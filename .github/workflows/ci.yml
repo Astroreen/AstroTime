@@ -88,6 +88,9 @@ jobs:
           test "$status" = 403
           if docker run --rm astrotime:ci 2> refusal.log; then echo "started without ASTROTIME_PROXY_ALLOW" >&2; exit 1; fi
           grep -q "ASTROTIME_PROXY_ALLOW must list" refusal.log
+      - name: The server's log, when a check above failed
+        if: failure()
+        run: docker logs web || true
 
   # Single required status for branch protection (docs/plans/foundation.md, D30).
   ci:

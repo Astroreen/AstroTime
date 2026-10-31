@@ -363,6 +363,11 @@ Decided while building the layout engine, ahead of PR 5's screens.
   with no `ETag`, `Last-Modified` or compression; the bundle is small
   today. Precompressed assets and conditional requests come when PR 5's app
   makes the bundle large ([D40](#D40)).
+- **A Host allowlist in the image** — the proxy compares `Origin` with
+  `Host`, so against DNS rebinding the image relies on the reverse proxy in
+  front answering only for its own server name; an optional
+  `ASTROTIME_PUBLIC_HOST` would make the image hold that line itself
+  ([D40](#D40)).
 - **Base images by digest** — the Dockerfile uses `node:24-alpine` by tag;
   pinning it by digest, with Dependabot for Docker, makes releases
   reproducible ([D41](#D41)).
