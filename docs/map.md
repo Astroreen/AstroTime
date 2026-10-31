@@ -28,7 +28,16 @@ When you add a package, app or module, add its line here in the same PR.
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
   - `test/fixtures/` — iCalendar as each client writes it.
 
-`caldav`, `storage` and `ui` are created by the PRs that first need them
+- `packages/storage` (`@astrotime/storage`) — the local store.
+  - `Store` — accounts, calendars, objects with pending local changes,
+    conflicts; finds objects by date range. → `plans/foundation.md#D36`
+  - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
+    `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
+    → `plans/foundation.md#D25`
+  - `schema.ts` (Drizzle) and `migrations.ts` (`PRAGMA user_version`).
+  - `test/store.contract.ts` — the store's behaviour, run on every driver.
+
+`caldav` and `ui` are created by the PRs that first need them
 (`plans/foundation.md#D23`, `plans/foundation.md#pr-plan`).
 
 ## Apps
@@ -38,8 +47,9 @@ When you add a package, app or module, add its line here in the same PR.
 
 ## Tooling
 
-- `vite.config.ts` — Vite+ config: tests, format, lint (with the isomorphic
-  rule for the core). → `plans/foundation.md#D21`
+- `vite.config.ts` — Vite+ config: tests (`unit` in Node, `browser` in
+  headless Chromium for `*.browser.test.ts`), format, lint (with the
+  isomorphic rule for the core). → `plans/foundation.md#D21`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
 - `.github/workflows/` — CI, Claude review, `@claude`.

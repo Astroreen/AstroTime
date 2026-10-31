@@ -1,5 +1,6 @@
 import "vite-plus/test/config";
 import { defineConfig } from "vite-plus";
+import { playwright } from "vite-plus/test/browser-playwright";
 
 const GENERATED = ["node_modules", "dist", "pnpm-lock.yaml", "*.tsbuildinfo", "devenv.lock"];
 
@@ -14,7 +15,31 @@ export default defineConfig({
           name: "unit",
           environment: "node",
           include: ["packages/**/*.test.ts", "apps/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+          exclude: ["**/node_modules/**", "**/dist/**", "**/*.browser.test.{ts,tsx}"],
+        },
+      },
+      {
+        // Anything that needs a real browser is named *.browser.test.{ts,tsx}
+        // and runs in headless Chromium (as in Jhin).
+        extends: true,
+        // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
+        optimizeDeps: {
+          exclude: ["@sqlite.org/sqlite-wasm"],
+          include: ["drizzle-orm/sqlite-proxy", "drizzle-orm", "ical.js"],
+        },
+        test: {
+          name: "browser",
+          include: ["packages/**/*.browser.test.{ts,tsx}", "apps/**/*.browser.test.{ts,tsx}"],
           exclude: ["**/node_modules/**", "**/dist/**"],
+          // A fixed port collides when two checkouts run browser tests at once.
+          api: { port: 0, strictPort: false },
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: "chromium" }],
+            screenshotFailures: false,
+          },
         },
       },
     ],

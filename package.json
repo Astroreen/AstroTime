@@ -12,7 +12,9 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "knip": "catalog:",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },

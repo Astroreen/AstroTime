@@ -149,9 +149,22 @@ logic worth borrowing.
 
 - **D24. The core is isomorphic** (AGENTS.md rule 1): `core` and `caldav`
   have no Node or DOM dependencies, enforced by oxlint and `types: []`.
-- **D25. SQLite everywhere, through Drizzle.** wa-sqlite on OPFS on the
-  web, `@capacitor-community/sqlite` on Android, `better-sqlite3` in
-  Electron; one schema and one query layer (Drizzle) over all three.
+- **D25. SQLite everywhere, through Drizzle.** One schema and one query
+  layer (Drizzle's `sqlite-proxy`) over a small `SqlDriver` per platform:
+  - web: the official `@sqlite.org/sqlite-wasm` in a worker, on OPFS through
+    the `opfs-sahpool` VFS, which needs no cross-origin isolation headers;
+  - Electron and tests: `node:sqlite`, built into Node 24, so no native
+    module to rebuild;
+  - Android: `@capacitor-community/sqlite`.
+
+  _Changed in PR 3:_ the grilling named wa-sqlite and better-sqlite3; the
+  official build and Node's own SQLite do the same with fewer moving parts.
+
+- **D36. The store holds only valid objects.** Every write parses the
+  iCalendar with `@astrotime/core` and indexes it by `boundsOf`; a range
+  query returns candidates for `occurrencesBetween` to place exactly. Local
+  changes carry `pending` (`create`, `update`, `delete`) for the sync engine;
+  credentials are not in the store ([D19](#D19)).
 
 ### Process
 
@@ -222,8 +235,11 @@ Decided while building PR 2.
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
-- **Browser-mode component tests and Playwright e2e** — set up in PR 5,
-  when there is UI to test.
+- **Playwright e2e** — set up in PR 5, when there is UI to test. Browser-mode
+  tests run since PR 3.
+- **One store across tabs** — the web store opens its database in one tab;
+  a second tab fails to open it until a `SharedWorker` or a lock hands it
+  over ([D25](#D25)).
 
 ## PR plan
 
@@ -254,8 +270,11 @@ to PR 4's "Done when". The owner may set it back.
 
 ### PR 3 — Local store
 
-`@astrotime/storage`: the Drizzle schema and the web adapter (wa-sqlite on
-OPFS). Decisions: D5, D25.
+`@astrotime/storage`: the Drizzle schema, the migrations, the Node driver and
+the web driver (sqlite-wasm on OPFS). The browser test project and Chromium
+in CI arrive with it.
+
+Decisions: D5, D25, D36.
 
 Done when: items, calendars, accounts, sync tokens and conflicts persist and
 are queried by date range in a browser test.

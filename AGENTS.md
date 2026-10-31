@@ -52,7 +52,9 @@ Work is done only when it is proven. Prefer the smallest proof:
   `vp run --filter <package> typecheck`;
 - leave the full run to CI unless you changed shared config.
 
-The dev shell (`devenv`, entered by direnv) provides Node 24 and pnpm.
+The dev shell (`devenv`, entered by direnv) provides Node 24, pnpm and
+Playwright's Chromium from nixpkgs; without nix,
+`pnpm exec playwright install chromium` is enough.
 
 Tests:
 

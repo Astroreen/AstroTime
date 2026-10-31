@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "WebWorker"],
+    "types": []
+  },
+  "include": ["src"],
+  // The Node driver is the one file that sees Node's types.
+  "exclude": ["src/node.ts"]
+}
