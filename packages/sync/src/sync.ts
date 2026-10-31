@@ -291,13 +291,18 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
   const known = new Map([...local].map(([href, entry]) => [href, entry.etag]));
 
   const changes = await provider.changes(calendar.url, calendar, known);
+  let keepToken = false;
   for (const object of changes.changed) {
     const mine = local.get(object.href);
     if (mine && mine.pending !== "none") {
       // Our own change is still pending (its upload was refused); it is
       // merged on the next sync. In a read-only calendar it never can be: the
       // server's version shows, ours goes to the Conflicts list.
-      if (!calendar.readOnly) continue;
+      if (!calendar.readOnly) {
+        // Asked again next time: the server keeps reporting it until ours is merged.
+        keepToken = true;
+        continue;
+      }
       const ours = await store.object(mine.id);
       if (ours && ours.pending !== "delete") {
         await store.addConflict(ours.id, ours.ics);
@@ -322,5 +327,6 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
     report.removed++;
     if (mine.pending !== "none") report.dropped.push(href);
   }
-  await store.setSyncState(calendar.id, { syncToken: changes.syncToken, ctag: changes.ctag });
+  if (!keepToken)
+    await store.setSyncState(calendar.id, { syncToken: changes.syncToken, ctag: changes.ctag });
 }

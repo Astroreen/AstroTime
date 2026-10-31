@@ -1,10 +1,12 @@
-import type {
-  Changes,
-  Provider,
-  RemoteCalendar,
-  RemoteObject,
-  SyncState,
-  WriteResult,
+import {
+  AuthError as CredentialsRefused,
+  OfflineError,
+  type Changes,
+  type Provider,
+  type RemoteCalendar,
+  type RemoteObject,
+  type SyncState,
+  type WriteResult,
 } from "@astrotime/core";
 
 import {
@@ -322,7 +324,11 @@ export class CalDavProvider implements Provider {
     const removed: string[] = [];
     let incomplete = false;
     for (const href of hrefs.filter((h) => !got.has(h))) {
-      const object = await this.fetch(href).catch(() => undefined);
+      // Offline or refused credentials stop the sync, as anywhere else (D37).
+      const object = await this.fetch(href).catch((error: unknown) => {
+        if (error instanceof OfflineError || error instanceof CredentialsRefused) throw error;
+        return undefined;
+      });
       if (object === null) removed.push(href);
       else if (object) objects.push(object);
       else incomplete = true;

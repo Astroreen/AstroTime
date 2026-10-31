@@ -326,4 +326,20 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect(updates).toEqual(['"1"']);
     expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["m"]);
   });
+
+  test("a server change held back by a pending edit keeps the old sync token, so it is reported again", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("held", "One"));
+    await sync();
+    const before = (await store.calendars())[0]!.syncToken;
+    const href = `${calendarUrl}held.ics`;
+    server.objects.set(href, { etag: '"theirs"', ics: task("held", "Theirs") });
+    server.beforeWrite = () => {
+      throw new Error("503");
+    };
+    await store.saveLocal(calendar.id, task("held", "Ours"));
+    await sync();
+    expect((await store.calendars())[0]!.syncToken).toBe(before);
+  });
 });

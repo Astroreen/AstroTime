@@ -77,3 +77,18 @@ test("an object the multiget leaves out is fetched on its own; one that cannot b
   const second = await provider.changes(home, { syncToken: "t1", ctag: null }, new Map());
   expect(second.syncToken).toBeNull();
 });
+
+test("going offline while fetching what the multiget left out stops the sync", async () => {
+  const { OfflineError } = await import("@astrotime/core");
+  const http: HttpClient = async (request) => {
+    if (request.method === "GET") throw new OfflineError("offline");
+    const reply = (body: string) => ({ status: 207, url: request.url, header: () => null, body });
+    if (request.body?.includes("calendar-multiget"))
+      return reply(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>`);
+    return reply(multistatus(changed("a.ics"), "t2"));
+  };
+  const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
+  await expect(provider.changes(home, { syncToken: "t1", ctag: null }, new Map())).rejects.toThrow(
+    OfflineError,
+  );
+});
