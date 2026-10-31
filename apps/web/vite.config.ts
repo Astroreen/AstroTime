@@ -4,9 +4,18 @@ import { defineConfig } from "vite";
 
 import { davProxy } from "./dav-proxy.ts";
 
+// Host names besides localhost and IPs the dev server answers to
+// (comma-separated, `.example.com` for a domain and its subdomains);
+// scripts/t3/dev.sh sets them.
+const allowedHosts = process.env["ASTROTIME_WEB_ALLOWED_HOSTS"]
+  ?.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
   plugins: [react({ compiler: true }), tailwindcss(), davProxy()],
+  ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
   build: {
     outDir: "dist",
     emptyOutDir: true,

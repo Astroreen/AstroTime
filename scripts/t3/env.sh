@@ -29,6 +29,9 @@ export ASTROTIME_DEV_DIR
 mkdir -p "$ASTROTIME_DEV_DIR"
 
 ASTROTIME_WEB_PORT="${ASTROTIME_WEB_PORT:-5180}"
+# Every interface, so the app opens from the owner's other devices (over
+# Tailscale, say); 127.0.0.1 keeps it to this machine.
+ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-0.0.0.0}"
 ASTROTIME_DAV_PORT="${ASTROTIME_DAV_PORT:-5232}"
 
 node_major() {
