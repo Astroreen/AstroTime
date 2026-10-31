@@ -121,7 +121,8 @@ logic worth borrowing.
     is found through `/.well-known/caldav` (RFC 6764).
 
   Credentials stay on the device: IndexedDB on the web, the Android Keystore
-  on Android.
+  on Android ([android D64](android.md#D64)), the system keyring on the
+  desktop ([desktop D74](desktop.md#D74)).
 
 - **D20. CORS on the web.** A browser may not read responses from another
   origin unless that server allows it, and Nextcloud does not allow it for
@@ -147,7 +148,8 @@ logic worth borrowing.
 - **D22. One React UI, thin shells.** Mobile (Android) is **Capacitor**; desktop is **Electron**; the web is plain Vite. Native
   needs (HTTP without CORS, secure storage, notifications, background sync,
   system calendars) go through Capacitor plugins or Electron's main process,
-  behind interfaces the core defines.
+  behind interfaces the shared packages define (`@astrotime/core`,
+  `caldav`, `storage`, `ui`), named in [android D60](android.md#D60).
 - **D23. Monorepo layout.**
   - `apps/web`, `apps/mobile` (Capacitor), `apps/desktop` (Electron),
     `apps/proxy` (the web proxy, [D20](#D20));
@@ -165,10 +167,14 @@ logic worth borrowing.
     the `opfs-sahpool` VFS, which needs no cross-origin isolation headers;
   - Electron and tests: `node:sqlite`, built into Node 24, so no native
     module to rebuild;
-  - Android: `@capacitor-community/sqlite`.
+  - Android: the web's driver, in the WebView.
 
   _Changed in PR 3:_ the grilling named wa-sqlite and better-sqlite3; the
   official build and Node's own SQLite do the same with fewer moving parts.
+
+  _Changed by the Android plan ([D63](android.md#D63)):_ Android first named
+  `@capacitor-community/sqlite`; OPFS works in the Android WebView, so the
+  web's tested driver runs there unchanged and rows stay arrays.
 
 - **D36. The store holds only valid objects.** Every write parses the
   iCalendar with `@astrotime/core` and indexes it by `boundsOf`; a range
@@ -191,7 +197,8 @@ logic worth borrowing.
   commit SHAs.
 - **D28. Releases on a `v*` tag:** the web Docker image to GHCR and an
   Android APK to GitHub Releases (unsigned at first); the desktop build
-  joins when it exists.
+  joins when it exists. How: [android D69](android.md#D69),
+  [desktop D79](desktop.md#D79).
 - **D29. License: AGPL-3.0.** The web app is meant to be self-hosted; a
   modified hosted copy must share its code. It matches Nextcloud's license.
 - **D30. Repository and branches.** `Astroreen/AstroTime`, public. `main` is
@@ -422,7 +429,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
   which comes with Playwright e2e ([D19](#D19)).
 - **Scheduling syncs** — `syncAccount` runs when called; when and how often
   the apps call it (on start, on focus, on a timer, Android background sync)
-  is decided with each app.
+  is decided with each app: the web (the UI's own triggers, which every
+  shell inherits) with PR 5a's accounts and sync wiring, Android in
+  [android.md D67](android.md#D67), the desktop in
+  [desktop.md D75](desktop.md#D75).
 
 - **Overdue tasks on today** — D16's roll-over needs the store to find
   undone tasks due before today; it comes with PR 5a's calendar views
@@ -497,13 +507,17 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
 
 - **5a** — `@astrotime/ui` and the web app's shell and views: Day, 3 days,
   Week, Month, Agenda; the all-day strip, the overlap layout, task
-  placement; both themes; i18n; browser-mode tests and Playwright.
-  Decisions: D1, D13, D14, D15, D16, D17, D42, design D43–D51.
+  placement; both themes; i18n; browser-mode tests and Playwright; and
+  the accounts and sync wiring: signing in (Login Flow v2, password), the
+  web's credentials, and when the UI syncs (on start, on focus, on a timer:
+  Deferred "Scheduling syncs"). Decisions: D1, D13, D14, D15, D16, D17,
+  D19, D42, design D43–D51.
 - **5b** — the tasks screen, the drawer's settings and search. Decisions:
   design D52, D53.
 
 Done when, for 5a: each view renders real objects from the local store, in
-both themes and both languages, as the references describe; for 5b: the
+both themes and both languages, as the references describe, and an account
+added by password or Login Flow v2 syncs into them; for 5b: the
 tasks screen lists, completes and stars tasks through the local store, the
 drawer's settings apply, and search finds an item by its title. Screenshots
 of each, set against the reference's description, are the evidence.
@@ -524,6 +538,7 @@ allowlist.
 
 ### Later — Android, then Linux
 
-`apps/mobile` (Capacitor: native HTTP, Keystore, notifications, background
-sync, APK release), then `apps/desktop` (Electron for Linux). Each gets its
-own plan before it starts. Decisions: D12, D22, D28.
+Each platform has its own plan, with its decisions and PRs: the Android app
+(`apps/mobile`, Capacitor) in [`android.md`](android.md), then the Linux
+desktop app (`apps/desktop`, Electron) in [`desktop.md`](desktop.md). Both
+start once PR 5's UI lands. Decisions here: D12, D22, D28.

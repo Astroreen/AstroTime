@@ -1,8 +1,8 @@
 /**
  * What the store needs from a SQLite engine (docs/plans/foundation.md#D25).
  * Each platform brings one: `node:sqlite` (`@astrotime/storage/node`, tests
- * and Electron), sqlite-wasm on OPFS (`@astrotime/storage/web`), and later
- * Capacitor's SQLite on Android.
+ * and Electron), sqlite-wasm on OPFS (`@astrotime/storage/web`, the web and
+ * Android's WebView, docs/plans/android.md#D63).
  */
 export interface SqlDriver {
   /** Runs one statement and returns its rows, each row an array of column values. */

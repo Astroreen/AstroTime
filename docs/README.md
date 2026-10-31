@@ -23,10 +23,12 @@ first move: you cannot search for something you do not know exists.
 A plan records decisions (numbered `D<n>`), what was left out on purpose,
 what is deferred, and the PRs that land it. Plans are canon once implemented.
 
-| Plan                                   | Owns                                                                  | Status      |
-| -------------------------------------- | --------------------------------------------------------------------- | ----------- |
-| [`foundation.md`](plans/foundation.md) | product scope, protocol, sync, platforms, stack, process, the MVP PRs | in progress |
-| [`design.md`](plans/design.md)         | how AstroTime looks and is laid out, from the owner's references      | in progress |
+| Plan                                   | Owns                                                                   | Status      |
+| -------------------------------------- | ---------------------------------------------------------------------- | ----------- |
+| [`foundation.md`](plans/foundation.md) | product scope, protocol, sync, platforms, stack, process, the MVP PRs  | in progress |
+| [`design.md`](plans/design.md)         | how AstroTime looks and is laid out, from the owner's references       | in progress |
+| [`android.md`](plans/android.md)       | the platform interfaces every shell implements; the Android app        | planned     |
+| [`desktop.md`](plans/desktop.md)       | the Linux desktop app: its shell, platform adapters, build and release | planned     |
 
 ## Grilling sessions
 

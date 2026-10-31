@@ -15,7 +15,8 @@ When you add a package, app or module, add its line here in the same PR.
 - **Providers** bring calendars and tasks in; CalDAV is the first one.
   → `plans/foundation.md#D4`
 - **One React UI** for every app; the apps are thin shells around it.
-  → `plans/foundation.md#D22`
+  → `plans/foundation.md#D22`; what each shell hands the UI (HTTP, SQLite,
+  secrets, reminders, sync triggers) → `plans/android.md#D60`
 
 ## Packages
 
