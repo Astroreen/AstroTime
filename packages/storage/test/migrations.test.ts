@@ -22,3 +22,20 @@ test("a database from a newer build is refused, not touched", async () => {
   await expect(migrate(driver)).rejects.toThrow(NewerSchemaError);
   expect(await driver.query("SELECT count(*) FROM sqlite_master", [])).toEqual([[0]]);
 });
+
+test("migration 2 makes each synced object its own base; an unsent change's base stays unknown", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 1));
+  await driver.script(`
+    INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0);
+    INSERT INTO calendars (id, account_id, url, name, components) VALUES ('c', 'a', 'https://x/c/', 'C', 'VTODO');
+    INSERT INTO objects VALUES ('synced', 'c', 's.ics', '"1"', 's', 'task', 'SYNCED', 'none', NULL, NULL, 0);
+    INSERT INTO objects VALUES ('unsent', 'c', 'u.ics', '"1"', 'u', 'task', 'UNSENT', 'update', NULL, NULL, 0);
+  `);
+  await migrate(driver);
+  expect(await driver.query("SELECT id, base_ics FROM objects ORDER BY id", [])).toEqual([
+    ["synced", "SYNCED"],
+    ["unsent", null],
+  ]);
+});

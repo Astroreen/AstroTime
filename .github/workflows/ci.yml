@@ -43,6 +43,9 @@ jobs:
       - uses: ./.github/actions/setup
       # Browser-mode tests (*.browser.test.ts) run in headless Chromium.
       - uses: ./.github/actions/chromium
+      # The CalDAV integration tests run against a real Radicale, the version
+      # devenv.nix provides (packages/sync/test/servers.ts).
+      - run: pipx install radicale==3.8.0
       - run: vp test run
 
   knip:

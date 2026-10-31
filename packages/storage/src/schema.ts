@@ -47,6 +47,8 @@ export const objects = sqliteTable(
     ics: text("ics").notNull(),
     /** A local change the sync engine has not uploaded yet. */
     pending: text("pending", { enum: ["none", "create", "update", "delete"] }).notNull(),
+    /** The server's version this object's local change started from (migration 2). */
+    baseIcs: text("base_ics"),
     /** `boundsOf` from `@astrotime/core`: `null` start is undated, `null` end is unending. */
     startMs: integer("start_ms"),
     endMs: integer("end_ms"),
@@ -55,6 +57,7 @@ export const objects = sqliteTable(
   (t) => [
     uniqueIndex("objects_calendar_href").on(t.calendarId, t.href),
     index("objects_calendar_start").on(t.calendarId, t.startMs),
+    index("objects_calendar_uid").on(t.calendarId, t.uid),
   ],
 );
 

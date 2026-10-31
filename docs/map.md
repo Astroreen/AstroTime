@@ -28,6 +28,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
   - `layoutDay`, `layoutSpans`, `isAllDay` — where items go on the views:
     the all-day strip, the time grid, overlaps. → `plans/foundation.md#D42`
+  - `mergeObjects` — the three-way merge of a refused write.
+    → `plans/foundation.md#D6`
+  - `Provider` — the interface every provider implements.
+    → `plans/foundation.md#D37`
   - `test/fixtures/` — iCalendar as each client writes it.
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
@@ -39,13 +43,27 @@ When you add a package, app or module, add its line here in the same PR.
   - `schema.ts` (Drizzle) and `migrations.ts` (`PRAGMA user_version`).
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 
-`caldav` and `ui` are created by the PRs that first need them
+- `packages/caldav` (`@astrotime/caldav`) — the CalDAV provider.
+  - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars,
+    `sync-collection` with a full listing as fallback, multiget, writes with
+    ETags. → `plans/foundation.md#D2`
+  - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`
+  - `fetchClient`, `HttpClient` — how it reaches servers on each platform.
+  - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space.
+    → `plans/foundation.md#D39`
+- `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
+  → `plans/foundation.md#D37`
+  - `test/servers.test.ts` — the provider and the engine against Radicale
+    (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`).
+
+`ui` is created by the PRs that first need them
 (`plans/foundation.md#D23`, `plans/foundation.md#pr-plan`).
 
 ## Apps
 
 - `apps/web` (`@astrotime/web`) — the web app, the first platform; a
   placeholder screen for now. → `plans/foundation.md#D12`
+  - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`
 
 ## Tooling
 
@@ -54,5 +72,6 @@ When you add a package, app or module, add its line here in the same PR.
   isomorphic rule for the core). → `plans/foundation.md#D21`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
-- `.github/workflows/` — CI, Claude review, `@claude`.
+- `.github/workflows/` — CI, the nightly Nextcloud run, Claude review,
+  `@claude`.
   → `plans/foundation.md#D27`

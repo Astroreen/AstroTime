@@ -18,3 +18,14 @@ export {
   type Placed,
   type Span,
 } from "./layout.ts";
+export { mergeObjects, sameObjects, type Merge } from "./merge.ts";
+export {
+  AuthError,
+  OfflineError,
+  type Changes,
+  type Provider,
+  type RemoteCalendar,
+  type RemoteObject,
+  type SyncState,
+  type WriteResult,
+} from "./provider.ts";

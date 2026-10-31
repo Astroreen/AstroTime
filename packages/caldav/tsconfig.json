@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM for the types of fetch, URL and btoa, which every platform has;
+    // oxlint keeps window and document out (AGENTS.md rule 1).
+    "lib": ["ESNext", "DOM"],
+    "types": []
+  },
+  "include": ["src"]
+}

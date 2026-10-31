@@ -7,7 +7,7 @@
 export interface SqlDriver {
   /** Runs one statement and returns its rows, each row an array of column values. */
   query(sql: string, params: readonly unknown[]): Promise<unknown[][]>;
-  /** Runs a script of several statements, as one transaction. */
+  /** Runs a script of several statements; a script that needs a transaction says BEGIN and COMMIT. */
   script(sql: string): Promise<void>;
   close(): Promise<void>;
 }

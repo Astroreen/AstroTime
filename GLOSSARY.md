@@ -49,16 +49,21 @@ One word per concept. Use these terms in code, docs, commits and UI.
 
 - **Local store** — the SQLite database on the device; the UI's source of
   truth.
-- **Sync engine** — the code in `@astrotime/core` that reconciles the local
-  store with providers.
+- **Sync engine** — `syncAccount` in `@astrotime/sync`, which reconciles
+  the local store with a provider (D37).
 - **Sync token** — the server's marker of the last state we saw
   (RFC 6578); the next sync asks only for what changed since.
 - **ETag** — the server's version of one item; writes send it so a newer
   version is never overwritten blindly.
+- **Base** — the server's version of an object that a local change started
+  from; the third side of the merge when the server refuses the change.
+- **Pending change** — a local create, update or delete the server has not
+  accepted yet.
 - **Conflict** — a change of ours the server refused because the item
   changed there first, on the same field. Kept in the **Conflicts** list.
 - **Proxy** — the stateless web proxy that lets the web app reach CalDAV
-  servers despite CORS (`apps/proxy`, later).
+  servers despite CORS: in the dev server now, in the web app's Docker image
+  later (`proxyHandler`).
 
 ## The docs
 

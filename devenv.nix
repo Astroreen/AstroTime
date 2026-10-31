@@ -9,6 +9,9 @@
     pnpm.enable = true;
   };
 
+  # A real CalDAV server for the integration tests (AGENTS.md).
+  packages = [ pkgs.radicale ];
+
   # Playwright cannot run its downloaded browsers on NixOS; use the nixpkgs
   # build instead. `playwright` in pnpm-workspace.yaml is pinned to the same
   # version as `pkgs.playwright-driver` (as in Jhin).
