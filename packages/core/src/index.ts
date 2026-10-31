@@ -1,7 +1,9 @@
 export { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 export type { Alarm, Event, Item, Participant, Task } from "./item.ts";
 export {
+  boundsOf,
   ExpansionLimitError,
+  type Bounds,
   occurrencesBetween,
   type Occurrence,
   type Range,

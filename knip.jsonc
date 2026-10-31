@@ -7,6 +7,10 @@
     "packages/*": {
       "entry": ["src/index.ts"],
     },
+    "packages/storage": {
+      // One driver per platform, each its own export; the worker is loaded by URL.
+      "entry": ["src/index.ts", "src/node.ts", "src/web/index.ts", "src/web/worker.ts"],
+    },
     "apps/web": {
       "entry": ["src/main.tsx", "vite.config.ts"],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.

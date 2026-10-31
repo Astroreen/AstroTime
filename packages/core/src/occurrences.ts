@@ -66,7 +66,9 @@ function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time 
 
 /** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
 function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  return start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+  const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+  // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
+  return length.isNegative ? new ICAL.Duration({}) : length;
 }
 
 function bounds(range: Range) {
@@ -83,6 +85,8 @@ function overlaps(start: ItemTime, end: ItemTime, range: Range): boolean {
 
 /**
  * The occurrences of a calendar object that touch the range, in start order.
+ * Throws `ExpansionLimitError` for a series too dense to walk up to the
+ * range; a caller showing many objects catches it per object.
  * Expands `RRULE`, `RDATE` and `EXDATE`, and puts each exception
  * (`RECURRENCE-ID`) in place of the occurrence it replaces, wherever it moved.
  */
@@ -105,7 +109,8 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
     if (masterKind && recurrenceId.type !== masterKind)
       replaced.add(looseKey(recurrenceId, masterKind));
     // A cancelled exception removes its occurrence (docs/plans/foundation.md#D35).
-    if (component.getFirstPropertyValue("status") === "CANCELLED") continue;
+    if (String(component.getFirstPropertyValue("status") ?? "").toUpperCase() === "CANCELLED")
+      continue;
     const span = anchors(component);
     if (!span) continue;
     const start = fromIcalTime(span.start);
@@ -191,4 +196,65 @@ function localOf(time: ItemTime): string {
 function shiftDate(date: string, days: number): string {
   const ms = Date.parse(`${date}T00:00:00Z`) + days * 86_400_000;
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * The widest instants a calendar object can occupy, for an index to find it
+ * by date before `occurrencesBetween` places it exactly. Dates and floating
+ * times are widened by 14 hours each way, the most a zone is from UTC.
+ */
+export interface Bounds {
+  /** `null`: the object has no date at all (a task for the task panel). */
+  readonly startMs: number | null;
+  /** `null`: a series without an end. */
+  readonly endMs: number | null;
+}
+
+const ZONE_SLACK_MS = 14 * 3_600_000;
+
+function approxMs(time: ItemTime, side: "start" | "end"): number {
+  if (time.type === "zoned") return time.epochMs;
+  const ms = Date.parse(`${time.type === "date" ? `${time.date}T00:00:00` : time.local}Z`);
+  return side === "start" ? ms - ZONE_SLACK_MS : ms + ZONE_SLACK_MS;
+}
+
+export function boundsOf(object: CalendarObject): Bounds {
+  const { master, exceptions } = object.components;
+  let startMs: number | null = null;
+  let endMs: number | null = null;
+  let open = false;
+  const include = (start: ICAL.Time, end: ICAL.Time) => {
+    const s = approxMs(fromIcalTime(start), "start");
+    const e = approxMs(fromIcalTime(end), "end");
+    startMs = startMs === null ? s : Math.min(startMs, s);
+    endMs = endMs === null ? e : Math.max(endMs, e);
+  };
+
+  for (const component of exceptions) {
+    const span = anchors(component);
+    if (span) include(span.start, span.end);
+  }
+
+  const span = master ? anchors(master) : null;
+  if (master && span) {
+    include(span.start, span.end);
+    const rules = master.getAllProperties("rrule").map((p) => p.getFirstValue() as ICAL.Recur);
+    if (rules.some((rule) => rule.until === null && rule.count === null)) {
+      open = true;
+    } else if (rules.length > 0 || master.hasProperty("rdate")) {
+      // Every rule ends: walk to the last occurrence, as far as MAX_STEPS allows.
+      const length = lengthOf(span);
+      const expansion = new ICAL.RecurExpansion({ component: master, dtstart: span.start });
+      let last: ICAL.Time | null = null;
+      for (let step = 0; step < MAX_STEPS; step++) {
+        const next = expansion.next();
+        if (!next) break;
+        last = keepTzid(span.start, next);
+      }
+      if (expansion.complete && last) include(last, plus(last, length));
+      else open = true;
+    }
+  }
+
+  return { startMs, endMs: open ? null : endMs };
 }

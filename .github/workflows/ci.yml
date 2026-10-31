@@ -35,10 +35,14 @@ jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Chromium's system packages take 8–10 minutes on a slow apt mirror when
+    # the cache misses them (once per runner image; from Jhin).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
+      # Browser-mode tests (*.browser.test.ts) run in headless Chromium.
+      - uses: ./.github/actions/chromium
       - run: vp test run
 
   knip:
