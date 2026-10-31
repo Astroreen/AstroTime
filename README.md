@@ -41,6 +41,10 @@ vp dev apps/web  # the web app; CalDAV goes through its /dav-proxy/
 vp check && vp run -r typecheck && vp test run
 ```
 
+Or everything at once (the dev server and a local CalDAV server):
+`scripts/t3/dev.sh`, stopped with `scripts/t3/stop.sh`
+([details](scripts/t3/README.md)).
+
 Contributors and agents start at [`AGENTS.md`](AGENTS.md).
 
 ## License
