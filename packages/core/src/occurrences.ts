@@ -66,7 +66,9 @@ function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time 
 
 /** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
 function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  return start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+  const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+  // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
+  return length.isNegative ? new ICAL.Duration() : length;
 }
 
 function bounds(range: Range) {
@@ -83,6 +85,8 @@ function overlaps(start: ItemTime, end: ItemTime, range: Range): boolean {
 
 /**
  * The occurrences of a calendar object that touch the range, in start order.
+ * Throws `ExpansionLimitError` for a series too dense to walk up to the
+ * range; a caller showing many objects catches it per object.
  * Expands `RRULE`, `RDATE` and `EXDATE`, and puts each exception
  * (`RECURRENCE-ID`) in place of the occurrence it replaces, wherever it moved.
  */
@@ -105,7 +109,8 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
     if (masterKind && recurrenceId.type !== masterKind)
       replaced.add(looseKey(recurrenceId, masterKind));
     // A cancelled exception removes its occurrence (docs/plans/foundation.md#D35).
-    if (component.getFirstPropertyValue("status") === "CANCELLED") continue;
+    if (String(component.getFirstPropertyValue("status") ?? "").toUpperCase() === "CANCELLED")
+      continue;
     const span = anchors(component);
     if (!span) continue;
     const start = fromIcalTime(span.start);

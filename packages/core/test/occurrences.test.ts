@@ -258,3 +258,50 @@ describe("bounds (for the local store's date index)", () => {
     expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
   });
 });
+
+describe("leftovers from the review of #2", () => {
+  const vcal = (body: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${body}END:VCALENDAR\r\n`;
+
+  test("an end before the start is no length, and the series still shows", () => {
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VEVENT\r\nUID:n\r\nDTSTART:20261102T100000Z\r\nDTEND:20261102T090000Z\r\nRRULE:FREQ=DAILY;COUNT=2\r\nEND:VEVENT\r\n",
+      ),
+    );
+    const shown = occurrencesBetween(object, {
+      from: "2026-11-02",
+      to: "2026-11-04",
+      timeZone: "UTC",
+    });
+    expect(shown.map((o) => [wallClockOf(o.start, "UTC"), wallClockOf(o.end, "UTC")])).toEqual([
+      ["2026-11-02T10:00:00", "2026-11-02T10:00:00"],
+      ["2026-11-03T10:00:00", "2026-11-03T10:00:00"],
+    ]);
+  });
+
+  test("a RECURRENCE-ID in another zone than the series matches by instant", () => {
+    // 10:00 Vilnius is 09:00 Berlin on 3 Nov (both winter time).
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VEVENT\r\nUID:z\r\nDTSTART;TZID=Europe/Vilnius:20261102T100000\r\nRRULE:FREQ=DAILY;COUNT=3\r\nSUMMARY:Series\r\nEND:VEVENT\r\n" +
+          "BEGIN:VEVENT\r\nUID:z\r\nRECURRENCE-ID;TZID=Europe/Berlin:20261103T090000\r\nDTSTART;TZID=Europe/Vilnius:20261103T150000\r\nSUMMARY:Moved\r\nEND:VEVENT\r\n",
+      ),
+    );
+    expect(
+      occurrencesBetween(object, vilnius("2026-11-01", "2026-11-06")).map((o) => o.item.summary),
+    ).toEqual(["Series", "Moved", "Series"]);
+  });
+
+  test("enumerated values are read case-insensitively", () => {
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VEVENT\r\nUID:c\r\nDTSTART:20261102T090000Z\r\nRRULE:FREQ=DAILY;COUNT=2\r\nTRANSP:transparent\r\nEND:VEVENT\r\n" +
+          "BEGIN:VEVENT\r\nUID:c\r\nRECURRENCE-ID:20261103T090000Z\r\nDTSTART:20261103T090000Z\r\nSTATUS:cancelled\r\nEND:VEVENT\r\n",
+      ),
+    );
+    expect(object.master).toMatchObject({ transparent: true });
+    expect(
+      occurrencesBetween(object, { from: "2026-11-01", to: "2026-11-05", timeZone: "UTC" }),
+    ).toHaveLength(1);
+  });
+});

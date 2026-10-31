@@ -225,7 +225,8 @@ Decided while building PR 2.
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
 - **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
-  without a VTIMEZONE stays floating until it is mapped to IANA; with a
+  (or any TZID that is not IANA) without a VTIMEZONE stays floating, so it
+  shows at the viewer's wall clock, until it is mapped to IANA; with a
   VTIMEZONE the instant is exact and `timeZone` keeps the Windows name
   ([D32](#D32)).
 - **Expanding long series from the middle** — `occurrencesBetween` walks a

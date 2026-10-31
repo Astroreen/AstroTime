@@ -117,7 +117,10 @@ function alarm(component: ICAL.Component): Alarm {
       ? { type: "absolute", at: fromIcalTime(value) }
       : {
           type: "relative",
-          relatedTo: property?.getParameter("related") === "END" ? "end" : "start",
+          relatedTo:
+            String(property?.getParameter("related") ?? "").toUpperCase() === "END"
+              ? "end"
+              : "start",
           offsetSeconds: value instanceof ICAL.Duration ? value.toSeconds() : 0,
         };
   return {
@@ -175,7 +178,8 @@ function fields(component: ICAL.Component): ItemFields {
 function parentUid(component: ICAL.Component): string | null {
   for (const property of component.getAllProperties("related-to")) {
     const type = property.getParameter("reltype");
-    if (type === undefined || type === "PARENT") return String(property.getFirstValue());
+    if (type === undefined || String(type).toUpperCase() === "PARENT")
+      return String(property.getFirstValue());
   }
   return null;
 }
@@ -189,7 +193,7 @@ export function readItem(component: ICAL.Component): Item {
       ...fields(component),
       start: time(component, "dtstart"),
       end: time(component, "dtend") ?? startPlusDuration(component) ?? defaultEnd(component),
-      transparent: text(component, "transp") === "TRANSPARENT",
+      transparent: text(component, "transp")?.toUpperCase() === "TRANSPARENT",
       organizer: organizer ? participant(organizer) : null,
       attendees: component.getAllProperties("attendee").map(participant),
     };
