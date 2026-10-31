@@ -126,3 +126,29 @@ test("writes and deletions use the server's spelling too", async () => {
     "DELETE https://dav.example/cal/a@b.ics",
   ]);
 });
+
+test("an object without an ETag on either side is fetched again, not taken as unchanged", async () => {
+  const bodies: string[] = [];
+  const http: HttpClient = async (request) => {
+    bodies.push(request.body ?? "");
+    return {
+      status: 207,
+      url: request.url,
+      header: () => null,
+      body: `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/cal/n.ics</d:href><d:propstat><d:prop></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
+    };
+  };
+  const provider = new CalDavProvider(
+    http,
+    { username: "u", password: "p" },
+    "https://dav.example/cal/",
+  );
+  await provider.changes(
+    "https://dav.example/cal/",
+    { syncToken: null, ctag: null },
+    new Map([["https://dav.example/cal/n.ics", null]]),
+  );
+  expect(bodies.some((b) => b.includes("calendar-multiget") && b.includes("/cal/n.ics"))).toBe(
+    true,
+  );
+});

@@ -53,6 +53,8 @@ const MIGRATIONS: readonly string[] = [
   // three-way merge of a refused write (docs/plans/foundation.md#D6).
   `
   ALTER TABLE objects ADD COLUMN base_ics TEXT;
+  -- A synced object is its own base; an unsent change's base is unknown.
+  UPDATE objects SET base_ics = ics WHERE pending = 'none';
   `,
   // 3: `saveLocal` finds an object by its UID in a calendar.
   `
@@ -91,3 +93,6 @@ export async function migrate(
 
 /** The schema version this build writes. */
 export const SCHEMA_VERSION = MIGRATIONS.length;
+
+/** @internal The scripts themselves, for the migration tests. */
+export const MIGRATIONS_FOR_TESTS = MIGRATIONS;

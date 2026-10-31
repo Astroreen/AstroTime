@@ -73,6 +73,20 @@ export function canonicalHref(href: string, base?: string): string {
   return url.href;
 }
 
+/**
+ * Whether an object may have changed since the device saw it. No ETag on
+ * either side tells nothing, so it is fetched again rather than taken as unchanged.
+ */
+function changedSince(
+  known: ReadonlyMap<string, string | null>,
+  href: string,
+  etag: string | null,
+): boolean {
+  if (!known.has(href)) return true;
+  const mine = known.get(href) ?? null;
+  return mine === null || etag === null || mine !== etag;
+}
+
 /** Calendar URLs end in a slash; servers are not consistent about it in hrefs. */
 function collection(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
@@ -203,7 +217,7 @@ export class CalDavProvider implements Provider {
           if (r.status === 404) {
             removed.add(href);
             changed.delete(href);
-          } else if (!known.has(href) || known.get(href) !== text(r.props["getetag"])) {
+          } else if (changedSince(known, href, text(r.props["getetag"]))) {
             changed.add(href);
             removed.delete(href);
           }
@@ -245,7 +259,7 @@ export class CalDavProvider implements Provider {
       listed.set(href, text(r.props["getetag"]));
     }
     const changed = [...listed]
-      .filter(([href, etag]) => !known.has(href) || known.get(href) !== etag)
+      .filter(([href, etag]) => changedSince(known, href, etag))
       .map(([href]) => href);
     const removed = [...known.keys()].filter((href) => !listed.has(href));
     const got = await this.multiget(url, changed);

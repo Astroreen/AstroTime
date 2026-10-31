@@ -9,6 +9,26 @@ import {
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
 
+/**
+ * What went wrong for one object or calendar, as a code the UI words in the
+ * user's language (AGENTS.md rule 5); `detail` is English, for the logs.
+ */
+export type Problem =
+  | "read-only"
+  | "deletion-reverted"
+  | "no-place"
+  | "taken-unreadable"
+  | "calendar-gone-unsent"
+  | "failed";
+
+class SyncProblem extends Error {
+  readonly problem: Problem;
+  constructor(problem: Problem, detail: string) {
+    super(detail);
+    this.problem = problem;
+  }
+}
+
 /** What one sync did, for the UI and the logs. */
 export interface SyncReport {
   uploaded: number;
@@ -22,7 +42,7 @@ export interface SyncReport {
    * What failed for one object or one calendar without stopping the rest
    * (D37); a failed change stays pending for the next sync.
    */
-  errors: { href: string; message: string }[];
+  errors: { href: string; problem: Problem; detail: string }[];
   /** Local changes dropped because the server deleted their object (D38), so the UI can say so. */
   dropped: string[];
 }
@@ -80,7 +100,8 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
     else
       report.errors.push({
         href: calendar.url,
-        message: `${calendar.name} is gone from the server, with ${unsent} change(s) not sent; kept.`,
+        problem: "calendar-gone-unsent",
+        detail: `${calendar.name}: ${unsent} change(s) not sent`,
       });
   }
 
@@ -104,7 +125,11 @@ async function isolated(
     await work();
   } catch (error) {
     if (error instanceof OfflineError || error instanceof AuthError) throw error;
-    report.errors.push({ href, message: error instanceof Error ? error.message : String(error) });
+    report.errors.push({
+      href,
+      problem: error instanceof SyncProblem ? error.problem : "failed",
+      detail: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -130,7 +155,8 @@ async function settleReadOnly(
   object: StoredObject,
   report: SyncReport,
 ) {
-  if (object.pending === "create") throw new Error(`${calendar.name} is read-only on the server.`);
+  if (object.pending === "create")
+    throw new SyncProblem("read-only", `${calendar.name} is read-only on the server`);
   const server = await provider.fetch(absolute(calendar, object.href));
   if (!server) {
     await store.removeObject(object.id);
@@ -141,7 +167,21 @@ async function settleReadOnly(
     await store.addConflict(object.id, object.ics);
     report.conflicts++;
   }
-  await store.saveFromServer(calendar.id, server, { replacePending: true });
+  // A deletion the server will not take: the item comes back, and the user is told.
+  if (object.pending === "delete") {
+    report.errors.push({
+      href: server.href,
+      problem: "deletion-reverted",
+      detail: `${calendar.name} is read-only on the server`,
+    });
+  }
+  try {
+    await store.saveFromServer(calendar.id, server, { replacePending: true });
+  } catch (error) {
+    // Not iCalendar (D36): nothing to give way to; ours stays, the object is reported.
+    if (!(error instanceof CalendarObjectError)) throw error;
+    if (!report.skipped.includes(server.href)) report.skipped.push(server.href);
+  }
 }
 
 async function upload(
@@ -181,12 +221,17 @@ async function upload(
     }
     // A creation has no server copy to be deleted (D38 does not apply): a
     // missing calendar or a bad href keeps it pending, reported.
-    if (result.reason === "gone") throw new Error(`The server has no place for ${href}.`);
+    if (result.reason === "gone")
+      throw new SyncProblem("no-place", `The server has no place for ${href}`);
     // Something is at the href already: our own earlier upload whose answer
     // was lost, or another object. Ours is recognised; otherwise the server's
     // stays and ours goes to the Conflicts list.
     const server = await provider.fetch(href);
-    if (!server) throw new Error(`${href} is taken on the server, but cannot be read.`);
+    if (!server)
+      throw new SyncProblem(
+        "taken-unreadable",
+        `${href} is taken on the server, but cannot be read`,
+      );
     if (!sameObjects(server.ics, object.ics)) {
       await store.addConflict(object.id, object.ics);
       report.conflicts++;
@@ -315,7 +360,7 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
         report.downloaded++;
       } catch (error) {
         if (!(error instanceof CalendarObjectError)) throw error;
-        report.skipped.push(object.href);
+        if (!report.skipped.includes(object.href)) report.skipped.push(object.href);
       }
       continue;
     }
@@ -324,7 +369,7 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
       report.downloaded++;
     } catch (error) {
       if (!(error instanceof CalendarObjectError)) throw error;
-      report.skipped.push(object.href);
+      if (!report.skipped.includes(object.href)) report.skipped.push(object.href);
     }
   }
   for (const href of changes.removed) {

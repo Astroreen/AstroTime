@@ -44,7 +44,8 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect(report.errors).toEqual([
       {
         href: `${calendarUrl}new.ics`,
-        message: `The server has no place for ${calendarUrl}new.ics.`,
+        problem: "no-place",
+        detail: `The server has no place for ${calendarUrl}new.ics`,
       },
     ]);
     expect((await store.pending(calendar.id)).map((o) => [o.uid, o.pending])).toEqual([
@@ -97,7 +98,9 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect(report).toMatchObject({
       uploaded: 1,
       downloaded: 1,
-      errors: [{ href: `${calendarUrl}bad.ics`, message: "415 Unsupported Media Type" }],
+      errors: [
+        { href: `${calendarUrl}bad.ics`, problem: "failed", detail: "415 Unsupported Media Type" },
+      ],
     });
     expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["bad"]);
   });
@@ -134,7 +137,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     await store.saveLocal(calendar.id, task("locked"));
     await store.saveLocal(calendar.id, task("kept", "Ours"));
     const report = await sync();
-    expect(report.errors.map((e) => e.message)).toEqual(["Cal is read-only on the server."]);
+    expect(report.errors.map((e) => e.problem)).toEqual(["read-only"]);
     expect(report.conflicts).toBe(1);
     expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["locked"]);
     expect((await store.objectAt(calendar.id, `${calendarUrl}kept.ics`))?.ics).toContain(
@@ -267,9 +270,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const listed = server.calendarList;
     server.calendarList = [];
     const report = await sync();
-    expect(report.errors.map((e) => e.message)).toEqual([
-      "Cal is gone from the server, with 1 change(s) not sent; kept.",
-    ]);
+    expect(report.errors.map((e) => e.problem)).toEqual(["calendar-gone-unsent"]);
     expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["unsent"]);
     server.calendarList = listed;
     server.beforeWrite = () => {};
@@ -390,6 +391,19 @@ describe("the sync engine's harder paths (review of #4)", () => {
     await store.saveLocal(calendar.id, task("junk", "Ours"));
     server.objects.set(href, { etag: '"bad"', ics: "not a calendar" });
     const report = await sync();
-    expect(report.errors.every((e) => !e.message.includes("CalendarObject"))).toBe(true);
+    expect([report.errors, report.skipped]).toEqual([[], [href]]);
+  });
+
+  test("in a read-only calendar a deletion the server will not take comes back, and says so", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("keep"));
+    await sync();
+    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    const row = (await store.objectAt(calendar.id, `${calendarUrl}keep.ics`))!;
+    await store.deleteLocal(row.id);
+    const report = await sync();
+    expect(report.errors.map((e) => e.problem)).toEqual(["deletion-reverted"]);
+    expect((await store.objectAt(calendar.id, `${calendarUrl}keep.ics`))?.pending).toBe("none");
   });
 });

@@ -1,1 +1,1 @@
-export { syncAccount, type SyncReport } from "./sync.ts";
+export { syncAccount, type Problem, type SyncReport } from "./sync.ts";

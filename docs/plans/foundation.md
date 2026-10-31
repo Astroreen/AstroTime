@@ -220,7 +220,8 @@ Decided while building PR 2.
 - **D38. Who wins a deletion.** A calendar or an object deleted on the
   server is deleted here, with any pending change to it; a calendar that
   merely went missing from a listing while it holds unsent changes stays,
-  reported, until a listing without it finds it has none. A deletion of ours
+  reported, until a listing without it finds it has none. In a read-only
+  calendar a deletion of ours comes back, reported. A deletion of ours
   the server refuses because the object changed there is dropped: the object
   comes back as the server has it. An edit of an object deleted on this
   device before the deletion is uploaded revives it as an update. Otherwise
@@ -262,7 +263,12 @@ Decided while building PR 4.
   dropped, and an interrupted sync's error carries its report so far. An
   edit made while a sync runs is never undone by that sync: a deletion or a
   taken href it learns of leaves the newer edit pending for the next one.
-  Through the web proxy, a server it cannot reach is offline, like no answer.
+  Through the web proxy, a server it cannot reach is offline, like no answer. The report's
+  `errors` carry a `problem` code the UI words in the user's language
+  (`read-only`, `deletion-reverted`, `no-place`, `taken-unreadable`,
+  `calendar-gone-unsent`, `failed`) and an English `detail` for the logs.
+  An object with no ETag on either side is fetched again, never taken as
+  unchanged.
 - **D39. The proxy's URL space.** The web app sends a request for
   `https://cloud.example.com/remote.php/dav/` to
   `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
