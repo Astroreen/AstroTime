@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { proxyHandler, throughProxy } from "../src/index.ts";
+import { fetchClient, proxyHandler, throughProxy } from "../src/index.ts";
 
 const via = throughProxy("/dav-proxy/");
 
@@ -205,4 +205,20 @@ test("a 401 passes without WWW-Authenticate, so the browser shows no dialog of i
     }),
   );
   expect([response.status, response.headers.get("www-authenticate")]).toEqual([401, null]);
+});
+
+test("a server the proxy cannot reach is offline for the client, not a 502 from the server", async () => {
+  const { OfflineError } = await import("@astrotime/core");
+  const failing = (async () => {
+    throw new TypeError("fetch failed");
+  }) as unknown as typeof fetch;
+  const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: failing });
+  const http = fetchClient({
+    fetch: (async (input: URL | string, init: RequestInit) =>
+      handler(new Request(new URL(String(input), "http://app.localhost"), init))) as typeof fetch,
+    via,
+  });
+  await expect(
+    http({ method: "PROPFIND", url: "https://down.example/dav/", headers: {} }),
+  ).rejects.toThrow(OfflineError);
 });

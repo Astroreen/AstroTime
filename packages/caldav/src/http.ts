@@ -1,5 +1,7 @@
 import { AuthError as CredentialsRefused, OfflineError } from "@astrotime/core";
 
+import { UNREACHABLE } from "./proxy.ts";
+
 export interface HttpRequest {
   readonly method: string;
   readonly url: string;
@@ -57,6 +59,10 @@ export function fetchClient(
       throw new OfflineError(`${request.method} ${request.url}: the answer broke off.`, {
         cause: error,
       });
+    }
+    // The proxy could not reach the server: as offline as no answer (D37).
+    if (response.headers.get(UNREACHABLE) !== null) {
+      throw new OfflineError(`${request.method} ${request.url} could not reach the server.`);
     }
     return {
       status: response.status,

@@ -38,7 +38,7 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
       // 404 until the user approves.
       if (response.status === 404) return null;
       if (response.status !== 200) throw new Error(`The login flow failed (${response.status}).`);
-      const result = JSON.parse(response.body) as {
+      const result = json(response.body) as {
         server?: unknown;
         loginName?: unknown;
         appPassword?: unknown;
@@ -69,7 +69,7 @@ function parseStart(
   body: string,
   serverUrl: string,
 ): { login: string; poll: { token: string; endpoint: string } } {
-  const data = JSON.parse(body) as {
+  const data = json(body) as {
     login?: unknown;
     poll?: { token?: unknown; endpoint?: unknown };
   };
@@ -82,11 +82,27 @@ function parseStart(
     throw new Error("The login flow's answer is not Nextcloud's.");
   }
   // The host is compared: behind a TLS terminator Nextcloud may name its
-  // pages http:// while the user reached it on https://.
-  const host = new URL(serverUrl).host;
-  for (const url of [login, poll.endpoint]) {
-    if (new URL(url).host !== host)
-      throw new Error(`The login flow points to ${new URL(url).host}, not ${host}.`);
+  // pages http:// while the user reached it on https://. They are then used
+  // on the user's https, so the token and the app password never go in clear.
+  const user = new URL(serverUrl);
+  const onUsersScheme = (url: string) => {
+    const parsed = new URL(url);
+    if (parsed.host !== user.host)
+      throw new Error(`The login flow points to ${parsed.host}, not ${user.host}.`);
+    parsed.protocol = user.protocol;
+    return parsed.href;
+  };
+  return {
+    login: onUsersScheme(login),
+    poll: { token: poll.token, endpoint: onUsersScheme(poll.endpoint) },
+  };
+}
+
+/** The answer's JSON; a page that is not (a captive portal, a proxy's error) says what it is. */
+function json(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error("The server's answer to the login flow is not Nextcloud's (not JSON).");
   }
-  return { login, poll: { token: poll.token, endpoint: poll.endpoint } };
 }

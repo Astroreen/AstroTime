@@ -92,3 +92,21 @@ test("going offline while fetching what the multiget left out stops the sync", a
     OfflineError,
   );
 });
+
+test("a 403 to sync-collection is an expired token only with RFC 6578's precondition", async () => {
+  const answer = { body: "" };
+  const http: HttpClient = async (request) => {
+    if (request.method === "REPORT" && request.body?.includes("sync-collection"))
+      return { status: 403, url: request.url, header: () => null, body: answer.body };
+    return { status: 207, url: request.url, header: () => null, body: multistatus("", "t5") };
+  };
+  const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
+  answer.body = `<?xml version="1.0"?><d:error xmlns:d="DAV:"><d:valid-sync-token/></d:error>`;
+  expect(
+    (await provider.changes(home, { syncToken: "old", ctag: null }, new Map())).changed,
+  ).toEqual([]);
+  answer.body = `<?xml version="1.0"?><d:error xmlns:d="DAV:"><d:need-privileges/></d:error>`;
+  await expect(provider.changes(home, { syncToken: "old", ctag: null }, new Map())).rejects.toThrow(
+    /403/,
+  );
+});

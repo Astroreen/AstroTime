@@ -342,4 +342,54 @@ describe("the sync engine's harder paths (review of #4)", () => {
     await sync();
     expect((await store.calendars())[0]!.syncToken).toBe(before);
   });
+
+  test("an edit made while a sync runs survives that sync's news of a server deletion", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("mid", "One"));
+    await sync();
+    const href = `${calendarUrl}mid.ics`;
+    server.objects.delete(href);
+    const changes = server.changes.bind(server);
+    // The user edits it after the sync took its snapshot, before the listing arrives.
+    server.changes = async (...args) => {
+      const result = await changes(...args);
+      await store.saveLocal(calendar.id, task("mid", "Edited mid-sync"));
+      return result;
+    };
+    await sync();
+    expect((await store.objectAt(calendar.id, href))?.pending).toBe("update");
+  });
+
+  test("an edit made while a taken href is resolved stays pending", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("race", "Ours"));
+    const href = `${calendarUrl}race.ics`;
+    server.objects.set(href, { etag: '"x"', ics: task("race", "Theirs") });
+    const fetchServer = server.fetch.bind(server);
+    server.fetch = async (h) => {
+      const object = await fetchServer(h);
+      await store.saveLocal(calendar.id, task("race", "Edited meanwhile"));
+      return object;
+    };
+    await sync().catch(() => {});
+    const row =
+      (await store.objectAt(calendar.id, href)) ?? (await store.objectAt(calendar.id, "race.ics"));
+    expect(row?.ics).toContain("SUMMARY:Edited meanwhile");
+    expect(row?.pending).not.toBe("none");
+  });
+
+  test("in a read-only calendar a pending object the server serves as garbage is skipped, not stuck", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("junk", "One"));
+    await sync();
+    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    const href = `${calendarUrl}junk.ics`;
+    await store.saveLocal(calendar.id, task("junk", "Ours"));
+    server.objects.set(href, { etag: '"bad"', ics: "not a calendar" });
+    const report = await sync();
+    expect(report.errors.every((e) => !e.message.includes("CalendarObject"))).toBe(true);
+  });
 });

@@ -259,7 +259,10 @@ Decided while building PR 4.
   sync lists everything again. The time of an item (`DTSTART`, `DTEND`,
   `DURATION`, `DUE`) is one field, and an attendee is identified by their
   address, so changing their answer on one side is no duplicate. The report names the pending changes a server deletion
-  dropped, and an interrupted sync's error carries its report so far.
+  dropped, and an interrupted sync's error carries its report so far. An
+  edit made while a sync runs is never undone by that sync: a deletion or a
+  taken href it learns of leaves the newer edit pending for the next one.
+  Through the web proxy, a server it cannot reach is offline, like no answer.
 - **D39. The proxy's URL space.** The web app sends a request for
   `https://cloud.example.com/remote.php/dav/` to
   `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
@@ -398,9 +401,7 @@ are queried by date range in a browser test.
 `@astrotime/caldav` and the sync engine: discovery, Login Flow v2, password
 sign-in, `sync-collection`, ETag writes, conflicts; the Vite dev proxy;
 integration tests against Radicale in CI and the nightly Nextcloud job.
-Decisions: D2, D5, D6, D19, D20 (development half), D27.
-
-Decisions: D37, D39 (new), D38.
+Decisions: D2, D5, D6, D19, D20 (development half), D27, D37, D38, D39.
 
 Done when: a Radicale and a Nextcloud account sync both ways, offline edits
 reach the server when it comes back, and a conflicting edit lands in the

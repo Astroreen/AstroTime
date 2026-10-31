@@ -191,8 +191,10 @@ async function upload(
       await store.addConflict(object.id, object.ics);
       report.conflicts++;
     }
-    // Our row moves to the server's href first, so the server's version replaces it.
+    // Our row moves to the server's href first, so the server's version replaces it,
+    // unless it was edited meanwhile: markSynced keeps that edit pending for the next sync.
     await store.markSynced(object.id, { href: server.href, etag: server.etag, ics: object.ics });
+    if ((await store.object(object.id))?.pending !== "none") return;
     await store.saveFromServer(calendar.id, server, { replacePending: true });
     return;
   }
@@ -308,8 +310,13 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
         await store.addConflict(ours.id, ours.ics);
         report.conflicts++;
       }
-      await store.saveFromServer(calendar.id, object, { replacePending: true });
-      report.downloaded++;
+      try {
+        await store.saveFromServer(calendar.id, object, { replacePending: true });
+        report.downloaded++;
+      } catch (error) {
+        if (!(error instanceof CalendarObjectError)) throw error;
+        report.skipped.push(object.href);
+      }
       continue;
     }
     try {
@@ -323,6 +330,10 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
   for (const href of changes.removed) {
     const mine = local.get(href);
     if (!mine) continue;
+    // Edited here since the sync began: that edit is newer than this listing,
+    // and the next sync decides it (an upload, then D38).
+    const now = await store.object(mine.id);
+    if (now && now.pending !== mine.pending) continue;
     await store.removeObject(mine.id);
     report.removed++;
     if (mine.pending !== "none") report.dropped.push(href);

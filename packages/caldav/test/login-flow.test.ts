@@ -88,8 +88,9 @@ test("behind a TLS terminator a flow naming its pages http:// on the same host i
       login: "http://cloud.example.com/login/v2/flow/x",
     }),
   });
+  // …and used on the user's https, so nothing goes in clear.
   expect((await startLoginFlow(http, "https://cloud.example.com")).loginUrl).toBe(
-    "http://cloud.example.com/login/v2/flow/x",
+    "https://cloud.example.com/login/v2/flow/x",
   );
 });
 
@@ -111,4 +112,14 @@ test("an approval naming another server keeps the app password home", async () =
   };
   const flow = await startLoginFlow(http, "https://cloud.example.com");
   await expect(flow.poll()).rejects.toThrow(/names evil.example/);
+});
+
+test("a page that is not JSON (a captive portal) is named for what it is", async () => {
+  const http: HttpClient = async (request) => ({
+    status: 200,
+    url: request.url,
+    header: () => null,
+    body: "<html>Sign in to the Wi-Fi</html>",
+  });
+  await expect(startLoginFlow(http, "https://cloud.example.com")).rejects.toThrow(/not JSON/);
 });

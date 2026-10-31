@@ -180,7 +180,17 @@ export class CalDavProvider implements Provider {
           // An expired or unknown token (RFC 6578 §3.2) falls back to a full listing.
           [403, 409, 410],
         );
-        if (response.status >= 300) break;
+        if (response.status >= 300) {
+          // 403 and 409 mean an expired token only with RFC 6578's precondition;
+          // otherwise they are what they say (a revoked share, say).
+          if (
+            (response.status === 403 || response.status === 409) &&
+            !response.body.includes("valid-sync-token")
+          ) {
+            throw new HttpError({ method: "REPORT", url, headers: {} }, response);
+          }
+          break;
+        }
         const status = parseMultistatus(response.body);
         let truncated = false;
         for (const r of status.responses) {

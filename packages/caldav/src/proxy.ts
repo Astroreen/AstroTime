@@ -16,6 +16,9 @@ const FORWARDED = [
   "prefer",
   "brief",
 ];
+/** Set on the proxy's own answer when the CalDAV server could not be reached. */
+export const UNREACHABLE = "x-astrotime-unreachable";
+
 /** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 /** Response headers the client reads. */
@@ -98,7 +101,11 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
         redirect: "manual",
       });
     } catch {
-      return new Response(`${target.origin} could not be reached.`, { status: 502 });
+      // Marked as the proxy's own: the client reads it as offline, not as the server's 502.
+      return new Response(`${target.origin} could not be reached.`, {
+        status: 502,
+        headers: { [UNREACHABLE]: "1" },
+      });
     }
     const returned = new Headers();
     for (const name of RETURNED) {
