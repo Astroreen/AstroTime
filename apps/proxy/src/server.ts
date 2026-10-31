@@ -63,11 +63,20 @@ export function allowlist(value: string | undefined): string[] {
 }
 
 /** The request body as a stream, read only if the proxy lets the request through, and capped. */
+/**
+ * Requests that went over the cap while streaming. The error itself reaches
+ * the proxy wrapped in fetch's own, so the server remembers which they were.
+ */
+const overCap = new WeakSet<IncomingMessage>();
+
 async function* capped(req: IncomingMessage): AsyncGenerator<Buffer> {
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > MAX_REQUEST_BYTES) throw new TooLarge();
+    if (size > MAX_REQUEST_BYTES) {
+      overCap.add(req);
+      throw new TooLarge();
+    }
     yield chunk as Buffer;
   }
 }
@@ -147,6 +156,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
     const url = req.url ?? "/";
     // The cause goes to the log; the client learns only that it failed.
     const done = (error: unknown) => {
+      if (overCap.has(req)) error = new TooLarge();
       if (!(error instanceof TooLarge)) console.error(error);
       if (!res.headersSent) {
         res.writeHead(
@@ -175,6 +185,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
       Promise.resolve()
         .then(() => proxy(toRequest(req, gone.signal)))
         .then((response) => {
+          if (overCap.has(req)) throw new TooLarge();
           res.statusCode = response.status;
           response.headers.forEach((value, name) => res.setHeader(name, value));
           // Someone's calendar, fetched with their credentials: never kept by a cache.

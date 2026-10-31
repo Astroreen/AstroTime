@@ -227,3 +227,32 @@ test("a request the proxy refuses is answered without its body being read", asyn
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 });
+
+test("a chunked request without a length is cut off at the cap", async () => {
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "index.html"), "x");
+  const reached: number[] = [];
+  const upstream = (async (_input: unknown, init: RequestInit) => {
+    await new Response(init.body as BodyInit).arrayBuffer();
+    reached.push(1);
+    return new Response("never");
+  }) as unknown as typeof fetch;
+  const server = createAppServer({ root, allow: ["https://dav.example"], fetch: upstream });
+  const base = await listen(server);
+  const { request } = await import("node:http");
+  const status = await new Promise<number>((resolve, reject) => {
+    const req = request(
+      `${base}${throughProxy(DAV_PROXY_PREFIX).to("https://dav.example/x.ics")}`,
+      { method: "PUT" },
+    );
+    req.on("response", (res) => resolve(res.statusCode ?? 0));
+    req.on("error", reject);
+    const chunk = Buffer.alloc(1024 * 1024, 120);
+    for (let i = 0; i < 11; i++) req.write(chunk);
+    req.end();
+  });
+  expect(status).toBe(413);
+  expect(reached).toEqual([]);
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+});
