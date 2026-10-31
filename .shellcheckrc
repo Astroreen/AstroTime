@@ -1,0 +1,2 @@
+# scripts/t3 source env.sh from their own directory.
+source-path=SCRIPTDIR

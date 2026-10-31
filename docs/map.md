@@ -74,6 +74,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `vite.config.ts` — Vite+ config: tests (`unit` in Node, `browser` in
   headless Chromium for `*.browser.test.ts`), format, lint (with the
   isomorphic rule for the core). → `plans/foundation.md#D21`
+- `scripts/t3/` — `dev.sh` starts the web dev server and a local Radicale,
+  `stop.sh` stops them, `smoke.sh` proves both. → `../scripts/t3/README.md`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
 - `.github/workflows/` — CI (with the image built and started), the nightly
