@@ -1,0 +1,26 @@
+{
+  "name": "@astrotime/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The AstroTime web app, the first platform (docs/plans/foundation.md#D12)",
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "dev": "vp dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "oxc-transform-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:"
+  }
+}
