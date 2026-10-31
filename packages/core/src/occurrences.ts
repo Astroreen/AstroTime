@@ -68,7 +68,7 @@ function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time 
 function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
   const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
-  return length.isNegative ? new ICAL.Duration() : length;
+  return length.isNegative ? new ICAL.Duration({}) : length;
 }
 
 function bounds(range: Range) {
