@@ -248,7 +248,7 @@ describe("the all-day strip across a week (D14, D42)", () => {
   });
 });
 
-describe("from the review of #6", () => {
+describe("chips, days and edges", () => {
   test("a task with a date start and a timed due is a chip at the due, on that day only", () => {
     const ics = task("report", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T150000Z\r\n");
     const monday = layoutDay(on("2026-11-02", "2026-11-03", ics), "2026-11-02", { timeZone });
@@ -328,7 +328,7 @@ describe("from the review of #6", () => {
   });
 });
 
-describe("from the second review of #6", () => {
+describe("whole days, DST and deep cascades", () => {
   const vilnius = "Europe/Vilnius";
   const zoned = (uid: string, start: string, end: string) =>
     vcal(

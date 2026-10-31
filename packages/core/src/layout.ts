@@ -158,7 +158,8 @@ export function layoutDay(
     const endsAfter =
       e.slice(0, 10) > day && !(e.slice(0, 10) === nextDay(day) && minutesOf(e) === 0);
     let top = startsBefore ? 0 : minutesOf(s);
-    let bottom = endsAfter ? DAY_MINUTES : e.slice(0, 10) > day ? DAY_MINUTES : minutesOf(e);
+    // Ending on a later day (or exactly at the next midnight), it runs to the end of this one.
+    let bottom = e.slice(0, 10) > day ? DAY_MINUTES : minutesOf(e);
     if (chip) bottom = top + chipMinutes;
     bottom = Math.max(bottom, top + (chip ? chipMinutes : minBlockMinutes));
     // A chip or a short block at the end of the day is lifted to fit.

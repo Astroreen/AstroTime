@@ -247,7 +247,9 @@ Decided while building the layout engine, ahead of PR 5's screens.
   - a block is drawn at least 15 minutes tall, a chip 30; a chip at the end
     of the day is lifted to fit;
   - the cascade steps 15% of the column per item underneath, and switches to
-    equal columns past three items at once;
+    equal columns past three items at once; the depth is transitive (an item
+    over a cascaded one steps once more, even along a chain where no more
+    than two overlap at once) and stops at `1 - step`;
   - in the strip, longer spans come first, then events before tasks.
 
 ## Deferred
