@@ -404,7 +404,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
   is decided with each app.
 
 - **Overdue tasks on today** — D16's roll-over needs the store to find
-  undone tasks due before today; it comes with PR 5's tasks screen.
+  undone tasks due before today; it comes with PR 5a's calendar views
+  (design D51).
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.

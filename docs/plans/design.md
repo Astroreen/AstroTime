@@ -25,8 +25,9 @@ the project.
   Calendar: many items readable at once, small radii, little chrome. Colours,
   type and icons are AstroTime's own, not Google's brand.
 - **D44. Dark and light themes from the first screen**, following the system
-  setting, with a manual override. Dark is designed first (the reference is
-  dark).
+  setting. Dark is designed first (the reference is dark). _Added by the
+  agent, beyond the owner's answer:_ a manual override in the drawer's
+  settings (D53), as Google Calendar has.
 - **D45. Week start and clock from the locale**, overridable in settings:
   for Russian (and Lithuanian) Monday and 24 hours.
 - **D46. The layout is Google Calendar's on Android** (the owner answered
@@ -64,13 +65,15 @@ the project.
   block like an event.
 - **D51. Tasks on the calendar.** A task's chip carries a check-circle icon;
   a completed task stays, struck through, in a muted colour. Undone tasks
-  whose due (a date, a time, or the end of a start–due block) is before the
+  whose due (a date, a time, the end of a start–due block, or the start of
+  a task with a start and no due) is before the
   start of today, in the user's zone, collapse into one chip on today,
   "N undone tasks", which opens them; it shows only on today, in every view
   that has today, and the days they were due no longer show them. This is
   D16's roll-over, drawn as one chip, even for a single
   task (Google shows "1 undone task" too). It counts undone tasks only, so
-  "hide completed" does not change it. A recurring task counts once, by its
+  "hide completed" does not change it. A task with neither stays on the
+  tasks screen only. A recurring task counts once, by its
   latest undone occurrence before today. In the Agenda view the chip heads
   today's group. D16's "hide
   completed" toggle stays, in the drawer, and hides completed tasks' chips on
