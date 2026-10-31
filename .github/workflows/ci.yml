@@ -105,7 +105,7 @@ jobs:
       # A ceiling on the whole smoke run, and its log when it fails.
       - run: timeout 180 bash scripts/t3/smoke.sh
       - if: failure()
-        run: cat .astrotime-dev/smoke.log || true
+        run: cat .astrotime-dev/smoke/smoke.log || true
 
   # Single required status for branch protection (docs/plans/foundation.md, D30).
   ci:

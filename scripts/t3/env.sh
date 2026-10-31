@@ -127,7 +127,8 @@ record_pid() {
   # On exit (Ctrl-C included) the services are stopped and waited for, so a
   # quick restart does not find their ports still taken.
   trap 'rm -f "'"$file"'"; for job in $(jobs -p); do stop_tree "$job" || true; done' EXIT
-  trap 'exit 130' INT TERM
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 }
 
 # Starts a command in the background with its output on this terminal, and

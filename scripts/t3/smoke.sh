@@ -15,6 +15,8 @@ log="$ASTROTIME_DEV_DIR/smoke.log"
 : >"$log"
 fifo="$(mktemp -u "$ASTROTIME_DEV_DIR/smoke.XXXXXX")"
 mkfifo "$fifo"
+# Whatever ends the smoke run, nothing it started stays behind.
+trap 'bash "$ASTROTIME_ROOT/scripts/t3/stop.sh" >/dev/null 2>&1 || true' EXIT
 bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" >"$fifo" 2>&1 &
 exec {out}<"$fifo"
 rm -f "$fifo"
@@ -26,8 +28,6 @@ while IFS= read -r line <&"$out"; do
 done
 [ "$ready" = 1 ] || { echo "smoke: dev.sh ended before it was ready; see $log" >&2; exit 1; }
 cat <&"$out" >>"$log" &
-# Whatever ends the smoke run, nothing it started stays behind.
-trap 'bash "$ASTROTIME_ROOT/scripts/t3/stop.sh" >/dev/null 2>&1 || true' EXIT
 
 fail() {
   echo "smoke: $1" >&2
