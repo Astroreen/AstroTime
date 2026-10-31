@@ -14,12 +14,14 @@ Capacitor shell. It talks to CalDAV servers directly (no proxy, no CORS),
 keeps credentials under a key in the Android Keystore, fires reminders as
 notifications even when the app is closed, and syncs in the background. A
 `v*` tag attaches the APK to the GitHub Release, unsigned at first
-([D28](foundation.md#D28)), next to a debug-signed build anyone can install.
+([D28](foundation.md#D28)); until the signed release (Deferred) it is not
+installable by users as it is.
 
 ## Decisions
 
-Numbered on from the design plan, after D54–D59, which foundation's
-PR 5 holds; D60–D69 belong to this plan. Versions
+Numbered on from the design plan, after D54–D59, which are kept for the
+decisions of foundation's PR 5 (being built alongside this plan); D60–D69
+belong to this plan. Versions
 were checked on 2026-11-01.
 
 ### What every shell provides
@@ -44,7 +46,8 @@ were checked on 2026-11-01.
   become reminders (all-day and floating items, `RELATED=END`, absolute
   triggers, `REPEAT`, a series' exceptions, tasks with only a due) is
   decided where the set is first built: foundation's PR 6, reminders as
-  notifications ([D9](foundation.md#D9)). It also exports one sync entry,
+  notifications ([D9](foundation.md#D9)). `@astrotime/sync`, which
+  reaches the store and the providers, also exports one sync entry,
   `syncAll()`: it syncs every account, joins a sync already running instead
   of starting a second, and reschedules the reminders afterwards. The UI's
   own triggers (start, focus, a timer) are the web's decision, taken in
@@ -87,9 +90,9 @@ were checked on 2026-11-01.
   redirects itself, up to 10, with OkHttp's `followRedirects` and
   `followSslRedirects` off, as the desktop does ([desktop D72](desktop.md#D72)),
   and returns the last hop's URL, so one rule holds on every platform: a
-  307 or 308 keeps the method and body, a 301, 302 or 303 turns only a
-  `POST` into a `GET` (as `fetch` does; `PROPFIND` and `REPORT` keep their
-  method and body);
+  307 or 308 keeps the method and body, a 301 or 302 turns only a `POST`
+  into a `GET`, and a 303 turns anything but `GET` and `HEAD` into a `GET`,
+  as `fetch` does (so `PROPFIND` and `REPORT` keep theirs on 301 and 302);
   `Authorization` goes only to the request's origin (scheme, host and
   port) and is dropped when a redirect leaves it, and the cleartext check
   below applies to every hop; no cookie
@@ -236,9 +239,9 @@ were checked on 2026-11-01.
     26.04) and the SDK packages it needs installed by the job itself
     (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`, a no-op
     where the image has them), so a new runner image cannot take them
-    away. The debug APK, signed
-    with a debug key kept in the repository (a debug key is public by
-    nature), so each build installs over the last, is the run's artifact;
+    away. The debug APK, signed with the run's throwaway debug key and so
+    installable for trying the app, is the run's artifact (each run's
+    key differs, so one does not update over another);
     the job joins the `CI` status ([D27](foundation.md#D27)).
   - **Release:** on a `v*` tag that passes the existing checks (on `main`,
     `CI` passed, matches `package.json`, [D41](foundation.md#D41)), a job
@@ -248,9 +251,9 @@ were checked on 2026-11-01.
     (`gh release create --verify-tag --generate-notes`, a prerelease for a
     prerelease tag, skipped when it exists); the Android and desktop jobs
     `need` it (desktop [D79](desktop.md#D79)). An unsigned APK does not
-    install as it is, so the Release also carries the debug-signed build,
-    `astrotime-<version>-debug.apk`, which installs and is named for what
-    it is; the signed release stays Deferred.
+    install as it is; no debug-signed build goes on a Release, since a key
+    anyone can hold could sign updates to it. The signed release stays
+    Deferred.
   - **Tests:** the TypeScript side of each adapter is unit-tested in Node
     with the plugin replaced (errors to `OfflineError`, the notification
     set's diff, the ids); the Kotlin HTTP plugin is tested by Gradle with
@@ -343,10 +346,9 @@ need the app opened now and then.
 
 ### PR A5 — The release APK
 
-The release job: the GitHub Release on a `v*` tag with the unsigned APK
-and the debug-signed one.
+The release job: the GitHub Release on a `v*` tag with the unsigned APK.
 Decisions: D69 (release), foundation's D28.
 
 Done when: a prerelease tag (on a fork is enough) creates its Release with
-`astrotime-<version>-unsigned.apk` (`apksigner verify` reports it
-unsigned) and `astrotime-<version>-debug.apk`, which a phone installs.
+`astrotime-<version>-unsigned.apk`, which `apksigner verify` reports
+unsigned and which, signed by hand with a test key, a phone installs.

@@ -169,11 +169,12 @@ logic worth borrowing.
     module to rebuild;
   - Android: the web's driver, in the WebView.
 
+  _Changed in PR 3:_ the grilling named wa-sqlite and better-sqlite3; the
+  official build and Node's own SQLite do the same with fewer moving parts.
+
   _Changed by the Android plan ([D63](android.md#D63)):_ Android first named
   `@capacitor-community/sqlite`; OPFS works in the Android WebView, so the
   web's tested driver runs there unchanged and rows stay arrays.
-  _Changed in PR 3:_ the grilling named wa-sqlite and better-sqlite3; the
-  official build and Node's own SQLite do the same with fewer moving parts.
 
 - **D36. The store holds only valid objects.** Every write parses the
   iCalendar with `@astrotime/core` and indexes it by `boundsOf`; a range
