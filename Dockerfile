@@ -19,5 +19,6 @@ COPY --from=build /src/apps/proxy/dist/main.js /app/server.js
 COPY --from=build /src/apps/web/dist /app/web
 USER node
 EXPOSE 8080
-HEALTHCHECK CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+# Shell form, so it checks the port the server was given.
+HEALTHCHECK CMD wget -qO- "http://127.0.0.1:${PORT}/healthz" || exit 1
 CMD ["node", "/app/server.js"]

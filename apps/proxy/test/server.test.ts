@@ -181,3 +181,26 @@ test("the allowlist is required, and holds origins only", () => {
     "http://10.0.0.2:8080",
   ]);
 });
+
+test("an answer that breaks off midway is cut off, never ended as if whole", async () => {
+  const broken = (async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("<multistatus>"));
+          controller.error(new Error("upstream broke"));
+        },
+      }),
+      { status: 207 },
+    )) as unknown as typeof fetch;
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "index.html"), "x");
+  const server = createAppServer({ root, allow: ["https://dav.example"], fetch: broken });
+  const base = await listen(server);
+  // However far the answer got, reading it whole fails: it is never a complete 207.
+  const read = fetch(`${base}${throughProxy(DAV_PROXY_PREFIX).to("https://dav.example/cal/")}`, {
+    method: "PROPFIND",
+  }).then((response) => response.text());
+  await expect(read).rejects.toThrow();
+  await new Promise((resolve) => server.close(resolve));
+});

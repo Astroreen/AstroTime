@@ -169,8 +169,13 @@ function createAppHandler(options: ServerOptions, root: string): Server {
           // Someone's calendar, fetched with their credentials: never kept by a cache.
           res.setHeader("Cache-Control", "no-store");
           if (!response.body) return void res.end();
+          // Broken midway, the answer is cut off, not ended: a client must not
+          // take a truncated multistatus for a whole one.
           Readable.fromWeb(response.body as NodeReadableStream)
-            .on("error", done)
+            .on("error", (error) => {
+              console.error(error);
+              res.destroy(error);
+            })
             .pipe(res);
         })
         .catch(done);

@@ -76,10 +76,14 @@ jobs:
       - run: docker build -t astrotime:ci .
       - name: The image serves the app, proxies only to its allowlist, and refuses to start without one
         run: |
-          docker run -d --name web -p 8080:8080 -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com astrotime:ci
+          # A stand-in server the proxy may reach, on the runner.
+          mkdir -p stub && echo calendar > stub/x.ics
+          (cd stub && python3 -m http.server 9999 --bind 127.0.0.1 &)
+          docker run -d --name web --network host -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com,http://127.0.0.1:9999 astrotime:ci
           # curl's own retries while the server starts, not a sleep loop.
           curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8080/healthz
           curl -fsS http://127.0.0.1:8080/ | grep -q "<title>AstroTime</title>"
+          curl -fsS --retry 10 --retry-delay 1 --retry-all-errors "http://127.0.0.1:8080/dav-proxy/http%3A%2F%2F127.0.0.1%3A9999/x.ics" | grep -q calendar
           status=$(curl -s -o /dev/null -w '%{http_code}' -X PROPFIND "http://127.0.0.1:8080/dav-proxy/https%3A%2F%2Felsewhere.example/dav/")
           test "$status" = 403
           if docker run --rm astrotime:ci 2> refusal.log; then echo "started without ASTROTIME_PROXY_ALLOW" >&2; exit 1; fi
