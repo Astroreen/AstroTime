@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 
 import { allowlist, createAppServer } from "./server.ts";
 
-const port = Number(process.env["PORT"] ?? 8080);
+const port = Number(process.env["PORT"] || 8080);
+// A typo here would listen on a random port that the healthcheck never finds.
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error(`PORT must be a port number, not "${process.env["PORT"]}"`);
+}
 const root = resolve(process.env["ASTROTIME_WEB_ROOT"] ?? "apps/web/dist");
 const server = createAppServer({ root, allow: allowlist(process.env["ASTROTIME_PROXY_ALLOW"]) });
 server.listen(port, () => {
