@@ -63,7 +63,10 @@ When you add a package, app or module, add its line here in the same PR.
 
 - `apps/web` (`@astrotime/web`) — the web app, the first platform; a
   placeholder screen for now. → `plans/foundation.md#D12`
-  - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`
+  - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
+    its rules beyond localhost `plans/foundation.md#D20`
+  - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
+    server listens beyond localhost. → `plans/foundation.md#D20`
 
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
   static files, `/healthz`, the CalDAV proxy; bundled into the Docker image

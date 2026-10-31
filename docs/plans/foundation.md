@@ -127,7 +127,11 @@ logic worth borrowing.
   origin unless that server allows it, and Nextcloud does not allow it for
   CalDAV. (Native apps and our Android and Electron shells are not
   browsers and are not affected.) So:
-  - in development, the Vite dev server proxies CalDAV requests;
+  - in development, the Vite dev server proxies CalDAV requests. Reached
+    from beyond localhost (the owner's devices on their tailnet,
+    `scripts/t3/README.md`), it lets in loopback and tailnet clients only
+    and proxies only to `ASTROTIME_PROXY_ALLOW`'s servers, since the local
+    Radicale's password is published;
   - in production, the web app ships as **one Docker image** that serves the
     static app and proxies `/dav/*` to the user's server. The proxy keeps no
     state: credentials come from the client and are passed through. An

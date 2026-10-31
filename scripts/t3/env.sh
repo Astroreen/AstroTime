@@ -29,6 +29,27 @@ export ASTROTIME_DEV_DIR
 mkdir -p "$ASTROTIME_DEV_DIR"
 
 ASTROTIME_WEB_PORT="${ASTROTIME_WEB_PORT:-5180}"
+# With Tailscale, every interface, so the app opens from the owner's other
+# devices, but only loopback and tailnet clients may connect
+# (apps/web/dev-clients.ts); without it, this machine only. A host set by
+# hand (0.0.0.0 for a LAN) is taken as it is, with no client check.
+if [ -z "${ASTROTIME_WEB_HOST:-}" ] && command -v tailscale >/dev/null 2>&1 && [ -n "$(tailscale ip -4 2>/dev/null || true)" ]; then
+  # IPv4 only, which is enough: a tailnet device whose browser tries the
+  # MagicDNS name's IPv6 address first falls back to IPv4. The IPv6 range in
+  # dev-clients.ts serves a hand-set `::`.
+  ASTROTIME_WEB_HOST=0.0.0.0
+  ASTROTIME_WEB_CLIENTS="${ASTROTIME_WEB_CLIENTS:-tailnet}"
+  export ASTROTIME_WEB_CLIENTS
+fi
+ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-127.0.0.1}"
+
+# True when the dev server is reachable from this machine alone.
+web_is_local() {
+  case "$ASTROTIME_WEB_HOST" in
+    127.0.0.1 | localhost | ::1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 ASTROTIME_DAV_PORT="${ASTROTIME_DAV_PORT:-5232}"
 
 node_major() {

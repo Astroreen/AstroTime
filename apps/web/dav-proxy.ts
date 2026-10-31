@@ -1,7 +1,8 @@
 // The CORS proxy in the dev server (docs/plans/foundation.md#D20): the web app
-// reaches CalDAV servers through /dav-proxy/ on its own origin. The dev server
-// listens on localhost only, so any server may be reached unless
-// ASTROTIME_PROXY_ALLOW lists the allowed origins (comma-separated).
+// reaches CalDAV servers through /dav-proxy/ on its own origin. While the dev
+// server listens on localhost only, any server may be reached unless
+// ASTROTIME_PROXY_ALLOW lists the allowed origins (comma-separated); beyond
+// localhost the list is required.
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { proxyHandler } from "@astrotime/caldav";
