@@ -92,3 +92,23 @@ test("behind a TLS terminator a flow naming its pages http:// on the same host i
     "http://cloud.example.com/login/v2/flow/x",
   );
 });
+
+test("an approval naming another server keeps the app password home", async () => {
+  const http: HttpClient = async (request) => {
+    const reply = (body: unknown) => ({
+      status: 200,
+      url: request.url,
+      header: () => null,
+      body: JSON.stringify(body),
+    });
+    if (request.url.endsWith("/index.php/login/v2")) {
+      return reply({
+        poll: { token: "t", endpoint: "https://cloud.example.com/login/v2/poll" },
+        login: "https://cloud.example.com/login/v2/flow/x",
+      });
+    }
+    return reply({ server: "https://evil.example", loginName: "astro", appPassword: "secret" });
+  };
+  const flow = await startLoginFlow(http, "https://cloud.example.com");
+  await expect(flow.poll()).rejects.toThrow(/names evil.example/);
+});

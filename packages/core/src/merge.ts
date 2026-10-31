@@ -70,7 +70,9 @@ function fieldsOf(component: ICAL.Component): Fields {
   const add = (name: string, text: string) => values.set(name, [...(values.get(name) ?? []), text]);
   for (const property of component.getAllProperties()) {
     if (BOOKKEEPING.has(property.name)) continue;
-    add(TIME.has(property.name) ? TIME_FIELD : property.name, line(property));
+    if (SETS.has(property.name))
+      for (const single of singles(property)) add(property.name, line(single));
+    else add(TIME.has(property.name) ? TIME_FIELD : property.name, line(property));
   }
   for (const sub of component.getAllSubcomponents()) add(`@${sub.name}`, sub.toString());
   return new Map([...values].map(([name, list]) => [name, list.toSorted().join(VALUE)]));
@@ -191,12 +193,33 @@ function identity(name: string, text: string): string {
  * removed, with what we changed. A value both sides changed differently
  * keeps the server's, and is a conflict.
  */
+/**
+ * A set property one value per line: `EXDATE:20260101,20260108` is two
+ * values, and each side may add or remove one of them.
+ */
+function singles(property: ICAL.Property): ICAL.Property[] {
+  const values = property.getValues();
+  if (values.length <= 1) return [property];
+  return values.map((value) => {
+    const single = new ICAL.Property(copy(property.toJSON()));
+    single.setValue(value);
+    return single;
+  });
+}
+
 function mergeSet(
   target: ICAL.Component,
   name: string,
   base: Set<string>,
   local: Set<string>,
 ): boolean {
+  // The server's lines split the same way, so one value can be taken out.
+  for (const property of target.getAllProperties(name)) {
+    const split = singles(property);
+    if (split.length === 1) continue;
+    target.removeProperty(property);
+    for (const single of split) target.addProperty(single);
+  }
   const byId = (values: Iterable<string>) =>
     new Map([...values].map((text) => [identity(name, text), text]));
   const [b, l] = [byId(base), byId(local)];

@@ -169,3 +169,15 @@ test("behind a TLS terminator the app's https page still passes: the host is com
   );
   expect(response.status).toBe(200);
 });
+
+test("an answer with a null-body status such as 205 passes without a body", async () => {
+  const { fetchImpl } = upstream(() => new Response(null, { status: 205 }));
+  const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });
+  const response = await handler(
+    new Request(`http://app.localhost${via.to("https://cloud.example.com/x")}`, {
+      method: "PUT",
+      body: "x",
+    }),
+  );
+  expect(response.status).toBe(205);
+});

@@ -287,7 +287,7 @@ export class CalDavProvider implements Provider {
       [404, 410, 412],
     );
     if (response.status === 412) return { ok: false, reason: "conflict" };
-    if (response.status >= 400) return { ok: false, reason: "gone" };
+    if (response.status === 404 || response.status === 410) return { ok: false, reason: "gone" };
     // A server that changes what it stores (or a weak ETag) gives no ETag; the next sync fetches it.
     const etag = response.header("etag");
     return { ok: true, href, etag: etag && !etag.startsWith("W/") ? etag : null };

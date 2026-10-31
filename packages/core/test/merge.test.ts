@@ -235,3 +235,19 @@ describe("mergeObjects: identities and time (fifth review of #4)", () => {
     });
   });
 });
+
+test("values listed in one line merge one by one (EXDATE:a,b)", () => {
+  const series = { ...base, RRULE: "FREQ=DAILY;COUNT=6" };
+  const start = object({ ...series, EXDATE: "20261103T090000Z,20261104T090000Z" });
+  const local = object({ ...series, EXDATE: "20261103T090000Z,20261104T090000Z,20261105T090000Z" });
+  const server = object({ ...series, EXDATE: "20261104T090000Z" });
+  const merged = mergeObjects(start, local, server);
+  expect(merged.conflict).toBe(false);
+  const exdates = merged.ics
+    .split("\r\n")
+    .filter((l) => l.startsWith("EXDATE"))
+    .flatMap((l) => l.slice(7).split(","))
+    .toSorted();
+  // Theirs removed the 3rd, ours added the 5th; the 4th stays.
+  expect(exdates).toEqual(["20261104T090000Z", "20261105T090000Z"]);
+});

@@ -50,6 +50,12 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
       ) {
         throw new Error("The login flow's answer is not Nextcloud's.");
       }
+      // The app password goes only to the server the user named.
+      if (new URL(result.server).host !== new URL(serverUrl).host) {
+        throw new Error(
+          `The login flow names ${new URL(result.server).host}, not ${new URL(serverUrl).host}.`,
+        );
+      }
       return { server: result.server, username: result.loginName, password: result.appPassword };
     },
   };

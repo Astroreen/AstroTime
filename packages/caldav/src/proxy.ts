@@ -16,6 +16,8 @@ const FORWARDED = [
   "prefer",
   "brief",
 ];
+/** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
+const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 /** Response headers the client reads. */
 const RETURNED = ["content-type", "etag", "dav", "location", "www-authenticate"];
 
@@ -118,13 +120,10 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       }
       returned.set(name, via.to(location.href));
     }
-    return new Response(
-      answer.status === 204 || answer.status === 304 ? null : await answer.arrayBuffer(),
-      {
-        status: answer.status,
-        headers: returned,
-      },
-    );
+    return new Response(NULL_BODY.has(answer.status) ? null : await answer.arrayBuffer(), {
+      status: answer.status,
+      headers: returned,
+    });
   };
 }
 

@@ -268,7 +268,10 @@ Decided while building PR 4.
   origins off its allowlist. It serves the app's own pages only: a request
   with another `Origin`, or that the browser marks cross-site, is refused, so
   a page elsewhere cannot use it to reach the servers behind it. The host is
-  compared, not the scheme, so it works behind a TLS terminator. The
+  compared, not the scheme, so it works behind a TLS terminator. A caller
+  that is not a browser sends neither header and passes: the check keeps
+  other sites' pages out, while the allowlist bounds where anyone can reach,
+  and credentials are the caller's own. The
   provider sends credentials to its calendar home's origin only (discovery
   too: a principal or a home named on another origin is not followed);
   hrefs the
