@@ -99,11 +99,13 @@ export class Store {
     return rows.map(toCalendar);
   }
 
-  async setSyncState(
+  setSyncState(
     calendarId: string,
     state: { syncToken: string | null; ctag: string | null },
   ): Promise<void> {
-    await this.db.update(schema.calendars).set(state).where(eq(schema.calendars.id, calendarId));
+    return this.exclusive(async () => {
+      await this.db.update(schema.calendars).set(state).where(eq(schema.calendars.id, calendarId));
+    });
   }
 
   async removeCalendar(id: string): Promise<void> {
@@ -168,7 +170,7 @@ export class Store {
   private async deleteLocalNow(id: string): Promise<void> {
     const object = await this.object(id);
     if (!object) return;
-    if (object.pending === "create") await this.removeObject(id);
+    if (object.pending === "create") await this.removeObjectNow(id);
     else
       await this.db
         .update(schema.objects)
@@ -176,7 +178,6 @@ export class Store {
         .where(eq(schema.objects.id, id));
   }
 
-  /** Records that the server accepted an upload. */
   /**
    * Records that the server accepted an upload of `uploaded.ics`. A change
    * made on this device while the upload was on its way stays pending: an
@@ -198,7 +199,12 @@ export class Store {
     });
   }
 
-  async removeObject(id: string): Promise<void> {
+  removeObject(id: string): Promise<void> {
+    return this.exclusive(() => this.removeObjectNow(id));
+  }
+
+  // The `…Now` methods run inside `exclusive`; they never call an exclusive method.
+  private async removeObjectNow(id: string): Promise<void> {
     await this.db.delete(schema.objects).where(eq(schema.objects.id, id));
   }
 
@@ -277,7 +283,11 @@ export class Store {
   // Conflicts
 
   /** Keeps our refused version of an object (docs/plans/foundation.md#D6). */
-  async addConflict(objectId: string, localIcs: string): Promise<Conflict> {
+  addConflict(objectId: string, localIcs: string): Promise<Conflict> {
+    return this.exclusive(() => this.addConflictNow(objectId, localIcs));
+  }
+
+  private async addConflictNow(objectId: string, localIcs: string): Promise<Conflict> {
     CalendarObject.parse(localIcs);
     const conflict = { id: crypto.randomUUID(), objectId, localIcs, createdAt: Date.now() };
     await this.db.insert(schema.conflicts).values(conflict);

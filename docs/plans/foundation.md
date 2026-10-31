@@ -164,7 +164,9 @@ logic worth borrowing.
   iCalendar with `@astrotime/core` and indexes it by `boundsOf`; a range
   query returns candidates for `occurrencesBetween` to place exactly. Local
   changes carry `pending` (`create`, `update`, `delete`) for the sync engine;
-  credentials are not in the store ([D19](#D19)).
+  credentials are not in the store ([D19](#D19)). An object a server serves
+  that does not parse is refused by the store; the sync engine skips it,
+  counts it in its report and leaves it on the server untouched (PR 4).
 
 ### Process
 

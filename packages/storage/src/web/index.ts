@@ -60,8 +60,12 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
       await send({ type: "script", sql });
     },
     close: async () => {
-      await send({ type: "close" });
-      worker.terminate();
+      try {
+        await send({ type: "close" });
+      } finally {
+        // A broken worker still holds its thread until it is terminated.
+        worker.terminate();
+      }
     },
   };
 }
