@@ -59,7 +59,9 @@ Playwright's Chromium from nixpkgs; without nix,
 Tests:
 
 - **No `sleep`, polling or timeouts in tests.** Wait for a concrete event or
-  a persisted record. A test that needs a timeout to pass is wrong.
+  a persisted record. A test that needs a timeout to pass is wrong. (A
+  raised ceiling for a suite against a slow real server, such as Nextcloud,
+  is not a wait: nothing in the test depends on time passing.)
 - Protocol code is tested against recorded fixtures from real servers and
   clients, and against a real CalDAV server in CI.
 - UI: Playwright with role and accessibility-tree locators.

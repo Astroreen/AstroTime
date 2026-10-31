@@ -11,8 +11,12 @@
       // One driver per platform, each its own export; the worker is loaded by URL.
       "entry": ["src/index.ts", "src/node.ts", "src/web/index.ts", "src/web/worker.ts"],
     },
+    "packages/sync": {
+      // The integration tests start the dev shell's (or CI's) Radicale.
+      "ignoreBinaries": ["radicale"],
+    },
     "apps/web": {
-      "entry": ["src/main.tsx", "vite.config.ts"],
+      "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts"],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.
       "ignoreDependencies": ["oxc-transform-react"],
     },

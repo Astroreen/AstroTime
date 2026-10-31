@@ -1,0 +1,8 @@
+{
+  // Tests read fixtures from disk, so they see Node's types; src/ never does (AGENTS.md rule 1).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."]
+}

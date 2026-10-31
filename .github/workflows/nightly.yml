@@ -1,0 +1,43 @@
+# docs/plans/foundation.md, D27: the CalDAV integration tests against a real
+# Nextcloud, nightly and by hand; Radicale runs them on every PR in ci.yml.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nextcloud:
+    name: CalDAV against Nextcloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      nextcloud:
+        image: nextcloud:31-apache
+        ports:
+          - 8080:80
+        env:
+          SQLITE_DATABASE: nextcloud
+          NEXTCLOUD_ADMIN_USER: astro
+          NEXTCLOUD_ADMIN_PASSWORD: astrotime-test-password
+          NEXTCLOUD_TRUSTED_DOMAINS: localhost 127.0.0.1
+        # The job starts once the image reports itself installed: status.php
+        # says so when its first-start installation is done.
+        options: >-
+          --health-cmd "curl -fsS http://localhost/status.php | grep -q installed.:true"
+          --health-interval 5s
+          --health-retries 120
+          --health-start-period 30s
+    env:
+      ASTROTIME_NEXTCLOUD_URL: http://127.0.0.1:8080/
+      ASTROTIME_NEXTCLOUD_USERNAME: astro
+      ASTROTIME_NEXTCLOUD_PASSWORD: astrotime-test-password
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pipx install radicale==3.8.0
+      - run: vp test run --project unit packages/sync

@@ -52,10 +52,12 @@ export class Store {
 
   // Accounts
 
-  async addAccount(input: Omit<Account, "id" | "createdAt">): Promise<Account> {
-    const account = { ...input, id: crypto.randomUUID(), createdAt: Date.now() };
-    await this.db.insert(schema.accounts).values(account);
-    return account;
+  addAccount(input: Omit<Account, "id" | "createdAt">): Promise<Account> {
+    return this.exclusive(async () => {
+      const account = { ...input, id: crypto.randomUUID(), createdAt: Date.now() };
+      await this.db.insert(schema.accounts).values(account);
+      return account;
+    });
   }
 
   accounts(): Promise<Account[]> {
@@ -63,31 +65,35 @@ export class Store {
   }
 
   /** Removes the account with its calendars, objects and conflicts. */
-  async removeAccount(id: string): Promise<void> {
-    await this.db.delete(schema.accounts).where(eq(schema.accounts.id, id));
+  removeAccount(id: string): Promise<void> {
+    return this.exclusive(async () => {
+      await this.db.delete(schema.accounts).where(eq(schema.accounts.id, id));
+    });
   }
 
   // Calendars
 
   /** Adds a calendar, or updates the one with the same account and URL. Sync state is kept. */
-  async saveCalendar(
+  saveCalendar(
     input: Pick<Calendar, "accountId" | "url" | "name" | "color" | "components" | "readOnly">,
   ): Promise<Calendar> {
-    const values = { ...input, components: input.components.join(",") };
-    const [row] = await this.db
-      .insert(schema.calendars)
-      .values({ ...values, id: crypto.randomUUID() })
-      .onConflictDoUpdate({
-        target: [schema.calendars.accountId, schema.calendars.url],
-        set: {
-          name: values.name,
-          color: values.color,
-          components: values.components,
-          readOnly: values.readOnly,
-        },
-      })
-      .returning();
-    return toCalendar(row!);
+    return this.exclusive(async () => {
+      const values = { ...input, components: input.components.join(",") };
+      const [row] = await this.db
+        .insert(schema.calendars)
+        .values({ ...values, id: crypto.randomUUID() })
+        .onConflictDoUpdate({
+          target: [schema.calendars.accountId, schema.calendars.url],
+          set: {
+            name: values.name,
+            color: values.color,
+            components: values.components,
+            readOnly: values.readOnly,
+          },
+        })
+        .returning();
+      return toCalendar(row!);
+    });
   }
 
   async calendars(accountId?: string): Promise<Calendar[]> {
@@ -108,8 +114,10 @@ export class Store {
     });
   }
 
-  async removeCalendar(id: string): Promise<void> {
-    await this.db.delete(schema.calendars).where(eq(schema.calendars.id, id));
+  removeCalendar(id: string): Promise<void> {
+    return this.exclusive(async () => {
+      await this.db.delete(schema.calendars).where(eq(schema.calendars.id, id));
+    });
   }
 
   // Objects
@@ -128,7 +136,14 @@ export class Store {
     return this.exclusive(async () => {
       const current = await this.objectAt(calendarId, resource.href);
       if (current && current.pending !== "none" && !options.replacePending) return current;
-      return this.upsert(calendarId, resource.href, resource.etag, resource.ics, "none");
+      return this.upsert(
+        calendarId,
+        resource.href,
+        resource.etag,
+        resource.ics,
+        "none",
+        resource.ics,
+      );
     });
   }
 
@@ -158,8 +173,16 @@ export class Store {
     if (current && current.uid !== object.uid) {
       throw new Error(`${href} holds ${current.uid}; a change to ${object.uid} cannot replace it.`);
     }
+    // An edit of an object deleted here but not yet uploaded revives it (D38).
     const pending: Pending = !current || current.pending === "create" ? "create" : "update";
-    return this.upsert(calendarId, href, current?.etag ?? null, ics, pending);
+    return this.upsert(
+      calendarId,
+      href,
+      current?.etag ?? null,
+      ics,
+      pending,
+      current?.baseIcs ?? null,
+    );
   }
 
   /** Deletes an object on this device: at once if it never reached the server, else after the upload. */
@@ -192,10 +215,43 @@ export class Store {
       if (!current) return;
       const pending: Pending =
         current.pending === "delete" ? "delete" : current.ics === uploaded.ics ? "none" : "update";
+      // What the server accepted is the base of the next local change.
       await this.db
         .update(schema.objects)
-        .set({ href: uploaded.href, etag: uploaded.etag, pending })
+        .set({ href: uploaded.href, etag: uploaded.etag, pending, baseIcs: uploaded.ics })
         .where(eq(schema.objects.id, id));
+    });
+  }
+
+  /**
+   * Replaces a pending change with its merge onto the server's newer version
+   * (docs/plans/foundation.md#D6); it stays pending, now against `etag`.
+   * Only if the change is still `from`: an edit made meanwhile is never
+   * overwritten (`null` then, and the next sync merges again).
+   */
+  rebase(
+    id: string,
+    from: string,
+    merged: { ics: string; etag: string | null; baseIcs: string },
+  ): Promise<StoredObject | null> {
+    return this.exclusive(async () => {
+      const current = await this.object(id);
+      if (!current || current.ics !== from || current.pending === "delete") return null;
+      const object = CalendarObject.parse(merged.ics);
+      const { startMs, endMs } = boundsOf(object);
+      const [row] = await this.db
+        .update(schema.objects)
+        .set({
+          ...merged,
+          uid: object.uid,
+          kind: object.kind,
+          startMs,
+          endMs,
+          updatedAt: Date.now(),
+        })
+        .where(eq(schema.objects.id, id))
+        .returning();
+      return row ?? null;
     });
   }
 
@@ -262,7 +318,7 @@ export class Store {
       .select()
       .from(schema.objects)
       .where(and(eq(schema.objects.calendarId, calendarId), ne(schema.objects.pending, "none")))
-      .orderBy(schema.objects.updatedAt);
+      .orderBy(schema.objects.updatedAt, schema.objects.id);
   }
 
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */
@@ -298,8 +354,10 @@ export class Store {
     return this.db.select().from(schema.conflicts).orderBy(schema.conflicts.createdAt);
   }
 
-  async removeConflict(id: string): Promise<void> {
-    await this.db.delete(schema.conflicts).where(eq(schema.conflicts.id, id));
+  removeConflict(id: string): Promise<void> {
+    return this.exclusive(async () => {
+      await this.db.delete(schema.conflicts).where(eq(schema.conflicts.id, id));
+    });
   }
 
   /**
@@ -324,6 +382,7 @@ export class Store {
     etag: string | null,
     ics: string,
     pending: Pending,
+    baseIcs: string | null,
   ): Promise<StoredObject> {
     const object = CalendarObject.parse(ics);
     const { startMs, endMs } = boundsOf(object);
@@ -333,6 +392,7 @@ export class Store {
       kind: object.kind,
       ics,
       pending,
+      baseIcs,
       startMs,
       endMs,
       updatedAt: Date.now(),

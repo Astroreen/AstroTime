@@ -186,6 +186,34 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(local).toMatchObject({ pending: "update", etag: '"1"' });
     });
 
+    test("the base of a local change is the server's version it started from", async () => {
+      const { store, calendar } = await setup();
+      const server = event("b", "20261102T090000Z", "20261102T100000Z");
+      await store.saveFromServer(calendar.id, { href: "b.ics", etag: '"1"', ics: server });
+      const local = await store.saveLocal(
+        calendar.id,
+        event("b", "20261102T110000Z", "20261102T120000Z"),
+      );
+      expect(local.baseIcs).toBe(server);
+      await store.markSynced(local.id, { href: "b.ics", etag: '"2"', ics: local.ics });
+      expect((await store.object(local.id))?.baseIcs).toBe(local.ics);
+
+      const newer = event("b", "20261102T130000Z", "20261102T140000Z");
+      const current = (await store.object(local.id))!;
+      const rebased = await store.rebase(local.id, current.ics, {
+        ics: newer,
+        etag: '"3"',
+        baseIcs: newer,
+      });
+      expect(rebased).toMatchObject({ etag: '"3"', startMs: Date.parse("2026-11-02T13:00:00Z") });
+      // Edited meanwhile: the rebase does not overwrite it.
+      await store.saveLocal(calendar.id, event("b", "20261102T150000Z", "20261102T160000Z"));
+      expect(
+        await store.rebase(local.id, newer, { ics: newer, etag: '"4"', baseIcs: newer }),
+      ).toBeNull();
+      expect((await store.object(local.id))?.startMs).toBe(Date.parse("2026-11-02T15:00:00Z"));
+    });
+
     test("a change made while its upload was on the way stays pending", async () => {
       const { store, calendar } = await setup();
       const uploading = await store.saveLocal(
@@ -229,6 +257,19 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         store.saveLocal(calendar.id, event("y", "20261102T090000Z", "20261102T100000Z"), "x.ics"),
       ).rejects.toThrow(/holds x/);
       expect((await store.objectAt(calendar.id, "x.ics"))?.uid).toBe("x");
+    });
+
+    test("editing an object deleted here before the deletion is uploaded revives it (D38)", async () => {
+      const { store, calendar } = await setup();
+      const object = await store.saveFromServer(calendar.id, {
+        href: "z.ics",
+        etag: '"1"',
+        ics: event("z", "20261102T090000Z", "20261102T100000Z"),
+      });
+      await store.deleteLocal(object.id);
+      expect(
+        await store.saveLocal(calendar.id, event("z", "20261102T110000Z", "20261102T120000Z")),
+      ).toMatchObject({ id: object.id, pending: "update" });
     });
 
     test("deleting an object that never reached the server removes it at once", async () => {

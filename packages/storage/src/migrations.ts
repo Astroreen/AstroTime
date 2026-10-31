@@ -49,6 +49,15 @@ const MIGRATIONS: readonly string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+  // 2: the server's version an object's local change started from, for the
+  // three-way merge of a refused write (docs/plans/foundation.md#D6).
+  `
+  ALTER TABLE objects ADD COLUMN base_ics TEXT;
+  `,
+  // 3: `saveLocal` finds an object by its UID in a calendar.
+  `
+  CREATE INDEX objects_calendar_uid ON objects(calendar_id, uid);
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

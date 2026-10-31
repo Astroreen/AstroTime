@@ -218,11 +218,65 @@ Decided while building PR 2.
 ### Sync
 
 - **D38. Who wins a deletion.** A calendar or an object deleted on the
-  server is deleted here, with any pending change to it. A deletion of ours
+  server is deleted here, with any pending change to it; a calendar that
+  merely went missing from a listing while it holds unsent changes stays,
+  reported, until a listing without it finds it has none. A deletion of ours
   the server refuses because the object changed there is dropped: the object
-  comes back as the server has it. Otherwise the store never lets the
+  comes back as the server has it. An edit of an object deleted on this
+  device before the deletion is uploaded revives it as an update. Otherwise
+  the store never lets the
   server's version overwrite a pending local change; the sync engine (PR 4)
   is the one place that applies these rules.
+
+Decided while building PR 4.
+
+- **D37. The sync engine is its own package.** `@astrotime/sync` reconciles
+  the store with any `Provider` (the interface lives in `@astrotime/core`);
+  `@astrotime/caldav` implements it and knows nothing of the store. One sync
+  replaces the account's calendar list, then per calendar uploads pending
+  changes first and downloads the server's changes after, so a refused write
+  is merged before anything comes down. A refused write is merged three ways
+  against the object's **base** (the server's version the change started
+  from, kept by the store) and tried once more; refused again, or edited on
+  this device meanwhile, it waits for the next sync. Properties that hold a
+  set (`EXDATE`, `CATEGORIES`, `ATTENDEE`…) combine both sides' additions and
+  removals instead of conflicting, and a VTIMEZONE our side uses comes along.
+  A failure of one object (or one calendar's download) is reported in the
+  sync's `errors` and the rest goes on; only `OfflineError` and `AuthError`
+  stop a sync. A creation the server has no place for stays pending; one
+  that finds its href taken is recognised if the server holds our own
+  version (an upload whose answer was lost), and otherwise goes to the
+  Conflicts list with the server's version kept. A write against an
+  object the server last answered without an ETag first fetches it: if it
+  is still our change's base, the write goes against the ETag it has now;
+  if it changed, our change is merged as for a refused write; if it is gone,
+  D38 applies. A refused write with no base keeps the server's version and
+  lists ours as a conflict, unless both are the same. In a read-only
+  calendar a pending edit gives way at once: the server's version comes back
+  and ours goes to the Conflicts list; a new item there waits, reported,
+  until the calendar is writable. An object a multiget leaves out is fetched
+  on its own; one that still cannot be read keeps no sync token, so the next
+  sync lists everything again. The time of an item (`DTSTART`, `DTEND`,
+  `DURATION`, `DUE`) is one field, and an attendee is identified by their
+  address, so changing their answer on one side is no duplicate. The report names the pending changes a server deletion
+  dropped, and an interrupted sync's error carries its report so far.
+- **D39. The proxy's URL space.** The web app sends a request for
+  `https://cloud.example.com/remote.php/dav/` to
+  `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
+  origin. The handler (`proxyHandler` in `@astrotime/caldav`) passes only the
+  headers CalDAV needs, maps redirects back into its URL space, and refuses
+  origins off its allowlist. It serves the app's own pages only: a request
+  with another `Origin`, or that the browser marks cross-site, is refused, so
+  a page elsewhere cannot use it to reach the servers behind it. The host is
+  compared, not the scheme, so it works behind a TLS terminator. The
+  provider sends credentials to its calendar home's origin only; hrefs the
+  server names elsewhere are ignored, and every href is spelled one way
+  (`canonicalHref`: `a@b.ics` and `a%40b.ics` are one resource). A redirect
+  to another server is not passed through the proxy (the browser would keep
+  the credentials for it): sign in with that server's address instead. The dev server allows any origin
+  (only while it listens on localhost; with `--host` it requires the list) unless
+  `ASTROTIME_PROXY_ALLOW` lists some; the production image (PR 7) requires
+  the list.
 
 ### Layout
 
@@ -273,6 +327,13 @@ Decided while building the layout engine, ahead of PR 5's screens.
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
   or a cache comes when a real calendar hits it ([D33](#D33)).
+- **Login Flow v2 end to end** — the flow is tested against Nextcloud up to
+  the approval page; approving it needs a browser driving Nextcloud's login,
+  which comes with Playwright e2e ([D19](#D19)).
+- **Scheduling syncs** — `syncAccount` runs when called; when and how often
+  the apps call it (on start, on focus, on a timer, Android background sync)
+  is decided with each app.
+
 - **Overdue tasks on today** — D16's roll-over needs the store to find
   undone tasks due before today; it comes with PR 5's task panel.
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
@@ -329,10 +390,17 @@ sign-in, `sync-collection`, ETag writes, conflicts; the Vite dev proxy;
 integration tests against Radicale in CI and the nightly Nextcloud job.
 Decisions: D2, D5, D6, D19, D20 (development half), D27.
 
+Decisions: D37, D39 (new), D38.
+
 Done when: a Radicale and a Nextcloud account sync both ways, offline edits
 reach the server when it comes back, and a conflicting edit lands in the
-Conflicts list; objects written by Nextcloud's web calendar and by Radicale
-are recorded as fixtures and pass PR 2's round-trip tests.
+Conflicts list; objects as Nextcloud and Radicale serve them back are
+recorded as fixtures and pass PR 2's round-trip tests.
+
+_Changed in PR 4:_ "objects written by Nextcloud's web calendar" became
+"objects as Nextcloud serves them back": the web calendar is a browser app
+no test drives yet. The recordings are `radicale-*.ics` and
+`nextcloud-served-*.ics` in `packages/core/test/fixtures/`.
 
 ### PR 5 — Calendar grid
 
