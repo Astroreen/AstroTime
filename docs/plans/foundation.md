@@ -224,6 +224,35 @@ Decided while building PR 2.
   server's version overwrite a pending local change; the sync engine (PR 4)
   is the one place that applies these rules.
 
+### Layout
+
+Decided while building the layout engine, ahead of PR 5's screens.
+
+- **D42. The layout is pure geometry in `@astrotime/core`.** `layoutDay`
+  places one day's occurrences in minutes and fractions of a column;
+  `layoutSpans` packs the all-day strip of a week (or a month's week) into
+  rows. The UI turns both into pixels, so every view shares one placement and
+  the rules are tested without a browser. On top of D14–D16:
+  - a timed item lasting 24 hours or more (elapsed, so across a DST change
+    too), or covering a whole day of the user's wall clock, goes to the
+    all-day strip, as Google shows a three-day conference;
+  - a task's due date is its last day (an event's `DTEND` date is the day
+    after its last);
+  - a task is a chip when it has a timed due and no timed start (a date
+    start included), or a timed start and no due; the chip sits on the day
+    of that time only;
+  - an occurrence that does not show on the day it is laid out for is left
+    out;
+  - an item over midnight is clipped to each day and says it goes on;
+  - a block is drawn at least 15 minutes tall, a chip 30; a chip at the end
+    of the day is lifted to fit;
+  - the cascade steps 15% of the column per item underneath, and switches to
+    equal columns past three items at once; the depth is transitive (an item
+    over a cascaded one steps once more, even along a chain where no more
+    than two overlap at once); a chain deep enough to run off the column
+    switches to equal columns too, so no item hides another;
+  - in the strip, longer spans come first, then events before tasks.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -244,6 +273,8 @@ Decided while building PR 2.
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
   or a cache comes when a real calendar hits it ([D33](#D33)).
+- **Overdue tasks on today** — D16's roll-over needs the store to find
+  undone tasks due before today; it comes with PR 5's task panel.
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.

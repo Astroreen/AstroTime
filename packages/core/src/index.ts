@@ -9,3 +9,12 @@ export {
   type Range,
 } from "./occurrences.ts";
 export { wallClockOf, type ItemTime } from "./time.ts";
+export {
+  isAllDay,
+  layoutDay,
+  layoutSpans,
+  type DayLayout,
+  type LayoutOptions,
+  type Placed,
+  type Span,
+} from "./layout.ts";

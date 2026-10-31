@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   boundsOf,
+  layoutDay,
   CalendarObject,
   ExpansionLimitError,
   occurrencesBetween,
@@ -303,5 +304,83 @@ describe("leftovers from the review of #2", () => {
     expect(
       occurrencesBetween(object, { from: "2026-11-01", to: "2026-11-05", timeZone: "UTC" }),
     ).toHaveLength(1);
+  });
+});
+
+describe("where a task ends (D42)", () => {
+  const vcal = (body: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${body}END:VCALENDAR\r\n`;
+  const utc = (from: string, to: string) => ({ from, to, timeZone: "UTC" });
+
+  test("a due date is the task's last day: the occurrence ends the day after", () => {
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VTODO\r\nUID:d\r\nDTSTART;VALUE=DATE:20261102\r\nDUE;VALUE=DATE:20261104\r\nEND:VTODO\r\n",
+      ),
+    );
+    const [occurrence] = occurrencesBetween(object, utc("2026-11-01", "2026-11-10"));
+    expect([occurrence?.start, occurrence?.end]).toEqual([
+      { type: "date", date: "2026-11-02" },
+      { type: "date", date: "2026-11-05" },
+    ]);
+    expect(boundsOf(object).endMs).toBe(Date.parse("2026-11-05T14:00:00Z"));
+  });
+
+  test("a task with only a due date covers that day", () => {
+    const object = CalendarObject.parse(
+      vcal("BEGIN:VTODO\r\nUID:o\r\nDUE;VALUE=DATE:20261104\r\nEND:VTODO\r\n"),
+    );
+    expect(occurrencesBetween(object, utc("2026-11-04", "2026-11-05"))).toHaveLength(1);
+    expect(occurrencesBetween(object, utc("2026-11-05", "2026-11-06"))).toHaveLength(0);
+  });
+
+  test("a task with only a start date covers that day; a timed start or due stays a moment", () => {
+    const start = CalendarObject.parse(
+      vcal("BEGIN:VTODO\r\nUID:s\r\nDTSTART;VALUE=DATE:20261104\r\nEND:VTODO\r\n"),
+    );
+    expect(occurrencesBetween(start, utc("2026-11-04", "2026-11-05"))[0]?.end).toEqual({
+      type: "date",
+      date: "2026-11-05",
+    });
+    const timed = CalendarObject.parse(
+      vcal("BEGIN:VTODO\r\nUID:t\r\nDUE:20261104T150000Z\r\nEND:VTODO\r\n"),
+    );
+    const [moment] = occurrencesBetween(timed, utc("2026-11-04", "2026-11-05"));
+    expect(moment?.end).toEqual(moment?.start);
+  });
+
+  test("a recurring task with date dues covers each due day", () => {
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VTODO\r\nUID:r\r\nDTSTART;VALUE=DATE:20261102\r\nDUE;VALUE=DATE:20261102\r\nRRULE:FREQ=WEEKLY;COUNT=2\r\nEND:VTODO\r\n",
+      ),
+    );
+    expect(
+      occurrencesBetween(object, utc("2026-11-01", "2026-11-15")).map((o) => [o.start, o.end]),
+    ).toEqual([
+      [
+        { type: "date", date: "2026-11-02" },
+        { type: "date", date: "2026-11-03" },
+      ],
+      [
+        { type: "date", date: "2026-11-09" },
+        { type: "date", date: "2026-11-10" },
+      ],
+    ]);
+  });
+
+  test("a one-off item ending before it starts is a moment at its start, still shown", () => {
+    const object = CalendarObject.parse(
+      vcal(
+        "BEGIN:VEVENT\r\nUID:b\r\nDTSTART:20261102T100000Z\r\nDTEND:20261102T090000Z\r\nEND:VEVENT\r\n",
+      ),
+    );
+    const [occurrence] = occurrencesBetween(object, utc("2026-11-02", "2026-11-03"));
+    expect(occurrence?.end).toEqual(occurrence?.start);
+    expect(
+      layoutDay([occurrence!], "2026-11-02", { timeZone: "UTC" }).timed.map((p) => [
+        p.top,
+        p.bottom,
+      ]),
+    ).toEqual([[600, 615]]);
   });
 });

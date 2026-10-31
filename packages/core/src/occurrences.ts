@@ -11,7 +11,10 @@ export interface Occurrence {
   /** The occurrence's identity within its series; `null` for an item that does not recur. */
   readonly recurrenceId: ItemTime | null;
   readonly start: ItemTime;
-  /** Exclusive. Equal to `start` for an item with no length. */
+  /**
+   * Exclusive. Equal to `start` for an item with no length. A task due on a
+   * date ends the day after its due date: the due day is the task's last.
+   */
   readonly end: ItemTime;
 }
 
@@ -43,6 +46,13 @@ export class ExpansionLimitError extends Error {
  * (docs/plans/foundation.md#D16). An item with neither has no place.
  */
 function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
+  const span = rawAnchors(component);
+  // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
+  if (span && span.end.compare(span.start) < 0) return { start: span.start, end: span.start };
+  return span;
+}
+
+function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
   const value = (name: string) => {
     const v = component.getFirstPropertyValue(name);
     return v instanceof ICAL.Time ? v : null;
@@ -59,9 +69,14 @@ function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time 
   let due = value("due");
   const duration = component.getFirstPropertyValue("duration");
   if (!due && start && duration instanceof ICAL.Duration) due = plus(start, duration);
-  if (start && due) return { start, end: due };
-  const only = start ?? due;
-  return only ? { start: only, end: only } : null;
+  // A due date is the last day of the task, not a bound after it as an
+  // event's DTEND date is: the span ends after that day (exclusive, like every end).
+  const end = due?.isDate ? plus(due, ICAL.Duration.fromData({ days: 1 })) : due;
+  if (start && end) return { start, end };
+  if (due) return { start: due, end: end ?? due };
+  return start
+    ? { start, end: start.isDate ? plus(start, ICAL.Duration.fromData({ days: 1 })) : start }
+    : null;
 }
 
 /** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */

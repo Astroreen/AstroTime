@@ -33,7 +33,14 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Time grid** — the column of hours of a day, where timed items sit.
 - **All-day strip** — the band pinned above the time grid with all-day
   items; it does not scroll away.
-- **Task chip** — a task with only a due time, drawn small at that time.
+- **Task chip** — a task with only a due time (or only a start time), drawn
+  small at that time. `shape: "chip"` in the layout.
+- **Block** — a timed item with a length, drawn from its start to its end
+  in the time grid. `shape: "block"` in the layout.
+- **Span** — an all-day item drawn as one bar over the days it covers in
+  the all-day strip of a week or a month.
+- **Cluster** — timed items that overlap, directly or through others; they
+  share the column's width (D15).
 - **Task panel** — the side panel with the tasks that have no date.
 - **View** — Day, Week, Month or Agenda.
 - **Agenda** — the view that lists items in time order instead of a grid.
