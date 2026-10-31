@@ -7,6 +7,7 @@ source "$(dirname "$0")/env.sh"
 enter_dev_shell "$@"
 
 log="$ASTROTIME_DEV_DIR/smoke.log"
+: >"$log"
 fifo="$(mktemp -u "$ASTROTIME_DEV_DIR/smoke.XXXXXX")"
 mkfifo "$fifo"
 bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" >"$fifo" 2>&1 &
@@ -31,7 +32,8 @@ if command -v radicale >/dev/null 2>&1; then
     "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/")"
   [ "$status" = 207 ] || fail "the CalDAV proxy answered $status"
 fi
-if bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" >/dev/null 2>&1; then fail "a second dev.sh started"; fi
+if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a second dev.sh started"; fi
+[[ "$second" == *"dev is already running"* ]] || fail "a second dev.sh failed for another reason: $second"
 
 bash "$ASTROTIME_ROOT/scripts/t3/stop.sh"
 if curl -s -o /dev/null "http://127.0.0.1:$ASTROTIME_WEB_PORT/"; then fail "the dev server still answers after stop.sh"; fi

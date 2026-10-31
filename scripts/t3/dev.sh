@@ -31,7 +31,7 @@ else
 fi
 
 # The script stays in the checkout's root: stop.sh recognises it by its directory.
-start_until "Local:" pnpm --dir "$ASTROTIME_ROOT/apps/web" exec vp dev --host 127.0.0.1 --port "$ASTROTIME_WEB_PORT" --strictPort
+start_until "Local:" env NO_COLOR=1 pnpm --dir "$ASTROTIME_ROOT/apps/web" exec vp dev --host 127.0.0.1 --port "$ASTROTIME_WEB_PORT" --strictPort
 
 echo
 echo "astrotime: open http://127.0.0.1:$ASTROTIME_WEB_PORT"

@@ -4,6 +4,7 @@
 # stop.sh ends exactly what dev.sh started.
 
 set -euo pipefail
+shopt -s extglob
 
 # `wait -n`, `exec {fd}<` and EPOCHREALTIME need bash 5.1.
 if [ "${BASH_VERSINFO[0]}" -lt 5 ] || { [ "${BASH_VERSINFO[0]}" -eq 5 ] && [ "${BASH_VERSINFO[1]}" -lt 1 ]; }; then
@@ -15,6 +16,9 @@ ASTROTIME_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export ASTROTIME_ROOT
 # The same path without symlinks, as /proc/<pid>/cwd reports it.
 ASTROTIME_ROOT_PHYSICAL="$(cd "$ASTROTIME_ROOT" && pwd -P)"
+# The scripts run from the checkout's root, wherever they are called from:
+# stop.sh recognises dev.sh by that directory.
+cd "$ASTROTIME_ROOT"
 
 # Everything the dev scripts create lives here (gitignored).
 ASTROTIME_DEV_DIR="${ASTROTIME_DEV_DIR:-$ASTROTIME_ROOT/.astrotime-dev}"
@@ -57,14 +61,6 @@ tree_pids() {
   echo "$1"
   for child in $(pgrep -P "$1" 2>/dev/null); do
     tree_pids "$child"
-  done
-}
-
-# Ends a process and its descendants at once, children before parents.
-kill_tree() {
-  local pid
-  for pid in $(tree_pids "$1" | tac); do
-    kill "$pid" 2>/dev/null || true
   done
 }
 
@@ -124,7 +120,9 @@ record_pid() {
     exit 1
   fi
   # shellcheck disable=SC2154 # job is the loop variable inside the trap string
-  trap 'rm -f "'"$file"'"; for job in $(jobs -p); do kill_tree "$job"; done' EXIT
+  # On exit (Ctrl-C included) the services are stopped and waited for, so a
+  # quick restart does not find their ports still taken.
+  trap 'rm -f "'"$file"'"; for job in $(jobs -p); do stop_tree "$job" || true; done' EXIT
   trap 'exit 130' INT TERM
 }
 
@@ -142,7 +140,8 @@ start_until() {
   rm -f "$fifo"
   while IFS= read -r line <&"$out"; do
     printf '%s\n' "$line"
-    if [[ "$line" == *"$ready"* ]]; then
+    # Matched without colour codes: in CI, Vite writes `\e[1mLocal\e[22m:`.
+    if [[ "${line//$'\e'\[+([0-9;])m/}" == *"$ready"* ]]; then
       # Keep forwarding its output.
       cat <&"$out" &
       return 0
