@@ -13,7 +13,7 @@ catalog:
   "@vitest/browser-playwright": 5.0.5
   drizzle-orm: 0.45.4
   fast-xml-parser: 5.11.2
-  i18next: 26.6.0
+  i18next: 26.5.12
   "@sqlite.org/sqlite-wasm": 3.54.1-build1
   ical.js: 2.2.1
   knip: 6.41.0

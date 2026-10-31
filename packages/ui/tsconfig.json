@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    // The UI runs in every app's web view, never in Node.
+    "types": []
+  },
+  "include": ["src"]
+}
