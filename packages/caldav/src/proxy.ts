@@ -19,7 +19,9 @@ const FORWARDED = [
 /** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 /** Response headers the client reads. */
-const RETURNED = ["content-type", "etag", "dav", "location", "www-authenticate"];
+// Not WWW-Authenticate: on the app's own origin it would make the browser
+// show its own sign-in dialog; the app reads the 401 and asks itself.
+const RETURNED = ["content-type", "etag", "dav", "location"];
 
 export interface ProxyOptions {
   /** Where proxied URLs start on the app's origin, `/dav-proxy/`. */

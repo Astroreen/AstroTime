@@ -333,6 +333,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
   or a cache comes when a real calendar hits it ([D33](#D33)).
+- **Fixtures from Nextcloud's web calendar** — PR 4's "Done when" first
+  asked for objects written by Nextcloud's web calendar; the recordings are
+  of objects as Nextcloud serves them back. Recording what its web calendar
+  writes needs a browser driving it, which comes with Playwright e2e.
 - **Login Flow v2 end to end** — the flow is tested against Nextcloud up to
   the approval page; approving it needs a browser driving Nextcloud's login,
   which comes with Playwright e2e ([D19](#D19)).

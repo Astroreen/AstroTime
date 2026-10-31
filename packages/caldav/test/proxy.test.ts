@@ -192,3 +192,17 @@ test("a malformed redirect is a 502, not a crash", async () => {
   );
   expect(response.status).toBe(502);
 });
+
+test("a 401 passes without WWW-Authenticate, so the browser shows no dialog of its own", async () => {
+  const { fetchImpl } = upstream(
+    () =>
+      new Response("", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="SabreDAV"' } }),
+  );
+  const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });
+  const response = await handler(
+    new Request(`http://app.localhost${via.to("https://cloud.example.com/x")}`, {
+      method: "PROPFIND",
+    }),
+  );
+  expect([response.status, response.headers.get("www-authenticate")]).toEqual([401, null]);
+});
