@@ -152,8 +152,20 @@ were checked on 2026-11-01.
   a small background entry that calls `syncAll()` ([D60](#D60)) and
   reschedules reminders, with the HTTP, secrets and notification code of
   [D62](#D62), [D64](#D64) and [D66](#D66) reached through a
-  `WebMessageListener` instead of Capacitor's bridge. When the app's own
-  WebView holds the store, the job does nothing: the open app syncs itself.
+  `WebMessageListener` instead of Capacitor's bridge. The two WebViews
+  share one origin, and `opfs-sahpool` holds its files exclusively, so only
+  one may have the store open. Whoever opens it holds a Web Lock named for
+  the store (`navigator.locks`, shared by every WebView of the app, as by
+  every tab of a browser), the same hand-over foundation's Deferred "One
+  store across tabs" needs. The job asks with `ifAvailable`: when the open
+  app holds it, the job does nothing, since the open app syncs itself. The
+  app starting while the job holds it asks the job to yield (a
+  `BroadcastChannel` on the same origin) and waits for the lock, showing
+  that it is opening; the job stops at its next object, closes the store
+  and releases the lock. A run cut short loses nothing: an object is marked
+  synced only when the server took it, and a calendar's sync token is saved
+  only after its download, so the next sync picks up where it stopped
+  ([D37](foundation.md#D37)).
   Limits: WorkManager decides the exact time (Doze, battery saver), a run
   may last 10 minutes, and the user can stop it in Android's settings.
   Rejected: `@capacitor/background-runner`, which runs JavaScript in a
@@ -249,7 +261,8 @@ Done when: the debug APK from CI installs on a phone or an emulator, signs
 in to a Radicale or a Nextcloud by password, and shows its items from the
 local store after a restart without a network; the plugin's Gradle tests
 pass in CI; `navigator.storage.persist()`'s answer in the WebView is
-recorded in the PR. Screenshots in both themes are the evidence.
+recorded in the PR, and so is whether a second WebView of the app sees the
+same OPFS files and the first one's Web Lock (D67 depends on both). Screenshots in both themes are the evidence.
 
 ### PR A2 — Credentials, Login Flow v2, the shell's manners
 
