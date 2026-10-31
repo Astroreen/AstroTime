@@ -17,6 +17,9 @@ fifo="$(mktemp -u "$ASTROTIME_DEV_DIR/smoke.XXXXXX")"
 mkfifo "$fifo"
 # Whatever ends the smoke run, nothing it started stays behind.
 trap 'bash "$ASTROTIME_ROOT/scripts/t3/stop.sh" >/dev/null 2>&1 || true' EXIT
+# A signal (CI's `timeout`) ends the script through exit, so the cleanup runs.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" >"$fifo" 2>&1 &
 exec {out}<"$fifo"
 rm -f "$fifo"
@@ -35,7 +38,9 @@ fail() {
   exit 1
 }
 
-curl -fsS "http://127.0.0.1:$ASTROTIME_WEB_PORT/" | grep -q "<title>AstroTime</title>" || fail "the page did not load"
+# Read whole, then searched: `curl | grep -q` under pipefail can fail a good page.
+page="$(curl -fsS "http://127.0.0.1:$ASTROTIME_WEB_PORT/")" || fail "the page did not load"
+[[ "$page" == *"<title>AstroTime</title>"* ]] || fail "the page is not AstroTime's"
 if command -v radicale >/dev/null 2>&1; then
   status="$(curl -s -o /dev/null -w '%{http_code}' -X PROPFIND -u astro:astro -H 'Depth: 0' \
     "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/personal/")"
