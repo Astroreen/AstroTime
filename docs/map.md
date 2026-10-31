@@ -26,6 +26,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `occurrencesBetween` — expands a series into the occurrences that touch
     a range of days in the user's zone. → `plans/foundation.md#D33`
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `windows-zones.ts` — Windows zone name → IANA, generated from Unicode
+    CLDR by `scripts/generate-windows-zones.ts`; do not edit by hand.
+    → `plans/foundation.md#D32`
   - `layoutDay`, `layoutSpans`, `isAllDay` — where items go on the views:
     the all-day strip, the time grid, overlaps. → `plans/foundation.md#D42`
   - `mergeObjects` — the three-way merge of a refused write.
@@ -81,6 +84,9 @@ When you add a package, app or module, add its line here in the same PR.
   `stop.sh` stops them, `smoke.sh` proves both. → `../scripts/t3/README.md`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
+- `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
+  `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
+  → `plans/foundation.md#D32`
 - `.github/workflows/` — CI (with the image built and started), the nightly
   Nextcloud run, the release of the image on a `v*` tag, Claude review,
   `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`

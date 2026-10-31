@@ -3,7 +3,13 @@ import { readdirSync } from "node:fs";
 import ICAL from "ical.js";
 import { describe, expect, test } from "vite-plus/test";
 
-import { CalendarObject, CalendarObjectError, type Event, type Task } from "../src/index.ts";
+import {
+  CalendarObject,
+  CalendarObjectError,
+  type Event,
+  type Task,
+  wallClockOf,
+} from "../src/index.ts";
 import { fixture, load } from "./support.ts";
 
 /** Unfolded content lines (RFC 5545 §3.1). */
@@ -164,13 +170,103 @@ describe("events", () => {
     expect(event.end).toMatchObject({ type: "zoned", local: "2026-10-31T01:00:00" });
   });
 
-  test("Outlook: a VTIMEZONE with a Windows name gives the exact instant and keeps the name", () => {
+  test("Outlook: a VTIMEZONE with a Windows name gives the exact instant and the IANA zone", () => {
     const event = load("outlook-event-windows-tz.ics").master as Event;
     expect(event.start).toEqual({
       type: "zoned",
       local: "2026-11-04T14:00:00",
-      timeZone: "W. Europe Standard Time",
+      timeZone: "Europe/Berlin",
       epochMs: Date.parse("2026-11-04T13:00:00Z"),
+    });
+  });
+
+  test("with a VTIMEZONE the zone is one Intl knows, so its wall clock reads back", () => {
+    const start = (load("outlook-event-windows-tz.ics").master as Event).start;
+    if (start?.type !== "zoned") throw new Error("expected a zoned start");
+    expect(start.timeZone).toBe("Europe/Berlin");
+    expect(wallClockOf(start, start.timeZone)).toBe(start.local);
+  });
+
+  // The fixtures below are hand-written in the shape Exchange writes
+  // (PRODID, X-MICROSOFT-CDO-*, Windows TZIDs), minus the VTIMEZONE a client may
+  // strip or a server may not keep.
+  describe("a Windows zone name without a VTIMEZONE", () => {
+    test("W. Europe Standard Time is Europe/Berlin, in summer and in winter", () => {
+      const summer = load("outlook-event-windows-tz-no-vtimezone.ics").master as Event;
+      expect(summer.start).toEqual({
+        type: "zoned",
+        local: "2026-07-15T10:00:00",
+        timeZone: "Europe/Berlin",
+        epochMs: Date.parse("2026-07-15T08:00:00Z"),
+      });
+      expect(summer.end).toMatchObject({ epochMs: Date.parse("2026-07-15T09:30:00Z") });
+      const winter = load("outlook-event-windows-tz-winter-no-vtimezone.ics").master as Event;
+      expect(winter.start).toMatchObject({
+        local: "2026-12-04T10:00:00",
+        timeZone: "Europe/Berlin",
+        epochMs: Date.parse("2026-12-04T09:00:00Z"),
+      });
+    });
+
+    test("Russian Standard Time is Europe/Moscow", () => {
+      const event = load("outlook-event-russian-tz-no-vtimezone.ics").master as Event;
+      expect(event.start).toEqual({
+        type: "zoned",
+        local: "2026-11-04T14:00:00",
+        timeZone: "Europe/Moscow",
+        epochMs: Date.parse("2026-11-04T11:00:00Z"),
+      });
+    });
+
+    test("a quoted TZID parameter and another letter case resolve the same", () => {
+      const quoted = load("outlook-event-recurring-no-vtimezone.ics").master as Event;
+      expect(quoted.start).toMatchObject({ timeZone: "Europe/Berlin" });
+      const shouting = fixture("outlook-event-windows-tz-no-vtimezone.ics").replaceAll(
+        "W. Europe Standard Time",
+        "w. europe standard time",
+      );
+      expect(CalendarObject.parse(shouting).master).toMatchObject({
+        start: { timeZone: "Europe/Berlin", epochMs: Date.parse("2026-07-15T08:00:00Z") },
+      });
+    });
+
+    test("a name that is neither IANA nor Windows stays floating", () => {
+      const event = load("outlook-event-unknown-windows-tz.ics").master as Event;
+      expect(event.start).toEqual({ type: "floating", local: "2026-11-04T14:00:00" });
+    });
+
+    test("a local time in the spring gap takes the offset before it, as for IANA names", () => {
+      // Berlin skips 02:00–03:00 on 29 Mar 2026; 02:30 is read with +01:00.
+      const ics = fixture("outlook-event-windows-tz-no-vtimezone.ics")
+        .replace(
+          "DTSTART;TZID=W. Europe Standard Time:20260715T100000",
+          "DTSTART;TZID=W. Europe Standard Time:20260329T023000",
+        )
+        .replace(
+          "DTEND;TZID=W. Europe Standard Time:20260715T113000",
+          "DTEND;TZID=W. Europe Standard Time:20260329T040000",
+        );
+      expect(CalendarObject.parse(ics).master).toMatchObject({
+        start: { timeZone: "Europe/Berlin", epochMs: Date.parse("2026-03-29T01:30:00Z") },
+      });
+    });
+
+    test("an IANA name wins over a Windows one", () => {
+      expect(load("google-event-unknown-tz.ics").master).toMatchObject({
+        start: { timeZone: "Europe/Berlin" },
+      });
+    });
+
+    test.each([
+      "outlook-event-windows-tz-no-vtimezone.ics",
+      "outlook-event-russian-tz-no-vtimezone.ics",
+      "outlook-event-unknown-windows-tz.ics",
+    ])("%s is written back with the TZID it was read with", (name) => {
+      const tzids = (ics: string) =>
+        contentLines(ics).filter((line) => /^DT(START|END);/.test(line));
+      const written = load(name).serialize();
+      expect(tzids(written)).toEqual(tzids(fixture(name)));
+      expect(written).not.toMatch(/Europe\/(Berlin|Moscow)/);
     });
   });
 

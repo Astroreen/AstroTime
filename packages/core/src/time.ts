@@ -1,5 +1,7 @@
 import ICAL from "ical.js";
 
+import { WINDOWS_ZONES } from "./windows-zones.ts";
+
 /**
  * A point in time as iCalendar states it (docs/plans/foundation.md#D7):
  * - `date`: an all-day date, `2026-10-31`;
@@ -14,8 +16,12 @@ export type ItemTime =
       readonly type: "zoned";
       readonly local: string;
       /**
-       * The IANA zone, or the TZID as written when it is not an IANA name
-       * (an Outlook VTIMEZONE, say). `epochMs` is exact either way.
+       * The IANA zone; a Windows zone name is read as the IANA zone it maps
+       * to, with a VTIMEZONE or without. Only a TZID that is neither, in a
+       * VTIMEZONE the object defines (`Customized Time Zone`), stays as written,
+       * and is then no zone `Intl` knows. `epochMs` is exact either way. The
+       * TZID itself is never rewritten: it stays in the calendar object, which
+       * is what `serialize` writes.
        */
       readonly timeZone: string;
       readonly epochMs: number;
@@ -30,8 +36,9 @@ function localOf(time: ICAL.Time): string {
 /**
  * Converts an ical.js time. A TZID the object defines in a VTIMEZONE is
  * resolved by ical.js; a TZID it does not define (Google, some Android
- * clients) is taken as an IANA name and resolved through `Intl`. A TZID
- * neither knows stays floating.
+ * clients) is taken as an IANA name and resolved through `Intl`, or else as a
+ * Windows zone name (Outlook, Exchange) and mapped to IANA. A TZID none of
+ * these knows stays floating (docs/plans/foundation.md#D32).
  */
 export function fromIcalTime(time: ICAL.Time): ItemTime {
   if (time.isDate) {
@@ -51,10 +58,25 @@ export function fromIcalTime(time: ICAL.Time): ItemTime {
     };
   }
   const tzid = tzidOf(time);
-  if (tzid && isKnownTimeZone(tzid)) {
-    return { type: "zoned", local, timeZone: tzid, epochMs: zonedToEpoch(local, tzid) };
-  }
+  const timeZone = tzid === undefined ? undefined : resolveUndefinedTzid(tzid);
+  if (timeZone) return { type: "zoned", local, timeZone, epochMs: zonedToEpoch(local, timeZone) };
   return { type: "floating", local };
+}
+
+/** The IANA zone for a TZID the object does not define: itself, or a Windows zone name's. */
+function resolveUndefinedTzid(written: string): string | undefined {
+  const tzid = written.trim();
+  if (isKnownTimeZone(tzid)) return tzid;
+  return windowsZone(tzid);
+}
+
+// Windows compares zone names case-insensitively.
+const windowsZonesByLowerCase = new Map(
+  Object.entries(WINDOWS_ZONES).map(([windows, iana]) => [windows.toLowerCase(), iana]),
+);
+
+function windowsZone(tzid: string): string | undefined {
+  return windowsZonesByLowerCase.get(tzid.toLowerCase());
 }
 
 /**
@@ -73,9 +95,10 @@ export function keepTzid(from: ICAL.Time, to: ICAL.Time): ICAL.Time {
 }
 
 /**
- * The IANA name a TZID stands for: itself, or the end of a path-style TZID
- * (`/freeassociation.sourceforge.net/Europe/Berlin`, older Evolution and
- * Lightning). Anything else is returned as written.
+ * The IANA name a TZID the object defines stands for: itself, the end of a
+ * path-style TZID (`/freeassociation.sourceforge.net/Europe/Berlin`, older
+ * Evolution and Lightning), or a Windows zone name's. Anything else is
+ * returned as written.
  */
 function ianaName(tzid: string): string {
   if (isKnownTimeZone(tzid)) return tzid;
@@ -84,7 +107,7 @@ function ianaName(tzid: string): string {
     const candidate = parts.slice(i).join("/");
     if (candidate.includes("/") && isKnownTimeZone(candidate)) return candidate;
   }
-  return tzid;
+  return windowsZone(tzid.trim()) ?? tzid;
 }
 
 function isKnownTimeZone(timeZone: string): boolean {
