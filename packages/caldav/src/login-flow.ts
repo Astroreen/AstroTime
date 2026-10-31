@@ -56,7 +56,9 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
           `The login flow names ${new URL(result.server).host}, not ${new URL(serverUrl).host}.`,
         );
       }
-      return { server: result.server, username: result.loginName, password: result.appPassword };
+      // On the user's scheme, like the flow's own pages: the app password is never sent in clear.
+      const server = result.server.replace(/^https?:/i, new URL(serverUrl).protocol);
+      return { server, username: result.loginName, password: result.appPassword };
     },
   };
 }

@@ -222,3 +222,16 @@ test("a server the proxy cannot reach is offline for the client, not a 502 from 
     http({ method: "PROPFIND", url: "https://down.example/dav/", headers: {} }),
   ).rejects.toThrow(OfflineError);
 });
+
+test("allowlist entries match however their origin is spelled", async () => {
+  const { fetchImpl } = upstream(() => new Response("ok"));
+  const handler = proxyHandler({
+    prefix: "/dav-proxy/",
+    allow: ["HTTPS://Cloud.Example.com:443/"],
+    fetch: fetchImpl,
+  });
+  const response = await handler(
+    new Request(`http://app.localhost${via.to("https://cloud.example.com/dav/")}`),
+  );
+  expect(response.status).toBe(200);
+});

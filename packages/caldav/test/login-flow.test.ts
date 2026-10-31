@@ -123,3 +123,23 @@ test("a page that is not JSON (a captive portal) is named for what it is", async
   });
   await expect(startLoginFlow(http, "https://cloud.example.com")).rejects.toThrow(/not JSON/);
 });
+
+test("the approved server is used on the user's scheme too", async () => {
+  const http: HttpClient = async (request) => {
+    const reply = (body: unknown) => ({
+      status: 200,
+      url: request.url,
+      header: () => null,
+      body: JSON.stringify(body),
+    });
+    if (request.url.endsWith("/index.php/login/v2")) {
+      return reply({
+        poll: { token: "t", endpoint: "http://cloud.example.com/login/v2/poll" },
+        login: "http://cloud.example.com/login/v2/flow/x",
+      });
+    }
+    return reply({ server: "http://cloud.example.com", loginName: "astro", appPassword: "secret" });
+  };
+  const flow = await startLoginFlow(http, "https://cloud.example.com");
+  expect((await flow.poll())?.server).toBe("https://cloud.example.com");
+});

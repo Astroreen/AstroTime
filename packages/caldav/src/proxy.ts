@@ -58,6 +58,11 @@ export function throughProxy(prefix: string) {
 export function proxyHandler(options: ProxyOptions): (request: Request) => Promise<Response> {
   const via = throughProxy(options.prefix);
   const run = options.fetch ?? fetch;
+  // Spelled as URL spells an origin (lower case, no default port, no slash),
+  // so `HTTPS://Cloud.example.com:443/` in the list matches.
+  const allowed = new Set(
+    options.allow === "*" ? [] : options.allow.map((origin) => new URL(origin).origin),
+  );
   return async (request) => {
     const incoming = new URL(request.url);
     // Only the app's own pages may use the proxy: a page elsewhere would use
@@ -81,7 +86,7 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     }
     if (!/^https?:$/.test(target.protocol))
       return new Response("Not a proxied URL.", { status: 400 });
-    if (options.allow !== "*" && !options.allow.includes(target.origin)) {
+    if (options.allow !== "*" && !allowed.has(target.origin)) {
       return new Response(`${target.origin} is not on this proxy's allowlist.`, { status: 403 });
     }
     const headers = new Headers();

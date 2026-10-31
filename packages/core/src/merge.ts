@@ -189,11 +189,6 @@ function identity(name: string, text: string): string {
 }
 
 /**
- * The server's set, plus what we added since the base, minus what we
- * removed, with what we changed. A value both sides changed differently
- * keeps the server's, and is a conflict.
- */
-/**
  * A set property one value per line: `EXDATE:20260101,20260108` is two
  * values, and each side may add or remove one of them.
  */
@@ -207,6 +202,11 @@ function singles(property: ICAL.Property): ICAL.Property[] {
   });
 }
 
+/**
+ * The server's set, plus what we added since the base, minus what we
+ * removed, with what we changed. A value both sides changed differently
+ * keeps the server's, and is a conflict.
+ */
 function mergeSet(
   target: ICAL.Component,
   name: string,

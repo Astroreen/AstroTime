@@ -239,7 +239,12 @@ async function upload(
     // Our row moves to the server's href first, so the server's version replaces it,
     // unless it was edited meanwhile: markSynced keeps that edit pending for the next sync.
     await store.markSynced(object.id, { href: server.href, etag: server.etag, ics: object.ics });
-    if ((await store.object(object.id))?.pending !== "none") return;
+    const now = await store.object(object.id);
+    if (now && now.pending !== "none") {
+      // Its base is the server's version, which the edit will be merged with.
+      await store.rebase(now.id, now.ics, { ics: now.ics, etag: server.etag, baseIcs: server.ics });
+      return;
+    }
     await store.saveFromServer(calendar.id, server, { replacePending: true });
     return;
   }
