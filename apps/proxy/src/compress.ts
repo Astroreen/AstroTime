@@ -1,7 +1,7 @@
 // Precompresses the built app once, when the image is built
 // (docs/plans/foundation.md#D80): a `.br` and a `.gz` next to each text file,
 // kept only where they are smaller. The server picks one by Accept-Encoding.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
@@ -40,7 +40,9 @@ export async function compress(root: string): Promise<number> {
       [".gz", gzipSync(body, { level: constants.Z_BEST_COMPRESSION })],
     ];
     for (const [suffix, packed] of variants) {
-      // A tiny file can come out larger: then it is served as it is.
+      // A tiny file can come out larger: then it is served as it is, and a
+      // copy left from an earlier run of an older file goes.
+      await rm(file + suffix, { force: true });
       if (packed.length >= body.length) continue;
       await writeFile(file + suffix, packed);
       written++;

@@ -1,8 +1,8 @@
 // The web app's server (docs/plans/foundation.md#D20, D39): the built app's
 // static files, and the CalDAV proxy at /dav-proxy/. It keeps no state.
 import { createHash } from "node:crypto";
-import { createReadStream, type Stats } from "node:fs";
-import { stat } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { open, stat, type FileHandle } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -208,17 +208,18 @@ function matches(header: string | undefined, etag: string): boolean {
 /**
  * The static files of one root (D80). Files are streamed, never held in
  * memory; only each file's ETag is kept, hashed from its content once and
- * again only when its size or time changes.
+ * again only when its size or time changes. Each answer reads one open
+ * file: its size, ETag and body agree even if the file is replaced meanwhile.
  */
 function staticFiles(root: string) {
   const etags = new Map<string, { readonly stamp: string; readonly etag: Promise<string> }>();
-  const etagOf = (file: string, info: Stats): Promise<string> => {
+  const etagOf = (file: string, handle: FileHandle, info: Stats): Promise<string> => {
     const stamp = `${info.ino}:${info.size}:${info.mtimeMs}`;
     const known = etags.get(file);
     if (known?.stamp === stamp) return known.etag;
     const etag = (async () => {
       const hash = createHash("sha256");
-      for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
+      for await (const chunk of bytesOf(handle, info)) hash.update(chunk as Buffer);
       return `"${hash.digest("base64url").slice(0, 22)}"`;
     })();
     const entry = { stamp, etag };
@@ -275,33 +276,47 @@ function staticFiles(root: string) {
     );
     const variant = variants.find((v) => v.coding === coding);
     const sent = variant?.file ?? target;
-    const info = variant?.info ?? (found || (await stat(target)));
-    const etag = await etagOf(sent, info);
-    // Vite names what it puts in assets/ by its content: it never changes.
-    // Everything else, index.html first, is asked about again every time.
-    const immutable = asset && target === file;
-    const headers: Record<string, string | number> = {
-      "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
-      ETag: etag,
-      Vary: "Accept-Encoding",
-      "X-Content-Type-Options": "nosniff",
-    };
-    if (matches(req.headers["if-none-match"], etag)) {
-      res.writeHead(304, headers).end();
-      return;
+    const opened = await open(sent);
+    try {
+      await answer(opened, await opened.stat());
+    } finally {
+      await opened.close();
     }
-    res.writeHead(200, {
-      ...headers,
-      "Content-Type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream",
-      "Content-Length": info.size,
-      ...(variant ? { "Content-Encoding": coding } : {}),
-    });
-    if (req.method === "HEAD") return void res.end();
-    await pipeline(createReadStream(sent), res).catch((error: { code?: string }) => {
-      // A client that went away midway is ordinary, not an error to log.
-      if (error.code !== "ERR_STREAM_PREMATURE_CLOSE") throw error;
-    });
+
+    async function answer(handle: FileHandle, info: Stats): Promise<void> {
+      const etag = await etagOf(sent, handle, info);
+      // Vite names what it puts in assets/ by its content: it never changes.
+      // Everything else, index.html first, is asked about again every time.
+      const immutable = asset && target === file;
+      const headers: Record<string, string | number> = {
+        "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
+        ETag: etag,
+        Vary: "Accept-Encoding",
+        "X-Content-Type-Options": "nosniff",
+      };
+      if (matches(req.headers["if-none-match"], etag)) {
+        res.writeHead(304, headers).end();
+        return;
+      }
+      res.writeHead(200, {
+        ...headers,
+        "Content-Type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream",
+        "Content-Length": info.size,
+        ...(variant ? { "Content-Encoding": coding } : {}),
+      });
+      if (req.method === "HEAD") return void res.end();
+      await pipeline(bytesOf(handle, info), res).catch((error: { code?: string }) => {
+        // A client that went away midway is ordinary, not an error to log.
+        if (error.code !== "ERR_STREAM_PREMATURE_CLOSE") throw error;
+      });
+    }
   };
+}
+
+/** The file's bytes up to the size it had when it was opened, never more than its Content-Length. */
+function bytesOf(handle: FileHandle, info: Stats) {
+  if (info.size === 0) return Readable.from([]);
+  return handle.createReadStream({ start: 0, end: info.size - 1, autoClose: false });
 }
 
 export function createAppServer(options: ServerOptions): Server {

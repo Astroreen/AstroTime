@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -482,19 +482,14 @@ describe("the Host allowlist (D81)", () => {
     expect(proxied.status).toBe(421);
   });
 
-  test("a request with no Host is refused too", async () => {
-    const { request } = await import("node:http");
-    const status = await new Promise<number>((resolve, reject) => {
-      // HTTP/1.1 requires a Host; Node's server refuses one without it (400)
-      // before our handler runs, which is refused all the same.
-      const req = request(`${base}/`, { setHost: false }, (res) => {
-        res.resume();
-        resolve(res.statusCode ?? 0);
-      });
-      req.on("error", reject);
-      req.end();
-    });
-    expect(status).toBe(400);
+  test("an HTTP/1.0 request, which may have no Host, is refused with 421", async () => {
+    const { connect } = await import("node:net");
+    const { port } = new URL(base);
+    const socket = connect(Number(port), "127.0.0.1");
+    socket.end("GET / HTTP/1.0\r\n\r\n");
+    let answer = "";
+    for await (const chunk of socket) answer += String(chunk);
+    expect(answer.split("\r\n")[0]).toBe("HTTP/1.1 421 Misdirected Request");
   });
 
   test("the health check answers whatever the host", async () => {
@@ -523,4 +518,13 @@ test("ASTROTIME_PUBLIC_HOST lists host names, each with an optional port", () =>
   ]) {
     expect(() => publicHosts(wrong)).toThrow(/ASTROTIME_PUBLIC_HOST: .* is not a host name/);
   }
+});
+
+test("compressing again drops a copy that no longer pays off", async () => {
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "app.js"), "calendar ".repeat(200));
+  expect(await compress(root)).toBe(2);
+  writeFileSync(join(root, "app.js"), "1");
+  expect(await compress(root)).toBe(0);
+  expect(readdirSync(root)).toEqual(["app.js"]);
 });

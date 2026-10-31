@@ -371,14 +371,17 @@ Decided while building PR 7.
   picks one by `Accept-Encoding`: the highest q wins, a tie goes to brotli,
   then gzip, then the file as it is, which is also what a client without the
   header or one that refuses everything gets (never a 406); `Vary:
-  Accept-Encoding` on every static answer. Each variant has a strong `ETag`
+  Accept-Encoding` on every answer that carries a file (200 and 304). Each variant has a strong `ETag`
   from its content (SHA-256, cut to 22 base64url characters), and a matching
   `If-None-Match` is a 304; there is no `Last-Modified`, since a build that
   rewrites timestamps (`SOURCE_DATE_EPOCH`) would give two builds of
   `index.html` the same date. Files are streamed from disk, never held in
   memory; the server keeps only each file's ETag, hashed once and again only
   when its size or time changes, so memory is bounded by the number of files
-  in the image. HEAD answers GET's headers. `index.html`, on every route of
+  in the image. The root is taken as read-only, as it is in the image: each
+  answer reads one open file, so its size, ETag and body agree, but a file
+  rewritten in place with the same size within one clock tick keeps its old
+  ETag. HEAD answers GET's headers. `index.html`, on every route of
   the single-page app, is `no-cache` (revalidated on every load); only files
   under `assets/` are immutable ([D40](#D40)). Ranges are not served: the
   files are small enough to fetch whole. A path ending in `.br` or `.gz` is
@@ -392,9 +395,10 @@ Decided while building PR 7.
   browsers send them (punycode, no scheme, path or `*`), or the server refuses
   to start. A request whose `Host` is not listed is answered 421 Misdirected
   Request (RFC 9110: this server cannot answer for that name; 400 would say
-  the request itself is malformed) before it reaches the app or the proxy;
-  one with no `Host` is malformed, and Node refuses it with 400 first. This holds the line against DNS rebinding in the
-  image itself, where [D39](#D39)'s Origin check, which compares with `Host`,
+  the request itself is malformed) before it reaches the app or the proxy,
+  and so is an HTTP/1.0 request with no `Host`; an HTTP/1.1 one without it
+  is malformed, and Node refuses it with 400 first. This holds the line
+  against DNS rebinding in the image itself, where [D39](#D39)'s Origin check, which compares with `Host`,
   cannot. `/healthz` answers whatever the `Host`: it tells nothing, and
   health checks come by loopback (Docker's `HEALTHCHECK`) or by the
   container's own address (Kubernetes sends the pod's IP). Unset, every host
