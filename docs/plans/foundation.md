@@ -471,16 +471,19 @@ no test drives yet. The recordings are `radicale-*.ics` and
 
 ### PR 5 — Calendar grid
 
-`@astrotime/ui` and the web app's views: Day, 3 days, Week, Month, Agenda,
-the all-day strip, the overlap layout, task placement, the tasks screen;
-both themes; i18n; browser-mode tests and Playwright. Builds the
-[design plan](design.md) ([D18](#D18)). Decisions: D1, D13, D14, D15, D16,
-D17, D42, and the design plan's D43–D53.
+In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
+
+- **5a** — `@astrotime/ui` and the web app's shell and views: Day, 3 days,
+  Week, Month, Agenda; the all-day strip, the overlap layout, task
+  placement; both themes; i18n; browser-mode tests and Playwright.
+  Decisions: D1, D13, D14, D15, D16, D17, D42, design D43–D51.
+- **5b** — the tasks screen, the drawer's settings and search. Decisions:
+  design D52, D53.
 
 Done when: each view and the tasks screen render real objects from the
 local store, in both themes and both languages, as in the references; the
-drawer's settings apply and search finds an item by its title;
-screenshots of each next to its reference are the evidence.
+drawer's settings apply and search finds an item by its title; screenshots
+of each next to its reference are the evidence.
 
 ### PR 6 — Editing
 

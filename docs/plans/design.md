@@ -58,8 +58,10 @@ the project.
 - **D50. Items are rounded filled blocks** in their colour with the title
   in bold-ish text wrapping inside; an item drawn over another (D15) gets a
   thin outline in the background colour, so the edge between them shows.
-  All-day items, and tasks the layout does not draw as blocks (D16, D42),
-  are chips one line high; a task with a timed start and due stays a block.
+  In the all-day strip, items are chips one line high. In the time grid a
+  task with only a due (or start) time is a chip as D42 sizes it (30
+  minutes tall, one line of text); a task with a timed start and due is a
+  block like an event.
 - **D51. Tasks on the calendar.** A task's chip carries a check-circle icon;
   a completed task stays, struck through, in a muted colour. Undone tasks
   whose due (a date, a time, or the end of a start–due block) is before the
@@ -68,7 +70,9 @@ the project.
   that has today, and the days they were due no longer show them. This is
   D16's roll-over, drawn as one chip, even for a single
   task (Google shows "1 undone task" too). It counts undone tasks only, so
-  "hide completed" does not change it. D16's "hide
+  "hide completed" does not change it. A recurring task counts once, by its
+  latest undone occurrence before today. In the Agenda view the chip heads
+  today's group. D16's "hide
   completed" toggle stays, in the drawer, and hides completed tasks' chips on
   every view. When the all-day strip holds more than
   fits, it shows the first two rows and "+N", with a chevron that expands
@@ -96,7 +100,10 @@ the project.
 
 ## PR plan
 
-PR 5 of the foundation plan builds this plan: the app shell (top bar,
-drawer with its settings, floating button, search), the five views on the
-layout engine, the tasks screen, both themes, i18n. Its evidence is screenshots of each view next to the matching
-reference, in both themes.
+Foundation's PR 5 builds this plan in two parts:
+
+- **PR 5a** — the app shell (top bar, drawer, floating button), the five
+  views on the layout engine, both themes, i18n (D43–D51).
+- **PR 5b** — the tasks screen, the drawer's settings and search (D52,
+  D53). Its evidence is screenshots of each view next to the matching
+  reference, in both themes.
