@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts", "vite.config.ts"],
+    },
+    "packages/*": {
+      "entry": ["src/index.ts"],
+    },
+    "apps/web": {
+      "entry": ["src/main.tsx", "vite.config.ts"],
+      // Loaded by @vitejs/plugin-react when the React Compiler is on.
+      "ignoreDependencies": ["oxc-transform-react"],
+    },
+  },
+}
