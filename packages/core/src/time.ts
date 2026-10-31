@@ -13,6 +13,10 @@ export type ItemTime =
   | {
       readonly type: "zoned";
       readonly local: string;
+      /**
+       * The IANA zone, or the TZID as written when it is not an IANA name
+       * (an Outlook VTIMEZONE, say). `epochMs` is exact either way.
+       */
       readonly timeZone: string;
       readonly epochMs: number;
     };
@@ -39,7 +43,12 @@ export function fromIcalTime(time: ICAL.Time): ItemTime {
     return { type: "zoned", local, timeZone: "UTC", epochMs: time.toUnixTime() * 1000 };
   }
   if (zone && zone !== ICAL.Timezone.localTimezone && zone.tzid !== "floating") {
-    return { type: "zoned", local, timeZone: zone.tzid, epochMs: time.toUnixTime() * 1000 };
+    return {
+      type: "zoned",
+      local,
+      timeZone: ianaName(zone.tzid),
+      epochMs: time.toUnixTime() * 1000,
+    };
   }
   const tzid = tzidOf(time);
   if (tzid && isKnownTimeZone(tzid)) {
@@ -61,6 +70,21 @@ export function keepTzid(from: ICAL.Time, to: ICAL.Time): ICAL.Time {
   const tzid = tzidOf(from);
   if (tzid) (to as ICAL.Time & { timezone?: string }).timezone = tzid;
   return to;
+}
+
+/**
+ * The IANA name a TZID stands for: itself, or the end of a path-style TZID
+ * (`/freeassociation.sourceforge.net/Europe/Berlin`, older Evolution and
+ * Lightning). Anything else is returned as written.
+ */
+function ianaName(tzid: string): string {
+  if (isKnownTimeZone(tzid)) return tzid;
+  const parts = tzid.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const candidate = parts.slice(i).join("/");
+    if (candidate.includes("/") && isKnownTimeZone(candidate)) return candidate;
+  }
+  return tzid;
 }
 
 function isKnownTimeZone(timeZone: string): boolean {

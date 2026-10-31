@@ -6,7 +6,7 @@ const ITEM_COMPONENTS = ["vevent", "vtodo"] as const;
 
 // ical.js folds after `foldLength` octets but counts a continuation line's
 // leading space on top, so 75 writes 76-octet lines; RFC 5545 §3.1 allows 75.
-ICAL.foldLength = 74;
+const FOLD_LENGTH = 74;
 
 /**
  * One calendar object resource (RFC 4791 §4.1): a `VCALENDAR` with the
@@ -43,7 +43,10 @@ export class CalendarObject {
     if (uids.size !== 1)
       throw new CalendarObjectError("The calendar object holds more than one UID.");
 
-    const master = items.find((component) => !component.hasProperty("recurrence-id")) ?? null;
+    const masters = items.filter((component) => !component.hasProperty("recurrence-id"));
+    if (masters.length > 1)
+      throw new CalendarObjectError("The calendar object has more than one master.");
+    const master = masters[0] ?? null;
     const exceptions = items.filter((component) => component !== master);
     this.root = root;
     this.components = { master, exceptions };
@@ -71,7 +74,14 @@ export class CalendarObject {
 
   /** The iCalendar text, with CRLF line endings as RFC 5545 requires. */
   serialize(): string {
-    return `${this.root.toString()}\r\n`;
+    // `foldLength` is ical.js's global; it is set only while this object is written.
+    const previous = ICAL.foldLength;
+    ICAL.foldLength = FOLD_LENGTH;
+    try {
+      return `${this.root.toString()}\r\n`;
+    } finally {
+      ICAL.foldLength = previous;
+    }
   }
 }
 

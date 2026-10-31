@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   CalendarObject,
+  ExpansionLimitError,
   occurrencesBetween,
   wallClockOf,
   type Occurrence,
@@ -149,4 +150,20 @@ test("an exception whose master the server does not hold still shows (D34)", () 
   expect(
     occurrencesBetween(object, vilnius("2026-11-02", "2026-11-03")).map((o) => o.item.summary),
   ).toEqual(["Invited occurrence"]);
+});
+
+test("a series too dense to reach the range is refused, not cut short", () => {
+  const object = CalendarObject.parse(
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:m\r\nDTSTART:20200101T000000Z\r\nRRULE:FREQ=MINUTELY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  expect(() => occurrencesBetween(object, vilnius("2026-11-01", "2026-11-02"))).toThrow(
+    ExpansionLimitError,
+  );
+});
+
+test("a dense series close to the range still expands", () => {
+  const object = CalendarObject.parse(
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:h\r\nDTSTART:20250101T000000Z\r\nRRULE:FREQ=HOURLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  expect(occurrencesBetween(object, vilnius("2026-11-01", "2026-11-02"))).toHaveLength(24);
 });

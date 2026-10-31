@@ -191,8 +191,8 @@ Decided while building PR 2.
   on the user's day, a floating one at the same wall clock everywhere. A
   series keeps its wall-clock time and length across DST changes.
 - **D34. A calendar object is one UID.** A `VCALENDAR` mixing UIDs, or events
-  with tasks, is refused (RFC 4791 §4.1); exceptions without their master
-  are kept and shown.
+  with tasks, or with two masters, is refused (RFC 4791 §4.1); exceptions
+  without their master are kept and shown.
 
 ## Deferred
 
@@ -206,10 +206,13 @@ Decided while building PR 2.
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
 - **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
-  without a VTIMEZONE stays floating until it is mapped to IANA ([D32](#D32)).
+  without a VTIMEZONE stays floating until it is mapped to IANA; with a
+  VTIMEZONE the instant is exact and `timeZone` keeps the Windows name
+  ([D32](#D32)).
 - **Expanding long series from the middle** — `occurrencesBetween` walks a
-  series from its first occurrence; a cache or a start point comes when a
-  profile shows it matters ([D33](#D33)).
+  series from its first occurrence and throws `ExpansionLimitError` past
+  50 000 steps (a minutely or hourly series from years ago); a start point
+  or a cache comes when a real calendar hits it ([D33](#D33)).
 - **Browser-mode component tests and Playwright e2e** — set up in PR 5,
   when there is UI to test.
 

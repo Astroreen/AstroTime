@@ -23,8 +23,19 @@ export interface Range {
   readonly timeZone: string;
 }
 
-/** A guard against rules no range can stop (a series that never moves forward). */
-const MAX_STEPS = 100_000;
+/**
+ * How many occurrences a series may be walked through before the range.
+ * Expansion starts at the series' first occurrence (docs/plans/foundation.md#deferred),
+ * so a minutely or hourly series from years ago would take seconds (a daily
+ * one may reach back to 1890). Such a series is refused instead of being cut
+ * short in silence.
+ */
+const MAX_STEPS = 50_000;
+
+/** A series too dense to expand up to the range (`MAX_STEPS`). */
+export class ExpansionLimitError extends Error {
+  override name = "ExpansionLimitError";
+}
 
 /**
  * Where an item sits in time. An event spans `DTSTART`–end; a task spans
@@ -106,9 +117,14 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
       // A start in another zone shows at most a day away from its own wall clock.
       const stop = `${shiftDate(range.to, 1)}T00:00:00`;
       const expansion = new ICAL.RecurExpansion({ component: master, dtstart: span.start });
-      for (let step = 0; step < MAX_STEPS; step++) {
+      for (let step = 0; ; step++) {
         const next = expansion.next();
         if (!next) break;
+        if (step >= MAX_STEPS) {
+          throw new ExpansionLimitError(
+            `The series ${object.uid} needs more than ${MAX_STEPS} steps to reach the range.`,
+          );
+        }
         keepTzid(span.start, next);
         const recurrenceId = fromIcalTime(next);
         if (localOf(recurrenceId) >= stop) break;

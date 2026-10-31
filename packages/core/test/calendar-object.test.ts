@@ -117,6 +117,26 @@ describe("events", () => {
     expect(event.end).toMatchObject({ type: "zoned", local: "2026-10-31T01:00:00" });
   });
 
+  test("Outlook: a VTIMEZONE with a Windows name gives the exact instant and keeps the name", () => {
+    const event = load("outlook-event-windows-tz.ics").master as Event;
+    expect(event.start).toEqual({
+      type: "zoned",
+      local: "2026-11-04T14:00:00",
+      timeZone: "W. Europe Standard Time",
+      epochMs: Date.parse("2026-11-04T13:00:00Z"),
+    });
+  });
+
+  test("a path-style TZID reads as the IANA zone at its end", () => {
+    const source = fixture("nextcloud-event-recurring.ics").replaceAll(
+      "Europe/Vilnius",
+      "/freeassociation.sourceforge.net/Europe/Vilnius",
+    );
+    expect(CalendarObject.parse(source).master).toMatchObject({
+      start: { timeZone: "Europe/Vilnius", epochMs: Date.parse("2026-10-20T07:00:00Z") },
+    });
+  });
+
   test("a floating time stays floating", () => {
     const event = load("floating-event.ics").master as Event;
     expect(event.start).toEqual({ type: "floating", local: "2026-10-31T09:00:00" });
@@ -203,4 +223,10 @@ test("Cyrillic text folds on octets, never inside a character", () => {
     true,
   );
   expect(CalendarObject.parse(written).master?.summary).toBe(summary);
+});
+
+test("serialize leaves ical.js's global fold length as it found it", () => {
+  const before = ICAL.foldLength;
+  load("apple-event-attendees.ics").serialize();
+  expect(ICAL.foldLength).toBe(before);
 });
