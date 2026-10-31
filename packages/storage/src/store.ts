@@ -1,5 +1,14 @@
-import { boundsOf, CalendarObject, type Range } from "@astrotime/core";
-import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import {
+  boundsOf,
+  CalendarObject,
+  ExpansionLimitError,
+  isDone,
+  latestUndoneBefore,
+  type Occurrence,
+  type Range,
+  wallClockOf,
+} from "@astrotime/core";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 
 import type { SqlDriver } from "./driver.ts";
@@ -14,6 +23,12 @@ export type StoredObject = typeof schema.objects.$inferSelect;
 export type Conflict = typeof schema.conflicts.$inferSelect;
 export type Component = "VEVENT" | "VTODO";
 export type Pending = StoredObject["pending"];
+
+/** A task that rolls over to today, with the occurrence it counts by (design D51). */
+export interface UndoneTask {
+  readonly object: StoredObject;
+  readonly occurrence: Occurrence;
+}
 
 /** The most a zone is from UTC; a range of days is widened by it to find candidates. */
 const ZONE_SLACK_MS = 14 * 3_600_000;
@@ -48,6 +63,31 @@ export class Store {
 
   close(): Promise<void> {
     return this.driver.close();
+  }
+
+  /**
+   * Calls `listener` after every write, before the write's promise resolves,
+   * so a view reads the store again (a sync writes while the app is open).
+   * Returns the function that stops it.
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private readonly listeners = new Set<() => void>();
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        // A listener's failure is reported, but never fails the write.
+        queueMicrotask(() => {
+          throw error;
+        });
+      }
+    }
   }
 
   // Accounts
@@ -242,17 +282,9 @@ export class Store {
       const current = await this.object(id);
       if (!current || current.ics !== from || current.pending === "delete") return null;
       const object = CalendarObject.parse(merged.ics);
-      const { startMs, endMs } = boundsOf(object);
       const [row] = await this.db
         .update(schema.objects)
-        .set({
-          ...merged,
-          uid: object.uid,
-          kind: object.kind,
-          startMs,
-          endMs,
-          updatedAt: Date.now(),
-        })
+        .set({ ...merged, ...indexOf(object), updatedAt: Date.now() })
         .where(eq(schema.objects.id, id))
         .returning();
       return row ?? null;
@@ -302,6 +334,48 @@ export class Store {
       );
   }
 
+  /**
+   * The undone tasks whose due is before `day` starts in `timeZone`, each
+   * with the occurrence it counts by, oldest due first: the "N undone tasks"
+   * chip on today (design D51). A series too dense to expand is left out.
+   */
+  async undoneTasksBefore(
+    calendarIds: readonly string[],
+    day: string,
+    timeZone: string,
+  ): Promise<UndoneTask[]> {
+    const candidates = await this.db
+      .select()
+      .from(schema.objects)
+      .where(
+        and(
+          inArray(schema.objects.calendarId, [...calendarIds]),
+          eq(schema.objects.kind, "task"),
+          ne(schema.objects.pending, "delete"),
+          or(isNull(schema.objects.done), eq(schema.objects.done, false)),
+          lt(schema.objects.startMs, Date.parse(`${day}T00:00:00Z`) + ZONE_SLACK_MS),
+        ),
+      );
+    const undone: (UndoneTask & { key: string })[] = [];
+    for (const object of candidates) {
+      let occurrence: Occurrence | null;
+      try {
+        occurrence = latestUndoneBefore(CalendarObject.parse(object.ics), day, timeZone);
+      } catch (error) {
+        if (error instanceof ExpansionLimitError) continue;
+        throw error;
+      }
+      if (occurrence) {
+        // Ties by title, in code-unit order, the same on every platform.
+        const key = `${wallClockOf(occurrence.end, timeZone)} ${occurrence.item.summary ?? ""}`;
+        undone.push({ object, occurrence, key });
+      }
+    }
+    return undone
+      .toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .map(({ object, occurrence }) => ({ object, occurrence }));
+  }
+
   /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
   undated(calendarIds: readonly string[]): Promise<StoredObject[]> {
     return this.db
@@ -318,11 +392,14 @@ export class Store {
 
   /** The local changes of a calendar the sync engine has to upload. */
   pending(calendarId: string): Promise<StoredObject[]> {
-    return this.db
-      .select()
-      .from(schema.objects)
-      .where(and(eq(schema.objects.calendarId, calendarId), ne(schema.objects.pending, "none")))
-      .orderBy(schema.objects.updatedAt, schema.objects.id);
+    return (
+      this.db
+        .select()
+        .from(schema.objects)
+        .where(and(eq(schema.objects.calendarId, calendarId), ne(schema.objects.pending, "none")))
+        // Changes made in the same millisecond keep the order their rows were made in.
+        .orderBy(schema.objects.updatedAt, sql`rowid`)
+    );
   }
 
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */
@@ -370,7 +447,11 @@ export class Store {
    * must see the first one's row).
    */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(operation);
+    const result = this.queue.then(async () => {
+      const value = await operation();
+      this.notify();
+      return value;
+    });
     this.queue = result.then(
       () => {},
       () => {},
@@ -388,17 +469,12 @@ export class Store {
     pending: Pending,
     baseIcs: string | null,
   ): Promise<StoredObject> {
-    const object = CalendarObject.parse(ics);
-    const { startMs, endMs } = boundsOf(object);
     const values = {
       etag,
-      uid: object.uid,
-      kind: object.kind,
+      ...indexOf(CalendarObject.parse(ics)),
       ics,
       pending,
       baseIcs,
-      startMs,
-      endMs,
       updatedAt: Date.now(),
     };
     const [row] = await this.db
@@ -408,6 +484,16 @@ export class Store {
       .returning();
     return row!;
   }
+}
+
+/** The columns an object is found by, read from its iCalendar. */
+function indexOf(object: CalendarObject) {
+  return {
+    uid: object.uid,
+    kind: object.kind,
+    ...boundsOf(object),
+    done: object.master !== null && isDone(object.master),
+  };
 }
 
 function toCalendar(row: typeof schema.calendars.$inferSelect): Calendar {

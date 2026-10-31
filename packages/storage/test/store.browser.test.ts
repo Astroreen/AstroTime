@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { Store } from "../src/index.ts";
+import { Store, StoreInUseError } from "../src/index.ts";
 import { webDriver } from "../src/web/index.ts";
 import { storeContract } from "./store.contract.ts";
 
@@ -8,11 +8,13 @@ import { storeContract } from "./store.contract.ts";
 let n = 0;
 storeContract("sqlite-wasm on OPFS", () => webDriver(`test-${Date.now()}-${n++}`));
 
-test("a second open of a database another worker holds fails instead of hanging", async () => {
+test("a second open of a database another tab holds fails with StoreInUseError instead of hanging", async () => {
   const name = `held-${Date.now()}`;
   const first = await webDriver(name);
-  await expect(webDriver(name)).rejects.toThrow();
+  await expect(webDriver(name)).rejects.toThrow(StoreInUseError);
   await first.close();
+  // Closed, the database is free again.
+  await (await webDriver(name)).close();
 });
 
 test("what is written survives closing and reopening the database on OPFS", async () => {

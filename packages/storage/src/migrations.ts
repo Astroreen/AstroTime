@@ -60,6 +60,12 @@ const MIGRATIONS: readonly string[] = [
   `
   CREATE INDEX objects_calendar_uid ON objects(calendar_id, uid);
   `,
+  // 4: whether a task's master is done, so finding undone tasks skips the
+  // done ones without parsing them (design D51). NULL: written before this
+  // migration, parsed to find out.
+  `
+  ALTER TABLE objects ADD COLUMN done INTEGER;
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */
