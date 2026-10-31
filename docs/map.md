@@ -78,5 +78,4 @@ When you add a package, app or module, add its line here in the same PR.
   → `README.md#how-knowledge-is-arranged`
 - `.github/workflows/` — CI (with the image built and started), the nightly
   Nextcloud run, the release of the image on a `v*` tag, Claude review,
-  `@claude`. → `plans/foundation.md#D41`
-  → `plans/foundation.md#D27`
+  `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`
