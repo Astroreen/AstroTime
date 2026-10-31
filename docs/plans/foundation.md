@@ -219,8 +219,10 @@ Decided while building PR 2.
   table is generated, not written by hand (`scripts/generate-windows-zones.ts`
   pins a CLDR release). For a mapped name `ItemTime.timeZone` is the IANA
   zone; the TZID as read stays in the calendar object, so `serialize` writes
-  it back unchanged (rule 2). A zone the object defines keeps its TZID as
-  `timeZone` even when it is a Windows name.
+  it back unchanged (rule 2). A Windows name the object defines in a
+  VTIMEZONE (Outlook's usual output) is mapped the same way for `timeZone`,
+  while its instants come from the VTIMEZONE; only a defined TZID that is
+  neither (`Customized Time Zone`) stays as written.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A

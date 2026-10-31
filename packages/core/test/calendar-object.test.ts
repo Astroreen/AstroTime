@@ -3,7 +3,13 @@ import { readdirSync } from "node:fs";
 import ICAL from "ical.js";
 import { describe, expect, test } from "vite-plus/test";
 
-import { CalendarObject, CalendarObjectError, type Event, type Task } from "../src/index.ts";
+import {
+  CalendarObject,
+  CalendarObjectError,
+  type Event,
+  type Task,
+  wallClockOf,
+} from "../src/index.ts";
 import { fixture, load } from "./support.ts";
 
 /** Unfolded content lines (RFC 5545 §3.1). */
@@ -164,12 +170,12 @@ describe("events", () => {
     expect(event.end).toMatchObject({ type: "zoned", local: "2026-10-31T01:00:00" });
   });
 
-  test("Outlook: a VTIMEZONE with a Windows name gives the exact instant and keeps the name", () => {
+  test("Outlook: a VTIMEZONE with a Windows name gives the exact instant and the IANA zone", () => {
     const event = load("outlook-event-windows-tz.ics").master as Event;
     expect(event.start).toEqual({
       type: "zoned",
       local: "2026-11-04T14:00:00",
-      timeZone: "W. Europe Standard Time",
+      timeZone: "Europe/Berlin",
       epochMs: Date.parse("2026-11-04T13:00:00Z"),
     });
   });
@@ -222,9 +228,30 @@ describe("events", () => {
       expect(event.start).toEqual({ type: "floating", local: "2026-11-04T14:00:00" });
     });
 
-    test("an IANA name wins, and a VTIMEZONE of the object wins over both", () => {
-      const event = load("outlook-event-windows-tz.ics").master as Event;
-      expect(event.start).toMatchObject({ timeZone: "W. Europe Standard Time" });
+    test("with a VTIMEZONE the zone is one Intl knows, so its wall clock reads back", () => {
+      const start = (load("outlook-event-windows-tz.ics").master as Event).start;
+      if (start?.type !== "zoned") throw new Error("expected a zoned start");
+      expect(start.timeZone).toBe("Europe/Berlin");
+      expect(wallClockOf(start, start.timeZone)).toBe(start.local);
+    });
+
+    test("a local time in the spring gap takes the offset before it, as for IANA names", () => {
+      // Berlin skips 02:00–03:00 on 29 Mar 2026; 02:30 is read with +01:00.
+      const ics = fixture("outlook-event-windows-tz-no-vtimezone.ics")
+        .replace(
+          "DTSTART;TZID=W. Europe Standard Time:20260715T100000",
+          "DTSTART;TZID=W. Europe Standard Time:20260329T023000",
+        )
+        .replace(
+          "DTEND;TZID=W. Europe Standard Time:20260715T113000",
+          "DTEND;TZID=W. Europe Standard Time:20260329T040000",
+        );
+      expect(CalendarObject.parse(ics).master).toMatchObject({
+        start: { timeZone: "Europe/Berlin", epochMs: Date.parse("2026-03-29T01:30:00Z") },
+      });
+    });
+
+    test("an IANA name wins over a Windows one", () => {
       expect(load("google-event-unknown-tz.ics").master).toMatchObject({
         start: { timeZone: "Europe/Berlin" },
       });

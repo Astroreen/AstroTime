@@ -16,11 +16,12 @@ export type ItemTime =
       readonly type: "zoned";
       readonly local: string;
       /**
-       * The IANA zone; a Windows zone name without a VTIMEZONE is read as the
-       * IANA zone it maps to. When the object defines the zone and it is not an
-       * IANA name (an Outlook VTIMEZONE, say) this is the TZID as written.
-       * `epochMs` is exact either way. The TZID itself is never rewritten: it
-       * stays in the calendar object, which is what `serialize` writes.
+       * The IANA zone; a Windows zone name is read as the IANA zone it maps
+       * to, with a VTIMEZONE or without. Only a TZID that is neither, in a
+       * VTIMEZONE the object defines (`Customized Time Zone`), stays as written,
+       * and is then no zone `Intl` knows. `epochMs` is exact either way. The
+       * TZID itself is never rewritten: it stays in the calendar object, which
+       * is what `serialize` writes.
        */
       readonly timeZone: string;
       readonly epochMs: number;
@@ -94,9 +95,10 @@ export function keepTzid(from: ICAL.Time, to: ICAL.Time): ICAL.Time {
 }
 
 /**
- * The IANA name a TZID stands for: itself, or the end of a path-style TZID
- * (`/freeassociation.sourceforge.net/Europe/Berlin`, older Evolution and
- * Lightning). Anything else is returned as written.
+ * The IANA name a TZID the object defines stands for: itself, the end of a
+ * path-style TZID (`/freeassociation.sourceforge.net/Europe/Berlin`, older
+ * Evolution and Lightning), or a Windows zone name's. Anything else is
+ * returned as written.
  */
 function ianaName(tzid: string): string {
   if (isKnownTimeZone(tzid)) return tzid;
@@ -105,7 +107,7 @@ function ianaName(tzid: string): string {
     const candidate = parts.slice(i).join("/");
     if (candidate.includes("/") && isKnownTimeZone(candidate)) return candidate;
   }
-  return tzid;
+  return windowsZone(tzid.trim()) ?? tzid;
 }
 
 function isKnownTimeZone(timeZone: string): boolean {
