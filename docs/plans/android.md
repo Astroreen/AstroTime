@@ -42,8 +42,8 @@ were checked on 2026-11-01.
   ones; a platform only shows them. It also exports one sync entry,
   `syncAll()`: it syncs every account, joins a sync already running instead
   of starting a second, and reschedules the reminders afterwards. The UI's
-  own triggers (start, focus, a timer) are the web's decision, taken
-  elsewhere, and run in every shell because the UI is the same; a shell
+  own triggers (start, focus, a timer) are the web's decision, taken in
+  foundation's PR 5 with the accounts and sync wiring, and run in every shell because the UI is the same; a shell
   adds triggers of its own by calling `syncAll()` ([D67](#D67), desktop
   [D75](desktop.md#D75)). The UI pads its edges by the safe-area insets
   ([D68](#D68)). If PR 5 lands a different shape first, the code is the
@@ -83,8 +83,12 @@ were checked on 2026-11-01.
   jar is set, so no cookies are kept. The app trusts user-installed CAs as
   well as the system's (`network_security_config`), so a self-hosted
   server with its own CA works once its certificate is installed on the
-  phone, and allows plain `http` to the address the user typed (a server
-  on the home network, the local Radicale), as the web app does.
+  phone. Plain `http` (a server on the home network, the local Radicale)
+  cannot be allowed per address in `network_security_config`, which is
+  static and by domain, so the base config permits cleartext and the plugin
+  holds the line itself: it refuses an `http` request unless its origin is
+  a saved account's or the one being signed in to, so nothing the user did
+  not type goes out unencrypted.
 
 - **D63. The store: sqlite-wasm on OPFS in the WebView.** _Changes
   foundation's [D25](foundation.md#D25)_, which named
@@ -123,7 +127,11 @@ were checked on 2026-11-01.
   sign-in screen (the same on every platform) polls every 2 seconds while
   it waits, at once when the user returns to the app (`browserFinished`,
   `visibilitychange`), and gives up after 20 minutes, when Nextcloud's
-  token expires; once approved, the Custom Tab is closed.
+  token expires. `@capacitor/browser`'s `close()` does nothing on Android,
+  so once the flow is approved the plugin of [D62](#D62) brings the app's
+  activity forward (`FLAG_ACTIVITY_CLEAR_TOP`, which ends the Custom Tab in
+  the app's task); if that fails on a device, the user returns with back,
+  and the poll on return finishes the sign-in.
 
 ### Behaviour
 
@@ -287,13 +295,21 @@ after the next sync; unit tests cover the set's diff and the ids.
 ### PR A4 — Background sync
 
 The WorkManager job with the headless WebView; first the proof that it
-opens the store. Decisions: D67.
+opens the store. Then the job's own native entry points: the headless
+WebView has no Capacitor bridge, so HTTP ([D62](#D62)), secrets
+([D64](#D64)) and notifications ([D66](#D66)) each get a
+`WebMessageListener` handler next to their plugin, sharing its Kotlin core,
+and a background adapter set in TypeScript speaks to them. Decisions: D67.
 
 Done when: with the app closed, a change made on the server arrives within
 a WorkManager run (forced with `adb shell cmd jobscheduler run` or
 WorkManager's test driver, never a wait), and its reminder is scheduled;
-with the app open the job does nothing. If the proof fails, the PR records
-it and moves background sync to Deferred instead.
+with the app open the job does nothing; the three handlers are unit-tested
+like the plugins. If the proof fails, the PR records it and moves
+background sync to Deferred instead; reminders then reach only as far as
+the last time the app was opened, so the horizon of [D60](#D60) grows to
+30 days (still at most 100 reminders) and the settings say that reminders
+need the app opened now and then.
 
 ### PR A5 — The release APK
 

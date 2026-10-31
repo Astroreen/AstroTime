@@ -44,10 +44,16 @@ were checked on 2026-11-01.
   privileged `app://astrotime/` scheme served by `protocol.handle` out of
   the app's asar, not from `file://`. The preload exposes one object through
   `contextBridge`, with exactly what the adapters need: `http(request)`
-  ([D72](#D72)), the store's port ([D73](#D73)), `secrets` ([D74](#D74)),
+  ([D72](#D72)), `secrets` ([D74](#D74)),
   `reminders.schedule` ([D76](#D76)), `openExternal` for an `http(s)` URL
   ([D77](#D77)), and an event for sync requests ([D75](#D75)); each IPC
   handler checks its arguments and that the sender is the app's own page.
+  The store's `MessagePort` ([D73](#D73)) cannot cross `contextBridge`: the
+  main process sends it to the preload (`webContents.postMessage`), which
+  passes it to the page with `window.postMessage` to the app's own origin.
+  The page then holds a port that runs SQL, as the web app holds its
+  worker: the utility process answers only the store protocol's messages,
+  and nothing but the app's own page, under the CSP, runs there.
   The CSP is `default-src 'self'` with `connect-src 'self'`, `object-src
   'none'`, `base-uri 'none'`: the renderer reaches no network itself, every
   request goes through the main process. Navigation away from `app://` and
@@ -80,7 +86,7 @@ were checked on 2026-11-01.
 - **D73. The store in a utility process.** `node:sqlite` ([D25](foundation.md#D25))
   runs in an Electron `utilityProcess` that owns the database file
   (`astrotime.sqlite3` in `userData`). The main process hands the renderer
-  a `MessagePort` to it at start, and the renderer's `SqlDriver` speaks the
+  a `MessagePort` to it at start, through the preload ([D71](#D71)), and the renderer's `SqlDriver` speaks the
   web worker's messages (`packages/storage/src/web/protocol.ts`) over that
   port, so the web's driver serves both with the port as its only
   difference. `DatabaseSync` is synchronous: in the main process a long
@@ -164,7 +170,10 @@ were checked on 2026-11-01.
   Node without Electron. A `v*` tag builds the AppImage and deb for x64 on
   `ubuntu-latest` and for arm64 on `ubuntu-24.04-arm` (free for public
   repositories, so no emulation) and uploads them with `gh release upload`
-  to the Release the Android plan's workflow creates ([D69](android.md#D69)).
+  to the tag's Release. One job of the release workflow creates that
+  Release when it is missing (`gh release view || gh release create`), and
+  the Android ([D69](android.md#D69)) and desktop jobs `need` it, so neither
+  races the other and either can run without the other.
   On NixOS the dev shell sets `ELECTRON_SKIP_BINARY_DOWNLOAD=1` and points
   `ELECTRON_OVERRIDE_DIST_PATH` at nixpkgs' Electron of the same major
   ([D70](#D70)), since Electron's downloaded binary does not run there.
@@ -203,7 +212,8 @@ password (credentials held in memory until PR D2). The dev shell's Electron.
 CI's desktop build and smoke test. Decisions: D70, D71, D72, D73, D79 (CI
 half).
 
-Done when: `node:sqlite` is shown to run in the utility process; the app
+Done when: `node:sqlite` is shown to run in the utility process, and the
+page receives its port through the preload as D71 describes; the app
 starts in the dev shell, signs in to the local Radicale and shows its items
 from the local store; a redirect test proves the final URL and the dropped
 `Authorization`; the smoke test passes in CI. Screenshots of the window in

@@ -410,8 +410,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
   which comes with Playwright e2e ([D19](#D19)).
 - **Scheduling syncs** — `syncAccount` runs when called; when and how often
   the apps call it (on start, on focus, on a timer, Android background sync)
-  is decided with each app: Android in [android.md D67](android.md#D67), the
-  desktop in [desktop.md D75](desktop.md#D75).
+  is decided with each app: the web (the UI's own triggers, which every
+  shell inherits) with PR 5's accounts and sync wiring, Android in
+  [android.md D67](android.md#D67), the desktop in
+  [desktop.md D75](desktop.md#D75).
 
 - **Overdue tasks on today** — D16's roll-over needs the store to find
   undone tasks due before today; it comes with PR 5a's calendar views
