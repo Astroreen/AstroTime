@@ -38,6 +38,10 @@ else
   echo "astrotime: no radicale on PATH, so no local CalDAV server (it comes with devenv)" >&2
 fi
 
+if [ "$ASTROTIME_WEB_HOST" != 127.0.0.1 ] && [ -z "${ASTROTIME_PROXY_ALLOW:-}" ]; then
+  echo "astrotime: the dev proxy listens beyond localhost with no ASTROTIME_PROXY_ALLOW, so it refuses every CalDAV server; list yours there" >&2
+fi
+
 # Names other devices may reach the dev server by (Vite refuses unknown Host
 # headers): this machine's name, and its Tailscale MagicDNS names.
 export ASTROTIME_WEB_ALLOWED_HOSTS="${ASTROTIME_WEB_ALLOWED_HOSTS:-$(hostname),.ts.net}"
@@ -47,7 +51,7 @@ start_until "Local:" env NO_COLOR=1 pnpm --dir "$ASTROTIME_ROOT/apps/web" exec v
 
 echo
 echo "astrotime: open http://127.0.0.1:$ASTROTIME_WEB_PORT"
-if [ "$ASTROTIME_WEB_HOST" != 127.0.0.1 ] && command -v tailscale >/dev/null 2>&1; then
+if [ "${ASTROTIME_WEB_CLIENTS:-}" = tailnet ]; then
   tailnet="$(tailscale ip -4 2>/dev/null | head -n 1 || true)"
   if [ -n "$tailnet" ]; then
     echo "astrotime: on your tailnet http://$tailnet:$ASTROTIME_WEB_PORT (or http://$(hostname):$ASTROTIME_WEB_PORT)"

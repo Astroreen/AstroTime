@@ -29,9 +29,16 @@ export ASTROTIME_DEV_DIR
 mkdir -p "$ASTROTIME_DEV_DIR"
 
 ASTROTIME_WEB_PORT="${ASTROTIME_WEB_PORT:-5180}"
-# Every interface, so the app opens from the owner's other devices (over
-# Tailscale, say); 127.0.0.1 keeps it to this machine.
-ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-0.0.0.0}"
+# With Tailscale, every interface, so the app opens from the owner's other
+# devices, but only loopback and tailnet clients may connect
+# (apps/web/dev-clients.ts); without it, this machine only. A host set by
+# hand (0.0.0.0 for a LAN) is taken as it is, with no client check.
+if [ -z "${ASTROTIME_WEB_HOST:-}" ] && command -v tailscale >/dev/null 2>&1 && [ -n "$(tailscale ip -4 2>/dev/null || true)" ]; then
+  ASTROTIME_WEB_HOST=0.0.0.0
+  ASTROTIME_WEB_CLIENTS="${ASTROTIME_WEB_CLIENTS:-tailnet}"
+  export ASTROTIME_WEB_CLIENTS
+fi
+ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-127.0.0.1}"
 ASTROTIME_DAV_PORT="${ASTROTIME_DAV_PORT:-5232}"
 
 node_major() {
