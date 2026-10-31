@@ -112,11 +112,15 @@ export class CalDavProvider implements Provider {
         ]);
         const principalHref = text(principal.response?.props["current-user-principal"]);
         if (!principalHref) continue;
+        // The credentials go no further than the origin that answered: a
+        // principal or a home the server names elsewhere is not followed.
+        const origin = new URL(principal.url).origin;
         const principalUrl = new URL(principalHref, principal.url).href;
+        if (new URL(principalUrl).origin !== origin) continue;
         const home = await propfindOne(http, authorization, principalUrl, ["c:calendar-home-set"]);
         const homeHref = text(home.response?.props["calendar-home-set"]);
-        if (homeHref)
-          return { principalUrl, homeUrl: collection(new URL(homeHref, home.url).href) };
+        const homeUrl = homeHref ? collection(new URL(homeHref, home.url).href) : null;
+        if (homeUrl && new URL(homeUrl).origin === origin) return { principalUrl, homeUrl };
       } catch (error) {
         if (error instanceof AuthError) throw error;
         lastError = error;
@@ -243,7 +247,7 @@ export class CalDavProvider implements Provider {
 
   async fetch(href: string): Promise<RemoteObject | null> {
     const response = await this.request(
-      { method: "GET", url: href, headers: { Accept: "text/calendar" } },
+      { method: "GET", url: this.wire(href), headers: { Accept: "text/calendar" } },
       [404, 410],
     );
     if (response.status >= 400) return null;
@@ -306,7 +310,7 @@ export class CalDavProvider implements Provider {
         method: "REPORT",
         url: calendarUrl,
         headers: { Depth: "1", "Content-Type": "application/xml; charset=utf-8" },
-        body: multiget(batch.map((href) => new URL(href).pathname)),
+        body: multiget(batch.map((href) => new URL(this.wire(href)).pathname)),
       });
       for (const r of parseMultistatus(response.body).responses) {
         const ics = text(r.props["calendar-data"]);
@@ -344,7 +348,19 @@ export class CalDavProvider implements Provider {
   /** An href from the server, resolved; `null` when it points to another origin. */
   private own(href: string, base: string): string | null {
     const url = canonicalHref(href, base);
-    return new URL(url).origin === new URL(this.homeUrl).origin ? url : null;
+    if (new URL(url).origin !== new URL(this.homeUrl).origin) return null;
+    // Compared in one spelling, asked for in the server's own.
+    this.spelling.set(url, new URL(href, base).pathname);
+    return url;
+  }
+
+  /** How the server spells each href it named (see `own`). */
+  private readonly spelling = new Map<string, string>();
+
+  /** An href as the server spells it, for a request about it. */
+  private wire(href: string): string {
+    const path = this.spelling.get(href);
+    return path ? new URL(path, href).href : href;
   }
 }
 

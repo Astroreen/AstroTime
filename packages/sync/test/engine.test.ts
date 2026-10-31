@@ -297,4 +297,33 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect(await sync()).toMatchObject({ uploaded: 1, conflicts: 0 });
     expect(sent.every((e) => !e?.startsWith("W/"))).toBe(true);
   });
+
+  test("after a merge, a server without a strong ETag gets no blind retry; the next sync compares first", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("m", "One"));
+    await sync();
+    const href = `${calendarUrl}m.ics`;
+    server.objects.set(href, {
+      etag: '"theirs"',
+      ics: task("m", "One").replace("END:VTODO", "LOCATION:There\r\nEND:VTODO"),
+    });
+    const fetchServer = server.fetch.bind(server);
+    // The server answers a GET with a weak ETag only.
+    server.fetch = async (h) => {
+      const object = await fetchServer(h);
+      return object ? { ...object, etag: 'W/"weak"' } : null;
+    };
+    const updates: (string | null)[] = [];
+    const update = server.update.bind(server);
+    server.update = async (h, ics, etag) => {
+      updates.push(etag);
+      return update(h, ics, etag);
+    };
+    await store.saveLocal(calendar.id, task("m", "Two"));
+    await sync();
+    // One conditional try (refused), then no blind write against the weak ETag.
+    expect(updates).toEqual(['"1"']);
+    expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["m"]);
+  });
 });

@@ -75,10 +75,12 @@ function parseStart(
   ) {
     throw new Error("The login flow's answer is not Nextcloud's.");
   }
-  const origin = new URL(serverUrl).origin;
+  // The host is compared: behind a TLS terminator Nextcloud may name its
+  // pages http:// while the user reached it on https://.
+  const host = new URL(serverUrl).host;
   for (const url of [login, poll.endpoint]) {
-    if (new URL(url).origin !== origin)
-      throw new Error(`The login flow points to ${new URL(url).origin}, not ${origin}.`);
+    if (new URL(url).host !== host)
+      throw new Error(`The login flow points to ${new URL(url).host}, not ${host}.`);
   }
   return { login, poll: { token: poll.token, endpoint: poll.endpoint } };
 }

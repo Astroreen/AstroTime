@@ -234,6 +234,9 @@ async function upload(
         await store.addConflict(object.id, object.ics);
         report.conflicts++;
       }
+      // Without a strong ETag the retry could overwrite a change made since
+      // the fetch; the next sync compares with the new base first (currentEtag).
+      if (server.etag === null || server.etag.startsWith("W/")) return;
       uploaded = merge.ics;
       result = await provider.update(href, merge.ics, server.etag);
       // Refused again: it changed once more meanwhile; the next sync merges the rebased change.

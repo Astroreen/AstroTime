@@ -49,8 +49,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
 
 - **Local store** — the SQLite database on the device; the UI's source of
   truth.
-- **Sync engine** — the code in `@astrotime/core` that reconciles the local
-  store with providers.
+- **Sync engine** — `syncAccount` in `@astrotime/sync`, which reconciles
+  the local store with a provider (D37).
 - **Sync token** — the server's marker of the last state we saw
   (RFC 6578); the next sync asks only for what changed since.
 - **ETag** — the server's version of one item; writes send it so a newer

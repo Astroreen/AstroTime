@@ -269,9 +269,12 @@ Decided while building PR 4.
   with another `Origin`, or that the browser marks cross-site, is refused, so
   a page elsewhere cannot use it to reach the servers behind it. The host is
   compared, not the scheme, so it works behind a TLS terminator. The
-  provider sends credentials to its calendar home's origin only; hrefs the
+  provider sends credentials to its calendar home's origin only (discovery
+  too: a principal or a home named on another origin is not followed);
+  hrefs the
   server names elsewhere are ignored, and every href is spelled one way
-  (`canonicalHref`: `a@b.ics` and `a%40b.ics` are one resource). A redirect
+  (`canonicalHref`: `a@b.ics` and `a%40b.ics` are one resource) for
+  comparing, while requests about an href use the server's own spelling. A redirect
   to another server is not passed through the proxy (the browser would keep
   the credentials for it): sign in with that server's address instead. The dev server allows any origin
   (only while it listens on localhost; with `--host` it requires the list) unless

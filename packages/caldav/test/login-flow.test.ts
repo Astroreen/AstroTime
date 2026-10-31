@@ -74,6 +74,21 @@ test("a login flow pointing to another server is refused", async () => {
     }),
   });
   await expect(startLoginFlow(http, "https://cloud.example.com")).rejects.toThrow(
-    /points to https:\/\/evil.example/,
+    /points to evil.example/,
+  );
+});
+
+test("behind a TLS terminator a flow naming its pages http:// on the same host is accepted", async () => {
+  const http: HttpClient = async (request) => ({
+    status: 200,
+    url: request.url,
+    header: () => null,
+    body: JSON.stringify({
+      poll: { token: "t", endpoint: "http://cloud.example.com/login/v2/poll" },
+      login: "http://cloud.example.com/login/v2/flow/x",
+    }),
+  });
+  expect((await startLoginFlow(http, "https://cloud.example.com")).loginUrl).toBe(
+    "http://cloud.example.com/login/v2/flow/x",
   );
 });
