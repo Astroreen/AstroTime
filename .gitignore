@@ -1,0 +1,34 @@
+# devenv / direnv
+.devenv*
+.direnv/
+devenv.local.nix
+devenv.local.yaml
+
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo
+.vite/
+
+# build outputs
+dist/
+build/
+out/
+coverage/
+
+# test artifacts
+playwright-report/
+test-results/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data
+*.db
+*.log
+.env
+.env.*
