@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import {
+  boundsOf,
   CalendarObject,
   ExpansionLimitError,
   occurrencesBetween,
@@ -229,4 +230,31 @@ test("an occurrence far ahead on its own wall clock still shows for a user far b
   expect(shown.map((o) => wallClockOf(o.start, "Pacific/Pago_Pago"))).toEqual([
     "2026-10-31T23:30:00",
   ]);
+});
+describe("bounds (for the local store's date index)", () => {
+  test("a one-off zoned event spans its own instants", () => {
+    expect(boundsOf(load("apple-event-attendees.ics"))).toEqual({
+      startMs: Date.parse("2026-11-05T19:00:00Z"),
+      endMs: Date.parse("2026-11-05T20:00:00Z"),
+    });
+  });
+
+  test("a counted series ends at its last occurrence; an exception moved later widens it", () => {
+    expect(boundsOf(load("nextcloud-event-recurring.ics"))).toEqual({
+      startMs: Date.parse("2026-10-20T07:00:00Z"),
+      endMs: Date.parse("2026-11-10T08:30:00Z"),
+    });
+  });
+
+  test("an all-day span is widened by the furthest zones", () => {
+    expect(boundsOf(load("thunderbird-event-allday.ics"))).toEqual({
+      startMs: Date.parse("2026-11-10T10:00:00Z"),
+      endMs: Date.parse("2026-11-14T14:00:00Z"),
+    });
+  });
+
+  test("an unending series is open; an undated task has no bounds", () => {
+    expect(boundsOf(load("tasksorg-task-recurring.ics")).endMs).toBeNull();
+    expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
+  });
 });
