@@ -213,7 +213,9 @@ Decided while building PR 2.
   repeats (the earlier instant); then a Windows zone name (Outlook,
   Exchange: `W. Europe Standard Time`), mapped to IANA by Unicode CLDR's
   `windowsZones.xml`, the `territory="001"` row of each name, compared
-  without regard to case. A TZID none of these knows stays floating. The
+  without regard to case and surrounding spaces, and spelled as IANA names
+  the zone today (CLDR keeps old spellings such as `Asia/Calcutta`; its
+  `bcp47/timezone.xml` gives `Asia/Kolkata`). A TZID none of these knows stays floating. The
   table is generated, not written by hand (`scripts/generate-windows-zones.ts`
   pins a CLDR release). For a mapped name `ItemTime.timeZone` is the IANA
   zone; the TZID as read stays in the calendar object, so `serialize` writes
@@ -394,8 +396,9 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Display-style Windows TZIDs** — Outlook's desktop export can write
   `TZID:(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna`, the
   zone's display name, which CLDR's table does not carry (only as comments, in
-  English); such a time stays floating until a reader of those names is
-  justified by a real file ([D32](#D32)).
+  English), and its `tzone://Microsoft/Utc`, `tzone://Microsoft/Custom` and
+  `Customized Time Zone`; such a time stays floating until a reader of those
+  names is justified by a real file ([D32](#D32)).
 - **Expanding long series from the middle** — `occurrencesBetween` walks a
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point

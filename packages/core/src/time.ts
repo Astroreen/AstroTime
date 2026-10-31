@@ -63,7 +63,8 @@ export function fromIcalTime(time: ICAL.Time): ItemTime {
 }
 
 /** The IANA zone for a TZID the object does not define: itself, or a Windows zone name's. */
-function resolveUndefinedTzid(tzid: string): string | undefined {
+function resolveUndefinedTzid(written: string): string | undefined {
+  const tzid = written.trim();
   if (isKnownTimeZone(tzid)) return tzid;
   return windowsZone(tzid);
 }
@@ -74,7 +75,7 @@ const windowsZonesByLowerCase = new Map(
 );
 
 function windowsZone(tzid: string): string | undefined {
-  return windowsZonesByLowerCase.get(tzid.trim().toLowerCase());
+  return windowsZonesByLowerCase.get(tzid.toLowerCase());
 }
 
 /**

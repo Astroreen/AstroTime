@@ -29,6 +29,11 @@ describe("zoned wall clocks (RFC 5545 §3.3.5)", () => {
 });
 
 describe("Windows zone names (D32)", () => {
+  test("the table names IANA's current zones, not CLDR's old spellings", () => {
+    expect(WINDOWS_ZONES["India Standard Time"]).toBe("Asia/Kolkata");
+    expect(WINDOWS_ZONES["FLE Standard Time"]).toBe("Europe/Kyiv");
+  });
+
   test("every zone in the generated table names an IANA zone the runtime knows", () => {
     for (const [windows, iana] of Object.entries(WINDOWS_ZONES)) {
       expect(() => wallClockIn(0, iana), `${windows} → ${iana}`).not.toThrow();

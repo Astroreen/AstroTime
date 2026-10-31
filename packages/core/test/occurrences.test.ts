@@ -75,6 +75,26 @@ describe("series", () => {
     );
   });
 
+  test("an Outlook series without a VTIMEZONE matches its EXDATE and RECURRENCE-ID across DST (D32)", () => {
+    // Thursdays at 09:00 Berlin from 15 Oct; 22 Oct (summer time) is excluded, and
+    // 29 Oct (after the change on 25 Oct) is moved to 11:00. Both name the slot by
+    // the Windows TZID, so they must resolve to the same instants as the series.
+    const occurrences = occurrencesBetween(
+      load("outlook-event-recurring-exceptions-no-vtimezone.ics"),
+      vilnius("2026-10-01", "2026-12-01"),
+    );
+    expect(starts(occurrences, "Europe/Berlin")).toEqual([
+      "2026-10-15T09:00:00",
+      "2026-10-29T11:00:00",
+      "2026-11-05T09:00:00",
+    ]);
+    expect(occurrences.map((o) => o.item.summary)).toEqual([
+      "Weekly sync",
+      "Weekly sync (moved)",
+      "Weekly sync",
+    ]);
+  });
+
   test("an exception moved into the range shows even when its original slot is outside", () => {
     // 27 Oct 10:00 moved to 12:00 the same day; a range of the afternoon only catches it.
     const occurrences = occurrencesBetween(
