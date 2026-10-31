@@ -98,3 +98,31 @@ END:VCALENDAR</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:
   const multiget = bodies.find((b) => b.includes("calendar-multiget"))!;
   expect(multiget).toContain("<d:href>/cal/a@b.ics</d:href>");
 });
+
+test("writes and deletions use the server's spelling too", async () => {
+  const urls: string[] = [];
+  const http: HttpClient = async (request) => {
+    urls.push(`${request.method} ${request.url}`);
+    const listing = `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/cal/a@b.ics</d:href><d:propstat><d:prop><d:getetag>"1"</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
+    return {
+      status: request.method === "PROPFIND" ? 207 : 204,
+      url: request.url,
+      header: () => null,
+      body: request.method === "PROPFIND" ? listing : "",
+    };
+  };
+  const provider = new CalDavProvider(
+    http,
+    { username: "u", password: "p" },
+    "https://dav.example/cal/",
+  );
+  const known = new Map([[canonicalHref("https://dav.example/cal/a@b.ics"), '"1"']]);
+  await provider.changes("https://dav.example/cal/", { syncToken: null, ctag: null }, known);
+  const href = canonicalHref("https://dav.example/cal/a@b.ics");
+  await provider.update(href, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", '"1"');
+  await provider.remove(href, '"2"');
+  expect(urls.filter((u) => !u.startsWith("PROPFIND"))).toEqual([
+    "PUT https://dav.example/cal/a@b.ics",
+    "DELETE https://dav.example/cal/a@b.ics",
+  ]);
+});

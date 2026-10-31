@@ -264,7 +264,7 @@ export class CalDavProvider implements Provider {
 
   async remove(href: string, etag: string | null): Promise<WriteResult> {
     const response = await this.request(
-      { method: "DELETE", url: href, headers: etag ? { "If-Match": etag } : {} },
+      { method: "DELETE", url: this.wire(href), headers: etag ? { "If-Match": etag } : {} },
       [404, 410, 412],
     );
     if (response.status === 412) return { ok: false, reason: "conflict" };
@@ -280,7 +280,7 @@ export class CalDavProvider implements Provider {
     const response = await this.request(
       {
         method: "PUT",
-        url: href,
+        url: this.wire(href),
         headers: { "Content-Type": "text/calendar; charset=utf-8", ...condition },
         body: ics,
       },
