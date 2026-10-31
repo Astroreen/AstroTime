@@ -62,14 +62,17 @@ export function allowlist(value: string | undefined): string[] {
   return origins;
 }
 
-async function toRequest(req: IncomingMessage, signal: AbortSignal): Promise<Request> {
-  const chunks: Buffer[] = [];
+/** The request body as a stream, read only if the proxy lets the request through, and capped. */
+async function* capped(req: IncomingMessage): AsyncGenerator<Buffer> {
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
     if (size > MAX_REQUEST_BYTES) throw new TooLarge();
-    chunks.push(chunk as Buffer);
+    yield chunk as Buffer;
   }
+}
+
+function toRequest(req: IncomingMessage, signal: AbortSignal): Request {
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers)) {
     if (typeof value === "string") headers.set(name, value);
@@ -79,8 +82,15 @@ async function toRequest(req: IncomingMessage, signal: AbortSignal): Promise<Req
     method: req.method ?? "GET",
     headers,
     signal,
-    ...(hasBody ? { body: Buffer.concat(chunks) } : {}),
-  });
+    // Streamed: a request the proxy refuses (another origin, an unlisted
+    // server) is answered without its body being read.
+    ...(hasBody
+      ? {
+          body: Readable.toWeb(Readable.from(capped(req))) as ReadableStream,
+          duplex: "half" as const,
+        }
+      : {}),
+  } as RequestInit);
 }
 
 async function serveStatic(root: string, url: string, res: ServerResponse): Promise<void> {
@@ -162,13 +172,15 @@ function createAppHandler(options: ServerOptions, root: string): Server {
       res.on("close", () => {
         if (!res.writableFinished) gone.abort();
       });
-      toRequest(req, gone.signal)
-        .then(proxy)
+      Promise.resolve()
+        .then(() => proxy(toRequest(req, gone.signal)))
         .then((response) => {
           res.statusCode = response.status;
           response.headers.forEach((value, name) => res.setHeader(name, value));
           // Someone's calendar, fetched with their credentials: never kept by a cache.
           res.setHeader("Cache-Control", "no-store");
+          // Served on the app's own origin: never sniffed into something runnable.
+          res.setHeader("X-Content-Type-Options", "nosniff");
           if (!response.body) return void res.end();
           // Broken midway, the answer is cut off, not ended: a client must not
           // take a truncated multistatus for a whole one.

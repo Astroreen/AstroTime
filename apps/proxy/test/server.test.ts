@@ -96,6 +96,7 @@ describe("the web app's server", () => {
       { method: "PROPFIND" },
     );
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
   test("a request announcing more than the cap is refused before it is read", async () => {
@@ -203,5 +204,26 @@ test("an answer that breaks off midway is cut off, never ended as if whole", asy
     method: "PROPFIND",
   }).then((response) => response.text());
   await expect(read).rejects.toThrow();
+  await new Promise((resolve) => server.close(resolve));
+});
+
+test("a request the proxy refuses is answered without its body being read", async () => {
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "index.html"), "x");
+  const server = createAppServer({ root, allow: ["https://dav.example"] });
+  const base = await listen(server);
+  const { request } = await import("node:http");
+  // A body that never ends: only an answer that does not wait for it can come.
+  const status = await new Promise<number>((resolve, reject) => {
+    const req = request(
+      `${base}${throughProxy(DAV_PROXY_PREFIX).to("https://unlisted.example/x.ics")}`,
+      { method: "PUT" },
+    );
+    req.on("response", (res) => resolve(res.statusCode ?? 0));
+    req.on("error", reject);
+    req.write("partial");
+  });
+  expect(status).toBe(403);
+  server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 });

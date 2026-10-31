@@ -28,8 +28,9 @@ docker run -d -p 8080:8080 \
 CalDAV servers the proxy may reach. Put the container behind your usual
 reverse proxy for TLS, next to your Nextcloud. The proxy serves the app's own
 pages only and checks this by host, so the reverse proxy must pass the
-original `Host` on (nginx: `proxy_set_header Host $host;`; Caddy and Traefik
-do so by default).
+original `Host`, port included, on (nginx: `proxy_set_header Host
+$http_host;` — `$host` drops the port; Caddy and Traefik pass it by
+default).
 
 ## Development
 
