@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vite-plus/test";
 
 import { isTailnetOrLocal } from "./dev-clients.ts";
 
 describe("isTailnetOrLocal", () => {
-  it("lets in this machine and the tailnet", () => {
+  test("lets in this machine and the tailnet", () => {
     for (const ip of [
       "127.0.0.1",
       "::1",
@@ -19,7 +19,7 @@ describe("isTailnetOrLocal", () => {
     }
   });
 
-  it("keeps out a LAN, the internet and look-alikes", () => {
+  test("keeps out a LAN, the internet and look-alikes", () => {
     for (const ip of [
       "192.168.1.10",
       "10.0.0.2",

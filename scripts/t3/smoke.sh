@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Proves dev.sh and stop.sh: starts everything, checks the page (and the
-# CalDAV proxy when Radicale is there), that a second start is refused, and
-# that stop.sh leaves nothing running. CI runs it.
+# CalDAV proxy when Radicale is there), the proxy's allowlist and Vite's host
+# check, that a second start is refused, and that stop.sh leaves nothing
+# running. CI runs it.
 # Its own directory and ports, so it never meets (or stops) a dev session
 # that is running.
 export ASTROTIME_DEV_DIR="${ASTROTIME_SMOKE_DIR:-$(cd "$(dirname "$0")/../.." && pwd)/.astrotime-dev/smoke}"
 export ASTROTIME_WEB_PORT="${ASTROTIME_SMOKE_WEB_PORT:-5190}"
 export ASTROTIME_DAV_PORT="${ASTROTIME_SMOKE_DAV_PORT:-5242}"
+# The guarded setup the tailnet default gets (scripts/t3/README.md), with or
+# without Tailscale: a wide bind, tailnet clients only, the proxy's allowlist.
+export ASTROTIME_WEB_HOST=0.0.0.0 ASTROTIME_WEB_CLIENTS=tailnet
 # shellcheck source=env.sh
 source "$(dirname "$0")/env.sh"
 enter_dev_shell "$@"
@@ -46,6 +50,13 @@ if command -v radicale >/dev/null 2>&1; then
     "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/personal/")"
   [ "$status" = 207 ] || fail "the CalDAV proxy answered $status"
 fi
+# Beyond localhost the proxy reaches only listed servers, and Vite answers
+# only to known host names (DNS rebinding).
+status="$(curl -s -o /dev/null -w '%{http_code}' \
+  "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/https%3A%2F%2Fexample.com/")"
+[ "$status" = 403 ] || fail "the CalDAV proxy answered $status for a server not on its allowlist"
+status="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: rebound.example' "http://127.0.0.1:$ASTROTIME_WEB_PORT/")"
+[ "$status" = 403 ] || fail "the dev server answered $status for an unknown host name"
 if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a second dev.sh started"; fi
 [[ "$second" == *"dev is already running"* ]] || fail "a second dev.sh failed for another reason: $second"
 
