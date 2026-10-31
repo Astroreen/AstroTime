@@ -1,6 +1,7 @@
 import ICAL from "ical.js";
 
 import { CalendarObject } from "./calendar-object.ts";
+import { fromIcalTime, type ItemTime } from "./time.ts";
 
 /**
  * Properties every client rewrites on every save; they never make a conflict.
@@ -36,13 +37,24 @@ const SETS = new Set([
 /** A deep copy of jCal, which is plain JSON (`structuredClone` is not in every runtime's types). */
 const copy = <T>(jcal: T): T => JSON.parse(JSON.stringify(jcal)) as T;
 
+function instantKey(time: ItemTime): string {
+  return time.type === "zoned"
+    ? String(time.epochMs)
+    : time.type === "date"
+      ? time.date
+      : time.local;
+}
+
 /** Each item component by its identity: `vevent` or `vevent@<RECURRENCE-ID>`. */
 function itemsOf(object: CalendarObject): Map<string, ICAL.Component> {
   const items = new Map<string, ICAL.Component>();
   const { master, exceptions } = object.components;
   for (const component of [master, ...exceptions]) {
     if (!component) continue;
-    const recurrenceId = component.getFirstProperty("recurrence-id")?.toICALString() ?? "";
+    // By the instant it names, so `RECURRENCE-ID;TZID=Europe/Vilnius:…T100000`
+    // and the same moment in UTC are one occurrence however a server spells it.
+    const value = component.getFirstPropertyValue("recurrence-id");
+    const recurrenceId = value instanceof ICAL.Time ? instantKey(fromIcalTime(value)) : "";
     items.set(`${component.name}@${recurrenceId}`, component);
   }
   return items;

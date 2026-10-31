@@ -251,3 +251,20 @@ test("values listed in one line merge one by one (EXDATE:a,b)", () => {
   // Theirs removed the 3rd, ours added the 5th; the 4th stays.
   expect(exdates).toEqual(["20261104T090000Z", "20261105T090000Z"]);
 });
+
+test("an exception spelled in another zone by the server is the same occurrence", () => {
+  const series = { ...base, RRULE: "FREQ=DAILY;COUNT=3" };
+  const vilnius =
+    "BEGIN:VTIMEZONE\r\nTZID:Europe/Vilnius\r\nBEGIN:STANDARD\r\nDTSTART:19701025T040000\r\nTZOFFSETFROM:+0300\r\nTZOFFSETTO:+0200\r\nRRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n";
+  const exception = (rid: string, summary: string) =>
+    `BEGIN:VEVENT\r\nUID:m\r\n${rid}\r\nDTSTART:20261103T120000Z\r\nDTEND:20261103T130000Z\r\nSUMMARY:${summary}\r\nEND:VEVENT\r\n`;
+  const start = object(series, exception("RECURRENCE-ID:20261103T090000Z", "Moved"));
+  const local = object(series, exception("RECURRENCE-ID:20261103T090000Z", "Moved (ours)"));
+  // The server wrote the same instance in local time: 11:00 in Vilnius is 09:00 UTC.
+  const server = object(
+    series,
+    exception("RECURRENCE-ID;TZID=Europe/Vilnius:20261103T110000", "Moved") + vilnius,
+  );
+  const merged = CalendarObject.parse(mergeObjects(start, local, server).ics);
+  expect(merged.exceptions.map((e) => e.summary)).toEqual(["Moved (ours)"]);
+});

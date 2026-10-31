@@ -5,6 +5,7 @@ import {
   OfflineError,
   sameObjects,
   type Provider,
+  type RemoteObject,
   type WriteResult,
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
@@ -206,7 +207,7 @@ async function upload(
     } else {
       // Changed on the server since: the change wins over our deletion (D38).
       const server = await provider.fetch(href);
-      if (server) await store.saveFromServer(calendar.id, server, { replacePending: true });
+      if (server) await saveServerVersion(store, calendar, server, report);
       else await store.removeObject(object.id);
     }
     return;
@@ -245,7 +246,7 @@ async function upload(
       await store.rebase(now.id, now.ics, { ics: now.ics, etag: server.etag, baseIcs: server.ics });
       return;
     }
-    await store.saveFromServer(calendar.id, server, { replacePending: true });
+    await saveServerVersion(store, calendar, server, report);
     return;
   }
 
@@ -269,7 +270,7 @@ async function upload(
           await store.addConflict(object.id, object.ics);
           report.conflicts++;
         }
-        await store.saveFromServer(calendar.id, server, { replacePending: true });
+        await saveServerVersion(store, calendar, server, report);
         return;
       }
       // Merge onto what the server has now, and try once more against its ETag.
@@ -390,4 +391,19 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
   }
   if (!keepToken)
     await store.setSyncState(calendar.id, { syncToken: changes.syncToken, ctag: changes.ctag });
+}
+
+/** The server's version replaces ours; one that is not iCalendar is skipped (D36), ours kept. */
+async function saveServerVersion(
+  store: Store,
+  calendar: Calendar,
+  server: RemoteObject,
+  report: SyncReport,
+) {
+  try {
+    await store.saveFromServer(calendar.id, server, { replacePending: true });
+  } catch (error) {
+    if (!(error instanceof CalendarObjectError)) throw error;
+    if (!report.skipped.includes(server.href)) report.skipped.push(server.href);
+  }
 }

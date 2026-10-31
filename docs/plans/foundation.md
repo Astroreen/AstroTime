@@ -346,6 +346,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
   asked for objects written by Nextcloud's web calendar; the recordings are
   of objects as Nextcloud serves them back. Recording what its web calendar
   writes needs a browser driving it, which comes with Playwright e2e.
+- **Finer write rights** — a calendar is read-only unless its privilege
+  set grants `write`, `write-content` or `all`; a share that lets one edit
+  but not create (`bind`) or delete (`unbind`) is taken as fully writable,
+  and its refused creations show as errors ([D37](#D37)).
 - **Login Flow v2 end to end** — the flow is tested against Nextcloud up to
   the approval page; approving it needs a browser driving Nextcloud's login,
   which comes with Playwright e2e ([D19](#D19)).
