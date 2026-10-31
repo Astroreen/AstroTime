@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { wallClockIn, zonedToEpoch } from "../src/time.ts";
+import { WINDOWS_ZONES } from "../src/windows-zones.ts";
 
 describe("zoned wall clocks (RFC 5545 §3.3.5)", () => {
   test("an ordinary time", () => {
@@ -24,5 +25,13 @@ describe("zoned wall clocks (RFC 5545 §3.3.5)", () => {
     expect(zonedToEpoch("2026-10-25T03:30:00", "Europe/Vilnius")).toBe(
       Date.parse("2026-10-25T00:30:00Z"),
     );
+  });
+});
+
+describe("Windows zone names (D32)", () => {
+  test("every zone in the generated table names an IANA zone the runtime knows", () => {
+    for (const [windows, iana] of Object.entries(WINDOWS_ZONES)) {
+      expect(() => wallClockIn(0, iana), `${windows} → ${iana}`).not.toThrow();
+    }
   });
 });

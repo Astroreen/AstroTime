@@ -206,11 +206,19 @@ Decided while building PR 2.
   `floating` wall clock (the same in every zone), or a `zoned` wall clock
   with its IANA zone and the instant it names. Instants are never stored
   without the wall clock and zone they came from.
-- **D32. A TZID without a VTIMEZONE is an IANA name.** ical.js resolves
-  zones the object defines; a TZID it does not define (Google, some Android
-  clients) is resolved through `Intl`, following RFC 5545 for DST gaps (the
-  offset before the gap) and repeats (the earlier instant). A TZID neither
-  knows stays floating.
+- **D32. A TZID without a VTIMEZONE is an IANA or a Windows name.** ical.js
+  resolves zones the object defines; a TZID it does not define is tried in
+  this order: an IANA name (Google, some Android clients), resolved through
+  `Intl`, following RFC 5545 for DST gaps (the offset before the gap) and
+  repeats (the earlier instant); then a Windows zone name (Outlook,
+  Exchange: `W. Europe Standard Time`), mapped to IANA by Unicode CLDR's
+  `windowsZones.xml`, the `territory="001"` row of each name, compared
+  without regard to case. A TZID none of these knows stays floating. The
+  table is generated, not written by hand (`scripts/generate-windows-zones.ts`
+  pins a CLDR release). For a mapped name `ItemTime.timeZone` is the IANA
+  zone; the TZID as read stays in the calendar object, so `serialize` writes
+  it back unchanged (rule 2). A zone the object defines keeps its TZID as
+  `timeZone` even when it is a Windows name.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
@@ -383,11 +391,11 @@ Decided while building the layout engine, ahead of PR 5's screens.
   reproducible ([D41](#D41)).
 - **Content Security Policy** for the web image — once the app's own needs
   (wasm, workers) are known from PR 5 ([D40](#D40)).
-- **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
-  (or any TZID that is not IANA) without a VTIMEZONE stays floating, so it
-  shows at the viewer's wall clock, until it is mapped to IANA; with a
-  VTIMEZONE the instant is exact and `timeZone` keeps the Windows name
-  ([D32](#D32)).
+- **Display-style Windows TZIDs** — Outlook's desktop export can write
+  `TZID:(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna`, the
+  zone's display name, which CLDR's table does not carry (only as comments, in
+  English); such a time stays floating until a reader of those names is
+  justified by a real file ([D32](#D32)).
 - **Expanding long series from the middle** — `occurrencesBetween` walks a
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
