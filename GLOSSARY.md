@@ -25,6 +25,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Floating time** — a wall-clock time with no zone, shown at the same
   hour everywhere. A **zoned time** names its IANA zone and an instant.
 - **Subtask** — a task whose `RELATED-TO` names a parent task.
+- **Reminder** — a `VALARM` of an event or a task: the notification it asks
+  for before it starts or is due (foundation D9). A task itself is never a
+  reminder.
 - **Due** — a task's `DUE`. A task is **overdue** when its due has passed
   and it is not completed.
 
@@ -71,6 +74,18 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Proxy** — the stateless web proxy that lets the web app reach CalDAV
   servers despite CORS: in the dev server now, in the web app's Docker image
   later (`proxyHandler`).
+
+## Platforms
+
+- **Shell** — an app that wraps the shared UI for one platform and hands it
+  that platform's adapters: `apps/web`, `apps/mobile` (Capacitor),
+  `apps/desktop` (Electron). Shells hold no product logic (foundation D22).
+- **Platform interfaces** — what the shared code needs from a platform and
+  cannot do itself: HTTP, SQLite, secrets, reminders, sync triggers; named
+  once in android plan D60. A shell's implementation of one is an
+  **adapter**; all of them together are the shell's `Platform`.
+- **Background sync** — a sync the operating system starts while the app is
+  not open (Android's WorkManager, android plan D67).
 
 ## Development
 
