@@ -25,6 +25,12 @@ const TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".wasm": "application/wasm",
   ".webmanifest": "application/manifest+json",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".map": "application/json",
+  ".txt": "text/plain; charset=utf-8",
+  ".woff2": "font/woff2",
+  ".jpg": "image/jpeg",
+  ".webp": "image/webp",
 };
 
 export interface ServerOptions {
@@ -167,7 +173,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
       res.end();
     };
     const path = url.split("?")[0];
-    if (path === "/healthz") {
+    if (path === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
       res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
     } else if (url.startsWith(DAV_PROXY_PREFIX)) {
       // Refused before reading a byte when the size is announced; a body
