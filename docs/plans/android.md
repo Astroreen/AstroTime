@@ -14,7 +14,7 @@ Capacitor shell. It talks to CalDAV servers directly (no proxy, no CORS),
 keeps credentials under a key in the Android Keystore, fires reminders as
 notifications even when the app is closed, and syncs in the background. A
 `v*` tag attaches the APK to the GitHub Release, unsigned at first
-([D28](foundation.md#D28)).
+([D28](foundation.md#D28)), next to a debug-signed build anyone can install.
 
 ## Decisions
 
@@ -83,8 +83,12 @@ were checked on 2026-11-01.
   (repeated ones joined with `, `, as `fetch` does) and the body as text,
   and rejects with an "offline" code when the server cannot be reached,
   which the TypeScript adapter turns into `OfflineError`. OkHttp follows
-  redirects itself (OkHttp's own following is off), as the desktop does
-  ([desktop D72](desktop.md#D72)), so one rule holds on every platform:
+  redirects itself, up to 10, with OkHttp's `followRedirects` and
+  `followSslRedirects` off, as the desktop does ([desktop D72](desktop.md#D72)),
+  and returns the last hop's URL, so one rule holds on every platform: a
+  307 or 308 keeps the method and body, a 301, 302 or 303 turns only a
+  `POST` into a `GET` (as `fetch` does; `PROPFIND` and `REPORT` keep their
+  method and body);
   `Authorization` goes only to the request's origin (scheme, host and
   port) and is dropped when a redirect leaves it, and the cleartext check
   below applies to every hop; no cookie
@@ -182,7 +186,9 @@ were checked on 2026-11-01.
   app starting while the job holds it asks the job to yield (a
   `BroadcastChannel` on the same origin) and waits for the lock, showing
   that it is opening; the job stops at its next object, closes the store
-  and releases the lock. A run cut short loses nothing: an object is marked
+  and releases the lock. The wait is bounded by the job's own limit: past
+  10 minutes the app says the store is busy and offers to try again. A job
+  whose process is killed releases the lock with its WebView. A run cut short loses nothing: an object is marked
   synced only when the server took it, and a calendar's sync token is saved
   only after its download, so the next sync picks up where it stopped
   ([D37](foundation.md#D37)).
@@ -240,8 +246,9 @@ were checked on 2026-11-01.
     (`gh release create --verify-tag --generate-notes`, a prerelease for a
     prerelease tag, skipped when it exists); the Android and desktop jobs
     `need` it (desktop [D79](desktop.md#D79)). An unsigned APK does not
-    install as it is: until the signed release (Deferred) it is for those
-    who sign it themselves, and the PR artifact is for trying the app.
+    install as it is, so the Release also carries the debug-signed build,
+    `astrotime-<version>-debug.apk`, which installs and is named for what
+    it is; the signed release stays Deferred.
   - **Tests:** the TypeScript side of each adapter is unit-tested in Node
     with the plugin replaced (errors to `OfflineError`, the notification
     set's diff, the ids); the Kotlin HTTP plugin is tested by Gradle with
@@ -304,7 +311,9 @@ themes (screenshots).
 ### PR A3 — Reminders
 
 Local notifications from the shared reminder set, exact alarms, the
-notification permission, opening the item from a tap. Decisions: D66.
+notification permission, opening the item from a tap. It needs foundation's
+PR 6, which computes the set ([D60](#D60)); A1 and A2 do not. Decisions:
+D66.
 
 Done when: a reminder fires on time with the app closed and after a
 reboot; editing or deleting the item on the server moves or removes it
@@ -332,9 +341,10 @@ need the app opened now and then.
 
 ### PR A5 — The release APK
 
-The release job: the GitHub Release on a `v*` tag with the unsigned APK.
+The release job: the GitHub Release on a `v*` tag with the unsigned APK
+and the debug-signed one.
 Decisions: D69 (release), foundation's D28.
 
 Done when: a prerelease tag (on a fork is enough) creates its Release with
-`astrotime-<version>-unsigned.apk`, which `apksigner` signs and a phone
-installs.
+`astrotime-<version>-unsigned.apk` (`apksigner verify` reports it
+unsigned) and `astrotime-<version>-debug.apk`, which a phone installs.

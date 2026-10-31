@@ -498,7 +498,8 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
   design D52, D53.
 
 Done when, for 5a: each view renders real objects from the local store, in
-both themes and both languages, as the references describe; for 5b: the
+both themes and both languages, as the references describe, and an account
+added by password or Login Flow v2 syncs into them; for 5b: the
 tasks screen lists, completes and stars tasks through the local store, the
 drawer's settings apply, and search finds an item by its title. Screenshots
 of each, set against the reference's description, are the evidence.

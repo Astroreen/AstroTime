@@ -99,7 +99,7 @@ were checked on 2026-11-01.
   it first, and the fallback is the main process behind the same port.
 
 - **D74. Credentials through `safeStorage`, and said so when unprotected.**
-  App passwords and passwords are encrypted with the asynchronous
+  Passwords (app passwords included) are encrypted with the asynchronous
   `safeStorage` API (`encryptStringAsync`; the synchronous one is
   deprecated in Electron 45 and removed in 46), whose key lives in the
   desktop's keyring (GNOME's libsecret, KWallet, or the Secret portal), and
@@ -109,7 +109,11 @@ were checked on 2026-11-01.
   `getSelectedStorageBackend()` is `basic_text`: the "encryption" uses a
   fixed key and protects nothing. Then the app says so before saving and
   asks: keep the password until the app quits, or save it unprotected in
-  the profile. Nothing is written before the user picks.
+  the profile. Nothing is written before the user picks. Each entry
+  records how it was saved, so one saved unprotected is never taken for
+  ciphertext when a keyring appears later. An entry that does not decrypt
+  (a changed keyring, a profile copied to another machine) leaves its
+  account asking to sign in again, never a crash or an empty account.
 
 ### Behaviour
 
@@ -229,7 +233,8 @@ in the system browser. Decisions: D74, D77.
 
 Done when: credentials survive a restart with a keyring; without one
 (`--password-store=basic` forces it) the prompt appears and nothing is
-written before the choice; the login page opens in the system browser and
+written before the choice; an entry that does not decrypt asks to sign in
+again; the login page opens in the system browser and
 the poll stops once approved (up to Nextcloud's approval page in tests,
 foundation's Deferred "Login Flow v2 end to end").
 
