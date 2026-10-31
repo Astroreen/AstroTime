@@ -181,3 +181,14 @@ test("an answer with a null-body status such as 205 passes without a body", asyn
   );
   expect(response.status).toBe(205);
 });
+
+test("a malformed redirect is a 502, not a crash", async () => {
+  const { fetchImpl } = upstream(
+    () => new Response(null, { status: 301, headers: { Location: "http://[bad" } }),
+  );
+  const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });
+  const response = await handler(
+    new Request(`http://app.localhost${via.to("https://cloud.example.com/x")}`),
+  );
+  expect(response.status).toBe(502);
+});

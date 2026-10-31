@@ -109,7 +109,14 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       // A redirect to another server is not passed on: inside the proxy the
       // browser would keep the Authorization header for it, which a fetch to
       // another origin drops.
-      const location = new URL(value, target);
+      let location: URL;
+      try {
+        location = new URL(value, target);
+      } catch {
+        return new Response(`${target.origin} answered with a malformed redirect.`, {
+          status: 502,
+        });
+      }
       if (location.origin !== target.origin) {
         return new Response(
           `${target.origin} redirects to ${location.origin}; sign in with that address.`,
