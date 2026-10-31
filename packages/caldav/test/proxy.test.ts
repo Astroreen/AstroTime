@@ -239,4 +239,28 @@ test("allowlist entries match however their origin is spelled", async () => {
     new Request(`http://app.localhost${via.to("https://cloud.example.com/dav/")}`),
   );
   expect(response.status).toBe(200);
+test("the answer is streamed through, and the client going away aborts the request to the server", async () => {
+  let signal: AbortSignal | undefined;
+  const fetchImpl = (async (_input: URL | string, init: RequestInit) => {
+    signal = init.signal ?? undefined;
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("<multistatus>"));
+      },
+    });
+    return new Response(body, { status: 207 });
+  }) as typeof fetch;
+  const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });
+  const client = new AbortController();
+  const response = await handler(
+    new Request(`http://app.localhost${via.to("https://cloud.example.com/cal/")}`, {
+      method: "PROPFIND",
+      signal: client.signal,
+    }),
+  );
+  // The first chunk arrives while the upstream answer is still open: streamed, not buffered.
+  const reader = response.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe("<multistatus>");
+  client.abort();
+  expect(signal?.aborted).toBe(true);
 });

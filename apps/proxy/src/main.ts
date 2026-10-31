@@ -16,7 +16,9 @@ server.listen(port, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     server.close(() => process.exit(0));
-    // A long proxied answer would hold `docker stop` past its grace period.
-    server.closeAllConnections();
+    // Idle connections go now; requests in flight (a PUT on its way to the
+    // CalDAV server) get a few seconds to finish, inside docker stop's 10.
+    server.closeIdleConnections();
+    setTimeout(() => server.closeAllConnections(), 7_000).unref();
   });
 }
