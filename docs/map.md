@@ -19,8 +19,17 @@ When you add a package, app or module, add its line here in the same PR.
 
 ## Packages
 
-None yet. `core`, `caldav`, `storage` and `ui` are created by the PRs that
-first need them (`plans/foundation.md#D23`, `plans/foundation.md#pr-plan`).
+- `packages/core` (`@astrotime/core`) — isomorphic domain core.
+  - `CalendarObject` — parses one calendar object resource, reads its
+    master and exceptions as `Event` or `Task`, and serializes it back
+    without losing a property. → `plans/foundation.md#D7`, `plans/foundation.md#D34`
+  - `occurrencesBetween` — expands a series into the occurrences that touch
+    a range of days in the user's zone. → `plans/foundation.md#D33`
+  - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `test/fixtures/` — iCalendar as each client writes it.
+
+`caldav`, `storage` and `ui` are created by the PRs that first need them
+(`plans/foundation.md#D23`, `plans/foundation.md#pr-plan`).
 
 ## Apps
 

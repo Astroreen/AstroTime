@@ -173,6 +173,27 @@ logic worth borrowing.
   protected: the `CI` status is required, no direct or force pushes. One
   branch per PR; Conventional Commits.
 
+### The core's time model
+
+Decided while building PR 2.
+
+- **D31. Three kinds of time.** An `ItemTime` is a `date` (all-day), a
+  `floating` wall clock (the same in every zone), or a `zoned` wall clock
+  with its IANA zone and the instant it names. Instants are never stored
+  without the wall clock and zone they came from.
+- **D32. A TZID without a VTIMEZONE is an IANA name.** ical.js resolves
+  zones the object defines; a TZID it does not define (Google, some Android
+  clients) is resolved through `Intl`, following RFC 5545 for DST gaps (the
+  offset before the gap) and repeats (the earlier instant). A TZID neither
+  knows stays floating.
+- **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
+  takes days and the IANA zone the calendar is shown in; a zoned item shows
+  on the user's day, a floating one at the same wall clock everywhere. A
+  series keeps its wall-clock time and length across DST changes.
+- **D34. A calendar object is one UID.** A `VCALENDAR` mixing UIDs, or events
+  with tasks, is refused (RFC 4791 §4.1); exceptions without their master
+  are kept and shown.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -184,6 +205,11 @@ logic worth borrowing.
 - **Year and 3-day views** ([D13](#D13)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
+- **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
+  without a VTIMEZONE stays floating until it is mapped to IANA ([D32](#D32)).
+- **Expanding long series from the middle** — `occurrencesBetween` walks a
+  series from its first occurrence; a cache or a start point comes when a
+  profile shows it matters ([D33](#D33)).
 - **Browser-mode component tests and Playwright e2e** — set up in PR 5,
   when there is UI to test.
 
@@ -203,11 +229,13 @@ pass locally and in CI; the docs route test passes.
 
 `@astrotime/core`: the event and task model over `ical.js`, lossless
 round-trip, recurrence expansion with exceptions and time zones. Decisions:
-D7, D8, D10.
+D7, D8, D10, D31–D34.
 
-Done when: fixtures recorded from Nextcloud, Apple, Thunderbird and Tasks.org
-parse and serialize back with every property kept; recurrence expansion
-matches the fixtures' expected occurrences.
+Done when: fixtures in the shape Nextcloud, Apple, Thunderbird, Google and
+Tasks.org write parse and serialize back with every property kept;
+recurrence expansion matches the fixtures' expected occurrences. The
+fixtures are written by hand after each client's output; PR 4 adds
+fixtures recorded from real servers.
 
 ### PR 3 — Local store
 
