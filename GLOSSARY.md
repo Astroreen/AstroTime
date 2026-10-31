@@ -33,16 +33,23 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Time grid** — the column of hours of a day, where timed items sit.
 - **All-day strip** — the band pinned above the time grid with all-day
   items; it does not scroll away.
-- **Task chip** — a task with only a due time (or only a start time), drawn
-  small at that time. `shape: "chip"` in the layout.
+- **Chip** — a small item, of two kinds: in the all-day strip, any item one
+  line high (a **span** in the week's strip, D42); in the time grid, a task
+  with only a due (or start) time, 30 minutes tall (`shape: "chip"` in
+  `layoutDay`).
 - **Block** — a timed item with a length, drawn from its start to its end
   in the time grid. `shape: "block"` in the layout.
-- **Span** — an all-day item drawn as one bar over the days it covers in
-  the all-day strip of a week or a month.
+- **Span** — a chip of the all-day strip of a week or a month drawn as one
+  bar over every day the item covers; a one-day item is a span of one day.
 - **Cluster** — timed items that overlap, directly or through others; they
   share the column's width (D15).
-- **Task panel** — the side panel with the tasks that have no date.
-- **View** — Day, Week, Month or Agenda.
+- **Tasks screen** — the task lists, as in Google Tasks: a screen on a
+  phone, a panel beside the calendar on a wide screen (design D52).
+- **Top bar**, **drawer**, **floating button** — the app shell: the bar
+  with the month, search, "today" and the tasks toggle; the side menu with
+  views, calendars and settings (a sidebar on a wide screen); the "+" button
+  that creates an item (design D46).
+- **View** — Day, 3 days, Week, Month or Agenda.
 - **Agenda** — the view that lists items in time order instead of a grid.
 
 ## Sync

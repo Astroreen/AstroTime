@@ -26,6 +26,7 @@ what is deferred, and the PRs that land it. Plans are canon once implemented.
 | Plan                                   | Owns                                                                  | Status      |
 | -------------------------------------- | --------------------------------------------------------------------- | ----------- |
 | [`foundation.md`](plans/foundation.md) | product scope, protocol, sync, platforms, stack, process, the MVP PRs | in progress |
+| [`design.md`](plans/design.md)         | how AstroTime looks and is laid out, from the owner's references      | in progress |
 
 ## Grilling sessions
 

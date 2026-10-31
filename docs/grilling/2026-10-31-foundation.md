@@ -70,7 +70,19 @@ Asked after reading Jhin and Caspian Logistics.
 | Q30 | Claude's secret   | the owner adds `CLAUDE_CODE_OAUTH_TOKEN` and asked for the exact commands            | D27      |
 | Q31 | The first step    | repository, skeleton, docs, CI in one PR; no features yet                            | PR 1     |
 
+## Round 5
+
+The design questions, asked once the backend had landed. The plan also
+added D53 (settings in the drawer, search) to make D44–D46 buildable.
+
+| #   | Question             | Answer                                                                                       | Decision       |
+| --- | -------------------- | -------------------------------------------------------------------------------------------- | -------------- |
+| Q32 | Style                | Google's density, a calm look of our own                                                     | design D43     |
+| Q33 | Themes               | dark and light, by the system setting                                                        | design D44     |
+| Q34 | Week start and clock | by locale, overridable                                                                       | design D45     |
+| Q35 | Screen layout        | **answered with screenshots** of Google Calendar and Tasks on Android: that layout, as it is | design D46–D52 |
+| Q36 | Item colour          | the calendar's, or the item's own `COLOR`                                                    | design D47     |
+
 ## Left open on purpose
 
-- The visual design (D18), before PR 5.
 - The i18n library, chosen in PR 5 (D17).

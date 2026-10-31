@@ -115,7 +115,7 @@ describe("placement", () => {
     });
   });
 
-  test("a task with neither DTSTART nor DUE has no occurrence; it lives in the task panel", () => {
+  test("a task with neither DTSTART nor DUE has no occurrence; it lives in the tasks screen", () => {
     expect(
       occurrencesBetween(load("tasksorg-task-completed.ics"), vilnius("2026-01-01", "2027-01-01")),
     ).toEqual([]);
