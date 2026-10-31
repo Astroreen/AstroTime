@@ -141,6 +141,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       }
       returned.set(name, via.to(location.href));
     }
+    // Someone's calendar, fetched with their credentials: never kept by a cache.
+    returned.set("cache-control", "no-store");
     return new Response(NULL_BODY.has(answer.status) ? null : await answer.arrayBuffer(), {
       status: answer.status,
       headers: returned,

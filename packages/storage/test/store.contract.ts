@@ -164,13 +164,39 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         await store.saveFromServer(
           calendar.id,
           { href: "p.ics", etag: '"2"', ics: server },
-          { replacePending: true },
+          { replacePending: local },
         ),
       ).toMatchObject({
         pending: "none",
         etag: '"2"',
         ics: server,
       });
+    });
+
+    test("the sync engine replaces a pending change only as it saw it", async () => {
+      const { store, calendar } = await setup();
+      await store.saveFromServer(calendar.id, {
+        href: "s.ics",
+        etag: '"1"',
+        ics: event("s", "20261102T090000Z", "20261102T100000Z"),
+      });
+      const seen = await store.saveLocal(
+        calendar.id,
+        event("s", "20261102T110000Z", "20261102T120000Z"),
+      );
+      // Edited again after the engine looked.
+      const newer = await store.saveLocal(
+        calendar.id,
+        event("s", "20261102T130000Z", "20261102T140000Z"),
+      );
+      const server = event("s", "20261102T150000Z", "20261102T160000Z");
+      expect(
+        await store.saveFromServer(
+          calendar.id,
+          { href: "s.ics", etag: '"2"', ics: server },
+          { replacePending: seen },
+        ),
+      ).toEqual(newer);
     });
 
     test("operations run one at a time: a local edit started during a download sees the download", async () => {

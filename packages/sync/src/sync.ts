@@ -177,7 +177,7 @@ async function settleReadOnly(
     });
   }
   try {
-    await store.saveFromServer(calendar.id, server, { replacePending: true });
+    await store.saveFromServer(calendar.id, server, { replacePending: object });
   } catch (error) {
     // Not iCalendar (D36): nothing to give way to; ours stays, the object is reported.
     if (!(error instanceof CalendarObjectError)) throw error;
@@ -207,7 +207,7 @@ async function upload(
     } else {
       // Changed on the server since: the change wins over our deletion (D38).
       const server = await provider.fetch(href);
-      if (server) await saveServerVersion(store, calendar, server, report);
+      if (server) await saveServerVersion(store, calendar, server, report, object);
       else await store.removeObject(object.id);
     }
     return;
@@ -246,7 +246,7 @@ async function upload(
       await store.rebase(now.id, now.ics, { ics: now.ics, etag: server.etag, baseIcs: server.ics });
       return;
     }
-    await saveServerVersion(store, calendar, server, report);
+    if (now) await saveServerVersion(store, calendar, server, report, now);
     return;
   }
 
@@ -270,7 +270,7 @@ async function upload(
           await store.addConflict(object.id, object.ics);
           report.conflicts++;
         }
-        await saveServerVersion(store, calendar, server, report);
+        await saveServerVersion(store, calendar, server, report, object);
         return;
       }
       // Merge onto what the server has now, and try once more against its ETag.
@@ -362,7 +362,7 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
         report.conflicts++;
       }
       try {
-        await store.saveFromServer(calendar.id, object, { replacePending: true });
+        if (ours) await store.saveFromServer(calendar.id, object, { replacePending: ours });
         report.downloaded++;
       } catch (error) {
         if (!(error instanceof CalendarObjectError)) throw error;
@@ -399,9 +399,10 @@ async function saveServerVersion(
   calendar: Calendar,
   server: RemoteObject,
   report: SyncReport,
+  seen: Pick<StoredObject, "ics" | "pending">,
 ) {
   try {
-    await store.saveFromServer(calendar.id, server, { replacePending: true });
+    await store.saveFromServer(calendar.id, server, { replacePending: seen });
   } catch (error) {
     if (!(error instanceof CalendarObjectError)) throw error;
     if (!report.skipped.includes(server.href)) report.skipped.push(server.href);

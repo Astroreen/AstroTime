@@ -406,4 +406,23 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect(report.errors.map((e) => e.problem)).toEqual(["deletion-reverted"]);
     expect((await store.objectAt(calendar.id, `${calendarUrl}keep.ics`))?.pending).toBe("none");
   });
+
+  test("an edit made while a read-only calendar gives way is kept, not overwritten", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("ro", "One"));
+    await sync();
+    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    await store.saveLocal(calendar.id, task("ro", "Ours"));
+    const fetchServer = server.fetch.bind(server);
+    server.fetch = async (h) => {
+      const object = await fetchServer(h);
+      await store.saveLocal(calendar.id, task("ro", "Edited while it settled"));
+      return object;
+    };
+    await sync();
+    expect((await store.objectAt(calendar.id, `${calendarUrl}ro.ics`))?.ics).toContain(
+      "SUMMARY:Edited while it settled",
+    );
+  });
 });

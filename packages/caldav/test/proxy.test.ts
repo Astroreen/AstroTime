@@ -68,7 +68,12 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
     redirect: "manual",
   });
   expect(response.status).toBe(207);
-  expect([...response.headers.keys()].toSorted()).toEqual(["content-type", "dav", "etag"]);
+  expect([...response.headers.keys()].toSorted()).toEqual([
+    "cache-control",
+    "content-type",
+    "dav",
+    "etag",
+  ]);
 });
 
 test("a redirect comes back mapped into the proxy", async () => {

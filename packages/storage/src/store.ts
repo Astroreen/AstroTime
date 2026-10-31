@@ -131,11 +131,15 @@ export class Store {
   saveFromServer(
     calendarId: string,
     resource: { href: string; etag: string | null; ics: string },
-    options: { replacePending?: boolean } = {},
+    options: { replacePending?: Pick<StoredObject, "ics" | "pending"> } = {},
   ): Promise<StoredObject> {
     return this.exclusive(async () => {
       const current = await this.objectAt(calendarId, resource.href);
-      if (current && current.pending !== "none" && !options.replacePending) return current;
+      if (current && current.pending !== "none") {
+        // Replaced only as the sync engine saw it: an edit made since stays.
+        const seen = options.replacePending;
+        if (!seen || seen.ics !== current.ics || seen.pending !== current.pending) return current;
+      }
       return this.upsert(
         calendarId,
         resource.href,
