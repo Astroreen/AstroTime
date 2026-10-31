@@ -183,13 +183,16 @@ export function layoutDay(
   };
 }
 
+const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 /** Longer spans first, then events before tasks, then by title (Google's order). */
 function sortAllDay(occurrences: Occurrence[], timeZone: string): Occurrence[] {
   return occurrences.toSorted(
     (a, b) =>
       minutesBetween(b.start, b.end, timeZone) - minutesBetween(a.start, a.end, timeZone) ||
       (a.item.kind === b.item.kind ? 0 : a.item.kind === "event" ? -1 : 1) ||
-      (a.item.summary ?? "").localeCompare(b.item.summary ?? ""),
+      // Code-unit order, the same on every platform (localeCompare is not).
+      compare(a.item.summary ?? "", b.item.summary ?? ""),
   );
 }
 
