@@ -226,7 +226,10 @@ were checked on 2026-11-01.
   - **CI:** a job on every PR builds the UI, `cap sync`s it and runs
     `./gradlew assembleDebug test` on `ubuntu-latest`, with JDK 21 from
     `actions/setup-java` (the runner's default JDK moves to 25 with Ubuntu
-    26.04) and the Android SDK the image already has. The debug APK, signed
+    26.04) and the SDK packages it needs installed by the job itself
+    (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`, a no-op
+    where the image has them), so a new runner image cannot take them
+    away. The debug APK, signed
     with a throwaway debug key and so installable, is the run's artifact;
     the job joins the `CI` status ([D27](foundation.md#D27)).
   - **Release:** on a `v*` tag that passes the existing checks (on `main`,
