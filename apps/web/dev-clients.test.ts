@@ -1,6 +1,9 @@
+import { EventEmitter } from "node:events";
+
+import type { ViteDevServer } from "vite";
 import { describe, expect, test } from "vite-plus/test";
 
-import { isTailnetOrLocal } from "./dev-clients.ts";
+import { devClients, isTailnetOrLocal } from "./dev-clients.ts";
 
 describe("isTailnetOrLocal", () => {
   test("lets in this machine and the tailnet", () => {
@@ -30,8 +33,37 @@ describe("isTailnetOrLocal", () => {
       "fd7a:115c:a1e1::1",
       "",
       "100.64",
+      "0x7f.0.0.1",
+      "1e2.64.0.1",
+      "100..0.1",
     ]) {
       expect(isTailnetOrLocal(ip), ip).toBe(false);
     }
+  });
+});
+
+describe("devClients", () => {
+  // The dev server's HTTP server, as far as the plugin uses it.
+  function serve(clients: string | undefined) {
+    const httpServer = new EventEmitter();
+    const hook = devClients(clients).configureServer;
+    if (typeof hook !== "function") throw new Error("configureServer is a function");
+    void hook.call({} as never, { httpServer } as unknown as ViteDevServer);
+    return (remoteAddress: string) => {
+      const socket = { remoteAddress, destroyed: false, destroy: () => (socket.destroyed = true) };
+      httpServer.emit("connection", socket);
+      return socket.destroyed;
+    };
+  }
+
+  test("with tailnet clients, ends a LAN connection and keeps a tailnet one", () => {
+    const connect = serve("tailnet");
+    expect(connect("192.168.50.10")).toBe(true);
+    expect(connect("100.72.90.18")).toBe(false);
+    expect(connect("::ffff:127.0.0.1")).toBe(false);
+  });
+
+  test("without the setting, checks no one", () => {
+    expect(serve(undefined)("192.168.50.10")).toBe(false);
   });
 });

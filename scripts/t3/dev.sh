@@ -30,16 +30,22 @@ CONFIG
     201 | 405 | 409) ;;
     *) echo "astrotime: could not make the dev calendar (MKCALENDAR answered $made)" >&2; exit 1 ;;
   esac
-  # Beyond localhost the dev proxy reaches only listed servers (dav-proxy.ts);
-  # the local Radicale is always one of them.
-  ASTROTIME_PROXY_ALLOW="${ASTROTIME_PROXY_ALLOW:+$ASTROTIME_PROXY_ALLOW,}http://127.0.0.1:$ASTROTIME_DAV_PORT"
-  export ASTROTIME_PROXY_ALLOW
+  # Beyond localhost (or with a list of the owner's) the dev proxy reaches
+  # only listed servers (dav-proxy.ts); the local Radicale is one of them.
+  # On localhost with no list it reaches any server, Radicale included.
+  if ! web_is_local || [ -n "${ASTROTIME_PROXY_ALLOW:-}" ]; then
+    ASTROTIME_PROXY_ALLOW="${ASTROTIME_PROXY_ALLOW:+$ASTROTIME_PROXY_ALLOW,}http://127.0.0.1:$ASTROTIME_DAV_PORT"
+    export ASTROTIME_PROXY_ALLOW
+  fi
 else
   echo "astrotime: no radicale on PATH, so no local CalDAV server (it comes with devenv)" >&2
 fi
 
-if [ "$ASTROTIME_WEB_HOST" != 127.0.0.1 ] && [ -z "${ASTROTIME_PROXY_ALLOW:-}" ]; then
+if ! web_is_local && [ -z "${ASTROTIME_PROXY_ALLOW:-}" ]; then
   echo "astrotime: the dev proxy listens beyond localhost with no ASTROTIME_PROXY_ALLOW, so it refuses every CalDAV server; list yours there" >&2
+fi
+if ! web_is_local && [ "${ASTROTIME_WEB_CLIENTS:-}" != tailnet ]; then
+  echo "astrotime: warning: listening on $ASTROTIME_WEB_HOST for every network; anyone who reaches port $ASTROTIME_WEB_PORT can use the local CalDAV server through the proxy (password astro)" >&2
 fi
 
 # Names other devices may reach the dev server by (Vite refuses unknown Host

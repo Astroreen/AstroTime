@@ -72,6 +72,12 @@ One word per concept. Use these terms in code, docs, commits and UI.
   servers despite CORS: in the dev server now, in the web app's Docker image
   later (`proxyHandler`).
 
+## Development
+
+- **Tailnet** — the owner's private Tailscale network (100.64.0.0/10,
+  fd7a:115c:a1e0::/48); with Tailscale up, the dev server lets in this
+  machine and tailnet devices only (`scripts/t3/README.md`).
+
 ## The docs
 
 - **Context library** — everything AstroTime knows about itself in `docs/`,

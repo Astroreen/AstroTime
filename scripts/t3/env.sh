@@ -39,6 +39,14 @@ if [ -z "${ASTROTIME_WEB_HOST:-}" ] && command -v tailscale >/dev/null 2>&1 && [
   export ASTROTIME_WEB_CLIENTS
 fi
 ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-127.0.0.1}"
+
+# True when the dev server is reachable from this machine alone.
+web_is_local() {
+  case "$ASTROTIME_WEB_HOST" in
+    127.0.0.1 | localhost | ::1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 ASTROTIME_DAV_PORT="${ASTROTIME_DAV_PORT:-5232}"
 
 node_major() {
