@@ -18,7 +18,8 @@ notifications even when the app is closed, and syncs in the background. A
 
 ## Decisions
 
-Numbered on from the design plan; D60–D69 belong to this plan. Versions
+Numbered on from the design plan, after D54–D59, which foundation's
+PR 5 holds; D60–D69 belong to this plan. Versions
 were checked on 2026-11-01.
 
 ### What every shell provides
@@ -82,7 +83,7 @@ were checked on 2026-11-01.
   the status, the URL that answered (`response.request.url`), the headers
   (repeated ones joined with `, `, as `fetch` does) and the body as text,
   and rejects with an "offline" code when the server cannot be reached,
-  which the TypeScript adapter turns into `OfflineError`. OkHttp follows
+  which the TypeScript adapter turns into `OfflineError`. The plugin follows
   redirects itself, up to 10, with OkHttp's `followRedirects` and
   `followSslRedirects` off, as the desktop does ([desktop D72](desktop.md#D72)),
   and returns the last hop's URL, so one rule holds on every platform: a
@@ -236,7 +237,8 @@ were checked on 2026-11-01.
     (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`, a no-op
     where the image has them), so a new runner image cannot take them
     away. The debug APK, signed
-    with a throwaway debug key and so installable, is the run's artifact;
+    with a debug key kept in the repository (a debug key is public by
+    nature), so each build installs over the last, is the run's artifact;
     the job joins the `CI` status ([D27](foundation.md#D27)).
   - **Release:** on a `v*` tag that passes the existing checks (on `main`,
     `CI` passed, matches `package.json`, [D41](foundation.md#D41)), a job
