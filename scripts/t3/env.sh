@@ -105,7 +105,8 @@ stop_tree() {
 # stale pid file never matches an unrelated process that reused the pid.
 is_ours() {
   kill -0 "$1" 2>/dev/null || return 1
-  ps -o args= -p "$1" 2>/dev/null | grep -Eq "(^|[ /])$2\.sh( |\$)" || return 1
+  # bash running the script, not an editor that has it open in the root.
+  ps -o args= -p "$1" 2>/dev/null | grep -Eq "^(/[^ ]*/)?bash .*(^|[ /])$2\.sh( |\$)" || return 1
   if [ -d "/proc/$1" ]; then
     [ "$(readlink "/proc/$1/cwd")" = "$ASTROTIME_ROOT_PHYSICAL" ] || return 1
   fi

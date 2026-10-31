@@ -2,6 +2,11 @@
 # Proves dev.sh and stop.sh: starts everything, checks the page (and the
 # CalDAV proxy when Radicale is there), that a second start is refused, and
 # that stop.sh leaves nothing running. CI runs it.
+# Its own directory and ports, so it never meets (or stops) a dev session
+# that is running.
+export ASTROTIME_DEV_DIR="${ASTROTIME_SMOKE_DIR:-$(cd "$(dirname "$0")/../.." && pwd)/.astrotime-dev/smoke}"
+export ASTROTIME_WEB_PORT="${ASTROTIME_SMOKE_WEB_PORT:-5190}"
+export ASTROTIME_DAV_PORT="${ASTROTIME_SMOKE_DAV_PORT:-5242}"
 # shellcheck source=env.sh
 source "$(dirname "$0")/env.sh"
 enter_dev_shell "$@"
@@ -14,10 +19,12 @@ bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" >"$fifo" 2>&1 &
 exec {out}<"$fifo"
 rm -f "$fifo"
 # Waits for dev.sh's own "ready" line, not for time.
+ready=0
 while IFS= read -r line <&"$out"; do
   printf '%s\n' "$line" >>"$log"
-  [[ "$line" == *"astrotime: stop with"* ]] && break
+  [[ "$line" == *"astrotime: stop with"* ]] && ready=1 && break
 done
+[ "$ready" = 1 ] || { echo "smoke: dev.sh ended before it was ready; see $log" >&2; exit 1; }
 cat <&"$out" >>"$log" &
 # Whatever ends the smoke run, nothing it started stays behind.
 trap 'bash "$ASTROTIME_ROOT/scripts/t3/stop.sh" >/dev/null 2>&1 || true' EXIT
@@ -39,4 +46,5 @@ if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a secon
 
 bash "$ASTROTIME_ROOT/scripts/t3/stop.sh"
 if curl -s -o /dev/null "http://127.0.0.1:$ASTROTIME_WEB_PORT/"; then fail "the dev server still answers after stop.sh"; fi
+if curl -s -o /dev/null "http://127.0.0.1:$ASTROTIME_DAV_PORT/"; then fail "Radicale still answers after stop.sh"; fi
 echo "smoke: ok"
