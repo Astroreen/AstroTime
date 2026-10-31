@@ -126,7 +126,8 @@ record_pid() {
   # shellcheck disable=SC2154 # job is the loop variable inside the trap string
   # On exit (Ctrl-C included) the services are stopped and waited for, so a
   # quick restart does not find their ports still taken.
-  trap 'rm -f "'"$file"'"; for job in $(jobs -p); do stop_tree "$job" || true; done' EXIT
+  # The pid file goes last, so no second dev.sh starts while ports are still taken.
+  trap 'for job in $(jobs -p); do stop_tree "$job" || true; done; rm -f "'"$file"'"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
 }
