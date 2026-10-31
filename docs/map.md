@@ -26,6 +26,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `occurrencesBetween` — expands a series into the occurrences that touch
     a range of days in the user's zone. → `plans/foundation.md#D33`
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `layoutDay`, `layoutSpans`, `isAllDay` — where items go on the views:
+    the all-day strip, the time grid, overlaps. → `plans/foundation.md#D42`
   - `test/fixtures/` — iCalendar as each client writes it.
 
 - `packages/storage` (`@astrotime/storage`) — the local store.

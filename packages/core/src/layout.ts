@@ -1,0 +1,274 @@
+// Where items go on the calendar's views (docs/plans/foundation.md#D14–D16,
+// D42): which belong to the all-day strip, where timed ones sit in a day's
+// time grid, and how overlaps share the width. Pure geometry in minutes and
+// fractions of a column; the UI turns it into pixels.
+import type { Occurrence } from "./occurrences.ts";
+import { wallClockOf, type ItemTime } from "./time.ts";
+
+const DAY_MINUTES = 24 * 60;
+
+export interface LayoutOptions {
+  /** The IANA zone the calendar is shown in. */
+  readonly timeZone: string;
+  /** How tall a task with only a due time is drawn (D16). */
+  readonly chipMinutes?: number;
+  /** The shortest a block is drawn, so a 5-minute event can still be hit. */
+  readonly minBlockMinutes?: number;
+  /** How far each cascaded item is shifted right, as a fraction of the column (D15). */
+  readonly cascadeStep?: number;
+  /** Past this many items at once, a cluster switches to equal columns (D15). */
+  readonly maxCascade?: number;
+}
+
+/** A timed item placed in one day's column. */
+export interface Placed {
+  readonly occurrence: Occurrence;
+  /** `chip`: a task with only a due time; `block`: anything with a length. */
+  readonly shape: "block" | "chip";
+  /** Minutes from the day's midnight; clipped to the day. */
+  readonly top: number;
+  readonly bottom: number;
+  /** Whether the item goes on before or after this day. */
+  readonly continuesBefore: boolean;
+  readonly continuesAfter: boolean;
+  /** Left edge and width as fractions of the column. */
+  readonly left: number;
+  readonly width: number;
+  /** Paint order: higher is drawn on top. */
+  readonly layer: number;
+}
+
+export interface DayLayout {
+  readonly allDay: readonly Occurrence[];
+  readonly timed: readonly Placed[];
+}
+
+function minutesOf(local: string): number {
+  return (
+    Number(local.slice(11, 13)) * 60 +
+    Number(local.slice(14, 16)) +
+    Number(local.slice(17, 19)) / 60
+  );
+}
+
+function nextDay(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Calendar days from `a` to `b` (both `YYYY-MM-DD`). */
+function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
+
+/** A task's chip: it has a due time and nothing to span from (D16). */
+function isChip(occurrence: Occurrence): boolean {
+  const { item } = occurrence;
+  if (item.kind !== "task" || item.due?.type === "date") return false;
+  return item.start === null || item.start.type === "date" || item.due === null;
+}
+
+/**
+ * Whether an occurrence belongs to the all-day strip: an all-day item (a
+ * date, a task due on a date) or a timed one lasting a whole day or more,
+ * as Google shows a 3-day conference (D42).
+ */
+export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
+  const { item, start, end } = occurrence;
+  if (start.type === "date") return true;
+  if (item.kind === "task" && item.due?.type === "date") return true;
+  if (isChip(occurrence)) return false;
+  return minutesBetween(start, end, timeZone) >= DAY_MINUTES;
+}
+
+function minutesBetween(start: ItemTime, end: ItemTime, timeZone: string): number {
+  const s = wallClockOf(start, timeZone);
+  const e = wallClockOf(end, timeZone);
+  return daysBetween(s.slice(0, 10), e.slice(0, 10)) * DAY_MINUTES + minutesOf(e) - minutesOf(s);
+}
+
+/**
+ * One day's layout. `occurrences` are the day's, as `occurrencesBetween`
+ * returns them for the range of this one day.
+ */
+export function layoutDay(
+  occurrences: readonly Occurrence[],
+  day: string,
+  options: LayoutOptions,
+): DayLayout {
+  const {
+    timeZone,
+    chipMinutes = 30,
+    minBlockMinutes = 15,
+    cascadeStep = 0.15,
+    maxCascade = 3,
+  } = options;
+  const allDay: Occurrence[] = [];
+  const items: Omit<Placed, "left" | "width" | "layer">[] = [];
+
+  for (const occurrence of occurrences) {
+    if (isAllDay(occurrence, timeZone)) {
+      allDay.push(occurrence);
+      continue;
+    }
+    const chip = isChip(occurrence);
+    const at =
+      chip && occurrence.item.kind === "task" && occurrence.item.due
+        ? occurrence.item.due
+        : occurrence.start;
+    const s = wallClockOf(at, timeZone);
+    const e = wallClockOf(chip ? at : occurrence.end, timeZone);
+    const startsBefore = s.slice(0, 10) < day;
+    const endsAfter =
+      e.slice(0, 10) > day && !(e.slice(0, 10) === nextDay(day) && minutesOf(e) === 0);
+    let top = startsBefore ? 0 : minutesOf(s);
+    let bottom = endsAfter ? DAY_MINUTES : e.slice(0, 10) > day ? DAY_MINUTES : minutesOf(e);
+    if (chip) bottom = top + chipMinutes;
+    bottom = Math.max(bottom, top + (chip ? chipMinutes : minBlockMinutes));
+    // A chip or a short block at the end of the day is lifted to fit.
+    if (bottom > DAY_MINUTES) {
+      top = Math.max(0, top - (bottom - DAY_MINUTES));
+      bottom = DAY_MINUTES;
+    }
+    items.push({
+      occurrence,
+      shape: chip ? "chip" : "block",
+      top,
+      bottom,
+      continuesBefore: startsBefore,
+      continuesAfter: endsAfter,
+    });
+  }
+
+  return {
+    allDay: sortAllDay(allDay, timeZone),
+    timed: placeOverlaps(items, cascadeStep, maxCascade),
+  };
+}
+
+/** Longer spans first, then events before tasks, then by title (Google's order). */
+function sortAllDay(occurrences: Occurrence[], timeZone: string): Occurrence[] {
+  return occurrences.toSorted(
+    (a, b) =>
+      minutesBetween(b.start, b.end, timeZone) - minutesBetween(a.start, a.end, timeZone) ||
+      (a.item.kind === b.item.kind ? 0 : a.item.kind === "event" ? -1 : 1) ||
+      (a.item.summary ?? "").localeCompare(b.item.summary ?? ""),
+  );
+}
+
+/**
+ * D15: items that overlap, directly or through others, form a cluster. In a
+ * cluster an item that starts later (or, starting together, is shorter) is
+ * drawn on top, shifted right by one step per item under it that it
+ * overlaps. When more than `maxCascade` items overlap at one moment the
+ * cascade would hide too much, and the cluster switches to equal columns.
+ */
+function placeOverlaps(
+  items: Omit<Placed, "left" | "width" | "layer">[],
+  step: number,
+  maxCascade: number,
+): Placed[] {
+  const sorted = items.toSorted((a, b) => a.top - b.top || b.bottom - b.top - (a.bottom - a.top));
+  const placed: Placed[] = [];
+  let cluster: typeof sorted = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    if (cluster.length > 0) placed.push(...placeCluster(cluster, step, maxCascade));
+    cluster = [];
+  };
+  for (const item of sorted) {
+    if (item.top >= clusterEnd) flush();
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.bottom);
+  }
+  flush();
+  return placed;
+}
+
+function overlap(a: { top: number; bottom: number }, b: { top: number; bottom: number }): boolean {
+  return a.top < b.bottom && b.top < a.bottom;
+}
+
+function placeCluster(
+  cluster: Omit<Placed, "left" | "width" | "layer">[],
+  step: number,
+  maxCascade: number,
+): Placed[] {
+  // The most items at one moment: checked at every start.
+  const peak = Math.max(
+    ...cluster.map((a) => cluster.filter((b) => b.top <= a.top && a.top < b.bottom).length),
+  );
+  if (peak > maxCascade) {
+    // Equal columns: each item takes the first column free at its start.
+    const columns: number[] = [];
+    const column = cluster.map((item) => {
+      let index = columns.findIndex((bottom) => bottom <= item.top);
+      if (index < 0) index = columns.push(0) - 1;
+      columns[index] = item.bottom;
+      return index;
+    });
+    const width = 1 / columns.length;
+    return cluster.map((item, i) => ({ ...item, left: column[i]! * width, width, layer: i }));
+  }
+  const depth: number[] = [];
+  return cluster.map((item, i) => {
+    let d = 0;
+    for (let j = 0; j < i; j++) if (overlap(cluster[j]!, item)) d = Math.max(d, depth[j]! + 1);
+    depth.push(d);
+    const left = Math.min(d * step, 1 - step);
+    return { ...item, left, width: 1 - left, layer: i };
+  });
+}
+
+/** An all-day span placed in a row of the week's (or a month week's) strip. */
+export interface Span {
+  readonly occurrence: Occurrence;
+  /** The first and last day it covers, as indexes into `days`. */
+  readonly firstDay: number;
+  readonly lastDay: number;
+  readonly row: number;
+  readonly continuesBefore: boolean;
+  readonly continuesAfter: boolean;
+}
+
+/**
+ * The all-day strip across several days (a week, or one week of a month):
+ * each span gets the first row free on all its days, longest spans first, so
+ * a three-day conference reads as one bar (D14, D42).
+ */
+export function layoutSpans(
+  occurrences: readonly Occurrence[],
+  days: readonly string[],
+  timeZone: string,
+): Span[] {
+  const first = days[0];
+  const last = days.at(-1);
+  if (!first || !last) return [];
+  const rows: boolean[][] = [];
+  const spans: Span[] = [];
+  for (const occurrence of sortAllDay([...occurrences], timeZone)) {
+    const startDay = wallClockOf(occurrence.start, timeZone).slice(0, 10);
+    const endClock = wallClockOf(occurrence.end, timeZone);
+    // An exclusive end at midnight (all-day ends always are) belongs to the day before.
+    const endDay =
+      endClock.endsWith("T00:00:00") && endClock.slice(0, 10) > startDay
+        ? new Date(Date.parse(`${endClock.slice(0, 10)}T00:00:00Z`) - 86_400_000)
+            .toISOString()
+            .slice(0, 10)
+        : endClock.slice(0, 10);
+    const firstDay = Math.max(0, daysBetween(first, startDay));
+    const lastDay = Math.min(days.length - 1, daysBetween(first, endDay));
+    if (lastDay < 0 || firstDay > days.length - 1 || lastDay < firstDay) continue;
+    let row = rows.findIndex((taken) => taken.slice(firstDay, lastDay + 1).every((t) => !t));
+    if (row < 0) row = rows.push(Array.from({ length: days.length }, () => false)) - 1;
+    for (let d = firstDay; d <= lastDay; d++) rows[row]![d] = true;
+    spans.push({
+      occurrence,
+      firstDay,
+      lastDay,
+      row,
+      continuesBefore: startDay < first,
+      continuesAfter: endDay > last,
+    });
+  }
+  return spans;
+}
