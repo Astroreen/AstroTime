@@ -391,4 +391,36 @@ describe("whole days, DST and deep cascades", () => {
       ["d", 0.45],
     ]);
   });
+
+  test("a chain too deep for the cascade switches to columns, so no item hides another", () => {
+    // Eight items, each overlapping only the next: at most two at once, but
+    // the cascade would step 7 × 15% and run off the column.
+    const chain = Array.from({ length: 8 }, (_, i) => {
+      const start = 9 * 60 + i * 20;
+      const at = (m: number) =>
+        `20261102T${String(Math.floor(m / 60)).padStart(2, "0")}${String(m % 60).padStart(2, "0")}00Z`;
+      return event(`c${i}`, at(start), at(start + 30));
+    });
+    const timed = brief(day(...chain).timed);
+    expect(new Set(timed.map((t) => t.width))).toEqual(new Set([0.5]));
+    for (const [i, t] of timed.entries()) {
+      const next = timed[i + 1];
+      if (next && next.top < t.bottom) expect(next.left).not.toBe(t.left);
+    }
+  });
+
+  test("floating times are placed at their wall clock in any zone", () => {
+    const floating = vcal(
+      "BEGIN:VEVENT\r\nUID:f\r\nDTSTART:20261102T090000\r\nDTEND:20261102T100000\r\nEND:VEVENT\r\n",
+    );
+    for (const zone of ["UTC", "Pacific/Kiritimati", "America/New_York"]) {
+      const occurrences = occurrencesBetween(CalendarObject.parse(floating), {
+        from: "2026-11-02",
+        to: "2026-11-03",
+        timeZone: zone,
+      });
+      const layout = layoutDay(occurrences, "2026-11-02", { timeZone: zone });
+      expect([layout.allDay.length, layout.timed[0]?.top]).toEqual([0, 540]);
+    }
+  });
 });

@@ -231,12 +231,20 @@ function placeCluster(
   step: number,
   maxCascade: number,
 ): Placed[] {
+  const depth: number[] = [];
+  for (const [i, item] of cluster.entries()) {
+    let d = 0;
+    for (let j = 0; j < i; j++) if (overlap(cluster[j]!, item)) d = Math.max(d, depth[j]! + 1);
+    depth.push(d);
+  }
   // The most items at one moment: checked at every start.
   const peak = Math.max(
     ...cluster.map((a) => cluster.filter((b) => b.top <= a.top && a.top < b.bottom).length),
   );
-  if (peak > maxCascade) {
-    // Equal columns: each item takes the first column free at its start.
+  // Too many at once, or a chain so deep the cascade would run off the
+  // column and stack items on one another: equal columns instead.
+  if (peak > maxCascade || Math.max(...depth) * step > 1 - step) {
+    // Each item takes the first column free at its start.
     const columns: number[] = [];
     const column = cluster.map((item) => {
       let index = columns.findIndex((bottom) => bottom <= item.top);
@@ -247,13 +255,9 @@ function placeCluster(
     const width = 1 / columns.length;
     return cluster.map((item, i) => ({ ...item, left: column[i]! * width, width, layer: i }));
   }
-  const depth: number[] = [];
   return cluster.map((item, i) => {
-    let d = 0;
-    for (let j = 0; j < i; j++) if (overlap(cluster[j]!, item)) d = Math.max(d, depth[j]! + 1);
-    depth.push(d);
     // Rounded so a cascade of 0.15 steps reads 0.45, not 0.44999…
-    const left = Math.round(Math.min(d * step, 1 - step) * 1e4) / 1e4;
+    const left = Math.round(depth[i]! * step * 1e4) / 1e4;
     return { ...item, left, width: 1 - left, layer: i };
   });
 }
