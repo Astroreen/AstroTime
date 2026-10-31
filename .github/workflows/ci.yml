@@ -66,11 +66,30 @@ jobs:
       - uses: ./.github/actions/setup
       - run: vp run --filter @astrotime/web build
 
+  image:
+    name: Web image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The release builds the same Dockerfile; this proves it builds and starts.
+      - run: docker build -t astrotime:ci .
+      - name: The image serves the app, proxies only to its allowlist, and refuses to start without one
+        run: |
+          docker run -d --name web -p 8080:8080 -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com astrotime:ci
+          # curl's own retries while the server starts, not a sleep loop.
+          curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8080/healthz
+          curl -fsS http://127.0.0.1:8080/ | grep -q "<title>AstroTime</title>"
+          status=$(curl -s -o /dev/null -w '%{http_code}' -X PROPFIND "http://127.0.0.1:8080/dav-proxy/https%3A%2F%2Felsewhere.example/dav/")
+          test "$status" = 403
+          if docker run --rm astrotime:ci 2> refusal.log; then echo "started without ASTROTIME_PROXY_ALLOW" >&2; exit 1; fi
+          grep -q "ASTROTIME_PROXY_ALLOW must list" refusal.log
+
   # Single required status for branch protection (docs/plans/foundation.md, D30).
   ci:
     name: CI
     if: always()
-    needs: [check, typecheck, unit, knip, build]
+    needs: [check, typecheck, unit, knip, build, image]
     runs-on: ubuntu-latest
     steps:
       - name: All jobs passed

@@ -293,6 +293,32 @@ Decided while building PR 4.
   `ASTROTIME_PROXY_ALLOW` lists some; the production image (PR 7) requires
   the list.
 
+### The web image
+
+Decided while building PR 7.
+
+- **D40. One small image.** `apps/proxy` is bundled by Vite into one
+  JavaScript file with the workspace packages it needs, and runs on
+  `node:24-alpine` next to `apps/web/dist`, as the unprivileged `node` user.
+  It serves the app (hashed assets as immutable, every other path as the
+  single-page app), `/healthz`, and the CalDAV proxy of [D39](#D39).
+  `ASTROTIME_PROXY_ALLOW` is required and holds origins only; the server
+  refuses to start without it. TLS is the job of the reverse proxy in front.
+  Proxied answers are streamed and sent `Cache-Control: no-store`; requests
+  are capped at 10 MB (413, refused before reading when announced), and slow
+  ones are cut off. A missing file under `assets/` is a 404, never the app,
+  and only a file that resolves under `assets/` is immutable. Errors are
+  logged, not shown to the client. A client that goes away cancels its
+  request to the CalDAV server. Behind a TLS terminator the page's `https`
+  origin passes the proxy's check, which compares hosts ([D39](#D39)).
+- **D41. Releases are tagged from `package.json`.** The root `version` is
+  the product's; a `v<version>` tag publishes
+  `ghcr.io/astroreen/astrotime:<version>`, `:<major>.<minor>` and, for a
+  release that is not a prerelease, `:latest`, for amd64 and arm64. The
+  build stage runs on the builder's platform (its output is JavaScript), so
+  arm64 needs no emulation. A tag publishes only a commit on `main` whose
+  `CI` passed. CI builds and starts the image on every PR.
+
 ### Layout
 
 Decided while building the layout engine, ahead of PR 5's screens.
@@ -333,6 +359,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Year and 3-day views** ([D13](#D13)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
+- **Content Security Policy** for the web image — once the app's own needs
+  (wasm, workers) are known from PR 5 ([D40](#D40)).
 - **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
   (or any TZID that is not IANA) without a VTIMEZONE stays floating, so it
   shows at the viewer's wall clock, until it is mapped to IANA; with a
@@ -438,7 +466,11 @@ recurrence scope dialog, reminders as notifications. Decisions: D9, D10, D11.
 ### PR 7 — Web proxy and release
 
 `apps/proxy` and the Docker image, its allowlist, the release workflow that
-publishes it to GHCR on a `v*` tag. Decisions: D20, D28.
+publishes it to GHCR on a `v*` tag. Decisions: D20, D28, D40, D41.
+
+Done when: the image builds in CI, serves the app, proxies to an allowed
+server and refuses an unlisted one, and refuses to start without an
+allowlist.
 
 ### Later — Android, then Linux
 
