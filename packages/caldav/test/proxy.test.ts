@@ -239,6 +239,8 @@ test("allowlist entries match however their origin is spelled", async () => {
     new Request(`http://app.localhost${via.to("https://cloud.example.com/dav/")}`),
   );
   expect(response.status).toBe(200);
+});
+
 test("the answer is streamed through, and the client going away aborts the request to the server", async () => {
   let signal: AbortSignal | undefined;
   const fetchImpl = (async (_input: URL | string, init: RequestInit) => {
