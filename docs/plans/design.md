@@ -1,0 +1,102 @@
+# Design plan
+
+Status: **in progress** — decided, not yet built; PR 5 of
+[`foundation.md`](foundation.md#pr-5--calendar-grid) builds it. This plan
+owns how AstroTime looks and is laid out (foundation's
+[D18](foundation.md#D18)); where items go is the layout engine's
+([D42](foundation.md#D42)).
+
+## Goal
+
+The owner's reference is **Google Calendar and Google Tasks on Android**, in
+their dark theme: the screenshots the owner sent are the brief, described in
+[`../design/README.md`](../design/README.md). AstroTime looks and behaves like them closely enough that a
+Google Calendar user is at home, with its own calm palette rather than a
+copy of Google's brand.
+
+## Decisions
+
+Decisions here are numbered on from foundation's, so a `D<n>` is unique in
+the project.
+
+### From the owner (grilling round 5)
+
+- **D43. Google's density, a calm look of our own.** As dense as Google
+  Calendar: many items readable at once, small radii, little chrome. Colours,
+  type and icons are AstroTime's own, not Google's brand.
+- **D44. Dark and light themes from the first screen**, following the system
+  setting, with a manual override. Dark is designed first (the reference is
+  dark).
+- **D45. Week start and clock from the locale**, overridable in settings:
+  for Russian (and Lithuanian) Monday and 24 hours.
+- **D46. The layout is Google Calendar's on Android** (the owner answered
+  with the reference screenshots):
+  - a top bar: the menu button (opens the drawer), the month and year as a
+    button that opens a month picker, search, "today", the tasks toggle, the
+    account;
+  - a drawer with the views, the accounts and their calendars (each with its
+    colour and a visibility checkbox), and settings;
+  - the view below the bar; a floating "+" button bottom right creates an
+    event or a task;
+  - on a wide screen (desktop, a wide browser window) the drawer stays open
+    as a sidebar, as Google Calendar's web app does; nothing else changes.
+- **D47. An item's colour is its calendar's**, as the server gives it
+  (Apple's `calendar-color` property, which `CalDavProvider` reads into
+  `RemoteCalendar.color`), unless the item has its own RFC 7986 `COLOR`.
+
+### Read from the reference
+
+- **D48. Views: Day, 3 days, Week, Month, Agenda.** The reference uses the
+  3-day view, so it joins the MVP (foundation's D13 deferred it; D13 is
+  updated). Year stays deferred.
+- **D49. The time grid is a grid of tiles.** Each hour of each day is a
+  dark tile with rounded corners and a small gap between tiles; hour labels
+  sit on the left, on the line between hours. Week numbers sit left of the
+  day headers (week view, a pill per week in the month view). Today's date is
+  a filled circle in the accent colour, its weekday in the accent too. A
+  white line with a dot marks the current time across today.
+- **D50. Items are rounded filled blocks** in their colour with the title
+  in bold-ish text wrapping inside; an item drawn over another (D15) gets a
+  thin outline in the background colour, so the edge between them shows.
+  All-day items, and tasks the layout does not draw as blocks (D16, D42),
+  are chips one line high; a task with a timed start and due stays a block.
+- **D51. Tasks on the calendar.** A task's chip carries a check-circle icon;
+  a completed task stays, struck through, in a muted colour. Undone tasks
+  whose due (a date, a time, or the end of a start–due block) is before the
+  start of today, in the user's zone, collapse into one chip on today,
+  "N undone tasks", which opens them; it shows only on today, in every view
+  that has today, and the days they were due no longer show them. This is
+  D16's roll-over, drawn as one chip, even for a single
+  task (Google shows "1 undone task" too). It counts undone tasks only, so
+  "hide completed" does not change it. D16's "hide
+  completed" toggle stays, in the drawer, and hides completed tasks' chips on
+  every view. When the all-day strip holds more than
+  fits, it shows the first two rows and "+N", with a chevron that expands
+  it in place.
+- **D52. The tasks screen is Google Tasks'.** The tasks toggle in the top
+  bar opens it: a tab per task list (a VTODO calendar) with its count of
+  undone tasks, and "+ New list"; under the tab, a card with the list's
+  tasks (a circle to complete, a star), sort and menu buttons; below it,
+  "Completed (N)" folded. On a wide screen it is a panel on the right of the
+  calendar instead of a screen.
+  The star is stored as an AstroTime property (`X-ASTROTIME-STARRED:TRUE`),
+  so the task's own `PRIORITY` is never touched and other clients keep it
+  (AGENTS.md rule 2).
+- **D53. Settings in the drawer**: the theme (system, dark, light), the
+  week start and the clock (D44, D45), and "hide completed" (D51). Search,
+  in the top bar, finds items by title in the local store.
+
+## Deferred
+
+- **Year view** ([D48](#D48)).
+- **A view of starred tasks across lists** — the star is stored from PR 5
+  ([D52](#D52)); a place that gathers starred tasks comes later.
+- **Search beyond titles** — descriptions, locations, attendees, and the
+  server's own search ([D53](#D53)).
+
+## PR plan
+
+PR 5 of the foundation plan builds this plan: the app shell (top bar,
+drawer with its settings, floating button, search), the five views on the
+layout engine, the tasks screen, both themes, i18n. Its evidence is screenshots of each view next to the matching
+reference, in both themes.

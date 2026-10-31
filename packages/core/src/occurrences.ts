@@ -219,7 +219,7 @@ function shiftDate(date: string, days: number): string {
  * times are widened by 14 hours each way, the most a zone is from UTC.
  */
 export interface Bounds {
-  /** `null`: the object has no date at all (a task for the task panel). */
+  /** `null`: the object has no date at all (a task for the tasks screen). */
   readonly startMs: number | null;
   /** `null`: a series without an end. */
   readonly endMs: number | null;

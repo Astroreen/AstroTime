@@ -78,8 +78,9 @@ logic worth borrowing.
 
 ### Calendar UI
 
-- **D13. Views: Day, Week, Month, Agenda.** Year and 3-day views are
-  deferred.
+- **D13. Views: Day, 3 days, Week, Month, Agenda.** The Year view is
+  deferred. _Changed by the design plan ([D48](design.md#D48)): the grilling
+  deferred the 3-day view too; the owner's reference uses it._
 - **D14. Google-style layout.** All-day items sit in the all-day strip,
   pinned above the time grid so they stay visible while the day scrolls.
   Timed items sit in the time grid. Items can be dragged to another time and
@@ -90,20 +91,25 @@ logic worth borrowing.
   narrower. When more than three or four items overlap at once, the cluster
   switches to equal-width columns.
 - **D16. Where a task goes.**
-  - Only `DUE` with a time: a task chip at the due time (drawn about
+  - Only `DUE` with a time: a chip at the due time (drawn about
     30 minutes tall); dragging it moves `DUE`.
   - `DTSTART` and `DUE`: a block from start to due, like an event; resizing
     moves either end.
   - `DUE` with a date only: the all-day strip of that day.
-  - No date: the task panel only.
+  - No date: the tasks screen only (design D52).
   - Completed tasks stay visible, struck through and dimmed, with a "hide
     completed" toggle.
   - Overdue tasks roll over to today.
+    _Changed by the design plan ([D50](design.md#D50), [D51](design.md#D51)):
+    all-day items, and tasks not drawn as blocks, are one-line chips; completed tasks
+    are struck through and muted; the roll-over is one "N undone tasks" chip
+    on today; "hide completed" lives in the drawer's settings._
 - **D17. English and Russian from the first screen.** Every UI string goes
   through an i18n library (Lingui or i18next, chosen in PR 5); no strings in
   code.
 - **D18. The visual design is decided later**, in its own plan, before
-  PR 5. Until then UI work is structure and behaviour.
+  PR 5. Until then UI work is structure and behaviour. _Decided:_ the
+  [design plan](design.md), from Google Calendar's Android app.
 
 ### Accounts and connectivity
 
@@ -356,7 +362,7 @@ Decided while building the layout engine, ahead of PR 5's screens.
   DAVx5 and others), read-only first ([D4](#D4)).
 - **Time blocking** — planning tasks as blocks beyond `DTSTART`/`DUE`.
 - **Sending invitations** — iTIP/iMIP for attendees ([D9](#D9)).
-- **Year and 3-day views** ([D13](#D13)).
+- **Year view** ([D13](#D13); the 3-day view joined the MVP, [D48](design.md#D48)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
 - **Static files served whole** — the image reads each file into memory
@@ -398,7 +404,7 @@ Decided while building the layout engine, ahead of PR 5's screens.
   is decided with each app.
 
 - **Overdue tasks on today** — D16's roll-over needs the store to find
-  undone tasks due before today; it comes with PR 5's task panel.
+  undone tasks due before today; it comes with PR 5's tasks screen.
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
@@ -465,10 +471,16 @@ no test drives yet. The recordings are `radicale-*.ics` and
 
 ### PR 5 — Calendar grid
 
-`@astrotime/ui` and the web app's views: Day, Week, Month, Agenda, the
-all-day strip, the overlap layout, task placement, the task panel; i18n;
-browser-mode tests and Playwright. Needs the design plan ([D18](#D18)).
-Decisions: D1, D13, D14, D15, D16, D17.
+`@astrotime/ui` and the web app's views: Day, 3 days, Week, Month, Agenda,
+the all-day strip, the overlap layout, task placement, the tasks screen;
+both themes; i18n; browser-mode tests and Playwright. Builds the
+[design plan](design.md) ([D18](#D18)). Decisions: D1, D13, D14, D15, D16,
+D17, D42, and the design plan's D43–D53.
+
+Done when: each view and the tasks screen render real objects from the
+local store, in both themes and both languages, as in the references; the
+drawer's settings apply and search finds an item by its title;
+screenshots of each next to its reference are the evidence.
 
 ### PR 6 — Editing
 

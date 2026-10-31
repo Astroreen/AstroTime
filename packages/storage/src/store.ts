@@ -302,7 +302,7 @@ export class Store {
       );
   }
 
-  /** The objects with no date at all: the task panel's tasks (docs/plans/foundation.md#D16). */
+  /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
   undated(calendarIds: readonly string[]): Promise<StoredObject[]> {
     return this.db
       .select()
