@@ -52,9 +52,13 @@ if command -v radicale >/dev/null 2>&1; then
 fi
 # Beyond localhost the proxy reaches only listed servers, and Vite answers
 # only to known host names (DNS rebinding).
-status="$(curl -s -o /dev/null -w '%{http_code}' \
-  "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/https%3A%2F%2Fexample.com/")"
-[ "$status" = 403 ] || fail "the CalDAV proxy answered $status for a server not on its allowlist"
+# The body tells the allowlist's 403 from the "no list" one.
+refused="$(curl -s -w ' %{http_code}' "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/https%3A%2F%2Fexample.com/")"
+if command -v radicale >/dev/null 2>&1; then
+  [[ "$refused" == *"not on this proxy's allowlist. 403" ]] || fail "the CalDAV proxy let in a server not on its allowlist: $refused"
+else
+  [[ "$refused" == *"ASTROTIME_PROXY_ALLOW"*" 403" ]] || fail "the CalDAV proxy with no allowlist answered: $refused"
+fi
 status="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: rebound.example' "http://127.0.0.1:$ASTROTIME_WEB_PORT/")"
 [ "$status" = 403 ] || fail "the dev server answered $status for an unknown host name"
 if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a second dev.sh started"; fi

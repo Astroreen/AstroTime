@@ -34,6 +34,9 @@ ASTROTIME_WEB_PORT="${ASTROTIME_WEB_PORT:-5180}"
 # (apps/web/dev-clients.ts); without it, this machine only. A host set by
 # hand (0.0.0.0 for a LAN) is taken as it is, with no client check.
 if [ -z "${ASTROTIME_WEB_HOST:-}" ] && command -v tailscale >/dev/null 2>&1 && [ -n "$(tailscale ip -4 2>/dev/null || true)" ]; then
+  # IPv4 only, which is enough: a tailnet device whose browser tries the
+  # MagicDNS name's IPv6 address first falls back to IPv4. The IPv6 range in
+  # dev-clients.ts serves a hand-set `::`.
   ASTROTIME_WEB_HOST=0.0.0.0
   ASTROTIME_WEB_CLIENTS="${ASTROTIME_WEB_CLIENTS:-tailnet}"
   export ASTROTIME_WEB_CLIENTS
