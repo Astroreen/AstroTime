@@ -137,7 +137,7 @@ async function serveStatic(root: string, url: string, res: ServerResponse): Prom
   // Vite names what it puts in assets/ by its content: it never changes.
   const immutable = asset && target === file;
   res.writeHead(200, {
-    "Content-Type": TYPES[extname(target)] ?? "application/octet-stream",
+    "Content-Type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream",
     "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
     "X-Content-Type-Options": "nosniff",
   });
@@ -212,7 +212,12 @@ function createAppHandler(options: ServerOptions, root: string): Server {
         })
         .catch(done);
     } else if (req.method === "GET" || req.method === "HEAD") {
-      serveStatic(root, url, res).catch(done);
+      // A file of our own that cannot be read is our failure, not an upstream's.
+      serveStatic(root, url, res).catch((error: unknown) => {
+        console.error(error);
+        if (!res.headersSent) res.writeHead(500);
+        res.end();
+      });
     } else {
       res.writeHead(405).end();
     }
