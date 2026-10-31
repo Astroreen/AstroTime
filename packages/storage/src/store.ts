@@ -112,19 +112,37 @@ export class Store {
 
   // Objects
 
-  /** Stores the server's version of a resource, replacing what was stored under its href. */
-  async saveFromServer(
+  /**
+   * Stores the server's version of a resource under its href. A local change
+   * still pending there is never overwritten (AGENTS.md rule 2): the stored
+   * row comes back unchanged, unless `replacePending` says the sync engine
+   * decided the server's version wins (docs/plans/foundation.md#D38).
+   */
+  saveFromServer(
     calendarId: string,
     resource: { href: string; etag: string | null; ics: string },
+    options: { replacePending?: boolean } = {},
   ): Promise<StoredObject> {
-    return this.upsert(calendarId, resource.href, resource.etag, resource.ics, "none");
+    return this.exclusive(async () => {
+      const current = await this.objectAt(calendarId, resource.href);
+      if (current && current.pending !== "none" && !options.replacePending) return current;
+      return this.upsert(calendarId, resource.href, resource.etag, resource.ics, "none");
+    });
   }
 
   /**
    * Stores a change made on this device, for the sync engine to upload. A new
    * object gets the href the sync engine will create it under.
    */
-  async saveLocal(calendarId: string, ics: string, href?: string): Promise<StoredObject> {
+  saveLocal(calendarId: string, ics: string, href?: string): Promise<StoredObject> {
+    return this.exclusive(() => this.saveLocalNow(calendarId, ics, href));
+  }
+
+  private async saveLocalNow(
+    calendarId: string,
+    ics: string,
+    href?: string,
+  ): Promise<StoredObject> {
     const object = CalendarObject.parse(ics);
     if (href === undefined) {
       const existing = await this.db
@@ -140,7 +158,11 @@ export class Store {
   }
 
   /** Deletes an object on this device: at once if it never reached the server, else after the upload. */
-  async deleteLocal(id: string): Promise<void> {
+  deleteLocal(id: string): Promise<void> {
+    return this.exclusive(() => this.deleteLocalNow(id));
+  }
+
+  private async deleteLocalNow(id: string): Promise<void> {
     const object = await this.object(id);
     if (!object) return;
     if (object.pending === "create") await this.removeObject(id);
@@ -152,11 +174,13 @@ export class Store {
   }
 
   /** Records that the server accepted an upload. */
-  async markSynced(id: string, server: { href: string; etag: string | null }): Promise<void> {
-    await this.db
-      .update(schema.objects)
-      .set({ ...server, pending: "none" })
-      .where(eq(schema.objects.id, id));
+  markSynced(id: string, server: { href: string; etag: string | null }): Promise<void> {
+    return this.exclusive(async () => {
+      await this.db
+        .update(schema.objects)
+        .set({ ...server, pending: "none" })
+        .where(eq(schema.objects.id, id));
+    });
   }
 
   async removeObject(id: string): Promise<void> {
@@ -252,6 +276,22 @@ export class Store {
   async removeConflict(id: string): Promise<void> {
     await this.db.delete(schema.conflicts).where(eq(schema.conflicts.id, id));
   }
+
+  /**
+   * Runs read-then-write operations one at a time, so two of them never
+   * interleave on the one connection (a second `saveLocal` of a new object
+   * must see the first one's row).
+   */
+  private exclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(operation);
+    this.queue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  private queue: Promise<void> = Promise.resolve();
 
   private async upsert(
     calendarId: string,

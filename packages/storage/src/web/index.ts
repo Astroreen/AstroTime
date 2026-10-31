@@ -24,15 +24,36 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
     if (response.ok) pending?.resolve(response.rows ?? []);
     else pending?.reject(new Error(response.error));
   });
+  // A worker that fails to load or crashes answers nothing again: every
+  // waiting request and every later one fails instead of hanging.
+  let broken: Error | undefined;
+  const fail = (error: Error) => {
+    broken = error;
+    for (const pending of waiting.values()) pending.reject(error);
+    waiting.clear();
+  };
+  worker.addEventListener("error", (event) => {
+    event.preventDefault();
+    fail(new Error(`The store's worker failed: ${event.message || "it could not load"}`));
+  });
+  worker.addEventListener("messageerror", () =>
+    fail(new Error("The store's worker sent a message it could not read.")),
+  );
   const send = (request: Distribute<Request>) =>
     new Promise<unknown[][]>((resolve, reject) => {
+      if (broken) return reject(broken);
       const id = next++;
       waiting.set(id, { resolve, reject });
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a worker's postMessage takes no origin
       worker.postMessage({ ...request, id });
     });
 
-  await send({ type: "open", name });
+  try {
+    await send({ type: "open", name });
+  } catch (error) {
+    worker.terminate();
+    throw error;
+  }
   return {
     query: (sql, params) => send({ type: "query", sql, params }),
     script: async (sql) => {

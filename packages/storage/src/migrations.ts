@@ -51,11 +51,32 @@ const MIGRATIONS: readonly string[] = [
   `,
 ];
 
-export async function migrate(driver: SqlDriver): Promise<void> {
+/** The database was written by a newer AstroTime; this build must not touch it. */
+export class NewerSchemaError extends Error {
+  override name = "NewerSchemaError";
+}
+
+export async function migrate(
+  driver: SqlDriver,
+  migrations: readonly string[] = MIGRATIONS,
+): Promise<void> {
   await driver.script("PRAGMA foreign_keys = ON;");
   const [[version] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
-  for (let next = Number(version); next < MIGRATIONS.length; next++) {
-    await driver.script(`BEGIN;\n${MIGRATIONS[next]}\nPRAGMA user_version = ${next + 1};\nCOMMIT;`);
+  if (Number(version) > migrations.length) {
+    throw new NewerSchemaError(
+      `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
+    );
+  }
+  for (let next = Number(version); next < migrations.length; next++) {
+    try {
+      await driver.script(
+        `BEGIN;\n${migrations[next]}\nPRAGMA user_version = ${next + 1};\nCOMMIT;`,
+      );
+    } catch (error) {
+      // A failed script leaves its transaction open; nothing of it may stay.
+      await driver.script("ROLLBACK;").catch(() => {});
+      throw error;
+    }
   }
 }
 

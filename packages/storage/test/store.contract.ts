@@ -141,6 +141,47 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect((await store.objectsBetween([calendar.id], week)).map((o) => o.uid)).toEqual(["new"]);
     });
 
+    test("the server's version never overwrites a pending local change, unless the sync engine says so", async () => {
+      const { store, calendar } = await setup();
+      await store.saveFromServer(calendar.id, {
+        href: "p.ics",
+        etag: '"1"',
+        ics: event("p", "20261102T090000Z", "20261102T100000Z"),
+      });
+      const local = await store.saveLocal(
+        calendar.id,
+        event("p", "20261102T120000Z", "20261102T130000Z"),
+      );
+      const server = event("p", "20261102T150000Z", "20261102T160000Z");
+      expect(
+        await store.saveFromServer(calendar.id, { href: "p.ics", etag: '"2"', ics: server }),
+      ).toEqual(local);
+      expect(
+        await store.saveFromServer(
+          calendar.id,
+          { href: "p.ics", etag: '"2"', ics: server },
+          { replacePending: true },
+        ),
+      ).toMatchObject({
+        pending: "none",
+        etag: '"2"',
+        ics: server,
+      });
+    });
+
+    test("operations run one at a time: a local edit started during a download sees the download", async () => {
+      const { store, calendar } = await setup();
+      const [, local] = await Promise.all([
+        store.saveFromServer(calendar.id, {
+          href: "r.ics",
+          etag: '"1"',
+          ics: event("r", "20261102T090000Z", "20261102T100000Z"),
+        }),
+        store.saveLocal(calendar.id, event("r", "20261102T100000Z", "20261102T110000Z"), "r.ics"),
+      ]);
+      expect(local).toMatchObject({ pending: "update", etag: '"1"' });
+    });
+
     test("deleting an object that never reached the server removes it at once", async () => {
       const { store, calendar } = await setup();
       const created = await store.saveLocal(calendar.id, task("draft"));
