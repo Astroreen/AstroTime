@@ -66,4 +66,13 @@ describe("devClients", () => {
   test("without the setting, checks no one", () => {
     expect(serve(undefined)("192.168.50.10")).toBe(false);
   });
+
+  test("refuses to start with a value it does not know, or no server", () => {
+    expect(() => serve("Tailnet")).toThrow(/takes is "tailnet"/);
+    const hook = devClients("tailnet").configureServer;
+    if (typeof hook !== "function") throw new Error("configureServer is a function");
+    expect(() => hook.call({} as never, { httpServer: null } as unknown as ViteDevServer)).toThrow(
+      /own HTTP server/,
+    );
+  });
 });

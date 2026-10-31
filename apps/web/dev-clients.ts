@@ -18,8 +18,18 @@ export function devClients(clients = process.env["ASTROTIME_WEB_CLIENTS"]): Plug
   return {
     name: "astrotime-dev-clients",
     configureServer(server) {
-      if (clients !== "tailnet") return;
-      server.httpServer?.on("connection", (socket) => {
+      // Fails closed: a value it does not know, or no server to watch, stops
+      // the dev server rather than leaving it open.
+      if (clients === undefined || clients === "") return;
+      if (clients !== "tailnet") {
+        throw new Error(
+          `ASTROTIME_WEB_CLIENTS is "${clients}"; the one value it takes is "tailnet".`,
+        );
+      }
+      if (!server.httpServer) {
+        throw new Error("ASTROTIME_WEB_CLIENTS=tailnet needs the dev server's own HTTP server.");
+      }
+      server.httpServer.on("connection", (socket) => {
         if (!isTailnetOrLocal(socket.remoteAddress ?? "")) socket.destroy();
       });
     },
