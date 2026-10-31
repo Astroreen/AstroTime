@@ -7,7 +7,14 @@ import { join } from "node:path";
 import { throughProxy } from "@astrotime/caldav";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
-import { allowlist, createAppServer, DAV_PROXY_PREFIX } from "../src/server.ts";
+import { compress } from "../src/compress.ts";
+import {
+  allowlist,
+  createAppServer,
+  DAV_PROXY_PREFIX,
+  negotiate,
+  publicHosts,
+} from "../src/server.ts";
 
 const listen = async (server: Server) => {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -258,4 +265,226 @@ test("a chunked request without a length is cut off at the cap", async () => {
   expect(reached).toEqual([]);
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
+});
+
+/** A GET or HEAD with headers fetch would not send as given (Host, Accept-Encoding). */
+const raw = async (
+  base: string,
+  path: string,
+  headers: Record<string, string> = {},
+  method = "GET",
+) => {
+  const { request } = await import("node:http");
+  return new Promise<{ status: number; headers: Record<string, unknown>; body: Buffer }>(
+    (resolve, reject) => {
+      const req = request(`${base}${path}`, { method, headers }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          }),
+        );
+      });
+      req.on("error", reject);
+      req.end();
+    },
+  );
+};
+
+describe("static files (D80)", () => {
+  let base: string;
+  let server: Server;
+  const script = `console.log(${JSON.stringify("calendar ".repeat(200))})`;
+
+  beforeAll(async () => {
+    const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+    mkdirSync(join(root, "assets"));
+    writeFileSync(
+      join(root, "index.html"),
+      `<!doctype html><title>AstroTime</title>${"<p>".repeat(100)}`,
+    );
+    writeFileSync(join(root, "assets", "app-1a2b.js"), script);
+    writeFileSync(join(root, "assets", "tiny-0000.js"), "1");
+    writeFileSync(join(root, "assets", "logo-1a2b.png"), Buffer.alloc(2000));
+    // Compressible, larger when compressed (kept as it is), and not compressible.
+    expect(await compress(root)).toBe(4);
+    server = createAppServer({ root, allow: ["https://dav.example"] });
+    base = await listen(server);
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  test("sends brotli first, then gzip, and the file as it is to a client that asks for neither", async () => {
+    const { gunzipSync, brotliDecompressSync } = await import("node:zlib");
+    const br = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "gzip, deflate, br" });
+    expect([br.headers["content-encoding"], br.headers["vary"]]).toEqual(["br", "Accept-Encoding"]);
+    expect(brotliDecompressSync(br.body).toString()).toBe(script);
+    expect(Number(br.headers["content-length"])).toBe(br.body.length);
+    const gzip = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "gzip" });
+    expect(gzip.headers["content-encoding"]).toBe("gzip");
+    expect(gunzipSync(gzip.body).toString()).toBe(script);
+    const plain = await raw(base, "/assets/app-1a2b.js");
+    expect([plain.headers["content-encoding"], plain.headers["vary"]]).toEqual([
+      undefined,
+      "Accept-Encoding",
+    ]);
+    expect(plain.body.toString()).toBe(script);
+    // Every variant is the same file, so it carries the asset's own type.
+    expect(br.headers["content-type"]).toBe("text/javascript; charset=utf-8");
+  });
+
+  test("honours q-values: br;q=0 is never sent br", async () => {
+    const answer = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "br;q=0, gzip" });
+    expect(answer.headers["content-encoding"]).toBe("gzip");
+    const neither = await raw(base, "/assets/app-1a2b.js", {
+      "Accept-Encoding": "br;q=0, gzip;q=0",
+    });
+    expect(neither.headers["content-encoding"]).toBeUndefined();
+  });
+
+  test("a file with nothing smaller to send goes as it is", async () => {
+    for (const path of ["/assets/tiny-0000.js", "/assets/logo-1a2b.png"]) {
+      const answer = await raw(base, path, { "Accept-Encoding": "br, gzip" });
+      expect([answer.status, answer.headers["content-encoding"]]).toEqual([200, undefined]);
+    }
+  });
+
+  test("answers If-None-Match with 304, per encoding", async () => {
+    const first = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "br" });
+    const etag = String(first.headers["etag"]);
+    expect(etag).toMatch(/^"[\w-]{22}"$/);
+    const again = await raw(base, "/assets/app-1a2b.js", {
+      "Accept-Encoding": "br",
+      "If-None-Match": `"other", W/${etag}`,
+    });
+    expect([again.status, again.body.length, again.headers["etag"]]).toEqual([304, 0, etag]);
+    expect(again.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    // The gzip variant is another representation, with its own ETag.
+    const gzip = await raw(base, "/assets/app-1a2b.js", {
+      "Accept-Encoding": "gzip",
+      "If-None-Match": etag,
+    });
+    expect(gzip.status).toBe(200);
+    expect(gzip.headers["etag"]).not.toBe(etag);
+  });
+
+  test("the app's page revalidates on every route, and is never immutable", async () => {
+    const page = await raw(base, "/", { "Accept-Encoding": "br" });
+    expect([page.status, page.headers["cache-control"], page.headers["content-encoding"]]).toEqual([
+      200,
+      "no-cache",
+      "br",
+    ]);
+    const route = await raw(base, "/week/2026-11-02", {
+      "Accept-Encoding": "br",
+      "If-None-Match": String(page.headers["etag"]),
+    });
+    expect([route.status, route.headers["cache-control"]]).toEqual([304, "no-cache"]);
+  });
+
+  test("HEAD answers the headers of GET, without a body", async () => {
+    const get = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "gzip" });
+    const head = await raw(base, "/assets/app-1a2b.js", { "Accept-Encoding": "gzip" }, "HEAD");
+    expect(head.status).toBe(200);
+    expect(head.body.length).toBe(0);
+    for (const name of [
+      "content-length",
+      "content-encoding",
+      "etag",
+      "cache-control",
+      "content-type",
+    ]) {
+      expect(head.headers[name]).toBe(get.headers[name]);
+    }
+    expect((await raw(base, "/assets/gone-0000.js", {}, "HEAD")).status).toBe(404);
+  });
+});
+
+test("Accept-Encoding: the highest q wins, ties go to brotli, nothing asked is identity", () => {
+  const both = ["br", "gzip"] as const;
+  expect(negotiate(undefined, both)).toBe("identity");
+  expect(negotiate("", both)).toBe("identity");
+  expect(negotiate("gzip, br", both)).toBe("br");
+  expect(negotiate("gzip;q=1, br;q=0.5", both)).toBe("gzip");
+  expect(negotiate("BR;Q=0.1", both)).toBe("br");
+  expect(negotiate("*", both)).toBe("br");
+  expect(negotiate("*;q=0, gzip", both)).toBe("gzip");
+  expect(negotiate("br", ["gzip"])).toBe("identity");
+  expect(negotiate("identity;q=0, br;q=0", both)).toBe("identity");
+});
+
+describe("the Host allowlist (D81)", () => {
+  let base: string;
+  let server: Server;
+
+  beforeAll(async () => {
+    const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+    writeFileSync(join(root, "index.html"), "<!doctype html><title>AstroTime</title>");
+    const hosts = publicHosts("Calendar.example.com, cal.example.com:8443, [::1]");
+    server = createAppServer({ root, allow: ["https://dav.example"], ...(hosts ? { hosts } : {}) });
+    base = await listen(server);
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  test("a listed host passes, on any port unless the entry names one", async () => {
+    for (const host of [
+      "calendar.example.com",
+      "CALENDAR.example.com:8080",
+      "cal.example.com:8443",
+      "[::1]:8080",
+    ]) {
+      expect([host, (await raw(base, "/", { Host: host })).status]).toEqual([host, 200]);
+    }
+  });
+
+  test("any other host is refused with 421, the app and the proxy alike", async () => {
+    for (const host of [
+      "evil.example",
+      "cal.example.com",
+      "cal.example.com:9000",
+      "calendar.example.com.evil.example",
+      "127.0.0.1",
+    ]) {
+      expect([host, (await raw(base, "/", { Host: host })).status]).toEqual([host, 421]);
+    }
+    const proxied = await raw(base, throughProxy(DAV_PROXY_PREFIX).to("https://dav.example/cal/"), {
+      Host: "evil.example",
+    });
+    expect(proxied.status).toBe(421);
+  });
+
+  test("the health check answers whatever the host", async () => {
+    for (const host of ["localhost:8080", "127.0.0.1:8080", "10.1.2.3:8080", "evil.example"]) {
+      const answer = await raw(base, "/healthz", { Host: host });
+      expect([host, answer.status, answer.body.toString()]).toEqual([host, 200, "ok"]);
+    }
+  });
+});
+
+test("ASTROTIME_PUBLIC_HOST lists host names, each with an optional port", () => {
+  expect(publicHosts(undefined)).toBeUndefined();
+  expect(publicHosts(" , ")).toBeUndefined();
+  expect(publicHosts(" Calendar.example.com , cal.example.com:8443, [::1]:8080")).toEqual([
+    { hostname: "calendar.example.com", port: null },
+    { hostname: "cal.example.com", port: "8443" },
+    { hostname: "[::1]", port: "8080" },
+  ]);
+  for (const wrong of [
+    "*",
+    "https://calendar.example.com",
+    "calendar.example.com/",
+    "::1",
+    "a.example:0",
+    "a.example:99999",
+  ]) {
+    expect(() => publicHosts(wrong)).toThrow(/ASTROTIME_PUBLIC_HOST: .* is not a host name/);
+  }
 });

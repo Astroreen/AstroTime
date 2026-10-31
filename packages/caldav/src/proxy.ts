@@ -69,7 +69,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     // it to reach the servers behind it. Browsers mark cross-site requests.
     // The host is compared, not the scheme: behind a TLS terminator the page
     // is https and the request reaching us is http. (DNS rebinding is the
-    // Host check's job: Vite's allowedHosts, a reverse proxy's server name.)
+    // Host check's job: Vite's allowedHosts, a reverse proxy's server name,
+    // the image's ASTROTIME_PUBLIC_HOST.)
     const origin = request.headers.get("origin");
     const site = request.headers.get("sec-fetch-site");
     if (

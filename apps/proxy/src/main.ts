@@ -1,7 +1,7 @@
 // Starts the web app's server from its environment (README.md#self-hosting).
 import { resolve } from "node:path";
 
-import { allowlist, createAppServer } from "./server.ts";
+import { allowlist, createAppServer, publicHosts } from "./server.ts";
 
 const port = Number(process.env["PORT"] || 8080);
 // A typo here would listen on a random port that the healthcheck never finds.
@@ -9,7 +9,12 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`PORT must be a port number, not "${process.env["PORT"]}"`);
 }
 const root = resolve(process.env["ASTROTIME_WEB_ROOT"] ?? "apps/web/dist");
-const server = createAppServer({ root, allow: allowlist(process.env["ASTROTIME_PROXY_ALLOW"]) });
+const hosts = publicHosts(process.env["ASTROTIME_PUBLIC_HOST"]);
+const server = createAppServer({
+  root,
+  allow: allowlist(process.env["ASTROTIME_PROXY_ALLOW"]),
+  ...(hosts ? { hosts } : {}),
+});
 server.listen(port, () => {
   console.log(`AstroTime on :${port}, serving ${root}`);
 });
