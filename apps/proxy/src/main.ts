@@ -10,5 +10,9 @@ server.listen(port, () => {
   console.log(`AstroTime on :${port}, serving ${root}`);
 });
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => server.close(() => process.exit(0)));
+  process.on(signal, () => {
+    server.close(() => process.exit(0));
+    // A long proxied answer would hold `docker stop` past its grace period.
+    server.closeAllConnections();
+  });
 }

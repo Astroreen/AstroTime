@@ -30,7 +30,7 @@ jobs:
         run: |
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=CI" --jq '.check_runs[0].conclusion')"
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=CI" --paginate --jq '.check_runs[]' | jq -rs 'sort_by(.started_at) | last | .conclusion')"
           if [ "$conclusion" != "success" ]; then
             echo "CI on ${GITHUB_SHA} is '${conclusion}', not success" >&2
             exit 1

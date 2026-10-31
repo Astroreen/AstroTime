@@ -26,7 +26,10 @@ docker run -d -p 8080:8080 \
 
 `ASTROTIME_PROXY_ALLOW` is required: the comma-separated origins of the
 CalDAV servers the proxy may reach. Put the container behind your usual
-reverse proxy for TLS, next to your Nextcloud.
+reverse proxy for TLS, next to your Nextcloud. The proxy serves the app's own
+pages only and checks this by host, so the reverse proxy must pass the
+original `Host` on (nginx: `proxy_set_header Host $host;`; Caddy and Traefik
+do so by default).
 
 ## Development
 
