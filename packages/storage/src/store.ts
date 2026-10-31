@@ -153,6 +153,9 @@ export class Store {
       href = existing?.href ?? `${encodeURIComponent(object.uid)}.ics`;
     }
     const current = await this.objectAt(calendarId, href);
+    if (current && current.uid !== object.uid) {
+      throw new Error(`${href} holds ${current.uid}; a change to ${object.uid} cannot replace it.`);
+    }
     const pending: Pending = !current || current.pending === "create" ? "create" : "update";
     return this.upsert(calendarId, href, current?.etag ?? null, ics, pending);
   }
@@ -174,11 +177,23 @@ export class Store {
   }
 
   /** Records that the server accepted an upload. */
-  markSynced(id: string, server: { href: string; etag: string | null }): Promise<void> {
+  /**
+   * Records that the server accepted an upload of `uploaded.ics`. A change
+   * made on this device while the upload was on its way stays pending: an
+   * edit as an update of what the server now has, a deletion as a deletion.
+   */
+  markSynced(
+    id: string,
+    uploaded: { href: string; etag: string | null; ics: string },
+  ): Promise<void> {
     return this.exclusive(async () => {
+      const current = await this.object(id);
+      if (!current) return;
+      const pending: Pending =
+        current.pending === "delete" ? "delete" : current.ics === uploaded.ics ? "none" : "update";
       await this.db
         .update(schema.objects)
-        .set({ ...server, pending: "none" })
+        .set({ href: uploaded.href, etag: uploaded.etag, pending })
         .where(eq(schema.objects.id, id));
     });
   }

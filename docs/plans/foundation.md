@@ -213,6 +213,15 @@ Decided while building PR 2.
   time for a zoned one) matches by wall clock, or by day when one side is a
   date.
 
+### Sync
+
+- **D38. Who wins a deletion.** A calendar or an object deleted on the
+  server is deleted here, with any pending change to it. A deletion of ours
+  the server refuses because the object changed there is dropped: the object
+  comes back as the server has it. Otherwise the store never lets the
+  server's version overwrite a pending local change; the sync engine (PR 4)
+  is the one place that applies these rules.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -275,7 +284,7 @@ to PR 4's "Done when". The owner may set it back.
 the web driver (sqlite-wasm on OPFS). The browser test project and Chromium
 in CI arrive with it.
 
-Decisions: D5, D25, D36.
+Decisions: D5, D25, D36, D38.
 
 Done when: items, calendars, accounts, sync tokens and conflicts persist and
 are queried by date range in a browser test.

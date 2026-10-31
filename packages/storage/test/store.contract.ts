@@ -132,7 +132,11 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(updated).toMatchObject({ href: "old.ics", pending: "update", etag: '"5"' });
       expect((await store.pending(calendar.id)).map((o) => o.uid)).toEqual(["new", "old"]);
 
-      await store.markSynced(created.id, { href: "new.ics", etag: '"1"' });
+      await store.markSynced(created.id, {
+        href: "new.ics",
+        etag: '"1"',
+        ics: (await store.object(created.id))!.ics,
+      });
       await store.deleteLocal(updated.id);
       expect((await store.pending(calendar.id)).map((o) => [o.uid, o.pending])).toEqual([
         ["old", "delete"],
@@ -180,6 +184,51 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         store.saveLocal(calendar.id, event("r", "20261102T100000Z", "20261102T110000Z"), "r.ics"),
       ]);
       expect(local).toMatchObject({ pending: "update", etag: '"1"' });
+    });
+
+    test("a change made while its upload was on the way stays pending", async () => {
+      const { store, calendar } = await setup();
+      const uploading = await store.saveLocal(
+        calendar.id,
+        event("u", "20261102T090000Z", "20261102T100000Z"),
+      );
+      // The user edits again before the server's answer arrives.
+      await store.saveLocal(calendar.id, event("u", "20261102T110000Z", "20261102T120000Z"));
+      await store.markSynced(uploading.id, {
+        href: "https://dav.example/u.ics",
+        etag: '"1"',
+        ics: uploading.ics,
+      });
+      expect(await store.object(uploading.id)).toMatchObject({
+        pending: "update",
+        etag: '"1"',
+        href: "https://dav.example/u.ics",
+      });
+
+      // And a deletion made meanwhile stays a deletion, now against the server's ETag.
+      const second = await store.saveLocal(
+        calendar.id,
+        event("v", "20261102T090000Z", "20261102T100000Z"),
+      );
+      await store.markSynced(second.id, { href: "v.ics", etag: '"1"', ics: second.ics });
+      await store.saveLocal(calendar.id, event("v", "20261102T130000Z", "20261102T140000Z"));
+      const editing = (await store.object(second.id))!;
+      await store.deleteLocal(second.id);
+      await store.markSynced(second.id, { href: "v.ics", etag: '"2"', ics: editing.ics });
+      expect(await store.object(second.id)).toMatchObject({ pending: "delete", etag: '"2"' });
+    });
+
+    test("a local change cannot replace another object at the same href", async () => {
+      const { store, calendar } = await setup();
+      await store.saveFromServer(calendar.id, {
+        href: "x.ics",
+        etag: '"1"',
+        ics: event("x", "20261102T090000Z", "20261102T100000Z"),
+      });
+      await expect(
+        store.saveLocal(calendar.id, event("y", "20261102T090000Z", "20261102T100000Z"), "x.ics"),
+      ).rejects.toThrow(/holds x/);
+      expect((await store.objectAt(calendar.id, "x.ics"))?.uid).toBe("x");
     });
 
     test("deleting an object that never reached the server removes it at once", async () => {
