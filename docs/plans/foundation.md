@@ -245,9 +245,12 @@ D7, D8, D10, D31–D35.
 
 Done when: fixtures in the shape Nextcloud, Apple, Thunderbird, Google and
 Tasks.org write parse and serialize back with every property kept;
-recurrence expansion matches the fixtures' expected occurrences. The
-fixtures are written by hand after each client's output; PR 4 adds
-fixtures recorded from real servers.
+recurrence expansion matches the fixtures' expected occurrences.
+
+_Changed in PR 2:_ this PR first asked for fixtures recorded from those
+clients. Recording needs the servers PR 4 brings, so the fixtures here are
+written by hand after each client's documented output, and recording moved
+to PR 4's "Done when". The owner may set it back.
 
 ### PR 3 — Local store
 
@@ -266,7 +269,8 @@ Decisions: D2, D5, D6, D19, D20 (development half), D27.
 
 Done when: a Radicale and a Nextcloud account sync both ways, offline edits
 reach the server when it comes back, and a conflicting edit lands in the
-Conflicts list.
+Conflicts list; objects written by Nextcloud's web calendar and by Radicale
+are recorded as fixtures and pass PR 2's round-trip tests.
 
 ### PR 5 — Calendar grid
 

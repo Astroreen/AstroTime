@@ -108,13 +108,10 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
     if (component.getFirstPropertyValue("status") === "CANCELLED") continue;
     const span = anchors(component);
     if (!span) continue;
-    const occurrence = {
-      item: readItem(component),
-      recurrenceId,
-      start: fromIcalTime(span.start),
-      end: fromIcalTime(span.end),
-    };
-    if (overlaps(occurrence.start, occurrence.end, range)) result.push(occurrence);
+    const start = fromIcalTime(span.start);
+    const end = fromIcalTime(span.end);
+    if (overlaps(start, end, range))
+      result.push({ item: readItem(component), recurrenceId, start, end });
   }
 
   const span = master ? anchors(master) : null;
