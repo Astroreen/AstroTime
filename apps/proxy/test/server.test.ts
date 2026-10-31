@@ -117,6 +117,9 @@ describe("the web app's server", () => {
   test("a missing asset is a 404, not the app; a bad escape is a 400", async () => {
     expect((await fetch(`${app}/assets/gone-0000.js`)).status).toBe(404);
     expect((await fetch(`${app}/favicon.ico`)).status).toBe(404);
+    expect(await (await fetch(`${app}/day/2026.10.31`)).text()).toContain(
+      "<title>AstroTime</title>",
+    );
     expect((await fetch(`${app}/%E0%A4%A`)).status).toBe(400);
   });
 

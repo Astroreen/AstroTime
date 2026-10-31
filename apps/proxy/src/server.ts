@@ -125,9 +125,10 @@ async function serveStatic(root: string, url: string, res: ServerResponse): Prom
   const found = await stat(file).catch(() => null);
   // Judged on the resolved file, so `/assets/..%2findex.html` is not an asset.
   const asset = file.startsWith(join(root, "assets") + sep);
-  // A missing asset, or a missing file (`/favicon.ico`, `/robots.txt`), is
-  // missing; only a path without an extension is a route of the single-page app.
-  if (!found?.isFile() && (asset || extname(path) !== "")) {
+  // A missing asset, or a missing file of a type we serve (`/favicon.ico`,
+  // `/robots.txt`), is missing; anything else (`/day/2026.10.31`) is a route
+  // of the single-page app.
+  if (!found?.isFile() && (asset || extname(path).toLowerCase() in TYPES)) {
     res.writeHead(404).end();
     return;
   }
