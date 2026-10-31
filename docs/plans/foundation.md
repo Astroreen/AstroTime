@@ -381,7 +381,8 @@ Decided while building PR 7.
   in the image. HEAD answers GET's headers. `index.html`, on every route of
   the single-page app, is `no-cache` (revalidated on every load); only files
   under `assets/` are immutable ([D40](#D40)). Ranges are not served: the
-  files are small enough to fetch whole.
+  files are small enough to fetch whole. A path ending in `.br` or `.gz` is
+  a 404: the copies are reached only through `Accept-Encoding`.
 - **D81. The image can answer only for its own hosts.**
   `ASTROTIME_PUBLIC_HOST`, optional, lists the host names the server answers
   for, comma-separated: `calendar.example.com` matches on any port,
@@ -389,10 +390,10 @@ Decided while building PR 7.
   443, so list those as the bare name), an IPv6 address goes in brackets
   (`[2001:db8::1]`); names are matched case-insensitively and are written as
   browsers send them (punycode, no scheme, path or `*`), or the server refuses
-  to start. A request whose `Host` is not listed, or that has none, is
-  answered 421 Misdirected Request (RFC 9110: this server cannot answer for
-  that name; 400 would say the request itself is malformed) before it reaches
-  the app or the proxy. This holds the line against DNS rebinding in the
+  to start. A request whose `Host` is not listed is answered 421 Misdirected
+  Request (RFC 9110: this server cannot answer for that name; 400 would say
+  the request itself is malformed) before it reaches the app or the proxy;
+  one with no `Host` is malformed, and Node refuses it with 400 first. This holds the line against DNS rebinding in the
   image itself, where [D39](#D39)'s Origin check, which compares with `Host`,
   cannot. `/healthz` answers whatever the `Host`: it tells nothing, and
   health checks come by loopback (Docker's `HEALTHCHECK`) or by the

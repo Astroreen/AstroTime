@@ -296,11 +296,12 @@ const raw = async (
 
 describe("static files (D80)", () => {
   let base: string;
+  let root: string;
   let server: Server;
   const script = `console.log(${JSON.stringify("calendar ".repeat(200))})`;
 
   beforeAll(async () => {
-    const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+    root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
     mkdirSync(join(root, "assets"));
     writeFileSync(
       join(root, "index.html"),
@@ -371,6 +372,26 @@ describe("static files (D80)", () => {
     });
     expect(gzip.status).toBe(200);
     expect(gzip.headers["etag"]).not.toBe(etag);
+  });
+
+  test("a precompressed copy is not a route of its own", async () => {
+    for (const path of ["/assets/app-1a2b.js.br", "/assets/app-1a2b.js.gz", "/index.html.br"]) {
+      expect([path, (await raw(base, path)).status]).toEqual([path, 404]);
+    }
+  });
+
+  test("a file that changes gets a new ETag, and the old one no longer matches", async () => {
+    const first = await raw(base, "/assets/tiny-0000.js");
+    const etag = String(first.headers["etag"]);
+    writeFileSync(join(root, "assets", "tiny-0000.js"), "22");
+    const changed = await raw(base, "/assets/tiny-0000.js", { "If-None-Match": etag });
+    expect(changed.status).toBe(200);
+    expect(changed.body.toString()).toBe("22");
+    expect(changed.headers["etag"]).not.toBe(etag);
+    const again = await raw(base, "/assets/tiny-0000.js", {
+      "If-None-Match": String(changed.headers["etag"]),
+    });
+    expect(again.status).toBe(304);
   });
 
   test("the app's page revalidates on every route, and is never immutable", async () => {
@@ -459,6 +480,21 @@ describe("the Host allowlist (D81)", () => {
       Host: "evil.example",
     });
     expect(proxied.status).toBe(421);
+  });
+
+  test("a request with no Host is refused too", async () => {
+    const { request } = await import("node:http");
+    const status = await new Promise<number>((resolve, reject) => {
+      // HTTP/1.1 requires a Host; Node's server refuses one without it (400)
+      // before our handler runs, which is refused all the same.
+      const req = request(`${base}/`, { setHost: false }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("error", reject);
+      req.end();
+    });
+    expect(status).toBe(400);
   });
 
   test("the health check answers whatever the host", async () => {

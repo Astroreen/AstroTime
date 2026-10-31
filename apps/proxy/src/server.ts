@@ -242,8 +242,12 @@ function staticFiles(root: string) {
       return;
     }
     const file = resolve(join(root, path));
-    // Nothing outside the app's directory, whatever the path says.
-    if (file !== root && !file.startsWith(root + sep)) {
+    // Nothing outside the app's directory, whatever the path says; and the
+    // precompressed copies are reached only through Accept-Encoding.
+    if (
+      (file !== root && !file.startsWith(root + sep)) ||
+      ENCODINGS.some(([, suffix]) => file.endsWith(suffix))
+    ) {
       res.writeHead(404).end();
       return;
     }
