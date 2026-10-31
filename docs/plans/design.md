@@ -74,7 +74,9 @@ the project.
   task (Google shows "1 undone task" too). It counts undone tasks only, so
   "hide completed" does not change it. A task with neither stays on the
   tasks screen only. A recurring task counts once, by its
-  latest undone occurrence before today. In the Agenda view the chip heads
+  latest occurrence before today that is undone: an occurrence is done when
+  its own exception (`RECURRENCE-ID`) says `STATUS:COMPLETED`, or when the
+  series itself is completed. In the Agenda view the chip heads
   today's group. D16's "hide
   completed" toggle stays, in the drawer, and hides completed tasks' chips on
   every view. When the all-day strip holds more than
@@ -86,7 +88,10 @@ the project.
   tasks (a circle to complete, a star), sort and menu buttons; below it,
   "Completed (N)" folded. On a wide screen it is a panel on the right of the
   calendar instead of a screen.
-  The star is stored as an AstroTime property (`X-ASTROTIME-STARRED:TRUE`),
+  Completing and starring are the only edits here: they write the task
+  through the local store (`saveLocal`) and the sync engine uploads them
+  (D5); editing dialogs and dragging are foundation's PR 6. The star is
+  stored as an AstroTime property (`X-ASTROTIME-STARRED:TRUE`),
   so the task's own `PRIORITY` is never touched and other clients keep it
   (AGENTS.md rule 2).
 - **D53. Settings in the drawer**: the theme (system, dark, light), the

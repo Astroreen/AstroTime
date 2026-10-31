@@ -33,9 +33,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Time grid** — the column of hours of a day, where timed items sit.
 - **All-day strip** — the band pinned above the time grid with all-day
   items; it does not scroll away.
-- **Chip** — a one-line item: an all-day item or a task in the all-day
-  strip, or a task with only a due (or start) time in the time grid
-  (`shape: "chip"` in the layout).
+- **Chip** — a small item, of two kinds: in the all-day strip, any item one
+  line high (a **span** in the week's strip, D42); in the time grid, a task
+  with only a due (or start) time, 30 minutes tall (`shape: "chip"` in
+  `layoutDay`).
 - **Block** — a timed item with a length, drawn from its start to its end
   in the time grid. `shape: "block"` in the layout.
 - **Span** — a chip of the all-day strip of a week or a month drawn as one

@@ -481,10 +481,11 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
 - **5b** — the tasks screen, the drawer's settings and search. Decisions:
   design D52, D53.
 
-Done when: each view and the tasks screen render real objects from the
-local store, in both themes and both languages, as in the references; the
-drawer's settings apply and search finds an item by its title; screenshots
-of each next to its reference are the evidence.
+Done when, for 5a: each view renders real objects from the local store, in
+both themes and both languages, as the references describe; for 5b: the
+tasks screen lists, completes and stars tasks through the local store, the
+drawer's settings apply, and search finds an item by its title. Screenshots
+of each, set against the reference's description, are the evidence.
 
 ### PR 6 — Editing
 
