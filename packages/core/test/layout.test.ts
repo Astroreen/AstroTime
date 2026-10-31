@@ -114,11 +114,6 @@ describe("the time grid (D14, D16)", () => {
   });
 
   test("the grid follows the user's zone", () => {
-    const occurrences = on(
-      "2026-11-02",
-      "2026-11-03",
-      event("m", "20261102T090000Z", "20261102T100000Z"),
-    );
     const [placed] = layoutDay(
       occurrencesBetween(CalendarObject.parse(event("m", "20261102T090000Z", "20261102T100000Z")), {
         from: "2026-11-02",
@@ -128,7 +123,6 @@ describe("the time grid (D14, D16)", () => {
       "2026-11-02",
       { timeZone: "Europe/Vilnius" },
     ).timed;
-    expect(occurrences).toHaveLength(1);
     expect(placed).toMatchObject({ top: 660, bottom: 720 });
   });
 });
@@ -251,5 +245,85 @@ describe("the all-day strip across a week (D14, D42)", () => {
     expect(spans(event("conference", "20261103T090000Z", "20261105T170000Z"))).toEqual([
       { uid: "conference", firstDay: 1, lastDay: 3, row: 0, before: false, after: false },
     ]);
+  });
+});
+
+describe("from the review of #6", () => {
+  test("a task with a date start and a timed due is a chip at the due, on that day only", () => {
+    const ics = task("report", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T150000Z\r\n");
+    const monday = layoutDay(on("2026-11-02", "2026-11-03", ics), "2026-11-02", { timeZone });
+    const wednesday = layoutDay(on("2026-11-04", "2026-11-05", ics), "2026-11-04", { timeZone });
+    expect([monday.allDay.length, monday.timed.length]).toEqual([0, 0]);
+    expect(wednesday.timed.map((p) => [p.shape, p.top])).toEqual([["chip", 900]]);
+  });
+
+  test("a task with only a timed start is a chip at the start (D42)", () => {
+    expect(
+      day(task("call", "DTSTART:20261102T110000Z\r\n")).timed.map((p) => [
+        p.shape,
+        p.top,
+        p.bottom,
+      ]),
+    ).toEqual([["chip", 660, 690]]);
+  });
+
+  test("an occurrence that does not show on the day is left out", () => {
+    const yesterday = on(
+      "2026-11-01",
+      "2026-11-02",
+      event("y", "20261101T090000Z", "20261101T100000Z"),
+    );
+    const endedAtMidnight = on(
+      "2026-11-01",
+      "2026-11-02",
+      event("z", "20261101T230000Z", "20261102T000000Z"),
+    );
+    expect(layoutDay([...yesterday, ...endedAtMidnight], "2026-11-02", { timeZone }).timed).toEqual(
+      [],
+    );
+  });
+
+  test("a zero-length event is drawn as the shortest block", () => {
+    expect(
+      brief(day(event("instant", "20261102T120000Z", "20261102T120000Z")).timed)[0],
+    ).toMatchObject({ top: 720, bottom: 735 });
+  });
+
+  test("on a DST day the grid is the wall clock: 10:00 sits at 10:00", () => {
+    // Vilnius leaves summer time at 04:00 on 25 Oct 2026; the day has 25 hours.
+    const ics = vcal(
+      "BEGIN:VEVENT\r\nUID:d\r\nDTSTART;TZID=Europe/Vilnius:20261025T100000\r\nDTEND;TZID=Europe/Vilnius:20261025T110000\r\nEND:VEVENT\r\n",
+    );
+    const options = { from: "2026-10-25", to: "2026-10-26", timeZone: "Europe/Vilnius" };
+    const [placed] = layoutDay(
+      occurrencesBetween(CalendarObject.parse(ics), options),
+      "2026-10-25",
+      { timeZone: "Europe/Vilnius" },
+    ).timed;
+    expect(placed).toMatchObject({ top: 600, bottom: 660 });
+  });
+
+  test("in the strip, events come before tasks of the same length, then by title", () => {
+    const layout = day(
+      task("b-task", "DUE;VALUE=DATE:20261102\r\n"),
+      allDay("z-event", "20261102", "20261103"),
+      allDay("a-event", "20261102", "20261103"),
+    );
+    expect(layout.allDay.map((o) => o.item.uid)).toEqual(["a-event", "z-event", "b-task"]);
+  });
+
+  test("the week's strip takes only all-day items, whatever it is given", () => {
+    const week = ["2026-11-02", "2026-11-03"];
+    const spans = layoutSpans(
+      on(
+        "2026-11-02",
+        "2026-11-04",
+        event("meeting", "20261102T090000Z", "20261102T100000Z"),
+        allDay("off", "20261103", "20261104"),
+      ),
+      week,
+      timeZone,
+    );
+    expect(spans.map((s) => s.occurrence.item.uid)).toEqual(["off"]);
   });
 });

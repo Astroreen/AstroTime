@@ -235,6 +235,11 @@ Decided while building the layout engine, ahead of PR 5's screens.
   the rules are tested without a browser. On top of D14–D16:
   - a timed item lasting 24 hours or more goes to the all-day strip, as
     Google shows a three-day conference;
+  - a task is a chip when it has a timed due and no timed start (a date
+    start included), or a timed start and no due; the chip sits on the day
+    of that time only;
+  - an occurrence that does not show on the day it is laid out for is left
+    out;
   - an item over midnight is clipped to each day and says it goes on;
   - a block is drawn at least 15 minutes tall, a chip 30; a chip at the end
     of the day is lifted to fit;

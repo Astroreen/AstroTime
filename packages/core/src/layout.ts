@@ -60,11 +60,18 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 }
 
-/** A task's chip: it has a due time and nothing to span from (D16). */
-function isChip(occurrence: Occurrence): boolean {
+/**
+ * Where a task's chip sits, or `null` when the task is not a chip (D16,
+ * D42): a timed due with no timed start to span from, or a timed start
+ * with no due at all.
+ */
+function chipTime(occurrence: Occurrence): ItemTime | null {
   const { item } = occurrence;
-  if (item.kind !== "task" || item.due?.type === "date") return false;
-  return item.start === null || item.start.type === "date" || item.due === null;
+  if (item.kind !== "task") return null;
+  const { start, due } = item;
+  if (due && due.type !== "date" && (start === null || start.type === "date")) return due;
+  if (!due && start && start.type !== "date") return start;
+  return null;
 }
 
 /**
@@ -74,9 +81,10 @@ function isChip(occurrence: Occurrence): boolean {
  */
 export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
   const { item, start, end } = occurrence;
+  // One rule for tasks first, so a date start with a timed due is a chip, not a bar.
+  if (chipTime(occurrence)) return false;
   if (start.type === "date") return true;
   if (item.kind === "task" && item.due?.type === "date") return true;
-  if (isChip(occurrence)) return false;
   return minutesBetween(start, end, timeZone) >= DAY_MINUTES;
 }
 
@@ -87,8 +95,9 @@ function minutesBetween(start: ItemTime, end: ItemTime, timeZone: string): numbe
 }
 
 /**
- * One day's layout. `occurrences` are the day's, as `occurrencesBetween`
- * returns them for the range of this one day.
+ * One day's layout. `occurrences` are usually the day's, as
+ * `occurrencesBetween` returns them for this one day; anything that does not
+ * show on `day` (a chip due another day, an item outside it) is left out.
  */
 export function layoutDay(
   occurrences: readonly Occurrence[],
@@ -110,13 +119,16 @@ export function layoutDay(
       allDay.push(occurrence);
       continue;
     }
-    const chip = isChip(occurrence);
-    const at =
-      chip && occurrence.item.kind === "task" && occurrence.item.due
-        ? occurrence.item.due
-        : occurrence.start;
-    const s = wallClockOf(at, timeZone);
-    const e = wallClockOf(chip ? at : occurrence.end, timeZone);
+    const at = chipTime(occurrence);
+    const chip = at !== null;
+    const s = wallClockOf(at ?? occurrence.start, timeZone);
+    const e = wallClockOf(at ?? occurrence.end, timeZone);
+    // Not on this day (a chip shows on its own day only): left out.
+    const starts = s.slice(0, 10);
+    const endsBeforeDay = chip
+      ? starts < day
+      : e < `${day}T00:00:00` || (e === `${day}T00:00:00` && e !== s);
+    if (starts > day || endsBeforeDay) continue;
     const startsBefore = s.slice(0, 10) < day;
     const endsAfter =
       e.slice(0, 10) > day && !(e.slice(0, 10) === nextDay(day) && minutesOf(e) === 0);
@@ -245,7 +257,8 @@ export function layoutSpans(
   if (!first || !last) return [];
   const rows: boolean[][] = [];
   const spans: Span[] = [];
-  for (const occurrence of sortAllDay([...occurrences], timeZone)) {
+  const strip = occurrences.filter((occurrence) => isAllDay(occurrence, timeZone));
+  for (const occurrence of sortAllDay(strip, timeZone)) {
     const startDay = wallClockOf(occurrence.start, timeZone).slice(0, 10);
     const endClock = wallClockOf(occurrence.end, timeZone);
     // An exclusive end at midnight (all-day ends always are) belongs to the day before.
