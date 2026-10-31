@@ -38,8 +38,12 @@ were checked on 2026-11-01.
   | `openExternal`      | `@astrotime/ui`      | opens a URL in the system browser (Login Flow v2's page)                                                                  |
 
   The shared code computes the reminders (from `VALARM`s, the next 7 days,
-  at most 100, each with a stable id), so every platform fires the same
-  ones; a platform only shows them. It also exports one sync entry,
+  at most 100, the soonest first, each with a stable string id), so every
+  platform fires the same ones; a platform only shows them. How alarms
+  become reminders (all-day and floating items, `RELATED=END`, absolute
+  triggers, `REPEAT`, a series' exceptions, tasks with only a due) is
+  decided where the set is first built: foundation's PR 6, reminders as
+  notifications ([D9](foundation.md#D9)). It also exports one sync entry,
   `syncAll()`: it syncs every account, joins a sync already running instead
   of starting a second, and reschedules the reminders afterwards. The UI's
   own triggers (start, focus, a timer) are the web's decision, taken in
@@ -79,7 +83,11 @@ were checked on 2026-11-01.
   (repeated ones joined with `, `, as `fetch` does) and the body as text,
   and rejects with an "offline" code when the server cannot be reached,
   which the TypeScript adapter turns into `OfflineError`. OkHttp follows
-  redirects and drops `Authorization` when one leaves the host; no cookie
+  redirects itself (OkHttp's own following is off), as the desktop does
+  ([desktop D72](desktop.md#D72)), so one rule holds on every platform:
+  `Authorization` goes only to the request's origin (scheme, host and
+  port) and is dropped when a redirect leaves it, and the cleartext check
+  below applies to every hop; no cookie
   jar is set, so no cookies are kept. The app trusts user-installed CAs as
   well as the system's (`network_security_config`), so a self-hosted
   server with its own CA works once its certificate is installed on the
@@ -113,7 +121,9 @@ were checked on 2026-11-01.
   Keystore, the ciphertext in the app's shared preferences, as foundation's
   [D19](foundation.md#D19) asks. The key needs no user authentication, so
   background sync ([D67](#D67)) can read the credentials. Android's backup
-  is off (`allowBackup="false"`): a Keystore key is never restored, so
+  is off (`allowBackup="false"`, and `dataExtractionRules` excluding every
+  domain, which Android 12 and later read instead for cloud backup and
+  device transfer): a Keystore key is never restored, so
   restored ciphertext could not be read, and the store is a copy of the
   server. Rejected: Capawesome's secure preferences (a proprietary licence,
   for sponsors), Ionic's secure storage (an enterprise product), and
@@ -138,7 +148,9 @@ were checked on 2026-11-01.
 - **D66. Reminders as local notifications, exact.** The
   `ReminderScheduler` adapter uses `@capacitor/local-notifications` (8.3.1):
   each `schedule` cancels what is no longer in the set and schedules the
-  rest, with an integer id hashed from the reminder's stable id. Android
+  rest, with an integer id the adapter allocates per stable id and keeps
+  (a map in the app's preferences), never a hash, so no two reminders
+  share one. Android
   holds them, so they fire with the app closed, and the plugin restores them
   after a reboot (its boot receiver). The set is replaced after every sync,
   every local edit and every start, and by background sync; 100 at most
@@ -221,16 +233,19 @@ were checked on 2026-11-01.
     `CI` passed, matches `package.json`, [D41](foundation.md#D41)), a job
     runs `./gradlew assembleRelease` with no signing config and attaches
     `astrotime-<version>-unsigned.apk` to the tag's GitHub Release, which
-    this job creates (`gh release create --verify-tag --generate-notes`, a
-    prerelease for a prerelease tag); the desktop's files join the same
-    Release (desktop [D79](desktop.md#D79)). An unsigned APK does not
+    the release workflow's first job creates for both platforms
+    (`gh release create --verify-tag --generate-notes`, a prerelease for a
+    prerelease tag, skipped when it exists); the Android and desktop jobs
+    `need` it (desktop [D79](desktop.md#D79)). An unsigned APK does not
     install as it is: until the signed release (Deferred) it is for those
     who sign it themselves, and the PR artifact is for trying the app.
   - **Tests:** the TypeScript side of each adapter is unit-tested in Node
     with the plugin replaced (errors to `OfflineError`, the notification
     set's diff, the ids); the Kotlin HTTP plugin is tested by Gradle with
     OkHttp's `MockWebServer` (`PROPFIND` and `REPORT` pass, the answering
-    URL after a redirect, `Authorization` dropped off-host, no cookies).
+    URL after a redirect, `Authorization` dropped when a redirect leaves
+    the origin, by host, scheme or port, an `https` → `http` hop refused,
+    no cookies).
     No emulator in CI yet: the UI is tested in the browser, and screenshots
     from a device or an emulator are each PR's evidence.
 
@@ -290,7 +305,8 @@ notification permission, opening the item from a tap. Decisions: D66.
 
 Done when: a reminder fires on time with the app closed and after a
 reboot; editing or deleting the item on the server moves or removes it
-after the next sync; unit tests cover the set's diff and the ids.
+after the next sync; unit tests cover the set's diff and the ids (no two
+reminders share an integer id).
 
 ### PR A4 — Background sync
 

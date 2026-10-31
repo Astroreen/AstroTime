@@ -69,8 +69,10 @@ were checked on 2026-11-01.
 - **D72. HTTP from the main process, on `net.request`.** The renderer's
   `HttpClient` sends each request over IPC to the main process, which makes
   it with Electron's `net.request`: Chromium's network stack, so the
-  system's proxy settings and certificate store apply, as in a browser; a
-  self-hosted Nextcloud with its own CA works once the system trusts it.
+  system's proxy settings and certificate store apply, as in a browser.
+  Not yet proven: that a self-hosted Nextcloud with its own CA works once
+  the system trusts it (Chromium on Linux reads NSS's database); PR D1
+  checks it.
   Any method and header passes (`PROPFIND`, `REPORT`, `MKCALENDAR`). The
   request uses `redirect: "manual"` and the adapter follows redirects
   itself, up to 10, so it knows the URL that answered (the `HttpResponse`
@@ -170,10 +172,9 @@ were checked on 2026-11-01.
   Node without Electron. A `v*` tag builds the AppImage and deb for x64 on
   `ubuntu-latest` and for arm64 on `ubuntu-24.04-arm` (free for public
   repositories, so no emulation) and uploads them with `gh release upload`
-  to the tag's Release. One job of the release workflow creates that
-  Release when it is missing (`gh release view || gh release create`), and
-  the Android ([D69](android.md#D69)) and desktop jobs `need` it, so neither
-  races the other and either can run without the other.
+  to the tag's Release, which the release workflow's first job creates for
+  both platforms, as [android D69](android.md#D69) gives it; the desktop
+  job `needs` that job, so it never races the Android one.
   On NixOS the dev shell sets `ELECTRON_SKIP_BINARY_DOWNLOAD=1` and points
   `ELECTRON_OVERRIDE_DIST_PATH` at nixpkgs' Electron of the same major
   ([D70](#D70)), since Electron's downloaded binary does not run there.
@@ -216,7 +217,9 @@ Done when: `node:sqlite` is shown to run in the utility process, and the
 page receives its port through the preload as D71 describes; the app
 starts in the dev shell, signs in to the local Radicale and shows its items
 from the local store; a redirect test proves the final URL and the dropped
-`Authorization`; the smoke test passes in CI. Screenshots of the window in
+`Authorization` (another host, scheme or port); a server with a private CA
+the system trusts is reached, or the gap goes to Deferred with "Untrusted
+certificates"; the smoke test passes in CI. Screenshots of the window in
 both themes are the evidence.
 
 ### PR D2 — Credentials and Login Flow v2

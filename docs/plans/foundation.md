@@ -148,7 +148,8 @@ logic worth borrowing.
 - **D22. One React UI, thin shells.** Mobile (Android) is **Capacitor**; desktop is **Electron**; the web is plain Vite. Native
   needs (HTTP without CORS, secure storage, notifications, background sync,
   system calendars) go through Capacitor plugins or Electron's main process,
-  behind interfaces the core defines, named in [android D60](android.md#D60).
+  behind interfaces the shared packages define (`@astrotime/core`,
+  `caldav`, `storage`, `ui`), named in [android D60](android.md#D60).
 - **D23. Monorepo layout.**
   - `apps/web`, `apps/mobile` (Capacitor), `apps/desktop` (Electron),
     `apps/proxy` (the web proxy, [D20](#D20));
@@ -411,7 +412,7 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Scheduling syncs** — `syncAccount` runs when called; when and how often
   the apps call it (on start, on focus, on a timer, Android background sync)
   is decided with each app: the web (the UI's own triggers, which every
-  shell inherits) with PR 5's accounts and sync wiring, Android in
+  shell inherits) with PR 5a's accounts and sync wiring, Android in
   [android.md D67](android.md#D67), the desktop in
   [desktop.md D75](desktop.md#D75).
 
@@ -488,8 +489,11 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
 
 - **5a** — `@astrotime/ui` and the web app's shell and views: Day, 3 days,
   Week, Month, Agenda; the all-day strip, the overlap layout, task
-  placement; both themes; i18n; browser-mode tests and Playwright.
-  Decisions: D1, D13, D14, D15, D16, D17, D42, design D43–D51.
+  placement; both themes; i18n; browser-mode tests and Playwright; and
+  the accounts and sync wiring: signing in (Login Flow v2, password), the
+  web's credentials, and when the UI syncs (on start, on focus, on a timer:
+  Deferred "Scheduling syncs"). Decisions: D1, D13, D14, D15, D16, D17,
+  D19, D42, design D43–D51.
 - **5b** — the tasks screen, the drawer's settings and search. Decisions:
   design D52, D53.
 
