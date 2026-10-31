@@ -65,6 +65,10 @@ When you add a package, app or module, add its line here in the same PR.
   placeholder screen for now. → `plans/foundation.md#D12`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`
 
+- `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
+  static files, `/healthz`, the CalDAV proxy; bundled into the Docker image
+  (`Dockerfile`). → `plans/foundation.md#D40`
+
 ## Tooling
 
 - `vite.config.ts` — Vite+ config: tests (`unit` in Node, `browser` in
@@ -72,6 +76,6 @@ When you add a package, app or module, add its line here in the same PR.
   isomorphic rule for the core). → `plans/foundation.md#D21`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
-- `.github/workflows/` — CI, the nightly Nextcloud run, Claude review,
-  `@claude`.
-  → `plans/foundation.md#D27`
+- `.github/workflows/` — CI (with the image built and started), the nightly
+  Nextcloud run, the release of the image on a `v*` tag, Claude review,
+  `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`

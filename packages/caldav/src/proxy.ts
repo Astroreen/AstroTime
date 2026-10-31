@@ -104,6 +104,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
         // A redirect goes back to the client, mapped into the proxy, so the
         // client sees the URL that answered (discovery's /.well-known redirect).
         redirect: "manual",
+        // The client went away: so does the request to the server.
+        signal: request.signal,
       });
     } catch {
       // Marked as the proxy's own: the client reads it as offline, not as the server's 502.
@@ -143,7 +145,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     }
     // Someone's calendar, fetched with their credentials: never kept by a cache.
     returned.set("cache-control", "no-store");
-    return new Response(NULL_BODY.has(answer.status) ? null : await answer.arrayBuffer(), {
+    // Streamed through: a calendar's multiget answer can be megabytes.
+    return new Response(NULL_BODY.has(answer.status) ? null : answer.body, {
       status: answer.status,
       headers: returned,
     });
