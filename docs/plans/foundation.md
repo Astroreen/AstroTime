@@ -233,8 +233,11 @@ Decided while building the layout engine, ahead of PR 5's screens.
   `layoutSpans` packs the all-day strip of a week (or a month's week) into
   rows. The UI turns both into pixels, so every view shares one placement and
   the rules are tested without a browser. On top of D14–D16:
-  - a timed item lasting 24 hours or more goes to the all-day strip, as
-    Google shows a three-day conference;
+  - a timed item lasting 24 hours or more (elapsed, so across a DST change
+    too), or covering a whole day of the user's wall clock, goes to the
+    all-day strip, as Google shows a three-day conference;
+  - a task's due date is its last day (an event's `DTEND` date is the day
+    after its last);
   - a task is a chip when it has a timed due and no timed start (a date
     start included), or a timed start and no due; the chip sits on the day
     of that time only;

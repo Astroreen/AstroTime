@@ -327,3 +327,68 @@ describe("from the review of #6", () => {
     expect(spans.map((s) => s.occurrence.item.uid)).toEqual(["off"]);
   });
 });
+
+describe("from the second review of #6", () => {
+  const vilnius = "Europe/Vilnius";
+  const zoned = (uid: string, start: string, end: string) =>
+    vcal(
+      `BEGIN:VEVENT\r\nUID:${uid}\r\nSUMMARY:${uid}\r\nDTSTART;TZID=Europe/Vilnius:${start}\r\nDTEND;TZID=Europe/Vilnius:${end}\r\nEND:VEVENT\r\n`,
+    );
+  const strip = (ics: string, from: string, to: string) =>
+    layoutDay(
+      occurrencesBetween(CalendarObject.parse(ics), { from, to, timeZone: vilnius }),
+      from,
+      { timeZone: vilnius },
+    ).allDay.length;
+
+  test("the strip of a day holds only what covers that day", () => {
+    const occurrences = on(
+      "2026-11-01",
+      "2026-11-05",
+      allDay("before", "20261101", "20261102"),
+      allDay("on", "20261102", "20261103"),
+    );
+    expect(
+      layoutDay(occurrences, "2026-11-02", { timeZone }).allDay.map((o) => o.item.uid),
+    ).toEqual(["on"]);
+  });
+
+  test("a day long across DST: midnight to midnight is all-day at 23 or 25 hours; 23 hours that are not a whole day are not", () => {
+    expect(
+      strip(zoned("autumn", "20261025T000000", "20261026T000000"), "2026-10-25", "2026-10-26"),
+    ).toBe(1);
+    expect(
+      strip(zoned("spring", "20260329T000000", "20260330T000000"), "2026-03-29", "2026-03-30"),
+    ).toBe(1);
+    expect(
+      strip(zoned("short", "20260329T100000", "20260330T090000"), "2026-03-29", "2026-03-30"),
+    ).toBe(0);
+  });
+
+  test("a task's due date is its last day: Jun 1 to Jun 3 covers all three", () => {
+    const ics = task("move", "DTSTART;VALUE=DATE:20270601\r\nDUE;VALUE=DATE:20270603\r\n");
+    const days = ["2027-06-01", "2027-06-02", "2027-06-03", "2027-06-04"];
+    const [span] = layoutSpans(on("2027-06-01", "2027-06-05", ics), days, timeZone);
+    expect(span).toMatchObject({ firstDay: 0, lastDay: 2 });
+    expect(on("2027-06-03", "2027-06-04", ics)).toHaveLength(1);
+    expect(on("2027-06-04", "2027-06-05", ics)).toHaveLength(0);
+  });
+
+  test("the cascade is transitive: an item over one that is itself cascaded steps once more", () => {
+    const timed = brief(
+      day(
+        event("a", "20261102T090000Z", "20261102T120000Z"),
+        event("b", "20261102T093000Z", "20261102T103000Z"),
+        event("c", "20261102T101500Z", "20261102T110000Z"),
+        event("d", "20261102T104500Z", "20261102T113000Z"),
+      ).timed,
+    );
+    // c sits on b (and a); d overlaps a and c but not b, and still goes one step past c.
+    expect(timed.map((t) => [t.uid, t.left])).toEqual([
+      ["a", 0],
+      ["b", 0.15],
+      ["c", 0.3],
+      ["d", 0.45],
+    ]);
+  });
+});

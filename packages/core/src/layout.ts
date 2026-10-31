@@ -85,10 +85,34 @@ export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
   if (chipTime(occurrence)) return false;
   if (start.type === "date") return true;
   if (item.kind === "task" && item.due?.type === "date") return true;
-  return minutesBetween(start, end, timeZone) >= DAY_MINUTES;
+  // A day or more of time, or a whole day of the user's wall clock (midnight
+  // to midnight is a day even when DST makes it 23 hours).
+  if (minutesBetween(start, end, timeZone) >= DAY_MINUTES) return true;
+  const s = wallClockOf(start, timeZone);
+  const e = wallClockOf(end, timeZone);
+  const firstMidnight = s.endsWith("T00:00:00") ? s.slice(0, 10) : nextDay(s.slice(0, 10));
+  return e >= `${nextDay(firstMidnight)}T00:00:00`;
 }
 
+/** The first and last day an all-day item covers in the user's zone (its exclusive end at midnight belongs to the day before). */
+function daysOf(occurrence: Occurrence, timeZone: string): { first: string; last: string } {
+  const first = wallClockOf(occurrence.start, timeZone).slice(0, 10);
+  const end = wallClockOf(occurrence.end, timeZone);
+  const last =
+    end.endsWith("T00:00:00") && end.slice(0, 10) > first
+      ? new Date(Date.parse(`${end.slice(0, 10)}T00:00:00Z`) - 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+      : end.slice(0, 10);
+  return { first, last };
+}
+
+/**
+ * How long an item lasts: elapsed time when both ends are instants (so a
+ * day across a DST change is 23 or 25 hours), wall-clock time otherwise.
+ */
 function minutesBetween(start: ItemTime, end: ItemTime, timeZone: string): number {
+  if (start.type === "zoned" && end.type === "zoned") return (end.epochMs - start.epochMs) / 60_000;
   const s = wallClockOf(start, timeZone);
   const e = wallClockOf(end, timeZone);
   return daysBetween(s.slice(0, 10), e.slice(0, 10)) * DAY_MINUTES + minutesOf(e) - minutesOf(s);
@@ -116,7 +140,8 @@ export function layoutDay(
 
   for (const occurrence of occurrences) {
     if (isAllDay(occurrence, timeZone)) {
-      allDay.push(occurrence);
+      const { first, last } = daysOf(occurrence, timeZone);
+      if (first <= day && day <= last) allDay.push(occurrence);
       continue;
     }
     const at = chipTime(occurrence);
@@ -226,7 +251,8 @@ function placeCluster(
     let d = 0;
     for (let j = 0; j < i; j++) if (overlap(cluster[j]!, item)) d = Math.max(d, depth[j]! + 1);
     depth.push(d);
-    const left = Math.min(d * step, 1 - step);
+    // Rounded so a cascade of 0.15 steps reads 0.45, not 0.44999…
+    const left = Math.round(Math.min(d * step, 1 - step) * 1e4) / 1e4;
     return { ...item, left, width: 1 - left, layer: i };
   });
 }
@@ -259,15 +285,7 @@ export function layoutSpans(
   const spans: Span[] = [];
   const strip = occurrences.filter((occurrence) => isAllDay(occurrence, timeZone));
   for (const occurrence of sortAllDay(strip, timeZone)) {
-    const startDay = wallClockOf(occurrence.start, timeZone).slice(0, 10);
-    const endClock = wallClockOf(occurrence.end, timeZone);
-    // An exclusive end at midnight (all-day ends always are) belongs to the day before.
-    const endDay =
-      endClock.endsWith("T00:00:00") && endClock.slice(0, 10) > startDay
-        ? new Date(Date.parse(`${endClock.slice(0, 10)}T00:00:00Z`) - 86_400_000)
-            .toISOString()
-            .slice(0, 10)
-        : endClock.slice(0, 10);
+    const { first: startDay, last: endDay } = daysOf(occurrence, timeZone);
     const firstDay = Math.max(0, daysBetween(first, startDay));
     const lastDay = Math.min(days.length - 1, daysBetween(first, endDay));
     if (lastDay < 0 || firstDay > days.length - 1 || lastDay < firstDay) continue;
