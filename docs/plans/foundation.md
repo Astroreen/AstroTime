@@ -192,7 +192,13 @@ Decided while building PR 2.
   series keeps its wall-clock time and length across DST changes.
 - **D34. A calendar object is one UID.** A `VCALENDAR` mixing UIDs, or events
   with tasks, or with two masters, is refused (RFC 4791 §4.1); exceptions
-  without their master are kept and shown.
+  without their master are kept and shown. A component without a UID is
+  refused.
+- **D35. Exceptions, leniently.** A `STATUS:CANCELLED` exception removes
+  its occurrence, as Google shows it. A `RECURRENCE-ID` written as another
+  kind of time than the series' start (a date for a zoned series, a floating
+  time for a zoned one) matches by wall clock, or by day when one side is a
+  date.
 
 ## Deferred
 
@@ -213,6 +219,9 @@ Decided while building PR 2.
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
   or a cache comes when a real calendar hits it ([D33](#D33)).
+- **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
+  occurrence only. Nextcloud, Apple and Google split the series instead, so
+  it is rare; it comes when a fixture from a real client needs it.
 - **Browser-mode component tests and Playwright e2e** — set up in PR 5,
   when there is UI to test.
 
@@ -232,7 +241,7 @@ pass locally and in CI; the docs route test passes.
 
 `@astrotime/core`: the event and task model over `ical.js`, lossless
 round-trip, recurrence expansion with exceptions and time zones. Decisions:
-D7, D8, D10, D31–D34.
+D7, D8, D10, D31–D35.
 
 Done when: fixtures in the shape Nextcloud, Apple, Thunderbird, Google and
 Tasks.org write parse and serialize back with every property kept;

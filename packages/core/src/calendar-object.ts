@@ -40,6 +40,7 @@ export class CalendarObject {
       throw new CalendarObjectError("The calendar object mixes VEVENT and VTODO.");
     }
     const uids = new Set(items.map((component) => component.getFirstPropertyValue("uid")));
+    if (uids.has(null) || uids.has("")) throw new CalendarObjectError("A component has no UID.");
     if (uids.size !== 1)
       throw new CalendarObjectError("The calendar object holds more than one UID.");
 

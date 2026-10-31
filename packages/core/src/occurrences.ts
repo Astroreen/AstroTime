@@ -90,15 +90,27 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
   const { master, exceptions } = object.components;
   const result: Occurrence[] = [];
 
+  // A RECURRENCE-ID names the occurrence it replaces by its instant. Some
+  // clients write it as another kind of time than the series' start (a date
+  // for a zoned series, a floating time for a zoned one); those match on the
+  // wall clock, or on the day when one side is a date.
+  const masterType = master ? anchors(master)?.start : undefined;
+  const masterKind = masterType ? fromIcalTime(masterType).type : undefined;
   const replaced = new Set<string>();
   for (const component of exceptions) {
-    const recurrenceId = component.getFirstPropertyValue("recurrence-id");
-    if (recurrenceId instanceof ICAL.Time) replaced.add(key(fromIcalTime(recurrenceId)));
+    const value = component.getFirstPropertyValue("recurrence-id");
+    if (!(value instanceof ICAL.Time)) continue;
+    const recurrenceId = fromIcalTime(value);
+    replaced.add(key(recurrenceId));
+    if (masterKind && recurrenceId.type !== masterKind)
+      replaced.add(looseKey(recurrenceId, masterKind));
+    // A cancelled exception removes its occurrence (docs/plans/foundation.md#D35).
+    if (component.getFirstPropertyValue("status") === "CANCELLED") continue;
     const span = anchors(component);
-    if (!span || !(recurrenceId instanceof ICAL.Time)) continue;
+    if (!span) continue;
     const occurrence = {
       item: readItem(component),
-      recurrenceId: fromIcalTime(recurrenceId),
+      recurrenceId,
       start: fromIcalTime(span.start),
       end: fromIcalTime(span.end),
     };
@@ -114,8 +126,9 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
       const end = fromIcalTime(span.end);
       if (overlaps(start, end, range)) result.push({ item, recurrenceId: null, start, end });
     } else {
-      // A start in another zone shows at most a day away from its own wall clock.
-      const stop = `${shiftDate(range.to, 1)}T00:00:00`;
+      // Zones are up to 26 hours apart (UTC−12 to UTC+14), so a start can show
+      // more than a day away from its own wall clock.
+      const stop = `${shiftDate(range.to, 2)}T00:00:00`;
       const expansion = new ICAL.RecurExpansion({ component: master, dtstart: span.start });
       for (let step = 0; ; step++) {
         const next = expansion.next();
@@ -128,7 +141,7 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
         keepTzid(span.start, next);
         const recurrenceId = fromIcalTime(next);
         if (localOf(recurrenceId) >= stop) break;
-        if (replaced.has(key(recurrenceId))) continue;
+        if (isReplaced(replaced, recurrenceId)) continue;
         const start = recurrenceId;
         const end = fromIcalTime(plus(next, length));
         if (overlaps(start, end, range)) result.push({ item, recurrenceId, start, end });
@@ -153,6 +166,25 @@ function key(time: ItemTime): string {
     case "zoned":
       return String(time.epochMs);
   }
+}
+
+/**
+ * How a RECURRENCE-ID of another kind than the series is matched: by day
+ * when either side is a date, else by wall clock.
+ */
+function looseKey(recurrenceId: ItemTime, seriesKind: ItemTime["type"]): string {
+  const local = localOf(recurrenceId);
+  const byDay = recurrenceId.type === "date" || seriesKind === "date";
+  return byDay ? `day:${local.slice(0, 10)}` : `wall:${local}`;
+}
+
+function isReplaced(replaced: ReadonlySet<string>, occurrence: ItemTime): boolean {
+  const local = localOf(occurrence);
+  return (
+    replaced.has(key(occurrence)) ||
+    replaced.has(`wall:${local}`) ||
+    replaced.has(`day:${local.slice(0, 10)}`)
+  );
 }
 
 function localOf(time: ItemTime): string {

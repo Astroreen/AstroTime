@@ -204,6 +204,7 @@ describe("invalid objects", () => {
       "two UIDs",
       wrap("BEGIN:VEVENT\r\nUID:a\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:b\r\nEND:VEVENT\r\n"),
     ],
+    ["no UID", wrap("BEGIN:VEVENT\r\nSUMMARY:x\r\nEND:VEVENT\r\n")],
     [
       "two masters",
       wrap("BEGIN:VEVENT\r\nUID:a\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:a\r\nEND:VEVENT\r\n"),

@@ -167,3 +167,66 @@ test("a dense series close to the range still expands", () => {
   );
   expect(occurrencesBetween(object, vilnius("2026-11-01", "2026-11-02"))).toHaveLength(24);
 });
+
+describe("exceptions, leniently (D35)", () => {
+  const series = (exception: string) =>
+    CalendarObject.parse(
+      `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTART:20261102T090000Z\r\nDTEND:20261102T100000Z\r\nRRULE:FREQ=DAILY;COUNT=3\r\nSUMMARY:Series\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:s\r\n${exception}END:VEVENT\r\nEND:VCALENDAR\r\n`,
+    );
+  const summaries = (object: CalendarObject) =>
+    occurrencesBetween(object, { from: "2026-11-01", to: "2026-11-06", timeZone: "UTC" }).map(
+      (o) => `${wallClockOf(o.start, "UTC")} ${o.item.summary}`,
+    );
+
+  test("a cancelled exception removes its occurrence", () => {
+    expect(
+      summaries(
+        series(
+          "RECURRENCE-ID:20261103T090000Z\r\nDTSTART:20261103T090000Z\r\nSTATUS:CANCELLED\r\n",
+        ),
+      ),
+    ).toEqual(["2026-11-02T09:00:00 Series", "2026-11-04T09:00:00 Series"]);
+  });
+
+  test("a floating RECURRENCE-ID replaces the zoned occurrence at that wall clock", () => {
+    expect(
+      summaries(
+        series("RECURRENCE-ID:20261103T090000\r\nDTSTART:20261103T150000Z\r\nSUMMARY:Moved\r\n"),
+      ),
+    ).toEqual([
+      "2026-11-02T09:00:00 Series",
+      "2026-11-03T15:00:00 Moved",
+      "2026-11-04T09:00:00 Series",
+    ]);
+  });
+
+  test("a date RECURRENCE-ID replaces the zoned occurrence on that day", () => {
+    expect(
+      summaries(
+        series(
+          "RECURRENCE-ID;VALUE=DATE:20261104\r\nDTSTART:20261104T120000Z\r\nSUMMARY:Moved\r\n",
+        ),
+      ),
+    ).toEqual([
+      "2026-11-02T09:00:00 Series",
+      "2026-11-03T09:00:00 Series",
+      "2026-11-04T12:00:00 Moved",
+    ]);
+  });
+});
+
+test("an occurrence far ahead on its own wall clock still shows for a user far behind", () => {
+  // Kiritimati (UTC+14) is 25 hours ahead of Pago Pago (UTC−11): 2 Nov 00:30
+  // there is 31 Oct 23:30 here, two days past its own wall clock.
+  const object = CalendarObject.parse(
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:k\r\nDTSTART;TZID=Pacific/Kiritimati:20261101T003000\r\nRRULE:FREQ=DAILY;COUNT=2\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  const shown = occurrencesBetween(object, {
+    from: "2026-10-31",
+    to: "2026-11-01",
+    timeZone: "Pacific/Pago_Pago",
+  });
+  expect(shown.map((o) => wallClockOf(o.start, "Pacific/Pago_Pago"))).toEqual([
+    "2026-10-31T23:30:00",
+  ]);
+});
