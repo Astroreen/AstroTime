@@ -14,9 +14,16 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Task** — a `VTODO`: something to do, possibly with a due time. Never
   "todo" or "reminder" in code or UI.
 - **Item** — an event or a task, when it does not matter which.
+- **Calendar object** — one resource on a CalDAV server: a `VCALENDAR` with
+  the components of one UID (a master and its exceptions) and their time
+  zones. `CalendarObject` in code.
+- **Master** — the component of a calendar object without `RECURRENCE-ID`;
+  the series itself, or the only item when it does not recur.
 - **Series** — an item with a recurrence rule (`RRULE`, `RDATE`).
 - **Occurrence** — one instance of a series at one time; an occurrence that
   was changed on its own is an **exception** (`RECURRENCE-ID`).
+- **Floating time** — a wall-clock time with no zone, shown at the same
+  hour everywhere. A **zoned time** names its IANA zone and an instant.
 - **Subtask** — a task whose `RELATED-TO` names a parent task.
 - **Due** — a task's `DUE`. A task is **overdue** when its due has passed
   and it is not completed.

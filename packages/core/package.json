@@ -1,0 +1,22 @@
+{
+  "name": "@astrotime/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Isomorphic domain core: the event and task model, iCalendar, recurrence, the sync engine",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test"
+  },
+  "dependencies": {
+    "ical.js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

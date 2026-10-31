@@ -173,6 +173,33 @@ logic worth borrowing.
   protected: the `CI` status is required, no direct or force pushes. One
   branch per PR; Conventional Commits.
 
+### The core's time model
+
+Decided while building PR 2.
+
+- **D31. Three kinds of time.** An `ItemTime` is a `date` (all-day), a
+  `floating` wall clock (the same in every zone), or a `zoned` wall clock
+  with its IANA zone and the instant it names. Instants are never stored
+  without the wall clock and zone they came from.
+- **D32. A TZID without a VTIMEZONE is an IANA name.** ical.js resolves
+  zones the object defines; a TZID it does not define (Google, some Android
+  clients) is resolved through `Intl`, following RFC 5545 for DST gaps (the
+  offset before the gap) and repeats (the earlier instant). A TZID neither
+  knows stays floating.
+- **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
+  takes days and the IANA zone the calendar is shown in; a zoned item shows
+  on the user's day, a floating one at the same wall clock everywhere. A
+  series keeps its wall-clock time and length across DST changes.
+- **D34. A calendar object is one UID.** A `VCALENDAR` mixing UIDs, or events
+  with tasks, or with two masters, is refused (RFC 4791 §4.1); exceptions
+  without their master are kept and shown. A component without a UID is
+  refused.
+- **D35. Exceptions, leniently.** A `STATUS:CANCELLED` exception removes
+  its occurrence, as Google shows it. A `RECURRENCE-ID` written as another
+  kind of time than the series' start (a date for a zoned series, a floating
+  time for a zoned one) matches by wall clock, or by day when one side is a
+  date.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -184,6 +211,17 @@ logic worth borrowing.
 - **Year and 3-day views** ([D13](#D13)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
+- **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
+  without a VTIMEZONE stays floating until it is mapped to IANA; with a
+  VTIMEZONE the instant is exact and `timeZone` keeps the Windows name
+  ([D32](#D32)).
+- **Expanding long series from the middle** — `occurrencesBetween` walks a
+  series from its first occurrence and throws `ExpansionLimitError` past
+  50 000 steps (a minutely or hourly series from years ago); a start point
+  or a cache comes when a real calendar hits it ([D33](#D33)).
+- **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
+  occurrence only. Nextcloud, Apple and Google split the series instead, so
+  it is rare; it comes when a fixture from a real client needs it.
 - **Browser-mode component tests and Playwright e2e** — set up in PR 5,
   when there is UI to test.
 
@@ -203,11 +241,16 @@ pass locally and in CI; the docs route test passes.
 
 `@astrotime/core`: the event and task model over `ical.js`, lossless
 round-trip, recurrence expansion with exceptions and time zones. Decisions:
-D7, D8, D10.
+D7, D8, D10, D31–D35.
 
-Done when: fixtures recorded from Nextcloud, Apple, Thunderbird and Tasks.org
-parse and serialize back with every property kept; recurrence expansion
-matches the fixtures' expected occurrences.
+Done when: fixtures in the shape Nextcloud, Apple, Thunderbird, Google and
+Tasks.org write parse and serialize back with every property kept;
+recurrence expansion matches the fixtures' expected occurrences.
+
+_Changed in PR 2:_ this PR first asked for fixtures recorded from those
+clients. Recording needs the servers PR 4 brings, so the fixtures here are
+written by hand after each client's documented output, and recording moved
+to PR 4's "Done when". The owner may set it back.
 
 ### PR 3 — Local store
 
@@ -226,7 +269,8 @@ Decisions: D2, D5, D6, D19, D20 (development half), D27.
 
 Done when: a Radicale and a Nextcloud account sync both ways, offline edits
 reach the server when it comes back, and a conflicting edit lands in the
-Conflicts list.
+Conflicts list; objects written by Nextcloud's web calendar and by Radicale
+are recorded as fixtures and pass PR 2's round-trip tests.
 
 ### PR 5 — Calendar grid
 
