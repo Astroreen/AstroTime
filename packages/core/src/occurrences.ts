@@ -11,7 +11,10 @@ export interface Occurrence {
   /** The occurrence's identity within its series; `null` for an item that does not recur. */
   readonly recurrenceId: ItemTime | null;
   readonly start: ItemTime;
-  /** Exclusive. Equal to `start` for an item with no length. */
+  /**
+   * Exclusive. Equal to `start` for an item with no length. A task due on a
+   * date ends the day after its due date: the due day is the task's last.
+   */
   readonly end: ItemTime;
 }
 
@@ -43,6 +46,13 @@ export class ExpansionLimitError extends Error {
  * (docs/plans/foundation.md#D16). An item with neither has no place.
  */
 function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
+  const span = rawAnchors(component);
+  // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
+  if (span && span.end.compare(span.start) < 0) return { start: span.start, end: span.start };
+  return span;
+}
+
+function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
   const value = (name: string) => {
     const v = component.getFirstPropertyValue(name);
     return v instanceof ICAL.Time ? v : null;
