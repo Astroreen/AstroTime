@@ -19,6 +19,8 @@ while IFS= read -r line <&"$out"; do
   [[ "$line" == *"astrotime: stop with"* ]] && break
 done
 cat <&"$out" >>"$log" &
+# Whatever ends the smoke run, nothing it started stays behind.
+trap 'bash "$ASTROTIME_ROOT/scripts/t3/stop.sh" >/dev/null 2>&1 || true' EXIT
 
 fail() {
   echo "smoke: $1" >&2
@@ -29,7 +31,7 @@ fail() {
 curl -fsS "http://127.0.0.1:$ASTROTIME_WEB_PORT/" | grep -q "<title>AstroTime</title>" || fail "the page did not load"
 if command -v radicale >/dev/null 2>&1; then
   status="$(curl -s -o /dev/null -w '%{http_code}' -X PROPFIND -u astro:astro -H 'Depth: 0' \
-    "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/")"
+    "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/personal/")"
   [ "$status" = 207 ] || fail "the CalDAV proxy answered $status"
 fi
 if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a second dev.sh started"; fi

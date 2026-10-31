@@ -24,8 +24,12 @@ htpasswd_encryption = plain
 filesystem_folder = $dav/collections
 CONFIG
   start_until "Radicale server ready" radicale --config "$dav/config"
-  # A first calendar for a fresh dev directory; 405 means it is there already.
-  curl -s -o /dev/null -u astro:astro -X MKCALENDAR "http://127.0.0.1:$ASTROTIME_DAV_PORT/astro/personal/" || true
+  # A first calendar for a fresh dev directory; 405 or 409 mean it is there already.
+  made="$(curl -s -o /dev/null -w '%{http_code}' -u astro:astro -X MKCALENDAR "http://127.0.0.1:$ASTROTIME_DAV_PORT/astro/personal/")"
+  case "$made" in
+    201 | 405 | 409) ;;
+    *) echo "astrotime: could not make the dev calendar (MKCALENDAR answered $made)" >&2; exit 1 ;;
+  esac
 else
   echo "astrotime: no radicale on PATH, so no local CalDAV server (it comes with devenv)" >&2
 fi

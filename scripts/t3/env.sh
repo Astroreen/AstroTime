@@ -13,6 +13,9 @@ if [ "${BASH_VERSINFO[0]}" -lt 5 ] || { [ "${BASH_VERSINFO[0]}" -eq 5 ] && [ "${
 fi
 
 ASTROTIME_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# The calling script by an absolute path, taken before the `cd` below: the
+# devenv re-exec runs it again from the root.
+ASTROTIME_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 export ASTROTIME_ROOT
 # The same path without symlinks, as /proc/<pid>/cwd reports it.
 ASTROTIME_ROOT_PHYSICAL="$(cd "$ASTROTIME_ROOT" && pwd -P)"
@@ -42,7 +45,7 @@ enter_dev_shell() {
   fi
   if [ -z "${ASTROTIME_IN_DEVENV:-}" ] && command -v devenv >/dev/null 2>&1; then
     cd "$ASTROTIME_ROOT"
-    ASTROTIME_IN_DEVENV=1 exec devenv shell -- bash "$0" "$@"
+    ASTROTIME_IN_DEVENV=1 exec devenv shell -- bash "$ASTROTIME_SCRIPT" "$@"
   fi
   echo "astrotime: needs Node 24 and pnpm on PATH (or devenv); see README.md#development" >&2
   exit 1
