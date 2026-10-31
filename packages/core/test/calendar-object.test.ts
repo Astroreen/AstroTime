@@ -180,6 +180,13 @@ describe("events", () => {
     });
   });
 
+  test("with a VTIMEZONE the zone is one Intl knows, so its wall clock reads back", () => {
+    const start = (load("outlook-event-windows-tz.ics").master as Event).start;
+    if (start?.type !== "zoned") throw new Error("expected a zoned start");
+    expect(start.timeZone).toBe("Europe/Berlin");
+    expect(wallClockOf(start, start.timeZone)).toBe(start.local);
+  });
+
   // The fixtures below are hand-written in the shape Exchange writes
   // (PRODID, X-MICROSOFT-CDO-*, Windows TZIDs), minus the VTIMEZONE a client may
   // strip or a server may not keep.
@@ -226,13 +233,6 @@ describe("events", () => {
     test("a name that is neither IANA nor Windows stays floating", () => {
       const event = load("outlook-event-unknown-windows-tz.ics").master as Event;
       expect(event.start).toEqual({ type: "floating", local: "2026-11-04T14:00:00" });
-    });
-
-    test("with a VTIMEZONE the zone is one Intl knows, so its wall clock reads back", () => {
-      const start = (load("outlook-event-windows-tz.ics").master as Event).start;
-      if (start?.type !== "zoned") throw new Error("expected a zoned start");
-      expect(start.timeZone).toBe("Europe/Berlin");
-      expect(wallClockOf(start, start.timeZone)).toBe(start.local);
     });
 
     test("a local time in the spring gap takes the offset before it, as for IANA names", () => {

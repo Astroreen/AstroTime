@@ -215,14 +215,18 @@ Decided while building PR 2.
   `windowsZones.xml`, the `territory="001"` row of each name, compared
   without regard to case and surrounding spaces, and spelled as IANA names
   the zone today (CLDR keeps old spellings such as `Asia/Calcutta`; its
-  `bcp47/timezone.xml` gives `Asia/Kolkata`). A TZID none of these knows stays floating. The
-  table is generated, not written by hand (`scripts/generate-windows-zones.ts`
-  pins a CLDR release). For a mapped name `ItemTime.timeZone` is the IANA
+  `bcp47/timezone.xml` gives `Asia/Kolkata`). A TZID none of these knows
+  stays floating. The table is generated, not written by hand
+  (`scripts/generate-windows-zones.ts` pins a CLDR release). For a mapped name `ItemTime.timeZone` is the IANA
   zone; the TZID as read stays in the calendar object, so `serialize` writes
   it back unchanged (rule 2). A Windows name the object defines in a
   VTIMEZONE (Outlook's usual output) is mapped the same way for `timeZone`,
   while its instants come from the VTIMEZONE; only a defined TZID that is
-  neither (`Customized Time Zone`) stays as written.
+  neither (`Customized Time Zone`) stays as written. A known limit: where a
+  VTIMEZONE's rules differ from today's IANA data (an old or custom one, a
+  historical date), the instant is the VTIMEZONE's and the wall clock in
+  `timeZone` may differ from the written one, as for any VTIMEZONE named
+  with an IANA name.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
