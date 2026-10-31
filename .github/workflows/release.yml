@@ -1,0 +1,71 @@
+# docs/plans/foundation.md, D28: a `v*` tag publishes the web app's image to
+# GHCR (ghcr.io/astroreen/astrotime). The tag must match the version in
+# package.json. The Android APK joins this workflow with apps/mobile.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: Web image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: The tagged commit is on main and passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=CI" --paginate --jq '.check_runs[]' | jq -rs 'sort_by(.started_at) | last | .conclusion')"
+          if [ "$conclusion" = "null" ] || [ -z "$conclusion" ]; then
+            echo "CI on ${GITHUB_SHA} has not finished; re-run this job once it has" >&2
+            exit 1
+          fi
+          if [ "$conclusion" != "success" ]; then
+            echo "CI on ${GITHUB_SHA} is '${conclusion}', not success" >&2
+            exit 1
+          fi
+      - name: The tag matches package.json
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}" >&2
+            exit 1
+          fi
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/astrotime
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          # `latest` only for releases, never for a prerelease (v1.0.0-rc.1).
+          flavor: |
+            latest=auto
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

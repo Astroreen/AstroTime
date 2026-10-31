@@ -1,0 +1,7 @@
+.git
+.devenv*
+.direnv
+**/node_modules
+**/dist
+**/playwright-report
+**/test-results

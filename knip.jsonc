@@ -15,6 +15,9 @@
       // The integration tests start the dev shell's (or CI's) Radicale.
       "ignoreBinaries": ["radicale"],
     },
+    "apps/proxy": {
+      "entry": ["src/main.ts", "vite.config.ts"],
+    },
     "apps/web": {
       "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts"],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.
