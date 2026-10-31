@@ -62,13 +62,13 @@ export function allowlist(value: string | undefined): string[] {
   return origins;
 }
 
-/** The request body as a stream, read only if the proxy lets the request through, and capped. */
 /**
  * Requests that went over the cap while streaming. The error itself reaches
  * the proxy wrapped in fetch's own, so the server remembers which they were.
  */
 const overCap = new WeakSet<IncomingMessage>();
 
+/** The request body as a stream, read only if the proxy lets the request through, and capped. */
 async function* capped(req: IncomingMessage): AsyncGenerator<Buffer> {
   let size = 0;
   for await (const chunk of req) {
@@ -197,7 +197,8 @@ function createAppHandler(options: ServerOptions, root: string): Server {
           // take a truncated multistatus for a whole one.
           Readable.fromWeb(response.body as NodeReadableStream)
             .on("error", (error) => {
-              console.error(error);
+              // A client that went away is ordinary, not an error to log.
+              if (!gone.signal.aborted) console.error(error);
               res.destroy(error);
             })
             .pipe(res);

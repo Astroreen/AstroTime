@@ -359,6 +359,13 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Year and 3-day views** ([D13](#D13)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
+- **Static files served whole** — the image reads each file into memory
+  with no `ETag`, `Last-Modified` or compression; the bundle is small
+  today. Precompressed assets and conditional requests come when PR 5's app
+  makes the bundle large ([D40](#D40)).
+- **Base images by digest** — the Dockerfile uses `node:24-alpine` by tag;
+  pinning it by digest, with Dependabot for Docker, makes releases
+  reproducible ([D41](#D41)).
 - **Content Security Policy** for the web image — once the app's own needs
   (wasm, workers) are known from PR 5 ([D40](#D40)).
 - **Windows time zone names** — Outlook's `TZID:W. Europe Standard Time`
