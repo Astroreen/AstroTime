@@ -484,14 +484,22 @@ export class Store {
       .where(where(sql`${schema.objects.titles} LIKE ${containsPattern(folded)} ESCAPE '\\'`))
       .orderBy(desc(schema.objects.startMs))
       .limit(limit);
-    // Rows written before migration 6 have no titles yet: read from their iCalendar.
+    // Rows written before migration 6 have no titles yet: read from their
+    // iCalendar once, and kept, so the next search finds them by the column.
     const older = await this.db
       .select()
       .from(schema.objects)
       .where(where(sql`${schema.objects.titles} IS NULL`));
-    const matching = older.filter((row) =>
-      titlesOf(CalendarObject.parse(row.ics)).includes(folded),
-    );
+    const matching: StoredObject[] = [];
+    for (const row of older) {
+      const titles = titlesOf(CalendarObject.parse(row.ics));
+      // Only if the row is unchanged since it was read; not a change readers need to hear of.
+      await this.db
+        .update(schema.objects)
+        .set({ titles })
+        .where(and(eq(schema.objects.id, row.id), eq(schema.objects.ics, row.ics)));
+      if (titles.includes(folded)) matching.push({ ...row, titles });
+    }
     if (matching.length === 0) return found;
     return [...found, ...matching]
       .toSorted((a, b) => (b.startMs ?? -Infinity) - (a.startMs ?? -Infinity))

@@ -122,6 +122,11 @@ test("migration 6 leaves titles unknown on older rows, and search still finds th
     ["other", null],
   ]);
   expect((await store.search(["c"], "БАНК")).map((o) => o.uid)).toEqual(["old"]);
+  // The search kept what it read: the older rows have their titles now.
+  expect(await driver.query("SELECT id, titles IS NOT NULL FROM objects ORDER BY id", [])).toEqual([
+    ["old", 1],
+    ["other", 1],
+  ]);
   await store.saveFromServer("c", { href: "new.ics", etag: null, ics: ics("new", "Банк, снова") });
   expect((await store.search(["c"], "банк")).map((o) => o.uid)).toEqual(["new", "old"]);
 });

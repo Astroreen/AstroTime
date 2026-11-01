@@ -59,7 +59,7 @@ When you add a package, app or module, add its line here in the same PR.
     - `tasks` — every task of some calendars: the tasks screen's lists.
       → `plans/design.md#D95`
     - `search` — objects by title, case and diacritics aside, over the
-      folded `titles` column (`search.ts`, migration 5).
+      folded `titles` column (`search.ts`, migration 6).
       → `plans/design.md#D97`
   - `StoreInUseError` — another tab holds the web store.
     → `plans/foundation.md#D56`

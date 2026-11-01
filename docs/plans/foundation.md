@@ -191,7 +191,7 @@ logic worth borrowing.
 
 - **D36. The store holds only valid objects.** Every write parses the
   iCalendar with `@astrotime/core` and indexes it by `boundsOf` (and, since
-  migration 5, by its titles folded for search, design
+  migration 6, by its titles folded for search, design
   [D97](design.md#D97)); a range query returns candidates for
   `occurrencesBetween` to place exactly. Local
   changes carry `pending` (`create`, `update`, `delete`) for the sync engine;

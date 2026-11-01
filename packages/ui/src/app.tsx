@@ -3,7 +3,7 @@
 // secrets, the system browser, where preferences are kept) and the user's
 // languages, and renders this.
 import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 
 import { localeSettings } from "./calendar/locale.ts";
@@ -70,7 +70,13 @@ export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
     };
   }, [store]);
 
-  const change = (changes: Partial<Settings>) => setChosen({ ...chosen, ...changes });
+  // From the latest settings, so two changes before a render keep both.
+  const latest = useRef(chosen);
+  latest.current = chosen;
+  const change = (changes: Partial<Settings>) => {
+    latest.current = { ...latest.current, ...changes };
+    setChosen(latest.current);
+  };
   return (
     <I18nextProvider i18n={i18n}>
       <SettingsContext.Provider value={{ settings: chosen, change }}>
