@@ -58,7 +58,7 @@ export function UndoneChip({
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start" className="z-50">
           <Popover.Popup className="w-[min(22rem,calc(100vw-1.5rem))] origin-[var(--transform-origin)] rounded-xl bg-raised p-2 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            <Popover.Title className="px-2 pt-1 pb-2 text-sm font-semibold">
+            <Popover.Title className="px-2 pt-1 pb-2 text-body font-semibold">
               {t("undone.title")}
             </Popover.Title>
             <ul className="flex max-h-[50vh] flex-col overflow-y-auto">
@@ -82,7 +82,7 @@ export function UndoneChip({
                       <span className="text-small break-words">
                         {item.summary?.trim() || t("item.untitled")}
                       </span>
-                      <span className="text-xs text-ink-muted">
+                      <span className="text-note text-ink-muted">
                         {t("undone.due", { date: due })}
                       </span>
                     </span>

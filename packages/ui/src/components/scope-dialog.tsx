@@ -60,7 +60,7 @@ function Choice({ request, onClose }: { request: ScopeRequest; onClose: () => vo
         request.run(scope);
       }}
     >
-      <AlertDialog.Title className="text-lg font-medium">{title}</AlertDialog.Title>
+      <AlertDialog.Title className="text-title font-medium">{title}</AlertDialog.Title>
       {!confirm && (
         <fieldset className="mt-4 flex flex-col gap-1">
           <legend className="sr-only">{title}</legend>
@@ -89,7 +89,7 @@ function Choice({ request, onClose }: { request: ScopeRequest; onClose: () => vo
           autoFocus
           className={
             request.action === "delete"
-              ? "rounded-full bg-danger px-5 py-2 text-sm font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+              ? "rounded-full bg-danger px-5 py-2 text-body font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
               : primaryButton
           }
         >

@@ -132,7 +132,7 @@ export function TimeGrid(props: TimeGridProps) {
           ) : (
             <>
               <div className="flex items-end justify-center pb-1.5">
-                <span className="rounded-full bg-pill px-2 py-1 text-xs font-medium text-ink-muted">
+                <span className="rounded-full bg-pill px-2 py-1 text-note font-medium text-ink-muted">
                   <span aria-hidden="true">{formats.weekNumber(days)}</span>
                   <span className="sr-only">
                     {t("grid.week", { number: formats.weekNumber(days) })}

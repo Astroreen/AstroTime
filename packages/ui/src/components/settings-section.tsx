@@ -1,21 +1,21 @@
 // The Settings screen (design D53, D131): the whole screen on a phone, a
 // dialog from 640 px, in groups: general (theme, language), the views (week
-// start, clock, "hide completed"), the calendars and whether each shows,
-// reminders (foundation D101) and, on the desktop, whether closing the
+// start, clock, "hide completed"), the accounts with how each syncs, its
+// menu and its calendars, each shown or not (D137), reminders (foundation D101) and, on the desktop, whether closing the
 // window quits (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
-import { Checkbox } from "@base-ui/react/checkbox";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LANGUAGES } from "../i18n/index.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
-import { accountName } from "./accounts.tsx";
+import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
+import { CalendarRow } from "./calendar-row.tsx";
 import { useCalendar } from "./context.ts";
-import { CheckIcon, CloseIcon } from "./icons.tsx";
+import { CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 
@@ -65,6 +65,7 @@ export function SettingsScreen({
               hidden={hidden}
               onToggle={onToggle}
               colorOf={colorOf}
+              onLeave={onClose}
             />
           </div>
         </Dialog.Popup>
@@ -79,12 +80,15 @@ function SettingsGroups({
   hidden,
   onToggle,
   colorOf,
+  onLeave,
 }: {
   accounts: readonly Account[];
   calendars: readonly Calendar[];
   hidden: ReadonlySet<string>;
   onToggle: (calendarId: string, visible: boolean) => void;
   colorOf: (calendar: Calendar) => string;
+  /** Closes Settings before an account's dialog opens over it. */
+  onLeave: () => void;
 }) {
   const { t } = useTranslation();
   const { formats } = useCalendar();
@@ -138,38 +142,40 @@ function SettingsGroups({
           onChange={(hideCompleted) => change({ hideCompleted })}
         />
       </Group>
-      {accounts.map((account) => {
-        const own = calendars.filter((calendar) => calendar.accountId === account.id);
-        if (own.length === 0) return null;
-        // Each account's calendars and whether the views show them: the
-        // drawer's checkbox, in the calendar's colour, so one state is one
-        // widget wherever it is met (D131).
-        return (
-          <Group
-            key={account.id}
-            title={t("settings.calendarsOf", { account: accountName(account, t) })}
-          >
-            {own.map((calendar) => (
-              <label
-                key={calendar.id}
-                className="flex min-h-12 cursor-pointer items-center gap-4 px-4 text-body"
-              >
-                <Checkbox.Root
-                  checked={!hidden.has(calendar.id)}
-                  onCheckedChange={(shown) => onToggle(calendar.id, shown)}
-                  className="item-color grid size-[18px] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--item-fill)] data-checked:bg-[var(--item-fill)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  style={{ "--item": colorOf(calendar) } as CSSProperties}
-                >
-                  <Checkbox.Indicator className="flex text-white data-unchecked:hidden">
-                    <CheckIcon className="size-3.5" strokeWidth="2.6" />
-                  </Checkbox.Indicator>
-                </Checkbox.Root>
-                <span className="min-w-0 flex-1 truncate">{calendar.name}</span>
-              </label>
-            ))}
-          </Group>
-        );
-      })}
+      {/* Each account with how it syncs, its menu and its calendars, each
+          shown or not as the drawer's checkbox says (D131, D137). */}
+      <Group title={t("accounts.title")}>
+        {accounts.map((account, index) => {
+          const own = calendars.filter((calendar) => calendar.accountId === account.id);
+          return (
+            <section
+              key={account.id}
+              aria-label={accountName(account, t)}
+              className={`flex flex-col pb-1 ${index > 0 ? "border-t border-line pt-1" : ""}`}
+            >
+              <div className="px-4 py-2">
+                <AccountRow account={account} onLeave={onLeave} />
+              </div>
+              {own.length === 0 && (
+                <p className="px-4 pb-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>
+              )}
+              {own.map((calendar) => (
+                <CalendarRow
+                  key={calendar.id}
+                  calendar={calendar}
+                  color={colorOf(calendar)}
+                  shown={!hidden.has(calendar.id)}
+                  onToggle={onToggle}
+                  className="min-h-11"
+                />
+              ))}
+            </section>
+          );
+        })}
+        <div className="border-t border-line px-2 py-1">
+          <AddAccountButton onLeave={onLeave} />
+        </div>
+      </Group>
       <Group title={t("settings.notifications")}>
         <RemindersSwitch />
       </Group>

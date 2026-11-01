@@ -163,7 +163,7 @@ function Week({
   return (
     <div className="grid min-h-0" style={columns}>
       <div
-        className="flex justify-center rounded-full bg-pill pt-1.5 text-xs font-medium text-ink-muted tabular-nums"
+        className="flex justify-center rounded-full bg-pill pt-1.5 text-note font-medium text-ink-muted tabular-nums"
         style={{ gridColumn: 1, gridRow: 1 }}
       >
         <span aria-hidden="true">{number}</span>

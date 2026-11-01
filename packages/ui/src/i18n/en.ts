@@ -236,7 +236,6 @@ export const en = {
   "settings.close": "Close settings",
   "settings.general": "General",
   "settings.views": "Views",
-  "settings.calendarsOf": "Calendars of {{account}}",
   "settings.notifications": "Notifications",
   "settings.desktop": "Desktop app",
   "settings.theme": "Theme",

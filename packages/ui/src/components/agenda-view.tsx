@@ -231,7 +231,7 @@ export function AgendaView({
                   {items.length === 0 && !undone && (
                     <p
                       role="listitem"
-                      className="flex min-h-11 items-center text-sm text-ink-muted"
+                      className="flex min-h-11 items-center text-body text-ink-muted"
                     >
                       {t("agenda.nothingToday")}
                     </p>

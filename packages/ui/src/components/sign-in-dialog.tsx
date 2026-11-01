@@ -30,9 +30,9 @@ export interface SignInRequest {
 }
 
 export const primaryButton =
-  "rounded-full bg-accent px-5 py-2 text-sm font-medium text-on-accent hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
+  "rounded-full bg-accent px-5 py-2 text-body font-medium text-on-accent hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
 export const textButton =
-  "rounded-full px-4 py-2 text-sm font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
+  "rounded-full px-4 py-2 text-body font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 const input =
   "h-11 w-full rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent";
 
@@ -52,7 +52,7 @@ export function SignInDialog({
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-[110] max-h-[calc(100dvh-2rem)] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-          <Dialog.Title className="mb-4 text-[22px] leading-tight">
+          <Dialog.Title className="mb-4 text-headline leading-tight">
             {request?.account
               ? t("signIn.titleAgain")
               : request?.kind === "preset" && preset
@@ -175,7 +175,7 @@ function SignInForm({
 
   const problem =
     state.step === "failed" ? (
-      <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+      <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-body text-danger">
         {t(`signIn.problem.${state.problem}`, { location: state.location ?? "" })}
       </p>
     ) : null;
@@ -238,7 +238,7 @@ function SignInForm({
           </Field>
         ) : (
           <>
-            <p className="text-sm text-ink-muted">
+            <p className="text-body text-ink-muted">
               {t("signIn.preset.as", { username: preset.username })}
             </p>
             {/* For the browser's password manager, which keys a password by its user. */}
@@ -289,7 +289,7 @@ function SignInForm({
     <Tabs.Root value={kind} onValueChange={(value: SignInKind) => setKind(value)}>
       <Tabs.List
         aria-label={t("signIn.kind")}
-        className="mb-4 grid grid-cols-2 rounded-full bg-canvas p-1 text-sm font-medium"
+        className="mb-4 grid grid-cols-2 rounded-full bg-canvas p-1 text-body font-medium"
       >
         {(["nextcloud", "caldav"] as const).map((value) => (
           <Tabs.Tab
@@ -309,7 +309,7 @@ function SignInForm({
             void signIn.withNextcloud({ server });
           }}
         >
-          <p className="text-sm text-ink-muted">{t("signIn.nextcloudHelp")}</p>
+          <p className="text-body text-ink-muted">{t("signIn.nextcloudHelp")}</p>
           {serverField}
           {problem}
           {actions(t("signIn.continue"))}
@@ -323,7 +323,7 @@ function SignInForm({
             void signIn.withPassword({ server, username, password });
           }}
         >
-          <p className="text-sm text-ink-muted">{t("signIn.caldavHelp")}</p>
+          <p className="text-body text-ink-muted">{t("signIn.caldavHelp")}</p>
           {serverField}
           <Field label={t("signIn.username")}>
             {(id) => (
@@ -364,7 +364,7 @@ function Field({ label, children }: { label: string; children: (id: string) => R
   const id = useId();
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[13px] font-medium text-ink-muted">
+      <label htmlFor={id} className="text-small font-medium text-ink-muted">
         {label}
       </label>
       {children(id)}
@@ -384,7 +384,7 @@ function Busy({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col gap-3 text-sm text-ink-muted" aria-busy="true">
+    <div className="flex flex-col gap-3 text-body text-ink-muted" aria-busy="true">
       <div
         data-spinner
         className="size-6 animate-spin rounded-full border-[3px] border-accent-soft border-t-accent"

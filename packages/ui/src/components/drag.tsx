@@ -462,7 +462,7 @@ export function useDrag({
       {problem && (
         <div
           role="alert"
-          className="absolute bottom-4 left-4 z-[70] flex max-w-sm items-start gap-3 rounded-2xl bg-raised px-4 py-3 text-sm text-ink shadow-lg shadow-black/30"
+          className="absolute bottom-4 left-4 z-[70] flex max-w-sm items-start gap-3 rounded-2xl bg-raised px-4 py-3 text-body text-ink shadow-lg shadow-black/30"
         >
           <p className="flex-1 pt-1.5">{t(PROBLEM_KEYS[problem])}</p>
           <button type="button" className={textButton} onClick={() => setProblem(null)}>

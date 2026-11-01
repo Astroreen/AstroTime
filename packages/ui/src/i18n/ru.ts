@@ -248,7 +248,6 @@ export const ru = {
   "settings.close": "Закрыть настройки",
   "settings.general": "Общие",
   "settings.views": "Вид",
-  "settings.calendarsOf": "Календари: {{account}}",
   "settings.notifications": "Уведомления",
   "settings.desktop": "Приложение для компьютера",
   "settings.theme": "Тема",

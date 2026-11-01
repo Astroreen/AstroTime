@@ -3,7 +3,7 @@
 // and is kept.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openApp, openDemo, PHONE, WIDE } from "./support.ts";
 
 const header = (page: Page, name: string) => page.getByRole("heading", { name });
 const day = (page: Page, name: string) => page.getByRole("list", { name });
@@ -125,4 +125,35 @@ test("on a phone, Settings is the drawer's last row and a screen of its own", as
   await settings.getByRole("button", { name: "Close settings" }).click();
   await expect(settings).toBeHidden();
   await expect(page.getByRole("button", { name: "Main menu" })).toBeFocused();
+});
+
+test("Settings lists the accounts, each with how it syncs, its menu and its calendars (design D137)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const accounts = settings.getByRole("region", { name: "Accounts" });
+  const demo = accounts.getByRole("region", { name: "Demo" });
+  await expect(demo.getByRole("status")).toHaveText("Demo data, on this device only");
+  await expect(demo.getByRole("button", { name: "Options for Demo" })).toBeVisible();
+  // The drawer's calendar row, the same checkbox in the same place.
+  for (const name of ["Holidays", "Personal", "Tasks", "Work"]) {
+    await expect(demo.getByRole("checkbox", { name })).toBeChecked();
+  }
+  // "Add account" closes Settings and opens adding one.
+  await accounts.getByRole("button", { name: "Add account" }).click();
+  await expect(settings).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Add an account" })).toBeVisible();
+});
+
+test("the calendar on this device is named so in Settings (design D137)", async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  await openApp(page);
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  const accounts = page
+    .getByRole("dialog", { name: "Settings" })
+    .getByRole("region", { name: "Accounts" });
+  await expect(accounts.getByRole("region", { name: "On this device" })).toBeVisible();
 });

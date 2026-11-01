@@ -684,6 +684,27 @@ are its decisions.
   as soon as a dialog starts to close. The rule is every element Base UI
   marks closing, a collapsing panel too, not only popups and backdrops, on
   purpose: nothing is meant to be pressed while it goes.
+- **D137. The accounts in Settings, one row for a calendar, and the scale
+  everywhere** (the two Deferred items D131 and D134 left, once the first
+  run became the calendar on this device, [foundation D122](foundation.md#D122)):
+  - Settings' calendar groups become one **Accounts** group: each account
+    with its avatar, name, how it syncs (said as it changes) and its menu
+    (sync now, sign in again, remove), then its calendars, then "Add
+    account". The same account row is the accounts dialog's
+    (`AccountRow`), and the same calendar row the drawer's (`CalendarRow`,
+    `calendar-row.tsx`): one component each, so the two places cannot drift.
+    The calendar on this device is named as everywhere else ("On this
+    device"), not by its stored name. An account's menu or "Add account"
+    closes Settings before its dialog opens, as the drawer does. Its
+    conflicts and the sync's problems stay in the accounts dialog, where the
+    account button's dot leads.
+  - The accounts dialog is closed by ✕ before its title, as every other
+    dialog, not by a word at its other end.
+  - [D134](#D134)'s scale now holds everywhere: the accounts dialog,
+    sign-in, removing an account, the keyring question and the store's
+    error screen took its roles, and Tailwind's own sizes left in the UI
+    (`text-xs`, `text-sm`, `text-lg`) became `text-note`, `text-body` and
+    `text-title`, so a size is chosen by its role only.
 
 ### Decided in the logic QA (after v0.2.0)
 
@@ -810,18 +831,10 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   through the provider and the sync engine, or a colour kept on this device
   only. Google offers both per calendar. A menu on each calendar's row in
   the drawer comes with it.
-- **The type scale in the accounts' screens** — the account dialog, the
-  first run and sign-in keep their own sizes while they are reworked; they
-  take [D134](#D134)'s roles after.
 - **The tab strip right to left** — the fade and the chosen tab's scroll
   are worked out left to right; AstroTime speaks English and Russian
   (foundation [D17](foundation.md#D17)), so a right-to-left language
   brings their mirror ([D135](#D135)).
-- **Accounts in Settings** — adding, removing and signing in again stay in
-  the account dialog (the top bar's account button) while the first run and
-  the accounts are reworked (the first run is the calendar on this device
-  since [foundation D122](foundation.md#D122)); Settings gets an Accounts group then
-  ([D131](#D131)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
@@ -842,8 +855,8 @@ PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each
 next to the matching reference, in both themes.
 
 The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`),
-D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`) and D136
-(`fix/closing-popups-and-strip`);
+D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`), D136
+(`fix/closing-popups-and-strip`) and D137 (`feat/settings-accounts`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its

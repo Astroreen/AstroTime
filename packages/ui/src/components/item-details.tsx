@@ -303,7 +303,7 @@ function Body({
             <button
               type="button"
               aria-pressed={starred}
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
+              className="flex items-center gap-2 rounded-full px-4 py-2 text-body font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
               onClick={onStar}
             >
               <StarIcon filled={starred} className="size-4" />
