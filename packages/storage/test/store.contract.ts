@@ -306,6 +306,33 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       ).toMatchObject({ id: object.id, pending: "update" });
     });
 
+    test("a local change reads and writes in one transaction: all of its writes, or none", async () => {
+      const { store, calendar } = await setup();
+      const server = await store.saveFromServer(calendar.id, {
+        href: "s.ics",
+        etag: '"1"',
+        ics: event("s", "20261102T090000Z", "20261102T100000Z"),
+      });
+      const split = await store.changeLocal(async (local) => {
+        const current = (await local.object(server.id))!;
+        await local.save(calendar.id, current.ics.replace("SUMMARY:s", "SUMMARY:s1"), current.href);
+        return local.save(calendar.id, event("s2", "20261103T090000Z", "20261103T100000Z"));
+      });
+      expect(split).toMatchObject({ pending: "create", href: "s2.ics" });
+      expect(await store.object(server.id)).toMatchObject({ pending: "update" });
+      expect((await store.object(server.id))!.ics).toContain("SUMMARY:s1");
+
+      await expect(
+        store.changeLocal(async (local) => {
+          await local.delete(server.id);
+          await local.save(calendar.id, event("s3", "20261104T090000Z", "20261104T100000Z"));
+          throw new Error("The change failed half way.");
+        }),
+      ).rejects.toThrow("half way");
+      expect(await store.object(server.id)).toMatchObject({ pending: "update" });
+      expect(await store.objectAt(calendar.id, "s3.ics")).toBeUndefined();
+    });
+
     test("deleting an object that never reached the server removes it at once", async () => {
       const { store, calendar } = await setup();
       const created = await store.saveLocal(calendar.id, task("draft"));

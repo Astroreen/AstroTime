@@ -43,6 +43,13 @@ export type Conflict = typeof schema.conflicts.$inferSelect;
 export type Component = "VEVENT" | "VTODO";
 export type Pending = StoredObject["pending"];
 
+/** What a local change (`Store.changeLocal`) reads and writes, inside its transaction. */
+export interface LocalChange {
+  object(id: string): Promise<StoredObject | undefined>;
+  save(calendarId: string, ics: string, href?: string): Promise<StoredObject>;
+  delete(id: string): Promise<void>;
+}
+
 /** A task that rolls over to today, with the occurrence it counts by (design D51). */
 export interface UndoneTask {
   readonly object: StoredObject;
@@ -276,6 +283,23 @@ export class Store {
       ics,
       pending,
       current?.baseIcs ?? null,
+    );
+  }
+
+  /**
+   * Runs a change made on this device in one transaction
+   * (docs/plans/foundation.md#D99): it reads the objects as the store holds
+   * them now and writes from what it read, so no sync and no other tab writes
+   * in between; and its writes (`save` as `saveLocal`, `delete` as
+   * `deleteLocal`), one object or more, land whole or not at all.
+   */
+  changeLocal<T>(change: (local: LocalChange) => Promise<T>): Promise<T> {
+    return this.exclusive(() =>
+      change({
+        object: (id) => this.object(id),
+        save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
+        delete: (id) => this.deleteLocalNow(id),
+      }),
     );
   }
 

@@ -11,6 +11,7 @@ export {
   type Calendar,
   type Component,
   type Conflict,
+  type LocalChange,
   type Pending,
   type StoredObject,
   type UndoneTask,
