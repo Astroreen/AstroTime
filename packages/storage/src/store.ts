@@ -1,6 +1,7 @@
 import {
   boundsOf,
   CalendarObject,
+  CalendarObjectError,
   ExpansionLimitError,
   isDone,
   latestUndoneBefore,
@@ -571,7 +572,11 @@ export class Store {
       try {
         found = remindersOf(CalendarObject.parse(object.ics), object.id, range);
       } catch (error) {
-        if (!(error instanceof ExpansionLimitError)) throw error;
+        // A series too dense to expand reminds of nothing, as the views leave
+        // it out; and one odd object never costs every other its reminders.
+        if (!(error instanceof ExpansionLimitError || error instanceof CalendarObjectError)) {
+          throw error;
+        }
         found = [];
       }
       this.reminderCache.set(object.id, { ...range, ics: object.ics, reminders: found });

@@ -151,6 +151,9 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
 
   return {
     schedule(reminders) {
+      // The set ending first: a new one starts at now, so a reminder missed
+      // in a sleep and still within its grace shows from the old one.
+      arm();
       set = reminders.toSorted((a, b) => a.fireAt - b.fireAt);
       const keys = new Set(set.map(shownKey));
       for (const key of done) if (!keys.has(key)) done.delete(key);

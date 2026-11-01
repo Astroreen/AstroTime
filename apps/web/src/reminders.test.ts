@@ -84,6 +84,10 @@ function fakePage(options: { lead?: boolean; permission?: NotificationPermission
       }
       now = until;
     },
+    /** Time passes with no timer run and no wake heard yet (a page just thawing). */
+    lapse(ms: number) {
+      now += ms;
+    },
     /** Time passes with the page asleep (a laptop's lid closed), then it wakes. */
     sleep(ms: number) {
       now += ms;
@@ -154,6 +158,16 @@ test("after a sleep a reminder missed by a few minutes shows on waking; an older
   expect(fake.shown.map((s) => s.tag)).toEqual(["recent"]);
   fake.advance(30 * MINUTE);
   expect(fake.shown.map((s) => s.tag)).toEqual(["recent", "next"]);
+});
+
+test("woken, a new set that no longer holds a just-missed reminder still lets it show", () => {
+  const fake = fakePage();
+  const reminders = webReminders(fake.page);
+  reminders.schedule([reminder("a", 10)]);
+  // Asleep past it: no timer ran, and a sync's set arrives before the wake is heard.
+  fake.lapse(12 * MINUTE);
+  reminders.schedule([]);
+  expect(fake.shown.map((s) => s.tag)).toEqual(["a"]);
 });
 
 test("only the tab holding the lock shows them; another takes over when it closes", () => {
