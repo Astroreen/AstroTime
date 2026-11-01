@@ -1,0 +1,11 @@
+11-01 04:00:55.501  6198  6198 I Capacitor/Console: File:  - Line 1 - Msg: probe app-locks ["astrotime-store:astrotime"]
+11-01 04:00:55.501  6198  6198 I Capacitor/Console: File:  - Line 1 - Msg: probe app-persisted false
+11-01 04:00:55.526  6198  6198 I AstroTimeProbe: probe origin "https://localhost"
+11-01 04:00:55.528  6198  6198 I AstroTimeProbe: probe opfs-root [".astrotime-astrotime (directory, 1 entries)"]
+11-01 04:00:55.528  6198  6198 I AstroTimeProbe: probe locks-held-seen-here ["astrotime-store:astrotime"]
+11-01 04:00:55.529  6198  6198 I AstroTimeProbe: probe store-lock-free-here false
+11-01 04:00:55.529  6198  6198 I Capacitor/Console: File:  - Line 1 - Msg: probe app-heard ping from the second WebView
+11-01 04:00:55.529  6198  6198 I AstroTimeProbe: probe broadcast-reply "pong from the app WebView"
+11-01 04:00:55.529  6198  6198 I AstroTimeProbe: probe persist-here false
+11-01 04:00:55.529  6198  6198 I AstroTimeProbe: probe persisted-here false
+11-01 04:00:55.529  6198  6198 I AstroTimeProbe: probe done true
