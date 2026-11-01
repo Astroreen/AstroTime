@@ -49,6 +49,9 @@ export function devTls(env = process.env): Plugin {
         const { address, port: target } = http.address() as AddressInfo;
         const upstream = connect(target, address);
         socket.pipe(upstream).pipe(socket);
+        // Either side going away, by an error or a plain close, takes the other.
+        socket.on("close", () => upstream.destroy());
+        upstream.on("close", () => socket.destroy());
         socket.on("error", () => upstream.destroy());
         upstream.on("error", () => socket.destroy());
       });

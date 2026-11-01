@@ -130,10 +130,19 @@ is_ours() {
 }
 
 # What `tailscale serve` proxies https port $2 to, read from its status JSON
-# ($1); nothing when the port is not served or not proxied.
+# ($1): the one web entry on that port, when its only handler is `/` and it
+# proxies; nothing otherwise, so serve_off never takes an entry it did not make.
 serve_target() {
-  local re=":$2\": [{][^}]*\"Proxy\": \"([^\"]*)\""
-  [[ "$1" =~ $re ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+  # shellcheck disable=SC2016 # JavaScript, not the shell's, expands ${port}.
+  node -e '
+    const [json, port] = process.argv.slice(1);
+    const web = JSON.parse(json || "{}").Web ?? {};
+    const keys = Object.keys(web).filter((key) => key.endsWith(`:${port}`));
+    const handlers = keys.length === 1 ? (web[keys[0]].Handlers ?? {}) : {};
+    const only = Object.keys(handlers);
+    if (only.length !== 1 || only[0] !== "/" || !handlers["/"].Proxy) process.exit(1);
+    console.log(handlers["/"].Proxy);
+  ' "$1" "$2"
 }
 
 # Removes the `tailscale serve` entry dev.sh added (its https port and target
