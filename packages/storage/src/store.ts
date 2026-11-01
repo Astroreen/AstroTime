@@ -92,9 +92,11 @@ export class Store {
 
   // Accounts
 
-  addAccount(input: Omit<Account, "id" | "createdAt">): Promise<Account> {
+  addAccount(
+    input: Omit<Account, "id" | "createdAt" | "homeUrl"> & { homeUrl?: string | null },
+  ): Promise<Account> {
     return this.exclusive(async () => {
-      const account = { ...input, id: crypto.randomUUID(), createdAt: Date.now() };
+      const account = { homeUrl: null, ...input, id: crypto.randomUUID(), createdAt: Date.now() };
       await this.db.insert(schema.accounts).values(account);
       return account;
     });
@@ -102,6 +104,16 @@ export class Store {
 
   accounts(): Promise<Account[]> {
     return this.db.select().from(schema.accounts).orderBy(schema.accounts.createdAt);
+  }
+
+  /** Changes what an account says of itself (signing in again finds its home anew). */
+  updateAccount(
+    id: string,
+    changes: Partial<Pick<Account, "name" | "username" | "homeUrl">>,
+  ): Promise<void> {
+    return this.exclusive(async () => {
+      await this.db.update(schema.accounts).set(changes).where(eq(schema.accounts.id, id));
+    });
   }
 
   /** Removes the account with its calendars, objects and conflicts. */

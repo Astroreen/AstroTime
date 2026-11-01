@@ -66,6 +66,11 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE objects ADD COLUMN done INTEGER;
   `,
+  // 5: where discovery found an account's calendars, so a sync starts there
+  // instead of discovering again (docs/plans/foundation.md#D90).
+  `
+  ALTER TABLE accounts ADD COLUMN home_url TEXT;
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

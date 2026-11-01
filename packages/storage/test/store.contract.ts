@@ -63,6 +63,14 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect((await store.accounts()).map((a) => a.name)).toEqual(["Nextcloud"]);
     });
 
+    test("an account keeps the calendar home discovery found, and signing in again replaces it", async () => {
+      const { store, account } = await setup();
+      expect(account.homeUrl).toBeNull();
+      const home = "https://cloud.example.com/remote.php/dav/calendars/astro/";
+      await store.updateAccount(account.id, { homeUrl: home, username: "astro2" });
+      expect(await store.accounts()).toEqual([{ ...account, homeUrl: home, username: "astro2" }]);
+    });
+
     test("objects are found by date range, widened only as far as zones reach", async () => {
       const { store, calendar } = await setup();
       await store.saveFromServer(calendar.id, {

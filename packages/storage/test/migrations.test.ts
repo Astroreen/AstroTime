@@ -71,3 +71,23 @@ test("migration 4 leaves done unknown on older rows, so the undone query still p
     (await store.undoneTasksBefore(["c"], "2026-11-04", "UTC")).map((u) => u.object.uid),
   ).toEqual(["open"]);
 });
+
+test("migration 5 keeps existing accounts, with no calendar home until they sync", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const { Store } = await import("../src/index.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 4));
+  await driver.query("INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', 'u', 0)", []);
+  const store = await Store.open(driver);
+  expect(await store.accounts()).toEqual([
+    {
+      id: "a",
+      provider: "caldav",
+      name: "A",
+      serverUrl: "https://x/",
+      username: "u",
+      createdAt: 0,
+      homeUrl: null,
+    },
+  ]);
+});

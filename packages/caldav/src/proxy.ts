@@ -18,6 +18,12 @@ const FORWARDED = [
 ];
 /** Set on the proxy's own answer when the CalDAV server could not be reached. */
 export const UNREACHABLE = "x-astrotime-unreachable";
+/**
+ * Set on the proxy's own refusal, so the app can tell the user why
+ * (`ProxyRefusedError`): `not-allowed`, the server is off the allowlist
+ * (D20); `other-server <origin>`, the server redirects to another one (D39).
+ */
+export const REFUSED = "x-astrotime-refused";
 
 /** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
@@ -88,7 +94,10 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     if (!/^https?:$/.test(target.protocol))
       return new Response("Not a proxied URL.", { status: 400 });
     if (options.allow !== "*" && !allowed.has(target.origin)) {
-      return new Response(`${target.origin} is not on this proxy's allowlist.`, { status: 403 });
+      return new Response(`${target.origin} is not on this proxy's allowlist.`, {
+        status: 403,
+        headers: { [REFUSED]: "not-allowed" },
+      });
     }
     const headers = new Headers();
     for (const name of FORWARDED) {
@@ -137,9 +146,7 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       if (location.origin !== target.origin) {
         return new Response(
           `${target.origin} redirects to ${location.origin}; sign in with that address.`,
-          {
-            status: 502,
-          },
+          { status: 502, headers: { [REFUSED]: `other-server ${location.origin}` } },
         );
       }
       returned.set(name, via.to(location.href));

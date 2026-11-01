@@ -12,6 +12,7 @@ import {
 import {
   AuthError,
   HttpError,
+  ProxyRefusedError,
   type HttpClient,
   type HttpRequest,
   type HttpResponse,
@@ -37,6 +38,11 @@ export interface Credentials {
 export interface Discovery {
   readonly principalUrl: string;
   readonly homeUrl: string;
+}
+
+/** The address answers, but no CalDAV calendar home was found there (RFC 6764). */
+export class NoCalendarHomeError extends Error {
+  override name = "NoCalendarHomeError";
 }
 
 const MULTIGET_BATCH = 100;
@@ -138,11 +144,23 @@ export class CalDavProvider implements Provider {
         const homeUrl = homeHref ? collection(new URL(homeHref, home.url).href) : null;
         if (homeUrl && new URL(homeUrl).origin === origin) return { principalUrl, homeUrl };
       } catch (error) {
-        if (error instanceof AuthError) throw error;
-        lastError = error;
+        // Both candidates are on one origin: what holds for one holds for the other.
+        if (
+          error instanceof AuthError ||
+          error instanceof OfflineError ||
+          (error instanceof ProxyRefusedError && error.reason === "not-allowed")
+        )
+          throw error;
+        // A redirect elsewhere says more than what the address itself answers.
+        if (!(lastError instanceof ProxyRefusedError)) lastError = error;
       }
     }
-    throw new Error(`No CalDAV calendar home found at ${serverUrl}.`, { cause: lastError });
+    // `/.well-known/caldav` redirecting to another server, and the address
+    // itself no CalDAV server: the user signs in with the other address (D39).
+    if (lastError instanceof ProxyRefusedError) throw lastError;
+    throw new NoCalendarHomeError(`No CalDAV calendar home found at ${serverUrl}.`, {
+      cause: lastError,
+    });
   }
 
   async calendars(): Promise<RemoteCalendar[]> {

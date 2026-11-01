@@ -35,8 +35,9 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
         },
         body: `token=${encodeURIComponent(poll.token)}`,
       });
-      // 404 until the user approves.
-      if (response.status === 404) return null;
+      // 404 until the user approves. Rate limited (429, as a proxy in front
+      // of Nextcloud may answer) or the server busy: not yet, asked again later.
+      if (response.status === 404 || response.status === 429 || response.status >= 500) return null;
       if (response.status !== 200) throw new Error(`The login flow failed (${response.status}).`);
       const result = json(response.body) as {
         server?: unknown;

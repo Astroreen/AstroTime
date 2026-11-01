@@ -1,6 +1,6 @@
 import { AuthError as CredentialsRefused, OfflineError } from "@astrotime/core";
 
-import { UNREACHABLE } from "./proxy.ts";
+import { REFUSED, UNREACHABLE } from "./proxy.ts";
 
 export interface HttpRequest {
   readonly method: string;
@@ -64,6 +64,8 @@ export function fetchClient(
     if (response.headers.get(UNREACHABLE) !== null) {
       throw new OfflineError(`${request.method} ${request.url} could not reach the server.`);
     }
+    const refused = response.headers.get(REFUSED);
+    if (refused !== null) throw new ProxyRefusedError(request, refused);
     return {
       status: response.status,
       url: via.from(response.url || via.to(request.url)),
@@ -87,5 +89,24 @@ export class AuthError extends CredentialsRefused {
   readonly status = 401;
   constructor(request: HttpRequest) {
     super(`${request.method} ${request.url}: the server refused the credentials.`);
+  }
+}
+
+/**
+ * The web app's proxy would not carry the request (docs/plans/foundation.md#D20,
+ * D39): the server is not on this AstroTime's allowlist (`not-allowed`), or
+ * it redirects to another server (`other-server`, at `location`), which the
+ * user signs in to by its own address instead.
+ */
+export class ProxyRefusedError extends Error {
+  override name = "ProxyRefusedError";
+  readonly reason: "not-allowed" | "other-server";
+  /** For `other-server`: the origin the server redirects to. */
+  readonly location: string | null;
+  constructor(request: HttpRequest, header: string) {
+    const [reason, location = null] = header.split(" ");
+    super(`${request.method} ${request.url}: the proxy refused it (${header}).`);
+    this.reason = reason === "other-server" ? "other-server" : "not-allowed";
+    this.location = this.reason === "other-server" ? location : null;
   }
 }
