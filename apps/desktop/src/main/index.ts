@@ -1,6 +1,8 @@
 // The desktop app's main process (docs/plans/desktop.md): the window and its
 // security settings (D71), the app:// scheme, HTTP from here (D72), the
-// store in a utility process (D73), and credentials through safeStorage (D74).
+// store in a utility process (D73), credentials through safeStorage (D74),
+// one instance that lives on with its window closed, with its tray, its sync
+// triggers and its theme (D75), and the reminders' notifications (D76).
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,19 +11,43 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  Menu,
+  nativeImage,
   nativeTheme,
+  Notification,
+  powerMonitor,
   protocol,
   safeStorage,
   session,
   shell,
+  Tray,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
+  type MenuItemConstructorOptions,
 } from "electron";
 
-import { APP_SCHEME, APP_URL, CHANNELS, type HttpAnswer } from "../bridge.ts";
+import icon from "../../resources/icon.png?inline";
+import {
+  APP_SCHEME,
+  APP_URL,
+  CHANNELS,
+  NOTIFICATIONS_ARGUMENT,
+  type HttpAnswer,
+  type ShellState,
+} from "../bridge.ts";
 import { appFiles } from "./app-protocol.ts";
-import { checkRequest, checkSecret, checkSecretKey, isAppUrl, isWebUrl } from "./checks.ts";
+import { backgroundTriggers } from "./background.ts";
+import {
+  checkReminders,
+  checkRequest,
+  checkSecret,
+  checkSecretKey,
+  checkShellState,
+  isAppUrl,
+  isWebUrl,
+} from "./checks.ts";
 import { netClient } from "./http.ts";
+import { mainReminders } from "./reminders.ts";
 import { secretsFile } from "./secrets.ts";
 import { storeProcess } from "./store.ts";
 
@@ -44,6 +70,72 @@ app.enableSandbox();
 app.setDesktopName(`${APP_ID}.desktop`);
 
 let window: BrowserWindow | undefined;
+/** The app is quitting (the tray, the menu, the session ending): closing the window no longer hides it. */
+let quitting = false;
+/** What the page's settings asked last (D75); until it says, closing the window keeps the app running. */
+let state: ShellState | undefined;
+let tray: Tray | undefined;
+/** The app's icon, for the tray and the notifications. */
+const appIcon = () => nativeImage.createFromDataURL(icon);
+/** Notifications on the screen, kept so their clicks are heard (D76). */
+const shown = new Set<Notification>();
+/** The longest `setTimeout` Node keeps (about 24.8 days); a longer wait is armed again. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/**
+ * Whether this desktop shows no tray icons: GNOME's shell has none without an
+ * extension. `ASTROTIME_TRAY=1` says there is one (an extension), `=0` none.
+ */
+function trayless(): boolean {
+  const said = process.env["ASTROTIME_TRAY"];
+  if (said !== undefined) return said === "0";
+  return /gnome/i.test(process.env["XDG_CURRENT_DESKTOP"] ?? "");
+}
+
+/** Brings the window to the front, from the tray, a second launch or a notification. */
+function showWindow() {
+  if (!window) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+/** Asks the page for a sync: the main process's triggers and the tray's "Sync now" (D75). */
+const requestSync = () => window?.webContents.send(CHANNELS.sync);
+
+/** Applies the page's settings: the frame's theme, the tray and the menu in the user's words. */
+function applyShell(next: ShellState) {
+  state = next;
+  nativeTheme.themeSource = next.theme;
+  const { words } = next;
+  const quit: MenuItemConstructorOptions = { label: words.quit, click: () => app.quit() };
+  const syncNow: MenuItemConstructorOptions = { label: words.syncNow, click: requestSync };
+  // Where the desktop shows no tray, Quit stays in the window's menu (Alt shows it).
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "AstroTime",
+        submenu: [
+          syncNow,
+          { type: "separator" },
+          { label: words.closeWindow, accelerator: "CmdOrCtrl+W", click: () => window?.close() },
+          { ...quit, accelerator: "CmdOrCtrl+Q" },
+        ],
+      },
+    ]),
+  );
+  // A StatusNotifierItem where the desktop has a host for it (GNOME with an extension).
+  tray ??= new Tray(appIcon());
+  tray.setToolTip("AstroTime");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: words.open, click: showWindow },
+      syncNow,
+      { type: "separator" },
+      quit,
+    ]),
+  );
+}
 
 /** Whether an IPC message comes from the app's own page in its window, nothing else. */
 function fromApp(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
@@ -55,6 +147,19 @@ function fromApp(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
     frame === window.webContents.mainFrame &&
     isAppUrl(frame.url)
   );
+}
+
+/**
+ * Handles a message the page sent without awaiting an answer: one its checks
+ * refuse has no caller to throw to, so it is logged instead of escaping the
+ * listener.
+ */
+function refusing(handle: () => void) {
+  try {
+    handle();
+  } catch (error) {
+    console.error("Refused a message from the page:", error);
+  }
 }
 
 const openInBrowser = (url: string) => {
@@ -138,6 +243,45 @@ async function start() {
     if (fromApp(event) && typeof url === "string") openInBrowser(url);
   });
 
+  // The reminders' notifications, the window closed or not (D76).
+  const notificationIcon = appIcon();
+  const reminders = mainReminders({
+    clock: {
+      now: () => Date.now(),
+      after(ms, run) {
+        const timer = setTimeout(run, Math.min(ms, MAX_TIMEOUT_MS));
+        return () => clearTimeout(timer);
+      },
+    },
+    show({ title, body }, click) {
+      const notification = new Notification({ title, body, icon: notificationIcon });
+      shown.add(notification);
+      notification.on("click", () => {
+        shown.delete(notification);
+        click();
+      });
+      notification.on("close", () => shown.delete(notification));
+      notification.show();
+    },
+    open(reminder) {
+      showWindow();
+      window?.webContents.send(CHANNELS.reminderOpened, reminder);
+    },
+  });
+  ipcMain.on(CHANNELS.reminders, (event, value: unknown) => {
+    if (fromApp(event)) refusing(() => reminders.schedule(checkReminders(value)));
+  });
+  ipcMain.on(CHANNELS.shell, (event, value: unknown) => {
+    if (fromApp(event)) refusing(() => applyShell(checkShellState(value)));
+  });
+  // Syncs every 15 minutes and on resume, reminders checked on waking (D75, D76).
+  backgroundTriggers({
+    every: (ms, run) => setInterval(run, ms),
+    power: powerMonitor,
+    sync: requestSync,
+    wake: () => reminders.wake(),
+  });
+
   window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -154,16 +298,40 @@ async function start() {
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
+      // The hidden window's page syncs on the main process's requests (D75):
+      // its timers (the sync's debounce, the store's work) must not be
+      // throttled to once a minute while it is hidden.
+      backgroundThrottling: false,
+      // The page learns whether the system shows notifications (D76).
+      additionalArguments: Notification.isSupported() ? [NOTIFICATIONS_ARGUMENT] : [],
     },
   });
   window.once("ready-to-show", () => window?.show());
+  // Closing the window hides it and the app keeps running, unless the
+  // settings say to quit (D75); quitting closes it for good.
+  window.on("close", (event) => {
+    if (quitting || state?.keepRunning === false) return;
+    event.preventDefault();
+    // Where the desktop shows no tray (GNOME without an extension), a hidden
+    // window could not be found again: it is minimized there instead.
+    // Hidden only where a tray was made to bring it back.
+    if (trayless() || !tray) window?.minimize();
+    else window?.hide();
+  });
   window.on("closed", () => (window = undefined));
   await window.loadURL(APP_URL);
 }
 
 app.on("window-all-closed", () => app.quit());
+app.on("before-quit", () => (quitting = true));
 
-start().catch((error: unknown) => {
-  console.error(error);
-  app.exit(1);
-});
+// One instance (D75): a second launch hands over to the first, which shows its window.
+if (app.requestSingleInstanceLock()) {
+  app.on("second-instance", showWindow);
+  start().catch((error: unknown) => {
+    console.error(error);
+    app.exit(1);
+  });
+} else {
+  app.quit();
+}

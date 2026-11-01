@@ -9,7 +9,7 @@ import { LANGUAGES, type Language } from "./i18n/index.ts";
 
 export const THEMES = ["system", "dark", "light"] as const;
 /** `system` follows the device; the others set `data-theme` on the root (design D58). */
-type Theme = (typeof THEMES)[number];
+export type Theme = (typeof THEMES)[number];
 
 /** The weekdays a week may start on, ISO-numbered: Monday, Sunday, Saturday. */
 export const WEEK_STARTS = [1, 7, 6] as const;
@@ -23,6 +23,11 @@ export interface Settings {
   readonly hideCompleted: boolean;
   /** On unless turned off; they show once the platform may notify (foundation D101). */
   readonly reminders: boolean;
+  /**
+   * Closing the window leaves the app running, where the shell can (the
+   * desktop, docs/plans/desktop.md#D75); off, closing it quits.
+   */
+  readonly keepRunning: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   clock: "locale",
   hideCompleted: false,
   reminders: true,
+  keepRunning: true,
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -54,6 +60,7 @@ export function readSettings(stored: string | null): Settings {
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),
     hideCompleted: value.hideCompleted === true,
     reminders: value.reminders !== false,
+    keepRunning: value.keepRunning !== false,
   };
 }
 

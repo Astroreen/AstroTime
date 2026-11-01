@@ -1,14 +1,26 @@
-import type { ReminderScheduler } from "@astrotime/core";
+import type { ReminderScheduler, ScheduledReminder } from "@astrotime/core";
+
+import type { Bridge } from "../bridge.ts";
 
 /**
- * No reminders until PR D3 brings them from the main process
- * (docs/plans/desktop.md#D76): notifications are unsupported, so the
- * setting stays off and says why.
+ * The desktop's reminders (docs/plans/desktop.md#D76): the page hands the
+ * set to the main process, which shows each as a desktop notification,
+ * the window closed or not, and says which one the user clicked.
  */
-export const noReminders: ReminderScheduler = {
-  schedule: () => {},
-  onOpen: () => () => {},
-  permission: () => "unsupported",
-  requestPermission: async () => "unsupported",
-  whileOpenOnly: false,
-};
+export function desktopReminders(reminders: Bridge["reminders"]): ReminderScheduler {
+  const listeners = new Set<(reminder: ScheduledReminder) => void>();
+  reminders.onOpen((reminder) => {
+    for (const listener of listeners) listener(reminder);
+  });
+  const permission = () => (reminders.supported ? "granted" : "unsupported");
+  return {
+    schedule: (set) => reminders.schedule(set),
+    onOpen(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    permission,
+    requestPermission: async () => permission(),
+    whileOpenOnly: false,
+  };
+}

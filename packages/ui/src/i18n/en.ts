@@ -169,6 +169,8 @@ export const en = {
   "reminder.due": "Due {{when}}",
   "reminder.starts": "Starts {{when}}",
   "reminder.task": "Task",
+  "reminder.late": "{{when}} · reminder due at {{time}}",
+  "reminder.lateOnly": "Reminder due at {{time}}",
 
   undone_one: "{{count}} undone task",
   undone_other: "{{count}} undone tasks",
@@ -215,6 +217,12 @@ export const en = {
   "settings.clock.12": "12-hour",
   "settings.clock.24": "24-hour",
   "settings.hideCompleted": "Hide completed tasks",
+  "settings.keepRunning": "Keep running when the window is closed",
+  "settings.keepRunning.hint":
+    "AstroTime goes on syncing and reminding; quit it from the tray or the menu.",
+  "shell.open": "Open AstroTime",
+  "shell.closeWindow": "Close window",
+  "shell.quit": "Quit AstroTime",
 
   "details.close": "Close",
   "details.edit": "Edit",

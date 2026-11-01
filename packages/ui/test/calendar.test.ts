@@ -197,10 +197,13 @@ describe("the drawer's settings override the locale (D53)", () => {
       clock: 24,
       hideCompleted: true,
       reminders: false,
+      keepRunning: false,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
-    // Reminders are on unless turned off (foundation D101).
+    // Reminders are on unless turned off (foundation D101), and so is
+    // keeping the desktop app running with its window closed (desktop D75).
     expect(readSettings('{"reminders":"no"}').reminders).toBe(true);
+    expect(readSettings('{"keepRunning":0}').keepRunning).toBe(true);
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(

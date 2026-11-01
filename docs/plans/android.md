@@ -85,6 +85,16 @@ were checked on 2026-11-01.
   and says whether anything was, and a shell with a back button calls it
   ([D68](#D68)). The web and the desktop leave it out.
 
+  _Added in desktop PR D3 ([desktop D75](desktop.md#D75)):_ two more, both
+  optional. `shell(state)`: a shell whose app lives on with its window
+  closed takes the theme its frame follows, whether closing the window
+  quits, and its tray's and menu's words, on start and at every change; the
+  drawer's settings offer "Keep running" only where it exists.
+  `onSyncRequest(listener)`: a shell's own sync triggers, which the UI runs
+  as "Sync now" through its `SyncScheduler`. Each `ScheduledReminder`'s
+  words gained `late`, the body of one shown late
+  ([foundation D102](foundation.md#D102)).
+
 ### The shell
 
 - **D61. `apps/mobile`, Capacitor 8.** `@astrotime/mobile` is a Vite app

@@ -5,6 +5,22 @@ import type { SyncLock } from "@astrotime/sync";
 
 import type { UnprotectedPrompt } from "./accounts/unprotected.ts";
 import type { Preferences } from "./preferences.ts";
+import type { Theme } from "./settings.ts";
+
+/** What a shell's own chrome shows, from the settings, in the user's language (desktop D75). */
+export interface ShellState {
+  /** The theme the window's frame follows. */
+  readonly theme: Theme;
+  /** Closing the window leaves the app running; off, it quits. */
+  readonly keepRunning: boolean;
+  /** The words of the shell's tray and menu. */
+  readonly words: {
+    readonly open: string;
+    readonly syncNow: string;
+    readonly closeWindow: string;
+    readonly quit: string;
+  };
+}
 
 /**
  * What a shell hands the UI's root: its adapters of the platform interfaces
@@ -48,4 +64,16 @@ export interface Platform {
   readonly syncLock?: SyncLock;
   /** Shows the reminders the UI works out (docs/plans/foundation.md#D101). */
   readonly reminders: ReminderScheduler;
+  /**
+   * A shell that lives on with its window closed (the desktop, desktop D75):
+   * the UI hands it its chrome's state on start and at every change, and the
+   * drawer's settings offer to quit on close instead.
+   */
+  readonly shell?: (state: ShellState) => void;
+  /**
+   * A shell's own sync triggers (the desktop's timer, resume and tray, desktop
+   * D75): the UI runs each as a sync of its own, so two never run at once.
+   * Returns the function that stops listening.
+   */
+  readonly onSyncRequest?: (listener: () => void) => () => void;
 }

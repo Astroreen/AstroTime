@@ -177,6 +177,8 @@ export const ru = {
   "reminder.due": "Срок: {{when}}",
   "reminder.starts": "Начало: {{when}}",
   "reminder.task": "Задача",
+  "reminder.late": "{{when}} · напоминание на {{time}}",
+  "reminder.lateOnly": "Напоминание на {{time}}",
 
   undone_one: "{{count}} невыполненная задача",
   undone_few: "{{count}} невыполненные задачи",
@@ -225,6 +227,12 @@ export const ru = {
   "settings.clock.12": "12-часовой",
   "settings.clock.24": "24-часовой",
   "settings.hideCompleted": "Скрывать выполненные задачи",
+  "settings.keepRunning": "Работать в фоне после закрытия окна",
+  "settings.keepRunning.hint":
+    "AstroTime продолжает синхронизировать и напоминать; выйти можно из трея или меню.",
+  "shell.open": "Открыть AstroTime",
+  "shell.closeWindow": "Закрыть окно",
+  "shell.quit": "Выйти из AstroTime",
 
   "details.close": "Закрыть",
   "details.edit": "Изменить",

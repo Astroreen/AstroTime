@@ -66,19 +66,10 @@ export async function keyringSession(): Promise<Keyring> {
   };
 }
 
-/**
- * Starts the built app on the profile `userData` and returns its window,
- * showing the app with the clock frozen at `NOW`. Its passwords go to
- * `keyring`, or, without one, nowhere protected (`--password-store=basic`),
- * so a test never reaches the user's own keyring.
- */
-export async function launch(
-  userData: string,
-  options: { env?: Record<string, string>; keyring?: Keyring } = {},
-): Promise<{ app: ElectronApplication; page: Page }> {
+/** The app's command line and environment on the profile `userData`. */
+function command(userData: string, options: { env?: Record<string, string>; keyring?: Keyring }) {
   const { keyring } = options;
-  const app = await _electron.launch({
-    executablePath,
+  return {
     args: [
       appDir,
       `--user-data-dir=${userData}`,
@@ -92,15 +83,41 @@ export async function launch(
       ...keyring?.env,
       ...options.env,
     },
+  };
+}
+
+/**
+ * Starts the built app on the profile `userData` and returns its window,
+ * showing the app with the clock frozen at `NOW` (the main process's clock,
+ * and with `realClock` the page's too, run on). Its passwords go to
+ * `keyring`, or, without one, nowhere protected (`--password-store=basic`),
+ * so a test never reaches the user's own keyring.
+ */
+export async function launch(
+  userData: string,
+  options: { env?: Record<string, string>; keyring?: Keyring; realClock?: boolean } = {},
+): Promise<{ app: ElectronApplication; page: Page }> {
+  const app = await _electron.launch({
+    executablePath,
+    ...command(userData, options),
     colorScheme: "dark",
   });
   const page = await app.firstWindow();
+  if (options.realClock) return { app, page };
   // The first load ends before the reload that brings the frozen clock in;
   // a reload over a load still going is aborted (net::ERR_ABORTED).
   await page.waitForLoadState("load");
   await page.clock.setFixedTime(NOW);
   await page.reload();
   return { app, page };
+}
+
+/** Launches the app a second time on the same profile, as a user would; resolves with its exit code. */
+export async function launchAgain(userData: string): Promise<number | null> {
+  const { args, env } = command(userData, {});
+  const second = spawn(executablePath, args, { env, stdio: "inherit" });
+  const [code] = (await once(second, "exit")) as [number | null];
+  return code;
 }
 
 /** Signs in on the first-run screen, as a user would. */

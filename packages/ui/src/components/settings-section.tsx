@@ -1,12 +1,14 @@
 // The drawer's settings (design D53): theme, language, week start, clock,
-// "hide completed" and reminders (foundation D101). Each applies at once and
-// is kept on this device.
+// "hide completed", reminders (foundation D101) and, on the desktop, whether
+// closing the window quits (desktop D75). Each applies at once and is kept on
+// this device.
 import { Switch } from "@base-ui/react/switch";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LANGUAGES } from "../i18n/index.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
+import { useAccounts } from "./accounts-context.tsx";
 import { useCalendar } from "./context.ts";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 
@@ -20,6 +22,7 @@ export function SettingsSection() {
   const { t } = useTranslation();
   const { formats } = useCalendar();
   const { settings, change } = useSettings();
+  const { platform } = useAccounts();
   const title = useId();
   return (
     <section aria-labelledby={title} className="flex flex-col">
@@ -63,20 +66,55 @@ export function SettingsSection() {
           ...CLOCKS.map((clock) => [String(clock), t(`settings.clock.${clock}`)] as const),
         ]}
       />
-      <div className="flex min-h-11 items-center px-4 text-[14px]">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-          <span className="min-w-0 flex-1">{t("settings.hideCompleted")}</span>
-          <Switch.Root
-            checked={settings.hideCompleted}
-            onCheckedChange={(hideCompleted) => change({ hideCompleted })}
-            className="flex h-6 w-10 shrink-0 items-center rounded-full bg-pill p-0.5 transition-colors duration-150 data-checked:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <Switch.Thumb className="size-5 rounded-full bg-ink-muted transition-[translate,background-color] duration-150 data-checked:translate-x-4 data-checked:bg-on-accent" />
-          </Switch.Root>
-        </label>
-      </div>
+      <Toggle
+        label={t("settings.hideCompleted")}
+        checked={settings.hideCompleted}
+        onChange={(hideCompleted) => change({ hideCompleted })}
+      />
       <RemindersSwitch />
+      {platform.shell ? (
+        <Toggle
+          label={t("settings.keepRunning")}
+          checked={settings.keepRunning}
+          onChange={(keepRunning) => change({ keepRunning })}
+          {...(settings.keepRunning ? { hint: t("settings.keepRunning.hint") } : {})}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: string;
+}) {
+  const hintId = useId();
+  return (
+    <div className="flex flex-col px-4 text-[14px]">
+      <label className="flex min-h-11 min-w-0 cursor-pointer items-center gap-3">
+        <span className="min-w-0 flex-1">{label}</span>
+        <Switch.Root
+          checked={checked}
+          onCheckedChange={onChange}
+          aria-describedby={hint ? hintId : undefined}
+          className="flex h-6 w-10 shrink-0 items-center rounded-full bg-pill p-0.5 transition-colors duration-150 data-checked:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <Switch.Thumb className="size-5 rounded-full bg-ink-muted transition-[translate,background-color] duration-150 data-checked:translate-x-4 data-checked:bg-on-accent" />
+        </Switch.Root>
+      </label>
+      {hint ? (
+        <p id={hintId} className="pb-2 text-[12.5px] text-ink-muted">
+          {hint}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
