@@ -111,56 +111,57 @@ export function SearchResults({
     return `${day}, ${time}`;
   };
 
-  if (query.trim() === "") {
-    return (
-      <EmptyState
-        icon={<SearchIcon className="size-6" />}
-        title={t("search.hint")}
-        hint={t("search.scope")}
-      />
-    );
-  }
-  if (results.query === query && results.found.length === 0) {
-    return (
-      <EmptyState
-        icon={<SearchIcon className="size-6" />}
-        title={t("search.none")}
-        status
-        hint={t("search.scope")}
-      />
-    );
-  }
+  const blank = query.trim() === "";
+  const none = !blank && results.query === query && results.found.length === 0;
+  // The status stays while search is open and only its words change, so a
+  // screen reader says "Nothing found" when a query comes to find nothing
+  // (design D134); the results are a list of their own, outside it.
+  const status = (
+    <div role="status">
+      {blank || none ? (
+        <EmptyState
+          icon={<SearchIcon className="size-6" />}
+          title={t(blank ? "search.hint" : "search.none")}
+          hint={t("search.scope")}
+        />
+      ) : null}
+    </div>
+  );
+  if (blank || none) return status;
   return (
-    <ul aria-label={t("search.results")} className="flex flex-col py-1">
-      {results.found.map((result) => {
-        const title = result.item.summary?.trim() || t("item.untitled");
-        const time = when(result);
-        return (
-          <li key={result.stored.id}>
-            <button
-              type="button"
-              aria-label={`${title}, ${time}`}
-              onClick={() => onPick(result)}
-              className="item-color flex w-full items-start gap-4 px-5 py-2.5 text-left hover:bg-raised focus-visible:bg-raised focus-visible:-outline-offset-2"
-              style={{ "--item": colorOf(result) } as CSSProperties}
-            >
-              <span aria-hidden="true" className="grid h-5 w-[18px] shrink-0 place-items-center">
-                {result.item.kind === "task" ? (
-                  <CheckCircleIcon className="size-[18px] text-[var(--item-fill)]" />
-                ) : (
-                  <span className="size-3 rounded-full bg-[var(--item-fill)]" />
-                )}
-              </span>
-              {/* The space keeps the title and the time apart as words, as the name says them (WCAG 2.5.3). */}
-              <span className="flex min-w-0 flex-col">
-                <span className="text-row break-words text-ink">{title}</span>{" "}
-                <span className="text-small text-ink-muted">{time}</span>
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      {status}
+      <ul aria-label={t("search.results")} className="flex flex-col py-1">
+        {results.found.map((result) => {
+          const title = result.item.summary?.trim() || t("item.untitled");
+          const time = when(result);
+          return (
+            <li key={result.stored.id}>
+              <button
+                type="button"
+                aria-label={`${title}, ${time}`}
+                onClick={() => onPick(result)}
+                className="item-color flex w-full items-start gap-4 px-5 py-2.5 text-left hover:bg-raised focus-visible:bg-raised focus-visible:-outline-offset-2"
+                style={{ "--item": colorOf(result) } as CSSProperties}
+              >
+                <span aria-hidden="true" className="grid h-5 w-[18px] shrink-0 place-items-center">
+                  {result.item.kind === "task" ? (
+                    <CheckCircleIcon className="size-[18px] text-[var(--item-fill)]" />
+                  ) : (
+                    <span className="size-3 rounded-full bg-[var(--item-fill)]" />
+                  )}
+                </span>
+                {/* The space keeps the title and the time apart as words, as the name says them (WCAG 2.5.3). */}
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-row break-words text-ink">{title}</span>{" "}
+                  <span className="text-small text-ink-muted">{time}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 

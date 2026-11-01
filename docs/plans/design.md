@@ -659,7 +659,9 @@ are its decisions.
   mask on the strip, measured on scroll and on resize of the strip and its
   tabs), and the open list's tab is scrolled into view when it is chosen,
   from a search too ([D97](#D97)). No arrows: the strip scrolls by touch,
-  wheel and Tab, and the fade is the sign.
+  wheel and Tab, and the fade is the sign. The chosen tab is scrolled by the
+  strip's own `scrollLeft` until it clears the fade, so neither the page
+  nor the panel moves.
 
 ### Decided in the logic QA (after v0.2.0)
 
@@ -766,6 +768,10 @@ dialog ([D108](#D108)) did wrong, and does now:
 - **The type scale in the accounts' screens** — the account dialog, the
   first run and sign-in keep their own sizes while they are reworked; they
   take [D134](#D134)'s roles after.
+- **The tab strip right to left** — the fade and the chosen tab's scroll
+  are worked out left to right; AstroTime speaks English and Russian
+  (foundation [D17](foundation.md#D17)), so a right-to-left language
+  brings their mirror ([D135](#D135)).
 - **Accounts in Settings** — adding, removing and signing in again stay in
   the account dialog (the top bar's account button) while the first run and
   the accounts are reworked; Settings gets an Accounts group then

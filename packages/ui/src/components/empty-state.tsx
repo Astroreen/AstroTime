@@ -7,19 +7,13 @@ export function EmptyState({
   icon,
   title,
   hint,
-  status = false,
 }: {
   icon: ReactNode;
   title: string;
   hint?: string | undefined;
-  /** What changed after the user's action, said by a screen reader: "Nothing found". */
-  status?: boolean;
 }) {
   return (
-    <div
-      {...(status ? { role: "status" } : {})}
-      className="flex flex-col items-center gap-3 px-8 py-12 text-center"
-    >
+    <div className="flex flex-col items-center gap-3 px-8 py-12 text-center">
       <span
         aria-hidden="true"
         className="grid size-14 place-items-center rounded-full bg-accent-soft text-accent"

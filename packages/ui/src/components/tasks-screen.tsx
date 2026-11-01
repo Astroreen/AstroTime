@@ -50,6 +50,9 @@ const roundButton =
   "grid size-10 shrink-0 place-items-center rounded-full hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:hover:bg-transparent";
 const iconButton = `${roundButton} text-ink disabled:text-ink-muted`;
 
+/** How far the tab strip fades out on a side that hides tabs, in px (design D135). */
+const FADE = 40;
+
 export function TasksScreen({
   store,
   preferences,
@@ -155,15 +158,21 @@ export function TasksScreen({
     return () => observer.disconnect();
   }, [hasLists]);
   useEffect(() => {
-    strip.current
-      ?.querySelector("[role=tab][aria-selected=true]")
-      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    // The strip alone scrolls (not the page or the panel), so the tab clears
+    // the fade on either side, as far as the strip can go.
+    const element = strip.current;
+    const tab = element?.querySelector("[role=tab][aria-selected=true]");
+    if (!element || !tab) return;
+    const room = element.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    if (left < room.left + FADE) element.scrollLeft -= room.left + FADE - left;
+    else if (right > room.right - FADE) element.scrollLeft += right - (room.right - FADE);
   }, [selected]);
   const fade = (side: boolean) => (side ? "transparent" : "black");
   const stripMask =
     hides.start || hides.end
       ? {
-          maskImage: `linear-gradient(to right, ${fade(hides.start)}, black 2.5rem, black calc(100% - 2.5rem), ${fade(hides.end)})`,
+          maskImage: `linear-gradient(to right, ${fade(hides.start)}, black ${FADE}px, black calc(100% - ${FADE}px), ${fade(hides.end)})`,
         }
       : undefined;
 

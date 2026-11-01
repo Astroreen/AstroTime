@@ -779,11 +779,15 @@ test("the empty screens say what is empty and what to do, in English and Russian
 
     // Search before a word is typed, and when nothing is found.
     await page.getByRole("button", { name: words.search, exact: true }).click();
-    await expect.element(page.getByText(words.searchHint)).toBeInTheDocument();
+    // The status is there before a query finds nothing, so what it comes to say is said.
+    const status = page.getByRole("status");
+    await expect.element(status.getByText(words.searchHint)).toBeInTheDocument();
+    const region = status.element();
     await expect.element(page.getByText(words.scope)).toBeInTheDocument();
     await page.getByRole("searchbox").fill("zzzz");
-    // Said to a screen reader as the search's outcome.
-    await expect.element(page.getByRole("status").getByText(words.none)).toBeInTheDocument();
+    // Said to a screen reader as the search's outcome: the same region, new words.
+    await expect.element(status.getByText(words.none)).toBeInTheDocument();
+    expect(status.element()).toBe(region);
     await expect.element(page.getByText(words.scope)).toBeInTheDocument();
     for (const cleanup of cleanups.splice(0).toReversed()) await cleanup();
   }

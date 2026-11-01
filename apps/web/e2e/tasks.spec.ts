@@ -126,26 +126,41 @@ test.describe("in Russian", () => {
 test.describe("the tab strip wider than the panel (design D135)", () => {
   test.use({ locale: "ru-RU", viewport: WIDE });
 
-  test("fades out on the side that hides tabs, and the open list's tab is scrolled into view", async ({
+  test("fades out on the side that hides tabs, and a tab chosen there is scrolled past the fade", async ({
     page,
   }) => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Задачи", exact: true }).click();
     const panel = page.getByRole("region", { name: "Задачи" });
     const strip = panel.getByRole("tablist").locator("..");
+    const first = panel.getByRole("tab", { name: /^Задачи/ });
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    const fadesStart = /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/;
+    const fadesEnd = /^linear-gradient\(to right, rgb\(0, 0, 0\),.*rgba\(0, 0, 0, 0\)\)$/;
     // "+ Создать список" goes past the 360 px panel: the end fades, the start does not.
-    await expect(strip).toHaveCSS(
-      "mask-image",
-      /^linear-gradient\(to right, rgb\(0, 0, 0\),.*rgba\(0, 0, 0, 0\)\)$/,
-    );
+    await expect(strip).toHaveCSS("mask-image", fadesEnd);
+
+    // Scrolled to the end, the open first tab is under the start's fade.
+    await second.dispatchEvent("click");
+    await expect(second).toHaveAttribute("aria-selected", "true");
     await strip.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
-    await expect(strip).toHaveCSS(
-      "mask-image",
-      /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/,
-    );
-    // Back at the start, the open list's tab comes into view when it is chosen.
-    await strip.evaluate((element) => element.scrollTo({ left: 0 }));
-    await panel.getByRole("tab", { name: /^Личное/ }).click();
-    await expect(panel.getByRole("tab", { name: /^Личное/ })).toBeInViewport({ ratio: 1 });
+    await expect(strip).toHaveCSS("mask-image", fadesStart);
+    const under = await first.evaluate((tab) => {
+      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      return tab.getBoundingClientRect().left < room.left + 40;
+    });
+    expect(under).toBe(true);
+
+    // Chosen there (a click that scrolls nothing itself), it is scrolled back
+    // past the fade: the strip at its start, which then fades no more.
+    await first.dispatchEvent("click");
+    await expect(first).toHaveAttribute("aria-selected", "true");
+    await expect(strip).toHaveCSS("mask-image", fadesEnd);
+    const clear = await first.evaluate((tab) => {
+      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      const { left, right } = tab.getBoundingClientRect();
+      return left >= room.left && right <= room.right - 40;
+    });
+    expect(clear).toBe(true);
   });
 });
