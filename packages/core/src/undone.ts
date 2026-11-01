@@ -41,10 +41,13 @@ export function isUndoneBefore(
  * latest undone one due before `day`, or `null`. A recurring task counts
  * once (D51).
  *
- * A series is read back from `day` a window at a time, each wider than the
- * last, instead of from its first occurrence (D118): an occurrence outside a
- * window ends by the window's start, so one in it due after that start is
- * the latest.
+ * A series is read back from `day` a window at a time, each eight times as
+ * wide as the last, instead of from its first occurrence (D118): an
+ * occurrence outside a window ends by the window's start, so one in it due
+ * after that start is the latest. The last window reaches three days before
+ * the first occurrence (`firstDay`; no zone shows one earlier), so it holds
+ * them all: five windows reach back 359 years, and a series is
+ * walked whole at most once, as it was before D118.
  */
 export function latestUndoneBefore(
   object: CalendarObject,
@@ -53,23 +56,18 @@ export function latestUndoneBefore(
 ): Occurrence | null {
   if (object.kind !== "task" || (object.master && isDone(object.master))) return null;
   const dueOf = (occurrence: Occurrence) => wallClockOf(occurrence.end, timeZone);
-  const latestFrom = (from: string) =>
-    occurrencesBetween(object, { from, to: day, timeZone })
+  const first = firstDay(object);
+  // A task that does not recur has one occurrence, and one with no date none.
+  const all = first === null ? "0001-01-01" : shiftDate(first, -3);
+  for (let days = 32; ; days *= 8) {
+    const window = object.master?.recurring ? shiftDate(day, -days) : all;
+    const from = window > all ? window : all;
+    const latest = occurrencesBetween(object, { from, to: day, timeZone })
       .filter((occurrence) => isUndoneBefore(object, occurrence, day, timeZone))
       .reduce<Occurrence | null>(
-        (latest, occurrence) =>
-          !latest || dueOf(occurrence) > dueOf(latest) ? occurrence : latest,
+        (found, occurrence) => (!found || dueOf(occurrence) > dueOf(found) ? occurrence : found),
         null,
       );
-  const first = object.master?.recurring ? firstDay(object) : null;
-  if (first !== null) {
-    // Until a window reaches three days before the first: no zone shows one earlier.
-    const earliest = shiftDate(first, -3);
-    for (let days = 32; shiftDate(day, -days) > earliest; days *= 8) {
-      const from = shiftDate(day, -days);
-      const latest = latestFrom(from);
-      if (latest && dueOf(latest) > `${from}T00:00:00`) return latest;
-    }
+    if (from === all || (latest && dueOf(latest) > `${from}T00:00:00`)) return latest;
   }
-  return latestFrom("0001-01-01");
 }

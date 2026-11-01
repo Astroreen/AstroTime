@@ -1,6 +1,6 @@
 // The store's behaviour, run against every driver: `store.test.ts` (Node) and
 // `store.browser.test.ts` (sqlite-wasm on OPFS in Chromium).
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 import { ALL_RIGHTS, NO_RIGHTS } from "@astrotime/core";
 
 import { SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
@@ -504,6 +504,40 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await find("e", 2)).toEqual(["plain", "series"]);
       expect(await find("")).toEqual([]);
       expect(await store.search([], "отчёт")).toEqual([]);
+    });
+
+    test("a series whose rule ical.js refuses counts and reminds at its start alone; the others as ever (D118)", async () => {
+      const { store, calendar } = await setup();
+      const alarm = "BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\n";
+      const save = (uid: string, fields: string) =>
+        store.saveFromServer(calendar.id, {
+          href: `${uid}.ics`,
+          etag: '"1"',
+          ics: task(uid, fields),
+        });
+      // ical.js throws `Malformed values in BYDAY part` for a sixth Monday.
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        await save(
+          "refused",
+          `DTSTART:20261102T090000Z\r\nDUE:20261102T100000Z\r\nRRULE:FREQ=MONTHLY;BYDAY=6MO\r\n${alarm}`,
+        );
+        await save("plain", `DUE:20261103T100000Z\r\n${alarm}`);
+        const undone = await store.undoneTasksBefore([calendar.id], "2026-11-04", "UTC");
+        expect(undone.map((u) => u.object.uid)).toEqual(["refused", "plain"]);
+        const reminders = await store.reminders({
+          from: "2026-11-02",
+          to: "2026-11-04",
+          timeZone: "UTC",
+        });
+        expect(reminders.map((r) => [r.uid, new Date(r.fireAt).toISOString()])).toEqual([
+          ["refused", "2026-11-02T08:50:00.000Z"],
+          ["plain", "2026-11-03T09:50:00.000Z"],
+        ]);
+        expect(logged).toHaveBeenCalled();
+      } finally {
+        logged.mockRestore();
+      }
     });
 
     test("reminders: every calendar's items whose alarms fire in the range, soonest first (D100)", async () => {

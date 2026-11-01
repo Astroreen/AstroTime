@@ -2,7 +2,8 @@
 // while unchanged) → occurrences → the layout, with today's undone tasks.
 import { HandOverError, Store, type SqlDriver, type StoredObject } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
-import { describe, expect, test } from "vite-plus/test";
+import { ALL_RIGHTS, wallClockOf } from "@astrotime/core";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 import { daysFrom } from "../src/calendar/dates.ts";
 import { liveQuery } from "../src/calendar/live.ts";
@@ -235,4 +236,50 @@ describe("live queries", () => {
     expect(await counted).toBe(0);
     expect(errors).toEqual([]);
   });
+});
+
+test("one object whose rule ical.js refuses leaves the range drawn: the others as ever, it at its start (D118)", async () => {
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "Nextcloud",
+    serverUrl: "https://cloud.example.com/remote.php/dav/",
+    username: "astro",
+  });
+  const calendar = await store.saveCalendar({
+    accountId: account.id,
+    url: "https://cloud.example.com/remote.php/dav/calendars/astro/personal/",
+    name: "Personal",
+    color: null,
+    components: ["VEVENT"],
+    rights: ALL_RIGHTS,
+  });
+  const save = (uid: string, start: string, extra = "") =>
+    store.saveFromServer(calendar.id, {
+      href: `${uid}.ics`,
+      etag: '"1"',
+      ics: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTAMP:20261001T000000Z\r\nDTSTART;TZID=Europe/Vilnius:${start}\r\nDURATION:PT1H\r\nSUMMARY:${uid}\r\n${extra}END:VEVENT\r\nEND:VCALENDAR\r\n`,
+    });
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    // ical.js throws `Malformed values in BYDAY part` for a sixth Monday.
+    await save("refused this week", "20261102T090000", "RRULE:FREQ=MONTHLY;BYDAY=6MO\r\n");
+    await save("refused before", "20261005T090000", "RRULE:FREQ=MONTHLY;BYDAY=6MO\r\n");
+    await save("standup", "20261104T120000");
+    const range = { from: "2026-11-02", to: "2026-11-09", timeZone };
+    const entries = new ObjectCache().entries(
+      await store.objectsBetween([calendar.id], range),
+      range,
+    );
+    expect(
+      entries
+        .map((e) => [e.occurrence.item.summary, wallClockOf(e.occurrence.start, timeZone)])
+        .toSorted(),
+    ).toEqual([
+      ["refused this week", "2026-11-02T09:00:00"],
+      ["standup", "2026-11-04T12:00:00"],
+    ]);
+  } finally {
+    logged.mockRestore();
+  }
 });

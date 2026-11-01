@@ -470,3 +470,32 @@ test("serialize leaves ical.js's global fold length as it found it", () => {
   load("apple-event-attendees.ics").serialize();
   expect(ICAL.foldLength).toBe(before);
 });
+
+// Objects with the same VTIMEZONE share one ical.js zone, so its changes of
+// offset are worked out once (D118). This reads ical.js's cache of a
+// calendar's zones: an ical.js that keeps them elsewhere fails here.
+describe("VTIMEZONEs shared between objects (D118)", () => {
+  const zone = (offset: string, name = "Berlin") =>
+    `BEGIN:VTIMEZONE\r\nTZID:Office\r\nBEGIN:STANDARD\r\nTZNAME:${name}\r\nTZOFFSETFROM:${offset}\r\nTZOFFSETTO:${offset}\r\nDTSTART:19700101T000000\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n`;
+  const object = (uid: string, vtimezone: string) =>
+    CalendarObject.parse(
+      `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART;TZID=Office:20261102T090000\r\nEND:VEVENT\r\n${vtimezone}END:VCALENDAR\r\n`,
+    );
+  const zoneOf = (o: CalendarObject) =>
+    (o.components.master!.getFirstPropertyValue("dtstart") as ICAL.Time).zone;
+
+  test("the same VTIMEZONE in two objects is one zone; one that differs in any way is its own", () => {
+    const a = object("a", zone("+0100"));
+    const b = object("b", zone("+0100"));
+    const renamed = object("c", zone("+0100", "Bonn"));
+    const other = object("d", zone("+0300"));
+    expect(zoneOf(a)).toBe(zoneOf(b));
+    expect(zoneOf(renamed)).not.toBe(zoneOf(a));
+    expect(zoneOf(other)).not.toBe(zoneOf(a));
+    // Each object's instants are its own VTIMEZONE's (D32).
+    expect(a.master?.start).toMatchObject({ epochMs: Date.parse("2026-11-02T08:00:00Z") });
+    expect(other.master?.start).toMatchObject({ epochMs: Date.parse("2026-11-02T06:00:00Z") });
+    // The shared zone holds a copy, not the calendar it came from.
+    expect(zoneOf(a)?.component.parent).toBeNull();
+  });
+});

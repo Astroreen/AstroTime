@@ -109,7 +109,8 @@ function shareTimeZones(root: ICAL.Component): void {
     const content = JSON.stringify(component.toJSON());
     let zone = sharedZones.get(content);
     if (!zone) {
-      zone = new ICAL.Timezone({ component, tzid });
+      // A copy of its own: the zone keeps no calendar it came from alive.
+      zone = new ICAL.Timezone({ component: new ICAL.Component(JSON.parse(content)), tzid });
       if (sharedZones.size >= SHARED_ZONES) sharedZones.delete(sharedZones.keys().next().value!);
       sharedZones.set(content, zone);
     }

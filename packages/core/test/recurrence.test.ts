@@ -3,7 +3,7 @@
 // day far from DTSTART are ical.js's own starts walked from DTSTART, and the
 // occurrences placed in a range are those of the walk from the first one.
 import ICAL from "ical.js";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 import {
   boundsOf,
@@ -17,7 +17,14 @@ import {
   type Occurrence,
   type Range,
 } from "../src/index.ts";
-import { bounded, seriesStarts, startNear } from "../src/recurrence.ts";
+import {
+  bounded,
+  cycleTries,
+  iteratorOf,
+  seriesStarts,
+  startNear,
+  triesFor,
+} from "../src/recurrence.ts";
 import { vtimezone } from "../src/vtimezone.ts";
 
 /** A seeded generator (mulberry32): every run tests the same series. */
@@ -167,12 +174,8 @@ function seriesOf(g: Generator, freq: string = g.pick(FREQUENCIES)): Series {
     return form === "floating" ? `${at}T${time}` : `${at}T${time}Z`;
   };
   const rules = [ruleOf(g, freq, form, until)];
-  // Two rules, rarely (RFC 5545 deprecates it); neither ends (nor a daily
-  // one that may never meet), as ical.js stops both when one does.
-  if (g.chance(0.03) && freq !== "DAILY" && !/UNTIL|COUNT/.test(rules[0]!)) {
-    const other = ruleOf(g, g.pick(["WEEKLY", "MONTHLY"]), form, until);
-    if (!/UNTIL|COUNT/.test(other)) rules.push(other);
-  }
+  // Two rules, rarely (RFC 5545 deprecates it).
+  if (g.chance(0.03)) rules.push(ruleOf(g, g.pick(["DAILY", "WEEKLY", "MONTHLY"]), form, until));
   const length = g.pick([0, 30, 90, 24 * 60, 3 * 24 * 60]);
   const end =
     form === "date"
@@ -245,21 +248,58 @@ function startsOn(next: () => ICAL.Time | null, from: string, to: string): strin
 
 /**
  * ical.js's own walk from DTSTART, the oracle: its `RecurExpansion`, each
- * rule's search for an occurrence bounded as AstroTime bounds it.
+ * rule made and searched bounded as AstroTime bounds them, one it refuses its
+ * DTSTART alone. In a sweep it searches every rule at one time of the day
+ * its whole cycle, so AstroTime's `neverMeets` is checked against ical.js too.
  */
 function icalStartsOn(master: ICAL.Component, dtstart: ICAL.Time, from: string, to: string) {
-  const iterator = ICAL.Recur.prototype.iterator;
-  ICAL.Recur.prototype.iterator = function (this: ICAL.Recur, start: ICAL.Time) {
-    return bounded(iterator.call(this, start));
+  const original = ICAL.Recur.prototype.iterator;
+  const patched = function (this: ICAL.Recur, start: ICAL.Time) {
+    ICAL.Recur.prototype.iterator = original;
+    try {
+      const iterator = iteratorOf(this, start);
+      return iterator
+        ? bounded(iterator, SWEEP && once(this) ? cycleTries(this) : triesFor(this, start))
+        : stub(start, 0);
+    } catch {
+      return stub(start, 1);
+    } finally {
+      ICAL.Recur.prototype.iterator = patched;
+    }
   };
+  ICAL.Recur.prototype.iterator = patched;
   try {
     const expansion = new ICAL.RecurExpansion({ component: master, dtstart });
     return startsOn(() => expansion.next() ?? null, from, to);
   } catch (error) {
     return String(error);
   } finally {
-    ICAL.Recur.prototype.iterator = iterator;
+    ICAL.Recur.prototype.iterator = original;
   }
+}
+
+/**
+ * Whether a rule names one time of the day. `neverMeets` knows days only, so
+ * a sweep checks it on these: searching the whole cycle of a rule at six
+ * times a day takes ical.js 15 s.
+ */
+const once = (rule: ICAL.Recur) =>
+  [rule.parts.BYHOUR, rule.parts.BYMINUTE, rule.parts.BYSECOND].every(
+    (values) => !values || values.length <= 1,
+  );
+
+/** An iterator giving `start` `times` times (0 or 1), as AstroTime takes a rule it cannot walk. */
+function stub(start: ICAL.Time, times: number): ICAL.RecurIterator {
+  let calls = 0;
+  const iterator = {
+    completed: times === 0,
+    last: start.clone(),
+    next() {
+      iterator.completed = ++calls > times;
+      return iterator.completed ? null : iterator.last;
+    },
+  };
+  return iterator as unknown as ICAL.RecurIterator;
 }
 
 function walkFrom(master: ICAL.Component, dtstart: ICAL.Time, from: string | null) {
@@ -272,33 +312,58 @@ function walkFrom(master: ICAL.Component, dtstart: ICAL.Time, from: string | nul
   }
 }
 
-/** Series per frequency: a daily one walks furthest to the day for the oracle. */
-const CASES = { DAILY: 400, WEEKLY: 800, MONTHLY: 800, YEARLY: 800 };
+/**
+ * The series each run tests, in chunks of about half a second here, so none
+ * comes near Vitest's 5 s on a slower runner. Seeded: every run tests the
+ * same ones. `node scripts/sweep-recurrence.ts <seed>…` runs ten times as
+ * many series for other seeds, by hand (`SEED`, `SCALE`), in chunks a tenth
+ * as big: its oracle searches a rule that never meets for its whole cycle.
+ */
+const SEED = Number(process.env["ASTROTIME_RECURRENCE_SEED"] ?? "118");
+const SCALE = Number(process.env["ASTROTIME_RECURRENCE_SCALE"] ?? "1");
+/** Chunks per frequency, and series in each: a daily one walks furthest for the oracle. */
+const CHUNKS = { DAILY: [3, 70], WEEKLY: [3, 220], MONTHLY: [3, 160], YEARLY: [1, 800] } as const;
+const SWEEP = SCALE > 1;
+const chunks = (count: number) =>
+  Array.from({ length: count * SCALE * (SWEEP ? 10 : 1) }, (_, chunk) => chunk);
+/** Series in one chunk: a tenth as many in a sweep. */
+const each = (cases: number) => (SWEEP ? Math.ceil(cases / 10) : cases);
+const seedOf = (chunk: number, salt: number) => SEED * 10_000 + salt * 100 + chunk;
 
 describe("a series walked from near the range (D118)", () => {
-  test.each(FREQUENCIES)(
+  describe.each(FREQUENCIES)(
     "the starts walked from near a day are ical.js's own from DTSTART: %s",
     (freq) => {
-      const g = generator(118 + freq.length);
-      let jumped = 0;
-      const cases = CASES[freq];
-      for (let i = 0; i < cases; i++) {
-        const series = seriesOf(g, freq);
-        const object = CalendarObject.parse(ics(series, [series.lines]));
-        const master = object.components.master!;
-        const dtstart = master.getFirstPropertyValue("dtstart") as ICAL.Time;
-        // Mostly far from the start, sometimes near it.
-        const from = addDays(series.day, g.chance(0.1) ? g.int(-5, 60) : g.int(200, 7 * 365));
-        const to = addDays(from, g.pick([1, 7, 42, 84, 400]));
-        const rules = master.getAllProperties("rrule").map((p) => p.getFirstValue() as ICAL.Recur);
-        if (rules.some((rule) => startNear(rule, dtstart, from))) jumped++;
-        expect(
-          startsOn(walkFrom(master, dtstart, from), from, to),
-          `${series.lines.join(" ")} from ${from}`,
-        ).toEqual(icalStartsOn(master, dtstart, from, to));
-      }
-      // Many generated rules start near the day: the test is not of the walk alone.
-      expect(jumped).toBeGreaterThan(cases / 4);
+      const [count, cases] = CHUNKS[freq];
+      test.each(chunks(count))("chunk %i", (chunk) => {
+        const g = generator(seedOf(chunk, freq.length));
+        let jumped = 0;
+        for (let i = 0; i < each(cases); i++) {
+          const series = seriesOf(g, freq);
+          const object = CalendarObject.parse(ics(series, [series.lines]));
+          const master = object.components.master!;
+          const dtstart = master.getFirstPropertyValue("dtstart") as ICAL.Time;
+          // Mostly far from the start, sometimes near it.
+          const from = addDays(series.day, g.chance(0.1) ? g.int(-5, 60) : g.int(200, 7 * 365));
+          const to = addDays(from, g.pick([1, 7, 42, 84, 400]));
+          const rules = master
+            .getAllProperties("rrule")
+            .map((p) => p.getFirstValue() as ICAL.Recur);
+          if (rules.some((rule) => startNear(rule, dtstart, from))) jumped++;
+          // Two rules against AstroTime's own walk from DTSTART: ical.js's
+          // merge stops both when one ends (a rule refused, or out of tries).
+          const oracle =
+            rules.length > 1
+              ? startsOn(walkFrom(master, dtstart, null), from, to)
+              : icalStartsOn(master, dtstart, from, to);
+          expect(
+            startsOn(walkFrom(master, dtstart, from), from, to),
+            `${series.lines.join(" ")} from ${from}`,
+          ).toEqual(oracle);
+        }
+        // Many generated rules start near the day: the test is not of the walk alone.
+        if (!SWEEP) expect(jumped).toBeGreaterThan(cases / 4);
+      });
     },
   );
 
@@ -318,58 +383,65 @@ describe("a series walked from near the range (D118)", () => {
     );
   });
 
-  test("occurrences in a range are those of the walk from the first one, EXDATEs and exceptions too", () => {
-    const g = generator(33);
-    const zones = ["Europe/Vilnius", "America/Los_Angeles", "Pacific/Kiritimati", "UTC"];
-    for (let i = 0; i < 400; i++) {
-      const series = seriesOf(g);
-      const plain = CalendarObject.parse(ics(series, [series.lines]));
-      const master = plain.components.master!;
-      const dtstart = master.getFirstPropertyValue("dtstart") as ICAL.Time;
-      const from = addDays(series.day, g.int(200, 4 * 365));
-      const range: Range = { from, to: addDays(from, g.pick([1, 7, 42])), timeZone: g.pick(zones) };
-      // Occurrences near the range, excluded or replaced; and an EXDATE naming none.
-      const near = icalStartsOn(master, dtstart, addDays(from, -2), range.to);
-      const times = Array.isArray(near) ? near : [];
-      const at = (index: number) => {
-        const [day, time] = times[index]!.split(" ")[0]!.replace("Z", "").split("T");
-        return { day: day!, time: (time ?? "00:00:00").replaceAll(":", "") };
-      };
-      const extra: string[] = [];
-      const exceptions: string[][] = [];
-      if (times.length > 0 && g.chance(0.5)) {
-        const { day, time } = at(g.int(0, times.length - 1));
-        // An EXDATE as a date on a timed series matches by day (D35).
-        const form = g.chance(0.2) ? "date" : series.form;
-        extra.push(written("EXDATE", form, series.zone, day, time));
+  test.each(chunks(4))(
+    "occurrences in a range are those of the walk from the first one, EXDATEs and exceptions too: chunk %i",
+    (chunk) => {
+      const g = generator(seedOf(chunk, 33));
+      const zones = ["Europe/Vilnius", "America/Los_Angeles", "Pacific/Kiritimati", "UTC"];
+      for (let i = 0; i < each(60); i++) {
+        const series = seriesOf(g);
+        const plain = CalendarObject.parse(ics(series, [series.lines]));
+        const master = plain.components.master!;
+        const dtstart = master.getFirstPropertyValue("dtstart") as ICAL.Time;
+        const from = addDays(series.day, g.int(200, 4 * 365));
+        const range: Range = {
+          from,
+          to: addDays(from, g.pick([1, 7, 42])),
+          timeZone: g.pick(zones),
+        };
+        // Occurrences near the range, excluded or replaced; and an EXDATE naming none.
+        const near = icalStartsOn(master, dtstart, addDays(from, -2), range.to);
+        const times = Array.isArray(near) ? near : [];
+        const at = (index: number) => {
+          const [day, time] = times[index]!.split(" ")[0]!.replace("Z", "").split("T");
+          return { day: day!, time: (time ?? "00:00:00").replaceAll(":", "") };
+        };
+        const extra: string[] = [];
+        const exceptions: string[][] = [];
+        if (times.length > 0 && g.chance(0.5)) {
+          const { day, time } = at(g.int(0, times.length - 1));
+          // An EXDATE as a date on a timed series matches by day (D35).
+          const form = g.chance(0.2) ? "date" : series.form;
+          extra.push(written("EXDATE", form, series.zone, day, time));
+        }
+        if (g.chance(0.3)) {
+          extra.push(written("EXDATE", series.form, series.zone, addDays(from, 1), "013000"));
+        }
+        if (times.length > 0 && g.chance(0.5)) {
+          const { day, time } = at(g.int(0, times.length - 1));
+          const moved = `${pad((Number(time.slice(0, 2)) + 2) % 24)}${time.slice(2)}`;
+          exceptions.push([
+            written("RECURRENCE-ID", series.form, series.zone, day, time),
+            written("DTSTART", series.form, series.zone, day, moved),
+            ...(g.chance(0.3) ? ["STATUS:CANCELLED"] : []),
+            "SUMMARY:Moved",
+          ]);
+        }
+        const object = CalendarObject.parse(
+          ics(series, [[...series.lines, ...extra, "SUMMARY:Series"], ...exceptions]),
+        );
+        const walked = attempt(() =>
+          occurrencesBetween(object, { ...range, from: addDays(series.day, -45) }).filter(
+            (occurrence) => touches(occurrence, range),
+          ),
+        );
+        expect(
+          attempt(() => occurrencesBetween(object, range)),
+          `${series.lines.join(" ")} in ${from}`,
+        ).toEqual(walked);
       }
-      if (g.chance(0.3)) {
-        extra.push(written("EXDATE", series.form, series.zone, addDays(from, 1), "013000"));
-      }
-      if (times.length > 0 && g.chance(0.5)) {
-        const { day, time } = at(g.int(0, times.length - 1));
-        const moved = `${pad((Number(time.slice(0, 2)) + 2) % 24)}${time.slice(2)}`;
-        exceptions.push([
-          written("RECURRENCE-ID", series.form, series.zone, day, time),
-          written("DTSTART", series.form, series.zone, day, moved),
-          ...(g.chance(0.3) ? ["STATUS:CANCELLED"] : []),
-          "SUMMARY:Moved",
-        ]);
-      }
-      const object = CalendarObject.parse(
-        ics(series, [[...series.lines, ...extra, "SUMMARY:Series"], ...exceptions]),
-      );
-      const walked = attempt(() =>
-        occurrencesBetween(object, { ...range, from: addDays(series.day, -45) }).filter(
-          (occurrence) => touches(occurrence, range),
-        ),
-      );
-      expect(
-        attempt(() => occurrencesBetween(object, range)),
-        `${series.lines.join(" ")} in ${from}`,
-      ).toEqual(walked);
-    }
-  });
+    },
+  );
 
   test("a dense series from decades ago reaches the range; one that must walk is still refused", () => {
     const object = (rule: string) =>
@@ -460,13 +532,207 @@ describe("a rule ical.js never meets (D118)", () => {
     );
   });
 
-  test("a rule that meets rarely still meets: the 29th of February on a Monday", () => {
-    const starts = occurrencesBetween(
-      object("RRULE:FREQ=DAILY;BYMONTH=2;BYMONTHDAY=29;BYDAY=MO"),
-      vilnius("2026-10-06", "2045-01-01"),
-    ).map((o) => wallClockOf(o.start, "Europe/Vilnius"));
-    expect(starts).toEqual(["2044-02-29T09:00:00"]);
+  // `neverMeets` says so without walking; ical.js searching each for the
+  // whole 400-year cycle (`cycleTries`) agrees.
+  test.each(NEVER)("ical.js searching %s for 400 years finds nothing, as triesFor says", (rule) => {
+    const recur = ICAL.Recur.fromString(rule.slice("RRULE:".length));
+    const dtstart = ICAL.Time.fromDateTimeString("2026-10-05T09:00:00");
+    expect(triesFor(recur, dtstart)).toBe(0);
+    const iterator = bounded(iteratorOf(recur, dtstart)!, cycleTries(recur));
+    expect(iterator.next()?.toString()).toBe("2026-10-05T09:00:00");
+    expect(iterator.next()).toBeNull();
   });
+
+  // Not known without walking: the search runs its whole cycle, about 0.6 s.
+  test("a daily rule naming a week February never has is its DTSTART alone", () => {
+    expect(
+      occurrencesBetween(
+        object("RRULE:FREQ=DAILY;BYWEEKNO=53;BYMONTH=2"),
+        vilnius("2026-10-01", "2026-11-01"),
+      ).map((o) => wallClockOf(o.start, "Europe/Vilnius")),
+    ).toEqual(["2026-10-05T09:00:00"]);
+  });
+
+  // ical.js tries every day of a daily rule, BYMONTH's months or not: 14 301
+  // from 2073 to 2112, the year 2100 not leap.
+  test("a rule that meets rarely still meets: the 29th of February on a Monday", () => {
+    const sparse = CalendarObject.parse(
+      object("RRULE:FREQ=DAILY;BYMONTH=2;BYMONTHDAY=29;BYDAY=MO")
+        .serialize()
+        .replaceAll("20261005", "20730102"),
+    );
+    const starts = occurrencesBetween(sparse, vilnius("2073-01-01", "2169-01-01")).map((o) =>
+      wallClockOf(o.start, "Europe/Vilnius"),
+    );
+    expect(starts).toEqual([
+      "2073-01-02T09:00:00",
+      "2112-02-29T09:00:00",
+      "2140-02-29T09:00:00",
+      "2168-02-29T09:00:00",
+    ]);
+  });
+
+  // ical.js steps a daily rule's days one at a time: an INTERVAL past 400
+  // years never ended its first step, and one of 7 days took 7 a candidate.
+  test("a daily rule's interval is walked by days, bounded by 400 years of them", () => {
+    for (const rule of [
+      "RRULE:FREQ=DAILY;INTERVAL=999999999;BYHOUR=8",
+      "RRULE:FREQ=DAILY;INTERVAL=7;BYWEEKNO=53;BYMONTH=2",
+      "RRULE:FREQ=HOURLY;INTERVAL=999999999",
+    ]) {
+      expect(occurrencesBetween(object(rule), vilnius("2026-10-01", "2027-11-01"))).toHaveLength(
+        rule.includes("BYHOUR=8") ? 0 : 1,
+      );
+    }
+  });
+
+  // ical.js's constructor looks for a month with a fifth Monday in a loop of
+  // its own: every other year's February, from an odd year, has 28 days.
+  test("a rule whose first occurrence ical.js would look for for ever has none", () => {
+    const never = CalendarObject.parse(
+      object("RRULE:FREQ=MONTHLY;INTERVAL=24;BYDAY=5MO")
+        .serialize()
+        .replaceAll("20261005", "20230201"),
+    );
+    expect(occurrencesBetween(never, vilnius("2023-01-01", "2027-01-01"))).toEqual([]);
+    expect(
+      occurrencesBetween(object("RRULE:FREQ=YEARLY;BYMONTH=2;BYDAY=5MO;BYMONTHDAY=30"), {
+        ...vilnius("2026-10-01", "2026-11-01"),
+      }).length,
+    ).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("EXDATE, matched as a RECURRENCE-ID is (D35, D118)", () => {
+  const series = (start: string, exdate: string) =>
+    CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:exdate",
+        "DTSTAMP:20261001T000000Z",
+        start,
+        "RRULE:FREQ=DAILY;COUNT=3",
+        exdate,
+        "END:VEVENT",
+        VTIMEZONES.get("Europe/Vilnius")!.trim(),
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+  const days = (object: CalendarObject) =>
+    occurrencesBetween(object, {
+      from: "2026-11-01",
+      to: "2026-11-10",
+      timeZone: "Europe/Vilnius",
+    }).map((o) => wallClockOf(o.start, "Europe/Vilnius").slice(0, 10));
+  /** ical.js's own expansion, its EXDATE handling, for the days it gives. */
+  const icalDays = (object: CalendarObject) => {
+    const master = object.components.master!;
+    const expansion = new ICAL.RecurExpansion({
+      component: master,
+      dtstart: master.getFirstPropertyValue("dtstart") as ICAL.Time,
+    });
+    const found: string[] = [];
+    for (let next = expansion.next(); next; next = expansion.next()) found.push(dayOf(next));
+    return found;
+  };
+
+  test("a date on a timed series removes that day's occurrence, as ical.js does", () => {
+    const object = series(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "EXDATE;VALUE=DATE:20261103",
+    );
+    expect(days(object)).toEqual(["2026-11-02", "2026-11-04"]);
+    expect(icalDays(object)).toEqual(["2026-11-02", "2026-11-04"]);
+  });
+
+  test("a date removes every occurrence of its day (ical.js only the first)", () => {
+    const object = CalendarObject.parse(
+      series("DTSTART;TZID=Europe/Vilnius:20261102T090000", "EXDATE;VALUE=DATE:20261103")
+        .serialize()
+        .replace("COUNT=3", "COUNT=6;BYHOUR=9,17"),
+    );
+    expect(days(object)).toEqual(["2026-11-02", "2026-11-02", "2026-11-04", "2026-11-04"]);
+    expect(icalDays(object)).toEqual([
+      "2026-11-02",
+      "2026-11-02",
+      "2026-11-03",
+      "2026-11-04",
+      "2026-11-04",
+    ]);
+  });
+
+  test("a time on an all-day series, or a floating one on a zoned series, removes that day's or wall clock's (ical.js does not)", () => {
+    const allDay = series(
+      "DTSTART;VALUE=DATE:20261102",
+      "EXDATE;TZID=Europe/Vilnius:20261103T000000",
+    );
+    expect(days(allDay)).toEqual(["2026-11-02", "2026-11-04"]);
+    expect(icalDays(allDay)).toEqual(["2026-11-02", "2026-11-03", "2026-11-04"]);
+    const floating = series(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "EXDATE:20261103T090000",
+    );
+    expect(days(floating)).toEqual(["2026-11-02", "2026-11-04"]);
+    expect(icalDays(floating)).toEqual(["2026-11-02", "2026-11-03", "2026-11-04"]);
+  });
+});
+
+describe("a rule ical.js refuses (D118)", () => {
+  const object = (rule: string, kind = "VEVENT") =>
+    CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        `BEGIN:${kind}`,
+        `UID:refused-${kind}`,
+        "DTSTAMP:20261001T000000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261005T090000",
+        kind === "VEVENT" ? "DURATION:PT1H" : "DUE;TZID=Europe/Vilnius:20261005T100000",
+        rule,
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        "TRIGGER:-PT10M",
+        "END:VALARM",
+        `END:${kind}`,
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+  const vilnius = (from: string, to: string): Range => ({ from, to, timeZone: "Europe/Vilnius" });
+
+  // ical.js throws making the iterator: `Malformed values in BYDAY part`, and
+  // `For WEEKLY recurrences neither BYMONTHDAY nor BYYEARDAY may appear`.
+  test.each(["RRULE:FREQ=MONTHLY;BYDAY=6MO", "RRULE:FREQ=WEEKLY;BYMONTHDAY=1"])(
+    "%s is its DTSTART alone, said once per object and version",
+    (rule) => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const event = object(rule);
+        const starts = (range: Range) =>
+          occurrencesBetween(event, range).map((o) => wallClockOf(o.start, "Europe/Vilnius"));
+        expect(starts(vilnius("2026-10-01", "2026-11-01"))).toEqual(["2026-10-05T09:00:00"]);
+        expect(starts(vilnius("2026-11-01", "2026-12-01"))).toEqual([]);
+        expect(remindersOf(event, "refused", vilnius("2026-10-05", "2026-10-06"))).toHaveLength(1);
+        expect(boundsOf(object(`${rule};UNTIL=20271231T000000Z`)).endMs).toBe(
+          Date.parse("2026-10-05T07:00:00Z"),
+        );
+        // The same object parsed again is the same version: said once.
+        occurrencesBetween(object(rule), vilnius("2026-10-01", "2026-11-01"));
+        const task = object(rule, "VTODO");
+        expect(latestUndoneBefore(task, "2026-11-04", "Europe/Vilnius")?.start).toEqual(
+          task.master?.start,
+        );
+        // The event, its version with an UNTIL, and the task.
+        expect(logged).toHaveBeenCalledTimes(3);
+        expect(String(logged.mock.calls[0]?.[0])).toContain("refused-VEVENT");
+      } finally {
+        logged.mockRestore();
+      }
+    },
+  );
 });
 
 test("an EXDATE after one naming no occurrence still removes its own (ical.js skipped it)", () => {
@@ -494,57 +760,72 @@ test("an EXDATE after one naming no occurrence still removes its own (ical.js sk
   expect(starts).toEqual(["2026-11-02T09:00:00", "2026-11-09T09:00:00", "2026-11-23T09:00:00"]);
 });
 
-test("the latest undone occurrence, read back from today, is the one a walk from the first finds", () => {
-  const g = generator(51);
-  /** `latestUndoneBefore` as it was: every occurrence from the first. */
-  const walked = (object: CalendarObject, day: string, timeZone: string) => {
-    const dueOf = (o: Occurrence) => wallClockOf(o.end, timeZone);
-    return occurrencesBetween(object, { from: "0001-01-01", to: day, timeZone })
-      .filter((o) => isUndoneBefore(object, o, day, timeZone))
-      .reduce<Occurrence | null>((a, o) => (!a || dueOf(o) > dueOf(a) ? o : a), null);
-  };
-  for (let i = 0; i < 300; i++) {
-    const form = g.pick<Form>(["vtimezone", "tzid", "utc", "date"]);
-    const zone = g.pick(ZONES);
-    const start = addDays("2023-01-01", g.int(0, 900));
-    const time = `${pad(g.int(6, 20))}0000`;
-    const freq = g.pick(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]);
-    const rule = `RRULE:FREQ=${freq}${g.chance(0.3) ? `;INTERVAL=${g.int(2, 5)}` : ""}${g.chance(0.2) ? `;UNTIL=${addDays(start, g.int(10, 900)).replaceAll("-", "")}${form === "date" ? "" : "T000000Z"}` : ""}`;
-    const day = addDays(start, g.int(-10, 1400));
-    const series: Series = { form, zone, day: start, time, lines: [] };
-    const times = g.pick(["start and due", "due", "start"]);
-    const lines = [
-      ...(times !== "due" ? [written("DTSTART", form, zone, start, time)] : []),
-      ...(times !== "start" ? [written("DUE", form, zone, addDays(start, g.int(0, 2)), time)] : []),
-      rule,
-      "SUMMARY:Water the plants",
-    ];
-    // Some of the latest occurrences done on their own.
-    const master = CalendarObject.parse(ics(series, [lines]).replaceAll("VEVENT", "VTODO"));
-    const before = occurrencesBetween(master, {
-      from: addDays(day, -400),
-      to: day,
-      timeZone: "Europe/Vilnius",
-    });
-    const done = before
-      .slice(-g.int(0, 4))
-      .filter(() => g.chance(0.7))
-      .map((o) => {
-        const id = o.recurrenceId!;
-        const value = id.type === "date" ? id.date : id.local;
-        const [d, t] = value.split("T");
-        const exception = [
-          written("RECURRENCE-ID", form, zone, d!, (t ?? "000000").replaceAll(":", "")),
-          "STATUS:COMPLETED",
-        ];
-        if (times !== "due") exception.push(written("DTSTART", form, zone, d!, time));
-        return exception;
+test.each(chunks(3))(
+  "the latest undone occurrence, read back from today, is the one a walk from the first finds: chunk %i",
+  (chunk) => {
+    const g = generator(seedOf(chunk, 51));
+    /** `latestUndoneBefore` as it was: every occurrence from the first. */
+    const walked = (object: CalendarObject, day: string, timeZone: string) => {
+      const dueOf = (o: Occurrence) => wallClockOf(o.end, timeZone);
+      return occurrencesBetween(object, { from: "0001-01-01", to: day, timeZone })
+        .filter((o) => isUndoneBefore(object, o, day, timeZone))
+        .reduce<Occurrence | null>((a, o) => (!a || dueOf(o) > dueOf(a) ? o : a), null);
+    };
+    for (let i = 0; i < each(80); i++) {
+      const form = g.pick<Form>(["vtimezone", "tzid", "utc", "date"]);
+      const zone = g.pick(ZONES);
+      const start = addDays("2023-01-01", g.int(0, 900));
+      const time = `${pad(g.int(6, 20))}0000`;
+      const freq = g.pick(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]);
+      const rule = `RRULE:FREQ=${freq}${g.chance(0.3) ? `;INTERVAL=${g.int(2, 5)}` : ""}${g.chance(0.2) ? `;UNTIL=${addDays(start, g.int(10, 900)).replaceAll("-", "")}${form === "date" ? "" : "T000000Z"}` : ""}`;
+      const day = addDays(start, g.int(-10, 1400));
+      const series: Series = { form, zone, day: start, time, lines: [] };
+      const times = g.pick(["start and due", "due", "start"]);
+      const dueAfter = g.int(0, 2);
+      /** A task's times on `on`, the due `dueAfter` days on. */
+      const timesOn = (on: string) => [
+        ...(times !== "due" ? [written("DTSTART", form, zone, on, time)] : []),
+        ...(times !== "start" ? [written("DUE", form, zone, addDays(on, dueAfter), time)] : []),
+      ];
+      const lines = [...timesOn(start), rule, "SUMMARY:Water the plants"];
+      // Some of the latest occurrences replaced: done, moved (and undone), or
+      // changed and still undone.
+      const master = CalendarObject.parse(ics(series, [lines]).replaceAll("VEVENT", "VTODO"));
+      const before = occurrencesBetween(master, {
+        from: addDays(day, -400),
+        to: day,
+        timeZone: "Europe/Vilnius",
       });
-    const text = ics(series, [lines, ...done]).replaceAll("VEVENT", "VTODO");
-    const object = CalendarObject.parse(text);
-    const timeZone = g.pick(["Europe/Vilnius", "America/Los_Angeles", "Pacific/Kiritimati"]);
-    expect(latestUndoneBefore(object, day, timeZone), `${lines.join(" ")} before ${day}`).toEqual(
-      walked(object, day, timeZone),
-    );
-  }
-});
+      const exceptions = before
+        .slice(-g.int(0, 5))
+        .filter(() => g.chance(0.7))
+        .map((o) => {
+          const id = o.recurrenceId!;
+          const value = id.type === "date" ? id.date : id.local;
+          const [d, t] = value.split("T");
+          // The day the occurrence starts on (its due day for a task with a due alone).
+          const on = times === "due" ? addDays(d!, -dueAfter) : d!;
+          const exception = [
+            written("RECURRENCE-ID", form, zone, d!, (t ?? "000000").replaceAll(":", "")),
+          ];
+          switch (g.pick(["done", "moved", "undone"])) {
+            case "done":
+              exception.push(...timesOn(on), "STATUS:COMPLETED");
+              break;
+            case "moved":
+              exception.push(...timesOn(addDays(on, g.pick([-500, -40, -3, 1, 5, 40]))));
+              break;
+            default:
+              exception.push(...timesOn(on), "SUMMARY:Water the plants, the big pot too");
+          }
+          return exception;
+        });
+      const text = ics(series, [lines, ...exceptions]).replaceAll("VEVENT", "VTODO");
+      const object = CalendarObject.parse(text);
+      const timeZone = g.pick(["Europe/Vilnius", "America/Los_Angeles", "Pacific/Kiritimati"]);
+      expect(latestUndoneBefore(object, day, timeZone), `${text} before ${day}`).toEqual(
+        walked(object, day, timeZone),
+      );
+    }
+  },
+);
