@@ -536,7 +536,12 @@ describe("RFC 5545's corners", () => {
     const four = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"];
     expect(daily("20261025T003000Z")).toEqual(four);
     expect(daily("20261025T013000Z")).toEqual(four);
+    // In the second pass, 03:00–03:29:59 on the wall clock: 03:30 is its first instant, before.
+    expect(daily("20261025T010000Z")).toEqual(four);
+    expect(daily("20261025T011500Z")).toEqual(four);
+    expect(daily("20261025T012959Z")).toEqual(four);
     expect(daily("20261025T002959Z")).toEqual(four.slice(0, 3));
+    expect(daily("20261024T002959Z")).toEqual(four.slice(0, 2));
   });
 
   test("an UNTIL is left as ical.js reads it for a floating, an all-day or a defined zone's start", () => {

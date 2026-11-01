@@ -1161,9 +1161,11 @@ Decided while building PR 6a.
     not count, so no object is left with no occurrence (an edit's old
     series, a deletion's whole object goes).
   - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
-    made all-day or timed (`movedRule`): it ends on the same day, a date or
-    the end of that day in UTC. A series keeps its zone ([D104](#D104)), so
-    a zoned one's `UNTIL` stays.
+    made all-day or timed (`movedRule`): it ends on the same day, written
+    as a date for an all-day series, as 23:59:59 that day in the start's
+    zone written in UTC for a zoned one (`UNTIL=20261123T215959Z` in
+    Vilnius), and as 23:59:59 on the wall clock for a floating one. A
+    series keeps its zone ([D104](#D104)), so a zoned one's `UNTIL` stays.
   - **Every other week on several days** keeps its weeks when its days
     shift into different weeks than each other: the rule's week start
     (`WKST`) shifts by as many days.
@@ -1449,10 +1451,12 @@ errors").
     ical.js has such a `DTSTART` as a wall clock and compared the `UNTIL`
     with it as if the wall clock were UTC, so a series ended hours early or
     late: "this and following" ([D105](#D105)) left the occurrence it ended
-    before, west of UTC, and dropped the last one, east of it. The `UNTIL`
-    is walked as its instant's wall clock in that zone; in the hour a DST
-    change repeats, that wall clock stands for both instants, and an
-    occurrence at it is kept. Which zones these are is `zoneOrigin`'s
+    before, west of UTC, and dropped the last one, east of it. The rule is
+    walked to two hours past the `UNTIL`'s wall clock in that zone, and the
+    starts from two hours before it are kept by their instant: a wall
+    clock a DST change repeats is its first instant, as `fromIcalTime`
+    places it, so an `UNTIL` anywhere in the repeated hour's second pass
+    keeps every occurrence of that hour. Which zones these are is `zoneOrigin`'s
     (`time.ts`) to say, the one place `fromIcalTime` asks too: a floating,
     all-day or UTC start, or one whose VTIMEZONE the object has, keeps its
     rule as ical.js reads it.

@@ -3,7 +3,7 @@
 // whole periods of the rule after DTSTART, instead of at DTSTART.
 import ICAL from "ical.js";
 
-import { fromIcalTime, wallClockIn, zoneOrigin } from "./time.ts";
+import { fromIcalTime, wallClockIn, zonedToEpoch, zoneOrigin } from "./time.ts";
 
 /**
  * The parts with which ical.js's iterator settles into the rule's period:
@@ -351,11 +351,13 @@ export function seriesStarts(
   const refused = (error: unknown) => logRefusal(master, error);
   let starts = 0;
   const rules = master.getAllProperties("rrule");
+  const limits = new Map<ICAL.RecurIterator, UntilInstant>();
   const iterators = rules.flatMap((property) => {
     let iterator: ICAL.RecurIterator | null;
     let rule: ICAL.Recur;
+    let limit: UntilInstant | null;
     try {
-      rule = onWallClock(property.getFirstValue() as ICAL.Recur, dtstart);
+      ({ rule, limit } = onWallClock(property.getFirstValue() as ICAL.Recur, dtstart));
       // Made first, so a rule ical.js refuses from DTSTART is refused there,
       // and one it finds nothing for from there (a monthly 31st from a month
       // of 30 days, three such months on) stays without occurrences.
@@ -385,6 +387,7 @@ export function seriesStarts(
     bounded(iterator, tries, refused);
     // As RecurExpansion does: its `last` is then the first occurrence.
     iterator.next();
+    if (limit) limits.set(iterator, limit);
     return [iterator];
   });
 
@@ -406,22 +409,33 @@ export function seriesStarts(
   // first is before it (Google's birthdays).
   let index = dates[0] && dates[0].compare(dtstart) < 0 ? 0 : firstFrom(dates, dtstart);
 
-  const step = () => {
-    let earliest: ICAL.RecurIterator | null = null;
-    for (const iterator of iterators) {
-      if (!iterator.completed && (!earliest || earliest.last.compare(iterator.last) > 0)) {
-        earliest = iterator;
+  const step = (): ICAL.Time | null => {
+    for (;;) {
+      let earliest: ICAL.RecurIterator | null = null;
+      for (const iterator of iterators) {
+        if (!iterator.completed && (!earliest || earliest.last.compare(iterator.last) > 0)) {
+          earliest = iterator;
+        }
       }
+      const date = dates[index];
+      if (date && (!earliest || date.compare(earliest.last) <= 0)) {
+        index++;
+        return date;
+      }
+      if (!earliest) return null;
+      const next = earliest.last.clone();
+      earliest.next();
+      // Near its UNTIL, a start is in the rule by its instant (`onWallClock`).
+      const limit = limits.get(earliest);
+      if (
+        limit &&
+        next.compare(limit.near) >= 0 &&
+        zonedToEpoch(next.toString(), limit.timeZone) > limit.epochMs
+      ) {
+        continue;
+      }
+      return next;
     }
-    const date = dates[index];
-    if (date && (!earliest || date.compare(earliest.last) <= 0)) {
-      index++;
-      return date;
-    }
-    if (!earliest) return null;
-    const next = earliest.last.clone();
-    earliest.next();
-    return next;
   };
   // The set is the union of the rules' and the RDATEs' starts (RFC 5545
   // 3.8.5.3): a start two of them give (an RDATE at DTSTART beside an RRULE,
@@ -466,25 +480,45 @@ function inFrameOf(time: ICAL.Time, dtstart: ICAL.Time): ICAL.Time {
   return time;
 }
 
+/** A UTC `UNTIL` a walk on a zone's wall clock checks by instant: from `near` on. */
+interface UntilInstant {
+  readonly epochMs: number;
+  readonly timeZone: string;
+  readonly near: ICAL.Time;
+}
+
+/** Longer than any DST change, so wall clocks this far from an instant's are on its side. */
+const SHIFT_MS = 2 * 3_600_000;
+
 /**
  * The rule as ical.js must walk it from `dtstart`. A DTSTART in a zone the
  * object does not define (Google's and Outlook's: a TZID and no VTIMEZONE,
  * D32) is a wall clock to ical.js, which compares a UTC UNTIL with it as if
  * the wall clock were UTC, so the series ended hours early or late. Such an
- * UNTIL becomes its instant's wall clock in that zone.
+ * UNTIL becomes its instant's wall clock in that zone, two hours later, and
+ * the starts from two hours before it are checked by their instant (`limit`):
+ * a wall clock the DST change repeats is its first instant, as `fromIcalTime`
+ * places it, so an UNTIL in the second pass of the repeated hour keeps every
+ * occurrence in that hour (D141).
  */
-function onWallClock(rule: ICAL.Recur, dtstart: ICAL.Time): ICAL.Recur {
+function onWallClock(
+  rule: ICAL.Recur,
+  dtstart: ICAL.Time,
+): { rule: ICAL.Recur; limit: UntilInstant | null } {
   const { until } = rule;
-  if (!until || zoneOrigin(until).kind !== "utc") return rule;
+  if (!until || zoneOrigin(until).kind !== "utc") return { rule, limit: null };
   const origin = zoneOrigin(dtstart);
-  if (origin.kind !== "undefined") return rule;
+  if (origin.kind !== "undefined") return { rule, limit: null };
+  const epochMs = until.toUnixTime() * 1000;
+  const wall = (shift: number) =>
+    ICAL.Time.fromDateTimeString(
+      new Date(Date.parse(`${wallClockIn(epochMs, origin.timeZone)}Z`) + shift)
+        .toISOString()
+        .slice(0, 19),
+    );
   const walked = rule.clone();
-  // In the hour a DST change repeats, the wall clock stands for both of its
-  // instants: an occurrence at it is kept.
-  walked.until = ICAL.Time.fromDateTimeString(
-    wallClockIn(until.toUnixTime() * 1000, origin.timeZone),
-  );
-  return walked;
+  walked.until = wall(SHIFT_MS);
+  return { rule: walked, limit: { epochMs, timeZone: origin.timeZone, near: wall(-SHIFT_MS) } };
 }
 
 /** The index of the first time in `sorted` at or after `time`. */
