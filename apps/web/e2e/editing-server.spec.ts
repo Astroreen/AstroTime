@@ -32,6 +32,9 @@ test("an event created here reaches the server, and again once dragged", async (
   await signIn.getByLabel("Password").fill(radicale.password);
   await signIn.getByRole("button", { name: "Sign in" }).click();
   await expect(signIn).toHaveCount(0);
+  // The first sync brought the server's calendar, so the unused calendar on
+  // this device stepped aside (D122): a new event goes to the server's.
+  await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });

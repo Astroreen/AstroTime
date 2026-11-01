@@ -793,9 +793,12 @@ Decided while building PR 5a-3.
     never comes.
   - Connecting a server is optional, from the accounts dialog ("Add
     account"; Settings gets an Accounts group in the UI review's time,
-    [design Deferred](design.md#deferred)). Once a server's account is
-    added, an unused calendar on this device (nothing ever written in it)
-    steps aside (`removeLocalCalendarIfUnused`); one that holds items stays
+    [design Deferred](design.md#deferred)). Once a server's account has
+    calendars here (its first sync brought them), a calendar on this device
+    that holds no item steps aside (`removeLocalCalendarIfUnused`, which
+    checks both in one transaction, and which the UI calls as the store
+    comes to hold them); before that, a first sync that failed or found
+    none leaves the user somewhere to write. One that holds items stays
     beside the server's, as its own calendar, and its items move to a
     server's calendar one by one in the edit dialog ([D106](#D106)).
     Removing it asks first, and says its items are on no server. Uploading
@@ -829,7 +832,10 @@ Decided while building PR 5a-3.
   it unsigned (`astrotime.presetSignIn` in the preferences; a sign-in clears
   it). Without a preset nothing changes. The preset's server is the proxy's
   allowlist when `ASTROTIME_PROXY_ALLOW` is unset, and must be on it when it
-  is set; a malformed one stops the server at start.
+  is set, both read as origins (case, a default port and a final slash
+  aside); a malformed one stops the server at start. The tags are escaped,
+  and put in with a replacer function, so no `$` pattern or markup in a
+  preset changes the page, nor the nonce, which is filled in first.
   - **Security.** The preset is public: anyone who reaches the page reads it,
     so it holds no secret, and no password may be given this way. Naming the
     user tells a visitor which account the instance is for; an instance that
@@ -1781,6 +1787,12 @@ errors").
   move to a server's calendar one by one, in the edit dialog; offering, when
   an account is added, to upload them all to one of its calendars comes
   when someone asks.
+- **An edit dialog open as the calendar on this device steps aside**
+  ([D122](#D122)) — in the seconds between signing in and the first sync
+  bringing the server's calendars, a new item's dialog offers the calendar on
+  this device; saved after it stepped aside, the save fails and says so.
+  Moving the dialog to the server's calendar then comes with a default
+  calendar (below).
 - **Starting the web app with no network** ([D122](#D122)) — once open, the
   web app works offline, but a page loaded with no network needs a service
   worker holding the app's files (the image revalidates `index.html` on

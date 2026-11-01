@@ -62,7 +62,10 @@ export function presetTags(preset: Preset): string {
   ].join("");
 }
 
-/** The page's HTML with the preset in its head; as it was without one. */
+/**
+ * The page's HTML with the preset in its head; as it was without one. A
+ * replacer function, so `$&`, `$'` and the like in a preset stay as written.
+ */
 export function withPreset(html: string, preset: Preset | null): string {
-  return preset ? html.replace("</head>", `${presetTags(preset)}</head>`) : html;
+  return preset ? html.replace("</head>", () => `${presetTags(preset)}</head>`) : html;
 }

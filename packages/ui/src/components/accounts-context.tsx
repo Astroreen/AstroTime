@@ -159,8 +159,6 @@ export function AccountsProvider({
         });
         if ((await signIn.saveHeld()) === "saved") {
           void scheduler.syncNow();
-          // An unused calendar on this device steps aside for the server's (D122).
-          await store.removeLocalCalendarIfUnused();
         }
         const now = await heldApproval(pending);
         if (live) setHeld(now);
@@ -178,6 +176,29 @@ export function AccountsProvider({
       window.removeEventListener("online", run);
     };
   }, [platform, store, scheduler]);
+
+  // Once a server's account has calendars here, an unused calendar on this
+  // device steps aside for them (D122); the store checks both in one
+  // transaction.
+  useEffect(
+    () =>
+      liveQuery(
+        store,
+        async () => {
+          const accounts = await store.accounts();
+          const local = new Set(
+            accounts.filter((account) => account.provider === "local").map((account) => account.id),
+          );
+          if (local.size === 0) return false;
+          return (await store.calendars()).some((calendar) => !local.has(calendar.accountId));
+        },
+        (ready) => {
+          if (ready)
+            store.removeLocalCalendarIfUnused().catch((error: unknown) => console.error(error));
+        },
+      ),
+    [store],
+  );
 
   // A single-user deployment (D123): while no server's account is here, the
   // sign-in opens by itself on the password, once per page, until the user
@@ -257,8 +278,6 @@ export function AccountsProvider({
           void scheduler.syncNow();
           // Signed in: removed one day, the preset's sign-in opens by itself again.
           preferences.set(KEYS.presetSignIn, "");
-          // An unused calendar on this device steps aside for the server's (D122).
-          store.removeLocalCalendarIfUnused().catch((error: unknown) => console.error(error));
         }}
       />
       <RemoveAccountDialog

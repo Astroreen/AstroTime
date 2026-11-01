@@ -59,6 +59,8 @@ test("an account is there after the browser is closed and opened again, and the 
   baseURL,
 }) => {
   if (!baseURL) throw new Error("The config gives a baseURL.");
+  // A calendar on the server, for the calendar on this device to step aside for (D122).
+  await radicale.mkcalendar("personal");
   const profile = await mkdtemp(join(tmpdir(), "astrotime-profile-"));
   try {
     const first = await chromium.launchPersistentContext(profile, { baseURL, viewport: WIDE });

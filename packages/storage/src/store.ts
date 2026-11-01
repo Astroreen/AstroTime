@@ -227,15 +227,24 @@ export class Store {
   }
 
   /**
-   * Removes the calendar on this device if nothing was ever written in it and
-   * another account has calendars of its own now: it steps aside for the
-   * server the user connected (D122). True when it went.
+   * Removes the calendar on this device if it holds no item and another
+   * account has calendars of its own now: it steps aside for the server the
+   * user connected (D122), never before that server's calendars are here (a
+   * first sync that failed, or found none, leaves the user somewhere to
+   * write). True when it went.
    */
   removeLocalCalendarIfUnused(): Promise<boolean> {
     return this.exclusive(async () => {
       const accounts = await this.db.select().from(schema.accounts);
       const local = accounts.filter((account) => account.provider === "local");
-      if (local.length === 0 || local.length === accounts.length) return false;
+      if (local.length === 0) return false;
+      const [served] = await this.db
+        .select({ id: schema.calendars.id })
+        .from(schema.calendars)
+        .innerJoin(schema.accounts, eq(schema.calendars.accountId, schema.accounts.id))
+        .where(ne(schema.accounts.provider, "local"))
+        .limit(1);
+      if (!served) return false;
       let removed = false;
       for (const account of local) {
         const [used] = await this.db

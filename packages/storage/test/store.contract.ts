@@ -404,6 +404,18 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         serverUrl: "https://cloud.example.com/",
         username: "astro",
       });
+      // The server's account has no calendar yet (its first sync failed, or
+      // found none): the user keeps somewhere to write.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      expect((await store.accounts()).map((a) => a.provider)).toEqual(["local", "caldav"]);
+      await store.saveCalendar({
+        accountId: server.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/personal/",
+        name: "Personal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
       expect(await store.removeLocalCalendarIfUnused()).toBe(true);
       expect(await store.accounts()).toEqual([server]);
     });
@@ -417,11 +429,19 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       });
       const [calendar] = await store.calendars(local!.id);
       await store.saveLocal(calendar!.id, task("milk"));
-      await store.addAccount({
+      const server = await store.addAccount({
         provider: "caldav",
         name: "astro@cloud.example.com",
         serverUrl: "https://cloud.example.com/",
         username: "astro",
+      });
+      await store.saveCalendar({
+        accountId: server.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/personal/",
+        name: "Personal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
       });
       expect(await store.removeLocalCalendarIfUnused()).toBe(false);
       expect((await store.accounts()).map((a) => a.provider)).toEqual(["local", "caldav"]);

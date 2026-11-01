@@ -70,6 +70,8 @@ test("an account added by password syncs its calendars into the Week view, and S
   ).toBeVisible();
   // The drawer: the account, how it synced, and its calendar with its checkbox (design D46).
   const account = page.getByRole("region", { name: `astro@${new URL(radicale.url).host}` });
+  // With the server's calendars here, the unused calendar on this device steps aside (D122).
+  await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
   await expect(account.getByRole("checkbox", { name: "work" })).toBeChecked();
   await expect(account.getByText(/^Synced at /)).toBeVisible();
 

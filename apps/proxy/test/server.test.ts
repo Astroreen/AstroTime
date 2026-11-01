@@ -190,6 +190,8 @@ test("the allowlist is required, and holds origins only", () => {
   expect(() => allowlist("*")).toThrow(/not an origin/);
   expect(() => allowlist("https://cloud.example.com/remote.php")).toThrow(/not an origin/);
   expect(() => allowlist("cloud.example.com")).toThrow(/"cloud.example.com" is not an origin/);
+  expect(() => allowlist("https://cloud.example.com/?x")).toThrow(/not an origin/);
+  expect(() => allowlist("https://u:p@cloud.example.com")).toThrow(/not an origin/);
   expect(allowlist(" https://cloud.example.com , http://10.0.0.2:8080")).toEqual([
     "https://cloud.example.com",
     "http://10.0.0.2:8080",
@@ -204,6 +206,9 @@ test("a preset's server is the allowlist when none is given, and must be on one 
   expect(preset).toEqual({ server: "https://cloud.example.com/nextcloud", username: "astro" });
   expect(allowlist(undefined, preset)).toEqual(["https://cloud.example.com"]);
   expect(allowlist("https://cloud.example.com,https://dav.example.org", preset)).toHaveLength(2);
+  // The same origin spelled otherwise is on the list: case, a default port and a final slash aside.
+  expect(allowlist("HTTPS://Cloud.Example.com:443", preset)).toEqual(["https://cloud.example.com"]);
+  expect(allowlist("https://cloud.example.com/", preset)).toEqual(["https://cloud.example.com"]);
   expect(() => allowlist("https://dav.example.org", preset)).toThrow(
     /does not list https:\/\/cloud.example.com/,
   );
@@ -226,15 +231,23 @@ test("the page names the preset's server and user, escaped, on every route (D123
   const server = createAppServer({
     root,
     allow: [dav],
-    preset: { server: "https://cloud.example.com/", username: 'a"<b>&' },
+    preset: {
+      server: "https://cloud.example.com/$'",
+      username: `a"<b>&$$$&${NONCE_PLACEHOLDER}`,
+    },
   });
   servers.push(server);
   const base = await listen(server);
   for (const route of ["/", "/day/2026-11-04"]) {
     const html = await (await fetch(`${base}${route}`)).text();
+    // Escaped, with `$` patterns as written, and the nonce's placeholder in
+    // the preset left alone: only the page's own tag carries the nonce.
     expect(html).toContain(
-      '<meta name="astrotime-server" content="https://cloud.example.com/" /><meta name="astrotime-username" content="a&quot;&lt;b&gt;&amp;" /></head>',
+      `<meta name="astrotime-server" content="https://cloud.example.com/$'" /><meta name="astrotime-username" content="a&quot;&lt;b&gt;&amp;$$$&amp;${NONCE_PLACEHOLDER}" /></head>`,
     );
+    const nonce = /nonce="([^"]+)"/.exec(html)?.[1];
+    expect(nonce).not.toBe(NONCE_PLACEHOLDER);
+    expect(html.split("</head>")).toHaveLength(2);
   }
 });
 

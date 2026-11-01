@@ -153,34 +153,45 @@ function listed(hosts: readonly PublicHost[], header: string | undefined): boole
  * when one is.
  */
 export function allowlist(value: string | undefined, preset: Preset | null = null): string[] {
-  const origins = (value ?? "")
+  const entries = (value ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   const presetOrigin = preset && new URL(preset.server).origin;
-  if (origins.length === 0 && presetOrigin) return [presetOrigin];
-  if (presetOrigin && !origins.includes(presetOrigin)) {
-    throw new Error(
-      `ASTROTIME_PROXY_ALLOW does not list ${presetOrigin}, ASTROTIME_SERVER_URL's server`,
-    );
-  }
-  if (origins.length === 0) {
+  if (entries.length === 0 && presetOrigin) return [presetOrigin];
+  if (entries.length === 0) {
     throw new Error(
       "ASTROTIME_PROXY_ALLOW must list the CalDAV servers the proxy may reach, e.g. https://cloud.example.com",
     );
   }
-  for (const origin of origins) {
-    let parsed: string | null = null;
+  // Each entry as its origin: case, a default port and a final slash aside.
+  const origins = entries.map((entry) => {
+    let url: URL | null = null;
     try {
-      parsed = new URL(origin).origin;
+      url = new URL(entry);
     } catch {
       // Reported below, with the entry that is wrong.
     }
-    if (origin === "*" || parsed !== origin) {
+    const bare =
+      url !== null &&
+      /^https?:$/.test(url.protocol) &&
+      url.pathname === "/" &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password &&
+      !/[?#]$/.test(entry);
+    if (entry === "*" || !url || !bare) {
       throw new Error(
-        `ASTROTIME_PROXY_ALLOW: "${origin}" is not an origin like https://cloud.example.com`,
+        `ASTROTIME_PROXY_ALLOW: "${entry}" is not an origin like https://cloud.example.com`,
       );
     }
+    return url.origin;
+  });
+  if (presetOrigin && !origins.includes(presetOrigin)) {
+    throw new Error(
+      `ASTROTIME_PROXY_ALLOW does not list ${presetOrigin}, ASTROTIME_SERVER_URL's server`,
+    );
   }
   return origins;
 }

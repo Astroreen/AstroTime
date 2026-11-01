@@ -626,7 +626,7 @@ test("a sync that comes to need the user is said once, not again after each sync
   ]);
 });
 
-test("an empty app opens on the calendar on this device; an account added from the accounts dialog takes its place, a wrong password said in the user's language (D122)", async () => {
+test("an empty app opens on the calendar on this device; an account added from the accounts dialog with no calendar yet leaves it there, a wrong password said in the user's language (D122)", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });
   const secrets = memorySecrets();
@@ -655,14 +655,19 @@ test("an empty app opens on the calendar on this device; an account added from t
 
   await dialog.getByLabelText("Пароль").fill("right");
   await dialog.getByRole("button", { name: "Войти" }).click();
-  // Signed in: the dialog closes, and the unused calendar on this device steps aside.
+  // Signed in: the dialog closes. This fake server lists no calendar, so the
+  // calendar on this device stays, somewhere to write; it steps aside only
+  // once a server's calendars are here (D122, the store's contract).
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   await page.getByRole("button", { name: /^Аккаунты/ }).click();
   await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
   await expect
     .element(accounts.getByText("На этом устройстве", { exact: true }))
-    .not.toBeInTheDocument();
-  expect((await store.accounts()).map((a) => a.name)).toEqual(["astro@cloud.example.com"]);
+    .toBeInTheDocument();
+  expect((await store.accounts()).map((a) => [a.provider, a.name])).toEqual([
+    ["local", "На этом устройстве"],
+    ["caldav", "astro@cloud.example.com"],
+  ]);
   expect(secrets.values.size).toBe(1);
 });
 
@@ -693,16 +698,12 @@ test("a deployment's preset asks for the password alone, by itself, and not agai
   await dialog.getByLabelText("Password").fill("right");
   await dialog.getByRole("button", { name: "Sign in" }).click();
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  // The unused calendar on this device steps aside for the server's (D122).
   await page.getByRole("button", { name: /^Accounts/ }).click();
   const accounts = page.getByRole("dialog", { name: "Accounts" });
   await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
-  await expect
-    .element(accounts.getByText("On this device", { exact: true }))
-    .not.toBeInTheDocument();
-  expect((await store.accounts()).map((a) => [a.provider, a.username])).toEqual([
-    ["caldav", "astro"],
-  ]);
+  expect(
+    (await store.accounts()).filter((a) => a.provider === "caldav").map((a) => a.username),
+  ).toEqual(["astro"]);
   expect(preferences.get("astrotime.presetSignIn")).toBe("");
 });
 
@@ -737,7 +738,11 @@ test("Login Flow v2 in the UI: it waits, opens the page again, cancels, and fini
   server.approve();
   document.dispatchEvent(new Event("visibilitychange"));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  expect((await store.accounts()).map((a) => a.username)).toEqual(["astro"]);
+  // The server's account, beside the calendar on this device (this fake
+  // server lists no calendar for it to step aside for, D122).
+  expect(
+    (await store.accounts()).filter((a) => a.provider === "caldav").map((a) => a.username),
+  ).toEqual(["astro"]);
 });
 
 test("the back button closes what is open, the topmost first, then lets the shell leave (android D68)", async () => {
