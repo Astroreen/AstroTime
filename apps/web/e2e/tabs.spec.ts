@@ -23,10 +23,12 @@ async function openStore(page: Page): Promise<void> {
 test("a second tab works on the same store, and shows at once what the other writes", async ({
   page,
 }) => {
-  // The first tab opens an empty store, and leads it.
+  // The first tab opens an empty store, and leads it: no account yet, so
+  // it shows the ways in (docs/plans/foundation.md#D92).
   await openStore(page);
-  await expect(page.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
-  await expect(review(page)).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
+  ).toBeVisible();
   // The second tab writes the demo data through the first; both show it.
   const second = await page.context().newPage();
   await openDemo(second, "week");
