@@ -105,6 +105,86 @@ test("draws today from the local store, and follows the store as a sync writes t
   await expect.element(late).not.toBeInTheDocument();
 });
 
+test("a period whose items cannot be read is drawn all the same, empty, not held (design D59)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(() => errors.mockRestore());
+  const store = await demoStore(["en-US"]);
+  // From tomorrow on, the store rejects every read of the items.
+  const broken = Object.assign(Object.create(store) as Store, {
+    objectsBetween: (...args: Parameters<Store["objectsBetween"]>) =>
+      args[1].from >= "2026-11-05"
+        ? Promise.reject(new Error("The disk is gone."))
+        : store.objectsBetween(...args),
+  });
+  render(Promise.resolve(broken), ["en-US"]);
+  await expect
+    .element(
+      page
+        .getByRole("list", { name: "Wednesday, November 4" })
+        .getByRole("listitem", { name: /^Design review, / }),
+    )
+    .toBeInTheDocument();
+  await userEvent.keyboard("n");
+  const thursday = page.getByRole("list", { name: "Thursday, November 5" });
+  await expect.element(thursday).toBeInTheDocument();
+  expect(thursday.getByRole("listitem").elements()).toEqual([]);
+  expect(errors).toHaveBeenCalled();
+});
+
+test("back from the Agenda, the day is drawn as the store has it now, not as read before (design D59)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  render(Promise.resolve(store), ["en-US"]);
+  // Today's column in the Day view: the Agenda names its days too, but has no strip.
+  const today = () =>
+    document.querySelector('main [role="list"][aria-label="All day"]') &&
+    document.querySelector('main [role="list"][aria-label="Wednesday, November 4"]');
+  await expect
+    .element(page.getByRole("list", { name: "Wednesday, November 4" }).getByText("Design review"))
+    .toBeInTheDocument();
+  await userEvent.keyboard("a");
+  await expect.element(page.getByRole("list", { name: "All day" })).not.toBeInTheDocument();
+  const work = (await store.calendars()).find((calendar) => calendar.name === "Work")!;
+  await store.saveFromServer(work.id, {
+    href: "late.ics",
+    etag: '"1"',
+    ics: event("late", "Late review"),
+  });
+  // Every state of the page the Day view is drawn in, from the key on.
+  const drawn: boolean[] = [];
+  const observer = new MutationObserver(() => {
+    const list = today();
+    if (list) drawn.push(list.textContent?.includes("Late review") ?? false);
+  });
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  cleanups.push(() => observer.disconnect());
+  await userEvent.keyboard("d");
+  await expect
+    .element(page.getByRole("list", { name: "Wednesday, November 4" }).getByText("Late review"))
+    .toBeInTheDocument();
+  expect(drawn).not.toEqual([]);
+  expect(drawn.filter((late) => !late)).toEqual([]);
+});
+
+test("calendars that cannot be read leave the view drawn, empty, on open (design D59)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(() => errors.mockRestore());
+  const store = await demoStore(["en-US"]);
+  const broken = Object.assign(Object.create(store) as Store, {
+    calendars: () => Promise.reject(new Error("The disk is gone.")),
+  });
+  render(Promise.resolve(broken), ["en-US"]);
+  await expect
+    .element(page.getByRole("list", { name: "Wednesday, November 4" }))
+    .toBeInTheDocument();
+  expect(errors).toHaveBeenCalled();
+});
+
 test("completing and starring on the tasks screen write the task to the store, to upload (D52)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);

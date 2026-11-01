@@ -31,10 +31,10 @@ const EXEMPT: {
     // The Month's items, its "+N" and its undone chip: the button of each
     // one-line chip, 16 px high, a row every 17 px, as dense as the
     // reference (design D86). Its day's number and the week's pill are
-    // checked. On a touch screen the chips are no buttons: a tap opens the
-    // day, the target (design D86), and nothing is exempt.
+    // checked. With no mouse or pen the chips are no buttons: a tap opens
+    // the day, the target (design D86), and nothing is exempt.
     selector: '[data-view="month"] [role="listitem"] > button',
-    media: "(pointer: fine)",
+    media: "(any-pointer: fine)",
     tallest: 16,
     reason:
       "an accepted gap, not conformance (design D119): Google's density, for a mouse; on a touch screen the day is the target",
@@ -106,7 +106,7 @@ async function show(page: Page, view: "day" | "3days" | "week" | "month" | "agen
 }
 
 for (const colorScheme of ["dark", "light"] as const) {
-  // A phone is a touch screen (a coarse pointer); a wide screen has a mouse.
+  // A phone is a touch screen with no mouse or pen; a wide screen has a mouse.
   for (const [size, viewport, hasTouch] of [
     ["phone", PHONE, true],
     ["wide", WIDE, false],
@@ -121,7 +121,7 @@ for (const colorScheme of ["dark", "light"] as const) {
       });
       const page = await context.newPage();
       await openDemo(page, "day");
-      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(hasTouch);
+      expect(await page.evaluate(() => matchMedia("(any-pointer: fine)").matches)).toBe(!hasTouch);
       await expect(today(page).getByRole("listitem").first()).toBeVisible();
       for (const view of ["day", "3days", "week", "month", "agenda"] as const) {
         await show(page, view);

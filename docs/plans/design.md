@@ -152,7 +152,11 @@ the project.
     one's items are read, so its all-day items and task chips never
     arrive under a press and push the time grid down (about 70 px in the
     demo). The top bar names the new period at once; the Agenda reads its
-    own days ([D87](#D87)), and after it the next view draws once read.
+    own days ([D87](#D87)), and after it the next view draws once read
+    anew, not from the read kept from before it, even of the same days. A
+    read that fails, of the items or of the calendars, ends the wait: the
+    period is drawn empty (an error in the console), so the view never
+    stays on the last period or blank.
 - **D86. The Month view, read from the reference** (and from Google's
   Android app where the reference is silent):
   - six weeks from the week holding the month's first day, as the reference
@@ -177,13 +181,18 @@ the project.
     does (its web app opens a popover instead); items open with PR 6.
     _Changed in PR 6a:_ a tap on an item, a span over several days too,
     opens its details ([D108](#D108)); the rest of the tile still opens the
-    day. _Changed since:_ on a touch screen (`pointer: coarse`) a tap
-    anywhere on a tile opens its day, on an item, "+N" or the undone chip
-    too, as Google's Android app does: there the chips are no buttons, so
-    the tile (on a phone some 50 × 136 px) is the target, not a 16 px
-    chip ([D119](#D119)). A long press still drags an item
-    ([D111](#D111)), and its details open from the day. With a mouse a
-    chip is a button that opens its details, as before;
+    day. _Changed since:_ on a touch screen with no mouse or pen
+    (`any-pointer: fine` does not match: a phone, a tablet) a tap anywhere
+    on a tile opens its day, on an item, "+N" or the undone chip too, as
+    Google's Android app does: there the chips are no buttons, so the
+    tile (on a phone some 50 × 136 px) is the target, not a 16 px chip
+    ([D119](#D119)). A long press still drags an item ([D111](#D111)),
+    and its details open from the day, where every item is a button. A
+    device with a mouse, a trackpad or a pen, a touch laptop too, keeps
+    the chips as buttons that open their details, as before. The day's
+    number is a button named by the date and how many items the day has
+    ("Thursday, November 5, 4 items"; the date alone on an empty day),
+    and "+N"'s name begins with what it shows ("+6 more items on …");
   - previous and next (buttons, keys, a swipe) go to the first day of the
     month before or after; the top bar names the month (D59).
 - **D87. The Agenda**:
@@ -450,13 +459,18 @@ the project.
   exception does not cover it: the day's number (24 px) opens the day,
   where every item is a larger target, but not the item itself. An
   exemption holds only where the page matches its media query, this one
-  `(pointer: fine)`. **On a touch screen the Month conforms**, with no
-  exemption: a tap on a tile opens its day, the chips are no buttons
-  (D86), and the audit's phone runs with a touch screen, so a coarse
-  pointer. A tablet's keyboard reaches the day's number, not the items.
-  With a mouse the gap stays, for the density the owner chose
-  ([D43](#D43)). The spec also proves what axe cannot see
-  ([D120](#D120)).
+  `(any-pointer: fine)`. **On a touch screen the Month conforms**, with
+  no exemption: a tap on a tile opens its day, the chips are no buttons
+  (D86), and the audit's phone runs with a touch screen and no mouse.
+  There an item's details are reached through its day, which is not a
+  2.1.1 or 4.1.2 gap: the day's number is a button that says the day and
+  how many items it has, it opens the Day view, and there each item is a
+  button that opens its details and moves by its keys (D112); a screen
+  reader's double tap on a chip opens the day too. What is lost on such a
+  device with a keyboard is Tab to each chip in the Month, and the
+  Month's own keys, a week at a time ([deferred](#deferred)). With a
+  mouse the gap stays, for the density the owner chose ([D43](#D43)).
+  The spec also proves what axe cannot see ([D120](#D120)).
 - **D120. What the pass changed, and the rules it leaves:**
   - **an item's text on its colour** is white, as the reference draws it
     (Google Calendar keeps white text and colours dark enough for it), and
@@ -594,6 +608,12 @@ the project.
   the wall clock, so it jumps an hour on the change, or goes back over the
   repeated hour. A grid of the elapsed hours (23 or 25) comes if the drift
   is reported.
+- **The Month's chips by Tab on a touch screen with a keyboard** — a
+  tablet with a keyboard and no mouse or pen gets the touch Month
+  ([D86](#D86)): Tab reaches each day's number, not its chips, so an item
+  is opened or moved by keys from the Day view ([D119](#D119)). Telling a
+  keyboard user apart (a key pressed in the Month) could bring the
+  chips' buttons back there.
 - **Forced colours** (Windows' high contrast) — items keep their own fills
   and the rings their accent; the system's colours are not mapped
   ([D120](#D120)).

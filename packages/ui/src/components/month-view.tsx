@@ -2,9 +2,10 @@
 // day a tile with its number and its items as one-line chips, a span over
 // the week's days for an item over several; as many rows as the tiles fit,
 // then "+N". A day, or its "+N", opens in the Day view; an item, its details.
-// On a touch screen a tap anywhere on a day opens it, its items too, as
+// With no mouse or pen, a tap anywhere on a day opens it, its items too, as
 // Google's Android app does: the day is the target, not a 16 px chip
-// (design D86, D119). An item drags to another day, keeping its time (design D111).
+// (design D86, D119). An item drags to another day, keeping its time
+// (design D111).
 import { dayRange, isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -174,6 +175,13 @@ function Week({
           {...props}
           day={day}
           spans={shown.filter(({ span }) => span.firstDay === index)}
+          count={week.spans.reduce(
+            (sum, { span, entry }) =>
+              span.firstDay <= index && index <= span.lastDay
+                ? sum + (entry ? 1 : props.undone.length)
+                : sum,
+            0,
+          )}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
           column={index + 2}
@@ -204,6 +212,7 @@ function Week({
 function DayTile({
   day,
   spans,
+  count,
   more,
   moreRow,
   month,
@@ -220,14 +229,17 @@ function DayTile({
   day: string;
   /** The spans that start on this day (or, continued, at the week's start). */
   spans: readonly StripSpan[];
+  /** How many items the day has, the undone tasks on today among them. */
+  count: number;
   /** How many items "+N" stands for; 0 for none. */
   more: number;
   moreRow: number;
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
-  // A finger's tap on a chip opens the day under it: the chips are no buttons.
-  const touch = useMediaQuery("(pointer: coarse)");
+  // With no mouse or pen a tap on a chip opens the day under it: the chips
+  // are no buttons. A device with one keeps them, a touch laptop too.
+  const touch = !useMediaQuery("(any-pointer: fine)");
   const outside = day.slice(0, 7) !== month.slice(0, 7);
   const isToday = day === today;
   const name = formats.fullDate(day);
@@ -251,7 +263,9 @@ function DayTile({
       <div className="flex justify-center pt-px">
         <button
           type="button"
-          aria-label={name}
+          // The day and how many items it has: a screen reader's way to them
+          // on a touch screen, where the chips are no buttons (design D86).
+          aria-label={count > 0 ? t("month.day", { day: name, count }) : name}
           aria-current={isToday ? "date" : undefined}
           onClick={() => onOpenDay(day)}
           className={[

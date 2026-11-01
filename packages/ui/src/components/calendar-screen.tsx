@@ -106,18 +106,29 @@ export function CalendarScreen({
   const to = addDays(days.at(-1)!, 1);
 
   const [lists, setLists] = useState<{ accounts: Account[]; calendars: Calendar[] } | null>(null);
+  // The calendars could not be read: the view reads none, so it is drawn (design D59).
+  const [listsFailed, setListsFailed] = useState(false);
   useEffect(
     () =>
       liveQuery(
         store,
         async () => ({ accounts: await store.accounts(), calendars: await store.calendars() }),
-        setLists,
+        (result) => {
+          setLists(result);
+          setListsFailed(false);
+        },
+        (error) => {
+          console.error(error);
+          setListsFailed(true);
+        },
       ),
     [store],
   );
   const ids = lists
     ? lists.calendars.filter((calendar) => !hidden.has(calendar.id)).map((calendar) => calendar.id)
-    : null;
+    : listsFailed
+      ? []
+      : null;
 
   // One cache for every view, so a switch of views parses nothing again. The
   // Agenda reads its own days as it scrolls; the other views read their period.
@@ -133,12 +144,19 @@ export function CalendarScreen({
   // A period is drawn once its items are read, so none arrive under a press:
   // the strip's rows would push the time grid down (design D59). Until then
   // the view keeps the period it draws, or on open (and after the Agenda,
-  // which reads its own) draws none.
-  const fresh = !agenda && read !== null && read.from === from && read.to === to;
+  // which reads its own) draws none. A read that fails comes back empty.
+  // The read kept from before the Agenda is not one: the store may have
+  // changed meanwhile, and its live query starts again.
+  const [beforeAgenda, setBeforeAgenda] = useState<Entries | null>(null);
+  const fresh =
+    !agenda && read !== null && read !== beforeAgenda && read.from === from && read.to === to;
   const [held, setHeld] = useState<Drawn | null>(null);
   if (fresh && (held?.read !== read || held.view !== view || held.anchor !== anchor)) {
     setHeld({ view, days, anchor, read });
-  } else if (agenda && held) setHeld(null);
+  } else if (agenda && (held || beforeAgenda !== read)) {
+    setHeld(null);
+    setBeforeAgenda(read);
+  }
   const drawn = fresh ? { view, days, anchor, read } : held;
   const data = drawn?.read ?? { entries: [], undone: [] };
 

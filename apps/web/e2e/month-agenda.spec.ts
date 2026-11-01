@@ -6,7 +6,9 @@ import { openDemo, PHONE, WIDE } from "./support.ts";
 
 const day = (page: Page, name: string) => page.getByRole("list", { name, exact: true });
 const header = (page: Page, name: string) => page.getByRole("heading", { name, exact: true });
-const dayButton = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
+/** A Month day's number: named by its date, then how many items it has (D86). */
+const dayButton = (page: Page, name: string) =>
+  page.getByRole("button", { name: new RegExp(`^${name}(, \\d+ \\S+)?$`) });
 
 test.describe("Month", () => {
   test.use({ viewport: PHONE });
@@ -39,7 +41,7 @@ test.describe("Month", () => {
       day(page, "Monday, November 2").getByRole("listitem", { name: /Reply to Olga/ }),
     ).toHaveCount(0);
     // More than the tile fits: "+N" opens the day.
-    await today.getByRole("button", { name: "6 more items on Wednesday, November 4" }).click();
+    await today.getByRole("button", { name: "+6 more items on Wednesday, November 4" }).click();
     await expect(header(page, "Wednesday, November 4")).toBeVisible();
     await expect(page.getByRole("list", { name: "All day" })).toBeVisible();
   });
@@ -73,18 +75,37 @@ test.describe("Month", () => {
       page,
     }) => {
       await openDemo(page, "month");
+      // A touch screen with no mouse or pen, as the Month asks (D86).
+      expect(
+        await page.evaluate(() => [
+          matchMedia("(pointer: coarse)").matches,
+          matchMedia("(any-pointer: fine)").matches,
+        ]),
+      ).toEqual([true, false]);
       const thursday = day(page, "Thursday, November 5");
       const conference = thursday.getByRole("listitem", { name: "Developer conference, All day" });
       await expect(conference).toBeVisible();
-      // No chip is a button of its own: the day is the target.
+      // No chip is a button of its own: the day is the target, and its
+      // number the button a screen reader reaches, with how many items it has.
       await expect(page.locator('[data-view="month"] [role="listitem"] button')).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Thursday, November 5, 4 items", exact: true }),
+      ).toBeVisible();
       await conference.tap();
       await expect(header(page, "Thursday, November 5")).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      // In the Day view each item is a button again, which opens its details.
+      await page
+        .getByRole("list", { name: "All day" })
+        .getByRole("button", { name: "Developer conference, All day" })
+        .tap();
+      await expect(page.getByRole("dialog", { name: "Developer conference" })).toBeVisible();
+      await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toHaveCount(0);
 
       await page.locator("body").press("m");
       const today = day(page, "Wednesday, November 4");
-      await today.getByRole("listitem", { name: "6 more items on Wednesday, November 4" }).tap();
+      await today.getByRole("listitem", { name: "+6 more items on Wednesday, November 4" }).tap();
       await expect(header(page, "Wednesday, November 4")).toBeVisible();
 
       await page.locator("body").press("m");
@@ -240,7 +261,7 @@ test.describe("in Russian", () => {
     await expect(dayButton(page, "понедельник, 26 октября")).toBeVisible();
     await expect(dayButton(page, "воскресенье, 6 декабря")).toBeVisible();
     await expect(
-      day(page, "среда, 4 ноября").getByRole("button", { name: "Ещё 6 записей, среда, 4 ноября" }),
+      day(page, "среда, 4 ноября").getByRole("button", { name: "+6 записей, среда, 4 ноября" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Главное меню" }).click();
     await page.getByRole("button", { name: "Расписание" }).click();
