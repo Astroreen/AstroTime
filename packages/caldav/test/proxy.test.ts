@@ -51,6 +51,7 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
         Cookie: "app=1",
         Origin: "http://app.localhost",
         "If-Match": '"0"',
+        "OCS-APIRequest": "true",
       },
       body: "<propfind/>",
     }),
@@ -61,6 +62,7 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
     "content-type",
     "depth",
     "if-match",
+    "ocs-apirequest",
   ]);
   expect(seen[0]?.init).toMatchObject({
     method: "PROPFIND",

@@ -100,7 +100,22 @@ export async function revokeAppPassword(
       Authorization: basic(credentials),
     },
   });
-  if (response.status === 200 || response.status === 401) return;
+  if (response.status === 200) return;
+  // A 401 means revoked only if the password no longer signs in at all (it
+  // was revoked before); a refused call of any other kind is not a revocation.
+  if (response.status === 401) {
+    const check = await http({
+      method: "GET",
+      url: new URL("ocs/v2.php/cloud/user", serverUrl.endsWith("/") ? serverUrl : `${serverUrl}/`)
+        .href,
+      headers: {
+        "OCS-APIRequest": "true",
+        Accept: "application/json",
+        Authorization: basic(credentials),
+      },
+    });
+    if (check.status === 401) return;
+  }
   throw new Error(`${serverUrl} would not revoke the app password (${response.status}).`);
 }
 

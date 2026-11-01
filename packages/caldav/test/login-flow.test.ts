@@ -172,8 +172,18 @@ test("an app password is revoked with itself, as Nextcloud's OCS API asks; one r
       },
     ],
   ]);
-  // Revoked in Nextcloud's settings already: nothing left to do.
+  // Refused, and the password signs in no more: revoked in Nextcloud's settings already.
   await revokeAppPassword(answering(401), "https://cloud.example.com", credentials);
+  // Refused, while the password still signs in (the OCS header lost on the way): not revoked.
+  const stillValid: HttpClient = async (request) => ({
+    status: request.method === "DELETE" ? 401 : 200,
+    url: request.url,
+    header: () => null,
+    body: "{}",
+  });
+  await expect(
+    revokeAppPassword(stillValid, "https://cloud.example.com", credentials),
+  ).rejects.toThrow("would not revoke");
   // Not an app password (403), or a server that fails: it is still valid there.
   await expect(
     revokeAppPassword(answering(403), "https://cloud.example.com", credentials),
