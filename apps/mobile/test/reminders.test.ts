@@ -216,6 +216,27 @@ test("without a kept record, the alarms Android still holds are cancelled first:
   expect(phone.calls).toHaveLength(3);
 });
 
+test("a failed read of the alarms Android holds still schedules the set; the next set cancels the old ones, not ours", async () => {
+  const phone = device();
+  await scheduler(phone).reminders.schedule([
+    reminder("call", NOW + 30 * MINUTE),
+    reminder("lunch", NOW + 3 * 60 * MINUTE),
+  ]);
+  const read = phone.native.getPending;
+  phone.native.getPending = () => Promise.reject(new Error("Storage unavailable."));
+  const { reminders } = scheduler(phone);
+  await reminders.schedule([reminder("gym", NOW + 9 * 60 * MINUTE)]);
+  expect(phone.last().scheduled).toEqual(["gym"]);
+  // "gym" took id 1 and with it the old alarm of "call"; "lunch" is left.
+  expect([...phone.pending.values()].map(({ extra }) => extra.reminder.id)).toEqual([
+    "gym",
+    "lunch",
+  ]);
+  phone.native.getPending = read;
+  await reminders.schedule([reminder("gym", NOW + 9 * 60 * MINUTE)]);
+  expect([...phone.pending.values()].map(({ extra }) => extra.reminder.id)).toEqual(["gym"]);
+});
+
 test("ids: allocated per reminder from a kept counter, never shared, never handed out again after a restart", async () => {
   const phone = device();
   const preferences = memoryPreferences();
@@ -372,6 +393,27 @@ test("the app ended while asking: kept as not asked, so the next run asks again"
   await again.schedule([reminder("call", NOW + MINUTE)]);
   expect(again.permission()).toBe("granted");
   expect(phone.last().scheduled).toEqual(["call"]);
+  expect(JSON.parse(preferences.values.get(KEPT_KEY)!).asked).toBe(true);
+});
+
+test("a request that fails is not kept as asked, though the set is saved after it", async () => {
+  const phone = device({ display: "prompt", answer: "granted" });
+  const preferences = memoryPreferences();
+  const request = phone.native.requestPermissions;
+  phone.native.requestPermissions = () => Promise.reject(new Error("No activity."));
+  const { reminders } = scheduler(phone, preferences);
+  await expect(reminders.schedule([reminder("call", NOW + MINUTE)])).rejects.toThrow(
+    "No activity.",
+  );
+  // Allowed in the system's settings meanwhile: the set is saved, "asked" not with it.
+  phone.display = "granted";
+  await reminders.schedule([reminder("call", NOW + MINUTE)]);
+  expect(phone.last().scheduled).toEqual(["call"]);
+  expect(JSON.parse(preferences.values.get(KEPT_KEY) ?? "{}").asked).not.toBe(true);
+  phone.display = "prompt";
+  phone.native.requestPermissions = request;
+  await scheduler(phone, preferences).reminders.schedule([reminder("call", NOW + MINUTE)]);
+  expect(phone.asked()).toBe(1);
   expect(JSON.parse(preferences.values.get(KEPT_KEY)!).asked).toBe(true);
 });
 

@@ -331,7 +331,12 @@ were checked on 2026-11-01.
     the notification already shown is not taken off the screen. Without a
     map that reads (the preferences cleared, or written wrong), the first
     set cancels every alarm the plugin still holds (`getPending`) before
-    ids are handed out from 1 again, so no old alarm shares one.
+    ids are handed out from 1 again, so no old alarm shares one. The
+    plugin's cancel only stops alarms: a notification already shown stays
+    on screen (`LocalNotificationManager.cancel` in
+    `@capacitor/local-notifications` 8.3.1). A read that fails does not
+    stop the set: it is tried with the next one, skipping the ids handed out
+    since, as scheduling under an id already replaced its old alarm.
   - **Past reminders.** The set reaches an hour back
     ([foundation D100](foundation.md#D100)). One handed over before has
     fired from its alarm, and is never shown again. One that reaches
@@ -348,7 +353,8 @@ were checked on 2026-11-01.
     the plugin's, not the adapter's.
   - **The permission** is asked by the adapter once, the first time a set
     holds a reminder ahead (so the user sees why), and remembered once the
-    user answered (a prompt the app ended in is asked again): after a
+    user answered (a prompt the app ended in, or one that failed, is asked
+    again): after a
     refusal the "Reminders" switch asks again, as on the web; refused twice,
     Android stops asking and the setting says to allow notifications in the
     system's settings. Nothing is scheduled without it (the plugin would ask

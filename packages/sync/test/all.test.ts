@@ -390,6 +390,30 @@ test("signing in again revokes the app password Login Flow gave the one replaced
   expect(server.revoked).toHaveLength(1);
 });
 
+test("signing in again repairs credentials the secret store cannot read: the new ones are saved", async () => {
+  const { secrets, context, add } = await setup();
+  const { account } = await add("a.example", "old");
+  const get = secrets.get;
+  secrets.get = () => Promise.reject(new Error("Keystore unavailable."));
+  const again = await saveAccount(
+    { ...context, http: nextcloud().http },
+    {
+      name: "astro@a.example",
+      serverUrl: "https://a.example/",
+      homeUrl: "https://a.example/",
+      credentials: { username: "astro", password: "new" },
+      loginFlow: true,
+    },
+  );
+  secrets.get = get;
+  expect([again.added, again.account.id, await again.replaced]).toEqual([
+    false,
+    account.id,
+    "none",
+  ]);
+  expect(JSON.parse(secrets.values.get(`account:${account.id}`)!).password).toBe("new");
+});
+
 test("signing in as another user of the same calendar home adds that user, never takes over", async () => {
   const { store, secrets, context } = await setup();
   const as = (username: string) =>

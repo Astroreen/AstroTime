@@ -162,14 +162,20 @@ export function androidReminders(options: {
    * Asks the user; the answer outranks any read still on its way. Kept as
    * asked once answered: a prompt the app ended in is asked again.
    */
-  const request = async (): Promise<ReminderPermission> => {
-    kept.asked = true;
-    const { display } = await native.requestPermissions();
-    save();
-    reads++;
-    update({ permission: permissionOf(display) });
-    return permission;
-  };
+  let asking: Promise<ReminderPermission> | null = null;
+  const request = (): Promise<ReminderPermission> =>
+    (asking ??= (async () => {
+      try {
+        const { display } = await native.requestPermissions();
+        kept.asked = true;
+        save();
+        reads++;
+        update({ permission: permissionOf(display) });
+        return permission;
+      } finally {
+        asking = null;
+      }
+    })());
 
   /** Cancels `gone`; their entries (`forget`) are dropped only once Android did, so a failed cancel is tried again. */
   const cancel = async (gone: readonly number[], forget: readonly string[]) => {
@@ -181,13 +187,22 @@ export function androidReminders(options: {
 
   const apply = async (set: readonly ScheduledReminder[]) => {
     // Cancelling needs no permission, nor does reading what the plugin holds.
+    // The plugin's cancel stops an alarm and leaves a notification already
+    // shown on screen. A failed read is tried again with the next set, and
+    // this one is scheduled all the same: an id handed out since is skipped
+    // then, as scheduling under an id replaced the old alarm it had.
     if (orphans) {
-      const { notifications } = await native.getPending();
-      await cancel(
-        notifications.map(({ id }) => id),
-        [],
-      );
-      orphans = false;
+      try {
+        const { notifications } = await native.getPending();
+        const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
+        await cancel(
+          notifications.map(({ id }) => id).filter((id) => !ours.has(id)),
+          [],
+        );
+        orphans = false;
+      } catch {
+        // Read again with the next set.
+      }
     }
     await refresh();
     const at = now();

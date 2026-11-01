@@ -248,7 +248,9 @@ export async function saveAccount(
     username: input.credentials.username,
     homeUrl: input.homeUrl,
   });
-  const old = added ? null : await readSecret(secrets, account.id);
+  // An old secret that cannot be read only leaves its app password unrevoked:
+  // signing in again is how the user repairs broken credentials.
+  const old = added ? null : await readSecret(secrets, account.id).catch(() => null);
   try {
     await secrets.set(keyOf(account.id), secret);
   } catch (error) {
