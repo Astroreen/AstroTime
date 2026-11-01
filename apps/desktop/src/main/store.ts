@@ -7,6 +7,8 @@ import type { StoreCommand } from "../store/index.ts";
 
 /** Quick ends in a row before the store is not started again. */
 const RESTARTS = 3;
+/** Restarts in one run of the app, at any pace. */
+const MAX_RESTARTS = 20;
 /** An end this soon after the start counts as failing to start. */
 const QUICK_END_MS = 10_000;
 /** How long quitting waits for the store to close its database. */
@@ -30,6 +32,8 @@ export function storeProcess(entry: string, database: string, restarted: () => v
   // Ends in a row, each soon after its start: a store that cannot open the
   // database is not started for ever; the page then shows the store failed.
   let quickEnds = 0;
+  // And however slowly it keeps ending, not more than this in one run of the app.
+  let restarts = 0;
   const start = () => {
     const started = Date.now();
     const child = utilityProcess.fork(entry, [database], { serviceName: "AstroTime store" });
@@ -38,7 +42,8 @@ export function storeProcess(entry: string, database: string, restarted: () => v
       alive = false;
       if (closing) return;
       quickEnds = Date.now() - started < QUICK_END_MS ? quickEnds + 1 : 0;
-      if (quickEnds >= RESTARTS) {
+      restarts++;
+      if (quickEnds >= RESTARTS || restarts > MAX_RESTARTS) {
         console.error(`The store's process ended (${code}) ${RESTARTS} times at start; not again.`);
         return;
       }

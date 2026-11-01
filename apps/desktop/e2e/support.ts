@@ -33,6 +33,9 @@ export async function launch(
     colorScheme: "dark",
   });
   const page = await app.firstWindow();
+  // The first load ends before the reload that brings the frozen clock in;
+  // a reload over a load still going is aborted (net::ERR_ABORTED).
+  await page.waitForLoadState("load");
   await page.clock.setFixedTime(NOW);
   await page.reload();
   return { app, page };

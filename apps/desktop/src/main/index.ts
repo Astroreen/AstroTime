@@ -67,6 +67,13 @@ app.on("web-contents-created", (_event, contents) => {
     event.preventDefault();
     openInBrowser(event.url);
   });
+  // A redirect or a frame's navigation stays inside the app too.
+  contents.on("will-redirect", (event) => {
+    if (!isAppUrl(event.url)) event.preventDefault();
+  });
+  contents.on("will-frame-navigate", (event) => {
+    if (!isAppUrl(event.url)) event.preventDefault();
+  });
   contents.setWindowOpenHandler(({ url }) => {
     openInBrowser(url);
     return { action: "deny" };
