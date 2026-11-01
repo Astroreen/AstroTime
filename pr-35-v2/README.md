@@ -12,6 +12,6 @@
 - `e2e.log` — `CI=1 pnpm run e2e` in `apps/web`: 106 passed, 25 skipped
   (the screenshot specs), 0 failed; `a11y.spec.ts` with no axe violation.
 - `a11y-on-main-ui.log` — the same `a11y.spec.ts` run with `packages/ui/src`
-  as on `main` (bba4599..acd2866): 18 of its 30 tests fail, 14 of the 17
+  as on `main` (acd2866): 18 of its 30 tests fail, 14 of the 17
   axe audits (`color-contrast`, `label-content-name-mismatch`,
   `target-size`) and 4 of the 13 checks axe cannot see.
