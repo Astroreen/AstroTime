@@ -5,6 +5,7 @@ import {
   createItem,
   deleteItem,
   editItem,
+  hasOccurrence,
   occurrencesBetween,
   repeatOf,
   timesOf,
@@ -192,6 +193,37 @@ describe("editing writes what the user changed, and nothing else (D7)", () => {
         ],
         ["DTEND;TZID=Europe/Vilnius:20261116T110000", "DTEND;TZID=Europe/Vilnius:20261116T153000"],
       ])}\r\n`,
+    );
+  });
+
+  test("Google's event: its DURATION gives way to a DTEND in its own TZID, every other line kept", () => {
+    const source = fixture("google-event-unknown-tz.ics");
+    const { ics } = editItem(
+      CalendarObject.parse(source),
+      {
+        summary: "Night train to Vienna",
+        time: {
+          start: zonedTime("2026-10-30T22:00:00", "Europe/Berlin"),
+          end: zonedTime("2026-10-31T00:30:00", "Europe/Berlin"),
+        },
+      },
+      { now: NOW },
+    );
+    // Google wrote no VTIMEZONE for its TZID, and none is made for a TZID
+    // already written (D104); SEQUENCE and LAST-MODIFIED are new.
+    expect(ics).toBe(
+      edit(source, [
+        [
+          "DTSTART;TZID=Europe/Berlin:20261030T230000",
+          "DTSTART;TZID=Europe/Berlin:20261030T220000",
+        ],
+        ["DURATION:PT2H", null],
+        ["DTSTAMP:20261028T100000Z", `DTSTAMP:${STAMP}`],
+        [
+          "SUMMARY:Night train",
+          `SUMMARY:Night train to Vienna\r\nDTEND;TZID=Europe/Berlin:20261031T003000\r\nSEQUENCE:1\r\nLAST-MODIFIED:${STAMP}`,
+        ],
+      ]),
     );
   });
 
@@ -768,6 +800,202 @@ describe("the scope of an edit of one occurrence (D11)", () => {
   });
 });
 
+/** A calendar object of the VEVENTs given, each a list of lines. */
+function calendar(...events: string[][]): string {
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//test//EN"];
+  for (const event of events) {
+    lines.push("BEGIN:VEVENT", "UID:moved", "DTSTAMP:20261001T000000Z", ...event, "END:VEVENT");
+  }
+  return [...lines, "END:VCALENDAR", ""].join("\r\n");
+}
+
+describe("a series moves as its occurrence moved (D105)", () => {
+  test("all: an RDATE and RECURRENCE-IDs at other times shift by as much, across DST", () => {
+    // Mondays at 9:00 from October 19, in summer time; an RDATE on Wednesday
+    // October 28 at 14:00, after the change; November 2 moved to 16:00 on its own.
+    const source = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261019T090000",
+        "DTEND;TZID=Europe/Vilnius:20261019T100000",
+        "SUMMARY:Lesson",
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        "RDATE;TZID=Europe/Vilnius:20261028T140000",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261102T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261102T160000",
+        "DTEND;TZID=Europe/Vilnius:20261102T170000",
+        "SUMMARY:Lesson (late)",
+      ],
+    );
+    expect(starts(source, "2026-10-01")).toEqual([
+      "2026-10-19T09:00:00",
+      "2026-10-26T09:00:00",
+      "2026-10-28T14:00:00",
+      "2026-11-02T16:00:00",
+      "2026-11-09T09:00:00",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(source),
+      { time: { start: vilnius("2026-10-26T10:00:00"), end: vilnius("2026-10-26T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-10-26T09:00:00") },
+    );
+    expect(ics).toContain("RDATE;TZID=Europe/Vilnius:20261028T150000\r\n");
+    expect(ics).toContain("RECURRENCE-ID;TZID=Europe/Vilnius:20261102T100000\r\n");
+    expect(starts(ics, "2026-10-01")).toEqual([
+      "2026-10-19T10:00:00",
+      "2026-10-26T10:00:00",
+      "2026-10-28T15:00:00",
+      "2026-11-02T16:00:00",
+      "2026-11-09T10:00:00",
+    ]);
+  });
+
+  test("all: a rule's hours shift with it, and an exception at its other hour follows", () => {
+    // Daily at 9:00 and 14:00; Tuesday's 14:00 renamed, at its own time.
+    const source = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T093000",
+        "SUMMARY:Pills",
+        "RRULE:FREQ=DAILY;COUNT=6;BYHOUR=9,14",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261103T140000",
+        "DTSTART;TZID=Europe/Vilnius:20261103T140000",
+        "DTEND;TZID=Europe/Vilnius:20261103T143000",
+        "SUMMARY:Pills, with food",
+      ],
+    );
+    const { ics } = editItem(
+      CalendarObject.parse(source),
+      { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T10:30:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain("RRULE:FREQ=DAILY;COUNT=6;BYHOUR=10,15\r\n");
+    const occurrences = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-11-01",
+      to: "2026-11-10",
+      timeZone,
+    }).map((o) => [o.start.type === "zoned" ? o.start.local : "", o.item.summary]);
+    expect(occurrences).toEqual([
+      ["2026-11-02T10:00:00", "Pills"],
+      ["2026-11-02T15:00:00", "Pills"],
+      ["2026-11-03T10:00:00", "Pills"],
+      ["2026-11-03T15:00:00", "Pills, with food"],
+      ["2026-11-04T10:00:00", "Pills"],
+      ["2026-11-04T15:00:00", "Pills"],
+    ]);
+  });
+
+  test("the series itself, with no occurrence named: its EXDATEs and exceptions move too", () => {
+    const { ics } = editItem(
+      load("nextcloud-web-event-recurring.ics"),
+      { time: { start: vilnius("2026-11-23T10:00:00"), end: vilnius("2026-11-23T10:30:00") } },
+      { now: NOW },
+    );
+    expect(ics).toContain("EXDATE;TZID=Europe/Vilnius:20261207T100000\r\n");
+    expect(ics).toContain("RECURRENCE-ID;TZID=Europe/Vilnius:20261130T100000\r\n");
+    expect(starts(ics)).toEqual([
+      "2026-11-23T10:00:00",
+      "2026-11-30T11:00:00",
+      "2026-12-14T10:00:00",
+      "2026-12-21T10:00:00",
+      "2026-12-28T10:00:00",
+    ]);
+  });
+
+  // This and following on another day: the new series' rule names the new day.
+  test.each([
+    {
+      shape: "monthly on the second Tuesday, to the third Wednesday",
+      rule: "FREQ=MONTHLY;BYDAY=2TU",
+      start: "20261013",
+      occurrence: "2026-11-10",
+      to: "2026-11-18",
+      written: "FREQ=MONTHLY;BYDAY=3WE",
+      after: ["2026-11-18", "2026-12-16", "2027-01-20"],
+    },
+    {
+      shape: "monthly on the 15th, to the 16th",
+      rule: "FREQ=MONTHLY;BYMONTHDAY=15",
+      start: "20261015",
+      occurrence: "2026-11-15",
+      to: "2026-11-16",
+      written: "FREQ=MONTHLY;BYMONTHDAY=16",
+      after: ["2026-11-16", "2026-12-16", "2027-01-16"],
+    },
+    {
+      shape: "weekly on Monday, Wednesday and Friday, a day later",
+      rule: "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+      start: "20261102",
+      occurrence: "2026-11-09",
+      to: "2026-11-10",
+      written: "FREQ=WEEKLY;BYDAY=TU,TH,SA",
+      after: ["2026-11-10", "2026-11-12", "2026-11-14"],
+    },
+    {
+      shape: "yearly on November 4, to December 5",
+      rule: "FREQ=YEARLY;BYMONTH=11;BYMONTHDAY=4",
+      start: "20251104",
+      occurrence: "2026-11-04",
+      to: "2026-12-05",
+      written: "FREQ=YEARLY;BYMONTH=12;BYMONTHDAY=5",
+      after: ["2026-12-05", "2027-12-05"],
+    },
+  ])("this and following, $shape", ({ rule, start, occurrence, to, written, after }) => {
+    const source = calendar([
+      `DTSTART;TZID=Europe/Vilnius:${start}T090000`,
+      `DTEND;TZID=Europe/Vilnius:${start}T100000`,
+      "SUMMARY:Club",
+      `RRULE:${rule}`,
+    ]);
+    const { ics, split } = editItem(
+      CalendarObject.parse(source),
+      { time: { start: vilnius(`${to}T09:00:00`), end: vilnius(`${to}T10:00:00`) } },
+      {
+        now: NOW,
+        scope: "following",
+        recurrenceId: vilnius(`${occurrence}T09:00:00`),
+        newUid: "club-2",
+      },
+    );
+    expect(ics).toContain(`RRULE:${rule};UNTIL=`);
+    expect(split).toContain(`RRULE:${written}\r\n`);
+    expect(starts(split!, "2026-11-01", "2028-01-01").slice(0, after.length)).toEqual(
+      after.map((day) => `${day}T09:00:00`),
+    );
+  });
+
+  test("this occurrence on another day leaves the rule as it is", () => {
+    const source = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261013T090000",
+      "DTEND;TZID=Europe/Vilnius:20261013T100000",
+      "RRULE:FREQ=MONTHLY;BYDAY=2TU",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(source),
+      {
+        time: { start: vilnius("2026-11-18T09:00:00"), end: vilnius("2026-11-18T10:00:00") },
+      },
+      { now: NOW, scope: "this", recurrenceId: vilnius("2026-11-10T09:00:00") },
+    );
+    expect(ics).toContain("RRULE:FREQ=MONTHLY;BYDAY=2TU\r\n");
+    expect(starts(ics, "2026-11-01", "2026-12-01")).toEqual(["2026-11-18T09:00:00"]);
+  });
+});
+
+describe("a series still has an occurrence", () => {
+  const series = () => load("nextcloud-web-event-recurring.ics");
+  test("of its rule, or an exception; not one excluded, nor one after its end", () => {
+    expect(hasOccurrence(series(), vilnius("2026-12-14T09:00:00"))).toBe(true);
+    expect(hasOccurrence(series(), vilnius("2026-11-30T09:00:00"))).toBe(true);
+    expect(hasOccurrence(series(), vilnius("2026-12-07T09:00:00"))).toBe(false);
+    expect(hasOccurrence(series(), vilnius("2027-01-04T09:00:00"))).toBe(false);
+    expect(hasOccurrence(series(), vilnius("2026-12-14T10:00:00"))).toBe(false);
+  });
+});
+
 describe("deleting with a scope (D11)", () => {
   const source = fixture("nextcloud-web-event-recurring.ics");
   const series = () => CalendarObject.parse(source);
@@ -824,5 +1052,29 @@ describe("deleting with a scope (D11)", () => {
       }),
     ).toBeNull();
     expect(deleteItem(load("nextcloud-web-event-timed.ics"), { now: NOW })).toBeNull();
+  });
+
+  test("a series held without its master: this exception, or each from it on", () => {
+    const exception = (day: string) => [
+      `RECURRENCE-ID;TZID=Europe/Vilnius:${day}T090000`,
+      `DTSTART;TZID=Europe/Vilnius:${day}T090000`,
+      `DTEND;TZID=Europe/Vilnius:${day}T100000`,
+    ];
+    const orphans = calendar(exception("20261105"), exception("20261112"), exception("20261119"));
+    const options = { now: NOW, recurrenceId: vilnius("2026-11-12T09:00:00") };
+    const one = deleteItem(CalendarObject.parse(orphans), { ...options, scope: "this" })!;
+    expect(starts(one)).toEqual(["2026-11-05T09:00:00", "2026-11-19T09:00:00"]);
+    const following = deleteItem(CalendarObject.parse(orphans), {
+      ...options,
+      scope: "following",
+    })!;
+    expect(starts(following)).toEqual(["2026-11-05T09:00:00"]);
+    expect(
+      deleteItem(CalendarObject.parse(orphans), {
+        ...options,
+        scope: "following",
+        recurrenceId: vilnius("2026-11-05T09:00:00"),
+      }),
+    ).toBeNull();
   });
 });

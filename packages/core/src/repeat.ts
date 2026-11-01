@@ -168,3 +168,97 @@ export function weekdayOf(time: ItemTime): Weekday {
   const day = new Date(`${localOf(time).slice(0, 10)}T00:00:00Z`).getUTCDay();
   return WEEKDAYS[(day + 6) % 7]!;
 }
+
+/** Which of its month's weekdays like it a day (`YYYY-MM-DD`) is: 1–4, or −1 for one in the last week. */
+export function nthWeekdayOf(day: string): number {
+  const date = Number(day.slice(8, 10));
+  const length = new Date(
+    Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0),
+  ).getUTCDate();
+  return date + 7 > length ? -1 : Math.ceil(date / 7);
+}
+
+const DAY_MS = 86_400_000;
+const daysBetween = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+const unique = <T>(values: readonly T[]) => [...new Set(values)];
+
+/**
+ * A rule moved with its series' start, from `from` to `to` on the series'
+ * wall clock (docs/plans/foundation.md#D105), so the new start is one of its
+ * occurrences and the others move with it. Weekdays shift by as many days
+ * (Monday and Wednesday a day later are Tuesday and Thursday); the start's
+ * nth weekday of its month becomes the new start's, as the repeat picker
+ * names it (2TU moved to the third Wednesday is 3WE); the start's day of the
+ * month and its month become the new start's; hours and minutes shift as the
+ * start's did. Every other part stays as written.
+ */
+export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.Recur {
+  const moved = rule.clone();
+  const parts = moved.parts as Record<string, (string | number)[] | undefined>;
+  const fromDay = localOf(from).slice(0, 10);
+  const toDay = localOf(to).slice(0, 10);
+  const days = daysBetween(fromDay, toDay);
+  const inMonth = rule.freq === "MONTHLY" || (rule.freq === "YEARLY" && parts["BYMONTH"]);
+  if (days !== 0) {
+    const shift = (weekday: Weekday) =>
+      WEEKDAYS[(((WEEKDAYS.indexOf(weekday) + days) % 7) + 7) % 7]!;
+    // The start's own nth weekday: the 4th in the month's last week is also its last.
+    const own = new Set([
+      `${nthWeekdayOf(fromDay)}${weekdayOf(from)}`,
+      `${Math.ceil(Number(fromDay.slice(8)) / 7)}${weekdayOf(from)}`,
+    ]);
+    const byDay = parts["BYDAY"]?.map((value) => {
+      const match = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/.exec(String(value));
+      if (!match) return value;
+      const weekday = match[2] as Weekday;
+      if (!match[1]) return shift(weekday);
+      const ordinal = Number(match[1]);
+      if (inMonth && own.has(`${ordinal}${weekday}`))
+        return `${nthWeekdayOf(toDay)}${weekdayOf(to)}`;
+      return `${ordinal}${shift(weekday)}`;
+    });
+    if (byDay) parts["BYDAY"] = unique(byDay);
+    if (parts["BYMONTHDAY"] && (rule.freq === "MONTHLY" || rule.freq === "YEARLY")) {
+      const date = Number(fromDay.slice(8));
+      parts["BYMONTHDAY"] = unique(
+        parts["BYMONTHDAY"].map((value) =>
+          Number(value) === date ? Number(toDay.slice(8)) : value,
+        ),
+      );
+    }
+    if (parts["BYMONTH"] && rule.freq === "YEARLY") {
+      const months = Number(toDay.slice(5, 7)) - Number(fromDay.slice(5, 7));
+      parts["BYMONTH"] = unique(
+        parts["BYMONTH"].map((value) => ((((Number(value) - 1 + months) % 12) + 12) % 12) + 1),
+      );
+    }
+  }
+  if (from.type !== "date" && to.type !== "date") {
+    const shifted = (name: string, by: number, modulo: number) => {
+      const values = parts[name];
+      if (values && by !== 0) {
+        parts[name] = unique(values.map((v) => (((Number(v) + by) % modulo) + modulo) % modulo));
+      }
+    };
+    const part = (time: string, at: number) => Number(time.slice(at, at + 2));
+    shifted("BYHOUR", part(to.local, 11) - part(from.local, 11), 24);
+    shifted("BYMINUTE", part(to.local, 14) - part(from.local, 14), 60);
+  }
+  return moved;
+}
+
+/**
+ * A `Repeat` moved with its series' start from day `from` to day `to`, as
+ * `movedRule` moves its RRULE: what the edit dialog shows once the start's
+ * date changed.
+ */
+export function movedRepeat(repeat: Repeat, from: string, to: string): Repeat {
+  if (from === to) return repeat;
+  const start: ItemTime = { type: "date", date: from };
+  const end: ItemTime = { type: "date", date: to };
+  const moved = readRule(movedRule(ruleOf(repeat, start), start, end), end, true).repeat;
+  // No weekdays is the start's own, wherever it goes.
+  const weekdays = repeat.weekdays.length === 0 ? [] : moved.weekdays;
+  return { ...repeat, weekdays, monthlyWeekday: moved.monthlyWeekday };
+}

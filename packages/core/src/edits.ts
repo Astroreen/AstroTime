@@ -9,7 +9,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { readItem } from "./item.ts";
-import { ruleOf, type Repeat } from "./repeat.ts";
+import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
 import { fromIcalTime, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
@@ -126,7 +126,8 @@ function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | nu
  * The object with `changes` made in `scope` (all occurrences by default).
  * "This and following" ends the series before the occurrence and returns
  * the rest as a new series, `split`, under `newUid`; from the first
- * occurrence it is "all". Returns the new iCalendar text of each.
+ * occurrence it is "all". A series with no `recurrenceId` is edited as a
+ * whole. Returns the new iCalendar text of each.
  */
 export function editItem(
   object: CalendarObject,
@@ -144,13 +145,19 @@ export function editItem(
   const recurrenceId = options.recurrenceId ?? null;
   const master = copy.components.master;
   const scope = options.scope ?? "all";
-  if (recurrenceId === null || !master || !isSeries(master)) {
-    const component = master && !isSeries(master) ? master : componentOf(copy, recurrenceId);
+  if (!master || !isSeries(master)) {
+    // An item that does not repeat, or one exception of a series held without its master.
+    const component = master ?? componentOf(copy, recurrenceId);
     apply(component, copy.root, changes, now);
     if (changes.repeat !== undefined && component === master) {
       setRepeat(component, changes.repeat);
       if (changes.repeat === null) dropRecurrence(copy.root, component);
     }
+    return { ics: copy.serialize(), split: null };
+  }
+  if (recurrenceId === null) {
+    // The series itself: every occurrence, as its first one moved.
+    editSeries(copy.root, changes, null, timesOf(copy, null), now);
     return { ics: copy.serialize(), split: null };
   }
 
@@ -178,6 +185,7 @@ export function editItem(
  * The object without the occurrences `scope` covers, or `null` when none
  * are left and the object itself goes. This occurrence is an `EXDATE` (its
  * exception, if any, goes); this and following ends the series before it.
+ * A series held without its master loses the exception, or each from it on.
  */
 export function deleteItem(
   object: CalendarObject,
@@ -194,10 +202,17 @@ export function deleteItem(
   const master = copy.components.master;
   if (recurrenceId === null || scope === "all" || (master && !isSeries(master))) return null;
   if (!master) {
-    // Only exceptions are here: the one asked for goes, and the object with the last.
-    const component = componentOf(copy, recurrenceId);
-    copy.root.removeSubcomponent(component);
-    return copy.root.getAllSubcomponents(component.name).length > 0 ? copy.serialize() : null;
+    // Only exceptions are here: the one asked for goes, or each from it on,
+    // and the object with the last.
+    const at = orderKey(recurrenceId, recurrenceId);
+    const { exceptions } = copy.components;
+    const gone = exceptions.filter((exception) => {
+      const id = recurrenceIdOf(exception);
+      if (id === null) return false;
+      return scope === "following" ? orderKey(id, recurrenceId) >= at : sameTime(id, recurrenceId);
+    });
+    for (const exception of gone) copy.root.removeSubcomponent(exception);
+    return exceptions.length > gone.length ? copy.serialize() : null;
   }
   if (scope === "following") {
     if (isFirst(master, recurrenceId)) return null;
@@ -429,18 +444,32 @@ function withLocal(template: ItemTime, local: string): ItemTime {
   };
 }
 
+/** A time's wall clock as milliseconds, read as if it were UTC; a date at its midnight. */
+const wallMs = (time: ItemTime) =>
+  Date.parse(`${time.type === "date" ? `${time.date}T00:00:00` : time.local}Z`);
+
 /**
- * Moves a time as `shown` moved from `shownBefore`: as many days on, at
- * `shown`'s wall clock, in its zone and kind. So a series' start, its
- * EXDATEs and its RECURRENCE-IDs follow an occurrence moved from 9:00 to
- * 10:00 by the wall clock, across a DST change too, and a date becomes a
- * time (or a time a date) as the occurrence did.
+ * Moves times as an occurrence moved from `from` to `to`: by the same
+ * wall-clock time, in `to`'s zone and kind. So a series moved from 9:00 to
+ * 10:00 has its start, its RDATE at 14:00, its EXDATEs and RECURRENCE-IDs an
+ * hour later on the wall clock (the RDATE at 15:00), across a DST change too.
+ * Made all-day, each moves by whole days; made timed, each date takes `to`'s
+ * time of day.
  */
-function place(time: ItemTime, shownBefore: ItemTime, shown: ItemTime): ItemTime {
-  const day = addDays(dayOf(time), daysBetween(dayOf(shownBefore), dayOf(shown)));
-  return shown.type === "date"
-    ? { type: "date", date: day }
-    : withLocal(shown, `${day}T${shown.local.slice(11)}`);
+function mover(from: ItemTime, to: ItemTime): (time: ItemTime) => ItemTime {
+  if (to.type === "date") {
+    const days = daysBetween(dayOf(from), dayOf(to));
+    return (time) => ({ type: "date", date: addDays(dayOf(time), days) });
+  }
+  const delta = wallMs(to) - wallMs(from);
+  return (time) => withLocal(to, new Date(wallMs(time) + delta).toISOString().slice(0, 19));
+}
+
+/** An occurrence's times moved together from where `from` is to where `to` is, on `from`'s clock. */
+function translated(times: ItemTimes, from: ItemTime, to: ItemTime): ItemTimes {
+  const move = mover(from, to);
+  const moved = (time: ItemTime | null) => time && move(inFrameOf(time, from));
+  return { start: moved(times.start), end: moved(times.end) };
 }
 
 /** A time on the series' wall clock: a RECURRENCE-ID in UTC read in the series' zone. */
@@ -548,17 +577,19 @@ function occurrenceKeys(master: ICAL.Component, last: string): Set<string> | nul
 
 /**
  * Edits every occurrence through the master. A new time moves the series
- * as the occurrence `shown` moved (`place`), and its EXDATEs and the
- * RECURRENCE-IDs of its exceptions with it; an exception not moved on its
- * own follows, one moved keeps its time. A changed field reaches each
- * exception that had the master's value; one changed on its own keeps it.
- * The occurrence edited gets the changes as given. Exceptions and EXDATEs
- * that no longer name an occurrence of the new rule go.
+ * as the occurrence `shown` moved (`mover`): its start, the days and hours
+ * its rule names (`movedRule`), its RDATEs and EXDATEs and the
+ * RECURRENCE-IDs of its exceptions; an exception not moved on its own
+ * follows, one moved keeps its time. A changed field reaches each exception
+ * that had the master's value; one changed on its own keeps it. The
+ * occurrence edited (`recurrenceId`; `null` for the series itself) gets the
+ * changes as given. Exceptions and EXDATEs that no longer name an occurrence
+ * of the new rule go.
  */
 function editSeries(
   root: ICAL.Component,
   changes: ItemChanges,
-  recurrenceId: ItemTime,
+  recurrenceId: ItemTime | null,
   shown: ItemTimes,
   now: ICAL.Time,
 ): void {
@@ -570,7 +601,7 @@ function editSeries(
   const exceptions = exceptionsOf(root, master);
   const opened = exceptions.find((c) => {
     const id = recurrenceIdOf(c);
-    return id !== null && sameTime(id, recurrenceId);
+    return id !== null && recurrenceId !== null && sameTime(id, recurrenceId);
   });
   const others = exceptions.filter((c) => c !== opened);
   const beforeOthers = others.map(readItem);
@@ -582,22 +613,26 @@ function editSeries(
     }),
   );
 
-  // The series' time, as the occurrence shown moved; each of its times as
-  // far from its start as the occurrence's are.
+  // The series moves as the occurrence shown moved, on the series' wall
+  // clock; the master and each exception that follows take the new times,
+  // placed where each is as the occurrence's are where it is.
   let move: ((time: ItemTime) => ItemTime) | null = null;
-  const timesAt = (at: ItemTime, newAnchor: ItemTime, time: ItemTimes): ItemTimes => ({
-    start: time.start && place(at, newAnchor, time.start),
-    end: time.end && place(at, newAnchor, time.end),
-  });
-  const newAnchor = changes.time ? (changes.time.start ?? changes.time.end) : null;
+  let timesAt: ((at: ItemTime) => ItemTimes) | null = null;
   if (changes.time) {
+    const times = changes.time;
     const shownAnchor = shown.start ?? shown.end;
+    const newAnchor = times.start ?? times.end;
     if (!shownAnchor || !newAnchor) {
       throw new CalendarObjectError("A series needs a start or a due.");
     }
-    const anchor = place(oldAnchor, inFrameOf(shownAnchor, oldAnchor), newAnchor);
-    move = (time) => place(inFrameOf(time, oldAnchor), oldAnchor, anchor);
-    apply(master, root, { ...changes, time: timesAt(anchor, newAnchor, changes.time) }, now);
+    const to = inFrameOf(newAnchor, oldAnchor);
+    const byOccurrence = mover(inFrameOf(shownAnchor, oldAnchor), to);
+    move = (time) => byOccurrence(inFrameOf(time, oldAnchor));
+    timesAt = (at) => translated(times, to, at);
+    const anchor = move(oldAnchor);
+    apply(master, root, { ...changes, time: timesAt(anchor) }, now);
+    // The days and hours the rule names move with it, unless a new rule is given.
+    if (changes.repeat === undefined) followRule(master, oldAnchor, anchor);
   } else {
     apply(master, root, changes, now);
   }
@@ -622,7 +657,7 @@ function editSeries(
       const moved = move(id);
       setTime(exception.getFirstProperty("recurrence-id")!, moved, tzid);
       if (followers.has(exception)) {
-        setTimes(exception, root, timesAt(moved, newAnchor!, changes.time!));
+        setTimes(exception, root, timesAt!(moved));
         significant(exception, now);
       } else touch(exception, now);
     }
@@ -655,6 +690,36 @@ function editSeries(
   if (opened) apply(opened, root, withoutRepeat(changes), now);
 
   if (move || changes.repeat !== undefined) dropStale(root, master);
+}
+
+/** The master's rules moved with its start (`movedRule`), each only where that changes it. */
+function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void {
+  for (const property of master.getAllProperties("rrule")) {
+    const rule = property.getFirstValue();
+    if (!(rule instanceof ICAL.Recur)) continue;
+    const moved = movedRule(rule, from, to);
+    if (moved.toString() !== rule.toString()) property.setValue(moved);
+  }
+}
+
+/**
+ * Whether a series still has the occurrence `recurrenceId` names: an
+ * exception for it, or one its rule or RDATEs make that no EXDATE removes. A
+ * series too dense to walk through is taken to have it.
+ */
+export function hasOccurrence(object: CalendarObject, recurrenceId: ItemTime): boolean {
+  const { master, exceptions } = object.components;
+  const named = (component: ICAL.Component) => {
+    const id = recurrenceIdOf(component);
+    return id !== null && sameTime(id, recurrenceId);
+  };
+  if (exceptions.some(named)) return true;
+  const anchor = master && isSeries(master) ? anchorOf(master) : null;
+  if (!master || !anchor) return false;
+  const key = orderKey(recurrenceId, anchor);
+  if (datesOf(master, "exdate").some((time) => orderKey(time, anchor) === key)) return false;
+  const keys = occurrenceKeys(master, key);
+  return keys === null || keys.has(key);
 }
 
 /** Exceptions and EXDATEs that name no occurrence of the series any more. */

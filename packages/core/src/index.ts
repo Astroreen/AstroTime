@@ -14,6 +14,7 @@ export {
   createItem,
   deleteItem,
   editItem,
+  hasOccurrence,
   PRODID,
   timesOf,
   type ItemChanges,
@@ -23,6 +24,8 @@ export {
   type TaskStatus,
 } from "./edits.ts";
 export {
+  movedRepeat,
+  nthWeekdayOf,
   repeatOf,
   weekdayOf,
   WEEKDAYS,
