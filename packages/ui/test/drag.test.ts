@@ -1,5 +1,5 @@
-// Dragging and resizing without a browser (docs/plans/foundation.md#D14, D16;
-// design D111, D112): a point to a slot and a column, the edges that scroll,
+// Dragging and resizing without a browser (docs/plans/foundation.md#D14, D16,
+// D113; design D111, D112): a point to a slot and a column, the edges that scroll,
 // when a press is a drag, the times a drop or a key gives an event, a task's
 // chip, a start–due task and an all-day item (on the wall clock, across DST,
 // in the item's own zone), the scope a drop asks, and the write.
@@ -381,7 +381,7 @@ describe("the ghost", () => {
   });
 });
 
-describe("a drop saved (design D111)", () => {
+describe("a drop saved (foundation D113)", () => {
   async function demo() {
     const store = await Store.open(nodeDriver());
     await loadDemo(store, { languages: ["en-US"], timeZone, now: NOW });

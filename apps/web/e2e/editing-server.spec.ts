@@ -67,7 +67,7 @@ test("an event created here reaches the server, and again once dragged", async (
     .getByRole("listitem", { name: "Made in AstroTime, 4:00 – 5:00 PM" });
   const from = (await made.boundingBox())!;
   const thursday = (await page.getByRole("list", { name: "Thursday, November 5" }).boundingBox())!;
-  const moved = page.waitForResponse((response) => response.request().method() === "PUT");
+  const moved = page.waitForResponse((answer) => answer.request().method() === "PUT");
   await page.mouse.move(from.x + from.width / 2, from.y + 10);
   await page.mouse.down();
   await page.mouse.move(thursday.x + thursday.width / 2, thursday.y + 17.1 * 56, { steps: 8 });

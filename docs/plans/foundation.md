@@ -93,7 +93,9 @@ logic worth borrowing.
 - **D14. Google-style layout.** All-day items sit in the all-day strip,
   pinned above the time grid so they stay visible while the day scrolls.
   Timed items sit in the time grid. Items can be dragged to another time and
-  resized; a click opens their details, with an edit action.
+  resized; a click opens their details, with an edit action. _Built in PR
+  6b:_ how they drag, [design D111](design.md#D111), the keys, [design
+  D112](design.md#D112), what a drop writes, [D113](#D113).
 - **D15. Overlaps cascade.** Overlapping timed items form a cluster. In a
   cluster the item that starts earlier and lasts longer is wider and below;
   an item that starts later or is shorter is drawn on top, shifted right and
@@ -106,6 +108,8 @@ logic worth borrowing.
     moves either end.
   - `DUE` with a date only: the all-day strip of that day.
   - No date: the tasks screen only (design D52).
+  - _Built in PR 6b:_ a chip drags its time; either end of a start–due
+    block resizes ([D113](#D113)).
   - Completed tasks stay visible, struck through and dimmed, with a "hide
     completed" toggle.
   - Overdue tasks roll over to today.
@@ -504,7 +508,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
     after its last);
   - a task is a chip when it has a timed due and no timed start (a date
     start included), or a timed start and no due; the chip sits on the day
-    of that time only;
+    of that time only, the occurrence's own time in a series (until PR 6b
+    a series' chips took the first one's and showed on its day only);
   - an occurrence that does not show on the day it is laid out for is left
     out;
   - an item over midnight is clipped to each day and says it goes on;
@@ -1032,6 +1037,41 @@ Decided while building PR 6a.
   server's is offered. Ours is
   applied as it was refused, with its own `DTSTAMP` and `SEQUENCE`.
 
+### Dragging
+
+Decided while building PR 6b.
+
+- **D113. What a drag writes.** A drop or a key's move ([design
+  D111](design.md#D111), [D112](design.md#D112)) is an edit of the
+  occurrence's time and nothing else: it goes through the edit dialog's
+  save (`saveChanges`, [D103](#D103)) with only `time` changed, onto the
+  object as the store holds it, in the scope asked ([D105](#D105)), every
+  other property kept ([D7](#D7)). The new times are worked out
+  (`calendar/drag.ts` in `@astrotime/ui`) on the user's wall clock, as the
+  time grid draws it (design [D59](design.md#D59)), and written in the
+  item's own way ([D104](#D104)): a zoned time keeps its zone and TZID (an
+  item set in New York moves on a Vilnius grid and stays in New York), a
+  UTC one stays UTC, a floating one keeps its wall clock, a date moves by
+  whole days.
+  - **A move** shifts both ends by the same wall-clock time, so a block
+    keeps the length it is drawn with, onto a day the clocks change too; a
+    start that lands in the hour the clocks skip goes forward (RFC 5545
+    §3.3.5), and its end keeps the elapsed length after it.
+  - **A chip** ([D16](#D16)) moves its due, or its start when it has no due;
+    a task's start on a date goes with its due by the days the chip moved,
+    so it is never due before it starts.
+  - **A resize** moves one end of a block, kept at least 15 minutes from
+    the other and within its own day (an end at most the next midnight).
+  - **Into the all-day strip** an event becomes all day on that day (its
+    `DTEND` the day after) and a task due that day (a start the same day);
+    **out of it onto the grid**, an all-day item starts at the slot in the
+    user's zone, an hour long (a task with only a due is due there), and a
+    timed item over a day or more keeps its length.
+  - **The Month and the strip** move by days, keeping times.
+  - Times that would not change write nothing. The scope asked follows
+    `scopesFor`'s rule (`scopesForTimes`): the rule stays, so a new day for
+    one occurrence offers no "All".
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -1105,9 +1145,6 @@ Decided while building PR 6a.
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
   AstroTime's own "this and following" splits too ([D105](#D105)).
-- **Drag and resize** — moving and sizing items in the time grid
-  ([D14](#D14), [D16](#D16)), and a press-and-drag on an empty slot to make
-  one that long: PR 6b.
 - **Editing guests** — attendees are shown, never added, removed or
   answered; it comes with sending invitations ([D9](#D9)).
 - **Attachments** — `ATTACH` is kept ([D7](#D7)), not shown or edited.
@@ -1240,7 +1277,15 @@ In three PRs:
   reminders added and removed, and the Conflicts list
   ([Deferred](#deferred) until then). Decisions: D6, D9, D10, D11,
   D103–D107, design D108, D109.
-- **6b** — dragging and resizing in the time grid ([D14](#D14), [D16](#D16)).
+- **6b** — dragging and resizing in the time grid, the all-day strip and
+  the Month, a press dragged into a new event, the keys that move an item
+  ([D14](#D14), [D16](#D16)). Decisions: D113, design D111, D112. Done
+  when: the times a drop gives are unit-tested (snapping, columns, DST,
+  midnight, events, chips, start–due tasks, all-day, zones, scopes), and in
+  the web app an event, a resize, a chip, an occurrence in a scope, the
+  strip, the Month, a finger's long press, Escape and the keys work under a
+  frozen clock, a read-only item does not drag, and a dragged event
+  reaches Radicale.
 - **6c** — reminders as notifications, landed ahead of 6a: the reminder set
   in `@astrotime/core` and the store, the planner and the "Reminders"
   setting in the UI, the web's notifications (D100–D102). Done when: the

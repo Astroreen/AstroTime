@@ -1,5 +1,5 @@
 // Dragging and resizing on the views (docs/plans/foundation.md#D14, D16,
-// design D111, D112): what a drop or a key writes, worked out on the user's
+// D113, design D111, D112): what a drop or a key writes, worked out on the user's
 // wall clock as the time grid draws it (design D59), and the geometry under
 // the pointer. Pure: the components hand it points and rectangles, and the
 // write goes through the edit dialog's save (`saveChanges`, foundation D103).
@@ -17,13 +17,13 @@ import {
 import { addDays, daysBetween } from "./dates.ts";
 
 /** Minutes a drag moves and resizes in, as Google's grid snaps (design D111). */
-export const SNAP = 15;
+const SNAP = 15;
 /** How long a finger holds still before it drags, as Google's Android app waits. */
 export const LONG_PRESS = 500;
 /** Pixels a mouse moves before a press is a drag; a finger that moves this far first scrolls. */
 const SLOP = { mouse: 4, touch: 8 } as const;
 /** How near the time grid's top or bottom a drag scrolls it, and how fast at most (pixels a frame). */
-export const EDGE = 48;
+const EDGE = 48;
 const EDGE_SPEED = 16;
 /** The length an all-day item takes when dropped on the time grid. */
 const DROPPED_LENGTH = 60;
@@ -101,7 +101,7 @@ export interface Held {
  * due, when timed and the task has no timed start, or its start when timed
  * and the task has no due; `null` for anything else.
  */
-export function chipOf(held: Held): "start" | "end" | null {
+function chipOf(held: Held): "start" | "end" | null {
   if (held.kind !== "task") return null;
   const { start, end: due } = held.times;
   if (due && due.type !== "date" && (start === null || start.type === "date")) return "end";
@@ -156,7 +156,7 @@ function endDay(wall: string): string {
 }
 
 /**
- * The item moved by `minutes` of the wall clock (design D111): both ends
+ * The item moved by `minutes` of the wall clock (foundation D113): both ends
  * of a block, so it keeps the length the grid draws, even onto a day the
  * clocks change; a chip's time, and a task's start on a date with it by the
  * days the chip moved. With `grip` an end, that end only, kept at least
@@ -219,7 +219,7 @@ function sameTimes(a: ItemTimes, b: ItemTimes): boolean {
 
 /**
  * The times an item takes when dropped on `to`, picked up on `from`
- * (design D111), or `null` when nothing changes, so nothing is written:
+ * (foundation D113), or `null` when nothing changes, so nothing is written:
  * - on the time grid, moved by the slots and days between them, or an
  *   end resized by the slots;
  * - in the all-day strip or the Month, moved by the days, keeping its time;

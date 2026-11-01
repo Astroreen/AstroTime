@@ -322,7 +322,8 @@ export const en = {
   "scope.ok": "OK",
   "scope.cancel": "Cancel",
 
-  "drag.moved": "{{title}}, now {{when}}",
+  "drag.moved": "Moved: {{title}}. {{when}}",
+  "drag.resized": "Resized: {{title}}. {{when}}",
   "drag.cancelled": "Move cancelled",
   "drag.dismiss": "Dismiss",
   "drag.hint.grid":

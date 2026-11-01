@@ -158,7 +158,10 @@ function Week({
     : [];
   return (
     <div className="grid min-h-0" style={columns}>
-      <div className="flex justify-center rounded-full bg-pill pt-1.5 text-xs font-medium text-ink-muted tabular-nums">
+      <div
+        className="flex justify-center rounded-full bg-pill pt-1.5 text-xs font-medium text-ink-muted tabular-nums"
+        style={{ gridColumn: 1, gridRow: 1 }}
+      >
         <span aria-hidden="true">{number}</span>
         <span className="sr-only">{t("grid.week", { number })}</span>
       </div>
@@ -170,6 +173,7 @@ function Week({
           spans={shown.filter(({ span }) => span.firstDay === index)}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
+          column={index + 2}
           tile={tile(day)}
         />
       ))}
@@ -204,8 +208,11 @@ function DayTile({
   undone,
   undoneColor,
   onOpenDay,
+  column,
   tile,
 }: MonthViewProps & {
+  /** Its column in the week's grid, placed so a drag's ghost over it moves no tile. */
+  column: number;
   tile: (element: HTMLElement | null) => void;
   day: string;
   /** The spans that start on this day (or, continued, at the week's start). */
@@ -231,6 +238,7 @@ function DayTile({
   return (
     <div
       ref={tile}
+      style={{ gridColumn: column, gridRow: 1 }}
       className={`relative min-w-0 cursor-pointer rounded-[8px] ${outside ? "bg-tile/50" : "bg-tile"}`}
       data-outside={outside || undefined}
       onClick={onClick}

@@ -633,7 +633,7 @@ export async function saveForm(
 
 /**
  * Saves what the user changed of an item, in `scope`, into `calendarId`:
- * the edit dialog's save, and a drag's or a key's new times (design D111).
+ * the edit dialog's save, and a drag's or a key's new times (D113).
  * Nothing changed, nothing is written.
  */
 export async function saveChanges(

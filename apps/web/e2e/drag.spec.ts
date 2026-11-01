@@ -3,10 +3,11 @@
 // D16; design D111, D112): an event to another time and day, seen in Week and
 // the Agenda; a block's end; a task's chip; an occurrence of a series in a
 // scope; Escape; a read-only calendar's item; the all-day strip and the Month;
-// a press sized into a new event; and the keys that move a focused item.
+// a press sized into a new event; a finger's long press; and the keys that
+// move a focused item.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openDemo, WIDE } from "./support.ts";
+import { NOW, openDemo, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -59,7 +60,7 @@ test("an event dragged to another time and day shows there in Week and the Agend
   ).toBeVisible();
   await expect(item(page, "Wednesday, November 4", /^Lunch with Marta/)).toHaveCount(0);
   await expect(announced(page)).toHaveText(
-    "Lunch with Marta, now Thursday, November 5 · 3:00 – 4:00 PM",
+    "Moved: Lunch with Marta. Thursday, November 5 · 3:00 – 4:00 PM",
   );
   // The drop opened nothing.
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -128,6 +129,9 @@ test("an occurrence of a series asks the scope; this occurrence moves it alone",
   await expect(scope.getByRole("radio", { name: "This occurrence" })).toBeChecked();
   await scope.getByRole("button", { name: "OK" }).click();
   await expect(item(page, "Thursday, November 5", "Stand-up, 10:00 – 10:30 AM")).toBeVisible();
+  await expect(announced(page)).toHaveText(
+    "Moved: Stand-up. Thursday, November 5 · 10:00 – 10:30 AM",
+  );
   await expect(item(page, "Friday, November 6", "Stand-up, 9:00 – 9:30 AM")).toBeVisible();
   await expect(item(page, "Wednesday, November 4", "Stand-up, 9:00 – 9:30 AM")).toBeVisible();
 });
@@ -250,6 +254,20 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-07");
   await expect(dialog.getByLabel("Start time")).toHaveValue("14:00");
   await expect(dialog.getByLabel("End time")).toHaveValue("16:30");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+
+  // Cancelled by Escape, its release in the same column makes nothing.
+  await drag(
+    page,
+    await pointOn(page, "Saturday, November 7", 14.1),
+    await pointOn(page, "Saturday, November 7", 15.1),
+    false,
+  );
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(announced(page)).toHaveText("Move cancelled");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("keys move a focused item and say where it went; Shift moves its end", async ({ page }) => {
@@ -264,7 +282,7 @@ test("keys move a focused item and say where it went; Shift moves its end", asyn
   await opener.focus();
   await page.keyboard.press("Alt+ArrowDown");
   await expect(announced(page)).toHaveText(
-    "Lunch with Marta, now Wednesday, November 4 · 1:15 – 2:15 PM",
+    "Moved: Lunch with Marta. Wednesday, November 4 · 1:15 – 2:15 PM",
   );
   await page.keyboard.press("Alt+ArrowRight");
   const moved = day(page, "Thursday, November 5").getByRole("button", {
@@ -279,6 +297,59 @@ test("keys move a focused item and say where it went; Shift moves its end", asyn
     }),
   ).toBeFocused();
   await expect(announced(page)).toHaveText(
-    "Lunch with Marta, now Thursday, November 5 · 1:15 – 2:30 PM",
+    "Resized: Lunch with Marta. Thursday, November 5 · 1:15 – 2:30 PM",
   );
+});
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true });
+
+  /** The demo with its clock installed, so a long press is the clock run on, not a wait. */
+  async function openTouch(page: Page) {
+    await page.clock.install({ time: NOW });
+    await page.addInitScript(() => localStorage.setItem("astrotime.view", "week"));
+    await page.goto("/?demo");
+    // A finger, as Chromium's touch input sends it.
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: "touchStart" | "touchMove" | "touchEnd", at?: { x: number; y: number }) =>
+      cdp.send("Input.dispatchTouchEvent", { type, touchPoints: at ? [at] : [] });
+    return {
+      touch,
+      async slide(from: { x: number; y: number }, to: { x: number; y: number }) {
+        for (let step = 1; step <= 8; step++) {
+          await touch("touchMove", {
+            x: from.x + ((to.x - from.x) * step) / 8,
+            y: from.y + ((to.y - from.y) * step) / 8,
+          });
+        }
+      },
+    };
+  }
+
+  test("a long press drags an item; let go, it is where the finger went", async ({ page }) => {
+    const { touch, slide } = await openTouch(page);
+    const lunch = item(page, "Wednesday, November 4", "Lunch with Marta, 1:00 – 2:00 PM");
+    const from = await pointIn(lunch);
+    const to = await pointOn(page, "Thursday, November 5", 15.1);
+    await touch("touchStart", from);
+    await page.clock.runFor(500);
+    await slide(from, to);
+    await touch("touchEnd");
+    await expect(
+      item(page, "Thursday, November 5", "Lunch with Marta, 3:00 – 4:00 PM"),
+    ).toBeVisible();
+  });
+
+  test("a finger that moves before the long press scrolls; the item stays", async ({ page }) => {
+    const { touch, slide } = await openTouch(page);
+    const lunch = item(page, "Wednesday, November 4", "Lunch with Marta, 1:00 – 2:00 PM");
+    const from = await pointIn(lunch);
+    await touch("touchStart", from);
+    await slide(from, { x: from.x + 150, y: from.y - 120 });
+    await page.clock.runFor(500);
+    await touch("touchEnd");
+    await expect(page.locator("[data-ghost]")).toHaveCount(0);
+    await expect(lunch).toBeVisible();
+    await expect(item(page, "Thursday, November 5", /^Lunch with Marta/)).toHaveCount(0);
+  });
 });

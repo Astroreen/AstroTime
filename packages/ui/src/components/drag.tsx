@@ -121,7 +121,8 @@ interface Gesture {
   readonly y0: number;
   readonly t0: number;
   readonly from: Spot;
-  phase: "wait" | "drag";
+  /** Pressed, dragging, or dragged and cancelled by Escape (its release still opens nothing). */
+  phase: "wait" | "drag" | "cancelled";
   moved: number;
   x: number;
   y: number;
@@ -207,7 +208,7 @@ export function useDrag({
     return () => element.removeEventListener("touchmove", hold);
   }, [root]);
 
-  const report = (entry: Entry, times: ItemTimes, outcome: Rescheduled) => {
+  const report = (entry: Entry, grip: Grip, times: ItemTimes, outcome: Rescheduled) => {
     if (outcome === "saved") {
       const { item } = entry.occurrence;
       const allDay = (times.start ?? times.end)?.type === "date";
@@ -216,12 +217,13 @@ export function useDrag({
         formats,
         timeZone,
       });
-      setMessage(t("drag.moved", { title: item.summary?.trim() || t("item.untitled"), when }));
+      const title = item.summary?.trim() || t("item.untitled");
+      setMessage(t(grip === "move" ? "drag.moved" : "drag.resized", { title, when }));
     } else if (outcome === "cancelled") setMessage(t("drag.cancelled"));
     else if (outcome !== "unchanged") setProblem(outcome);
   };
 
-  const commit = async (entry: Entry, times: ItemTimes): Promise<Rescheduled> => {
+  const commit = async (entry: Entry, grip: Grip, times: ItemTimes): Promise<Rescheduled> => {
     busy.current = true;
     setProblem(null);
     const target = targetOf(
@@ -232,7 +234,7 @@ export function useDrag({
     );
     const outcome = await editing.reschedule(target, times);
     busy.current = false;
-    report(entry, times, outcome);
+    report(entry, grip, times, outcome);
     return outcome;
   };
 
@@ -339,7 +341,7 @@ export function useDrag({
         return;
       }
       setShown({ phase: "saving", ghost });
-      void commit(source.entry, times).then((outcome) =>
+      void commit(source.entry, grip, times).then((outcome) =>
         setShown(outcome === "saved" ? { phase: "saved", ghost } : null),
       );
     };
@@ -348,6 +350,7 @@ export function useDrag({
       if (other.pointerId !== gesture.pointerId) return;
       gesture.x = other.clientX;
       gesture.y = other.clientY;
+      if (gesture.phase === "cancelled") return;
       if (gesture.phase === "wait") {
         const distance = Math.hypot(other.clientX - gesture.x0, other.clientY - gesture.y0);
         gesture.moved = Math.max(gesture.moved, distance);
@@ -360,13 +363,13 @@ export function useDrag({
     }
     function onUp(other: globalThis.PointerEvent) {
       if (other.pointerId !== gesture.pointerId) return;
-      const dragging = gesture.phase === "drag";
+      const { phase } = gesture;
       gesture.stop();
-      if (!dragging) return;
+      if (phase === "wait") return;
       // Not a swipe to the next period, nor a click on what is under it.
       other.stopPropagation();
       swallowClick();
-      drop();
+      if (phase === "drag") drop();
     }
     function onCancel(other: globalThis.PointerEvent) {
       if (other.pointerId !== gesture.pointerId) return;
@@ -377,7 +380,9 @@ export function useDrag({
       if (other.key !== "Escape" || gesture.phase !== "drag") return;
       other.preventDefault();
       other.stopPropagation();
-      gesture.stop();
+      gesture.phase = "cancelled";
+      cancelAnimationFrame(frame);
+      delete document.documentElement.dataset["dragging"];
       setShown(null);
       setMessage(t("drag.cancelled"));
     }
@@ -410,7 +415,7 @@ export function useDrag({
       console.error(error);
     }
     if (!times) return;
-    void commit(entry, times).then((outcome) => {
+    void commit(entry, step.grip, times).then((outcome) => {
       if (outcome === "saved") setRefocus({ key: entry.key, entry });
     });
   };

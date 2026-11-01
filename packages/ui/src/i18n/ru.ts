@@ -332,7 +332,8 @@ export const ru = {
   "scope.ok": "ОК",
   "scope.cancel": "Отмена",
 
-  "drag.moved": "{{title}}, теперь {{when}}",
+  "drag.moved": "Перенесено: {{title}}. {{when}}",
+  "drag.resized": "Изменена длительность: {{title}}. {{when}}",
   "drag.cancelled": "Перенос отменён",
   "drag.dismiss": "Закрыть",
   "drag.hint.grid":
