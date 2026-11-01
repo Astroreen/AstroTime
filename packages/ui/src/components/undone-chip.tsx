@@ -12,24 +12,37 @@ import { CheckCircleIcon } from "./icons.tsx";
 export function UndoneChip({
   tasks,
   colorOf,
+  dense = false,
 }: {
   tasks: readonly UndoneTask[];
   colorOf: (task: UndoneTask) => string;
+  /** The month's smaller chip (design D86). */
+  dense?: boolean;
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   const first = tasks[0];
   return (
     <Popover.Root>
-      <Popover.Trigger className="flex h-full w-full min-w-0 items-center gap-1.5 rounded-[5px] bg-raised px-1.5 text-left text-[13px] leading-none font-medium text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent">
+      <Popover.Trigger
+        className={`flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent ${
+          dense
+            ? "gap-0.5 rounded-[4px] px-1 text-[11px]"
+            : "gap-1.5 rounded-[5px] px-1.5 text-[13px]"
+        }`}
+      >
         <span
           aria-hidden="true"
-          className="grid size-3.5 shrink-0 place-items-center rounded-full text-raised"
+          className={`grid shrink-0 place-items-center rounded-full text-raised ${dense ? "size-3" : "size-3.5"}`}
           style={{ background: first ? colorOf(first) : undefined }}
         >
-          <CheckCircleIcon className="size-3.5" strokeWidth={2.5} />
+          <CheckCircleIcon className={dense ? "size-3" : "size-3.5"} strokeWidth={2.5} />
         </span>
-        <span className="min-w-0 flex-1 truncate">{t("undone", { count: tasks.length })}</span>
+        <span
+          className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${dense ? "" : "text-ellipsis"}`}
+        >
+          {t("undone", { count: tasks.length })}
+        </span>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start" className="z-50">

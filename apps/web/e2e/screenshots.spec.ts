@@ -17,7 +17,7 @@ type Theme = "dark" | "light";
 async function open(
   browser: Browser,
   options: { language: Language; theme: Theme; size: { width: number; height: number } },
-  view: "day" | "3days" | "week",
+  view: "day" | "3days" | "week" | "month" | "agenda",
 ): Promise<Page> {
   const context = await browser.newContext({
     locale: LOCALES[options.language],
@@ -51,6 +51,21 @@ for (const language of ["en", "ru"] as const) {
       }
       const page = await open(browser, { language, theme, size: WIDE }, "week");
       await shot(page, `week-${theme}-${language}-wide`);
+      await page.context().close();
+    });
+  }
+}
+
+for (const language of ["en", "ru"] as const) {
+  for (const theme of ["dark", "light"] as const) {
+    test(`Month and Agenda, ${language}, ${theme}`, async ({ browser }) => {
+      for (const view of ["month", "agenda"] as const) {
+        const page = await open(browser, { language, theme, size: PHONE }, view);
+        await shot(page, `${view}-${theme}-${language}-phone`);
+        await page.context().close();
+      }
+      const page = await open(browser, { language, theme, size: WIDE }, "month");
+      await shot(page, `month-${theme}-${language}-wide`);
       await page.context().close();
     });
   }

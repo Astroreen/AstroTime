@@ -56,4 +56,9 @@ test("plurals follow each language's rules", () => {
     "21 невыполненная задача",
   ]);
   expect(ru.t("grid.more", { count: 3 })).toBe("+3");
+  expect([1, 3, 5].map((count) => ru.t("month.more", { count, day: "среда" }))).toEqual([
+    "Ещё 1 запись, среда",
+    "Ещё 3 записи, среда",
+    "Ещё 5 записей, среда",
+  ]);
 });

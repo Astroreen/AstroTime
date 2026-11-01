@@ -6,10 +6,17 @@ import { Checkbox } from "@base-ui/react/checkbox";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
-import { VIEWS, type View } from "../calendar/views.ts";
-import { ViewIcon } from "./icons.tsx";
+import { VIEWS, type GridView, type View } from "../calendar/views.ts";
+import { AgendaIcon, MonthIcon, ViewIcon } from "./icons.tsx";
 
-const COLUMNS: Record<View, number> = { day: 1, "3days": 3, week: 7 };
+const COLUMNS: Record<GridView, number> = { day: 1, "3days": 3, week: 7 };
+
+function ViewMark({ view }: { view: View }) {
+  const className = "size-5 text-ink-muted";
+  if (view === "month") return <MonthIcon className={className} />;
+  if (view === "agenda") return <AgendaIcon className={className} />;
+  return <ViewIcon columns={COLUMNS[view]} className={className} />;
+}
 
 export function DrawerContent({
   view,
@@ -44,7 +51,7 @@ export function DrawerContent({
                 v === view ? "bg-accent-soft font-medium" : "hover:bg-raised-hover"
               }`}
             >
-              <ViewIcon columns={COLUMNS[v]} className="size-5 text-ink-muted" />
+              <ViewMark view={v} />
               {t(`view.${v}`)}
             </button>
           </li>

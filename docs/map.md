@@ -30,8 +30,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `windows-zones.ts` — Windows zone name → IANA, generated from Unicode
     CLDR by `scripts/generate-windows-zones.ts`; do not edit by hand.
     → `plans/foundation.md#D32`
-  - `layoutDay`, `layoutSpans`, `isAllDay` — where items go on the views:
-    the all-day strip, the time grid, overlaps. → `plans/foundation.md#D42`
+  - `layoutDay`, `layoutSpans`, `isAllDay`, `dayRange` — where items go on
+    the views: the all-day strip, the time grid, overlaps, a month's weeks.
+    → `plans/foundation.md#D42`
   - `isDone`, `isUndoneBefore`, `latestUndoneBefore` — done tasks, and the
     undone ones that roll over to today. → `plans/design.md#D51`,
     `plans/foundation.md#D55`
@@ -76,11 +77,17 @@ When you add a package, app or module, add its line here in the same PR.
   - `AstroTime` — the root: the app gives it its store (opening), where
     preferences are kept (`Preferences`), the user's languages and zone.
   - `components/` — the shell (top bar, month picker, drawer, floating
-    button) and the time grid of Day, 3 days and Week with the all-day
-    strip and the undone tasks chip. → `plans/design.md#D46`
-  - `calendar/` — the views (`views.ts`), days, the locale's week and clock
-    (`locale.ts`), `Intl` formats, the query path to the layout
-    (`query.ts`, `ObjectCache`) and `liveQuery`. → `plans/foundation.md#D54`
+    button), the time grid of Day, 3 days and Week with the all-day strip
+    and the undone tasks chip, the Month (`month-view.tsx`,
+    `plans/design.md#D86`) and the Agenda (`agenda-view.tsx`,
+    `plans/design.md#D87`). → `plans/design.md#D46`
+  - `calendar/` — the views and their keys (`views.ts`), days, the locale's
+    week and clock (`locale.ts`), `Intl` formats, the query path to the
+    layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
+    (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery`.
+    → `plans/foundation.md#D54`
+  - `hooks.ts` — `useEntries` (a view's live query of a range of days),
+    `useSwipe`, `useNow`, `useMediaQuery`.
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light.

@@ -23,6 +23,10 @@ export const en = {
   "nav.next.day": "Next day",
   "nav.next.3days": "Next 3 days",
   "nav.next.week": "Next week",
+  "nav.previous.month": "Previous month",
+  "nav.next.month": "Next month",
+  "nav.previous.agenda": "Previous month",
+  "nav.next.agenda": "Next month",
 
   "picker.previousMonth": "Previous month",
   "picker.nextMonth": "Next month",
@@ -30,6 +34,8 @@ export const en = {
   "view.day": "Day",
   "view.3days": "3 days",
   "view.week": "Week",
+  "view.month": "Month",
+  "view.agenda": "Agenda",
 
   "drawer.views": "Views",
   "drawer.calendars": "Calendars",
@@ -43,6 +49,14 @@ export const en = {
   "grid.moreLabel": "{{count}} more on {{day}}",
   "grid.expand": "Show all all-day items",
   "grid.collapse": "Show fewer all-day items",
+
+  "month.more_one": "{{count}} more item on {{day}}",
+  "month.more_other": "{{count}} more items on {{day}}",
+
+  "agenda.dayOf": "Day {{index}} of {{total}}",
+  "agenda.nothingToday": "Nothing planned today",
+  "agenda.earlier": "Show earlier",
+  "agenda.later": "Show later",
 
   "item.untitled": "(No title)",
   "item.event": "{{title}}, {{time}}",

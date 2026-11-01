@@ -122,6 +122,13 @@ const CALENDARS: readonly DemoCalendar[] = [
           at(zone, day(3), "21:00"),
         ),
         event("demo-trip", t("Trip to Tallinn", "Поездка в Таллин"), date(day(4)), date(day(6))),
+        // Weeks before the rest: the Agenda reads it only when scrolled back to.
+        event(
+          "demo-exhibition",
+          t("Photo exhibition", "Фотовыставка"),
+          at(zone, day(-45), "17:00"),
+          at(zone, day(-45), "19:00"),
+        ),
         event(
           "demo-train",
           t("Night train", "Ночной поезд"),

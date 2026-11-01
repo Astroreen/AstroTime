@@ -1,9 +1,17 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { addDays, isoWeek, nowIn, startOfWeek, weekdayOf } from "../src/calendar/dates.ts";
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  isoWeek,
+  nowIn,
+  startOfWeek,
+  weekdayOf,
+} from "../src/calendar/dates.ts";
 import { Formats } from "../src/calendar/format.ts";
 import { localeSettings } from "../src/calendar/locale.ts";
-import { periodOf, stepAnchor } from "../src/calendar/views.ts";
+import { periodOf, stepAnchor, titleRange } from "../src/calendar/views.ts";
 
 describe("days", () => {
   test("arithmetic on calendar days ignores zones and DST", () => {
@@ -13,6 +21,13 @@ describe("days", () => {
     expect(startOfWeek("2026-11-04", 1)).toBe("2026-11-02");
     expect(startOfWeek("2026-11-04", 7)).toBe("2026-11-01");
     expect(startOfWeek("2026-11-01", 1)).toBe("2026-10-26");
+  });
+
+  test("months and the days between two days", () => {
+    expect(addMonths("2026-11-04", 1)).toBe("2026-12-01");
+    expect(addMonths("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addMonths("2026-01-15", -1)).toBe("2025-12-01");
+    expect(daysBetween("2026-11-05", "2026-11-07")).toBe(2);
   });
 
   test("ISO week numbers, as the reference shows them", () => {
@@ -45,10 +60,26 @@ describe("views", () => {
     expect(periodOf("day", "2026-11-04", 7)).toEqual(["2026-11-04"]);
   });
 
-  test("previous and next move by the view's length", () => {
+  test("previous and next move by the view's length; Month and Agenda to a month's first day", () => {
     expect(stepAnchor("week", "2026-11-04", 1)).toBe("2026-11-11");
     expect(stepAnchor("3days", "2026-11-04", -1)).toBe("2026-11-01");
     expect(stepAnchor("day", "2026-11-04", 1)).toBe("2026-11-05");
+    expect(stepAnchor("month", "2026-11-04", 1)).toBe("2026-12-01");
+    expect(stepAnchor("agenda", "2026-11-04", -1)).toBe("2026-10-01");
+  });
+
+  test("a month is its six weeks; the top bar names the month, not the weeks around it", () => {
+    const days = periodOf("month", "2026-11-04", 7);
+    expect([days.length, days[0], days.at(-1)]).toEqual([42, "2026-11-01", "2026-12-12"]);
+    expect(titleRange("month", days, "2026-11-04")).toEqual(["2026-11-01", "2026-11-30"]);
+    expect(titleRange("agenda", ["2027-02-10"], "2027-02-10")).toEqual([
+      "2027-02-01",
+      "2027-02-28",
+    ]);
+    expect(titleRange("week", periodOf("week", "2026-11-04", 1), "2026-11-04")).toEqual([
+      "2026-11-02",
+      "2026-11-08",
+    ]);
   });
 });
 
@@ -93,6 +124,18 @@ describe("formats", () => {
     expect(ru.period("2026-10-26", "2026-11-01", "2026")).toBe("Октябрь – ноябрь");
     expect(ru.period("2026-11-02", "2026-11-08", "2026")).toBe("Ноябрь");
     expect(en.period("2027-01-04", "2027-01-10", "2026")).toBe("January 2027");
+  });
+
+  test("a time range across days says the dates", () => {
+    const at = (local: string) => ({ type: "floating", local }) as const;
+    // Intl spaces with thin and narrow no-break spaces; compared as plain ones.
+    const plain = (text: string) => text.replaceAll(/\s/g, " ");
+    expect(plain(en.timeRange(at("2026-11-08T09:00:00"), at("2026-11-08T09:30:00"), "UTC"))).toBe(
+      "9:00 – 9:30 AM",
+    );
+    expect(plain(ru.timeRange(at("2026-11-08T22:00:00"), at("2026-11-09T01:00:00"), "UTC"))).toBe(
+      "8 нояб., 22:00 – 9 нояб., 01:00",
+    );
   });
 
   test("hour labels on the 24-hour clock as the reference, or 12 hours", () => {

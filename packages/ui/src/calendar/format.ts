@@ -23,6 +23,7 @@ export class Formats {
   readonly #monthYear: Intl.DateTimeFormat;
   readonly #hour: Intl.DateTimeFormat;
   readonly #time: Intl.DateTimeFormat;
+  readonly #dateTime: Intl.DateTimeFormat;
 
   constructor({ locale, hour12, weekStart }: LocaleSettings) {
     const at = (options: Intl.DateTimeFormatOptions) =>
@@ -41,6 +42,13 @@ export class Formats {
       hour12 ? { hour: "numeric", ...clock } : { hour: "2-digit", minute: "2-digit", ...clock },
     );
     this.#time = at({ hour: "numeric", minute: "2-digit", ...clock });
+    this.#dateTime = at({
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      ...clock,
+    });
   }
 
   /** "Mon", "пн". */
@@ -97,11 +105,12 @@ export class Formats {
     return this.#time.format(new Date(`${local}Z`));
   }
 
-  /** "9:30 – 10:30"; across days `Intl` adds the dates. */
+  /** "9:30 – 10:30"; across days with the dates, "Nov 8, 10:00 PM – Nov 9, 1:00 AM". */
   timeRange(start: ItemTime, end: ItemTime, timeZone: string): string {
-    const s = new Date(`${wallClockOf(start, timeZone)}Z`);
-    const e = new Date(`${wallClockOf(end, timeZone)}Z`);
-    return this.#time.formatRange(s, e);
+    const s = wallClockOf(start, timeZone);
+    const e = wallClockOf(end, timeZone);
+    const format = s.slice(0, 10) === e.slice(0, 10) ? this.#time : this.#dateTime;
+    return format.formatRange(new Date(`${s}Z`), new Date(`${e}Z`));
   }
 
   /**
