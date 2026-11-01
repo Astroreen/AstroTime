@@ -24,6 +24,7 @@ import {
   zonedToEpoch,
   type Range,
 } from "../packages/core/src/index.ts";
+import { walks } from "../packages/core/src/recurrence.ts";
 import { Store } from "../packages/storage/src/index.ts";
 import { nodeDriver } from "../packages/storage/src/node.ts";
 import { agendaDays } from "../packages/ui/src/calendar/agenda.ts";
@@ -289,6 +290,14 @@ async function main() {
       }),
     );
     await store.close();
+
+    // How the series were walked, over every read above.
+    const fallbacks = [...walks.fallbacks].map(([message, count]) => `${count}× ${message}`);
+    console.log(
+      `\nRules started near the range ${walks.near}, walked from DTSTART ${walks.fromStart}; ` +
+        `starts near the range ical.js refused ${fallbacks.length > 0 ? fallbacks.join(", ") : "0"}; ` +
+        `searches out of tries ${walks.exhausted}; rules ical.js refused ${walks.refused}.`,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

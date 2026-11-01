@@ -355,6 +355,9 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/bench-big-calendar.ts` — a big calendar read as the views, the
   undone chip and the reminders read it; prints how long each takes, run by
   hand. → `plans/foundation.md#D118`
+- `scripts/sweep-recurrence.ts` — the generated series of D118's proof for
+  other seeds, ten times as many as CI's, run by hand.
+  → `plans/foundation.md#D118`
 - `scripts/record-nextcloud-fixtures.ts` — drives Nextcloud's web Calendar
   and Tasks apps in Chromium on a disposable Nextcloud in Docker and records
   what they write as `packages/core/test/fixtures/nextcloud-web-*.ics`.
