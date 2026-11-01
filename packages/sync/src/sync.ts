@@ -122,14 +122,16 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
     }
     // Nothing changed there since its last download, and nothing went up: no request (D127).
     if (pending.length === 0 && unchanged(calendar, listed.get(calendar.url))) continue;
-    await isolated(report, calendar.url, () => download(store, provider, calendar, report));
+    await isolated(report, calendar.url, () =>
+      download(store, provider, calendar, listed.get(calendar.url), report),
+    );
   }
 }
 
 /**
  * Whether the listing says a calendar is as the device last downloaded it:
  * its sync token, or without one its ctag, is the one kept then (D127). A
- * download that left something out keeps neither, so it is never skipped.
+ * download that left something out keeps no new one, so it is not skipped.
  */
 function unchanged(kept: SyncState, listed: SyncState | undefined): boolean {
   if (!listed) return false;
@@ -366,7 +368,13 @@ async function currentEtag(
   return weak(server.etag) ? null : server.etag;
 }
 
-async function download(store: Store, provider: Provider, calendar: Calendar, report: SyncReport) {
+async function download(
+  store: Store,
+  provider: Provider,
+  calendar: Calendar,
+  listed: SyncState | undefined,
+  report: SyncReport,
+) {
   const local = new Map<
     string,
     { id: string; etag: string | null; pending: StoredObject["pending"] }
@@ -377,7 +385,7 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
   }
   const known = new Map([...local].map(([href, entry]) => [href, entry.etag]));
 
-  const changes = await provider.changes(calendar.url, calendar, known);
+  const changes = await provider.changes(calendar.url, calendar, known, listed);
   let keepToken = false;
   for (const object of changes.changed) {
     const mine = local.get(object.href);

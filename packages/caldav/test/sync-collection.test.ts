@@ -138,7 +138,8 @@ test("the listing reads every calendar's sync token and ctag; a report's data ne
   const [calendar] = await provider.calendars();
   expect(calendar?.state).toEqual({ syncToken: "t1", ctag: "c-t1" });
   // A first sync: from no token at all, since the listing names one.
-  const first = await provider.changes(home, { syncToken: null, ctag: null }, new Map());
+  const none = { syncToken: null, ctag: null };
+  const first = await provider.changes(home, none, new Map(), calendar?.state);
   expect(first.changed.map((o) => [o.href, o.ics.includes("UID:")])).toEqual([
     [`${home}a.ics`, true],
     [`${home}b.ics`, true],
@@ -146,6 +147,11 @@ test("the listing reads every calendar's sync token and ctag; a report's data ne
   expect(first.syncToken).toBe("t2");
   // Only `b.ics` came without its data: it alone is asked for.
   expect(requests).toEqual(["PROPFIND Depth 1", 'sync-collection from ""', "multiget"]);
+
+  // Without the listing's word, a provider takes no token for granted: it lists.
+  requests.length = 0;
+  await provider.changes(home, none, new Map());
+  expect(requests).toEqual(["PROPFIND Depth 1"]);
 });
 
 test("a first sync a server will not answer by sync-collection lists the calendar instead", async () => {
@@ -166,8 +172,22 @@ test("a first sync a server will not answer by sync-collection lists the calenda
     { username: "u", password: "p" },
     "https://dav.example/",
   );
-  await provider.calendars();
-  const first = await provider.changes(home, { syncToken: null, ctag: null }, new Map());
+  const [calendar] = await provider.calendars();
+  const first = await provider.changes(home, { syncToken: null, ctag: null }, new Map(), {
+    syncToken: "t1",
+    ctag: null,
+  });
   expect(first.syncToken).toBe("t1");
-  expect(requests).toEqual(["PROPFIND", "sync-collection", "PROPFIND"]);
+  expect(calendar?.state?.syncToken).toBe("t1");
+  // The token the listing kept goes to a later sync-collection, which the
+  // server does not answer either: the listing again, never a failure.
+  const later = await provider.changes(home, first, new Map(), calendar?.state);
+  expect(later.syncToken).toBe("t1");
+  expect(requests).toEqual([
+    "PROPFIND",
+    "sync-collection",
+    "PROPFIND",
+    "sync-collection",
+    "PROPFIND",
+  ]);
 });

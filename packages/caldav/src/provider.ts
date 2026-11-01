@@ -185,31 +185,28 @@ export class CalDavProvider implements Provider {
         "cs:getctag",
       ]),
     });
-    const calendars = parseMultistatus(response.body)
-      .responses.filter((r) => children(r.props["resourcetype"]).includes("calendar"))
-      // Nextcloud 31 lists deleted calendars from its trash bin with `deleted-at` and
-      // without the calendar resourcetype; both are checked, should either change.
-      .filter((r) => !text(r.props["deleted-at"]))
-      .filter((r) => this.own(r.href, response.url) !== null)
-      .map((r) => toCalendar(r, response.url));
-    for (const { url, state } of calendars) if (state) this.listed.set(url, state);
-    return calendars;
+    return (
+      parseMultistatus(response.body)
+        .responses.filter((r) => children(r.props["resourcetype"]).includes("calendar"))
+        // Nextcloud 31 lists deleted calendars from its trash bin with `deleted-at` and
+        // without the calendar resourcetype; both are checked, should either change.
+        .filter((r) => !text(r.props["deleted-at"]))
+        .filter((r) => this.own(r.href, response.url) !== null)
+        .map((r) => toCalendar(r, response.url))
+    );
   }
-
-  /** What `calendars` read of each calendar's state, for its first sync (`changes`). */
-  private readonly listed = new Map<string, SyncState>();
 
   async changes(
     calendarUrl: string,
     state: SyncState,
     known: ReadonlyMap<string, string | null>,
+    listed?: SyncState,
   ): Promise<Changes> {
     const url = collection(calendarUrl);
-    // A first sync of a calendar whose server keeps sync tokens asks for
+    // A first sync of a calendar whose listing names a sync token asks for
     // everything since none (RFC 6578 §3.4): its objects and their data in
     // one report, instead of a listing and its multigets (D127).
-    const initial =
-      state.syncToken === null && known.size === 0 && !!this.listed.get(url)?.syncToken;
+    const initial = state.syncToken === null && known.size === 0 && !!listed?.syncToken;
     const token = state.syncToken ?? (initial ? "" : null);
     if (token !== null) {
       const changes = await this.syncCollection(url, token, known);
@@ -224,7 +221,7 @@ export class CalDavProvider implements Provider {
       body: propfind(["d:getetag", "d:resourcetype", "d:sync-token", "cs:getctag"]),
     });
     const status = parseMultistatus(response.body);
-    const listed = new Map<string, string | null>();
+    const members = new Map<string, string | null>();
     let syncToken: string | null = null;
     let ctag: string | null = null;
     for (const r of status.responses) {
@@ -236,12 +233,12 @@ export class CalDavProvider implements Provider {
         continue;
       }
       if (children(r.props["resourcetype"]).includes("collection")) continue;
-      listed.set(href, text(r.props["getetag"]));
+      members.set(href, text(r.props["getetag"]));
     }
-    const changed = [...listed]
+    const changed = [...members]
       .filter(([href, etag]) => changedSince(known, href, etag))
       .map(([href]) => href);
-    const removed = [...known.keys()].filter((href) => !listed.has(href));
+    const removed = [...known.keys()].filter((href) => !members.has(href));
     const got = await this.multiget(url, changed);
     return {
       changed: got.objects,
@@ -277,8 +274,9 @@ export class CalDavProvider implements Provider {
           body: syncCollection(token, ["d:getetag", "c:calendar-data"]),
         },
         // An expired or unknown token (RFC 6578 §3.2) falls back to a full
-        // listing, as does a server that will not answer a first sync this way.
-        from === "" ? [400, 403, 409, 410, 501] : [403, 409, 410],
+        // listing, as does a server that does not answer sync-collection
+        // (501), or a first sync from no token (400).
+        from === "" ? [400, 403, 409, 410, 501] : [403, 409, 410, 501],
       );
       if (response.status >= 300) {
         // 403 and 409 mean an expired token only with RFC 6578's precondition;

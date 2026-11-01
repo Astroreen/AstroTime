@@ -1342,10 +1342,14 @@ too many requests.
   ([D37](#D37)) or kept its old token is asked again. A `sync-collection`
   asks for each changed object's `calendar-data` with its ETag, so a change
   comes down in that one report; a multiget asks only for what a server
-  sent without data. A calendar's first sync, on a server whose listing
+  sent without data. The engine hands the provider the listing's state of
+  the calendar it asks about (`changes`' `listed`); a provider keeps none of
+  its own between calls. A calendar's first sync, on a server whose listing
   names a sync token, is a `sync-collection` from the empty token (RFC 6578
   §3.4): everything in one report, instead of a listing and a multiget per
-  100 objects; a server that refuses it gets the listing. An expired token
+  100 objects; a server that refuses it, or answers no `sync-collection` at
+  all (501), gets the listing, which keeps the token the next sync compares.
+  An expired token
   still falls back to the listing, which fetches only what changed. Nextcloud
   and Radicale both name the same token in the listing as in the report, and
   both send data in a `sync-collection`. A server that names neither token

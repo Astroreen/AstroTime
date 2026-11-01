@@ -512,3 +512,99 @@ describe("finer write rights (D37)", () => {
     });
   });
 });
+
+describe("a calendar the listing says is unchanged is not asked (D127)", () => {
+  /** A device on a memory server whose `changes` are counted. */
+  async function counted(listing: MemoryServer["listing"]) {
+    const server = memoryServer(calendarUrl);
+    server.listing = listing;
+    server.objects.set(`${calendarUrl}a.ics`, { etag: '"a"', ics: task("a") });
+    let asked = 0;
+    const provider: Provider = {
+      ...server,
+      changes: (...args) => {
+        asked++;
+        return server.changes(...args);
+      },
+    };
+    const { store, sync, calendar } = await device(provider);
+    return { server, store, sync, calendar, asked: () => asked };
+  }
+
+  test.each(["token", "ctag"] as const)(
+    "by its %s: skipped while it is the one kept, asked once it changes",
+    async (listing) => {
+      const { server, sync, store, calendar, asked } = await counted(listing);
+      expect(asked()).toBe(1);
+      await sync();
+      await sync();
+      expect(asked()).toBe(1);
+      server.objects.set(`${calendarUrl}b.ics`, { etag: '"b"', ics: task("b") });
+      expect(await sync()).toMatchObject({ downloaded: 1 });
+      expect(asked()).toBe(2);
+      expect((await store.undated([calendar.id])).map((o) => o.uid)).toEqual(["a", "b"]);
+      await sync();
+      expect(asked()).toBe(2);
+    },
+  );
+
+  test("a calendar with a pending change is asked, its token unchanged", async () => {
+    const { sync, store, calendar, asked } = await counted("token");
+    await store.saveLocal(calendar.id, task("new"));
+    expect(await sync()).toMatchObject({ uploaded: 1 });
+    expect(asked()).toBe(2);
+  });
+
+  test("a download that left something out keeps no token: the next sync asks again", async () => {
+    const { server, sync, asked } = await counted("token");
+    server.incomplete = true;
+    server.objects.set(`${calendarUrl}b.ics`, { etag: '"b"', ics: task("b") });
+    await sync();
+    server.incomplete = false;
+    await sync();
+    expect(asked()).toBe(3);
+    await sync();
+    expect(asked()).toBe(3);
+  });
+
+  test("a download that kept its old token, for a change of ours it will merge, is asked again", async () => {
+    const { server, sync, store, calendar, asked } = await counted("token");
+    const [a] = await store.hrefs(calendar.id);
+    await store.saveLocal(calendar.id, task("a", "ours"));
+    // The server changes it too, and refuses our write: ours waits, merged next time.
+    server.objects.set(`${calendarUrl}a.ics`, { etag: '"a2"', ics: task("a", "theirs") });
+    server.beforeWrite = () => {
+      throw new Error("not now");
+    };
+    await sync();
+    expect((await store.object(a!.id))?.pending).toBe("update");
+    // Its old token stays: the listing's new one never matches it.
+    const [listed] = await server.calendars();
+    const [kept] = await store.calendars(calendar.accountId);
+    expect(kept?.syncToken).not.toBe(listed?.state?.syncToken);
+    server.beforeWrite = () => {};
+    await sync();
+    expect(asked()).toBe(3);
+  });
+
+  test("a server whose listing spells its token unlike its reports is asked every sync", async () => {
+    const { sync, asked } = await counted("unlike");
+    await sync();
+    await sync();
+    expect(asked()).toBe(3);
+  });
+
+  test("the provider hears the listing's state for the calendar it asks about", async () => {
+    const server = memoryServer(calendarUrl);
+    server.listing = "token";
+    const heard: unknown[] = [];
+    await device({
+      ...server,
+      changes: (url, state, known, listed) => {
+        heard.push(listed);
+        return server.changes(url, state, known, listed);
+      },
+    });
+    expect(heard).toEqual([{ syncToken: "t:", ctag: null }]);
+  });
+});

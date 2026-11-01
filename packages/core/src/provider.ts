@@ -66,12 +66,15 @@ export interface Provider {
   /**
    * What changed in a calendar since `state`. `known` holds every href the
    * device has with its ETag, for servers (or expired tokens) that can only
-   * list everything.
+   * list everything. `listed` is the calendar's state as this sync's
+   * `calendars()` read it (`RemoteCalendar.state`), from which a provider
+   * may choose how to ask (docs/plans/foundation.md#D127).
    */
   changes(
     calendarUrl: string,
     state: SyncState,
     known: ReadonlyMap<string, string | null>,
+    listed?: SyncState,
   ): Promise<Changes>;
   fetch(href: string): Promise<RemoteObject | null>;
   /** Creates an object at `href`; fails with `conflict` if one is there already. */
