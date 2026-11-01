@@ -53,6 +53,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
   views, calendars and settings (a sidebar on a wide screen); the "+" button
   that creates an item (design D46).
 - **View** — Day, 3 days, Week, Month or Agenda.
+- **Period** — the days a view shows: one, three, or the locale's week;
+  previous and next move by one period.
+- **Undone tasks chip** — the one chip on today that stands for every
+  undone task due before today, "N undone tasks" (design D51).
 - **Agenda** — the view that lists items in time order instead of a grid.
 
 ## Sync
@@ -61,6 +65,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
   truth.
 - **Sync engine** — `syncAccount` in `@astrotime/sync`, which reconciles
   the local store with a provider (D37).
+- **Live query** — a query of the local store that runs again whenever the
+  store changes, so a view shows what a sync wrote (`liveQuery`, D54).
 - **Sync token** — the server's marker of the last state we saw
   (RFC 6578); the next sync asks only for what changed since.
 - **ETag** — the server's version of one item; writes send it so a newer
@@ -89,6 +95,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 
 ## Development
 
+- **Demo data** — invented calendars, events and tasks around today, in
+  English or Russian (`@astrotime/ui/demo`); `?demo` loads them in the dev
+  server (D57).
 - **Tailnet** — the owner's private Tailscale network (100.64.0.0/10,
   fd7a:115c:a1e0::/48); with Tailscale up, the dev server lets in this
   machine and tailnet devices only (`scripts/t3/README.md`).

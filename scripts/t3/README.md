@@ -17,6 +17,9 @@ or use Node 24 and pnpm already on PATH.
     astrotime: on your tailnet http://100.x.y.z:5180 (or http://<this machine>:5180)
     astrotime: local CalDAV at http://127.0.0.1:5232/ (user astro, password astro)
 
+Open `http://127.0.0.1:5180/?demo` to fill the app's local store with demo
+data around today (dev server only; `docs/map.md`, `apps/web`).
+
 The local Radicale (from the devenv shell) keeps its data in
 `.astrotime-dev/radicale` (gitignored), with a calendar `personal` made on the
 first start. Radicale listens on 127.0.0.1 only; other devices reach it
