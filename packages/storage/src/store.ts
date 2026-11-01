@@ -633,6 +633,17 @@ export class Store {
     await this.db.delete(schema.objects).where(eq(schema.objects.id, id));
   }
 
+  /** Whether any of these calendars holds an object, a deleted one waiting for its upload included. */
+  async hasObjects(calendarIds: readonly string[]): Promise<boolean> {
+    if (calendarIds.length === 0) return false;
+    const [any] = await this.db
+      .select({ id: schema.objects.id })
+      .from(schema.objects)
+      .where(inArray(schema.objects.calendarId, [...calendarIds]))
+      .limit(1);
+    return any !== undefined;
+  }
+
   object(id: string): Promise<StoredObject | undefined> {
     return this.db.select().from(schema.objects).where(eq(schema.objects.id, id)).get();
   }

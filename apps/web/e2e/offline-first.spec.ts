@@ -32,7 +32,7 @@ test("with no account and no network, an event made on this device stays after a
   const dentist = wednesday(page).getByRole("listitem", { name: "Dentist, 4:00 – 5:00 PM" });
   await expect(dentist).toBeVisible();
   // Nothing in the accounts asks for attention: there is no server to reach.
-  await expect(page.getByRole("button", { name: "Accounts", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Accounts/ })).toHaveAccessibleName("Accounts");
 
   await context.setOffline(false);
   await page.reload();
@@ -62,6 +62,23 @@ test("an account added beside the calendar on this device keeps it once it holds
     // Holding an item, the calendar on this device stays, with it.
     await expect(page.getByRole("region", { name: "On this device" })).toBeVisible();
     await expect(page.getByRole("listitem", { name: /^Kept here, / })).toBeVisible();
+
+    // The network goes: the account says so calmly, and nothing asks for
+    // attention (D91, D122): the button's name has no "needs your attention",
+    // no live region says so, and no dot is drawn.
+    await page.context().setOffline(true);
+    await page.getByRole("button", { name: /^Accounts/ }).click();
+    const accounts = page.getByRole("dialog", { name: "Accounts" });
+    await accounts.getByRole("button", { name: "Sync now" }).click();
+    await expect(
+      accounts.getByText("Offline: changes wait until the server can be reached"),
+    ).toBeVisible();
+    await accounts.getByRole("button", { name: "Close" }).click();
+    const button = page.getByRole("button", { name: /^Accounts/ });
+    await expect(button).toHaveAccessibleName("Accounts");
+    await expect(page.getByText("Accounts, something needs your attention")).toHaveCount(0);
+    await expect(button.locator(".bg-danger")).toHaveCount(0);
+    await page.context().setOffline(false);
   } finally {
     await radicale.stop();
   }

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import { LANGUAGES } from "../i18n/index.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
+import { accountName } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { useCalendar } from "./context.ts";
 import { CheckIcon, CloseIcon } from "./icons.tsx";
@@ -144,7 +145,10 @@ function SettingsGroups({
         // drawer's checkbox, in the calendar's colour, so one state is one
         // widget wherever it is met (D131).
         return (
-          <Group key={account.id} title={t("settings.calendarsOf", { account: account.name })}>
+          <Group
+            key={account.id}
+            title={t("settings.calendarsOf", { account: accountName(account, t) })}
+          >
             {own.map((calendar) => (
               <label
                 key={calendar.id}

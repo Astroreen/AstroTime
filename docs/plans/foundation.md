@@ -786,8 +786,10 @@ Decided while building PR 5a-3.
     the token's place until the account and its secret are saved, so a page
     that goes in between (discovery, the first write) loses nothing: the
     next one saves it without a new flow, in the background: an approval
-    held never opens the dialog again. The UI tries it on start and whenever
-    the network comes back (`SignIn.saveHeld`), and while it waits, the
+    held never opens the dialog again. The UI tries it on start, whenever
+    the network comes back, and, for a server down while the browser is
+    online, at the end of a sync's tick once a backoff allows (a minute,
+    doubling to half an hour) (`SignIn.saveHeld`), and while it waits, the
     accounts dialog says calmly that AstroTime signs in as that user once the
     server can be reached. An approval is held for seven days (`heldUntil`);
     past that, its app password is revoked at the next chance and the entry
@@ -818,7 +820,9 @@ Decided while building PR 5a-3.
     Android have a `pendingSignIn` (their secrets); the desktop, whose
     window lives on while the browser is in front, has none.
   - **Eviction.** A browser may evict best-effort storage when the device runs
-    short of space. Once the store holds an account, the UI calls the
+    short of space. Once the store holds something worth keeping (a server's
+    account, or an item on the calendar on this device; never on a first
+    run's load, which makes that calendar empty), the UI calls the
     platform's `keepData`, the web's `navigator.storage.persist()` (unless
     `persisted()` already says so): Chromium grants or refuses it silently
     (by engagement, a bookmark, an installed app), Firefox asks the user. Its
@@ -836,8 +840,9 @@ Decided while building PR 5a-3.
   - A store with no account at all gets **the calendar on this device**: an
     account of provider `local` (`local:` its address, never synced, as the
     demo's is not, [D90](#D90)) with one calendar of events and tasks, named
-    in the language spoken then ("Personal") and shown as "On this device"
-    in the language spoken now. `Store.addLocalCalendarIfEmpty` makes it in
+    in the language spoken then ("Personal"); it and its account are shown
+    in the language spoken now ("Personal", "On this device"), the name
+    given where the UI reads its calendars. `Store.addLocalCalendarIfEmpty` makes it in
     one transaction, so two tabs opening an empty store make one; the UI
     calls it whenever the store has no account, after the last one is
     removed too, so the app always has somewhere to write.

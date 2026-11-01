@@ -39,6 +39,9 @@ export interface AccountsValue {
 
 const AccountsContext = createContext<AccountsValue | null>(null);
 
+/** The longest wait between two tries of an approval held while its server is unreachable. */
+const HELD_RETRY_MAX_MS = 30 * 60_000;
+
 /** The calendar on this device's colour, the demo's first calendar's blue (design D47). */
 const LOCAL_COLOR = "#4f8fd6";
 
@@ -145,6 +148,8 @@ export function AccountsProvider({
     if (!pending) return;
     let live = true;
     let running = false;
+    let tries = 0;
+    let notBefore = 0;
     const run = async () => {
       if (running) return;
       running = true;
@@ -157,9 +162,12 @@ export function AccountsProvider({
           pending,
           ...(platform.signingInTo ? { signingInTo: platform.signingInTo } : {}),
         });
-        if ((await signIn.saveHeld()) === "saved") {
-          void scheduler.syncNow();
-        }
+        const result = await signIn.saveHeld();
+        if (result === "saved") void scheduler.syncNow();
+        // Still unreachable: tried again on a sync's tick, a minute later,
+        // then two, doubling up to half an hour (D121).
+        tries = result === "held" ? tries + 1 : 0;
+        notBefore = Date.now() + Math.min(HELD_RETRY_MAX_MS, 60_000 * 2 ** Math.max(0, tries - 1));
         const now = await heldApproval(pending);
         if (live) setHeld(now);
       } catch (error) {
@@ -171,9 +179,18 @@ export function AccountsProvider({
     void run();
     retryHeld.current = () => void run();
     window.addEventListener("online", run);
+    // The server down while the browser is online: each sync's end is a
+    // chance, taken once the backoff allows.
+    let syncing = scheduler.status.running;
+    const stopTicks = scheduler.subscribe(() => {
+      const was = syncing;
+      syncing = scheduler.status.running;
+      if (was && !syncing && tries > 0 && Date.now() >= notBefore) void run();
+    });
     return () => {
       live = false;
       window.removeEventListener("online", run);
+      stopTicks();
     };
   }, [platform, store, scheduler]);
 
@@ -220,16 +237,26 @@ export function AccountsProvider({
     );
   }, [preset, preferences, store]);
 
-  // Once the store holds an account, the browser is asked to keep its data
-  // rather than evict it under pressure, once on this device: its answer is
-  // kept, granted or refused (D121).
+  // Once the store holds something worth keeping (a server's account, or an
+  // item on the calendar on this device; not the empty calendar a first run
+  // makes), the browser is asked to keep its data rather than evict it under
+  // pressure, once on this device: its answer is kept, granted or refused
+  // (D121). Firefox asks the user, so never on a first visit's load.
   useEffect(() => {
     const { keepData } = platform;
     if (!keepData || preferences.get(KEYS.keepData) !== null) return;
     let asked = false;
     return liveQuery(
       store,
-      async () => (await store.accounts()).some((account) => account.provider !== "demo"),
+      async () => {
+        const accounts = await store.accounts();
+        if (accounts.some((account) => account.provider === "caldav")) return true;
+        const local = new Set(
+          accounts.filter((account) => account.provider === "local").map((account) => account.id),
+        );
+        const calendars = (await store.calendars()).filter((c) => local.has(c.accountId));
+        return store.hasObjects(calendars.map((calendar) => calendar.id));
+      },
       (some) => {
         if (!some || asked || preferences.get(KEYS.keepData) !== null) return;
         asked = true;

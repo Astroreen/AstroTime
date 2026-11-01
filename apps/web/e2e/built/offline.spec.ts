@@ -129,7 +129,14 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     expect((await loaded).fromServiceWorker()).toBe(true);
     await expect(planning(page)).toBeVisible();
     // Said calmly: offline, no dot of trouble on the account button.
-    await expect(page.getByRole("button", { name: "Accounts", exact: true })).toBeVisible();
+    const account = page.getByRole("region", { name: /^astro@/ });
+    await expect(
+      account.getByText("Offline: changes wait until the server can be reached"),
+    ).toBeVisible();
+    const button = page.getByRole("button", { name: /^Accounts/ });
+    await expect(button).toHaveAccessibleName("Accounts");
+    await expect(page.getByText("Accounts, something needs your attention")).toHaveCount(0);
+    await expect(button.locator(".bg-danger")).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await context.setOffline(false);
     expect(violations).toEqual([]);

@@ -118,7 +118,19 @@ export function CalendarScreen({
     () =>
       liveQuery(
         store,
-        async () => ({ accounts: await store.accounts(), calendars: await store.calendars() }),
+        async () => {
+          const accounts = await store.accounts();
+          // The calendar on this device is named in the language spoken now,
+          // as its account is (foundation D122), wherever it is shown.
+          const local = new Set(
+            accounts.filter((account) => account.provider === "local").map((account) => account.id),
+          );
+          // Rows read afresh for this query alone, so named in place.
+          const calendars = await store.calendars();
+          for (const calendar of calendars)
+            if (local.has(calendar.accountId)) calendar.name = t("local.calendar");
+          return { accounts, calendars };
+        },
         (result) => {
           setLists(result);
           setListsFailed(false);
@@ -128,7 +140,7 @@ export function CalendarScreen({
           setListsFailed(true);
         },
       ),
-    [store],
+    [store, t],
   );
   const ids = lists
     ? lists.calendars.filter((calendar) => !hidden.has(calendar.id)).map((calendar) => calendar.id)
