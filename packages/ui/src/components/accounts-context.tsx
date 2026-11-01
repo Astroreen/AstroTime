@@ -105,9 +105,15 @@ export function AccountsProvider({
       (some) => {
         if (!some || asked || preferences.get(KEYS.keepData) !== null) return;
         asked = true;
-        keepData().then(
-          (kept) => preferences.set(KEYS.keepData, kept ? "granted" : "refused"),
-          (error: unknown) => console.error(error),
+        // One tab asks at a time, and none once another has its answer.
+        const ask = async () => {
+          if (preferences.get(KEYS.keepData) !== null) return;
+          const kept = await keepData();
+          preferences.set(KEYS.keepData, kept ? "granted" : "refused");
+        };
+        const locks = globalThis.navigator?.locks;
+        (locks ? locks.request("astrotime-keep-data", ask) : ask()).catch((error: unknown) =>
+          console.error(error),
         );
       },
     );

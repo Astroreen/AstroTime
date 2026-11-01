@@ -360,6 +360,32 @@ test("an approval whose account is not saved yet is kept: the next page saves it
   expect(next.secrets.values.has(PENDING_FLOW)).toBe(false);
 });
 
+test("a new flow that replaces an approval another page left unsaved revokes its app password (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  const page = await setup(server);
+  // A page went after the approval, before its account was saved, and this
+  // one starts a flow of its own rather than taking that one up.
+  page.secrets.values.set(
+    PENDING_FLOW,
+    JSON.stringify({
+      step: "approved",
+      token: "old-t0k3n",
+      server: `${SERVER}/`,
+      username: "astro",
+      password: "app-left",
+    }),
+  );
+  void page.signIn.withNextcloud({ server: SERVER });
+  await page.reaches("waiting");
+  expect(
+    server.requests.filter((r) => r.method === "DELETE").map((r) => r.headers.Authorization),
+  ).toEqual([`Basic ${btoa("astro:app-left")}`]);
+  expect(JSON.parse(page.secrets.values.get(PENDING_FLOW)!)).toMatchObject({
+    step: "waiting",
+    token: "t0k3n",
+  });
+});
+
 test("an approval whose account cannot be saved, or that is cancelled, is revoked and forgotten (D121)", async () => {
   const server = nextcloud({ password: "app-pass" });
   let reachable = false;

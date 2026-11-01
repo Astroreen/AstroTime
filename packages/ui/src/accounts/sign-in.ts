@@ -122,9 +122,20 @@ function underLock<T>(work: () => Promise<T>): Promise<T> {
   return locks ? locks.request("astrotime-login-flow", work) : work();
 }
 
-/** Keeps `flow`, replacing what was kept: the latest flow started is the one taken up. */
-function keepFlow(pending: SecretStore, flow: PendingFlow): Promise<void> {
-  return underLock(() => pending.set(PENDING_FLOW, JSON.stringify(flow)));
+type ApprovedFlow = Extract<PendingFlow, { step: "approved" }>;
+
+/**
+ * Keeps `flow`, replacing what was kept: the latest flow started is the one
+ * taken up. An approval of another flow it replaces, which a page left
+ * behind unsaved, is handed back, so its app password is revoked rather
+ * than lost.
+ */
+function keepFlow(pending: SecretStore, flow: PendingFlow): Promise<ApprovedFlow | null> {
+  return underLock(async () => {
+    const before = readPending(await pending.get(PENDING_FLOW));
+    await pending.set(PENDING_FLOW, JSON.stringify(flow));
+    return before?.step === "approved" && before.token !== flow.token ? before : null;
+  });
 }
 
 /**
@@ -352,12 +363,13 @@ export class SignIn {
           const { pending } = this.#options;
           if (pending && this.#kept === token) {
             try {
-              await keepFlow(pending, {
+              const displaced = await keepFlow(pending, {
                 step: "approved",
                 token,
                 server: named,
                 ...credentials,
               });
+              if (displaced) await this.#revoke(displaced);
             } catch (error) {
               console.error(error);
             }
@@ -416,17 +428,24 @@ export class SignIn {
     const held = this.#approved;
     if (!held) return;
     this.#approved = null;
-    await revokeAppPassword(this.#options.http, held.server, held.credentials).catch(
+    await this.#revoke({ server: held.server, ...held.credentials });
+    await this.#forget(held.token);
+  }
+
+  /** Revokes an app password Login Flow gave; the server unreachable, it stays valid there. */
+  async #revoke(approval: { server: string } & Credentials): Promise<void> {
+    const { server, username, password } = approval;
+    await revokeAppPassword(this.#options.http, server, { username, password }).catch(
       (error: unknown) => console.error(error),
     );
-    await this.#forget(held.token);
   }
 
   /** Keeps the flow in `pending`, for a page loaded after this one (D121). */
   async #keep(signal: AbortSignal, flow: PendingFlow): Promise<void> {
     const { pending } = this.#options;
     if (!pending) return;
-    await keepFlow(pending, flow);
+    const displaced = await keepFlow(pending, flow);
+    if (displaced) await this.#revoke(displaced);
     if (signal.aborted) return forgetFlow(pending, flow.token);
     this.#kept = flow.token;
   }

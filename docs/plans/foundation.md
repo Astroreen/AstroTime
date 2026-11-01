@@ -737,7 +737,8 @@ Decided while building PR 5a-3.
     (`hasPendingFlow`). Forgetting compares the kept token and deletes under
     a Web Lock (`astrotime-login-flow`), so a newer flow another page
     started is never forgotten for an older one; the latest flow started is
-    the one kept. A page that took up a flow another page ended closes its
+    the one kept, and an unsaved approval it replaces (a page left it, and
+    this one started anew) has its app password revoked, never lost. A page that took up a flow another page ended closes its
     dialog (`elsewhere`), the account coming through the store. The web and
     Android have a `pendingSignIn` (their secrets); the desktop, whose
     window lives on while the browser is in front, has none.
@@ -748,7 +749,8 @@ Decided while building PR 5a-3.
     (by engagement, a bookmark, an installed app), Firefox asks the user. Its
     answer is kept in the preferences (`astrotime.keepData`), and the UI
     never asks again once answered, so a user who refused is not asked at
-    every visit. A refusal changes nothing else.
+    every visit; tabs ask one at a time, under the `astrotime-keep-data` Web
+    Lock, each reading the answer again inside it. A refusal changes nothing else.
   - An insecure context (plain http beyond localhost) never opens the store
     and says so ([D20](#D20)), so it cannot lose anything.
 
