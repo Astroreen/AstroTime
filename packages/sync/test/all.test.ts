@@ -360,6 +360,36 @@ test("with the platform's lock, removing an account waits for another instance's
   ]);
 });
 
+test("signing in again revokes the app password Login Flow gave the one replaced, never one typed", async () => {
+  const { secrets, context } = await setup();
+  const server = nextcloud();
+  const signIn = (password: string, loginFlow: boolean, http: HttpClient | null = server.http) =>
+    saveAccount(
+      { ...context, ...(http ? { http } : {}) },
+      {
+        name: "astro@a.example",
+        serverUrl: "https://a.example/",
+        homeUrl: "https://a.example/",
+        credentials: { username: "astro", password },
+        loginFlow,
+      },
+    );
+  const typed = await signIn("typed", false);
+  expect(await typed.replaced).toBe("none");
+  // A password the user typed is theirs: replaced, never revoked.
+  expect(await (await signIn("app-1", true)).replaced).toBe("none");
+  expect(await (await signIn("app-2", true)).replaced).toBe("revoked");
+  expect(server.revoked).toEqual([
+    `DELETE https://a.example/ocs/v2.php/core/apppassword Basic ${btoa("astro:app-1")}`,
+  ]);
+  expect(JSON.parse(secrets.values.get(`account:${typed.account.id}`)!).password).toBe("app-2");
+  // The same password again replaces nothing; offline, the old one is said kept.
+  expect(await (await signIn("app-2", true)).replaced).toBe("none");
+  expect(await (await signIn("app-3", true, nextcloud(false).http)).replaced).toBe("kept");
+  expect(await (await signIn("app-4", true, null)).replaced).toBe("kept");
+  expect(server.revoked).toHaveLength(1);
+});
+
 test("signing in as another user of the same calendar home adds that user, never takes over", async () => {
   const { store, secrets, context } = await setup();
   const as = (username: string) =>
