@@ -23,7 +23,7 @@ import { addDays } from "../calendar/dates.ts";
 import { deleteScopes, type Target } from "../calendar/editing.ts";
 import type { Formats } from "../calendar/format.ts";
 import { rightsOf } from "../calendar/rights.ts";
-import { alarmWords, repeatWords } from "../calendar/words.ts";
+import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -227,7 +227,7 @@ function Body({
               <ul>
                 {item.alarms.map((alarm, index) => (
                   <li key={index}>
-                    {alarmWords(alarm, { allDay, task: task !== null }, t, formats, timeZone)}
+                    {alarmWords(alarm, alarmOptions(item, alarm), t, formats, timeZone)}
                   </li>
                 ))}
               </ul>

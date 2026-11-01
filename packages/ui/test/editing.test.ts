@@ -31,7 +31,8 @@ import {
   type Target,
 } from "../src/calendar/editing.ts";
 import { Formats } from "../src/calendar/format.ts";
-import { alarmWords, repeatWords } from "../src/calendar/words.ts";
+import { alarmOptions, alarmWords, repeatWords } from "../src/calendar/words.ts";
+import { valueOf } from "../src/components/conflicts-dialog.tsx";
 import { loadDemo } from "../src/demo/index.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
@@ -272,6 +273,42 @@ describe("the form's corners", () => {
     );
     expect(withStartTime(late, "23:30")).toMatchObject({ endDate: "2026-11-06", endTime: "00:30" });
     expect(withStartTime(late, "09:00")).toMatchObject({ endDate: "2026-11-05", endTime: "10:00" });
+  });
+
+  test("an event made a task and back while the dialog is open is the event it was", () => {
+    const options = { calendarId: "c", day: "2026-11-05", minutes: 0, at: 10 * 60, timeZone };
+    const round = (form: Form) => switchKind(switchKind(form, "task"), "event");
+    // Over three days.
+    const long = { ...newForm("event", options), endDate: "2026-11-07", endTime: "12:00" };
+    expect(round(long)).toMatchObject({
+      allDay: false,
+      startDate: "2026-11-05",
+      startTime: "10:00",
+      endDate: "2026-11-07",
+      endTime: "12:00",
+    });
+    // With no length.
+    const none = newForm("event", { ...options, length: 0 });
+    expect(round(none)).toMatchObject({
+      startTime: "10:00",
+      endDate: "2026-11-05",
+      endTime: "10:00",
+    });
+    // All day, over two days.
+    const allDay = { ...newForm("event", options), allDay: true, endDate: "2026-11-06" };
+    expect(round(allDay)).toMatchObject({
+      allDay: true,
+      startDate: "2026-11-05",
+      endDate: "2026-11-06",
+    });
+    // Due on another day meanwhile: as long, from there.
+    const moved = { ...switchKind(long, "task"), endDate: "2026-11-10" };
+    expect(switchKind(moved, "event")).toMatchObject({
+      startDate: "2026-11-10",
+      endDate: "2026-11-12",
+      endTime: "12:00",
+    });
+    expect(switchKind(moved, "event")).not.toHaveProperty("asEvent");
   });
 
   test("an event over midnight made a task and back keeps its length", () => {
@@ -824,6 +861,96 @@ describe("in words", () => {
     );
     expect(repeatWords({ ...monthly, frequency: "DAILY", interval: 5 }, start, ru, ruFormats)).toBe(
       "Каждые 5 дней",
+    );
+  });
+
+  test("a rule every 21st day, week, month or year reads as Russian counts it", () => {
+    const every = (frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY", interval: number) =>
+      repeatWords(
+        { ...weekly, frequency, interval, weekdays: [], monthlyWeekday: null },
+        start,
+        ru,
+        ruFormats,
+      );
+    expect(every("DAILY", 21)).toBe("Каждый 21 день");
+    expect(every("WEEKLY", 31)).toBe("Каждую 31 неделю в среду");
+    expect(every("MONTHLY", 21)).toBe("Каждый 21 месяц, 4 числа");
+    expect(every("YEARLY", 101)).toBe("Каждый 101 год, 4 ноября");
+    expect(every("DAILY", 22)).toBe("Каждые 22 дня");
+    expect(every("DAILY", 25)).toBe("Каждые 25 дней");
+  });
+
+  test("a task's reminder before its due date reads as the day and time it rings", () => {
+    // The edit dialog relates a task's reminders to its due (RELATED=END), and
+    // a due date counts from its day's midnight, as an all-day item's start does.
+    const due = (offsetSeconds: number) => ({
+      trigger: { type: "relative" as const, relatedTo: "end" as const, offsetSeconds },
+    });
+    const task = { allDay: true, task: true };
+    expect(alarmWords(due(9 * 3600), task, en, formats, timeZone)).toBe("On the day at 9:00 AM");
+    expect(alarmWords(due(-15 * 3600), task, en, formats, timeZone)).toBe(
+      "1 day before at 9:00 AM",
+    );
+    expect(alarmWords(due(-(6 * 86400 + 15 * 3600)), task, ru, ruFormats, timeZone)).toBe(
+      "За 1 неделю в 9:00",
+    );
+    // A timed due: after it, not after a start.
+    const timedTask = { allDay: false, task: true };
+    expect(alarmWords(due(600), timedTask, en, formats, timeZone)).toBe(
+      "10 minutes after the due time",
+    );
+    expect(alarmWords(due(-600), timedTask, ru, ruFormats, timeZone)).toBe("За 10 минут");
+  });
+
+  test("a task's reminder from its start date reads as its day too", () => {
+    const fromStart = {
+      trigger: {
+        type: "relative" as const,
+        relatedTo: "start" as const,
+        offsetSeconds: -15 * 3600,
+      },
+    };
+    expect(alarmWords(fromStart, { allDay: true, task: true }, en, formats, timeZone)).toBe(
+      "1 day before at 9:00 AM",
+    );
+  });
+
+  test("every reminder reads by the time its item counts it from (`alarmOptions`)", () => {
+    const task = (lines: string) =>
+      CalendarObject.parse(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20261101T000000Z\r\n${lines}SUMMARY:Report\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT15H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`,
+      );
+    const dated = task("DUE;VALUE=DATE:20261105\r\n");
+    const [alarm] = dated.master!.alarms;
+    expect(alarmOptions(dated.master!, alarm!)).toEqual({ allDay: true, task: true });
+    // Its due is timed though its start is a date: counted from the due.
+    const timed = task(
+      "DTSTART;VALUE=DATE:20261103\r\nDUE;TZID=Europe/Vilnius:20261105T120000\r\n",
+    );
+    expect(alarmOptions(timed.master!, timed.master!.alarms[0]!)).toEqual({
+      allDay: false,
+      task: true,
+    });
+    // The Conflicts list words them as the details do.
+    expect(valueOf(dated, "alarms", { t: en, formats, timeZone })).toBe("1 day before at 9:00 AM");
+    expect(valueOf(timed, "alarms", { t: ru, formats: ruFormats, timeZone })).toBe("За 15 часов");
+  });
+
+  test("a reminder at a time of its own reads on the user's day", () => {
+    // 22:30Z on 4 November is 01:30 on the 5th in Moscow.
+    const at = {
+      trigger: {
+        type: "absolute" as const,
+        at: {
+          type: "zoned" as const,
+          local: "2026-11-04T22:30:00",
+          timeZone: "UTC",
+          epochMs: Date.parse("2026-11-04T22:30:00Z"),
+        },
+      },
+    };
+    expect(alarmWords(at, { allDay: false, task: false }, en, formats, "Europe/Moscow")).toBe(
+      "On Nov 5, 2026, 1:30 AM",
     );
   });
 

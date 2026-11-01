@@ -87,6 +87,12 @@ export interface Form {
   readonly percent: number | null;
   /** The categories, comma-separated. */
   readonly categories: string;
+  /**
+   * While creating, an event switched to a task: whether it was all day, how
+   * many days after its start it ended, and at what time; switched back, it
+   * has them again.
+   */
+  readonly asEvent?: { readonly allDay: boolean; readonly days: number; readonly endTime: string };
 }
 
 /** The form's view of a wall clock: its date and its `HH:MM`. */
@@ -204,13 +210,38 @@ export function newForm(
 export function switchKind(form: Form, kind: "event" | "task"): Form {
   if (form.kind === kind) return form;
   if (kind === "task") {
-    return { ...form, kind, allDay: true, endDate: form.startDate || form.endDate, startDate: "" };
+    const days =
+      form.startDate && form.endDate
+        ? Math.round(
+            (Date.parse(`${form.endDate}T00:00:00Z`) - Date.parse(`${form.startDate}T00:00:00Z`)) /
+              86_400_000,
+          )
+        : 0;
+    return {
+      ...form,
+      kind,
+      allDay: true,
+      endDate: form.startDate || form.endDate,
+      startDate: "",
+      asEvent: { allDay: form.allDay, days, endTime: form.endTime },
+    };
   }
   const day = form.endDate || form.startDate;
-  // The event is rebuilt on the one day the task kept (its start day, as
-  // the switch to a task left it): an end after the start is that day's; one
-  // before it was the next day's (an event over midnight); one at it, no
-  // length, becomes an hour, as a new event's.
+  const { asEvent, ...task } = form;
+  // The event it was, on the task's day, as long as it was.
+  if (asEvent) {
+    return {
+      ...task,
+      kind,
+      allDay: asEvent.allDay,
+      startDate: day,
+      endDate: addDays(day, asEvent.days),
+      endTime: asEvent.endTime,
+    };
+  }
+  // A task made an event is rebuilt on its one day: an end after the start
+  // is that day's; one before it was the next day's (an event over
+  // midnight); one at it, no length, becomes an hour, as a new event's.
   if (form.endTime > form.startTime) {
     return { ...form, kind, allDay: false, startDate: day, endDate: day };
   }

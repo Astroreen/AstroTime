@@ -649,7 +649,7 @@ are its decisions.
 ### Decided in the logic QA (after v0.2.0)
 
 The owner's feedback 5 on v0.2.0: "silly logic errors". What the edit
-dialog ([D108](#D108)) did wrong, and does now:
+dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
 
 - **D143. The edit dialog's corners.**
   - **An event with no length saves.** One another client wrote with no
@@ -665,11 +665,34 @@ dialog ([D108](#D108)) did wrong, and does now:
   - **Save with nothing changed asks nothing** of an occurrence of a
     series, as a drop that changes nothing ([D111](#D111)); it writes
     nothing either.
-  - **Event, task, event keeps the event's times** while creating: a task
-    holds one day, so an end at or before the start was the next day's.
+  - **Event, task, event keeps the event's times** while creating: switched
+    to a task, the event's all-day state, its days and its end time are
+    kept with the form, and switched back it has them again, from the day
+    the task is due on (several days, no length, all day). A task made an
+    event otherwise holds its one day: an end before the start is the next
+    day's, one at it an hour.
   - **A dialog keeps its keys**: the view and period keys
     ([D88](#D88)) do nothing behind the scope question or a confirmation
     (`alertdialog`), as behind any other dialog.
+- **D144. Words that said the wrong thing.**
+  - **A task's reminder on its due date reads as its day**: "On the day at
+    9:00", "1 day before at 9:00", as an all-day item's ([D108](#D108)).
+    The dialog relates a task's reminders to its due (`RELATED=END`), and a
+    due date counts from its day's midnight, as an all-day start does; the
+    words read only a start that way, so every preset of a dated task said
+    "9 hours after the start" or "39 hours before". After a timed due it
+    says "after the due time", not "after the start". The details, the
+    edit dialog and the Conflicts list read every reminder by the time it
+    counts from (`alarmOptions`: a date or not, the item a task or not), as
+    core's `remindersOf` picks it.
+  - **A reminder at a time of its own** says the day it rings on in the
+    user's zone, as its time; the day was its own zone's.
+  - **Russian counts 21, 31, 101 in the singular**: "Каждый 21 день",
+    "Каждую 31 неделю", "Каждый 21 месяц", "Каждый 101 год"; they read
+    "Каждые 21 день".
+  - **A task in the search results** reads as its due: the day it is due
+    and the time, or the day alone for a due date, where it gave its
+    start's day with its due's time.
 
 ## Deferred
 
