@@ -137,6 +137,8 @@ the project.
     day is still 24 tiles, and the current-time line, like the items, is
     placed by the minutes the wall clock shows, not by the minutes elapsed
     since midnight.
+  - a tab left open overnight moves an anchor on today to the new today at
+    midnight; an anchor the user moved elsewhere stays.
 - **D86. The Month view, read from the reference** (and from Google's
   Android app where the reference is silent):
   - six weeks from the week holding the month's first day, as the reference
@@ -285,7 +287,9 @@ the project.
     `rightsOf`, the one check every part of the UI asks): Edit, and a
     task's Complete and Star, with `edit`; Delete when a scope is left:
     one occurrence or the following ones are an edit of the series, all
-    of them or an item that does not repeat a deletion (`delete`). A
+    of them or an item that does not repeat a deletion (`delete`), as is
+    the last exception of a series held without its master
+    ([foundation D105](foundation.md#D105)). A
     calendar that allows neither says it is read-only. A search result moves the calendar to its day, as D97 says, and
     opens its details over it;
   - the **edit dialog**: the whole screen on a phone, a dialog from 640 px,
