@@ -548,6 +548,11 @@ were checked on 2026-11-01.
   Android's plugin still follows them itself, in Kotlin, by the same rule
   ([D62](#D62)). Making the plugin one hop at a time under the shared loop
   would leave one implementation.
+- **A reminder Android did not fire** — an alarm whose time passed is taken
+  as fired; after a force-stop (which clears the app's alarms), one due in
+  the 5 minutes before the app opens again is not shown late. Telling a
+  fired alarm from a cleared one needs the plugin's delivered list
+  ([D66](#D66)).
 
 ## PR plan
 

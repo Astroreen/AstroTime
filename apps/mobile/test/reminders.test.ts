@@ -168,6 +168,33 @@ test("each set is diffed against the last: the gone cancelled, the new and moved
   expect(phone.pending.size).toBe(0);
 });
 
+test("a cancel that fails is tried again with the next set: no alarm is left behind untracked", async () => {
+  const phone = device();
+  const { reminders } = scheduler(phone);
+  const call = reminder("call", NOW + 30 * MINUTE);
+  const lunch = reminder("lunch", NOW + 3 * 60 * MINUTE);
+  await reminders.schedule([call, lunch]);
+  const lunchId = idOf(phone, "lunch")!;
+  const cancel = phone.native.cancel;
+  phone.native.cancel = async () => {
+    throw new Error("cancel failed");
+  };
+  await expect(reminders.schedule([call])).rejects.toThrow("cancel failed");
+  expect(phone.pending.has(lunchId)).toBe(true);
+  phone.native.cancel = cancel;
+  await reminders.schedule([call]);
+  expect(phone.pending.has(lunchId)).toBe(false);
+});
+
+test("a kept record that is not one (scheduled null) starts afresh instead of failing every set", async () => {
+  const phone = device();
+  const preferences = memoryPreferences();
+  preferences.set("astrotime.reminders", JSON.stringify({ next: 1, scheduled: null }));
+  const { reminders } = scheduler(phone, preferences);
+  await reminders.schedule([reminder("call", NOW + 30 * MINUTE)]);
+  expect(phone.last().scheduled).toEqual(["call"]);
+});
+
 test("ids: allocated per reminder from a kept counter, never shared, never handed out again after a restart", async () => {
   const phone = device();
   const preferences = memoryPreferences();

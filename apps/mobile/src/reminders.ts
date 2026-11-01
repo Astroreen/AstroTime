@@ -76,7 +76,16 @@ interface Entry {
 function readKept(preferences: Preferences): Kept {
   try {
     const kept = JSON.parse(preferences.get(KEPT_KEY) ?? "null") as Kept | null;
-    if (kept && Number.isInteger(kept.next) && typeof kept.scheduled === "object") return kept;
+    if (
+      kept &&
+      Number.isInteger(kept.next) &&
+      typeof kept.scheduled === "object" &&
+      kept.scheduled !== null &&
+      !Array.isArray(kept.scheduled) &&
+      Object.values(kept.scheduled).every((entry) => Number.isInteger(entry?.id))
+    ) {
+      return { ...kept, asked: kept.asked === true };
+    }
   } catch {
     // Unreadable: start again; ids already handed out are lost with it.
   }
@@ -162,10 +171,12 @@ export function androidReminders(options: {
 
     const ids = new Set(set.map((reminder) => reminder.id));
     const gone: number[] = [];
+    // Forgotten only once Android cancelled them: a failed cancel is tried again.
+    const forget: string[] = [];
     for (const [id, entry] of Object.entries(kept.scheduled)) {
       if (ids.has(id)) continue;
       gone.push(entry.id);
-      delete kept.scheduled[id];
+      forget.push(id);
     }
     const notifications: NativeNotification[] = [];
     for (const reminder of set) {
@@ -178,8 +189,10 @@ export function androidReminders(options: {
         if (fired) continue;
         // Missed by more than the grace: dropped, and an alarm for a later time it had, cancelled.
         if (at - reminder.fireAt > LATE_MS) {
-          if (entry) gone.push(entry.id);
-          delete kept.scheduled[reminder.id];
+          if (entry) {
+            gone.push(entry.id);
+            forget.push(reminder.id);
+          }
           continue;
         }
       } else {
@@ -208,7 +221,11 @@ export function androidReminders(options: {
     // Kept before Android has them: an id once handed out is never handed out again.
     save();
     // A delivered notification stays on the screen: cancelling only stops what is still to come.
-    if (gone.length > 0) await native.cancel({ notifications: gone.map((id) => ({ id })) });
+    if (gone.length > 0) {
+      await native.cancel({ notifications: gone.map((id) => ({ id })) });
+      for (const id of forget) delete kept.scheduled[id];
+      save();
+    }
     if (notifications.length === 0) return;
     try {
       await native.schedule({ notifications });
