@@ -16,3 +16,4 @@ export {
   type Discovery,
 } from "./provider.ts";
 export { proxyHandler, REFUSED, throughProxy, type ProxyOptions } from "./proxy.ts";
+export { followRedirects } from "./redirects.ts";
