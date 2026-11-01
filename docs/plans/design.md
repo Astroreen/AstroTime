@@ -453,7 +453,11 @@ the project.
     `oklch`). `packages/ui/test/item-colors.test.ts` proves it over every
     OKLCH hue, chroma to 0.5 and lightness, and over the `#rrggbb` cube,
     each rounded up to 8 bits; `a11y.spec.ts` checks Chromium draws it so
-    in both themes. A cap on OKLCH lightness alone (`min(l, …)`) was
+    in both themes. A browser without relative colour syntax (Safari
+    before 18, Firefox before 128) mixes every colour 45% into black
+    instead (`color-mix`, which does not clip): white reaches 4.75:1 on any
+    sRGB colour, the `#rrggbb` a CalDAV server sends; a wide-gamut colour
+    there may fall short. A cap on OKLCH lightness alone (`min(l, …)`) was
     weighed and dropped: lightness is not luminance, so one cap must be
     about 0.52 to hold for a vivid green, and so darkens a grey that 0.568
     would serve; and a dark, vivid colour leaves sRGB and comes back
