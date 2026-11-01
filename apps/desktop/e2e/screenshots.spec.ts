@@ -55,7 +55,11 @@ test("the question without a keyring, dark and light", async () => {
   await expect(prompt).toBeVisible();
   for (const theme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: theme });
-    await page.screenshot({ path: join(directory!, `desktop-unprotected-${theme}.png`) });
+    await page.screenshot({
+      path: join(directory!, `desktop-unprotected-${theme}.png`),
+      // Once the dialog has finished opening, not through its fade.
+      animations: "disabled",
+    });
   }
   await keepPassword(page, "Keep until AstroTime quits");
   await app.close();
