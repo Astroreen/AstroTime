@@ -12,6 +12,10 @@ export const APP_URL = `${APP_SCHEME}://${APP_HOST}/`;
 export const CHANNELS = {
   /** One HTTP exchange through the main process, redirects followed (D72). */
   http: "astrotime:http",
+  /** An account's credentials: get, set and delete, in the keyring's care (D74). */
+  secretsGet: "astrotime:secrets-get",
+  secretsSet: "astrotime:secrets-set",
+  secretsDelete: "astrotime:secrets-delete",
   /** Opens an http(s) URL in the system browser. */
   openExternal: "astrotime:open-external",
   /** Asks for a port to the store's process; it comes back on the same channel (D73). */
@@ -32,8 +36,23 @@ export type HttpAnswer =
   /** The server could not be reached, or the answer broke off. */
   | { readonly offline: string };
 
+/**
+ * How a secret is saved (D74): `keyring` encrypted under the keyring's key,
+ * and only where a keyring protects it; otherwise as the user chose, kept
+ * `until-quit` (never written) or saved `unprotected` in the profile.
+ */
+export type SecretSaving = "keyring" | "until-quit" | "unprotected";
+
+export const SECRET_SAVINGS: readonly SecretSaving[] = ["keyring", "until-quit", "unprotected"];
+
 export interface Bridge {
   http(request: HttpRequest): Promise<HttpAnswer>;
+  readonly secrets: {
+    get(key: string): Promise<string | null>;
+    /** `no-keyring`: nothing was written, since no keyring would protect it. */
+    set(key: string, value: string, saving: SecretSaving): Promise<"saved" | "no-keyring">;
+    delete(key: string): Promise<void>;
+  };
   openExternal(url: string): void;
   /** The port arrives as a window message from the app's own origin, data `STORE_PORT`. */
   connectStore(): void;

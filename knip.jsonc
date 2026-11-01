@@ -32,8 +32,9 @@
       ],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.
       "ignoreDependencies": ["oxc-transform-react"],
-      // The private CA's test makes its certificates with the dev shell's (or CI's) tools.
-      "ignoreBinaries": ["openssl", "certutil"],
+      // The private CA's test makes its certificates, and the credentials' test
+      // its keyring, with the dev shell's (or CI's) tools.
+      "ignoreBinaries": ["openssl", "certutil", "dbus-daemon", "gnome-keyring-daemon"],
     },
     "apps/proxy": {
       "entry": ["src/main.ts", "vite.config.ts"],

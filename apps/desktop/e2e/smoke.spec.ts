@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { launch, profile, putEvent, signInByPassword } from "./support.ts";
+import { keepPassword, launch, profile, putEvent, signInByPassword } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // The test stops it itself once; stopping again is nothing.
@@ -69,21 +69,23 @@ test("the app starts sandboxed on app://, keeps its store in a utility process, 
   });
   expect(inside).toEqual({
     node: ["undefined", "undefined"],
-    bridge: ["connectStore", "http", "openExternal"],
+    bridge: ["connectStore", "http", "openExternal", "secrets"],
     injected: false,
     outlineOffset: "0px",
   });
 
   // Signing in with a password: through the main process's net.request (D72).
   await signInByPassword(page, radicale);
+  // No keyring here (`--password-store=basic`): the app asks first (D74).
+  await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
     wednesday(page).getByRole("listitem", { name: /^Planning with Radicale, / }),
   ).toBeVisible();
   await app.close();
 
-  // The server goes; the items stay in the store. Credentials were kept in
-  // memory only (until PR D2), so the account asks to sign in again.
+  // The server goes; the items stay in the store. The password was kept
+  // until the app quit, so the account asks to sign in again.
   await radicale.stop();
   const again = await launch(userData);
   await expect(

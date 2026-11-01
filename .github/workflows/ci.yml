@@ -103,7 +103,7 @@ jobs:
   desktop-e2e:
     name: Desktop smoke test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -115,6 +115,12 @@ jobs:
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       # The smoke test signs in to a real Radicale (apps/desktop/e2e/smoke.spec.ts).
       - run: pipx install radicale==3.8.0
+      # A keyring of the tests' own: a session bus and gnome-keyring, which
+      # Electron reaches through libsecret (apps/desktop/e2e/credentials.spec.ts).
+      # Without it the runner has none: safeStorage's backend is basic_text.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dbus gnome-keyring libsecret-1-0
       # Playwright builds the app and starts it in Electron, on a virtual display.
       - run: xvfb-run -a -s "-screen 0 1440x900x24" pnpm --filter @astrotime/desktop e2e
       - name: Playwright's traces, when a test failed

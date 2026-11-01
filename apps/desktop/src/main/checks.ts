@@ -3,7 +3,7 @@
 // Electron, so the checks are tested in Node.
 import type { HttpRequest } from "@astrotime/caldav";
 
-import { APP_HOST, APP_SCHEME } from "../bridge.ts";
+import { APP_HOST, APP_SCHEME, SECRET_SAVINGS, type SecretSaving } from "../bridge.ts";
 
 /** Headers a page may not set (as fetch's forbidden request headers). */
 const FORBIDDEN = new Set([
@@ -58,6 +58,25 @@ export function checkRequest(value: unknown): HttpRequest {
     throw new TypeError("An HTTP request's body is a string.");
   }
   return { method, url, headers: checked, ...(body === undefined ? {} : { body }) };
+}
+
+/** A secret's key, as the shared code spells it (`account:<id>`, foundation D90). */
+export function checkSecretKey(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 256) {
+    throw new TypeError("A secret's key is a string of 1 to 256 characters.");
+  }
+  return value;
+}
+
+/** A secret to save: a string, and how to save it (D74). */
+export function checkSecret(value: unknown, saving: unknown): [string, SecretSaving] {
+  if (typeof value !== "string" || value.length > 65_536) {
+    throw new TypeError("A secret is a string of at most 64 KiB.");
+  }
+  if (!SECRET_SAVINGS.includes(saving as SecretSaving)) {
+    throw new TypeError(`Not a way to save a secret: ${String(saving)}.`);
+  }
+  return [value, saving as SecretSaving];
 }
 
 /** Whether `url` is an http(s) URL: what the app sends to servers and opens in the browser. */

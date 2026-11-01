@@ -41,9 +41,12 @@ in
     pkgs.openssl
     android.androidsdk
     # The desktop app's tests: a display for Electron where there is none
-    # (CI's way), and certutil for a test CA in an NSS database (apps/desktop/e2e).
+    # (CI's way), certutil for a test CA in an NSS database, and a session
+    # bus with gnome-keyring for a keyring of the tests' own (apps/desktop/e2e).
     pkgs.xvfb-run
     pkgs.nssTools
+    pkgs.dbus
+    pkgs.gnome-keyring
   ];
 
   env.ANDROID_HOME = androidHome;

@@ -130,6 +130,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Secret store** — where a platform keeps an account's credentials
   (`SecretStore`): IndexedDB on the web (foundation D89), the Keystore on
   Android, the keyring on the desktop. Never the local store.
+- **Unprotected** — a password saved where no keyring protects it: on the
+  desktop without one, only when the user chooses so over keeping it until
+  the app quits (desktop plan D74).
 - **Store's process** — the desktop's Electron utility process that owns
   the local store's database file and runs the page's statements on a
   port (desktop plan D73).
