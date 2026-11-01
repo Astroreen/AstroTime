@@ -299,19 +299,16 @@ describe.each(servers)(
         }
 
         const credentials = await flow.poll();
-        expect(credentials).toMatchObject({
-          server: server.url.replace(/\/$/, ""),
-          username: server.username,
-        });
-        expect(credentials!.password).not.toBe(server.password);
-        // The app password is what AstroTime signs in with from now on.
+        if (!credentials) throw new Error("The flow gave no app password once approved.");
         try {
-          const { homeUrl } = await CalDavProvider.discover(
-            fetchClient(),
-            server.url,
-            credentials!,
-          );
-          const provider = new CalDavProvider(fetchClient(), credentials!, homeUrl);
+          expect(credentials).toMatchObject({
+            server: server.url.replace(/\/$/, ""),
+            username: server.username,
+          });
+          expect(credentials.password).not.toBe(server.password);
+          // The app password is what AstroTime signs in with from now on.
+          const { homeUrl } = await CalDavProvider.discover(fetchClient(), server.url, credentials);
+          const provider = new CalDavProvider(fetchClient(), credentials, homeUrl);
           expect((await provider.calendars()).map((c) => c.name)).toContain(name);
         } finally {
           // The app password goes, as a user would revoke it: a long-lived
@@ -320,7 +317,7 @@ describe.each(servers)(
             method: "DELETE",
             headers: {
               "OCS-APIRequest": "true",
-              Authorization: `Basic ${Buffer.from(`${credentials!.username}:${credentials!.password}`).toString("base64")}`,
+              Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64")}`,
             },
           });
           expect(revoked.status).toBe(200);
