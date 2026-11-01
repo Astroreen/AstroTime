@@ -8,12 +8,27 @@ import {
   type Range,
   wallClockOf,
 } from "@astrotime/core";
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 
 import type { SqlDriver } from "./driver.ts";
 import { migrate } from "./migrations.ts";
 import * as schema from "./schema.ts";
+import { containsPattern, foldForSearch, titlesOf } from "./search.ts";
 
 export type Account = typeof schema.accounts.$inferSelect;
 export type Calendar = Omit<typeof schema.calendars.$inferSelect, "components"> & {
@@ -120,6 +135,8 @@ export class Store {
   removeAccount(id: string): Promise<void> {
     return this.exclusive(async () => {
       await this.db.delete(schema.accounts).where(eq(schema.accounts.id, id));
+      // Its calendars' undone tasks are no longer asked about by anyone.
+      this.undoneCache.clear();
     });
   }
 
@@ -169,6 +186,9 @@ export class Store {
   removeCalendar(id: string): Promise<void> {
     return this.exclusive(async () => {
       await this.db.delete(schema.calendars).where(eq(schema.calendars.id, id));
+      for (const [objectId, entry] of this.undoneCache) {
+        if (entry.calendarId === id) this.undoneCache.delete(objectId);
+      }
     });
   }
 
@@ -430,6 +450,54 @@ export class Store {
     }
   >();
 
+  /** Every task of the calendars, dated or not: the lists of the tasks screen (design D52). */
+  tasks(calendarIds: readonly string[]): Promise<StoredObject[]> {
+    return this.db
+      .select()
+      .from(schema.objects)
+      .where(
+        and(
+          inArray(schema.objects.calendarId, [...calendarIds]),
+          eq(schema.objects.kind, "task"),
+          ne(schema.objects.pending, "delete"),
+        ),
+      );
+  }
+
+  /**
+   * The objects of the calendars with a title that holds `text`, ignoring
+   * case and diacritics (design D53): at most `limit`, the latest start
+   * first, undated ones last. Objects deleted on this device are left out.
+   */
+  async search(calendarIds: readonly string[], text: string, limit = 50): Promise<StoredObject[]> {
+    const folded = foldForSearch(text.trim());
+    if (folded === "") return [];
+    const where = (titles: SQL) =>
+      and(
+        inArray(schema.objects.calendarId, [...calendarIds]),
+        ne(schema.objects.pending, "delete"),
+        titles,
+      );
+    const found = await this.db
+      .select()
+      .from(schema.objects)
+      .where(where(sql`${schema.objects.titles} LIKE ${containsPattern(folded)} ESCAPE '\\'`))
+      .orderBy(desc(schema.objects.startMs))
+      .limit(limit);
+    // Rows written before migration 6 have no titles yet: read from their iCalendar.
+    const older = await this.db
+      .select()
+      .from(schema.objects)
+      .where(where(sql`${schema.objects.titles} IS NULL`));
+    const matching = older.filter((row) =>
+      titlesOf(CalendarObject.parse(row.ics)).includes(folded),
+    );
+    if (matching.length === 0) return found;
+    return [...found, ...matching]
+      .toSorted((a, b) => (b.startMs ?? -Infinity) - (a.startMs ?? -Infinity))
+      .slice(0, limit);
+  }
+
   /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
   undated(calendarIds: readonly string[]): Promise<StoredObject[]> {
     return this.db
@@ -550,6 +618,7 @@ function indexOf(object: CalendarObject) {
     kind: object.kind,
     ...boundsOf(object),
     done: object.master !== null && isDone(object.master),
+    titles: titlesOf(object),
   };
 }
 
