@@ -1380,9 +1380,12 @@ errors").
     every view it was in.
   - **`DTSTART` is the first instance** of a series of `RDATE`s alone
     (RFC 5545 3.8.5.3), where ical.js's `RecurExpansion` leaves it out.
-  - **The set is a union** (RFC 5545 3.8.5.3): a start the `RRULE`s and
-    `RDATE`s give more than once (an `RDATE` at `DTSTART`, beside a rule or
-    not) is one occurrence.
+  - **The set is a union** (RFC 5545 3.8.5.3), merged by instant: a start
+    the `RRULE`s and `RDATE`s give more than once (an `RDATE` at `DTSTART`,
+    beside a rule or not, written in UTC or another zone) is one occurrence.
+    An `RDATE` at an instant of its own beside a start in a zone the object
+    does not define is put on that start's wall clock first, since ical.js
+    compares that wall clock as if it were UTC.
 
 ## Deferred
 

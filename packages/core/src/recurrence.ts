@@ -3,7 +3,7 @@
 // whole periods of the rule after DTSTART, instead of at DTSTART.
 import ICAL from "ical.js";
 
-import { wallClockIn, zoneOrigin } from "./time.ts";
+import { fromIcalTime, wallClockIn, zoneOrigin } from "./time.ts";
 
 /**
  * The parts with which ical.js's iterator settles into the rule's period:
@@ -394,7 +394,8 @@ export function seriesStarts(
     .flatMap((property) => property.getValues())
     .flatMap((value) =>
       value instanceof ICAL.Period ? [value.start] : value instanceof ICAL.Time ? [value] : [],
-    );
+    )
+    .map((value) => inFrameOf(value, dtstart));
   // DTSTART is the first instance of the recurrence set (RFC 5545 3.8.5.3),
   // of RDATEs alone too, where ical.js's RecurExpansion leaves it out; an
   // RRULE's own walk gives it.
@@ -436,6 +437,33 @@ export function seriesStarts(
       }
     }
   };
+}
+
+/**
+ * An RDATE as ical.js can compare it with the rule's starts, which are on
+ * `dtstart`'s clock: ical.js compares a wall clock it holds for a zone the
+ * object does not define (D32) as if it were UTC. For such a start, an RDATE
+ * at an instant of its own (UTC, or another zone) becomes that instant's
+ * wall clock in the start's zone; beside a start ical.js places, an RDATE in
+ * a zone the object does not define becomes its instant in UTC. So the
+ * series' set is merged, and a start two of them give is one, by instant
+ * (D141). In the hour a DST change repeats, a wall clock is its first
+ * instant.
+ */
+function inFrameOf(time: ICAL.Time, dtstart: ICAL.Time): ICAL.Time {
+  if (time.isDate || dtstart.isDate) return time;
+  const start = zoneOrigin(dtstart);
+  const own = zoneOrigin(time);
+  const value = fromIcalTime(time);
+  if (value.type !== "zoned") return time;
+  if (start.kind === "undefined") {
+    if (own.kind === "undefined" && own.timeZone === start.timeZone) return time;
+    return ICAL.Time.fromDateTimeString(wallClockIn(value.epochMs, start.timeZone));
+  }
+  if ((start.kind === "defined" || start.kind === "utc") && own.kind === "undefined") {
+    return ICAL.Time.fromJSDate(new Date(value.epochMs), true);
+  }
+  return time;
 }
 
 /**

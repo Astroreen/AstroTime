@@ -555,15 +555,30 @@ describe("RFC 5545's corners", () => {
       "RRULE:FREQ=WEEKLY;UNTIL=20261123",
     );
     expect(starts(occurrencesBetween(allDay, vilnius("2026-11-01", "2026-12-31")))).toHaveLength(4);
-    // With its VTIMEZONE ical.js places 23:00 in Vilnius at 21:00Z itself: the 23rd stays.
-    const defined = CalendarObject.parse(
-      load("nextcloud-event-recurring.ics")
-        .serialize()
-        .replace(/RRULE:[^\r]*/, "RRULE:FREQ=WEEKLY;UNTIL=20261110T075959Z"),
-    );
-    expect(starts(occurrencesBetween(defined, vilnius("2026-10-01", "2026-12-31")))).not.toContain(
+    // With its VTIMEZONE ical.js places the series' starts itself: Tuesdays
+    // at 10:00 in Vilnius from 20 October, 3 November excluded, 27 October
+    // moved to 12:00. An UNTIL at 07:59:59Z on 10 November, 09:59:59 there,
+    // ends it before that day's 10:00 (08:00Z); 07:00Z would have kept it.
+    const defined = (until: string) =>
+      starts(
+        occurrencesBetween(
+          CalendarObject.parse(
+            load("nextcloud-event-recurring.ics")
+              .serialize()
+              .replace(
+                "RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=4",
+                `RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=${until}`,
+              ),
+          ),
+          vilnius("2026-10-01", "2026-12-31"),
+        ),
+      );
+    expect(defined("20261110T075959Z")).toEqual(["2026-10-20T10:00:00", "2026-10-27T12:00:00"]);
+    expect(defined("20261110T080000Z")).toEqual([
+      "2026-10-20T10:00:00",
+      "2026-10-27T12:00:00",
       "2026-11-10T10:00:00",
-    );
+    ]);
   });
 
   test("an RDATE at DTSTART is the one occurrence, with an RRULE or alone", () => {
@@ -585,6 +600,31 @@ describe("RFC 5545's corners", () => {
     expect(starts(occurrencesBetween(alone, vilnius("2026-11-01", "2026-12-01")))).toEqual([
       "2026-11-02T09:00:00",
       "2026-11-05T09:00:00",
+    ]);
+  });
+
+  test("an RDATE in UTC beside a series in a zone the object does not define is merged by instant", () => {
+    // 09:00 in Vilnius is 07:00Z: the same start, once. 08:00Z is 10:00 there,
+    // after 09:00 though ical.js would read 09:00 as 09:00Z, before it.
+    const object = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T093000",
+      "RRULE:FREQ=DAILY;COUNT=3",
+      "RDATE:20261102T070000Z,20261103T080000Z",
+    );
+    const occurrences = occurrencesBetween(object, vilnius("2026-11-01", "2026-12-01"));
+    expect(starts(occurrences)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-03T09:00:00",
+      "2026-11-03T10:00:00",
+      "2026-11-04T09:00:00",
+    ]);
+    // Each at its own instant.
+    expect(
+      occurrencesBetween(object, vilnius("2026-11-03", "2026-11-04")).map((o) => o.start),
+    ).toMatchObject([
+      { epochMs: Date.parse("2026-11-03T07:00:00Z") },
+      { epochMs: Date.parse("2026-11-03T08:00:00Z") },
     ]);
   });
 
