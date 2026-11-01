@@ -258,6 +258,15 @@ describe("chips, days and edges", () => {
     expect(wednesday.timed.map((p) => [p.shape, p.top])).toEqual([["chip", 900]]);
   });
 
+  test("each occurrence of a series of timed tasks is a chip at its own due, on its own day", () => {
+    const ics = task("water", "DUE:20261102T150000Z\r\nRRULE:FREQ=DAILY\r\n");
+    const wednesday = layoutDay(on("2026-11-04", "2026-11-05", ics), "2026-11-04", { timeZone });
+    expect(wednesday.timed.map((p) => [p.shape, p.top])).toEqual([["chip", 900]]);
+    const started = task("call", "DTSTART:20261102T110000Z\r\nRRULE:FREQ=DAILY\r\n");
+    const thursday = on("2026-11-05", "2026-11-06", started);
+    expect(dayRange(thursday[0]!, timeZone)).toEqual({ first: "2026-11-05", last: "2026-11-05" });
+  });
+
   test("a task with only a timed start is a chip at the start (D42)", () => {
     expect(
       day(task("call", "DTSTART:20261102T110000Z\r\n")).timed.map((p) => [

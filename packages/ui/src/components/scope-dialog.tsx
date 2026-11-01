@@ -15,6 +15,8 @@ export interface ScopeRequest {
   /** The scopes offered, the first chosen; empty: a deletion to confirm. */
   readonly scopes: readonly Scope[];
   readonly run: (scope: Scope) => void;
+  /** Closed without a choice: Cancel, Escape or a tap outside. */
+  readonly onCancel?: () => void;
 }
 
 export function ScopeDialog({
@@ -25,7 +27,14 @@ export function ScopeDialog({
   onClose: () => void;
 }) {
   return (
-    <AlertDialog.Root open={request !== null} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog.Root
+      open={request !== null}
+      onOpenChange={(open) => {
+        if (open) return;
+        request?.onCancel?.();
+        onClose();
+      }}
+    >
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <AlertDialog.Popup className="fixed top-1/2 left-1/2 z-[150] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">

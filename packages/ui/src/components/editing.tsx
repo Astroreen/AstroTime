@@ -9,6 +9,7 @@ import {
   isDone,
   starTask,
   type ItemTime,
+  type ItemTimes,
   type Task,
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
@@ -28,8 +29,10 @@ import {
   itemOf,
   newForm,
   problemOf,
+  saveChanges,
   saveForm,
   scopesFor,
+  scopesForTimes,
   type Form,
   type Target,
 } from "../calendar/editing.ts";
@@ -44,9 +47,14 @@ interface CreateOptions {
   readonly day: string | null;
   /** Minutes past midnight of a tapped slot of the time grid. */
   readonly at?: number;
+  /** Minutes it lasts, a press dragged over the grid; an hour by default. */
+  readonly length?: number;
   /** The calendar (a task list) it goes in; the first that takes new items by default. */
   readonly calendarId?: string;
 }
+
+/** How a move or a resize ended (design D111): written, nothing to write, or why not. */
+export type Rescheduled = "saved" | "unchanged" | "cancelled" | "gone" | "inDoubt" | "failed";
 
 export interface EditingValue {
   /** Shows an item's details. */
@@ -55,6 +63,14 @@ export interface EditingValue {
   create(kind: "event" | "task", options: CreateOptions): void;
   /** Whether any calendar can take a new item. */
   readonly canCreate: boolean;
+  /** Whether an item of this calendar can change (its `edit` right): only those drag. */
+  canChange(calendarId: string): boolean;
+  /**
+   * Gives an occurrence new times, a drag's drop or a key's move, through
+   * the edit dialog's save, asking the scope for an occurrence of a series
+   * (design D111); resolves once it is written, or why it was not.
+   */
+  reschedule(target: Target, times: ItemTimes): Promise<Rescheduled>;
 }
 
 export const EditingContext = createContext<EditingValue | null>(null);
@@ -174,6 +190,14 @@ export function useEditingState({
   const write = (work: Promise<unknown>) =>
     work.then(onChanged, (error: unknown) => console.error(error));
 
+  /** Why a save did not land, for the user (D99): gone meanwhile, unclear, or failed. */
+  const failureOf = (error: unknown): "gone" | "inDoubt" | "failed" => {
+    if (error instanceof GoneError) return "gone";
+    if (error instanceof InDoubtError) return "inDoubt";
+    console.error(error);
+    return "failed";
+  };
+
   const value: EditingValue = {
     open: setDetails,
     create(kind, options) {
@@ -190,6 +214,7 @@ export function useEditingState({
         minutes,
         timeZone,
         ...(options.at === undefined ? {} : { at: options.at }),
+        ...(options.length === undefined ? {} : { length: options.length }),
       });
       setEditing({
         target: null,
@@ -198,6 +223,37 @@ export function useEditingState({
       });
     },
     canCreate: writable("event").length > 0 || writable("task").length > 0,
+    // Moving an item edits it: only where the calendar's rights allow it (D37).
+    canChange: (calendarId) => rightsOf(byId(calendarId)).edit,
+    reschedule(target, times) {
+      return new Promise((resolve) => {
+        const run = (scope: "this" | "following" | "all") => {
+          saveChanges(
+            store,
+            { target, changes: { time: times }, calendarId: target.calendarId, scope },
+            { now: Date.now(), uid: () => crypto.randomUUID() },
+          ).then(
+            () => {
+              onChanged();
+              resolve("saved");
+            },
+            (error: unknown) => resolve(failureOf(error)),
+          );
+        };
+        const rights = rightsOf(byId(target.calendarId));
+        const scopes = scopesForTimes(target, times, timeZone, rights);
+        if (scopes.length === 0) run("all");
+        else {
+          setAsking({
+            action: "edit",
+            kind: target.item.kind,
+            scopes,
+            run,
+            onCancel: () => resolve("cancelled"),
+          });
+        }
+      });
+    },
   };
 
   const change = (form: Form) =>
@@ -236,13 +292,7 @@ export function useEditingState({
         },
         (error: unknown) => {
           // Gone meanwhile, or unclear whether it was saved: the user is told so (D99).
-          const failure =
-            error instanceof GoneError
-              ? "gone"
-              : error instanceof InDoubtError
-                ? "inDoubt"
-                : "failed";
-          if (failure === "failed") console.error(error);
+          const failure = failureOf(error);
           setEditing(
             (current) =>
               current && {

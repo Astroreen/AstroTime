@@ -2,7 +2,8 @@
 // day a tile with its number and its items as one-line chips, a span over
 // the week's days for an item over several; as many rows as the tiles fit,
 // then "+N". A day, or its "+N", opens in the Day view; an item, its details.
-import { isAllDay } from "@astrotime/core";
+// An item drags to another day, keeping its time (design D111).
+import { dayRange, isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +13,8 @@ import { foldWeek, type MonthWeek } from "../calendar/month.ts";
 import type { StripSpan } from "../calendar/query.ts";
 import { useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
-import { StripChip } from "./items.tsx";
+import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
+import { GhostChip, StripChip } from "./items.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
 /** Pixels: the day's number above its chips, one row of chips, the gap between tiles. */
@@ -57,50 +59,103 @@ export function MonthView(props: MonthViewProps) {
     return () => observer.disconnect();
   }, [weeks.length]);
 
+  const root = useRef<HTMLDivElement>(null);
+  const tiles = useRef(new Map<string, HTMLElement>());
+  // The day under a point: the tile it is on, or the nearest.
+  const surface: DragSurface = {
+    spotAt(x, y) {
+      let best: { day: string; distance: number } | null = null;
+      for (const [day, tile] of tiles.current) {
+        const rect = tile.getBoundingClientRect();
+        const dx = Math.max(rect.left - x, 0, x - rect.right);
+        const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+        const distance = Math.hypot(dx, dy);
+        if (!best || distance < best.distance) best = { day, distance };
+      }
+      return best && { day: best.day, minutes: null };
+    },
+    scroller: () => null,
+  };
+  const find = (key: string) => {
+    for (const week of weeks) {
+      const found = week.spans.find(({ entry }) => entry?.key === key);
+      if (found?.entry) return found.entry;
+    }
+    return undefined;
+  };
+  const drag = useDrag({ surface, root, find });
+  const tile = (day: string) => (element: HTMLElement | null) => {
+    if (element) tiles.current.set(day, element);
+    else tiles.current.delete(day);
+  };
+
   const todayShown = weeks.some((week) => week.days.includes(today));
   return (
-    <div
-      className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
-      {...swipe}
-    >
-      <div aria-hidden="true" className="grid shrink-0 pb-1" style={columns}>
-        <span />
-        {weeks[0]?.days.map((day) => (
-          <span
-            key={day}
-            className={`text-center text-[11.5px] ${
-              todayShown && weekdayOf(day) === weekdayOf(today)
-                ? "font-semibold text-accent"
-                : "text-ink-muted"
-            }`}
-          >
-            {formats.weekday(day)}
-          </span>
-        ))}
-      </div>
+    <DragContext.Provider value={drag.value}>
       <div
-        ref={body}
-        className="grid min-h-0 flex-1"
-        style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`, gap: GAP }}
+        ref={root}
+        className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
+        {...swipe}
       >
-        {capacity !== null &&
-          weeks.map((week) => (
-            <Week key={week.days[0]} {...props} week={week} capacity={capacity} />
+        <div aria-hidden="true" className="grid shrink-0 pb-1" style={columns}>
+          <span />
+          {weeks[0]?.days.map((day) => (
+            <span
+              key={day}
+              className={`text-center text-[11.5px] ${
+                todayShown && weekdayOf(day) === weekdayOf(today)
+                  ? "font-semibold text-accent"
+                  : "text-ink-muted"
+              }`}
+            >
+              {formats.weekday(day)}
+            </span>
           ))}
+        </div>
+        <div
+          ref={body}
+          className="grid min-h-0 flex-1"
+          style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`, gap: GAP }}
+        >
+          {capacity !== null &&
+            weeks.map((week) => (
+              <Week
+                key={week.days[0]}
+                {...props}
+                week={week}
+                capacity={capacity}
+                ghost={drag.ghost}
+                tile={tile}
+              />
+            ))}
+        </div>
+        {drag.overlay}
       </div>
-    </div>
+    </DragContext.Provider>
   );
 }
 
 function Week({
   week,
   capacity,
+  ghost,
+  tile,
   ...props
-}: MonthViewProps & { week: MonthWeek; capacity: number }) {
+}: MonthViewProps & {
+  week: MonthWeek;
+  capacity: number;
+  ghost: Ghost | null;
+  tile: (day: string) => (element: HTMLElement | null) => void;
+}) {
   const { t } = useTranslation();
-  const { formats } = useCalendar();
+  const { formats, timeZone, colorOf } = useCalendar();
   const { shown, more } = foldWeek(week.spans, capacity);
   const number = formats.weekNumber(week.days);
+  // A drag's ghost over the days of this week it goes to, on the first row.
+  const over = ghost?.kind === "item" ? dayRange(ghost.occurrence, timeZone) : null;
+  const covered = over
+    ? week.days.flatMap((day, i) => (over.first <= day && day <= over.last ? [i] : []))
+    : [];
   return (
     <div className="grid min-h-0" style={columns}>
       <div className="flex justify-center rounded-full bg-pill pt-1.5 text-xs font-medium text-ink-muted tabular-nums">
@@ -115,8 +170,26 @@ function Week({
           spans={shown.filter(({ span }) => span.firstDay === index)}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
+          tile={tile(day)}
         />
       ))}
+      {ghost?.kind === "item" && covered.length > 0 && (
+        <div
+          className="pointer-events-none relative z-[3] min-w-0 self-start px-[1.5px]"
+          style={{
+            gridColumn: `${covered[0]! + 2} / ${covered.at(-1)! + 3}`,
+            gridRow: 1,
+            marginTop: NUMBER,
+            height: ROW - 1,
+          }}
+        >
+          <GhostChip
+            color={colorOf(ghost.entry)}
+            title={ghost.entry.occurrence.item.summary?.trim() || t("item.untitled")}
+            dense
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -131,7 +204,9 @@ function DayTile({
   undone,
   undoneColor,
   onOpenDay,
+  tile,
 }: MonthViewProps & {
+  tile: (element: HTMLElement | null) => void;
   day: string;
   /** The spans that start on this day (or, continued, at the week's start). */
   spans: readonly StripSpan[];
@@ -155,6 +230,7 @@ function DayTile({
 
   return (
     <div
+      ref={tile}
       className={`relative min-w-0 cursor-pointer rounded-[8px] ${outside ? "bg-tile/50" : "bg-tile"}`}
       data-outside={outside || undefined}
       onClick={onClick}
