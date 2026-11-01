@@ -201,6 +201,7 @@ export function useEditingState({
     setNotice(null);
     void work.then(onChanged, (error: unknown) => {
       const told = noticeOf(error, action);
+      if (told === null) return onChanged();
       if (told === "failed" || told === "deleteFailed") console.error(error);
       setNotice(told);
     });

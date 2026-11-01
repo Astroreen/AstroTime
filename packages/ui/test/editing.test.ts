@@ -594,6 +594,8 @@ describe("saving writes pending changes through the store (D5)", () => {
     const error = await rewriteTarget(store, standup, star).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(GoneError);
     expect(noticeOf(error, "change")).toBe("gone");
+    // Deleting an occurrence that has left its series: done, nothing to say.
+    expect(noticeOf(error, "delete")).toBeNull();
     await deleteTarget(store, standup, "all", NOW);
     const all = { ...standup, recurrenceId: null };
     await expect(rewriteTarget(store, all, star)).rejects.toThrow(GoneError);

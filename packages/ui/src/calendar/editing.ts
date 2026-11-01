@@ -729,7 +729,11 @@ export async function rewriteTarget(
 export type Notice = "gone" | "inDoubt" | "failed" | "deleteInDoubt" | "deleteFailed";
 
 /** The notice for a change that failed; a deletion of an item gone already never does. */
-export function noticeOf(error: unknown, action: "change" | "delete"): Notice {
-  if (action === "delete") return error instanceof InDoubtError ? "deleteInDoubt" : "deleteFailed";
+export function noticeOf(error: unknown, action: "change" | "delete"): Notice | null {
+  if (action === "delete") {
+    // Gone already (deleted elsewhere, or no longer in its series): what was asked is done.
+    if (error instanceof GoneError) return null;
+    return error instanceof InDoubtError ? "deleteInDoubt" : "deleteFailed";
+  }
   return error instanceof GoneError ? "gone" : error instanceof InDoubtError ? "inDoubt" : "failed";
 }
