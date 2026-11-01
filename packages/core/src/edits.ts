@@ -887,11 +887,11 @@ function splitAt(
       next.addProperty(new ICAL.Property(copyOf(property.toJSON())));
     }
   }
-  const before = countBefore(master, recurrenceId);
+  // Each rule's COUNT counts its own occurrences (RFC 5545 allows one rule; another client may write more).
   for (const property of next.getAllProperties("rrule")) {
     const rule = property.getFirstValue() as ICAL.Recur;
     if (rule.count) {
-      rule.count = Math.max(1, rule.count - before);
+      rule.count = Math.max(1, rule.count - countBefore(master, rule, recurrenceId));
       property.setValue(rule);
     }
   }
@@ -915,12 +915,11 @@ function splitAt(
   return rest;
 }
 
-/** How many occurrences the rule makes before `recurrenceId` (COUNT counts excluded ones too). */
-function countBefore(master: ICAL.Component, recurrenceId: ItemTime): number {
+/** How many occurrences `rule` makes before `recurrenceId` (COUNT counts excluded ones too). */
+function countBefore(master: ICAL.Component, rule: ICAL.Recur, recurrenceId: ItemTime): number {
   const anchor = anchorOf(master)!;
   const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
-  const rule = master.getFirstPropertyValue("rrule");
-  if (!(start instanceof ICAL.Time) || !(rule instanceof ICAL.Recur)) return 0;
+  if (!(start instanceof ICAL.Time)) return 0;
   const split = orderKey(recurrenceId, anchor);
   const iterator = rule.iterator(start);
   let count = 0;
