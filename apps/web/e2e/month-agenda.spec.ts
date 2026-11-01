@@ -189,7 +189,11 @@ test("the drawer and the keys switch to every view (D88)", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Agenda", exact: true })).toHaveAttribute(
     "aria-current",
     "true",
+  ); // The same key on a Russian layout types ь, and still means Month.
+  await page.evaluate(() =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ь", code: "KeyM" })),
   );
+  await expect(dayButton(page, "Wednesday, November 4")).toBeVisible();
 });
 
 test.describe("in Russian", () => {
