@@ -556,8 +556,7 @@ function isSeries(component: ICAL.Component): boolean {
  * "this and following" is all of them (D105), as when it is the first
  * occurrence by `DTSTART`, so no series is left without any. One its rule or
  * RDATEs make shows unless an EXDATE or a cancelled exception removes it; an
- * exception for one before, moved anywhere, shows. A series too dense to walk
- * through is taken to show one.
+ * exception for one before, moved anywhere, shows.
  */
 function isFirst(root: ICAL.Component, master: ICAL.Component, recurrenceId: ItemTime): boolean {
   const anchor = anchorOf(master);
@@ -575,14 +574,15 @@ function isFirst(root: ICAL.Component, master: ICAL.Component, recurrenceId: Ite
   const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
   if (!(start instanceof ICAL.Time)) return false;
   const nextStart = seriesStarts(master, start, null);
-  for (let step = 0; step < 50_000; step++) {
+  // Ends: the starts come in order, and the EXDATEs and cancelled exceptions
+  // remove finitely many of them (each names one, or one day's).
+  for (;;) {
     const next = nextStart();
     if (!next) return true;
     const time = fromIcalTime(keepTzid(start, next));
     if (orderKey(time, anchor) >= split) return true;
     if (!removed.some((gone) => sameOccurrence(gone, time, anchor))) return false;
   }
-  return false;
 }
 
 function exceptionsOf(root: ICAL.Component, master: ICAL.Component): ICAL.Component[] {

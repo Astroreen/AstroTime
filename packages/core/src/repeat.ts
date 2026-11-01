@@ -260,19 +260,14 @@ export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.
     shifted("BYHOUR", part(to.local, 11) - part(from.local, 11), 24);
     shifted("BYMINUTE", part(to.local, 14) - part(from.local, 14), 60);
   }
-  // UNTIL is of DTSTART's type (RFC 5545 §3.3.10): made all-day or timed, or
-  // in another zone, the series ends on the same day, written in the new type.
-  if (rule.until && !sameKind(from, to)) {
+  // UNTIL is of DTSTART's type (RFC 5545 §3.3.10): made all-day or timed,
+  // the series ends on the same day, written in the new type. A series keeps
+  // its zone when it moves (D104), so a zoned UNTIL stays as it is.
+  if (rule.until && from.type !== to.type) {
     const zone = from.type === "zoned" ? from.timeZone : "UTC";
     moved.until = untilOf(wallClockOf(fromIcalTime(rule.until), zone).slice(0, 10), to);
   }
   return moved;
-}
-
-/** Whether two times are of one type, and of one zone when zoned. */
-function sameKind(a: ItemTime, b: ItemTime): boolean {
-  if (a.type === "zoned" && b.type === "zoned") return a.timeZone === b.timeZone;
-  return a.type === b.type;
 }
 
 /**

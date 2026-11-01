@@ -1161,8 +1161,9 @@ Decided while building PR 6a.
     not count, so no object is left with no occurrence (an edit's old
     series, a deletion's whole object goes).
   - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
-    made all-day or timed, or moves to another zone (`movedRule`): it ends
-    on the same day, a date or the end of that day in UTC.
+    made all-day or timed (`movedRule`): it ends on the same day, a date or
+    the end of that day in UTC. A series keeps its zone ([D104](#D104)), so
+    a zoned one's `UNTIL` stays.
   - **Every other week on several days** keeps its weeks when its days
     shift into different weeks than each other: the rule's week start
     (`WKST`) shifts by as many days.
