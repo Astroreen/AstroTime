@@ -10,9 +10,11 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { compress } from "../src/compress.ts";
 import {
   allowlist,
+  contentSecurityPolicy,
   createAppServer,
   DAV_PROXY_PREFIX,
   negotiate,
+  NONCE_PLACEHOLDER,
   publicHosts,
 } from "../src/server.ts";
 
@@ -310,8 +312,9 @@ describe("static files (D80)", () => {
     writeFileSync(join(root, "assets", "app-1a2b.js"), script);
     writeFileSync(join(root, "assets", "tiny-0000.js"), "1");
     writeFileSync(join(root, "assets", "logo-1a2b.png"), Buffer.alloc(2000));
-    // Compressible, larger when compressed (kept as it is), and not compressible.
-    expect(await compress(root)).toBe(4);
+    // Compressible, larger when compressed (kept as it is), not compressible,
+    // and the page, filled afresh on every answer (D110).
+    expect(await compress(root)).toBe(2);
     server = createAppServer({ root, allow: ["https://dav.example"] });
     base = await listen(server);
   });
@@ -394,18 +397,19 @@ describe("static files (D80)", () => {
     expect(again.status).toBe(304);
   });
 
-  test("the app's page revalidates on every route, and is never immutable", async () => {
+  test("the app's page is fetched afresh on every route: never immutable, compressed or 304", async () => {
     const page = await raw(base, "/", { "Accept-Encoding": "br" });
-    expect([page.status, page.headers["cache-control"], page.headers["content-encoding"]]).toEqual([
-      200,
-      "no-cache",
-      "br",
-    ]);
+    expect([
+      page.status,
+      page.headers["cache-control"],
+      page.headers["content-encoding"],
+      page.headers["etag"],
+    ]).toEqual([200, "no-cache", undefined, undefined]);
     const route = await raw(base, "/week/2026-11-02", {
       "Accept-Encoding": "br",
-      "If-None-Match": String(page.headers["etag"]),
+      "If-None-Match": "*",
     });
-    expect([route.status, route.headers["cache-control"]]).toEqual([304, "no-cache"]);
+    expect([route.status, route.headers["cache-control"]]).toEqual([200, "no-cache"]);
   });
 
   test("HEAD answers the headers of GET, without a body", async () => {
@@ -423,6 +427,102 @@ describe("static files (D80)", () => {
       expect(head.headers[name]).toBe(get.headers[name]);
     }
     expect((await raw(base, "/assets/gone-0000.js", {}, "HEAD")).status).toBe(404);
+  });
+});
+
+describe("the Content Security Policy (D110)", () => {
+  let base: string;
+  // The page as Vite builds it with `html.cspNonce` (apps/web/vite.config.ts).
+  const html = `<!doctype html><meta property="csp-nonce" nonce="${NONCE_PLACEHOLDER}"><script type="module" src="/assets/app-1a2b.js" nonce="${NONCE_PLACEHOLDER}"></script>`;
+
+  beforeAll(async () => {
+    const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+    mkdirSync(join(root, "assets"));
+    writeFileSync(join(root, "index.html"), html);
+    // A copy an older image's build left: the page never goes compressed.
+    writeFileSync(join(root, "index.html.br"), "stale");
+    writeFileSync(join(root, "assets", "app-1a2b.js"), "console.log(1)");
+    const server = createAppServer({ root, allow: [dav] });
+    servers.push(server);
+    base = await listen(server);
+  });
+
+  const nonceOf = (policy: unknown) => /'nonce-([^']+)'/.exec(String(policy))?.[1];
+
+  test("the page, on every route, names a fresh nonce, the one in its tags", async () => {
+    const nonces: string[] = [];
+    for (const path of ["/", "/index.html", "/week/2026-11-02", "/day/2026-11-04?x=1"]) {
+      const page = await raw(base, path, { "Accept-Encoding": "br, gzip" });
+      const nonce = nonceOf(page.headers["content-security-policy"]);
+      expect(nonce).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+      expect(page.body.toString()).toBe(html.replaceAll(NONCE_PLACEHOLDER, nonce!));
+      expect(page.headers["content-security-policy"]).toBe(contentSecurityPolicy(nonce));
+      expect(Number(page.headers["content-length"])).toBe(page.body.length);
+      nonces.push(nonce!);
+    }
+    expect(new Set(nonces).size).toBe(nonces.length);
+  });
+
+  test("the policy loads only the app's own scripts, styles, workers and connections", () => {
+    expect(contentSecurityPolicy("n0nce").split("; ")).toEqual([
+      "default-src 'none'",
+      "script-src 'self' 'wasm-unsafe-eval'",
+      "style-src 'self' 'nonce-n0nce'",
+      "connect-src 'self'",
+      "worker-src 'self'",
+      "base-uri 'none'",
+      "form-action 'none'",
+      "frame-ancestors 'none'",
+    ]);
+    expect(contentSecurityPolicy()).toContain("style-src 'self';");
+  });
+
+  test("the page carries the other security headers", async () => {
+    const page = await raw(base, "/");
+    expect([
+      page.headers["referrer-policy"],
+      page.headers["cross-origin-opener-policy"],
+      page.headers["x-content-type-options"],
+      page.headers["permissions-policy"],
+    ]).toEqual(["same-origin", "same-origin", "nosniff", expect.stringContaining("camera=()")]);
+  });
+
+  test("HEAD answers the page's headers, without a body", async () => {
+    const head = await raw(base, "/", {}, "HEAD");
+    expect([head.status, head.body.length, Number(head.headers["content-length"])]).toEqual([
+      200,
+      0,
+      Buffer.byteLength(html.replaceAll(NONCE_PLACEHOLDER, "x".repeat(24))),
+    ]);
+    expect(nonceOf(head.headers["content-security-policy"])).toBeDefined();
+  });
+
+  test("a file carries the policy without a nonce, for a worker's sake, and stays cached", async () => {
+    const asset = await raw(base, "/assets/app-1a2b.js");
+    expect([asset.headers["content-security-policy"], asset.headers["cache-control"]]).toEqual([
+      contentSecurityPolicy(),
+      "public, max-age=31536000, immutable",
+    ]);
+    const again = await raw(base, "/assets/app-1a2b.js", {
+      "If-None-Match": String(asset.headers["etag"]),
+    });
+    expect([again.status, again.headers["content-security-policy"]]).toEqual([
+      304,
+      contentSecurityPolicy(),
+    ]);
+  });
+
+  test("proxied answers still pass, and a page among them runs nothing", async () => {
+    const answer = await fetch(`${base}${throughProxy(DAV_PROXY_PREFIX).to(`${dav}/dav/`)}`, {
+      method: "PROPFIND",
+    });
+    expect([answer.status, (await answer.json()).method]).toEqual([207, "PROPFIND"]);
+    expect(answer.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+  });
+
+  test("the health check carries no policy", async () => {
+    const health = await fetch(`${base}/healthz`);
+    expect([health.status, health.headers.get("content-security-policy")]).toEqual([200, null]);
   });
 });
 

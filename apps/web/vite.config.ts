@@ -18,6 +18,11 @@ export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
   plugins: [react({ compiler: true }), tailwindcss(), davProxy(), devClients(), devTls()],
   ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
+  // The page's tags, and a <meta property="csp-nonce"> the app reads, carry
+  // this placeholder; the web image's server fills in a fresh nonce on every
+  // answer (apps/proxy/src/server.ts, docs/plans/foundation.md#D110). The dev
+  // server sends no policy, so here it stays as it is.
+  html: { cspNonce: "astrotime-csp-nonce" },
   // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
   optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
   build: {

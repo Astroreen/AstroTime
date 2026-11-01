@@ -3,6 +3,7 @@
 // secrets, the system browser, where preferences are kept) and the user's
 // languages, and renders this.
 import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
+import { CSPProvider } from "@base-ui/react/csp-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 
@@ -20,6 +21,8 @@ export interface AstroTimeProps {
   readonly languages: readonly string[];
   /** The IANA zone the calendar is shown in; the device's by default. */
   readonly timeZone?: string;
+  /** The page's Content Security Policy nonce, for the styles Base UI adds (foundation D110). */
+  readonly nonce?: string;
 }
 
 type Opening =
@@ -27,7 +30,7 @@ type Opening =
   | { readonly status: "open"; readonly store: Store }
   | { readonly status: "failed"; readonly error: unknown };
 
-export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
+export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimeProps) {
   const { store, preferences } = platform;
   // The drawer's settings (design D53), applied as soon as they change.
   const [chosen, setChosen] = usePreference(preferences, KEYS.settings, readSettings, (value) =>
@@ -77,7 +80,7 @@ export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
     latest.current = { ...latest.current, ...changes };
     setChosen(latest.current);
   };
-  return (
+  const app = (
     <I18nextProvider i18n={i18n}>
       <SettingsContext.Provider value={{ settings: chosen, change }}>
         {opening.status === "open" ? (
@@ -100,6 +103,7 @@ export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
       </SettingsContext.Provider>
     </I18nextProvider>
   );
+  return <CSPProvider nonce={nonce}>{app}</CSPProvider>;
 }
 
 /** While the store opens, or why it did not. */

@@ -1,6 +1,8 @@
 // End-to-end tests of the web app in Chromium (AGENTS.md: role and
 // accessibility-tree locators, a frozen clock, no sleeps). They run against
-// the dev server, which can load the demo data (`?demo`).
+// the dev server, which can load the demo data (`?demo`); those in e2e/built
+// run the production build on the web image's server, under its Content
+// Security Policy (docs/plans/foundation.md#D110).
 import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env["ASTROTIME_E2E_PORT"] ?? 5190);
@@ -23,6 +25,11 @@ export default defineConfig({
     colorScheme: "dark",
     trace: "retain-on-failure",
   },
+  projects: [
+    { name: "dev", testIgnore: "built/**" },
+    { name: "build", testMatch: "built/build.setup.ts" },
+    { name: "built", testMatch: "built/*.spec.ts", dependencies: ["build"] },
+  ],
   webServer: {
     command: `vp dev --host 127.0.0.1 --port ${port} --strictPort`,
     url: `http://127.0.0.1:${port}`,

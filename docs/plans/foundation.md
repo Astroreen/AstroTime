@@ -360,7 +360,8 @@ Decided while building PR 7.
   and only a file that resolves under `assets/` is immutable. Errors are
   logged, not shown to the client. A client that goes away cancels its
   request to the CalDAV server. Behind a TLS terminator the page's `https`
-  origin passes the proxy's check, which compares hosts ([D39](#D39)).
+  origin passes the proxy's check, which compares hosts ([D39](#D39)). The
+  app runs under a strict Content Security Policy ([D110](#D110)).
 - **D41. Releases are tagged from `package.json`.** The root `version` is
   the product's; a `v<version>` tag publishes
   `ghcr.io/astroreen/astrotime:<version>`, `:<major>.<minor>` and, for a
@@ -374,7 +375,7 @@ Decided while building PR 7.
   never a new Node major (that one moves with the dev shell's and CI's).
 - **D80. Static files are streamed, precompressed and revalidated.** The
   image's build writes a `.br` (brotli, best quality) and a `.gz` (gzip,
-  level 9) next to every text file of the app (`apps/proxy/src/compress.ts`),
+  level 9) next to every text file of the app but its page (`apps/proxy/src/compress.ts`),
   kept only where smaller; nothing is compressed per request. The server
   picks one by `Accept-Encoding`: the highest q wins, a tie goes to brotli,
   then gzip, then the file as it is, which is also what a client without the
@@ -389,8 +390,10 @@ Decided while building PR 7.
   in the image. The root is taken as read-only, as it is in the image: each
   answer reads one open file, so its size, ETag and body agree, but a file
   rewritten in place with the same size within one clock tick keeps its old
-  ETag. HEAD answers GET's headers. `index.html`, on every route of
-  the single-page app, is `no-cache` (revalidated on every load); only files
+  ETag. HEAD answers GET's headers. The page (`index.html`, on every route of
+  the single-page app) is the exception: it carries a fresh nonce on every
+  answer ([D110](#D110)), so it is read whole (under a kilobyte), sent as it
+  is and `no-cache` with no `ETag`, fetched afresh on every load; only files
   under `assets/` are immutable ([D40](#D40)). Ranges are not served: the
   files are small enough to fetch whole. A path ending in `.br` or `.gz` is
   a 404: the copies are reached only through `Accept-Encoding`.
@@ -411,6 +414,54 @@ Decided while building PR 7.
   health checks come by loopback (Docker's `HEALTHCHECK`) or by the
   container's own address (Kubernetes sends the pod's IP). Unset, every host
   is served, as before.
+- **D110. A strict Content Security Policy, with a nonce per answer.** The
+  image's server sends the app's page with this policy, built from what the
+  app does and nothing more (`contentSecurityPolicy` in
+  `apps/proxy/src/server.ts`):
+  - `default-src 'none'`: nothing not named below (no frames, objects,
+    fonts, images or media: the app uses system fonts and inline SVG icons);
+  - `script-src 'self' 'wasm-unsafe-eval'`: the app's own scripts, and
+    SQLite's WebAssembly, which the store's worker compiles;
+  - `style-src 'self' 'nonce-…'`: the built stylesheet, and the `<style>`
+    elements Base UI adds (`ScrollArea` and `Select` do; none of the
+    components in use today does), which carry the nonce through
+    `CSPProvider`. `style` attributes React and Floating UI set go through
+    the CSSOM, which the policy allows;
+  - `connect-src 'self'`: the wasm, and every CalDAV request through
+    `/dav-proxy/` ([D39](#D39));
+  - `worker-src 'self'`: the store's worker, a file of the app's own;
+  - `base-uri 'none'`, `form-action 'none'` (no form is ever submitted to
+    a URL), `frame-ancestors 'none'` (no other site frames the app).
+
+  Login Flow v2 opens Nextcloud's page with `window.open(…, "noopener")`, a
+  navigation no directive governs, and notifications need none. The nonce
+  is fresh on every answer (16 random bytes): Vite's build writes the
+  placeholder `astrotime-csp-nonce` into the page's tags and a `<meta
+  property="csp-nonce">` (`html.cspNonce`), the server puts the nonce
+  there, and the web app reads it from the meta and hands it to the UI,
+  which passes it to Base UI's `CSPProvider`. Hence [D80](#D80)'s exception:
+  the page is not compressed or answered 304 (a stored page revalidated by
+  a 304 would get the new answer's policy over its old nonce), which costs
+  about 0.4 kB on every load. `'unsafe-inline'` for styles would have kept
+  the page cacheable but let any injected `<style>` in; hashes would have
+  to follow Base UI's styles at every upgrade. Every file carries the same
+  policy without the nonce, since a dedicated worker answers to the policy
+  its own script came with (Chromium does not apply the page's to it); the
+  page's policy holds what the worker needs too, for a browser that does.
+  The page also gets `Referrer-Policy: same-origin` (not `no-referrer`,
+  which would send `Origin: null` with the app's own PROPFINDs, and the
+  proxy refuses those), `Cross-Origin-Opener-Policy: same-origin` and a
+  `Permissions-Policy` that turns off the camera, microphone, location,
+  payments, USB, serial, HID and screen capture; `X-Frame-Options` is left
+  out, since every supported browser reads `frame-ancestors`. Proxied
+  answers get `default-src 'none'; sandbox`, so a page among them, opened
+  by URL on the app's origin, runs nothing; `fetch` ignores it. The dev
+  server sends no policy: Vite's HMR and React Refresh need inline scripts
+  and a WebSocket the production policy refuses, so a dev policy would be
+  another policy. The production build is checked under the real one by a
+  Playwright project (`apps/web/e2e/built`): the store opens, an account is
+  added through the proxy, and not one violation is reported, the worker's
+  included.
 
 ### Layout
 
@@ -594,10 +645,6 @@ Decided while building PR 5a-3.
   SQLite's wasm 880 kB; they are served precompressed and revalidated
   ([D80](#D80)), and splitting comes when the first load needs it
   ([D40](#D40)).
-- **Content Security Policy** for the web image — the app loads nothing from
-  another origin (system fonts, its own icons); it needs wasm and a worker
-  from its own origin, and Base UI's `CSPProvider` takes a nonce for the
-  styles it adds ([D40](#D40)).
 - **Display-style Windows TZIDs** — Outlook's desktop export can write
   `TZID:(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna`, the
   zone's display name, which CLDR's table does not carry (only as comments, in
@@ -751,7 +798,7 @@ an event or a task (PR 5a draws it disabled). Decisions: D9, D10, D11.
 
 `apps/proxy` and the Docker image, its allowlist, the release workflow that
 publishes it to GHCR on a `v*` tag. Decisions: D20, D28, D40, D41; later
-D80 and D81.
+D80, D81 and D110.
 
 Done when: the image builds in CI, serves the app, proxies to an allowed
 server and refuses an unlisted one, and refuses to start without an

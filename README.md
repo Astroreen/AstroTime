@@ -41,6 +41,12 @@ proxy answers for every name; `/healthz` answers whatever the `Host`, for
 health checks. Unset, every host is served
 ([D81](docs/plans/foundation.md#D81)).
 
+The container sends the app with a strict Content Security Policy and a
+fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Let the
+reverse proxy pass it on as it is and keep the page out of its cache: a policy
+added there applies on top of this one, and a cached page would give everyone
+the same nonce.
+
 ## Development
 
 ```sh

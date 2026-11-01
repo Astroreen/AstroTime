@@ -5,9 +5,11 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
-/** Types worth compressing; images and fonts are compressed already. */
+/**
+ * Types worth compressing; images and fonts are compressed already, and the
+ * page is filled with a fresh nonce on every answer (D110).
+ */
 const COMPRESSIBLE = new Set([
-  ".html",
   ".js",
   ".mjs",
   ".css",
