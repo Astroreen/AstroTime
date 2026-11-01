@@ -1,7 +1,7 @@
 // The evidence for desktop PR D1 (docs/plans/desktop.md#pr-d1--the-shell-the-store-and-http):
 // the window with a Radicale account signed in, in both themes; and for PR
 // D2, the question asked where no keyring protects the password (D74); for
-// PR D3, the drawer's settings with "Keep running when the window is closed"
+// PR D3, Settings with "Keep running when the window is closed"
 // (D75). The Login Flow's waiting state is taken by login-flow.spec.ts. Runs only when
 // ASTROTIME_SCREENSHOTS names a directory:
 //
@@ -67,19 +67,20 @@ test("the question without a keyring, dark and light", async () => {
   await radicale.stop();
 });
 
-test("the drawer's settings with the desktop's keep-running switch, English dark and Russian light", async () => {
+test("Settings with the desktop's keep-running switch, English dark and Russian light", async () => {
   const radicale = await startRadicale();
   await radicale.mkcalendar("Work");
   const { app, page } = await launch(profile());
   await signInByPassword(page, radicale);
   await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  const settings = page.getByRole("region", { name: "Settings" });
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
   await settings.getByRole("switch", { name: "Keep running when the window is closed" }).focus();
   await page.screenshot({ path: join(directory!, "desktop-settings-keep-running-dark-en.png") });
   await page.getByLabel("Language").selectOption({ label: "Русский" });
   await page.getByLabel("Тема").selectOption({ label: "Светлая" });
-  const russian = page.getByRole("region", { name: "Настройки" });
+  const russian = page.getByRole("dialog", { name: "Настройки" });
   await russian.getByRole("switch", { name: "Работать в фоне после закрытия окна" }).focus();
   await page.screenshot({ path: join(directory!, "desktop-settings-keep-running-light-ru.png") });
   await app.close();

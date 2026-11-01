@@ -282,6 +282,7 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
   const reminders = fakeReminders("default", "granted");
   render(Promise.resolve(store), ["en-US"], { reminders: reminders.scheduler });
   await page.getByRole("button", { name: "Main menu" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
   const toggle = page.getByRole("switch", { name: "Reminders" });
   // These tests load no CSS, so the switch itself has no size: its label takes the tap.
   const label = page.getByText("Reminders", { exact: true });
@@ -323,6 +324,7 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
 
   // Turned off: the platform is handed an empty set.
   await page.getByRole("button", { name: "Main menu" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
   await label.click();
   await expect.element(toggle).not.toBeChecked();
   expect(reminders.last).toEqual([]);
@@ -333,6 +335,7 @@ test("Reminders the browser blocks: the switch cannot turn on and says why, in R
   const reminders = fakeReminders("denied");
   render(Promise.resolve(store), ["ru-RU"], { reminders: reminders.scheduler });
   await page.getByRole("button", { name: "Главное меню" }).click();
+  await page.getByRole("button", { name: "Настройки" }).click();
   await expect.element(page.getByRole("switch", { name: "Напоминания" })).toBeDisabled();
   await expect
     .element(
@@ -369,6 +372,7 @@ test("Reminders on Android: the platform has the set before it may notify, asks 
   expect(reminders.last.map((r) => r.notification.title)).toContain("Call with Anna");
   expect(reminders.asked).toBe(0);
   await page.getByRole("button", { name: "Main menu" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
   const toggle = page.getByRole("switch", { name: "Reminders" });
   await expect.element(toggle).not.toBeChecked();
 
@@ -392,6 +396,7 @@ test("Reminders the system blocks: the setting names the system's settings, not 
     reminders: { ...reminders.scheduler, native: true, asksWhenNeeded: true },
   });
   await page.getByRole("button", { name: "Главное меню" }).click();
+  await page.getByRole("button", { name: "Настройки" }).click();
   await expect.element(page.getByRole("switch", { name: "Напоминания" })).toBeDisabled();
   await expect
     .element(

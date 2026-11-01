@@ -29,7 +29,7 @@ the project.
   type and icons are AstroTime's own, not Google's brand.
 - **D44. Dark and light themes from the first screen**, following the system
   setting. Dark is designed first (the reference is dark). _Added by the
-  agent, beyond the owner's answer:_ a manual override in the drawer's
+  agent, beyond the owner's answer:_ a manual override in the
   settings (D53), as Google Calendar has.
 - **D45. Week start and clock from the locale**, overridable in settings:
   for Russian (and Lithuanian) Monday and 24 hours.
@@ -44,6 +44,10 @@ the project.
     event or a task;
   - on a wide screen (desktop, a wide browser window) the drawer stays open
     as a sidebar, as Google Calendar's web app does; nothing else changes.
+  - _Changed by the UI review ([D131](#D131)–[D133](#D133)):_ settings left
+    the drawer for a Settings screen of their own; on a wide screen Create
+    heads the sidebar instead of floating, and the top bar takes Google's
+    web order.
 - **D47. An item's colour is its calendar's**, as the server gives it
   (Apple's `calendar-color` property, which `CalDavProvider` reads into
   `RemoteCalendar.color`), unless the item has its own RFC 7986 `COLOR`.
@@ -105,7 +109,8 @@ the project.
   so the task's own `PRIORITY` is never touched and other clients keep it
   (AGENTS.md rule 2). _Built in PR 5b:_ what completing writes is
   [D94](#D94), the screen's details [D95](#D95).
-- **D53. Settings in the drawer**: the theme (system, dark, light), the
+- **D53. Settings in the drawer** (_since [D131](#D131): in a Settings
+  screen of their own_): the theme (system, dark, light), the
   week start and the clock (D44, D45), and "hide completed" (D51). Search,
   in the top bar, finds items by title in the local store. _Built in
   PR 5b:_ the settings [D96](#D96), search [D97](#D97).
@@ -281,7 +286,8 @@ the project.
   12 or 24 hours. "Hide completed tasks" hides completed tasks' chips on
   every view, never the undone chip (D51). In the drawer each setting's
   name sits above its value, as Android's settings list them, so nothing
-  is squeezed in the sidebar. _Since:_ "Reminders", a switch, last
+  is squeezed in the sidebar (_since [D131](#D131)_ the name sits on the
+  left and its value on the right, in Settings). _Since:_ "Reminders", a switch, last
   ([foundation D101](foundation.md#D101)); after it, on the desktop only
   (the `Platform`'s `shell`), "Keep running when the window is closed",
   on unless turned off, with a line saying how to quit while it is on
@@ -556,6 +562,55 @@ the project.
   - **language**: the document's `lang` is the UI's language (D53), so a
     screen reader reads Russian as Russian.
 
+### Decided in the UI review (after v0.2.0)
+
+The owner's feedback on v0.2.0: "settings sit right at the left of the
+calendar on the web. Why there? Better a separate settings button, with
+everything in settings. The '+' button sits too close to the edge, and with
+the tasks panel open on the right it stands out even more. Review the UI and
+UX as a whole." The review looked at every view, dialog and state at 412 and
+1440 px, both themes, English and Russian, and ranked what it found; these
+are its decisions.
+
+- **D131. Settings are a screen of their own**, as Google Calendar's: the
+  whole screen on a phone (the details' and edit dialog's sheet,
+  [D108](#D108)), a dialog from 640 px, titled "Settings" with ✕ (Escape
+  closes it too). The drawer keeps what it is for, the views and the
+  calendars; on the desktop the settings no longer push the calendars up the
+  sidebar. Inside, groups, each a card under its name, as Android's settings
+  group them: _General_ (theme, language), _Views_ (week start, clock, hide
+  completed tasks), _Calendars of_ each account (each calendar with its
+  colour and a switch: shown in the views or not, the same setting as the
+  drawer's checkbox), _Notifications_ (reminders) and, on the desktop only,
+  _Desktop app_ (keep running, [desktop D75](desktop.md#D75)). A setting's
+  name is on the left and its value on the right; a value too wide wraps
+  under its name, so nothing scrolls sideways at 320 px. Each still applies
+  at once ([D96](#D96)). **Reached by** a gear in the top bar on a wide
+  screen (Google's web app) and by "Settings", the drawer's last row, on a
+  phone (Google's Android app). A gear beside the account in the phone's top
+  bar was weighed and left out: the bar already holds five buttons, and at
+  360 px a sixth leaves the title some 90 px, too little for "October –
+  November"; at 320 px less. Its switches show their off state by an
+  outline (the track was a grey near the card's own), as every switch in
+  the UI now does.
+- **D132. Create: at the sidebar's top on a wide screen, floating
+  elsewhere.** With the sidebar open, "Create" is an extended button (the
+  "+" and its word) heading it, where Google Calendar's web app has it, and
+  the wordmark it replaced is the browser's title; nothing floats over the
+  grid, whose last column and the tasks panel's edge it covered. With no
+  sidebar (a phone, a tablet, a desktop with the sidebar closed) the "+"
+  button floats bottom right with Material 3's margins, 16 px on a phone and
+  24 px from 640 px, inside the system bars' insets ([android
+  D68](android.md#D68)). The time grid keeps 80 px below midnight, as the
+  Agenda and the tasks list already did, so the button never hides the last
+  hour for good.
+- **D133. The top bar on a wide screen is in Google's web order**: the menu,
+  "Today" as a word in an outlined pill, previous and next, then the period
+  they move (the month picker's button); search, Settings, the tasks toggle
+  and the account at the right. The arrows sat at the far right, away from
+  the title they change. On a phone the bar is as it was (D46, D59): the
+  menu, the period, search, today's date as an icon, tasks, the account.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
@@ -627,6 +682,16 @@ the project.
   ([D120](#D120)). The same holds for the drawer's calendar checkbox on
   the dark drawer (1.4.11): its label names the calendar. A floor on the
   fill's lightness in the dark theme would close both.
+- **A calendar's colour and name, changed here** — Settings and the drawer
+  show and hide a calendar ([D131](#D131)); changing its colour or name is a
+  write to the server (`PROPPATCH` of `calendar-color`, `displayname`)
+  through the provider and the sync engine, or a colour kept on this device
+  only. Google offers both per calendar. A menu on each calendar's row in
+  the drawer comes with it.
+- **Accounts in Settings** — adding, removing and signing in again stay in
+  the account dialog (the top bar's account button) while the first run and
+  the accounts are reworked; Settings gets an Accounts group then
+  ([D131](#D131)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
@@ -645,6 +710,9 @@ Foundation's PR 5 builds this plan in two parts:
 Foundation's PR 6a (the details and edit dialogs) brought D108 and D109;
 PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each view
 next to the matching reference, in both themes.
+
+The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`);
+its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its
 evidence is the audit's run and screenshots of the colours before and after.

@@ -149,7 +149,8 @@ export function TimeGrid(props: TimeGridProps) {
         </div>
         <div
           ref={scroller}
-          className="relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+          // Room under midnight, so the "+" button never hides the last hour (design D132).
+          className="relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pb-20 [scrollbar-gutter:stable]"
           {...swipe}
         >
           <div className="grid" style={{ ...columns, height: 24 * HOUR }}>

@@ -26,9 +26,9 @@ async function openDemo(page: Page, permission?: NotificationPermission): Promis
   ).toBeVisible();
 }
 
-/** Turns reminders on in the drawer, the browser letting the site notify, and closes it. */
+/** Turns reminders on in Settings, the browser letting the site notify, and closes it. */
 async function turnOn(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Main menu" }).click();
+  await openSettings(page);
   const toggle = page.getByRole("switch", { name: "Reminders" });
   // Nothing was asked at start.
   await expect(toggle).not.toBeChecked();
@@ -39,6 +39,15 @@ async function turnOn(page: Page): Promise<void> {
   await expect(page.getByText(/^Next: Call with Anna, Wed, Nov 4, 11:00\sAM\.$/)).toBeVisible();
   await expect(page.getByText("Reminders show while AstroTime is open in a tab.")).toBeVisible();
   await page.keyboard.press("Escape");
+}
+
+/** Settings on a phone: the drawer's last row (design D131). */
+async function openSettings(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Main menu" }).click();
+  await page
+    .getByRole("dialog", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
 }
 
 const notifications = (page: Page) => page.getByRole("region", { name: "Notifications" });
@@ -87,7 +96,7 @@ test("where the browser already lets the site notify, reminders are on; turned o
 }) => {
   await page.context().grantPermissions(["notifications"]);
   await openDemo(page, "granted");
-  await page.getByRole("button", { name: "Main menu" }).click();
+  await openSettings(page);
   const toggle = page.getByRole("switch", { name: "Reminders" });
   await expect(toggle).toBeChecked();
   await expect(page.getByText(/^Next: Call with Anna, Wed, Nov 4, 11:00\sAM\.$/)).toBeVisible();

@@ -228,6 +228,12 @@ export const ru = {
   "search.noDate": "Без даты",
 
   "settings.title": "Настройки",
+  "settings.close": "Закрыть настройки",
+  "settings.general": "Общие",
+  "settings.views": "Вид",
+  "settings.calendarsOf": "Календари: {{account}}",
+  "settings.notifications": "Уведомления",
+  "settings.desktop": "Приложение для компьютера",
   "settings.theme": "Тема",
   "settings.theme.system": "Как в системе",
   "settings.theme.dark": "Тёмная",

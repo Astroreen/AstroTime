@@ -1,4 +1,4 @@
-// The "Reminders" setting in the drawer's settings (docs/plans/foundation.md#D101): a
+// The "Reminders" setting in Settings (docs/plans/foundation.md#D101, design D131): a
 // switch that asks the platform's permission when it is turned on, so the
 // browser asks from the user's tap and never at start; it names the next
 // reminder, and says when reminders show (the web: while the app is open)
@@ -44,7 +44,7 @@ export function RemindersSwitch() {
           disabled={blocked}
           onCheckedChange={(on) => void turn(on)}
           aria-describedby={notes.length > 0 ? hint : undefined}
-          className="flex h-6 w-10 shrink-0 items-center rounded-full bg-pill p-0.5 transition-colors duration-150 data-checked:bg-accent data-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex h-6 w-10 shrink-0 items-center rounded-full bg-pill p-0.5 shadow-[inset_0_0_0_2px_var(--color-ink-muted)] transition-colors duration-150 data-checked:bg-accent data-checked:shadow-none data-disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Switch.Thumb className="size-5 rounded-full bg-ink-muted transition-[translate,background-color] duration-150 data-checked:translate-x-4 data-checked:bg-on-accent" />
         </Switch.Root>

@@ -165,8 +165,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D95`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
-    - `settings-section.tsx` — the drawer's settings.
-      → `plans/design.md#D96`
+    - `settings-section.tsx` — the Settings screen (a dialog on a wide
+      screen), from the top bar's gear or the drawer's last row.
+      → `plans/design.md#D131`, `plans/design.md#D96`
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
       (`reschedule`); the details (`item-details.tsx`), the edit
@@ -205,7 +206,7 @@ When you add a package, app or module, add its line here in the same PR.
     `useSwipe`, `useNow`, `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
     localStorage, the web's and the desktop's.
-  - `settings.ts` — the drawer's settings, kept in the preferences and
+  - `settings.ts` — the settings, kept in the preferences and
     applied over the locale. → `plans/design.md#D96`
   - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
     platform; `reminderSet`, the set itself) and `reminderNotification` (its
@@ -213,7 +214,7 @@ When you add a package, app or module, add its line here in the same PR.
     `scheduleReminders`, the same set for a shell's headless run
     (`plans/android.md#D67`);
     `components/reminders-context.tsx` and `reminders-switch.tsx`, the
-    "Reminders" setting in the drawer and a tapped reminder opening its day
+    "Reminders" setting in Settings and a tapped reminder opening its day
     and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs.
