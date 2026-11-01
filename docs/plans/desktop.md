@@ -275,9 +275,11 @@ were checked on 2026-11-01.
   never shows again for the same set. The page learns at start whether the
   system shows notifications (`Notification.isSupported()`, passed to the
   preload as an argument): if not, the setting says notifications are
-  unsupported. What was shown is kept in memory only: quitting and starting
-  the app again within the hour shows the past hour's reminders again, late
-  ([Deferred](#deferred)).
+  unsupported. Electron loads `libnotify.so.4` at start (`dlopen`, not a
+  linked library): without it `isSupported()` is false, so a package must
+  depend on it (PR D4's deb: `libnotify4`). What was shown is kept in
+  memory only: quitting and starting the app again within the hour shows
+  the past hour's reminders again, late ([Deferred](#deferred)).
 
 - **D77. Login Flow v2 in the system browser.** The login page opens with
   `shell.openExternal`, where the user's password manager and second factor
@@ -368,7 +370,12 @@ were checked on 2026-11-01.
   for time. The 15-minute timer and the late reminders run on a fake clock
   and a fake `powerMonitor` in `src/main/reminders.test.ts`. Under `xvfb-run`
   there is no StatusNotifierItem host and no notification daemon, so
-  neither the tray's menu nor a notification is seen on screen.
+  neither the tray's menu nor a notification is seen on screen. CI's
+  runner has no libnotify either (nixpkgs' Electron has it on its rpath),
+  so the job installs `libnotify4`; without it the page turned reminders
+  off and the reminder test waited out its 30 s (reproduced with nixpkgs'
+  Electron with libnotify taken off its rpath). The test checks
+  `Notification.isSupported()` first, so a missing libnotify fails there.
 
 ## Deferred
 

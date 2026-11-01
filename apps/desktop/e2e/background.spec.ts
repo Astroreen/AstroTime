@@ -144,6 +144,12 @@ test("with the window closed, a server's change arrives on resume and its missed
 }) => {
   // The page's clock runs as the main process's: a reminder's time is the same to both.
   const { app, page, work } = await signedIn(radicale, { realClock: true });
+  // Electron loads libnotify when it starts: without it the system shows no
+  // notifications, the page turns reminders off and none would ever show.
+  expect(
+    await app.evaluate(({ Notification }) => Notification.isSupported()),
+    "Notification.isSupported(): is libnotify.so.4 installed?",
+  ).toBe(true);
   // Notifications as the system would show them: heard in the main process.
   await app.evaluate(({ Notification }) => {
     const state = globalThis as { notified?: Promise<{ title: string; body: string }> };

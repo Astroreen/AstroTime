@@ -118,9 +118,12 @@ jobs:
       # A keyring of the tests' own: a session bus and gnome-keyring, which
       # Electron reaches through libsecret (apps/desktop/e2e/credentials.spec.ts).
       # Without it the runner has none: safeStorage's backend is basic_text.
+      # And libnotify, which Electron loads for its notifications: without it
+      # `Notification.isSupported()` is false and no reminder shows
+      # (apps/desktop/e2e/background.spec.ts).
       - run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends dbus gnome-keyring libsecret-1-0
+          sudo apt-get install -y --no-install-recommends dbus gnome-keyring libsecret-1-0 libnotify4
       # Playwright builds the app and starts it in Electron, on a virtual display.
       - run: xvfb-run -a -s "-screen 0 1440x900x24" pnpm --filter @astrotime/desktop e2e
       - name: Playwright's traces, when a test failed

@@ -149,6 +149,19 @@ function fromApp(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
   );
 }
 
+/**
+ * Handles a message the page sent without awaiting an answer: one its checks
+ * refuse has no caller to throw to, so it is logged instead of escaping the
+ * listener.
+ */
+function refusing(handle: () => void) {
+  try {
+    handle();
+  } catch (error) {
+    console.error("Refused a message from the page:", error);
+  }
+}
+
 const openInBrowser = (url: string) => {
   if (isWebUrl(url)) void shell.openExternal(url);
 };
@@ -256,10 +269,10 @@ async function start() {
     },
   });
   ipcMain.on(CHANNELS.reminders, (event, value: unknown) => {
-    if (fromApp(event)) reminders.schedule(checkReminders(value));
+    if (fromApp(event)) refusing(() => reminders.schedule(checkReminders(value)));
   });
   ipcMain.on(CHANNELS.shell, (event, value: unknown) => {
-    if (fromApp(event)) applyShell(checkShellState(value));
+    if (fromApp(event)) refusing(() => applyShell(checkShellState(value)));
   });
   // Syncs every 15 minutes and on resume, reminders checked on waking (D75, D76).
   backgroundTriggers({
