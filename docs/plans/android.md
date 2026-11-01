@@ -206,7 +206,8 @@ were checked on 2026-11-01.
   runs under it ([desktop D72](desktop.md#D72)), and the plugin can do the
   same, each hop returned with OkHttp's redirects off and the adapter
   following them. It closed the Deferred "one redirect loop for the native
-  shells".
+  shells" for the desktop; Android's plugin still follows them itself
+  (Deferred, "One redirect loop for Android too").
 
 - **D63. The store: sqlite-wasm on OPFS in the WebView.** _Changes
   foundation's [D25](foundation.md#D25)_, which named
@@ -567,6 +568,20 @@ were checked on 2026-11-01.
   Android's plugin still follows them itself, in Kotlin, by the same rule
   ([D62](#D62)). Making the plugin one hop at a time under the shared loop
   would leave one implementation.
+- **Back without a synthetic Escape** — the back button closes a Base UI
+  popup by dispatching Escape at the focused element ([D68](#D68)), so a
+  control inside one that takes Escape for itself (a field that clears, a
+  list that closes its own popup) and marks it used makes back close
+  nothing, though the dialog stays open. A stack of what is open, closed by
+  the UI itself, would not depend on what has focus; it comes if such a
+  control is reported.
+- **Unreadable credentials told by the plugin's message** —
+  `@aparajita/capacitor-secure-storage` says ciphertext sealed under
+  another key only as an `osError` whose message names
+  `AEADBadTagException` ([D64](#D64)); `keystoreSecrets` matches that text,
+  so a plugin that words it otherwise makes such credentials an error
+  instead of a sign-in. A code of its own for it, upstream, would end the
+  match.
 - **A reminder Android did not fire** — an alarm whose time passed is taken
   as fired; after a force-stop (which clears the app's alarms), one due in
   the 5 minutes before the app opens again is not shown late. Telling a

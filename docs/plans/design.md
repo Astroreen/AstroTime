@@ -453,6 +453,12 @@ the project.
   the finger lifts, with no slide ([D59](#D59)).
 - **Week numbers by the locale's own rules** — every locale gets ISO's
   numbers; American numbering differs around the new year ([D59](#D59)).
+- **The time grid on a day the clock changes** — the grid is the wall
+  clock ([D59](#D59)): the hour a DST change skips is an empty tile, the
+  hour it repeats is one tile for two, and the current-time line follows
+  the wall clock, so it jumps an hour on the change, or goes back over the
+  repeated hour. A grid of the elapsed hours (23 or 25) comes if the drift
+  is reported.
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
