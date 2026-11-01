@@ -281,3 +281,73 @@ test("hiding a calendar in the drawer hides its items", async ({ page }) => {
   await page.getByRole("checkbox", { name: "Work" }).click();
   await expect(review).toBeVisible();
 });
+
+test.describe("the shell around the views (design D132, D133)", () => {
+  const create = (scope: ReturnType<Page["getByRole"]>) =>
+    scope.getByRole("button", { name: "Create", exact: true });
+
+  test("on a wide screen Create heads the sidebar; with the sidebar closed it floats 24 px in", async ({
+    page,
+  }) => {
+    await page.setViewportSize(WIDE);
+    await openDemo(page, "week");
+    const sidebar = page.getByRole("navigation", { name: "Main menu" });
+    const main = page.getByRole("main");
+    await expect(create(sidebar)).toBeVisible();
+    await expect(create(main)).toHaveCount(0);
+    // It opens a new event, as the floating button does.
+    await create(sidebar).click();
+    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("banner").getByRole("button", { name: "Main menu" }).click();
+    await expect(sidebar).toHaveCount(0);
+    await expect(create(main)).toBeVisible();
+    const fab = (await create(main).boundingBox())!;
+    const area = (await main.boundingBox())!;
+    expect(area.x + area.width - (fab.x + fab.width)).toBe(24);
+    expect(area.y + area.height - (fab.y + fab.height)).toBe(24);
+  });
+
+  test('on a phone the floating "+" sits 16 px in', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await openDemo(page, "day");
+    const main = page.getByRole("main");
+    const fab = (await create(main).boundingBox())!;
+    const area = (await main.boundingBox())!;
+    expect(area.x + area.width - (fab.x + fab.width)).toBe(16);
+    expect(area.y + area.height - (fab.y + fab.height)).toBe(16);
+  });
+
+  test("the wide top bar: menu, Today, previous, next, the period, then search, Settings, tasks, the account", async ({
+    page,
+  }) => {
+    await page.setViewportSize(WIDE);
+    await openDemo(page, "week");
+    // The bar is drawn once the store is read.
+    await expect(page.getByRole("banner").getByRole("button", { name: /^Accounts/ })).toBeVisible();
+    const names = await page
+      .getByRole("banner")
+      .getByRole("button")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+    expect(names).toEqual([
+      "Main menu",
+      "Today, Wednesday, November 4",
+      "Previous week",
+      "Next week",
+      "November, choose a date",
+      "Search",
+      "Settings",
+      "Tasks",
+      // With what it says about the accounts: the demo holds a conflict.
+      expect.stringMatching(/^Accounts/),
+    ]);
+    // "Today" is a word on a wide screen, and brings the view back to today's week.
+    const todayButton = page.getByRole("banner").getByRole("button", { name: /^Today/ });
+    await expect(todayButton).toHaveText("Today");
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(header(page, "Sunday, November 8")).toBeVisible();
+    await todayButton.click();
+    await expect(header(page, "Sunday, November 1")).toBeVisible();
+  });
+});

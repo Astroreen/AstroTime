@@ -1,4 +1,4 @@
-// The drawer's settings (design D53): this device's theme, language, week
+// The settings (design D53, D131): this device's theme, language, week
 // start and clock, whether completed tasks show on the views (D51), and
 // whether reminders notify (foundation D101). Kept in the app's preferences
 // as one value and applied at once.

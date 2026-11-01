@@ -1,5 +1,5 @@
 // The language, week start and clock come from the device's locale
-// (design D45: Russian means Monday and 24 hours); the drawer's settings
+// (design D45: Russian means Monday and 24 hours); the settings
 // override them (`settings.ts`, design D53).
 import { LANGUAGES, type Language } from "../i18n/index.ts";
 

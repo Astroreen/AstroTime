@@ -116,7 +116,7 @@ logic worth borrowing.
     _Changed by the design plan ([D50](design.md#D50), [D51](design.md#D51)):
     all-day items, and tasks not drawn as blocks, are one-line chips; completed tasks
     are struck through and muted; the roll-over is one "N undone tasks" chip
-    on today; "hide completed" lives in the drawer's settings._
+    on today; "hide completed" lives in Settings ([design D131](design.md#D131))._
 - **D17. English and Russian from the first screen.** Every UI string goes
   through an i18n library; no strings in code. _Chosen in PR 5a:_ **i18next**
   with react-i18next. It needs no build step or macro plugin (Lingui's

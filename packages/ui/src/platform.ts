@@ -68,7 +68,7 @@ export interface Platform {
   /**
    * A shell that lives on with its window closed (the desktop, desktop D75):
    * the UI hands it its chrome's state on start and at every change, and the
-   * drawer's settings offer to quit on close instead.
+   * settings offer to quit on close instead.
    */
   readonly shell?: (state: ShellState) => void;
   /**

@@ -45,8 +45,13 @@ test("the top bar, the drawer, the tasks screen and the floating buttons clear t
   await menu.click();
   const drawer = page.getByRole("dialog", { name: "Main menu" });
   await clear(drawer.getByText("AstroTime", { exact: true }));
-  await page.keyboard.press("Escape");
+  // Settings, a screen of its own on a phone (design D131), clear of both bars.
+  await drawer.getByRole("button", { name: "Settings" }).click();
   await expect(drawer).toBeHidden();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await clear(settings.getByRole("button", { name: "Close settings" }));
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
 
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   const tasks = page.getByRole("region", { name: "Tasks" });

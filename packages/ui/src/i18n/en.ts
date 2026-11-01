@@ -216,6 +216,12 @@ export const en = {
   "search.noDate": "No date",
 
   "settings.title": "Settings",
+  "settings.close": "Close settings",
+  "settings.general": "General",
+  "settings.views": "Views",
+  "settings.calendarsOf": "Calendars of {{account}}",
+  "settings.notifications": "Notifications",
+  "settings.desktop": "Desktop app",
   "settings.theme": "Theme",
   "settings.theme.system": "System default",
   "settings.theme.dark": "Dark",

@@ -34,7 +34,7 @@ type Opening =
 
 export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimeProps) {
   const { store, preferences } = platform;
-  // The drawer's settings (design D53), applied as soon as they change.
+  // The settings (design D53, D131), applied as soon as they change.
   const [chosen, setChosen] = usePreference(preferences, KEYS.settings, readSettings, (value) =>
     JSON.stringify(value),
   );

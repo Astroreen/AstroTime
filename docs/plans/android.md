@@ -92,7 +92,7 @@ were checked on 2026-11-01.
   optional. `shell(state)`: a shell whose app lives on with its window
   closed takes the theme its frame follows, whether closing the window
   quits, and its tray's and menu's words, on start and at every change; the
-  drawer's settings offer "Keep running" only where it exists.
+  settings offer "Keep running" only where it exists.
   `onSyncRequest(listener)`: a shell's own sync triggers, which the UI runs
   as "Sync now" through its `SyncScheduler`. Each `ScheduledReminder`'s
   words gained `late`, the body of one shown late
@@ -535,7 +535,7 @@ were checked on 2026-11-01.
     HTTP and credentials and the sync lock, then the reminder set through
     `scheduleReminders` (`@astrotime/ui/background`): the open app's set
     (`reminderSet`, which the planner now shares) in the open app's words,
-    from the drawer's settings and language; reminders turned off, nothing.
+    from the settings and language; reminders turned off, nothing.
     It closes the store and tells native it is done, with its report or its
     error. An `error` or `unhandledrejection` outside the run's promise is
     only logged: ending there would destroy the WebView mid-sync, and the

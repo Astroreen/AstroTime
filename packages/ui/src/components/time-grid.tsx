@@ -41,10 +41,12 @@ export interface TimeGridProps {
   readonly onExpandedChange: (expanded: boolean) => void;
   /** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period. */
   readonly onSwipe: (direction: 1 | -1) => void;
+  /** A "+" button floats over the grid's corner (design D132): room is kept below midnight. */
+  readonly floating: boolean;
 }
 
 export function TimeGrid(props: TimeGridProps) {
-  const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe } = props;
+  const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe, floating } = props;
   const { t } = useTranslation();
   const { formats } = useCalendar();
   const single = days.length === 1;
@@ -149,7 +151,8 @@ export function TimeGrid(props: TimeGridProps) {
         </div>
         <div
           ref={scroller}
-          className="relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+          // Room under midnight, so the "+" button never hides the last hour (design D132).
+          className={`relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable] ${floating ? "pb-20" : ""}`}
           {...swipe}
         >
           <div className="grid" style={{ ...columns, height: 24 * HOUR }}>

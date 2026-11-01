@@ -123,19 +123,23 @@ test("the tasks screen, its panel, the settings and search (design D52, D53)", a
       wide.getByRole("region", { name: tasks }).getByRole("checkbox").first(),
     ).toBeVisible();
     await shot(wide, `tasks-panel-${language === "en" ? "dark" : "light"}-${language}-wide`);
+    // Settings on a wide screen: the top bar's button, a dialog (design D131).
+    const name = language === "en" ? "Settings" : "Настройки";
+    await wide.getByRole("banner").getByRole("button", { name }).click();
+    await expect(wide.getByRole("dialog", { name })).toBeVisible();
+    await shot(wide, `settings-${language === "en" ? "dark" : "light"}-${language}-wide`);
     await wide.context().close();
 
     const page = await open(browser, { language, theme: "dark", size: PHONE }, "day");
+    const settingsName = language === "en" ? "Settings" : "Настройки";
     await page
       .getByRole("button", { name: language === "en" ? "Main menu" : "Главное меню" })
       .click();
-    const settings = page.getByRole("region", {
-      name: language === "en" ? "Settings" : "Настройки",
-    });
-    await settings.scrollIntoViewIfNeeded();
-    await expect(settings).toBeInViewport();
+    await page.getByRole("dialog").getByRole("button", { name: settingsName }).click();
+    await expect(page.getByRole("dialog", { name: settingsName })).toBeVisible();
     await shot(page, `settings-dark-${language}-phone`);
     await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: settingsName })).toBeHidden();
     await page.getByRole("button", { name: language === "en" ? "Search" : "Поиск" }).click();
     await page.getByRole("searchbox").fill(language === "en" ? "the" : "на");
     await expect(
@@ -150,8 +154,13 @@ test("reminders: the setting, and a notification as the page draws it (foundatio
   browser,
 }) => {
   const words = {
-    en: { menu: "Main menu", reminders: "Reminders", next: /^Next: / },
-    ru: { menu: "Главное меню", reminders: "Напоминания", next: /^Следующее: / },
+    en: { menu: "Main menu", settings: "Settings", reminders: "Reminders", next: /^Next: / },
+    ru: {
+      menu: "Главное меню",
+      settings: "Настройки",
+      reminders: "Напоминания",
+      next: /^Следующее: /,
+    },
   } as const;
   const openOnClock = async (
     language: Language,
@@ -177,6 +186,7 @@ test("reminders: the setting, and a notification as the page draws it (foundatio
         .first(),
     ).toBeVisible();
     await page.getByRole("button", { name: words[language].menu }).click();
+    await page.getByRole("dialog").getByRole("button", { name: words[language].settings }).click();
     const toggle = page.getByRole("switch", { name: words[language].reminders });
     await toggle.scrollIntoViewIfNeeded();
     return { page, toggle };

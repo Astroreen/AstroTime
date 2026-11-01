@@ -1,6 +1,8 @@
 // The app shell around the views (design D46): the top bar with the account
-// button, the drawer (a sidebar on a wide screen), the view and the floating
-// "+" button; search and the tasks screen open from the top bar (D52, D53);
+// button, the drawer (a sidebar on a wide screen, headed by Create), the view
+// and the floating "+" button where no sidebar holds Create (D132); search,
+// the tasks screen and, on a wide screen, Settings open from the top bar
+// (D52, D53, D131, D133), Settings from the drawer on a phone;
 // the first-run screen while there is no account. The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
 import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
@@ -39,12 +41,14 @@ import {
   MenuIcon,
   PlusIcon,
   SearchIcon,
+  SettingsIcon,
   TodayIcon,
 } from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
 import { MonthView } from "./month-view.tsx";
 import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
+import { SettingsScreen } from "./settings-section.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 
@@ -99,6 +103,7 @@ export function CalendarScreen({
   // The item a search jumped to, marked while its day is the one jumped to.
   const [found, setFound] = useState<{ objectId: string; anchor: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const days = periodOf(view, anchor, settings.weekStart);
@@ -247,6 +252,7 @@ export function CalendarScreen({
     const time = reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start;
     setSearching(false);
     setDrawerOpen(false);
+    setSettingsOpen(false);
     if (!wide) setTasksOpen(false);
     if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
     const stored = await store.object(reminder.objectId);
@@ -296,6 +302,17 @@ export function CalendarScreen({
   }, [view, today, setView]);
 
   const title = formats.period(...titleRange(view, days, anchor), today.slice(0, 4));
+  // A new event on the day shown, from the next half hour (Google).
+  const create = () => editing.value.create("event", { day: anchor });
+  // On a wide screen the sidebar's top holds Create, as Google Calendar's web
+  // app; with no sidebar the "+" button floats (D132).
+  const sidebar = wide && sidebarOpen;
+  const toggleCalendar = (id: string, shown: boolean) => {
+    const next = new Set(hidden);
+    if (shown) next.delete(id);
+    else next.add(id);
+    setHidden(next);
+  };
   const drawer = (
     <DrawerContent
       view={view}
@@ -303,14 +320,18 @@ export function CalendarScreen({
       accounts={lists?.accounts ?? []}
       calendars={lists?.calendars ?? []}
       hidden={hidden}
-      onToggle={(id, shown) => {
-        const next = new Set(hidden);
-        if (shown) next.delete(id);
-        else next.add(id);
-        setHidden(next);
-      }}
+      onToggle={toggleCalendar}
       colorOf={(calendar) => colorOfCalendar(calendar.id)}
       onLeave={() => setDrawerOpen(false)}
+      onSettings={
+        wide
+          ? undefined
+          : () => {
+              setDrawerOpen(false);
+              setSettingsOpen(true);
+            }
+      }
+      create={wide ? { disabled: !editing.value.canCreate, onCreate: create } : undefined}
     />
   );
 
@@ -346,19 +367,21 @@ export function CalendarScreen({
                   <MenuIcon />
                 </Dialog.Trigger>
               )}
-              <MonthPicker
-                title={title}
-                anchor={anchor}
-                today={today}
-                weekStart={settings.weekStart}
-                onPick={setAnchor}
-              />
-              <div className="flex-1" />
+              {/* On a wide screen, Google's web order: today, previous, next, then the period they move (D133). */}
               {wide && (
                 <>
                   <button
                     type="button"
-                    className={iconButton}
+                    className="ml-2 h-9 shrink-0 rounded-full border border-line px-4 text-[14px] font-medium text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+                    // Its name begins with what it shows and says the day (WCAG 2.5.3).
+                    aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
+                    onClick={() => setAnchor(today)}
+                  >
+                    {t("topBar.today")}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${iconButton} ml-1`}
                     aria-label={t(`nav.previous.${view}`)}
                     onClick={() => go(-1)}
                   >
@@ -374,6 +397,14 @@ export function CalendarScreen({
                   </button>
                 </>
               )}
+              <MonthPicker
+                title={title}
+                anchor={anchor}
+                today={today}
+                weekStart={settings.weekStart}
+                onPick={setAnchor}
+              />
+              <div className="flex-1" />
               <button
                 type="button"
                 className={iconButton}
@@ -383,16 +414,28 @@ export function CalendarScreen({
               >
                 <SearchIcon />
               </button>
-              <button
-                type="button"
-                className={iconButton}
-                // Its name says the day its icon shows (WCAG 2.5.3).
-                aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
-                title={t("topBar.today")}
-                onClick={() => setAnchor(today)}
-              >
-                <TodayIcon day={formats.dayNumber(today)} />
-              </button>
+              {wide ? (
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={t("settings.title")}
+                  title={t("settings.title")}
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <SettingsIcon />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={iconButton}
+                  // Its name says the day its icon shows (WCAG 2.5.3).
+                  aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
+                  title={t("topBar.today")}
+                  onClick={() => setAnchor(today)}
+                >
+                  <TodayIcon day={formats.dayNumber(today)} />
+                </button>
+              )}
               <button
                 type="button"
                 className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
@@ -406,7 +449,7 @@ export function CalendarScreen({
               <AccountButton accounts={lists?.accounts ?? []} />
             </header>
             <div inert={covered} aria-hidden={covered || undefined} className="flex min-h-0 flex-1">
-              {wide && sidebarOpen && (
+              {sidebar && (
                 <nav aria-label={t("topBar.menu")} className="w-64 shrink-0 overflow-y-auto">
                   {drawer}
                 </nav>
@@ -446,19 +489,22 @@ export function CalendarScreen({
                     expanded={expanded}
                     onExpandedChange={setExpanded}
                     onSwipe={go}
+                    floating={!sidebar}
                   />
                 )}
-                {/* A new event on the day shown, from the next half hour (Google). */}
-                <button
-                  type="button"
-                  disabled={!editing.value.canCreate}
-                  aria-label={t("fab.create")}
-                  title={t("fab.create")}
-                  onClick={() => editing.value.create("event", { day: anchor })}
-                  className="absolute right-4 bottom-4 z-[70] grid size-14 place-items-center rounded-2xl bg-fab text-on-fab shadow-lg shadow-black/30"
-                >
-                  <PlusIcon className="size-7" />
-                </button>
+                {/* Material 3's margins: 16 px on a phone, 24 px from 640 px (D132). */}
+                {!sidebar && (
+                  <button
+                    type="button"
+                    disabled={!editing.value.canCreate}
+                    aria-label={t("fab.create")}
+                    title={t("fab.create")}
+                    onClick={create}
+                    className="absolute right-4 bottom-4 z-[70] grid size-14 place-items-center rounded-2xl bg-fab text-on-fab shadow-lg shadow-black/30 active:scale-[0.97] sm:right-6 sm:bottom-6"
+                  >
+                    <PlusIcon className="size-7" />
+                  </button>
+                )}
               </main>
               {wide && tasksOpen && (
                 <aside className="w-[22.5rem] shrink-0 border-l border-line">
@@ -512,6 +558,15 @@ export function CalendarScreen({
             </Dialog.Popup>
           </Dialog.Portal>
         </Dialog.Root>
+        <SettingsScreen
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          accounts={lists?.accounts ?? []}
+          calendars={lists?.calendars ?? []}
+          hidden={hidden}
+          onToggle={toggleCalendar}
+          colorOf={(calendar) => colorOfCalendar(calendar.id)}
+        />
         {editing.dialogs}
       </EditingContext.Provider>
     </CalendarContext.Provider>

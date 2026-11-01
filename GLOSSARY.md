@@ -69,13 +69,17 @@ One word per concept. Use these terms in code, docs, commits and UI.
   `VTODO`), a tab of the tasks screen. Never "todo list".
 - **Star** — a task marked as important on the tasks screen,
   `X-ASTROTIME-STARRED:TRUE` (design D52); it is not `PRIORITY`.
-- **Settings** — the drawer's choices for this device: theme, language,
-  week start, clock, "hide completed", reminders, and on the desktop "keep
-  running" (design D96).
+- **Settings** — the screen (a dialog on a wide screen) of this device's
+  choices, in groups: theme and language; week start, clock and "hide
+  completed"; each account's calendars shown or hidden; reminders; on the
+  desktop "keep running". Reached by the top bar's gear on a wide screen and
+  by the drawer's last row on a phone (design D131, D96).
 - **Top bar**, **drawer**, **floating button** — the app shell: the bar
-  with the month, search, "today" and the tasks toggle; the side menu with
-  views, calendars and settings (a sidebar on a wide screen); the "+" button
-  that creates an item (design D46).
+  with the period, search, "today", the tasks toggle and the account (on a
+  wide screen in Google's web order with Settings, design D133); the side
+  menu with the views and calendars (a sidebar on a wide screen, headed by
+  **Create**); the "+" button that creates an item where no sidebar holds
+  Create (design D46, D132).
 - **View** — Day, 3 days, Week, Month or Agenda.
 - **Period** — the days a view shows: one, three, the locale's week, or a
   month's six weeks; previous and next move by one period (by month in the

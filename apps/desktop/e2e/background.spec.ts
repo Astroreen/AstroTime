@@ -19,7 +19,7 @@ const test = base.extend<{ radicale: CalDavServer }>({
   },
 });
 
-/** The app on a new profile, signed in to `radicale`: the drawer's settings show once an account does. */
+/** The app on a new profile, signed in to `radicale`, with Settings open (design D131). */
 async function signedIn(radicale: CalDavServer, options: { realClock?: boolean } = {}) {
   const work = await radicale.mkcalendar("work");
   const userData = profile();
@@ -27,7 +27,8 @@ async function signedIn(radicale: CalDavServer, options: { realClock?: boolean }
   await signInByPassword(page, radicale);
   await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Settings" })).toBeVisible();
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   return { app, page, userData, work };
 }
 
