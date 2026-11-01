@@ -4,7 +4,7 @@
 // chip on today.
 import type { CalendarObject } from "./calendar-object.ts";
 import type { Item } from "./item.ts";
-import { occurrencesBetween, type Occurrence } from "./occurrences.ts";
+import { firstDay, occurrencesBetween, shiftDate, type Occurrence } from "./occurrences.ts";
 import { wallClockOf } from "./time.ts";
 
 /**
@@ -40,6 +40,11 @@ export function isUndoneBefore(
  * The occurrence by which a task counts in today's "N undone tasks": its
  * latest undone one due before `day`, or `null`. A recurring task counts
  * once (D51).
+ *
+ * A series is read back from `day` a window at a time, each wider than the
+ * last, instead of from its first occurrence (D118): an occurrence outside a
+ * window ends by the window's start, so one in it due after that start is
+ * the latest.
  */
 export function latestUndoneBefore(
   object: CalendarObject,
@@ -47,12 +52,24 @@ export function latestUndoneBefore(
   timeZone: string,
 ): Occurrence | null {
   if (object.kind !== "task" || (object.master && isDone(object.master))) return null;
-  const undone = occurrencesBetween(object, { from: "0001-01-01", to: day, timeZone }).filter(
-    (occurrence) => isUndoneBefore(object, occurrence, day, timeZone),
-  );
   const dueOf = (occurrence: Occurrence) => wallClockOf(occurrence.end, timeZone);
-  return undone.reduce<Occurrence | null>(
-    (latest, occurrence) => (!latest || dueOf(occurrence) > dueOf(latest) ? occurrence : latest),
-    null,
-  );
+  const latestFrom = (from: string) =>
+    occurrencesBetween(object, { from, to: day, timeZone })
+      .filter((occurrence) => isUndoneBefore(object, occurrence, day, timeZone))
+      .reduce<Occurrence | null>(
+        (latest, occurrence) =>
+          !latest || dueOf(occurrence) > dueOf(latest) ? occurrence : latest,
+        null,
+      );
+  const first = object.master?.recurring ? firstDay(object) : null;
+  if (first !== null) {
+    // Until a window reaches three days before the first: no zone shows one earlier.
+    const earliest = shiftDate(first, -3);
+    for (let days = 32; shiftDate(day, -days) > earliest; days *= 8) {
+      const from = shiftDate(day, -days);
+      const latest = latestFrom(from);
+      if (latest && dueOf(latest) > `${from}T00:00:00`) return latest;
+    }
+  }
+  return latestFrom("0001-01-01");
 }
