@@ -91,6 +91,7 @@ test("the page's reminders pass as they came, each with an id, a time and its wo
     [{ ...reminder, notification: null }],
     [{ ...reminder, notification: { title: "Call" } }],
     [{ ...reminder, notification: { ...reminder.notification, late: 1 } }],
+    [{ ...reminder, extra: "x".repeat(20_000) }],
   ];
   for (const value of refused) expect(() => checkReminders(value)).toThrow(TypeError);
 });

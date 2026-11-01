@@ -87,6 +87,9 @@ export function checkSecret(value: unknown, saving: unknown): [string, SecretSav
 }
 
 /** A short text the page sends: a notification's words, a menu's. */
+/** The most a reminder may hold, its page's own fields included. */
+const MAX_REMINDER_BYTES = 16 * 1024;
+
 const isText = (value: unknown, max = 4096): value is string =>
   typeof value === "string" && value.length <= max;
 
@@ -108,7 +111,9 @@ export function checkReminders(value: unknown): ScheduledReminder[] {
       !Number.isFinite(fireAt) ||
       !isText(title) ||
       !isText(body) ||
-      (late !== undefined && !isText(late))
+      (late !== undefined && !isText(late)) ||
+      // The rest is kept for the click, as it came, and bounded.
+      JSON.stringify(reminder).length > MAX_REMINDER_BYTES
     ) {
       throw new TypeError("A reminder has an id, a time and its notification's words.");
     }
