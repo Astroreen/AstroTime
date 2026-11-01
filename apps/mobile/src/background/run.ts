@@ -104,15 +104,17 @@ function backgroundSecrets(native: Channel): SecretStore {
  * `androidReminders` then schedules nothing. Taps reach the open app only.
  */
 function backgroundNotifications(native: Channel): NativeNotifications {
-  const display = () => native.call<{ display: "granted" | "denied" }>("notifications.check", {});
+  type Display = { display: "granted" | "denied" };
   return {
-    checkPermissions: display,
-    requestPermissions: display,
+    checkPermissions: () => native.call<Display>("notifications.check", {}),
+    // Native answers it as a check: nobody is there to ask.
+    requestPermissions: () => native.call<Display>("notifications.request", {}),
     checkExactNotificationSetting: () =>
       native.call<{ exact_alarm: "granted" | "denied" }>("notifications.exact", {}),
     // A schedule's Date crosses as its ISO string, as over Capacitor's bridge.
     schedule: (options) => native.call("notifications.schedule", options),
     cancel: (options) => native.call("notifications.cancel", options),
+    getPending: () => native.call<{ notifications: { id: number }[] }>("notifications.pending", {}),
     addListener: () => Promise.resolve(),
   };
 }

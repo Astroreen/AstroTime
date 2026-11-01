@@ -1,6 +1,8 @@
 // Background sync's page (docs/plans/android.md#D67), which `SyncWorker`
 // loads in a WebView of its own with no activity, on the app's origin: it
-// runs one sync and says to native when it is over, however it ended.
+// says hello, runs one sync and says to native when it is over, however it
+// ended. Without native's object it can say nothing: native, hearing no hello
+// by the time the page has loaded, ends the run at once.
 import { Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 
@@ -15,7 +17,10 @@ const port = (globalThis as { AstroTimeBackground?: NativePort }).AstroTimeBackg
 
 if (port) {
   const native = channel(port);
+  native.tell("hello", {});
   // Anything that escapes the run still ends it, never leaving native waiting.
+  // These may say done more than once (an error after the run's own done):
+  // native takes the first and ignores the rest.
   const fail = (error: unknown) =>
     native.tell("done", { error: error instanceof Error ? error.message : String(error) });
   globalThis.addEventListener("error", (event) => fail(event.error ?? event.message));

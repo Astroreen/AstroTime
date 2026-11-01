@@ -28,6 +28,9 @@ interface Notifications {
     /** Alarms may be exact (always, before Android 12). */
     fun exact(): Boolean
 
+    /** The ids the plugin holds a record of, scheduled or delivered (its `getPending`). */
+    fun pending(): List<Int>
+
     /** Schedules these, each as the plugin's `schedule` takes it. */
     fun schedule(notifications: JSONArray)
 
@@ -79,8 +82,15 @@ class Handlers(
         when (method) {
             "http" -> jsonOf(exchange.run(requestOf(params)))
             "secrets.get" -> secrets.get(params.getString("key"))
-            "notifications.check" -> JSONObject().put("display", granted(notifications.enabled()))
+            // Nobody can be asked in the background: a request is a check.
+            "notifications.check", "notifications.request" ->
+                JSONObject().put("display", granted(notifications.enabled()))
             "notifications.exact" -> JSONObject().put("exact_alarm", granted(notifications.exact()))
+            "notifications.pending" ->
+                JSONObject().put(
+                    "notifications",
+                    JSONArray().apply { notifications.pending().forEach { put(JSONObject().put("id", it)) } },
+                )
             "notifications.schedule" -> notifications.schedule(params.getJSONArray("notifications")).let { null }
             "notifications.cancel" -> {
                 val list = params.getJSONArray("notifications")

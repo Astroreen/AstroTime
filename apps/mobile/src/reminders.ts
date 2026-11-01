@@ -114,7 +114,7 @@ export function androidReminders(options: {
 }): ReminderScheduler {
   const { native, preferences, now = () => Date.now() } = options;
   const record = readKept(preferences);
-  const kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
+  let kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
   // Without a record (unreadable, or the preferences cleared) the alarms
   // Android still holds are no one's: their ids would be handed out again
   // while they still fire. The first set cancels them all.
@@ -321,7 +321,8 @@ export function androidReminders(options: {
         const { lock } = options;
         if (!lock) return apply(next);
         await lock(() => {
-          kept = readKept(preferences);
+          // The other instance may have handed out ids since: its record wins.
+          kept = readKept(preferences) ?? kept;
           return apply(next);
         });
       });

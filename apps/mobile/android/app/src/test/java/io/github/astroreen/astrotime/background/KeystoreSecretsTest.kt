@@ -3,6 +3,7 @@
 // cipher and layout, under a JVM key instead of the Keystore's.
 package io.github.astroreen.astrotime.background
 
+import java.io.File
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -10,9 +11,26 @@ import javax.crypto.SecretKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.json.JSONObject
 import org.junit.Test
 
+/** The plugin's version whose format `readSecret` and `KeystoreSecrets` read. */
+private const val READ_FORMAT_OF = "8.0.1"
+
 class KeystoreSecretsTest {
+    @Test
+    fun `the installed plugin is the version whose format is read`() {
+        // Gradle runs the JVM tests in app/; the plugin is apps/mobile's dependency.
+        val manifest = File("../../node_modules/@aparajita/capacitor-secure-storage/package.json")
+        val version = JSONObject(manifest.readText()).getString("version")
+        assertEquals(
+            "@aparajita/capacitor-secure-storage is $version: re-check KeystoreSecrets against its " +
+                "SecureStorage.java and base.ts (docs/plans/android.md#D67), then move READ_FORMAT_OF",
+            READ_FORMAT_OF,
+            version,
+        )
+    }
+
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
     private val decode: (String) -> ByteArray = Base64.getDecoder()::decode
 

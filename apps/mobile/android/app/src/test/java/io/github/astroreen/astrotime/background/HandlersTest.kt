@@ -29,6 +29,8 @@ class HandlersTest {
 
             override fun exact() = false
 
+            override fun pending() = listOf(3, 5)
+
             override fun schedule(notifications: JSONArray) {
                 if (!enabled) throw IllegalStateException("Notifications are off.")
                 scheduled += notifications
@@ -128,6 +130,14 @@ class HandlersTest {
     }
 
     @Test
+    fun `a request asks no one, and what the plugin holds is read`() {
+        enabled = false
+        assertEquals("denied", call(13, "notifications.request").getJSONObject("value").getString("display"))
+        val held = call(14, "notifications.pending").getJSONObject("value").getJSONArray("notifications")
+        assertEquals(listOf(3, 5), (0 until held.length()).map { held.getJSONObject(it).getInt("id") })
+    }
+
+    @Test
     fun `notifications are scheduled and cancelled as sent`() {
         val notification = JSONObject().put("id", 7).put("title", "Dentist").put("channelId", "reminders")
         assertTrue(call(9, "notifications.schedule", JSONObject().put("notifications", JSONArray().put(notification))).getBoolean("ok"))
@@ -151,6 +161,7 @@ class HandlersTest {
         var answered = false
         handlers.receive("""{"method":"done","params":{"report":{"accounts":[]}}}""") { answered = true }
         handlers.receive("not json") { answered = true }
+        handlers.receive("""{"method":"hello","params":{}}""") { answered = true }
         assertFalse(answered)
         assertEquals(1, done.size)
         assertTrue(done.single().has("report"))

@@ -4,8 +4,9 @@
 // origin, `https://localhost`, so it shares the open app's OPFS store, Web
 // Locks and BroadcastChannels, and it answers the page's calls (`Handlers`)
 // through the one object it injects, for that origin only. It ends when the
-// page says it is done, or when its renderer or its page fails to load; the
-// WebView is destroyed whatever happens, which lets go of the store.
+// page says it is done; when the page loaded without ever reaching that
+// object, failed to load, or lost its renderer; the WebView is destroyed
+// whatever happens, which lets go of the store.
 package io.github.astroreen.astrotime.background
 
 import android.content.Context
@@ -45,7 +46,7 @@ class HeadlessRun(private val context: Context) {
             if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
                 throw RunFailed("This WebView has no WebMessageListener.")
             }
-            val threads = Executors.newCachedThreadPool()
+            val gate = Gate(Executors.newCachedThreadPool())
             val webView = WebView(context)
             try {
                 suspendCancellableCoroutine { continuation ->
@@ -57,13 +58,18 @@ class HeadlessRun(private val context: Context) {
                         }
                     }
                     val handlers =
-                        Handlers(Exchange(), KeystoreSecrets(context), PluginNotifications(context), threads::execute) {
+                        Handlers(Exchange(), KeystoreSecrets(context), PluginNotifications(context), gate::work) {
                             main.post { finish(Result.success(it)) }
                         }
+                    // The page says hello in its first script: loaded without
+                    // it, the page never reached this object, and nothing will.
+                    var heard = false
                     WebViewCompat.addWebMessageListener(webView, PORT, setOf(ORIGIN)) { _, message, _, isMainFrame, reply ->
                         val data = message.data
                         if (isMainFrame && data != null) {
-                            handlers.receive(data) { answer -> main.post { reply.postMessage(answer) } }
+                            heard = true
+                            // An answer after the run is over has no page to reach (`Gate`).
+                            handlers.receive(data) { answer -> main.post { gate.reply { reply.postMessage(answer) } } }
                         }
                     }
                     webView.settings.apply {
@@ -85,6 +91,10 @@ class HeadlessRun(private val context: Context) {
                                 request: WebResourceRequest,
                             ): WebResourceResponse? = assets.shouldInterceptRequest(request.url)
 
+                            override fun onPageFinished(view: WebView, url: String) {
+                                if (!heard) finish(Result.failure(RunFailed("The page loaded without reaching $PORT.")))
+                            }
+
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
@@ -104,8 +114,8 @@ class HeadlessRun(private val context: Context) {
                     webView.loadUrl("$ORIGIN/background.html")
                 }
             } finally {
+                gate.close()
                 webView.destroy()
-                threads.shutdownNow()
             }
         }
 }

@@ -53,6 +53,31 @@ function memoryPreferences(): Preferences {
 
 const alone = <T>(work: () => Promise<T>) => work();
 
+/** An account on a local server, with "Standup" at 12:00 and its alarm 15 minutes before, ahead of NOW. */
+async function storeWithStandup() {
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "Radicale",
+    serverUrl: "http://10.0.2.2:5232/",
+    homeUrl: "http://10.0.2.2:5232/anna/",
+    username: "anna",
+  });
+  const calendar = await store.saveCalendar({
+    accountId: account.id,
+    url: "http://10.0.2.2:5232/anna/work/",
+    name: "Work",
+    color: null,
+    components: ["VEVENT"],
+    rights: ALL_RIGHTS,
+  });
+  await store.saveLocal(
+    calendar.id,
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:standup\r\nSUMMARY:Standup\r\nDTSTART:20261104T120000Z\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  return { store, account };
+}
+
 function context(port: NativePort, store: Store) {
   let closed = false;
   const original = store.close.bind(store);
@@ -104,26 +129,7 @@ test("signed out of every account: nothing is synced or scheduled, and the store
 });
 
 test("each account syncs through native, and the reminder set goes to Android", async () => {
-  const store = await Store.open(nodeDriver());
-  const account = await store.addAccount({
-    provider: "caldav",
-    name: "Radicale",
-    serverUrl: "http://10.0.2.2:5232/",
-    homeUrl: "http://10.0.2.2:5232/anna/",
-    username: "anna",
-  });
-  const calendar = await store.saveCalendar({
-    accountId: account.id,
-    url: "http://10.0.2.2:5232/anna/work/",
-    name: "Work",
-    color: null,
-    components: ["VEVENT"],
-    rights: ALL_RIGHTS,
-  });
-  await store.saveLocal(
-    calendar.id,
-    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:standup\r\nSUMMARY:Standup\r\nDTSTART:20261104T120000Z\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
-  );
+  const { store, account } = await storeWithStandup();
   const device = native((method, params) => {
     if (method === "secrets.get") {
       expect(params).toEqual({ key: `account:${account.id}` });
@@ -133,6 +139,7 @@ test("each account syncs through native, and the reminder set goes to Android", 
     if (method === "http") return new NativeError("Unreachable.", "offline", undefined);
     if (method === "notifications.check") return { value: { display: "granted" } };
     if (method === "notifications.exact") return { value: { exact_alarm: "granted" } };
+    if (method === "notifications.pending") return { value: { notifications: [] } };
     return { value: null };
   });
   const run = context(device.port, store);
@@ -160,23 +167,23 @@ test("each account syncs through native, and the reminder set goes to Android", 
 });
 
 test("a permission not granted in the background schedules nothing and asks no one", async () => {
-  const store = await Store.open(nodeDriver());
-  await store.addAccount({
-    provider: "caldav",
-    name: "R",
-    serverUrl: "https://r.test/",
-    username: "a",
+  const { store, account } = await storeWithStandup();
+  const device = native((method) => {
+    if (method === "secrets.get")
+      return { value: JSON.stringify({ username: "anna", password: "secret" }) };
+    if (method === "http") return new NativeError("Unreachable.", "offline", undefined);
+    // Not yet asked in the open app: a check could say prompt; the background reads it as denied.
+    if (method === "notifications.check") return { value: { display: "denied" } };
+    if (method === "notifications.exact") return { value: { exact_alarm: "granted" } };
+    if (method === "notifications.pending") return { value: { notifications: [] } };
+    return { value: null };
   });
-  const device = native((method) =>
-    method === "notifications.check"
-      ? { value: { display: "denied" } }
-      : method === "notifications.exact"
-        ? { value: { exact_alarm: "granted" } }
-        : { value: null },
-  );
   const report = await context(device.port, store).run();
-  // No credentials kept: signed out, without a request.
-  expect(report.accounts.map((a) => a.status)).toEqual(["signed-out"]);
-  expect(device.methods()).not.toContain("http");
+  expect(report).toEqual({
+    accounts: [{ accountId: account.id, status: "offline" }],
+    reminders: 1,
+  });
+  expect(device.methods()).toContain("notifications.check");
+  expect(device.methods()).not.toContain("notifications.request");
   expect(device.methods()).not.toContain("notifications.schedule");
 });

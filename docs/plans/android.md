@@ -261,7 +261,9 @@ were checked on 2026-11-01.
   holds the app password in plain text. The library lists `@capacitor/ios` and
   `@capacitor/keyboard` among its dependencies, so pnpm installs their
   JavaScript; `cap sync` adds only the app's own dependencies to the Gradle
-  project, so neither reaches the APK.
+  project, so neither reaches the APK. _Since PR A4_ background sync reads
+  this format without the plugin ([D67](#D67)): updating the plugin means
+  re-checking `KeystoreSecrets`, which a test enforces.
 
 - **D65. Login Flow v2 in a Custom Tab.** The `openExternal` adapter opens
   the login page with `@capacitor/browser` (8.0.5, Chrome Custom Tabs), so
@@ -495,11 +497,18 @@ were checked on 2026-11-01.
     run the notifications plugin's own `LocalNotificationManager`,
     `NotificationStorage` and `LocalNotification` with no activity, so the
     alarms, the records its boot receiver arms again and a tap's intent (the
-    launcher activity) are the plugin's own; `done` ends the run. The
+    launcher activity) are the plugin's own; it schedules them one at a
+    time, each alarm and then its record, under a call of its own whose
+    refusal throws, so a refusal partway leaves every alarm already armed
+    with the record the boot receiver needs (from the review of #37); `done`
+    ends the run. The
     secure storage plugin's class needs the bridge, so `KeystoreSecrets`
     reads its format itself (AES-GCM, the ciphertext and IV in
     `WSSecureStorageSharedPreferences` under `capacitor-storage_` and the
-    key, D64): tied to its 8.0.1, so an update of the plugin re-checks it.
+    key, D64): tied to its 8.0.1, which a JVM test checks against the
+    installed plugin, failing with "re-check KeystoreSecrets" on any other
+    version (Dependabot updates no npm package here: an update is by hand,
+    and meets the test).
     Nobody can be asked in the background: a notification permission not
     granted reads as denied, and nothing is scheduled.
   - **The page** (`src/background/run.ts`) opens the store as any tab does;
@@ -511,8 +520,12 @@ were checked on 2026-11-01.
     It closes the store and tells native it is done, with its report or its
     error; an `error` or `unhandledrejection` anywhere does the same.
   - **The end and its bound.** The page's `done` is the event a run waits
-    for. A main frame that does not load and a renderer that goes end it
-    too. Past 9 minutes (`withTimeoutOrNull`, under WorkManager's own 10) the
+    for; native takes the first and ignores any after it. A main frame that
+    does not load and a renderer that goes end it too, and so does a page
+    that loaded without saying hello, which it does in its first script:
+    without native's object it could never say done. An answer or a call
+    that comes after the run is over (the watchdog, a `done` during an
+    exchange) reaches no WebView and throws nothing (`Gate`). Past 9 minutes (`withTimeoutOrNull`, under WorkManager's own 10) the
     run is stopped and its WebView destroyed, whatever it waits for; every
     request has its own ceiling besides (D62). Destroying the WebView lets
     go of the store's Web Lock, so an app that started meanwhile leads.

@@ -17,6 +17,9 @@ import com.getcapacitor.JSObject
 import com.getcapacitor.PluginCall
 import org.json.JSONArray
 
+/** What the plugin refused (its own words and code), or that notifications are off. */
+class NotificationRefused(message: String) : Exception(message)
+
 class PluginNotifications(private val context: Context) : Notifications {
     private val storage = NotificationStorage(context)
 
@@ -29,29 +32,47 @@ class PluginNotifications(private val context: Context) : Notifications {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
 
+    override fun pending(): List<Int> = storage.getSavedNotifications().mapNotNull { it.id }
+
+    /**
+     * One at a time, each alarm then its record, as the plugin's `schedule`
+     * does for a whole list: a refusal stops at the one refused, and every
+     * alarm armed before it has the record the boot receiver arms again.
+     */
     override fun schedule(notifications: JSONArray) {
         val list =
             (0 until notifications.length()).map {
                 LocalNotification.buildNotificationFromJSObject(JSObject.fromJSONObject(notifications.getJSONObject(it)))
             }
-        // As the plugin's `schedule`: the alarms, then the records its boot receiver reads.
-        manager.schedule(null, list) ?: throw IllegalStateException("Notifications are off.")
-        storage.appendNotifications(list)
+        for (notification in list) {
+            manager.schedule(Quiet("schedule", JSObject()), listOf(notification))
+                ?: throw NotificationRefused("Notifications are off.")
+            storage.appendNotifications(listOf(notification))
+        }
     }
 
     override fun cancel(ids: List<Int>) {
         val notifications = JSArray().apply { ids.forEach { put(JSObject().put("id", it)) } }
-        manager.cancel(Quiet(JSObject().put("notifications", notifications)))
+        manager.cancel(Quiet("cancel", JSObject().put("notifications", notifications)))
     }
 
-    /** The plugin's `cancel` takes a call and answers it; nobody waits for this one. */
-    private class Quiet(data: JSObject) : PluginCall(null, "LocalNotifications", "-1", "cancel", data) {
+    /**
+     * The plugin's calls take a call and answer it; nobody waits for these.
+     * A refusal throws, so it stops the work where the plugin said it, never
+     * reaching a bridge there is none of.
+     */
+    private class Quiet(method: String, data: JSObject) :
+        PluginCall(null, "LocalNotifications", "-1", method, data) {
         override fun resolve() {}
 
         override fun resolve(data: JSObject?) {}
 
         override fun reject(msg: String?, code: String?, ex: Exception?, data: JSObject?) {
-            throw IllegalStateException(msg ?: code)
+            throw NotificationRefused("${code ?: "refused"}: ${msg ?: ""}")
+        }
+
+        override fun errorCallback(msg: String?) {
+            throw NotificationRefused(msg ?: "refused")
         }
     }
 }
