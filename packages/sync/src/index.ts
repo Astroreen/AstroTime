@@ -4,6 +4,7 @@ export {
   saveAccount,
   syncAll,
   type AccountSync,
+  type AppPasswordRevocation,
   type Connect,
   type SyncAllReport,
   type SyncContext,

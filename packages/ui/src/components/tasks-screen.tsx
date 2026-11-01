@@ -24,7 +24,6 @@ import {
   type TaskRow,
 } from "../calendar/tasks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
-import { useAccounts } from "./accounts-context.tsx";
 import { useCalendar } from "./context.ts";
 import { targetOf, useEditing } from "./editing.tsx";
 import {
@@ -112,23 +111,19 @@ export function TasksScreen({
     timeZone,
   });
 
-  const { scheduler } = useAccounts();
   const editing = useEditing();
-  const write = (row: TaskRow, ics: string) => {
-    store.saveLocal(row.stored.calendarId, ics, row.stored.href).then(
-      // A local change goes up soon (docs/plans/foundation.md#D91).
-      () => scheduler.changed(),
-      (error: unknown) => console.error(error),
-    );
-  };
+  const targetOfRow = (row: TaskRow) =>
+    targetOf(row.stored, row.object, row.recurrenceId, row.task);
+  // Onto what the store holds now; the user is told when it did not land, and
+  // a local change goes up soon (docs/plans/foundation.md#D91, D99).
   const actions: Actions = {
     complete: (row, done) =>
-      write(
-        row,
-        completeTask(row.object, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
+      editing.rewrite(targetOfRow(row), (current) =>
+        completeTask(current, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
       ),
-    star: (row) => write(row, starTask(row.object, !row.starred, Date.now())),
-    open: (row) => editing.open(targetOf(row.stored, row.object, row.recurrenceId, row.task)),
+    star: (row) =>
+      editing.rewrite(targetOfRow(row), (current) => starTask(current, !row.starred, Date.now())),
+    open: (row) => editing.open(targetOfRow(row)),
     add: (list) => editing.create("task", { day: null, calendarId: list.id }),
     found,
     today,

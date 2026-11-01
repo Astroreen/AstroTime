@@ -1,6 +1,7 @@
 export {
   CommitInDoubtError,
   HandOverError,
+  handOverIn,
   InsecureContextError,
   OutdatedWebViewError,
   type SqlDriver,

@@ -30,7 +30,7 @@ import {
 } from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 
-import { transaction, type SqlDriver } from "./driver.ts";
+import { handOverIn, transaction, type SqlDriver } from "./driver.ts";
 import { migrate } from "./migrations.ts";
 import * as schema from "./schema.ts";
 import { containsPattern, foldForSearch, titlesOf } from "./search.ts";
@@ -145,6 +145,41 @@ export class Store {
       const account = { homeUrl: null, ...input, id: crypto.randomUUID(), createdAt: Date.now() };
       await this.db.insert(schema.accounts).values(account);
       return account;
+    });
+  }
+
+  /**
+   * The CalDAV account at this calendar home for this user, or a new one: the
+   * lookup and the insert are one transaction (docs/plans/foundation.md#D90,
+   * D99), so two sign-ins to one account at once, in two tabs too, add it once.
+   */
+  findOrAddAccount(
+    input: Omit<Account, "id" | "createdAt" | "provider" | "homeUrl"> & { homeUrl: string },
+  ): Promise<{ readonly account: Account; readonly added: boolean }> {
+    return this.exclusive(async () => {
+      const [existing] = await this.db
+        .select()
+        .from(schema.accounts)
+        .where(
+          and(
+            eq(schema.accounts.provider, "caldav"),
+            eq(schema.accounts.homeUrl, input.homeUrl),
+            input.username === null
+              ? isNull(schema.accounts.username)
+              : eq(schema.accounts.username, input.username),
+          ),
+        )
+        .orderBy(schema.accounts.createdAt)
+        .limit(1);
+      if (existing) return { account: existing, added: false };
+      const account = {
+        ...input,
+        provider: "caldav" as const,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+      };
+      await this.db.insert(schema.accounts).values(account);
+      return { account, added: true };
     });
   }
 
@@ -698,12 +733,16 @@ export class Store {
    * Runs read-then-write operations one at a time, each in a transaction
    * (docs/plans/foundation.md#D99), so two of them never interleave (a second
    * `saveLocal` of a new object must see the first one's row), not even from
-   * two tabs on one database, and a failed one leaves nothing of itself.
+   * two tabs on one database, and a failed one leaves nothing of itself. One
+   * whose leader went fails with the `HandOverError` itself, not Drizzle's
+   * wrapping of it, so its caller can tell that nothing was written.
    */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.queue.then(async () => {
       try {
         return await transaction(this.driver, operation);
+      } catch (error) {
+        throw handOverIn(error) ?? error;
       } finally {
         this.notify();
       }

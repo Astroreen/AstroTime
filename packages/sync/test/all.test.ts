@@ -1,6 +1,7 @@
 // `syncAll`, the one sync entry every shell calls (docs/plans/android.md#D60,
 // docs/plans/foundation.md#D90), and the accounts it syncs.
-import { AuthError, type Provider, type SecretStore } from "@astrotime/core";
+import type { HttpClient } from "@astrotime/caldav";
+import { AuthError, OfflineError, type Provider, type SecretStore } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { expect, test } from "vite-plus/test";
@@ -194,6 +195,77 @@ test("credentials go to the secret store, never the local store; signing in agai
   expect([again.added, again.account.id]).toEqual([false, first.account.id]);
   expect(await store.accounts()).toHaveLength(1);
   expect(JSON.parse(secrets.values.get(`account:${first.account.id}`)!).password).toBe("right");
+});
+
+test("two sign-ins to one account at once add it once, whichever comes first (D90)", async () => {
+  for (const order of [
+    ["first", "second"],
+    ["second", "first"],
+  ]) {
+    const { store, secrets, add } = await setup();
+    const [one, two] = await Promise.all(order.map((password) => add("a.example", password)));
+    expect([one!.added, two!.added]).toEqual([true, false]);
+    expect(two!.account.id).toBe(one!.account.id);
+    expect(await store.accounts()).toHaveLength(1);
+    // The later sign-in's password is the one kept.
+    expect(JSON.parse(secrets.values.get(`account:${one!.account.id}`)!).password).toBe(order[1]);
+  }
+});
+
+/** A Nextcloud answering only the app password's revocation, or no server at all. */
+function nextcloud(reachable = true) {
+  const revoked: string[] = [];
+  const http: HttpClient = async (request) => {
+    if (!reachable) throw new OfflineError(`${request.url} could not be reached.`);
+    revoked.push(`${request.method} ${request.url} ${request.headers["Authorization"]}`);
+    return { status: 200, url: request.url, header: () => null, body: "{}" };
+  };
+  return { http, revoked };
+}
+
+test("removing an account Login Flow added revokes its app password on the server, after it is gone here", async () => {
+  const { store, secrets, context } = await setup();
+  const viaFlow = (host: string) =>
+    saveAccount(context, {
+      name: `astro@${host}`,
+      serverUrl: `https://${host}/`,
+      homeUrl: `https://${host}/`,
+      credentials: { username: "astro", password: "app-pass" },
+      loginFlow: true,
+    });
+  const { account } = await viaFlow("a.example");
+  expect(JSON.parse(secrets.values.get(`account:${account.id}`)!)).toEqual({
+    username: "astro",
+    password: "app-pass",
+    loginFlow: true,
+  });
+  const server = nextcloud();
+  expect(await removeAccount({ ...context, http: server.http }, account.id)).toBe("revoked");
+  expect(server.revoked).toEqual([
+    `DELETE https://a.example/ocs/v2.php/core/apppassword Basic ${btoa("astro:app-pass")}`,
+  ]);
+  expect([await store.accounts(), secrets.values.size]).toEqual([[], 0]);
+
+  // Offline: removed all the same, and the user is told the password is still valid there.
+  const other = (await viaFlow("b.example")).account;
+  expect(await removeAccount({ ...context, http: nextcloud(false).http }, other.id)).toBe("kept");
+  expect([await store.accounts(), secrets.values.size]).toEqual([[], 0]);
+
+  // A server that never answers holds nothing: the removal is done, the password said kept.
+  const third = (await viaFlow("c.example")).account;
+  const stalled: HttpClient = () => new Promise(() => {});
+  expect(await removeAccount({ ...context, http: stalled, revokeWaitMs: 0 }, third.id)).toBe(
+    "kept",
+  );
+  expect(await store.accounts()).toEqual([]);
+});
+
+test("a password the user typed is not revoked: removing asks nothing of the server", async () => {
+  const { context, add } = await setup();
+  const { account } = await add("a.example");
+  const server = nextcloud();
+  expect(await removeAccount({ ...context, http: server.http }, account.id)).toBe("none");
+  expect(server.revoked).toEqual([]);
 });
 
 test("removing an account waits for a running sync, then deletes its secret and its data", async () => {

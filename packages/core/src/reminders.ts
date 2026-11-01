@@ -307,17 +307,17 @@ function bySoonest(a: Reminder, b: Reminder): number {
 }
 
 /**
- * The set a platform is handed (android D60): the reminders that fire from
- * `nowMs` on within the horizon, the soonest first, at most `MAX_REMINDERS`.
- * A reminder whose time has passed is not in it.
- */
-/**
  * How far back the set handed to a platform reaches: a reminder missed in a
  * sleep stays in it this long, and each platform shows it within its own
  * grace (the web 5 minutes, the desktop an hour) and drops it after.
  */
 export const REMINDER_GRACE_MS = 60 * 60_000;
 
+/**
+ * The set a platform is handed (android D60): the reminders that fire from
+ * `nowMs` on within the horizon, the soonest first, at most `MAX_REMINDERS`.
+ * A reminder whose time has passed is not in it, unless `backMs` reaches it.
+ */
 export function soonestReminders(
   reminders: Iterable<Reminder>,
   nowMs: number,

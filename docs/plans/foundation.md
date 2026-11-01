@@ -593,13 +593,24 @@ Decided while building PR 5a-3.
   provider at the calendar home kept with the account (`homeUrl`,
   migration 5; discovered again only when missing), so a sync does not
   discover first. `saveAccount` and `removeAccount` are the only code that
-  spells the credentials' key (`account:<id>`) and JSON. Signing in to an
+  spells the credentials' key (`account:<id>`) and JSON; the JSON says
+  `loginFlow: true` when Login Flow v2 gave the password. Signing in to an
   account already here (the same calendar home and user) replaces its
-  password instead of adding a second one. Removing makes every sync that
+  password instead of adding a second one: `Store.findOrAddAccount` looks
+  and adds in one transaction ([D99](#D99)), so two sign-ins at once, in
+  two tabs too, add one, the later one's password kept. (A unique index on
+  `(home_url, username)` was the other way; rejected, since a store with
+  two such accounts already would fail its migration.) Removing makes every sync that
   starts from then on leave the account alone, waits for the running one
   and the one queued after it, deletes the secret first (an account left
   behind asks to sign in again; a password left behind would be invisible),
-  then the account with its calendars and items. The demo's account (`provider: "demo"`) is never
+  then the account with its calendars and items. Then an app password Login
+  Flow v2 gave it is revoked on the server (Nextcloud's `DELETE
+  ocs/v2.php/core/apppassword`, signed in with it; a 401 means it was
+  revoked already), as far as that goes: `removeAccount` returns
+  `revoked`, `kept` (offline, or the server would not; the dialog says so,
+  and that it can be revoked in Nextcloud's security settings) or `none`.
+  Every shell does this through the UI's one call. The demo's account (`provider: "demo"`) is never
   synced. `@astrotime/sync` depends on `@astrotime/caldav` for this: it
   opens the providers. The reminders follow a sync through the store: its
   writes hand the platform a new set ([D101](#D101)).
@@ -629,7 +640,11 @@ Decided while building PR 5a-3.
   tab would show nothing of its accounts, and a `fresh` request must lead
   to a sync that starts after it; a sync that finds nothing new costs one
   `PROPFIND` and one `sync-collection` per calendar. A shell with one
-  instance of its store needs no lock.
+  instance of its store needs no lock. A sync never holds the lock for
+  ever: every request of every shell has a ceiling of 5 minutes with its
+  answer, after which the server is offline (the web's `fetchClient({
+  timeoutMs })`, the desktop's hop, [desktop D72](desktop.md#D72), and
+  OkHttp's call timeout on Android, [android D62](android.md#D62)).
 
   Android adds background sync ([android D67](android.md#D67)), which
   takes the same lock, and the desktop its main-process timer and resume
@@ -773,6 +788,13 @@ Decided while closing the Deferred "One store across tabs".
     update is refused and merged with a server copy that is ours already. A
     view reads again at the hand-over ([D98](#D98)), so the user sees
     whether an edit is there.
+  - **Drizzle wraps a failed statement** (`DrizzleQueryError`, the
+    driver's error its `cause`). The store's writes throw a hand-over bare,
+    so a caller can tell it; a read may fail with one inside, which
+    `handOverIn` finds. A live query does not report it: the next leader's
+    `welcome` makes it run again ([D98](#D98)). Before this, a statement
+    inside an edit's transaction lost to a hand-over was not tried again,
+    and every hand-over logged a "Failed query" in the console.
 
 ### Reminders
 
@@ -862,7 +884,8 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
     (`Store.subscribe`: a sync's writes and the changes made here alike, a
     burst costing one more run, as `liveQuery` does), at midnight in the
     user's zone (the horizon moves a day), and once the last reminder of a
-    full set has fired. Turned off, it hands over an empty set. A shell
+    full set has fired, and when the user's zone changes while the app is
+    open (`update(words, timeZone)`). Turned off, it hands over an empty set. A shell
     without the UI (Android's background job, [android D67](android.md#D67))
     runs the same planner after `syncAll`.
   - **The setting.** "Reminders", a switch at the end of the drawer's
@@ -949,6 +972,13 @@ Decided while building PR 6a.
     nothing, so the save runs once more; after a `CommitInDoubtError` the
     store is read again, and when what the save wrote is not there the
     dialog says it is unclear whether the change was saved.
+  - **The other changes say so too.** Deleting, and a task completed or
+    starred (in the details or on the tasks screen), go through the same
+    `changeLocal`, onto what the store holds then (`rewriteTarget`), and a
+    notice at the foot of the screen says what the edit dialog would: the
+    item gone meanwhile (nothing written), unclear whether it was saved or
+    deleted, or failed. Deleting what is gone already is done, and says
+    nothing.
 - **D104. An item keeps its zone.** An edited time is written in the zone
   the item had, with the TZID it was written with (`W. Europe Standard
   Time` stays, [D32](#D32)); a UTC time (Nextcloud Tasks writes them) is
@@ -980,6 +1010,9 @@ Decided while building PR 6a.
     exceptions, `EXDATE`s and `RDATE`s from the occurrence on (moved, not
     copied: one calendar object per UID, [D34](#D34)). From the first
     occurrence it is all of them. Deleting ends the series the same way.
+    RFC 5545 asks for one `RRULE`; a series with more is read and written
+    whole, as every other path walks all of them, each `COUNT` counting its
+    own rule's occurrences.
   - **All occurrences** edits the master; so does an edit of a series
     with no occurrence named. A field the user changed reaches each
     exception that had the master's value; one changed on its own keeps
@@ -1016,7 +1049,9 @@ Decided while building PR 6a.
     deleting this occurrence drops its exception, "this and following"
     each from it on, the last one the object; an edit changes the one
     exception. The edit dialog offers no scope for one
-    ([Deferred](#deferred)).
+    ([Deferred](#deferred)). Deleting one of several exceptions is an edit
+    of the object (the `edit` right); the last one deletes it, so it needs
+    `delete` ([D37](#D37), `deleteScopes`).
 
   The edit dialog asks only what Google asks: a new day for one occurrence
   is not every occurrence's (no "All"), a new rule is not one occurrence's
@@ -1173,6 +1208,22 @@ Decided while building PR 6b.
   of a series lets each be edited or deleted on its own: the edit dialog
   asks no scope for one, though `deleteItem` can delete each from one on
   ([D105](#D105)); "all" and an edit of the following ones need the master.
+- **A tab whose own worker cannot open the database** — after its
+  retries ([D98](#D98)) a tab stays on its error screen until it is
+  reloaded, though another tab may lead meanwhile; it could queue for the
+  store's lock again instead. It comes if it is seen outside a broken
+  profile (the error screen offers "Reload").
+- **Reminders in the visible tab** — the web's `astrotime-reminders` Web
+  Lock is held by the first tab opened, not the one in front
+  ([D101](#D101)), so a reminder shows from a background tab and a tap
+  brings that one forward. Handing the lock to the visible tab needs a
+  release on `visibilitychange` that does not drop a reminder due in the
+  moment between; it comes if the wrong tab coming forward is reported.
+- **Revoking a replaced app password** — signing in again by Login Flow
+  replaces the account's app password ([D90](#D90)) without revoking the
+  old one on the server; it stays in Nextcloud's list of devices until the
+  user revokes it there. It comes with a word in the sign-in dialog about a
+  revocation that failed.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store

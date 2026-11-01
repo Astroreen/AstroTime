@@ -74,6 +74,30 @@ test("a second store on a database follows the first: it reads its rows and hear
   expect(await first.accounts()).toEqual([]);
 });
 
+test("two tabs signing in to one account at once add it once, whichever asks first (D90)", async () => {
+  for (const order of [
+    [0, 1],
+    [1, 0],
+  ]) {
+    const name = unique("signing-in");
+    const stores = [
+      await Store.open(await webDriver(name)),
+      await Store.open(await webDriver(name)),
+    ];
+    const input = {
+      name: "astro@dav.example",
+      serverUrl: "https://dav.example/",
+      homeUrl: "https://dav.example/calendars/astro/",
+      username: "astro",
+    };
+    const found = await Promise.all(order.map((i) => stores[i]!.findOrAddAccount(input)));
+    expect(found.map((f) => f.added)).toEqual([true, false]);
+    expect(found[1]!.account.id).toBe(found[0]!.account.id);
+    expect(await stores[0]!.accounts()).toHaveLength(1);
+    await Promise.all(stores.map((store) => store.close()));
+  }
+});
+
 test("two stores opening a new database at once migrate it once", async () => {
   const name = unique("migrated");
   const drivers = await Promise.all([webDriver(name), webDriver(name)]);

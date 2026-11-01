@@ -14,6 +14,9 @@ import { indexedDbSecrets } from "./secrets.ts";
 /** Where the proxy is on the app's origin, as `dav-proxy.ts` and `apps/proxy` serve it. */
 const DAV_PROXY_PREFIX = "/dav-proxy/";
 
+/** As the desktop and Android bound a hop: a stalled server never holds the tabs' sync lock for ever. */
+const REQUEST_CEILING_MS = 5 * 60_000;
+
 /**
  * `store` is the web store named `name` on OPFS (`webDriver`'s), which every
  * tab of the origin opens (D98).
@@ -21,7 +24,7 @@ const DAV_PROXY_PREFIX = "/dav-proxy/";
 export function webPlatform(store: Promise<Store>, name: string): Platform {
   return {
     store,
-    http: fetchClient({ via: throughProxy(DAV_PROXY_PREFIX) }),
+    http: fetchClient({ via: throughProxy(DAV_PROXY_PREFIX), timeoutMs: REQUEST_CEILING_MS }),
     secrets: indexedDbSecrets(),
     // A tab of its own, which cannot reach back into this one.
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),

@@ -64,7 +64,8 @@ When you add a package, app or module, add its line here in the same PR.
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
-  - `Store` — accounts (with the calendar home discovery found, migration 5),
+  - `Store` — accounts (with the calendar home discovery found, migration 5;
+    `findOrAddAccount`, one per home and user),
     calendars (with their rights, migration 7), objects with pending local changes, conflicts; finds objects
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `subscribe` — hears every write, for live queries.
@@ -93,7 +94,8 @@ When you add a package, app or module, add its line here in the same PR.
     runs every tab's statements, one tab's transaction at a time
     (`serving.ts`), the drivers (`index.ts`) follow it and take over when it
     goes (`protocol.ts`); `HandOverError` when a statement's answer went
-    with it, `CommitInDoubtError` when a COMMIT's did.
+    with it, `CommitInDoubtError` when a COMMIT's did; `handOverIn` finds
+    one inside Drizzle's wrapping of a failed read.
     → `plans/foundation.md#D98`, `plans/foundation.md#D99`
   - `schema.ts` (Drizzle) and `migrations.ts` (`PRAGMA user_version`).
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
@@ -102,8 +104,11 @@ When you add a package, app or module, add its line here in the same PR.
   - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars,
     `sync-collection` with a full listing as fallback, multiget, writes with
     ETags. → `plans/foundation.md#D2`
-  - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`
-  - `fetchClient`, `HttpClient` — how it reaches servers on each platform.
+  - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
+    `revokeAppPassword`, the app password it gave revoked when its account
+    goes. → `plans/foundation.md#D90`
+  - `fetchClient`, `HttpClient` — how it reaches servers on each platform;
+    `timeoutMs`, the web's ceiling per request. → `plans/foundation.md#D91`
   - `followRedirects` — the redirect rule over a one-hop client, for the
     shells whose HTTP follows none (the desktop, Android).
     → `plans/desktop.md#D72`, `plans/android.md#D62`
@@ -171,6 +176,8 @@ When you add a package, app or module, add its line here in the same PR.
       `plans/design.md#D112`
     - `conflicts-dialog.tsx` — the Conflicts list, from the accounts
       dialog. → `plans/foundation.md#D107`
+    - `change-notice.tsx` — the notice when a deletion, a completion or a
+      star did not land. → `plans/foundation.md#D103`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding

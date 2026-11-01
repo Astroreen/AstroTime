@@ -3,8 +3,15 @@
 // plainly when it cannot open the store.
 import type { HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
-import { InsecureContextError, OutdatedWebViewError, Store } from "@astrotime/storage";
+import {
+  CommitInDoubtError,
+  InsecureContextError,
+  OutdatedWebViewError,
+  Store,
+  type LocalChange,
+} from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
+import { saveAccount } from "@astrotime/sync";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser/context";
@@ -140,6 +147,52 @@ test("completing and starring on the tasks screen write the task to the store, t
   await write;
   const proposal = (await store.pending(list.id)).find((task) => task.uid === "demo-proposal");
   expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
+});
+
+test("a completion or a star that did not land says so: the task gone meanwhile, a commit in doubt (D99)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  let failure: "gone" | "doubt" = "gone";
+  // The store as another tab or a leader that went leaves it, at the moment of the write.
+  const shaky = Object.assign(Object.create(store) as Store, {
+    async changeLocal<T>(change: (local: LocalChange) => Promise<T>): Promise<T> {
+      if (failure === "gone") {
+        return store.changeLocal((local) =>
+          change({
+            object: async () => undefined,
+            save: (...args) => local.save(...args),
+            delete: (id) => local.delete(id),
+          }),
+        );
+      }
+      await store
+        .changeLocal(async (local) => {
+          await change(local);
+          throw new Error("Rolled back with the leader.");
+        })
+        .catch(() => {});
+      throw new CommitInDoubtError("The answer went with the leader.");
+    },
+  });
+  render(Promise.resolve(shaky), ["en-US"]);
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page.getByRole("tab", { name: /^Tasks/ }).click();
+  const report = page.getByRole("checkbox", { name: "Send the report" });
+  await expect.element(report).toBeInTheDocument();
+  (report.element() as HTMLElement).click();
+  const notice = page.getByRole("alert");
+  await expect.element(notice.getByText(/^This is no longer on your calendar/)).toBeInTheDocument();
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect.element(notice).not.toBeInTheDocument();
+
+  failure = "doubt";
+  await page.getByRole("button", { name: "Star: Write the proposal" }).click();
+  await expect
+    .element(notice.getByText(/^It is not clear whether the change was saved/))
+    .toBeInTheDocument();
+  const list = (await store.calendars()).find((calendar) => calendar.name === "Tasks")!;
+  expect(await store.pending(list.id)).toEqual([]);
 });
 
 test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day and its details (D101)", async () => {
@@ -325,6 +378,48 @@ async function emptyStore(): Promise<Store> {
   cleanups.push(() => store.close());
   return store;
 }
+
+test("removing a Login Flow account offline: removed here, and the app password said to be still valid (foundation D90)", async () => {
+  const store = await Store.open(await webDriver(`ui-${Date.now()}-${n++}`));
+  cleanups.push(() => store.close());
+  const secrets = memorySecrets();
+  const name = "astro@cloud.example.com";
+  await saveAccount(
+    { store, secrets },
+    {
+      name,
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "app-pass" },
+      loginFlow: true,
+    },
+  );
+  render(Promise.resolve(store), ["en-US"], { secrets });
+  // No stylesheet here, so nothing is laid out to be clicked: clicked in the DOM.
+  const click = async (locator: ReturnType<typeof page.getByRole>) => {
+    await expect.element(locator).toBeInTheDocument();
+    (locator.element() as HTMLElement).click();
+  };
+  await click(page.getByRole("button", { name: "Accounts" }));
+  await click(
+    page
+      .getByRole("dialog", { name: "Accounts" })
+      .getByRole("button", { name: `Options for ${name}` }),
+  );
+  await click(page.getByRole("menuitem", { name: "Remove from this device" }));
+  await click(
+    page
+      .getByRole("alertdialog", { name: `Remove ${name}?` })
+      .getByRole("button", { name: "Remove" }),
+  );
+  const told = page.getByRole("alertdialog", { name: `${name} was removed` });
+  await expect
+    .element(told.getByText(/^AstroTime could not revoke its app password/))
+    .toBeInTheDocument();
+  expect([await store.accounts(), secrets.values.size]).toEqual([[], 0]);
+  await click(told.getByRole("button", { name: "OK" }));
+  await expect.element(told).not.toBeInTheDocument();
+});
 
 test("an empty app leads to adding an account, and a wrong password says so in the user's language", async () => {
   const store = await emptyStore();

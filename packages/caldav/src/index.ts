@@ -8,7 +8,7 @@ export {
   type HttpRequest,
   type HttpResponse,
 } from "./http.ts";
-export { startLoginFlow, type LoginFlow } from "./login-flow.ts";
+export { revokeAppPassword, startLoginFlow, type LoginFlow } from "./login-flow.ts";
 export {
   CalDavProvider,
   canonicalHref,

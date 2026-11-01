@@ -4,11 +4,13 @@ import {
   CalDavProvider,
   fetchClient,
   proxyHandler,
+  revokeAppPassword,
   startLoginFlow,
   throughProxy,
   type HttpClient,
 } from "@astrotime/caldav";
 import {
+  AuthError,
   CalendarObject,
   createItem,
   editItem,
@@ -429,17 +431,13 @@ describe.each(servers)(
           const provider = new CalDavProvider(fetchClient(), credentials, homeUrl);
           expect((await provider.calendars()).map((c) => c.name)).toContain(name);
         } finally {
-          // The app password goes, as a user would revoke it: a long-lived
-          // server (not the nightly's) keeps no device per run.
-          const revoked = await fetch(new URL("ocs/v2.php/core/apppassword", server.url), {
-            method: "DELETE",
-            headers: {
-              "OCS-APIRequest": "true",
-              Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64")}`,
-            },
-          });
-          expect(revoked.status).toBe(200);
+          // The app password goes, as removing the account revokes it (D90):
+          // a long-lived server (not the nightly's) keeps no device per run.
+          await revokeAppPassword(fetchClient(), server.url, credentials);
         }
+        await expect(
+          CalDavProvider.discover(fetchClient(), server.url, credentials),
+        ).rejects.toThrow(AuthError);
       },
     );
 

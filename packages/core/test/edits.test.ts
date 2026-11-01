@@ -647,6 +647,30 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     expect(starts(split!)).toEqual(["2026-12-21T10:00:00", "2026-12-28T10:00:00"]);
   });
 
+  test("this and following with two rules: each COUNT left as its own rule's occurrences remaining", () => {
+    // RFC 5545 says one RRULE; a client that writes two is read whole (D7).
+    const gym = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "SUMMARY:Gym",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      "RRULE:FREQ=WEEKLY;COUNT=12;BYDAY=TU,TH",
+    ]);
+    const { split } = editItem(
+      CalendarObject.parse(gym),
+      { location: "Hall" },
+      {
+        now: NOW,
+        scope: "following",
+        recurrenceId: vilnius("2026-11-23T09:00:00"),
+        newUid: "v2",
+      },
+    );
+    // Before the 23rd: three Mondays, six Tuesdays and Thursdays.
+    expect(split).toContain("RRULE:FREQ=WEEKLY;COUNT=3\r\n");
+    expect(split).toContain("RRULE:FREQ=WEEKLY;COUNT=6;BYDAY=TU,TH\r\n");
+  });
+
   test("this and following moves the exceptions and EXDATEs after it to the new series", () => {
     const { ics, split } = editItem(
       series(),

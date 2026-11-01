@@ -27,51 +27,66 @@ export type HttpClient = (request: HttpRequest) => Promise<HttpResponse>;
 /**
  * An `HttpClient` on `fetch`. `via` sends requests through a proxy and maps
  * the URLs back (the web app and its CORS proxy, D20): `to` turns a server
- * URL into the proxy's, `from` the proxy's into the server's.
+ * URL into the proxy's, `from` the proxy's into the server's. `timeoutMs`
+ * bounds each request with its answer, however slowly it trickles, as the
+ * desktop and Android bound a hop: a stalled server never holds a sync (and
+ * the web's sync lock, D91) for ever; past it, the server is offline.
  */
 export function fetchClient(
   options: {
     fetch?: typeof fetch;
     via?: { to(url: string): string; from(url: string): string };
+    timeoutMs?: number;
   } = {},
 ): HttpClient {
   const run = options.fetch ?? fetch;
   const via = options.via ?? { to: (url: string) => url, from: (url: string) => url };
+  const { timeoutMs } = options;
   return async (request) => {
-    let response: Response;
+    const abort = new AbortController();
+    const ceiling =
+      timeoutMs === undefined ? undefined : setTimeout(() => abort.abort(), timeoutMs);
+    const late = () => (abort.signal.aborted ? " in time" : "");
     try {
-      response = await run(via.to(request.url), {
-        method: request.method,
-        headers: request.headers,
-        ...(request.body === undefined ? {} : { body: request.body }),
-        credentials: "omit",
-      });
-    } catch (error) {
-      throw new OfflineError(`${request.method} ${request.url} could not reach the server.`, {
-        cause: error,
-      });
+      let response: Response;
+      try {
+        response = await run(via.to(request.url), {
+          method: request.method,
+          headers: request.headers,
+          ...(request.body === undefined ? {} : { body: request.body }),
+          credentials: "omit",
+          signal: abort.signal,
+        });
+      } catch (error) {
+        throw new OfflineError(
+          `${request.method} ${request.url} could not reach the server${late()}.`,
+          { cause: error },
+        );
+      }
+      let body: string;
+      try {
+        body = await response.text();
+      } catch (error) {
+        // The connection broke while the answer came: as offline as no answer.
+        throw new OfflineError(`${request.method} ${request.url}: the answer broke off${late()}.`, {
+          cause: error,
+        });
+      }
+      // The proxy could not reach the server: as offline as no answer (D37).
+      if (response.headers.get(UNREACHABLE) !== null) {
+        throw new OfflineError(`${request.method} ${request.url} could not reach the server.`);
+      }
+      const refused = response.headers.get(REFUSED);
+      if (refused !== null) throw new ProxyRefusedError(request, refused);
+      return {
+        status: response.status,
+        url: via.from(response.url || via.to(request.url)),
+        header: (name) => response.headers.get(name),
+        body,
+      };
+    } finally {
+      clearTimeout(ceiling);
     }
-    let body: string;
-    try {
-      body = await response.text();
-    } catch (error) {
-      // The connection broke while the answer came: as offline as no answer.
-      throw new OfflineError(`${request.method} ${request.url}: the answer broke off.`, {
-        cause: error,
-      });
-    }
-    // The proxy could not reach the server: as offline as no answer (D37).
-    if (response.headers.get(UNREACHABLE) !== null) {
-      throw new OfflineError(`${request.method} ${request.url} could not reach the server.`);
-    }
-    const refused = response.headers.get(REFUSED);
-    if (refused !== null) throw new ProxyRefusedError(request, refused);
-    return {
-      status: response.status,
-      url: via.from(response.url || via.to(request.url)),
-      header: (name) => response.headers.get(name),
-      body,
-    };
   };
 }
 

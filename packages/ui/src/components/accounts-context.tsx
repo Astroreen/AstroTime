@@ -94,7 +94,7 @@ export function AccountsProvider({
       <RemoveAccountDialog
         account={removing}
         onClose={() => setRemoving(null)}
-        onRemove={(account) => removeAccount(context, account.id)}
+        onRemove={(account) => removeAccount({ ...context, http: platform.http }, account.id)}
       />
     </AccountsContext.Provider>
   );

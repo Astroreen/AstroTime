@@ -15,6 +15,8 @@ const FORWARDED = [
   "user-agent",
   "prefer",
   "brief",
+  // Nextcloud's OCS API (revoking an app password) refuses a call without it.
+  "ocs-apirequest",
 ];
 /** Set on the proxy's own answer when the CalDAV server could not be reached. */
 export const UNREACHABLE = "x-astrotime-unreachable";

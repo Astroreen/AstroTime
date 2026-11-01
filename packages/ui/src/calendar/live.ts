@@ -1,7 +1,10 @@
 // A query that runs again whenever the store changes (a sync writes while the
 // app is open). A burst of writes costs at most one more run: a change during
-// a run marks it stale, and one run follows when it ends.
-import type { Store } from "@astrotime/storage";
+// a run marks it stale, and one run follows when it ends. A read that failed
+// because the web store's leader tab went is not reported: the store tells
+// every subscriber once the next leader serves, and the query runs again
+// (docs/plans/foundation.md#D98).
+import { handOverIn, type Store } from "@astrotime/storage";
 
 export function liveQuery<T>(
   store: Store,
@@ -24,7 +27,7 @@ export function liveQuery<T>(
         const result = await run();
         if (!stopped && !stale) onResult(result);
       } catch (error) {
-        if (!stopped) onError(error);
+        if (!stopped && !handOverIn(error)) onError(error);
       }
       // A change came during the run (`stale`, set by another `go`): once more.
       if (!stale || stopped) break;

@@ -138,6 +138,23 @@ describe("the set the platform is handed (D101)", () => {
     ]);
   });
 
+  test("the user's zone changed while open: dates and midnight are placed there from then on", async () => {
+    const { platform, time, planner } = await setup();
+    const words = wordsIn(["en-US"]);
+    const notify = (reminder: Reminder) => reminderNotification(reminder, words);
+    let handed = platform.next();
+    planner.update(notify);
+    await handed;
+    const trip = () => platform.last.find((r) => r.title === "Trip to Tallinn")!;
+    // An all-day item reminds at 9:00 the day before in the user's zone (foundation D100).
+    expect(new Date(trip().fireAt).toISOString()).toBe("2026-11-07T07:00:00.000Z");
+    handed = platform.next();
+    planner.update(notify, "America/New_York");
+    await handed;
+    expect(new Date(trip().fireAt).toISOString()).toBe("2026-11-07T14:00:00.000Z");
+    expect(time.next).toBe(Date.parse("2026-11-05T00:00:00-05:00"));
+  });
+
   test("a full set looks again once its last reminder has fired", async () => {
     const { store, platform, time, start } = await setup();
     const [calendar] = await store.calendars();

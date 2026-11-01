@@ -104,7 +104,7 @@ test("a wrong password says so, and keeps nothing", async () => {
 
 test("Login Flow v2: opens Nextcloud's page, waits for the approval, then signs in with the app password", async () => {
   const server = nextcloud({ password: "app-pass", approveAfter: 2 });
-  const { store, opened, time, signIn, reaches } = await setup(server);
+  const { store, secrets, opened, time, signIn, reaches } = await setup(server);
   const signingIn = signIn.withNextcloud({ server: "cloud.example.com" });
   expect(await reaches("waiting")).toEqual({
     step: "waiting",
@@ -126,6 +126,12 @@ test("Login Flow v2: opens Nextcloud's page, waits for the approval, then signs 
   await signingIn;
   expect(signIn.state).toMatchObject({ step: "done", added: true });
   expect((await store.accounts()).map((a) => a.username)).toEqual(["astro"]);
+  // Kept as Login Flow's, so removing the account revokes it (foundation D90).
+  const [account] = await store.accounts();
+  expect(JSON.parse((await secrets.get(`account:${account!.id}`))!)).toMatchObject({
+    password: "app-pass",
+    loginFlow: true,
+  });
   const polls = server.requests.filter((r) => r.url.endsWith("/login/v2/poll"));
   expect(polls).toHaveLength(4);
 });
@@ -178,14 +184,14 @@ test("a certificate the device refuses is said as such, by password and through 
 test("cancelled while the account was being saved, the account it added goes again", async () => {
   const server = nextcloud({ password: "secret" });
   const { store, secrets, signIn } = await setup(server);
-  const saving = store.addAccount.bind(store);
+  const saving = store.findOrAddAccount.bind(store);
   // Cancel the moment the account is written, before the sign-in sees it.
   let added = "";
-  store.addAccount = async (input) => {
-    const account = await saving(input);
-    added = account.id;
+  store.findOrAddAccount = async (input) => {
+    const found = await saving(input);
+    added = found.account.id;
     signIn.cancel();
-    return account;
+    return found;
   };
   await signIn.withPassword({ server: SERVER, username: "astro", password: "secret" });
   expect(added).not.toBe("");
