@@ -1,8 +1,9 @@
 // The Android app's platform (docs/plans/android.md#D60): the web store in
 // the WebView (D63), HTTP through AstroTime's OkHttp plugin (D62), credentials
 // under a Keystore key (D64), Login Flow's page in a Custom Tab (D65), the
-// back button (D68), preferences in the WebView's localStorage and reminders
-// as local notifications (D66).
+// back button (D68), preferences in the WebView's localStorage, reminders
+// as local notifications (D66), and the Web Locks it shares with background
+// sync's WebView (D67).
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import type { Store } from "@astrotime/storage";
 import type { Platform } from "@astrotime/ui";
@@ -12,6 +13,7 @@ import { registerPlugin } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import { cleartextOrigins, nativeClient, SigningIn, type NativeHttp } from "./http.ts";
+import { remindersLock, syncLock } from "./locks.ts";
 import { preferences } from "./preferences.ts";
 import { androidReminders } from "./reminders.ts";
 import { keystoreSecrets } from "./secrets.ts";
@@ -35,9 +37,12 @@ export function mobilePlatform(store: Promise<Store>): Platform {
     signingInTo: (server) => signingIn.begin(server),
     onBack: backButton(App),
     preferences,
+    // Background sync opens the same store in a WebView of its own (D67).
+    syncLock,
     reminders: androidReminders({
       native: LocalNotifications,
       preferences,
+      lock: remindersLock,
       // Back in front: the permissions may have changed in the system's settings.
       onResume: (listener) =>
         document.addEventListener("visibilitychange", () => {

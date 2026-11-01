@@ -154,7 +154,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   the local store's database file and runs the page's statements on a
   port (desktop plan D73).
 - **Background sync** — a sync the operating system starts while the app is
-  not open (Android's WorkManager, android plan D67).
+  not on the screen: on Android a WorkManager job that runs a page of the
+  app in a **headless WebView** (one with no activity or window) on the
+  app's origin (android plan D67).
 - **Keep running** — the desktop app living on with its window closed: the
   window hides, the tray stays, syncs and reminders go on; off, closing the
   window quits (desktop plan D75).

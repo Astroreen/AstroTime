@@ -6,6 +6,8 @@ import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
+import io.github.astroreen.astrotime.background.AppVisibility;
+import io.github.astroreen.astrotime.background.SyncWorker;
 import io.github.astroreen.astrotime.http.HttpPlugin;
 import io.github.astroreen.astrotime.shell.Bars;
 import io.github.astroreen.astrotime.shell.ShellPlugin;
@@ -18,6 +20,21 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ShellPlugin.class);
         super.onCreate(savedInstanceState);
         createRemindersChannel();
+        // Every hour while the app is not in front (docs/plans/android.md#D67).
+        SyncWorker.schedule(this);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // In front, the open app syncs itself; background sync's runs do nothing.
+        AppVisibility.setInFront(true);
+    }
+
+    @Override
+    public void onStop() {
+        AppVisibility.setInFront(false);
+        super.onStop();
     }
 
     /**

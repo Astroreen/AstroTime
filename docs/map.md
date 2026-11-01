@@ -205,7 +205,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `settings.ts` — the drawer's settings, kept in the preferences and
     applied over the locale. → `plans/design.md#D96`
   - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
-    platform) and `reminderNotification` (its words);
+    platform; `reminderSet`, the set itself) and `reminderNotification` (its
+    words); `background.ts` (`@astrotime/ui/background`),
+    `scheduleReminders`, the same set for a shell's headless run
+    (`plans/android.md#D67`);
     `components/reminders-context.tsx` and `reminders-switch.tsx`, the
     "Reminders" setting in the drawer and a tapped reminder opening its day
     and its details.
@@ -285,6 +288,15 @@ When you add a package, app or module, add its line here in the same PR.
     notifications (`@capacitor/local-notifications`), diffed per set, under
     integer ids kept in the preferences; the channel is made in
     `MainActivity`. → `plans/android.md#D66`
+  - background sync — `SyncWorker`, the hourly WorkManager job, and
+    `HeadlessRun`, its WebView with no activity on the app's origin, whose
+    calls `Handlers` answers (HTTP, the credentials read by
+    `KeystoreSecrets`, the notifications plugin's own classes)
+    (`android/app/src/main/java/io/github/astroreen/astrotime/background/`,
+    JVM tests in `app/src/test/`, the device's in `app/src/androidTest/`);
+    `background.html` and `src/background/`, the page it runs (`syncAll`,
+    then the reminder set); `src/locks.ts`, the Web Locks it shares with the
+    open app. → `plans/android.md#D67`
 
 - `apps/desktop` (`@astrotime/desktop`) — the Linux desktop app on
   Electron: `pnpm --filter @astrotime/desktop build`, then `start` (the dev

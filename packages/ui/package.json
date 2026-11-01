@@ -9,6 +9,10 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
+    "./background": {
+      "types": "./src/background.ts",
+      "import": "./src/background.ts"
+    },
     "./demo": {
       "types": "./src/demo/index.ts",
       "import": "./src/demo/index.ts"

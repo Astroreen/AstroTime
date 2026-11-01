@@ -1,11 +1,13 @@
 # Android plan
 
-Status: **in progress** — [PR A1](#pr-a1--the-shell-http-and-the-store)
-(the shell, HTTP and the store) and
-[PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners) (credentials,
-Login Flow v2, the shell's manners) and
-[PR A5](#pr-a5--the-release-apk) (the release APK) are built; A3 and A4
-are decided, not yet built.
+Status: **in progress** — every PR of the plan is built:
+[PR A1](#pr-a1--the-shell-http-and-the-store) (the shell, HTTP and the
+store), [PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners)
+(credentials, Login Flow v2, the shell's manners),
+[PR A3](#pr-a3--reminders) (reminders),
+[PR A4](#pr-a4--background-sync) (background sync) and
+[PR A5](#pr-a5--the-release-apk) (the release APK); what is left is
+[Deferred](#deferred), the signed release first.
 It started once foundation's
 [PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
 plan owns the Android app, `apps/mobile` (foundation's [D12](foundation.md#D12),
@@ -259,7 +261,9 @@ were checked on 2026-11-01.
   holds the app password in plain text. The library lists `@capacitor/ios` and
   `@capacitor/keyboard` among its dependencies, so pnpm installs their
   JavaScript; `cap sync` adds only the app's own dependencies to the Gradle
-  project, so neither reaches the APK.
+  project, so neither reaches the APK. _Since PR A4_ background sync reads
+  this format without the plugin ([D67](#D67)): updating the plugin means
+  re-checking `KeystoreSecrets`, which a test enforces.
 
 - **D65. Login Flow v2 in a Custom Tab.** The `openExternal` adapter opens
   the login page with `@capacitor/browser` (8.0.5, Chrome Custom Tabs), so
@@ -337,6 +341,16 @@ were checked on 2026-11-01.
     `@capacitor/local-notifications` 8.3.1). A read that fails does not
     stop the set: it is tried with the next one, skipping the ids handed out
     since, as scheduling under an id already replaced its old alarm.
+    _Since PR A4_ ([D67](#D67)) every set reads what the plugin holds, not
+    only the first set without a map: an id the plugin holds is never handed
+    out again, and one the map does not know is cancelled as no one's. The
+    map lives in localStorage, and background sync's WebView is destroyed
+    right after its run; nothing proves Chromium flushed the write by then,
+    so the map heals whatever the storage did (a lost write, a cleared
+    record) instead of trusting it. A shown notification keeps its record
+    after a cancel (the plugin only marks it cancelled, and `getPending`
+    does not say so), so it reads as held, its id stays out until the user
+    dismisses it, and it is cancelled once per run, not with every set.
   - **Past reminders.** The set reaches an hour back
     ([foundation D100](foundation.md#D100)). One handed over before has
     fired from its alarm, and is never shown again. One that reaches
@@ -379,10 +393,11 @@ were checked on 2026-11-01.
     with the reminder in `extra`; one that started the app is kept until the
     UI listens. The UI opens its day and its details
     ([foundation D101](foundation.md#D101)).
-  - **Until PR A4** the set is computed only while the app runs: on start,
-    after each sync and edit, at midnight. A reminder up to 7 days after the
-    app was last open fires; one further ahead fires only if the app is
-    opened in between. PR A4's background sync closes this ([D67](#D67)).
+  - **Until PR A4** the set was computed only while the app ran: on start,
+    after each sync and edit, at midnight. _Since PR A4_ background sync
+    hands Android the set again on every run, from the same code and in the
+    same words ([D67](#D67)), so the 7 days roll on with the app closed, as
+    often as Android lets the job run.
 
 - **D67. Background sync: WorkManager and a headless WebView, our own
   plugin.** A periodic WorkManager job (every hour, only with a network,
@@ -437,6 +452,138 @@ were checked on 2026-11-01.
   is the headless WebView opening the store from a job with no activity.
   The two-WebView check ran with a probe not kept in the repository (its log
   is with PR A1's evidence); PR A4's own test re-proves it.
+
+  _Built in PR A4_ (`apps/mobile/android/app/src/main/java/io/github/astroreen/astrotime/background/`,
+  `apps/mobile/src/background/` and `background.html`), and proven on an
+  Android 16 emulator (WebView 133), so background sync stays and the
+  30-day horizon of the fallback is not needed:
+  - **The job.** `SyncWorker`, a `CoroutineWorker` (WorkManager 2.11.0):
+    unique periodic work `astrotime-sync`, every hour, only with a network
+    (`CONNECTED`), enqueued by `MainActivity` at every start with
+    `ExistingPeriodicWorkPolicy.UPDATE` (an update replaces its settings and
+    keeps its timing). A run that failed still ends as a success: the next
+    hour's tries again, rather than WorkManager's backoff retrying a server
+    that is down.
+  - **A WebView with no activity.** The worker moves to the main thread
+    (`Dispatchers.Main`, the main Looper), creates a `WebView` with the
+    application's context, never attached to a window, and destroys it when
+    the run ends, whatever ends it. Seen working twice: the instrumented
+    test runs it in the app's process with no activity started, and on the
+    emulator a run in a process the job itself started (no `MainActivity`)
+    synced and scheduled.
+  - **The same origin.** `WebViewAssetLoader` on `localhost` (https) serves
+    `assets/public`, Capacitor's copy of the build, and answers anything
+    else with a 404, never the network. The page is `background.html`, a
+    second page of the Vite build beside the app's. OPFS, the Web Locks,
+    `BroadcastChannel` and localStorage are the open app's, as A1 found.
+  - **The open app.** _Changed:_ the job does not ask who leads the store
+    (`navigator.locks.query()`) but whether `MainActivity` is on the screen
+    (`AppVisibility`, set in `onStart` and `onStop`), read once as a run
+    starts. In front, the run does nothing: the app syncs itself. An app
+    that comes to the front during a run is not a reason to stop it: its
+    first sync waits for the run's (the sync lock) and finds little left,
+    and a run stopped mid-sync would only have to start over. Not in front, it runs even while the
+    app's WebView lives on in the background and leads the store: the UI
+    syncs only while it is visible (`SyncScheduler`), so "nothing while the
+    app leads" would never sync as long as Android keeps the process cached.
+    The run's page then follows the app's WebView as a tab follows the
+    leader tab ([foundation D98](foundation.md#D98)), seen on the emulator;
+    and when the app starts during a run, it follows the run's page until
+    the WebView is destroyed. Two rules keep both correct: Android's
+    `Platform` now has the `syncLock` (`astrotime-sync:astrotime`, the web's
+    lock by the web's name, `src/locks.ts`), so the two never sync at once;
+    and `androidReminders` takes the Web Lock `astrotime-reminder-ids`
+    around each set and reads the kept ids again under it, so neither hands
+    out an id the other did (a test fails without the read); the switch
+    asking for the permission writes `asked` under it too, on the record as
+    kept now. What the plugin holds is read with every set besides
+    ([D66](#D66)), so a map write lost with the WebView heals: on the
+    emulator, the map written by a run did reach the disk when the process
+    was killed right after it (`am kill`), but the design does not depend on
+    that.
+  - **The bridge: a small interface of our own, not a second Capacitor
+    Bridge.** Capacitor's `Bridge` is built on an `AppCompatActivity`, and
+    the plugins reach for it (`LocalNotificationsPlugin.load()` calls
+    `getActivity()`; the secure storage plugin's `getContext()` is the
+    bridge's). So the run injects one object, `AstroTimeBackground`, with
+    `WebViewCompat.addWebMessageListener`, for `https://localhost` and the
+    main frame only. Each call is a JSON message with an id, answered under
+    it (`src/background/channel.ts`; `Handlers.kt`, which uses no Android
+    API and is tested on the JVM): `http` runs the plugin's own `Exchange`
+    (the same redirect, `Authorization` and cleartext rules, D62, the JSON
+    read by the same `Json.kt`); `secrets.get` reads the credentials, never
+    writes them; `notifications.check`, `.exact`, `.schedule` and `.cancel`
+    run the notifications plugin's own `LocalNotificationManager`,
+    `NotificationStorage` and `LocalNotification` with no activity, so the
+    alarms, the records its boot receiver arms again and a tap's intent (the
+    launcher activity) are the plugin's own; it schedules them one at a
+    time, each alarm and then its record, under a call of its own whose
+    refusal throws, so a refusal partway leaves every alarm already armed
+    with the record the boot receiver needs (from the review of #37); `done`
+    ends the run. The
+    secure storage plugin's class needs the bridge, so `KeystoreSecrets`
+    reads its format itself (AES-GCM, the ciphertext and IV in
+    `WSSecureStorageSharedPreferences` under `capacitor-storage_` and the
+    key, D64): tied to its 8.0.1, which a JVM test checks against the
+    installed plugin, failing with "re-check KeystoreSecrets" on any other
+    version (Dependabot updates no npm package here: an update is by hand,
+    and meets the test).
+    Nobody can be asked in the background: a notification permission not
+    granted reads as denied, and nothing is scheduled.
+  - **The page** (`src/background/run.ts`) opens the store as any tab does;
+    with no CalDAV account it ends. Otherwise `syncAll` with the native
+    HTTP and credentials and the sync lock, then the reminder set through
+    `scheduleReminders` (`@astrotime/ui/background`): the open app's set
+    (`reminderSet`, which the planner now shares) in the open app's words,
+    from the drawer's settings and language; reminders turned off, nothing.
+    It closes the store and tells native it is done, with its report or its
+    error. An `error` or `unhandledrejection` outside the run's promise is
+    only logged: ending there would destroy the WebView mid-sync, and the
+    bound below covers a run that never ends.
+  - **The end and its bound.** The page's `done` is the event a run waits
+    for; native takes the first and ignores any after it. A main frame that does not load and a
+    renderer that goes end it too, and so does a page that finds no native
+    object, which could never say done: it sets its title to
+    `astrotime-background:no-port`, which native hears through
+    `WebChromeClient.onReceivedTitle` without the object. A signal of failure
+    only, so it races nothing; the review of #37 replaced a "hello" the page
+    sent, which `onPageFinished` could overtake and so fail a healthy run.
+    A script that does not load, or throws before the page started, can
+    never say done either: a small classic script ahead of the bundle in
+    `background.html` hears it (an `error` in the capture phase) and sets the
+    title to `astrotime-background:no-script`. And since every file is the
+    app's own, any file that answers an error status (`onReceivedHttpError`)
+    fails the run; the page declares an empty icon, or the WebView's own
+    request for `/favicon.ico` would. The app's pages have no Content
+    Security Policy on Android, so the inline script needs no hash. An answer or a call
+    that comes after the run is over (the watchdog, a `done` during an
+    exchange) reaches no WebView and throws nothing (`Gate`). Past 9 minutes (`withTimeoutOrNull`, under WorkManager's own 10) the
+    run is stopped and its WebView destroyed, whatever it waits for; every
+    request has its own ceiling besides (D62). Destroying the WebView lets
+    go of the store's Web Lock, so an app that started meanwhile leads.
+  - **A failure is an outcome.** Whatever a run throws (a WebView missing
+    or being updated, the Keystore, the preferences) is logged as the run's
+    outcome and the job still succeeds, so the next hour tries again; only
+    WorkManager's cancellation goes on up (`jobOutcome`, `outcomeOf`).
+  - **Nothing to do.** No account's credentials in the secure storage's
+    preferences (signed out of everything, or never signed in): the worker
+    ends before any WebView starts. An account with none saved is signed
+    out and sends no request (`syncAll`). The Keystore key needs no user
+    authentication (D64) and the app is not direct-boot aware, so Android
+    runs the job only after the first unlock; a read that fails anyway is
+    that account's failed sync, and the others go on.
+  - **Battery and what the user sees.** A plain job: no foreground service
+    and no notification of its own. Doze defers it to its maintenance
+    windows, App Standby's buckets cap how often it runs (a rarely used app
+    about once a day), battery saver may hold it; the user sees reminders
+    and fresh items, nothing else. A run with one account took 3.5 s from
+    the job's start to `done` on the emulator, the WebView's start included.
+  - **Forcing a run** (the proof, never a wait): WorkManager refuses a
+    periodic run before its period is up ("executed before schedule"), so
+    the emulator's clock was moved an hour ahead (`adb root`, `date`) and
+    the job run with `cmd jobscheduler run -f -n androidx.work.systemjobscheduler`.
+    The instrumented test (`app/src/androidTest/`, `connectedDebugAndroidTest`)
+    runs the worker through WorkManager's `TestListenableWorkerBuilder`.
 
 - **D68. Back button, theme, edge to edge.** The back button
   (`@capacitor/app`) closes what is open (a dialog, the drawer, the tasks
@@ -551,7 +698,14 @@ were checked on 2026-11-01.
 - **Signed Android release** — foundation's Deferred; a release key held
   in the repository's secrets, then F-Droid and Google Play ([D69](#D69)).
 - **Emulator tests in CI** — `android-emulator-runner` on a KVM runner, a
-  smoke test of the HTTP plugin and the store on a real WebView ([D69](#D69)).
+  smoke test of the HTTP plugin and the store on a real WebView ([D69](#D69));
+  background sync's instrumented tests (`SyncWorkerTest`,
+  `PluginNotificationsTest`, [D67](#D67)) are ready for it; until then they
+  run on a local emulator only.
+- **Saying that background sync stopped** — a run that fails is logged and
+  the job still succeeds ([D67](#D67)), so one that fails every hour (a
+  WebView below the floor, a broken store) shows nowhere but the log. A
+  line in Settings with the last background run's outcome would say it.
 - **Capacitor 9** — when it is stable: minSdk 26, target 37 ([D61](#D61)).
 - **The native SQLite plugin** — only if OPFS in the WebView proves
   evictable or slow ([D63](#D63)).
@@ -588,6 +742,13 @@ were checked on 2026-11-01.
   so a plugin that words it otherwise makes such credentials an error
   instead of a sign-in. A code of its own for it, upstream, would end the
   match.
+- **Background sync on real phones** — proven on the emulator only
+  ([D67](#D67)). Some makers' battery managers stop WorkManager's jobs of
+  apps not opened lately; the app says nothing about it yet, and how often
+  the job runs on a phone in its standby bucket is not measured.
+- **Background sync's notifications permission** — a run cannot ask, so
+  with the permission not granted it schedules nothing until the app is
+  opened ([D67](#D67)).
 - **A reminder Android did not fire** — an alarm whose time passed is taken
   as fired; after a force-stop (which clears the app's alarms), one due in
   the 5 minutes before the app opens again is not shown late. Telling a
@@ -677,6 +838,17 @@ background sync to Deferred instead; reminders then reach only as far as
 the last time the app was opened, so the horizon of [D60](#D60) grows to
 30 days (still at most 100 reminders) and the settings say that reminders
 need the app opened now and then.
+
+_As built:_ the proof held, so background sync is built and the 30 days are
+not needed. The job runs whenever the app is not on the screen, not only
+when nobody leads the store, so a cached app still syncs; Android's platform
+gained the tabs' sync lock, and its reminders a lock of their own ([D67](#D67)).
+The headless WebView reaches native through one injected object for the
+app's origin instead of Capacitor's bridge, which needs an activity; the
+credentials are read as the secure storage plugin keeps them, the
+notifications scheduled on the notifications plugin's own classes. Checked
+on an Android 16 emulator against a local Radicale, each run forced, the
+WebView driven over CDP.
 
 ### PR A5 — The release APK
 

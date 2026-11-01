@@ -100,21 +100,31 @@ const permissionOf = (state: NativePermission): ReminderPermission =>
 
 /**
  * Android's `ReminderScheduler`. `onResume` hears the app come to the front,
- * when the permissions may have changed in the system's settings.
+ * when the permissions may have changed in the system's settings. `lock`
+ * keeps each set's diff apart from another instance's on the same
+ * preferences (the open app's and background sync's, D67): under it the
+ * kept map is read again, so neither hands out an id the other did.
  */
 export function androidReminders(options: {
   native: NativeNotifications;
   preferences: Preferences;
   now?: () => number;
   onResume?: (listener: () => void) => void;
+  lock?: <T>(work: () => Promise<T>) => Promise<T>;
 }): ReminderScheduler {
   const { native, preferences, now = () => Date.now() } = options;
   const record = readKept(preferences);
-  const kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
-  // Without a record (unreadable, or the preferences cleared) the alarms
-  // Android still holds are no one's: their ids would be handed out again
-  // while they still fire. The first set cancels them all.
-  let orphans = record === null;
+  let kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
+  // The ids the plugin holds a record of, as the last set read them: none is
+  // handed out again while it is held. One the kept map does not know is no
+  // one's: the record was cleared or unreadable, or its write was lost (the
+  // headless WebView of background sync is destroyed right after its run,
+  // D67, and nothing proves localStorage was flushed by then). Every set
+  // cancels those, so the map heals whatever the storage did.
+  let held = new Set<number>();
+  // A shown notification keeps its record once cancelled (the plugin only
+  // marks it so): cancelled once per run, not again with every set.
+  const cancelledOrphans = new Set<number>();
   let permission: ReminderPermission = "default";
   let exact = true;
   // The first set of a run arms every reminder ahead again: alarms do not
@@ -132,7 +142,7 @@ export function androidReminders(options: {
   const allocate = (): number => {
     const used = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
     let id = kept.next;
-    while (used.has(id)) id = id >= MAX_ID ? 1 : id + 1;
+    while (used.has(id) || held.has(id)) id = id >= MAX_ID ? 1 : id + 1;
     kept.next = id >= MAX_ID ? 1 : id + 1;
     return id;
   };
@@ -158,6 +168,28 @@ export function androidReminders(options: {
       update({ permission: permissionOf(display), exact: exact_alarm === "granted" });
   };
 
+  // Whether this instance's set holds the lock now (`schedule`).
+  let applying = false;
+
+  /**
+   * Keeps that the app asked. The switch asks outside a set: its write takes
+   * the lock and goes on the record as kept now, so ids another instance
+   * handed out since are not written over (the review of #37). Within a set
+   * the lock is held and the record fresh already.
+   */
+  const keepAsked = async () => {
+    const write = async () => {
+      kept.asked = true;
+      save();
+    };
+    const { lock } = options;
+    if (!lock || applying) return write();
+    await lock(async () => {
+      kept = readKept(preferences) ?? kept;
+      await write();
+    });
+  };
+
   /**
    * Asks the user; the answer outranks any read still on its way. Kept as
    * asked once answered: a prompt the app ended in is asked again.
@@ -173,8 +205,7 @@ export function androidReminders(options: {
           failed = true;
           throw error;
         });
-        kept.asked = true;
-        save();
+        await keepAsked();
         reads++;
         update({ permission: permissionOf(display) });
         return permission;
@@ -195,20 +226,17 @@ export function androidReminders(options: {
     // Cancelling needs no permission, nor does reading what the plugin holds.
     // The plugin's cancel stops an alarm and leaves a notification already
     // shown on screen. A failed read is tried again with the next set, and
-    // this one is scheduled all the same: an id handed out since is skipped
-    // then, as scheduling under an id replaced the old alarm it had.
-    if (orphans) {
-      try {
-        const { notifications } = await native.getPending();
-        const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
-        await cancel(
-          notifications.map(({ id }) => id).filter((id) => !ours.has(id)),
-          [],
-        );
-        orphans = false;
-      } catch {
-        // Read again with the next set.
-      }
+    // this one is scheduled all the same, with the ids last read: an id
+    // handed out meanwhile replaced whatever alarm it had.
+    try {
+      const { notifications } = await native.getPending();
+      held = new Set(notifications.map(({ id }) => id));
+      const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
+      const orphans = [...held].filter((id) => !ours.has(id) && !cancelledOrphans.has(id));
+      await cancel(orphans, []);
+      for (const id of orphans) cancelledOrphans.add(id);
+    } catch {
+      // Read again with the next set.
     }
     await refresh();
     const at = now();
@@ -313,7 +341,19 @@ export function androidReminders(options: {
       const run = queue.then(async () => {
         const next = pending;
         pending = null;
-        if (next) await apply(next);
+        if (!next) return;
+        const { lock } = options;
+        if (!lock) return apply(next);
+        await lock(async () => {
+          // The other instance may have handed out ids since: its record wins.
+          kept = readKept(preferences) ?? kept;
+          applying = true;
+          try {
+            await apply(next);
+          } finally {
+            applying = false;
+          }
+        });
       });
       queue = run.catch(() => {});
       return run;

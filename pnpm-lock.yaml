@@ -197,6 +197,9 @@ importers:
       '@astrotime/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@astrotime/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@astrotime/ui':
         specifier: workspace:*
         version: link:../../packages/ui

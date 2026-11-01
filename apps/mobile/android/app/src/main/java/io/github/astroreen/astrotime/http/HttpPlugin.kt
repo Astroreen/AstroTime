@@ -21,17 +21,16 @@ class HttpPlugin : Plugin() {
     fun request(call: PluginCall) {
         val request =
             try {
-                read(call)
+                requestOf(call.data)
             } catch (error: InvalidRequest) {
                 call.reject(error.message, error.code, error)
                 return
             }
         threads.execute {
             try {
-                call.resolve(write(exchange.run(request)))
+                call.resolve(JSObject.fromJSONObject(jsonOf(exchange.run(request))))
             } catch (error: ExchangeException) {
-                val data = if (error is CleartextRefused) JSObject().put("origin", error.origin) else null
-                call.reject(error.message, error.code, error, data)
+                call.reject(error.message, error.code, error, dataOf(error)?.let(JSObject::fromJSONObject))
             } catch (error: Throwable) {
                 // Anything at all (an OutOfMemoryError on a huge answer too):
                 // the call is answered, never left waiting.
@@ -42,33 +41,5 @@ class HttpPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         threads.shutdownNow()
-    }
-
-    private fun read(call: PluginCall): HttpRequest {
-        val method = call.getString("method") ?: throw InvalidRequest("A request needs a method.")
-        val url = call.getString("url") ?: throw InvalidRequest("A request needs a URL.")
-        val headers = call.getObject("headers", JSObject())!!
-        return HttpRequest(
-            method = method,
-            url = url,
-            headers = headers.keys().asSequence().associateWith { headers.getString(it) ?: "" },
-            body = call.getString("body"),
-            cleartext =
-                try {
-                    call.getArray("cleartext")?.toList<String>()?.toSet() ?: emptySet()
-                } catch (error: org.json.JSONException) {
-                    throw InvalidRequest("The cleartext origins are not a list of strings.", error)
-                },
-        )
-    }
-
-    private fun write(response: HttpResponse): JSObject {
-        val headers = JSObject()
-        for ((name, value) in response.headers) headers.put(name, value)
-        return JSObject()
-            .put("status", response.status)
-            .put("url", response.url)
-            .put("headers", headers)
-            .put("body", response.body)
     }
 }
