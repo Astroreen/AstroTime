@@ -111,9 +111,10 @@ the project.
   Colours are CSS custom properties written with `light-dark()`; the root's
   `color-scheme` follows the system, and `data-theme="light"` or `"dark"` on
   the root element overrides it, so D53's setting only sets that attribute.
-  An item's text is dark or light by its fill's OKLCH lightness (CSS
-  relative colours), so any calendar colour reads (D47); a done task's fill
-  is its colour mixed 45% into the grid's. Fonts are the system's and the
+  An item's text is black or white by its fill's luminance (CSS relative
+  colours), so any calendar colour reads (D47; the rule is [D120](#D120)'s,
+  which replaced OKLCH lightness); a done task's fill is its colour mixed
+  45% into the grid's. Fonts are the system's and the
   icons AstroTime's own SVG, so nothing loads from another origin (D43). An
   hour is 56 px tall; from 1024 px wide the drawer is a sidebar (D46).
 - **D59. Details read from the reference for the time grid:**
@@ -407,6 +408,70 @@ the project.
   focus follows the item to its new day. A key's move asks the scope as a
   drop does.
 
+### Decided in the accessibility pass
+
+- **D119. Accessible by WCAG 2.2 AA, kept so by an audit in CI.**
+  `apps/web/e2e/a11y.spec.ts` runs axe-core (`@axe-core/playwright`) with
+  the WCAG 2.0, 2.1 and 2.2 A and AA rules over every view in both themes
+  on a phone and a wide screen, the drawer, the month picker, the strip
+  expanded, the undone tasks, the tasks screen and panel, the settings,
+  search with results, an event's and a task's details and edit dialog,
+  the scope dialog, the accounts dialog, the Conflicts list and adding an
+  account, from the demo data with the clock frozen; any violation fails
+  CI's `e2e` job. A popup is audited once Base UI's entering marks are gone
+  and its transitions have run out, not half faded in. A rule is switched
+  off only in the spec's `DISABLED` (everywhere) or `EXEMPT` (on some
+  elements), each with its reason; there is one: **target size** (2.5.8)
+  is not checked on the Month's chips, "+N" and undone chip, one line of
+  16 px every 17 px as dense as the reference ([D86](#D86)). The
+  criterion's _equivalent_ exception is the reason: the day's number, a
+  24 px target, opens the day, where every item is a larger target of its
+  own. The spec also proves what axe cannot see ([D120](#D120)).
+- **D120. What the pass changed, and the rules it leaves:**
+  - **an item's text on its colour** is black or white, whichever has more
+    contrast by WCAG's relative luminance, computed in CSS from the fill's
+    linear-light channels (`color(from … srgb-linear …)` in `styles.css`).
+    The two contrasts are equal at a luminance of 0.1791, where each is
+    4.58:1, so every calendar colour gets 4.5:1, small text's contrast,
+    with no exception for large text needed. OKLCH lightness (D58) gave
+    Nextcloud's own blue `#0082c9` white text at 4.2:1, and the demo's green
+    3.3:1. A done task keeps its muted fill (45% into the grid's) and its
+    strike-through but no longer fades its text, and an item's time is set
+    apart by its weight, not by opacity: faded, both fell below 4.5:1. The
+    drawer's checkbox mark on a calendar's colour follows the same rule;
+  - **muted text** is `ink-muted` at full strength: the faded variants
+    (a day outside the month, the drawer's sync line, placeholders) were
+    3.5:1;
+  - **targets** are at least 24 × 24 px (2.5.8): the Month's day numbers,
+    the strip's rows (24 px, were 22) and so its chips and "+N"; the
+    Month's own chips are D119's exemption;
+  - **names say what shows** (2.5.3): "Today" names the day its icon shows
+    ("Today, Wednesday, November 4"), and a search result's or a task
+    list tab's text keeps its words apart as its name says them;
+  - **focus**: every focusable element without a ring of its own gets the
+    accent's 2 px outline (the stylesheet's `:focus-visible`), the tasks
+    screen's tabs and panels, search results and menu items included.
+    Base UI's dialogs, popovers and the drawer keep the focus inside while
+    open and give it back to what opened them, an item's details too;
+  - **landmarks and headings**: the top bar is the banner, the drawer the
+    navigation, the view the main region named by the period, with a
+    level-1 heading of the period for screen readers; each day's header is
+    a level-2 heading. On the time grid and the Month each day is a list
+    named by its date and each item a list item named by what it is, its
+    title and its time (D50); the hour tiles and labels are hidden from
+    screen readers;
+  - **live regions**: a drag's or a key's move is said ([D112](#D112)); in
+    the accounts dialog each account's sync line is a status, so Sync now
+    is heard to run and end, and a sync that comes to need the user is
+    said once, as the account button's dot shows it;
+  - **less motion**: with `prefers-reduced-motion: reduce` nothing slides,
+    fades or scales (transitions take no time); the sync spinner turns on,
+    as it says that sync runs;
+  - **reflow**: at 320 px wide (1280 px at 400% zoom) every view needs no
+    sideways scroll and the top bar's buttons and "+" stay on screen;
+  - **language**: the document's `lang` is the UI's language (D53), so a
+    screen reader reads Russian as Russian.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
@@ -459,6 +524,19 @@ the project.
   the wall clock, so it jumps an hour on the change, or goes back over the
   repeated hour. A grid of the elapsed hours (23 or 25) comes if the drift
   is reported.
+- **Larger targets in the Month on a touch screen** — its chips are 16 px
+  high and exempt from WCAG 2.5.8 through the day's number ([D119](#D119));
+  Google's Android app opens the day on any tap of a tile instead.
+- **Forced colours** (Windows' high contrast) — items keep their own fills
+  and the rings their accent; the system's colours are not mapped
+  ([D120](#D120)).
+- **A screen reader's tour of the grid by arrow keys** — each day is a
+  list and items are buttons reached by Tab; a grid with arrow keys between
+  days and slots (ARIA's `grid`) is not built ([D120](#D120)).
+- **Contrast of a calendar's colour against the grid** — an item's text
+  reaches 4.5:1 on its fill, but a pale fill on the light grid's white
+  tiles can fall below 3:1 as a shape; its title says what it is
+  ([D120](#D120)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
@@ -477,3 +555,6 @@ Foundation's PR 5 builds this plan in two parts:
 Foundation's PR 6a (the details and edit dialogs) brought D108 and D109;
 PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each view
 next to the matching reference, in both themes.
+
+The accessibility pass (`fix/accessibility`) brought D119 and D120; its
+evidence is the audit's run and screenshots of the colours before and after.
