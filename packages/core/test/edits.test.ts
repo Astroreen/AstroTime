@@ -1487,7 +1487,6 @@ describe("a series' corners (D142)", () => {
   test("UNTIL moved between a zoned, a floating and an all-day start keeps its day", () => {
     const rule = (text: string) => ICAL.Recur.fromString(text);
     const floating = { type: "floating", local: "2026-11-02T09:00:00" } as const;
-    const date = { type: "date", date: "2026-11-02" } as const;
     // Zoned to floating: 23:59:59 in Vilnius on the 23rd, on the wall clock.
     expect(
       movedRule(
@@ -1506,13 +1505,17 @@ describe("a series' corners (D142)", () => {
     ).toBe("2026-11-23T21:59:59Z");
     // Floating to all-day: the wall clock's day.
     expect(
-      movedRule(rule("FREQ=WEEKLY;UNTIL=20261123T235959"), floating, date).until?.toString(),
+      movedRule(
+        rule("FREQ=WEEKLY;UNTIL=20261123T235959"),
+        floating,
+        date("2026-11-02"),
+      ).until?.toString(),
     ).toBe("2026-11-23");
     // All-day to timed in New York: the date read as a day, its end there in UTC.
     expect(
       movedRule(
         rule("FREQ=WEEKLY;UNTIL=20261123"),
-        date,
+        date("2026-11-02"),
         zonedTime("2026-11-02T09:00:00", "America/New_York"),
       ).until?.toString(),
     ).toBe("2026-11-24T04:59:59Z");
