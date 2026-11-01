@@ -120,8 +120,19 @@ function isKnownTimeZone(timeZone: string): boolean {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
+/**
+ * Wall clocks already asked of `Intl`, by zone and instant: the views ask
+ * for the same ones on every layout, and a series' expansion again for each
+ * range. Cleared when full, so it stays small.
+ */
+const wallClocks = new Map<string, string>();
+const WALL_CLOCKS = 20_000;
+
 /** The wall clock of an instant in a zone, `2026-10-31T09:00:00`. */
 export function wallClockIn(epochMs: number, timeZone: string): string {
+  const cacheKey = `${timeZone} ${epochMs}`;
+  const known = wallClocks.get(cacheKey);
+  if (known !== undefined) return known;
   let format = formatters.get(timeZone);
   if (!format) {
     format = new Intl.DateTimeFormat("en-US", {
@@ -137,7 +148,10 @@ export function wallClockIn(epochMs: number, timeZone: string): string {
     formatters.set(timeZone, format);
   }
   const parts = Object.fromEntries(format.formatToParts(epochMs).map((p) => [p.type, p.value]));
-  return `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}`;
+  const local = `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}`;
+  if (wallClocks.size >= WALL_CLOCKS) wallClocks.clear();
+  wallClocks.set(cacheKey, local);
+  return local;
 }
 
 function wallClockAsUtc(local: string): number {
