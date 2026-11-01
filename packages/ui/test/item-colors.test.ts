@@ -97,6 +97,23 @@ describe("an item's fill (design D120)", () => {
     expect(worst).toBeGreaterThanOrEqual(4.5);
   });
 
+  test("without relative colour syntax, the color-mix fallback still reaches 4.5:1 on every #rrggbb", () => {
+    const share = /color-mix\(in srgb, var\(--fill\) ([\d.]+)%, black\)/.exec(css);
+    if (!share) throw new Error("styles.css has no color-mix fallback: the model is out of date");
+    const p = Number(share[1]) / 100;
+    let worst = Infinity;
+    for (let r = 0; r < 256; r += 3) {
+      for (let g = 0; g < 256; g += 3) {
+        for (let b = 0; b < 256; b += 3) {
+          // Mixed with black in sRGB: each gamma-encoded channel scaled, then rounded to 8 bits.
+          const mixed = [r, g, b].map((x) => toLinear(Math.round(x * p) / 255)) as unknown as Rgb;
+          worst = Math.min(worst, contrastWithWhite(mixed));
+        }
+      }
+    }
+    expect(worst).toBeGreaterThanOrEqual(4.5);
+  });
+
   test("a colour dark enough is drawn as it is; a pale one keeps its hue, darker", () => {
     const hex = (value: string) =>
       [1, 3, 5].map((i) => toLinear(parseInt(value.slice(i, i + 2), 16) / 255)) as unknown as Rgb;

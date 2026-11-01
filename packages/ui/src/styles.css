@@ -123,12 +123,14 @@
     );
   }
   /* Without relative colour syntax (Chromium before 119, Safari before 18,
-   * Firefox before 128) the fill is the colour itself: shown, though not
-   * darkened. Android's WebView floor (123) and Electron have it. */
+   * Firefox before 128; Android's WebView floor, 123, and Electron have it)
+   * every colour is darkened alike: each sRGB channel scaled to 45% keeps
+   * the luminance under that of grey 45%, 0.171, so white text still
+   * reaches 4.75:1, though dark colours get darker than they need. */
   @supports not (color: color(from red srgb-linear calc(r * 0.5) g b)) {
     .item,
     .item-color {
-      --item-fill: var(--fill);
+      --item-fill: color-mix(in srgb, var(--fill) 45%, black);
     }
   }
   .item {
