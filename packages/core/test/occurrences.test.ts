@@ -544,6 +544,26 @@ describe("RFC 5545's corners", () => {
     expect(daily("20261024T002959Z")).toEqual(four.slice(0, 2));
   });
 
+  test("a UNTIL near the hour a DST change skips bounds a start in it by the instant it is placed at", () => {
+    // Vilnius jumps from 03:00 to 04:00 on 28 March 2027: 03:30 does not
+    // exist, and is placed with the offset before the gap, at 01:30Z (04:30 there).
+    const daily = (until: string) =>
+      starts(
+        occurrencesBetween(
+          event(
+            "DTSTART;TZID=Europe/Vilnius:20270326T033000",
+            "DTEND;TZID=Europe/Vilnius:20270326T034500",
+            `RRULE:FREQ=DAILY;UNTIL=${until}`,
+          ),
+          vilnius("2027-03-25", "2027-04-01"),
+        ),
+      ).map((start) => start.slice(0, 10));
+    const three = ["2027-03-26", "2027-03-27", "2027-03-28"];
+    expect(daily("20270328T013000Z")).toEqual(three);
+    // 01:15Z is 04:15 there: the start at 04:30 is after it.
+    expect(daily("20270328T011500Z")).toEqual(three.slice(0, 2));
+  });
+
   test("an UNTIL is left as ical.js reads it for a floating, an all-day or a defined zone's start", () => {
     // Floating: RFC 5545 asks a floating UNTIL; a UTC one is read on the wall clock, as before.
     const floating = event(

@@ -1370,6 +1370,41 @@ describe("a series' corners (D142)", () => {
       "2026-11-30T16:00:00",
       "2026-12-07T16:00:00",
     ]);
+    // As the other client wrote it (AGENTS.md rule 2).
+    expect(split).toContain("EXDATE;TZID=America/New_York:20261116T090000\r\n");
+  });
+
+  test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
+    const rdate = "RDATE;TZID=America/New_York:20261104T090000";
+    // And one of its own after the split below, which goes.
+    const source = () =>
+      object([
+        ...mondays,
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        rdate,
+        "RDATE;TZID=Europe/Vilnius:20261118T090000",
+      ]);
+    const { ics } = editItem(
+      source(),
+      { summary: "Renamed" },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain(`${rdate}\r\n`);
+    // Split after it, it stays in the old part as written; before it, it goes with the new one.
+    const after = editItem(
+      source(),
+      { summary: "Later" },
+      { now: NOW, scope: "following", recurrenceId: vilnius("2026-11-09T09:00:00"), newUid: "v2" },
+    );
+    expect(after.ics).toContain(`${rdate}\r\n`);
+    expect(after.ics).not.toContain("20261118T090000");
+    expect(after.split).not.toContain("America/New_York");
+    const before = deleteItem(source(), {
+      now: NOW,
+      scope: "following",
+      recurrenceId: vilnius("2026-11-16T09:00:00"),
+    })!;
+    expect(before).toContain(`${rdate}\r\n`);
   });
 
   test("all: a series every other week on two days keeps its pattern when it moves across its week", () => {

@@ -1169,10 +1169,14 @@ Decided while building PR 6a.
   - **Every other week on several days** keeps its weeks when its days
     shift into different weeks than each other: the rule's week start
     (`WKST`) shifts by as many days.
-  - **A time naming an occurrence in another zone than the start's** (an
-    EXDATE or RECURRENCE-ID another client wrote) is written, when rewritten,
-    with the start's TZID at the same instant, on its wall clock; it kept its
-    wall clock under the new TZID, and named another instant.
+  - **An EXDATE or RDATE an edit does not move is kept as written**, its
+    TZID another client's too ([D7](#D7)): ending or splitting a series and
+    dropping what no longer names an occurrence keep or drop each value, and
+    rewrite none. They were rewritten under the start's TZID with their own
+    wall clock, which named another instant, so an excluded occurrence came
+    back. A new EXDATE for an occurrence another client named in its own
+    zone (its RECURRENCE-ID) is written with the start's TZID, at the same
+    instant on the start's wall clock.
   - **An `RDATE` of a period** (`VALUE=PERIOD`) stays as written, and goes
     with the part of a split its start is in.
 
@@ -1478,7 +1482,8 @@ errors").
   period lasts as long as the series, not the period ([D141](#D141)); no
   client AstroTime has seen writes one.
 - **An `RDATE` period moved with its series** — a series moved keeps its
-  `RDATE`s of periods where they were ([D142](#D142)).
+  `RDATE`s of periods where they were, and one made all-day keeps them
+  timed ([D142](#D142)).
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by
