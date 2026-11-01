@@ -2,7 +2,7 @@
 // and follows it as it changes (docs/plans/foundation.md#D5), and says so
 // plainly when it cannot open the store.
 import type { HttpClient } from "@astrotime/caldav";
-import { OfflineError } from "@astrotime/core";
+import { ALL_RIGHTS, OfflineError } from "@astrotime/core";
 import {
   CommitInDoubtError,
   InsecureContextError,
@@ -669,6 +669,47 @@ test("an empty app opens on the calendar on this device; an account added from t
     ["caldav", "astro@cloud.example.com"],
   ]);
   expect(secrets.values.size).toBe(1);
+});
+
+test("a new event's dialog open as the calendar on this device steps aside saves to the server's calendar it then shows (D122)", async () => {
+  const store = await emptyStore();
+  render(Promise.resolve(store), ["en-US"]);
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect
+    .element(dialog.getByRole("combobox", { name: "Calendar" }))
+    .toHaveValue((await store.calendars())[0]!.id);
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Made meanwhile");
+  // Meanwhile a server's account brings calendars for events and tasks: the
+  // unused calendar on this device steps aside under the open dialog.
+  const server = await store.addAccount({
+    provider: "caldav",
+    name: "astro@cloud.example.com",
+    serverUrl: `${SERVER}/`,
+    username: "astro",
+  });
+  const work = await store.saveCalendar({
+    accountId: server.id,
+    url: `${SERVER}/remote.php/dav/calendars/astro/work/`,
+    name: "Work",
+    color: null,
+    components: ["VEVENT", "VTODO"],
+    rights: ALL_RIGHTS,
+  });
+  await expect
+    .element(
+      dialog.getByRole("combobox", { name: "Calendar" }).getByRole("option", { name: "Work" }),
+    )
+    .toBeInTheDocument();
+  await expect
+    .element(
+      dialog.getByRole("combobox", { name: "Calendar" }).getByRole("option", { name: "Personal" }),
+    )
+    .not.toBeInTheDocument();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect.element(dialog).not.toBeInTheDocument();
+  const [saved] = await store.pending(work.id);
+  expect(saved?.ics).toContain("SUMMARY:Made meanwhile");
 });
 
 test("a deployment's preset asks for the password alone, by itself, and not again once closed (D123)", async () => {

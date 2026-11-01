@@ -801,7 +801,9 @@ Decided while building PR 5a-3.
     which checks both in one transaction, and which the UI calls as the store
     comes to hold a server's calendars); before that (a first sync that
     failed or found none, only shared or read-only calendars, none for
-    tasks), it stays, so the user always has somewhere to create either. One that holds items stays
+    tasks), it stays, so the user always has somewhere to create either. A new
+    item's dialog left open as it steps aside saves where the dialog then
+    shows, the first calendar that takes it. One that holds items stays
     beside the server's, as its own calendar, and its items move to a
     server's calendar one by one in the edit dialog ([D106](#D106)).
     Removing it asks first, and says its items are on no server. Uploading
@@ -1790,12 +1792,6 @@ errors").
   move to a server's calendar one by one, in the edit dialog; offering, when
   an account is added, to upload them all to one of its calendars comes
   when someone asks.
-- **An edit dialog open as the calendar on this device steps aside**
-  ([D122](#D122)) — in the seconds between signing in and the first sync
-  bringing the server's calendars, a new item's dialog offers the calendar on
-  this device; saved after it stepped aside, the save fails and says so.
-  Moving the dialog to the server's calendar then comes with a default
-  calendar (below).
 - **Starting the web app with no network** ([D122](#D122)) — once open, the
   web app works offline, but a page loaded with no network needs a service
   worker holding the app's files (the image revalidates `index.html` on

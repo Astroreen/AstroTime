@@ -26,6 +26,8 @@ test("an event created here reaches the server, and again once dragged", async (
 }) => {
   const work = await radicale.mkcalendar("work");
   await openApp(page);
+  // The calendar on this device first, so its stepping aside below is seen, not assumed.
+  await expect(page.getByRole("region", { name: "On this device" })).toBeVisible();
   const signIn = await addAccount(page, "caldav");
   await signIn.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
   await signIn.getByRole("textbox", { name: "User name" }).fill(radicale.username);
