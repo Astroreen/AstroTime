@@ -98,7 +98,12 @@ export class ReminderPlanner {
     const { today } = nowIn(now, timeZone);
     // Whole days in the user's zone, so the store's computation is kept for
     // the day; the set itself starts now and reaches 7 days ahead.
-    const all = await this.#store.reminders({ from: today, to: addDays(today, 8), timeZone });
+    // From yesterday, so the hour back crosses midnight too.
+    const all = await this.#store.reminders({
+      from: addDays(today, -1),
+      to: addDays(today, 8),
+      timeZone,
+    });
     // New objects: the store keeps the reminders it computed.
     // An hour back too: a reminder missed in a sleep, which the platform
     // shows within its own grace, is not lost to a set computed on waking.

@@ -461,15 +461,12 @@ describe("the set a platform is handed (android D60)", () => {
       { backMs: REMINDER_GRACE_MS },
     );
     expect(back.map((reminder) => reminder.id)).toEqual(["hour", "soon"]);
-    // …and takes no place of the ones to come.
+    // …and takes only the places the ones to come leave.
     const full = soonestReminders([at("past", now - 1), ...many], now, {
       backMs: REMINDER_GRACE_MS,
     });
-    expect([full.length, full[0]?.id, full.at(-1)?.id]).toEqual([
-      MAX_REMINDERS + 1,
-      "past",
-      "r099",
-    ]);
+    // A full hundred to come leaves no room for the hour back.
+    expect([full.length, full[0]?.id, full.at(-1)?.id]).toEqual([MAX_REMINDERS, "r000", "r099"]);
   });
 
   test("the ids are the same however the window is cut", () => {

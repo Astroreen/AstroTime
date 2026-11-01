@@ -253,7 +253,10 @@ export function remindersOf(object: CalendarObject, objectId: string, range: Ran
     const lag = Math.max(
       0,
       ...relative.map(
-        (alarm, i) => offsets[i]! + alarm.repeat * (alarm.repeatEverySeconds ?? 0) * 1000,
+        // Repeats as many as `add` walks, not a server's unbounded REPEAT.
+        (alarm, i) =>
+          offsets[i]! +
+          Math.min(alarm.repeat, MAX_REMINDERS) * (alarm.repeatEverySeconds ?? 0) * 1000,
       ),
     );
     const from = dayIn(fromMs - lag - SLACK_MS, timeZone);
@@ -314,8 +317,8 @@ export function soonestReminders(
 ): Reminder[] {
   const { horizonMs = REMINDER_HORIZON_MS, max = MAX_REMINDERS, backMs = 0 } = options;
   const all = [...reminders].toSorted(bySoonest);
-  // The hour back never takes a place of the ones to come.
+  // At most `max` in all; the ones to come first, the hour back in what is left.
+  const ahead = all.filter((r) => r.fireAt >= nowMs && r.fireAt < nowMs + horizonMs).slice(0, max);
   const back = all.filter((r) => r.fireAt >= nowMs - backMs && r.fireAt < nowMs);
-  const ahead = all.filter((r) => r.fireAt >= nowMs && r.fireAt < nowMs + horizonMs);
-  return [...back, ...ahead.slice(0, max)];
+  return [...back.slice(Math.max(0, back.length - (max - ahead.length))), ...ahead];
 }
