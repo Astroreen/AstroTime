@@ -51,6 +51,8 @@ export interface NativeNotifications {
   checkExactNotificationSetting(): Promise<{ exact_alarm: NativePermission }>;
   schedule(options: { notifications: NativeNotification[] }): Promise<unknown>;
   cancel(options: { notifications: { id: number }[] }): Promise<void>;
+  /** What the plugin holds, scheduled or delivered (a delivered one keeps its record). */
+  getPending(): Promise<{ notifications: { id: number }[] }>;
   addListener(
     event: "localNotificationActionPerformed",
     listener: (action: { notification: { extra?: unknown } }) => void,
@@ -73,7 +75,8 @@ interface Entry {
   body: string;
 }
 
-function readKept(preferences: Preferences): Kept {
+/** The kept record, or `null` when there is none that reads. */
+function readKept(preferences: Preferences): Kept | null {
   try {
     const kept = JSON.parse(preferences.get(KEPT_KEY) ?? "null") as Kept | null;
     if (
@@ -89,7 +92,7 @@ function readKept(preferences: Preferences): Kept {
   } catch {
     // Unreadable: start again; ids already handed out are lost with it.
   }
-  return { next: 1, asked: false, scheduled: {} };
+  return null;
 }
 
 const permissionOf = (state: NativePermission): ReminderPermission =>
@@ -106,7 +109,12 @@ export function androidReminders(options: {
   onResume?: (listener: () => void) => void;
 }): ReminderScheduler {
   const { native, preferences, now = () => Date.now() } = options;
-  let kept = readKept(preferences);
+  const record = readKept(preferences);
+  const kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
+  // Without a record (unreadable, or the preferences cleared) the alarms
+  // Android still holds are no one's: their ids would be handed out again
+  // while they still fire. The first set cancels them all.
+  let orphans = record === null;
   let permission: ReminderPermission = "default";
   let exact = true;
   // The first set of a run arms every reminder ahead again: alarms do not
@@ -150,33 +158,78 @@ export function androidReminders(options: {
       update({ permission: permissionOf(display), exact: exact_alarm === "granted" });
   };
 
-  /** Asks the user; the answer outranks any read still on its way. */
-  const request = async (): Promise<ReminderPermission> => {
-    kept.asked = true;
+  /**
+   * Asks the user; the answer outranks any read still on its way. Kept as
+   * asked once answered: a prompt the app ended in is asked again.
+   */
+  let asking: Promise<ReminderPermission> | null = null;
+  // A prompt that failed is not asked again by itself until the next run:
+  // every store write makes a set.
+  let failed = false;
+  const request = (): Promise<ReminderPermission> =>
+    (asking ??= (async () => {
+      try {
+        const { display } = await native.requestPermissions().catch((error: unknown) => {
+          failed = true;
+          throw error;
+        });
+        kept.asked = true;
+        save();
+        reads++;
+        update({ permission: permissionOf(display) });
+        return permission;
+      } finally {
+        asking = null;
+      }
+    })());
+
+  /** Cancels `gone`; their entries (`forget`) are dropped only once Android did, so a failed cancel is tried again. */
+  const cancel = async (gone: readonly number[], forget: readonly string[]) => {
+    if (gone.length === 0) return;
+    await native.cancel({ notifications: gone.map((id) => ({ id })) });
+    for (const id of forget) delete kept.scheduled[id];
     save();
-    const { display } = await native.requestPermissions();
-    reads++;
-    update({ permission: permissionOf(display) });
-    return permission;
   };
 
   const apply = async (set: readonly ScheduledReminder[]) => {
+    // Cancelling needs no permission, nor does reading what the plugin holds.
+    // The plugin's cancel stops an alarm and leaves a notification already
+    // shown on screen. A failed read is tried again with the next set, and
+    // this one is scheduled all the same: an id handed out since is skipped
+    // then, as scheduling under an id replaced the old alarm it had.
+    if (orphans) {
+      try {
+        const { notifications } = await native.getPending();
+        const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
+        await cancel(
+          notifications.map(({ id }) => id).filter((id) => !ours.has(id)),
+          [],
+        );
+        orphans = false;
+      } catch {
+        // Read again with the next set.
+      }
+    }
     await refresh();
     const at = now();
     // Android asks once by itself, the first time there is a reminder to
     // schedule (D66); after that it is the setting's switch that asks.
-    if (permission === "default" && !kept.asked && set.some((r) => r.fireAt >= at)) await request();
-    // The plugin would ask on every set without the permission.
-    if (permission !== "granted") return;
+    if (permission === "default" && !kept.asked && !failed && set.some((r) => r.fireAt >= at))
+      await request();
 
     const ids = new Set(set.map((reminder) => reminder.id));
     const gone: number[] = [];
-    // Forgotten only once Android cancelled them: a failed cancel is tried again.
     const forget: string[] = [];
     for (const [id, entry] of Object.entries(kept.scheduled)) {
       if (ids.has(id)) continue;
       gone.push(entry.id);
       forget.push(id);
+    }
+    // The plugin would ask on every set without the permission. What left
+    // the set is cancelled all the same: allowed again, its alarm would show.
+    if (permission !== "granted") {
+      await cancel(gone, forget);
+      return;
     }
     const notifications: NativeNotification[] = [];
     for (const reminder of set) {
@@ -235,11 +288,7 @@ export function androidReminders(options: {
       }
     }
     // A delivered notification stays on the screen: cancelling only stops what is still to come.
-    if (gone.length > 0) {
-      await native.cancel({ notifications: gone.map((id) => ({ id })) });
-      for (const id of forget) delete kept.scheduled[id];
-      save();
-    }
+    await cancel(gone, forget);
   };
 
   const open = (reminder: ScheduledReminder) => {

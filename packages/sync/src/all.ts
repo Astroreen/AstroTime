@@ -217,10 +217,12 @@ async function readSecret(
  * gave the password (an app password, revoked when the account goes).
  * Signing in to an account that is here already (the same calendar home and
  * user) replaces its password instead, as "sign in again" does; the store
- * looks and adds in one transaction, so two sign-ins at once add one.
+ * looks and adds in one transaction, so two sign-ins at once add one. An app
+ * password Login Flow v2 gave the password replaced is revoked with `http`,
+ * unwaited: `replaced` says how that went.
  */
 export async function saveAccount(
-  context: Pick<SyncContext, "store" | "secrets">,
+  context: Pick<SyncContext, "store" | "secrets"> & { readonly http?: HttpClient },
   input: {
     readonly name: string;
     readonly serverUrl: string;
@@ -229,7 +231,11 @@ export async function saveAccount(
     /** The password is an app password from Nextcloud's Login Flow v2. */
     readonly loginFlow?: boolean;
   },
-): Promise<{ readonly account: Account; readonly added: boolean }> {
+): Promise<{
+  readonly account: Account;
+  readonly added: boolean;
+  readonly replaced: Promise<AppPasswordRevocation>;
+}> {
   const { store, secrets } = context;
   const secret = JSON.stringify({
     username: input.credentials.username,
@@ -242,13 +248,26 @@ export async function saveAccount(
     username: input.credentials.username,
     homeUrl: input.homeUrl,
   });
+  // An old secret that cannot be read only leaves its app password unrevoked:
+  // signing in again is how the user repairs broken credentials.
+  const old = added ? null : await readSecret(secrets, account.id).catch(() => null);
   try {
     await secrets.set(keyOf(account.id), secret);
   } catch (error) {
     if (added) await store.removeAccount(account.id);
     throw error;
   }
-  return { account, added };
+  // The device no longer uses the old app password: it leaves no way in behind.
+  let replaced: Promise<AppPasswordRevocation> = Promise.resolve("none");
+  if (old?.loginFlow && old.credentials.password !== input.credentials.password) {
+    replaced = context.http
+      ? revokeAppPassword(context.http, account.serverUrl, old.credentials).then(
+          () => "revoked" as const,
+          () => "kept" as const,
+        )
+      : Promise.resolve("kept");
+  }
+  return { account, added, replaced };
 }
 
 /**

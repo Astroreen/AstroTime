@@ -360,6 +360,65 @@ test("with the platform's lock, removing an account waits for another instance's
   ]);
 });
 
+test("signing in again revokes the app password Login Flow gave the one replaced, never one typed", async () => {
+  const { secrets, context } = await setup();
+  const server = nextcloud();
+  const signIn = (password: string, loginFlow: boolean, http: HttpClient | null = server.http) =>
+    saveAccount(
+      { ...context, ...(http ? { http } : {}) },
+      {
+        name: "astro@a.example",
+        serverUrl: "https://a.example/",
+        homeUrl: "https://a.example/",
+        credentials: { username: "astro", password },
+        loginFlow,
+      },
+    );
+  const typed = await signIn("typed", false);
+  expect(await typed.replaced).toBe("none");
+  // A password the user typed is theirs: replaced, never revoked.
+  expect(await (await signIn("app-1", true)).replaced).toBe("none");
+  expect(await (await signIn("app-2", true)).replaced).toBe("revoked");
+  expect(server.revoked).toEqual([
+    `DELETE https://a.example/ocs/v2.php/core/apppassword Basic ${btoa("astro:app-1")}`,
+  ]);
+  expect(JSON.parse(secrets.values.get(`account:${typed.account.id}`)!).password).toBe("app-2");
+  // The same password again replaces nothing; offline, the old one is said kept.
+  expect(await (await signIn("app-2", true)).replaced).toBe("none");
+  expect(await (await signIn("app-3", true, nextcloud(false).http)).replaced).toBe("kept");
+  expect(await (await signIn("app-4", true, null)).replaced).toBe("kept");
+  expect(server.revoked).toHaveLength(1);
+  // A typed password over Login Flow's: Login Flow's is revoked all the same.
+  expect(await (await signIn("typed-again", false)).replaced).toBe("revoked");
+  expect(server.revoked.at(-1)).toBe(
+    `DELETE https://a.example/ocs/v2.php/core/apppassword Basic ${btoa("astro:app-4")}`,
+  );
+});
+
+test("signing in again repairs credentials the secret store cannot read: the new ones are saved", async () => {
+  const { secrets, context, add } = await setup();
+  const { account } = await add("a.example", "old");
+  const get = secrets.get;
+  secrets.get = () => Promise.reject(new Error("Keystore unavailable."));
+  const again = await saveAccount(
+    { ...context, http: nextcloud().http },
+    {
+      name: "astro@a.example",
+      serverUrl: "https://a.example/",
+      homeUrl: "https://a.example/",
+      credentials: { username: "astro", password: "new" },
+      loginFlow: true,
+    },
+  );
+  secrets.get = get;
+  expect([again.added, again.account.id, await again.replaced]).toEqual([
+    false,
+    account.id,
+    "none",
+  ]);
+  expect(JSON.parse(secrets.values.get(`account:${account.id}`)!).password).toBe("new");
+});
+
 test("signing in as another user of the same calendar home adds that user, never takes over", async () => {
   const { store, secrets, context } = await setup();
   const as = (username: string) =>

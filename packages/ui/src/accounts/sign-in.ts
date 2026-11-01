@@ -229,7 +229,7 @@ export class SignIn {
       const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
       if (signal.aborted) return;
       saved = await saveAccount(
-        { store, secrets },
+        { store, secrets, http },
         {
           name: accountName(credentials.username, server),
           serverUrl: server,

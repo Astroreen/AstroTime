@@ -109,8 +109,9 @@ When you add a package, app or module, add its line here in the same PR.
     goes. → `plans/foundation.md#D90`
   - `fetchClient`, `HttpClient` — how it reaches servers on each platform;
     `timeoutMs`, the web's ceiling per request. → `plans/foundation.md#D91`
-  - `followRedirects` — the redirect rule over a one-hop client, for the
-    shells whose HTTP follows none (the desktop, Android).
+  - `followRedirects` — the redirect rule over a one-hop client, for a
+    shell whose HTTP follows none: the desktop's. Android's plugin still
+    follows them itself, in Kotlin (its Deferred).
     → `plans/desktop.md#D72`, `plans/android.md#D62`
   - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
     own refusals come to the app as `ProxyRefusedError`.

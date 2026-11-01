@@ -605,7 +605,10 @@ Decided while building PR 5a-3.
   account already here (the same calendar home and user) replaces its
   password instead of adding a second one: `Store.findOrAddAccount` looks
   and adds in one transaction ([D99](#D99)), so two sign-ins at once, in
-  two tabs too, add one, the later one's password kept. (A unique index on
+  two tabs too, add one, the later one's password kept. When the password
+  replaced was an app password from Login Flow v2 (and the new one differs),
+  `saveAccount` revokes it as removing does, without waiting, and its
+  `replaced` tells how that went. (A unique index on
   `(home_url, username)` was the other way; rejected, since a store with
   two such accounts already would fail its migration.) Removing makes every sync that
   starts from then on leave the account alone, waits for the running one
@@ -1231,11 +1234,15 @@ Decided while building PR 6b.
   brings that one forward. Handing the lock to the visible tab needs a
   release on `visibilitychange` that does not drop a reminder due in the
   moment between; it comes if the wrong tab coming forward is reported.
-- **Revoking a replaced app password** — signing in again by Login Flow
-  replaces the account's app password ([D90](#D90)) without revoking the
-  old one on the server; it stays in Nextcloud's list of devices until the
-  user revokes it there. It comes with a word in the sign-in dialog about a
-  revocation that failed.
+- **A replaced app password that was not revoked** — signing in again
+  revokes the app password it replaces ([D90](#D90)), unwaited; when that
+  fails (offline, a server that would not), the old password stays in
+  Nextcloud's list of devices and the sign-in dialog says nothing. A word
+  there, as the remove dialog has, comes if it is seen. Two sign-ins again
+  at once (two tabs) both read the same old secret outside the account's
+  transaction, so both revoke it and the first one's new password stays
+  unrevoked; reading the old secret and writing the new under one lock
+  would close that.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store

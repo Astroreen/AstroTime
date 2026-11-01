@@ -86,10 +86,10 @@ export function checkSecret(value: unknown, saving: unknown): [string, SecretSav
   return [value, saving as SecretSaving];
 }
 
-/** A short text the page sends: a notification's words, a menu's. */
 /** The most a reminder may hold, its page's own fields included. */
 const MAX_REMINDER_BYTES = 16 * 1024;
 
+/** A short text the page sends: a notification's words, a menu's. */
 const isText = (value: unknown, max = 4096): value is string =>
   typeof value === "string" && value.length <= max;
 

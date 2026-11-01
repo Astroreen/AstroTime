@@ -206,7 +206,8 @@ were checked on 2026-11-01.
   runs under it ([desktop D72](desktop.md#D72)), and the plugin can do the
   same, each hop returned with OkHttp's redirects off and the adapter
   following them. It closed the Deferred "one redirect loop for the native
-  shells".
+  shells" for the desktop; Android's plugin still follows them itself
+  (Deferred, "One redirect loop for Android too").
 
 - **D63. The store: sqlite-wasm on OPFS in the WebView.** _Changes
   foundation's [D25](foundation.md#D25)_, which named
@@ -327,7 +328,15 @@ were checked on 2026-11-01.
     Android is called, so an id is never handed out twice; a set Android
     refuses is scheduled again with the next, under the same ids. One that
     fired and then moved ahead (the item edited to later) gets a new id, so
-    the notification already shown is not taken off the screen.
+    the notification already shown is not taken off the screen. Without a
+    map that reads (the preferences cleared, or written wrong), the first
+    set cancels every alarm the plugin still holds (`getPending`) before
+    ids are handed out from 1 again, so no old alarm shares one. The
+    plugin's cancel only stops alarms: a notification already shown stays
+    on screen (`LocalNotificationManager.cancel` in
+    `@capacitor/local-notifications` 8.3.1). A read that fails does not
+    stop the set: it is tried with the next one, skipping the ids handed out
+    since, as scheduling under an id already replaced its old alarm.
   - **Past reminders.** The set reaches an hour back
     ([foundation D100](foundation.md#D100)). One handed over before has
     fired from its alarm, and is never shown again. One that reaches
@@ -343,11 +352,15 @@ were checked on 2026-11-01.
     while the phone was off, 15 seconds after boot, however old: that is
     the plugin's, not the adapter's.
   - **The permission** is asked by the adapter once, the first time a set
-    holds a reminder ahead (so the user sees why), and remembered: after a
+    holds a reminder ahead (so the user sees why), and remembered once the
+    user answered (a prompt the app ended in, or one that failed, is asked
+    again): after a
     refusal the "Reminders" switch asks again, as on the web; refused twice,
     Android stops asking and the setting says to allow notifications in the
     system's settings. Nothing is scheduled without it (the plugin would ask
-    on every set). Back in front the adapter reads both permissions again
+    on every set), but what leaves the set is still cancelled, which needs
+    no permission: its alarm would show once notifications are allowed
+    again. Back in front the adapter reads both permissions again
     and the setting follows.
   - **Exact alarms.** `USE_EXACT_ALARM`, and `SCHEDULE_EXACT_ALARM` with
     `maxSdkVersion` 32 (the plugin declares it for every version; the
@@ -561,6 +574,20 @@ were checked on 2026-11-01.
   Android's plugin still follows them itself, in Kotlin, by the same rule
   ([D62](#D62)). Making the plugin one hop at a time under the shared loop
   would leave one implementation.
+- **Back without a synthetic Escape** — the back button closes a Base UI
+  popup by dispatching Escape at the focused element ([D68](#D68)), so a
+  control inside one that takes Escape for itself (a field that clears, a
+  list that closes its own popup) and marks it used makes back close
+  nothing, though the dialog stays open. A stack of what is open, closed by
+  the UI itself, would not depend on what has focus; it comes if such a
+  control is reported.
+- **Unreadable credentials told by the plugin's message** —
+  `@aparajita/capacitor-secure-storage` says ciphertext sealed under
+  another key only as an `osError` whose message names
+  `AEADBadTagException` ([D64](#D64)); `keystoreSecrets` matches that text,
+  so a plugin that words it otherwise makes such credentials an error
+  instead of a sign-in. A code of its own for it, upstream, would end the
+  match.
 - **A reminder Android did not fire** — an alarm whose time passed is taken
   as fired; after a force-stop (which clears the app's alarms), one due in
   the 5 minutes before the app opens again is not shown late. Telling a
