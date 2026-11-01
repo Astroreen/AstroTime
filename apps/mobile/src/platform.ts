@@ -28,7 +28,8 @@ export function mobilePlatform(store: Promise<Store>): Platform {
     // A Custom Tab, where the user's browser keeps their passwords and second
     // factor. The app is frozen while the tab is in front (Android 14 and
     // later), so the user comes back, and the poll on return ends the sign-in.
-    openExternal: (url) => void Browser.open({ url }),
+    // No Custom Tab or browser to open it: the system's own handling of the link.
+    openExternal: (url) => void Browser.open({ url }).catch(() => window.open(url, "_blank")),
     signingInTo: (server) => signingIn.begin(server),
     onBack: backButton(App),
     preferences,

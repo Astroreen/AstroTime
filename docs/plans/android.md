@@ -98,8 +98,9 @@ were checked on 2026-11-01.
   Capacitor 9 is in beta (minSdk 26, target 37); the app moves when it is
   stable. The app's origin, `https://localhost`, holds the local store
   ([D63](#D63)), so `server.hostname` and `androidScheme` are never changed:
-  a new origin is an empty store. The store needs a System WebView of
-  Chromium 109 or newer; on an older one the app says to update the WebView
+  a new origin is an empty store. The app needs a System WebView of
+  Chromium 123 or newer (the store's OPFS needs 109, the theme's
+  `light-dark()` 123); on an older one it says to update the WebView
   instead of failing. `CapacitorHttp`'s patching of `fetch` stays off.
 
   _Built in PR A1_ with Capacitor 8.6.0 (`capacitor.config.json`, since the
@@ -112,17 +113,17 @@ were checked on 2026-11-01.
   general failure.
 
   _Built in PR A2:_ before opening the store, the app reads the WebView's
-  Chromium version from its user agent (`src/webview.ts`); below 109 it
+  Chromium version from its user agent (`src/webview.ts`); below 123 it
   throws `OutdatedWebViewError` (`@astrotime/storage`) instead, which the
   shared UI words in English and Russian, naming both versions, with no
   Reload button (reloading does not update the WebView). The check runs in
   the app's bundle, which Vite builds for Chromium 111: a WebView too old to
   run the bundle at all would show a blank page, and no such WebView was
   tried (the message was seen on the emulator's WebView 133 with its user
-  agent overridden over CDP). The theme's colours use `light-dark()`,
-  Chromium 123: on a WebView of 109 to 122 the store opens but the colours
-  do not apply (read from the CSS, not seen on a device;
-  [deferred](#deferred)).
+  agent overridden over CDP). The floor is 123, not the store's 109, since
+  the theme's colours use `light-dark()` (Chromium 123): below it the app
+  would open with no colours (a review of A2). The System WebView updates
+  through the Play Store; 123 shipped in March 2024.
 
 ### Platform adapters
 
@@ -454,10 +455,6 @@ were checked on 2026-11-01.
   awake meanwhile needs a foreground service for up to Nextcloud's 20
   minutes, or Chrome bound to the app (a Custom Tabs `postMessage` channel);
   neither is worth a tap.
-- **The look on WebView 109 to 122** — the theme's colours use
-  `light-dark()` (Chromium 123), so on these WebViews the store opens but the
-  colours do not apply ([D61](#D61)). Raising the floor to 123, or colours
-  without `light-dark()`, is design [D58](design.md#D58)'s call.
 - **A sync interval setting** — the hour of [D67](#D67) is fixed until
   someone needs another.
 - **Widgets, quick settings tile, share target** — none in the first
@@ -507,7 +504,7 @@ Done when: credentials survive a restart and are unreadable in the app's
 data without the Keystore; a Nextcloud account is added through Login
 Flow v2 on a phone; back closes the drawer, then leaves the app; the top
 bar and the floating button clear the status and navigation bars in both
-themes (screenshots); a WebView older than Chromium 109 says to update it.
+themes (screenshots); a WebView older than Chromium 123 says to update it.
 
 _As built:_ the platform gained `onBack` ([D60](#D60)); the app's own
 `AstroTimeShell` plugin styles the bars ([D68](#D68)); Login Flow v2 ends

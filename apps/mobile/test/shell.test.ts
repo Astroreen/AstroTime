@@ -63,5 +63,5 @@ test("the WebView's Chromium version comes from its user agent", () => {
   expect(
     chromiumVersion("Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"),
   ).toBeNull();
-  expect(MINIMUM_WEBVIEW).toBe(109);
+  expect(MINIMUM_WEBVIEW).toBe(123);
 });
