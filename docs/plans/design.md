@@ -654,8 +654,9 @@ dialog ([D108](#D108)) did wrong, and does now:
 - **D143. The edit dialog's corners.**
   - **An event with no length saves.** One another client wrote with no
     `DTEND` (RFC 5545: it ends when it starts) was refused as "ends before
-    it starts" even for a new title; it is refused only once its times
-    change and still give no length (`problemOf`).
+    it starts" even for a new title. It keeps no length wherever it moves,
+    its end moving with its start; only an event that had a length may not
+    be given none (`problemOf`).
   - **A new start keeps the length over midnight** (`withStartTime`), as
     Google moves the end: 22:00–02:00 started at 23:00 ends at 03:00 the
     next day; 22:00–23:00 started at 23:30 ends at 00:30.

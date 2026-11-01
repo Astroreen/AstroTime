@@ -242,10 +242,14 @@ describe("the form's corners", () => {
     const initial = formOf(event("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n"), timeZone);
     expect(problemOf({ ...initial, summary: "Ping 2" }, initial)).toBeNull();
     // Given a time, it lasts.
-    expect(problemOf({ ...initial, startTime: "08:00", endTime: "08:00" }, initial)).toBe(
-      "endBeforeStart",
-    );
+    // A new start moves its end with it, and it keeps no length.
+    const later = withStartTime(initial, "10:00");
+    expect(later).toMatchObject({ startTime: "10:00", endDate: "2026-11-05", endTime: "10:00" });
+    expect(problemOf(later, initial)).toBeNull();
+    // An end before the start is refused still; one that had a length may not lose it.
     expect(problemOf({ ...initial, endTime: "08:00" }, initial)).toBe("endBeforeStart");
+    const hour = { ...initial, endTime: "10:00" };
+    expect(problemOf({ ...hour, endTime: "09:00" }, hour)).toBe("endBeforeStart");
   });
 
   test("a new start keeps the event's length over midnight", () => {

@@ -207,8 +207,10 @@ export function switchKind(form: Form, kind: "event" | "task"): Form {
     return { ...form, kind, allDay: true, endDate: form.startDate || form.endDate, startDate: "" };
   }
   const day = form.endDate || form.startDate;
-  // A task keeps one day: an end at or before the start was the next day's
-  // (an event over midnight), or there was none, an hour as a new event's.
+  // The event is rebuilt on the one day the task kept (its start day, as
+  // the switch to a task left it): an end after the start is that day's; one
+  // before it was the next day's (an event over midnight); one at it, no
+  // length, becomes an hour, as a new event's.
   if (form.endTime > form.startTime) {
     return { ...form, kind, allDay: false, startDate: day, endDate: day };
   }
@@ -241,7 +243,8 @@ export function withStartTime(form: Form, startTime: string): Form {
       86_400_000,
   );
   const length = days * 1440 + minutesOf(form.endTime) - minutesOf(form.startTime);
-  if (length <= 0) return { ...form, startTime };
+  // No length (no DTEND) is a length too: the end moves with the start.
+  if (length < 0) return { ...form, startTime };
   const end = minutesOf(startTime) + length;
   return {
     ...form,
@@ -320,15 +323,15 @@ function compare(a: ItemTime, b: ItemTime): number {
 /**
  * Why a form cannot be saved, as a catalog key; `null` when it can. An event
  * lasts, unless it already had no length (no `DTEND`, as RFC 5545 allows,
- * from another client) and its times are as they were; a task may be due
- * when it starts.
+ * from another client): moved, it keeps none; a task may be due when it
+ * starts.
  */
 export function problemOf(form: Form, initial: Form | null = null): Problem | null {
   if (form.kind === "event" && (!form.startDate || !form.endDate)) return "noDate";
   const { start, end } = timesOfForm(form);
   if (start && end && form.kind === "event") {
     const length = compare(end, start);
-    if (length < 0 || (length === 0 && !(initial && sameTimes(initial, form)))) {
+    if (length < 0 || (length === 0 && !(initial && hasNoLength(initial)))) {
       return "endBeforeStart";
     }
   }
@@ -341,19 +344,10 @@ export function problemOf(form: Form, initial: Form | null = null): Problem | nu
   return null;
 }
 
-/** Whether a form's times are another's. */
-function sameTimes(a: Form, b: Form): boolean {
-  const keys = [
-    "kind",
-    "allDay",
-    "startDate",
-    "startTime",
-    "endDate",
-    "endTime",
-    "zone",
-    "utc",
-  ] as const;
-  return keys.every((key) => a[key] === b[key]);
+/** An event that ends when it starts. */
+function hasNoLength(form: Form): boolean {
+  const { start, end } = timesOfForm(form);
+  return form.kind === "event" && start !== null && end !== null && compare(end, start) === 0;
 }
 
 /** The same rule: weekdays in any order are the same days. */
