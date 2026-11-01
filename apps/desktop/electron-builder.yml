@@ -1,7 +1,8 @@
 # electron-builder (docs/plans/desktop.md#D78). The app's parts are bundled
 # into plain files (vite.config.ts), so nothing from node_modules is packed
-# and nothing native is rebuilt. CI builds the unpacked app on every PR
-# (`--dir`, D79); the AppImage and deb, the fuses and the release come with PR D4.
+# and nothing native is rebuilt. CI and the release build the AppImage and
+# deb with the root package.json's version (.github/actions/desktop-packages,
+# D79); `--dir` alone is the quick unpacked build.
 appId: io.github.astroreen.astrotime
 productName: AstroTime
 directories:
@@ -10,6 +11,53 @@ files:
   - dist/**
   - package.json
 npmRebuild: false
+extraMetadata:
+  # The .desktop file's name, as the main process names it to Electron
+  # (app.setDesktopName, D70); syncDesktopName names the file after it.
+  desktopName: io.github.astroreen.astrotime.desktop
+  # The deb's Homepage.
+  homepage: https://github.com/Astroreen/AstroTime
+# What the packaged binary refuses (D78), read back in CI with
+# `npx @electron/fuses read`. The app runs Node only in its utility process,
+# serves its pages from app://, never file://, and keeps no cookies.
+# Asar integrity is not checked on Linux, so its fuse stays off.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: false
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
 linux:
+  target:
+    - AppImage
+    - deb
   executableName: astrotime
+  syncDesktopName: true
   category: Office
+  synopsis: Calendars and tasks from your own CalDAV server
+  description: >-
+    AstroTime shows the events and tasks of your own CalDAV server
+    (Nextcloud, Radicale and others) together on one time grid.
+  maintainer: AstroTime contributors
+  vendor: AstroTime
+  # Each format names its architectures its own way: x86_64 and arm64 for
+  # the AppImage, amd64 and arm64 for the deb (D79).
+  artifactName: astrotime-${version}-${arch}.${ext}
+deb:
+  # electron-builder's own list, and ALSA, which Electron links to and
+  # which a stock Ubuntu or Debian without a desktop lacks (libasound2t64
+  # since Ubuntu 24.04 and Debian 13).
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libasound2t64 | libasound2

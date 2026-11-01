@@ -88,17 +88,25 @@ jobs:
       - run: vp run --filter @astrotime/web build
 
   desktop-build:
-    name: Build desktop
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: Build desktop (${{ matrix.arch }})
+    # The release's packages, built and started as the release builds them,
+    # on each architecture's own runner (docs/plans/desktop.md#D79).
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: vp run --filter @astrotime/desktop build
-      # The unpacked app, as electron-builder packs it (docs/plans/desktop.md#D79);
-      # the AppImage and deb come with the release.
-      - run: pnpm --filter @astrotime/desktop package
-      - run: test -x apps/desktop/release/linux-unpacked/astrotime
+      - uses: ./.github/actions/desktop-packages
+        with:
+          arch: ${{ matrix.arch }}
 
   desktop-e2e:
     name: Desktop smoke test
@@ -208,7 +216,7 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pipx install radicale==3.8.0
       # shellcheck is preinstalled on GitHub's Ubuntu runners.
-      - run: shellcheck -x scripts/t3/*.sh
+      - run: shellcheck -x scripts/t3/*.sh scripts/release-apk.sh .github/actions/desktop-packages/start.sh
       # A ceiling on the whole smoke run, and its log when it fails.
       - run: timeout 180 bash scripts/t3/smoke.sh
       - if: failure()
@@ -233,9 +241,13 @@ jobs:
       - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"'
       - run: vp run --filter @astrotime/mobile build
       - run: pnpm --filter @astrotime/mobile sync
-      # The debug APK, and the HTTP plugin's tests on MockWebServer.
-      - run: ./gradlew assembleDebug test --console=plain
+      # The debug APK, the release's unsigned one, and the HTTP plugin's
+      # tests on MockWebServer.
+      - run: ./gradlew assembleDebug assembleRelease test --console=plain
         working-directory: apps/mobile/android
+      # As the release names and checks it (.github/workflows/release.yml).
+      - name: The release APK is unsigned and carries the product's version
+        run: bash scripts/release-apk.sh
       # Signed with this run's own debug key: installable for trying the app,
       # never an update of another run's (D69).
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -1,6 +1,12 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
+// The product's version is the root package.json's (docs/plans/foundation.md#D41):
+// versionName as it is, versionCode from major, minor and patch, so each
+// release's is higher; a prerelease shares its release's (docs/plans/android.md#D69).
+def astrotimeVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../../../package.json')).version
+def (major, minor, patch) = (astrotimeVersion =~ /^(\d+)\.(\d+)\.(\d+)/)[0][1..3].collect { it as int }
+
 android {
     namespace = "io.github.astroreen.astrotime"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,8 +14,8 @@ android {
         applicationId "io.github.astroreen.astrotime"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode major * 1000000 + minor * 1000 + patch
+        versionName astrotimeVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

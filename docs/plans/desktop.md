@@ -1,8 +1,8 @@
 # Desktop plan
 
 Status: **in progress** — PR D1 (the shell, the store and HTTP), PR D2
-(credentials and Login Flow v2) and PR D3 (living in the background) are
-built; PR D4 is decided, not yet built. It follows the Android app
+(credentials and Login Flow v2), PR D3 (living in the background) and PR D4
+(packages and release) are built. It follows the Android app
 ([`android.md`](android.md)), as foundation's [D12](foundation.md#D12)
 orders the platforms. This plan owns the Linux desktop app, `apps/desktop`
 (foundation's [D22](foundation.md#D22), [D23](foundation.md#D23)). The
@@ -313,8 +313,41 @@ were checked on 2026-11-01.
   Rejected: Electron Forge 8, whose Vite plugin is still experimental and
   which needs pnpm's hoisted layout. Auto-update is deferred.
 
+  _Landed in PR D4_ (`apps/desktop/electron-builder.yml`):
+  - **Version:** the packages carry the root `package.json`'s version
+    ([D41](foundation.md#D41)), passed as `extraMetadata.version`;
+    `apps/desktop`'s own `0.0.0` is never published.
+  - **Names:** each format names its architectures its own way:
+    `astrotime-<version>-x86_64.AppImage`, `astrotime-<version>-arm64.AppImage`,
+    `astrotime-<version>-amd64.deb`, `astrotime-<version>-arm64.deb`.
+  - **Fuses**, set by electron-builder's `electronFuses` and read back in CI
+    with `@electron/fuses read`: `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`
+    (with it `NODE_EXTRA_CA_CERTS`; HTTP goes through Chromium's network
+    stack and the system's trust, [D72](#D72)), `EnableNodeCliInspectArguments`,
+    `GrantFileProtocolExtraPrivileges` (the page is on `app://`) and
+    `LoadBrowserProcessSpecificV8Snapshot` off; `EnableCookieEncryption` and
+    `OnlyLoadAppFromAsar` on. `EnableEmbeddedAsarIntegrityValidation` stays
+    off: Electron checks the asar's integrity only on macOS and Windows.
+    `WasmTrapHandlers` keeps Electron's default (on).
+  - **The .desktop file** is `io.github.astroreen.astrotime.desktop`
+    (`desktopName` with `syncDesktopName`), the name the main process gives
+    Electron ([D70](#D70)), and its `StartupWMClass` matches the window.
+  - **The deb** depends on electron-builder's list and on ALSA
+    (`libasound2t64 | libasound2`), which Electron links to and which that
+    list lacks: without it the installed app did not start on a stock
+    Ubuntu 24.04 or Debian 12. Its post-install script installs
+    electron-builder's AppArmor profile, so on Ubuntu 24.04 Chromium's
+    sandbox gets its user namespaces.
+  - **The AppImage** keeps electron-builder's stable runtime, which needs
+    `libfuse2` (`libfuse2t64` on Ubuntu 24.04, not installed by default;
+    README says so). Where AppArmor keeps user namespaces from it (Ubuntu
+    24.04), its `AppRun` starts the app with `--no-sandbox`: the renderer
+    then runs unsandboxed, behind the page's policy and `contextIsolation`
+    ([D71](#D71)). The README points Ubuntu's users to the deb.
+  - The icon is Electron's default until AstroTime has one (Deferred).
+
 - **D79. CI, release and the dev shell.** CI builds the desktop app on
-  every PR (`electron-builder --linux --dir`, a quick unpacked build) and
+  every PR (since PR D4 the AppImage and deb themselves, below) and
   runs one smoke test with Playwright's Electron support under `xvfb-run`:
   the app starts, the window shows the UI, the store opens in the utility
   process and a password account syncs against the local Radicale
@@ -377,6 +410,20 @@ were checked on 2026-11-01.
   Electron with libnotify taken off its rpath). The test checks
   `Notification.isSupported()` first, so a missing libnotify fails there.
 
+  _Changed in PR D4:_ `Build desktop` builds what the release ships, on
+  every PR, for x64 on `ubuntu-latest` and arm64 on `ubuntu-24.04-arm`,
+  through one composite action the release runs too
+  (`.github/actions/desktop-packages`): `vp build`, the AppImage and deb
+  with the root version, the fuses read back, then on the stock runner
+  (no `sysctl`) the AppImage started through FUSE and the deb installed
+  with `apt-get` and started, each on a virtual display until its window
+  is mapped (`start.sh`: xdotool waits for the window, `timeout` is only a
+  ceiling), with a screenshot of each as the run's artifact. The packages
+  take minutes, not seconds, but an arm64 or packaging failure then shows
+  on the PR that caused it, not on a tag. The release workflow's `desktop`
+  job (`needs: release`) runs the same action and uploads the four files
+  with `gh release upload --clobber`, so a re-run replaces them.
+
 ## Deferred
 
 - **Auto-update** — electron-updater can update an AppImage (and a deb
@@ -387,6 +434,13 @@ were checked on 2026-11-01.
 - **Reminders while the app is not running** — a systemd user timer or a
   small resident helper ([D76](#D76)).
 - **Other packages** — Flatpak (Flathub), rpm, AUR, Snap ([D78](#D78)).
+- **An AppImage without libfuse2 and with the sandbox** — electron-builder's
+  static AppImage runtime (its `appimage` toolset 1.x, beta in 26.18) needs
+  no `libfuse2`; and an AppImage on Ubuntu 24.04 gets user namespaces only
+  from an AppArmor profile it cannot install, so it runs with
+  `--no-sandbox` there ([D78](#D78)).
+- **The app's icon** — Electron's default until AstroTime has a design for
+  one, as on Android ([D78](#D78)).
 - **Windows** — NSIS from the same config, checked last if at all
   ([D12](foundation.md#D12)).
 - **Untrusted certificates** — a server whose certificate the system does
