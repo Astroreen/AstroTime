@@ -13,6 +13,10 @@
       "types": "./src/node.ts",
       "import": "./src/node.ts"
     },
+    "./port": {
+      "types": "./src/port.ts",
+      "import": "./src/port.ts"
+    },
     "./web": {
       "types": "./src/web/index.ts",
       "import": "./src/web/index.ts"

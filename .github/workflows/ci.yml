@@ -87,6 +87,44 @@ jobs:
       - uses: ./.github/actions/setup
       - run: vp run --filter @astrotime/web build
 
+  desktop-build:
+    name: Build desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: vp run --filter @astrotime/desktop build
+      # The unpacked app, as electron-builder packs it (docs/plans/desktop.md#D79);
+      # the AppImage and deb come with the release.
+      - run: pnpm --filter @astrotime/desktop package
+      - run: test -x apps/desktop/release/linux-unpacked/astrotime
+
+  desktop-e2e:
+    name: Desktop smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # pnpm never runs Electron's install script (pnpm-workspace.yaml): only
+      # this job needs its binary.
+      - run: node apps/desktop/node_modules/electron/install.js
+      # Chromium's sandbox needs unprivileged user namespaces, which Ubuntu
+      # 24.04 keeps from binaries AppArmor has no profile for.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # The smoke test signs in to a real Radicale (apps/desktop/e2e/smoke.spec.ts).
+      - run: pipx install radicale==3.8.0
+      # Playwright builds the app and starts it in Electron, on a virtual display.
+      - run: xvfb-run -a -s "-screen 0 1440x900x24" pnpm --filter @astrotime/desktop e2e
+      - name: Playwright's traces, when a test failed
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-e2e-traces
+          path: apps/desktop/test-results/
+          retention-days: 7
+
   image:
     name: Web image
     runs-on: ubuntu-latest
@@ -209,7 +247,20 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, typecheck, unit, e2e, knip, build, image, dev-scripts, android]
+    needs:
+      [
+        check,
+        typecheck,
+        unit,
+        e2e,
+        knip,
+        build,
+        desktop-build,
+        desktop-e2e,
+        image,
+        dev-scripts,
+        android,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: All jobs passed

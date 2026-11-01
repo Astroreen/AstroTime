@@ -1,0 +1,35 @@
+{
+  "name": "@astrotime/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The AstroTime Linux desktop app: the shared UI in an Electron shell (docs/plans/desktop.md)",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "vp build",
+    "e2e": "playwright test",
+    "package": "electron-builder --linux --dir",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*",
+    "@astrotime/storage": "workspace:*",
+    "@astrotime/ui": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "electron": "catalog:",
+    "electron-builder": "catalog:",
+    "oxc-transform-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:"
+  },
+  "productName": "AstroTime"
+}

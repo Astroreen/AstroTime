@@ -28,7 +28,7 @@ what is deferred, and the PRs that land it. Plans are canon once implemented.
 | [`foundation.md`](plans/foundation.md) | product scope, protocol, sync, platforms, stack, process, the MVP PRs  | in progress |
 | [`design.md`](plans/design.md)         | how AstroTime looks and is laid out, from the owner's references       | in progress |
 | [`android.md`](plans/android.md)       | the platform interfaces every shell implements; the Android app        | in progress |
-| [`desktop.md`](plans/desktop.md)       | the Linux desktop app: its shell, platform adapters, build and release | planned     |
+| [`desktop.md`](plans/desktop.md)       | the Linux desktop app: its shell, platform adapters, build and release | in progress |
 
 ## Grilling sessions
 

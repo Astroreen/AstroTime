@@ -1,0 +1,18 @@
+{
+  // The main process, the store's process and the preload, with Node's and
+  // Electron's types (the preload has the page's window too); the tests and configs.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "types": ["node", "electron"]
+  },
+  "include": [
+    "src/main",
+    "src/store",
+    "src/preload",
+    "src/bridge.ts",
+    "e2e",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ]
+}

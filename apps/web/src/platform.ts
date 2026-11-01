@@ -6,9 +6,8 @@
 // while the app is open (D101).
 import { fetchClient, throughProxy } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
-import type { Platform } from "@astrotime/ui";
+import { localPreferences, type Platform } from "@astrotime/ui";
 
-import { preferences } from "./preferences.ts";
 import { webReminders } from "./reminders.ts";
 import { indexedDbSecrets } from "./secrets.ts";
 
@@ -26,7 +25,7 @@ export function webPlatform(store: Promise<Store>, name: string): Platform {
     secrets: indexedDbSecrets(),
     // A tab of its own, which cannot reach back into this one.
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
-    preferences,
+    preferences: localPreferences,
     syncLock: tabsSyncLock(name),
     reminders: webReminders(),
   };

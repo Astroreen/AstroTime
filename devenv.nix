@@ -40,6 +40,10 @@ in
     pkgs.radicale
     pkgs.openssl
     android.androidsdk
+    # The desktop app's tests: a display for Electron where there is none
+    # (CI's way), and certutil for a test CA in an NSS database (apps/desktop/e2e).
+    pkgs.xvfb-run
+    pkgs.nssTools
   ];
 
   env.ANDROID_HOME = androidHome;
@@ -51,6 +55,11 @@ in
   # version as `pkgs.playwright-driver` (as in Jhin).
   env.PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
   env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+
+  # Electron's downloaded binary does not run on NixOS either: the desktop app
+  # runs nixpkgs' Electron of the major it pins (docs/plans/desktop.md#D70, D79).
+  env.ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
+  env.ELECTRON_OVERRIDE_DIST_PATH = "${pkgs.electron_44}/bin";
 
   # A host LD_LIBRARY_PATH (audio libraries for games, say) loads libraries
   # built against another glibc into Chromium and Node addons; the dev shell
