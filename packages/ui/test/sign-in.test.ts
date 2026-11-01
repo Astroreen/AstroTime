@@ -479,6 +479,42 @@ test("an approval held past its seven days is revoked at the next chance, then d
   expect(await page.store.accounts()).toEqual([]);
 });
 
+test("an approval kept by an earlier build, with no deadline, gets one on take-up and is revoked past it, never dropped (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  let unreachable = true;
+  const page = await setup({
+    ...server,
+    http: (request) =>
+      unreachable ? Promise.reject(new OfflineError("offline")) : server.http(request),
+  });
+  page.secrets.values.set(
+    PENDING_FLOW,
+    JSON.stringify({
+      step: "approved",
+      token: "old-t0k3n",
+      server: `${SERVER}/`,
+      owner: "a-page-of-an-earlier-build",
+      username: "astro",
+      password: "app-old",
+    }),
+  );
+  expect(await hasPendingFlow(page.secrets, 0)).toBe(false);
+  expect(await heldApproval(page.secrets, page.page)).not.toBeNull();
+  page.time.advance(1_000);
+  expect(await page.signIn.saveHeld()).toBe("held");
+  expect(JSON.parse(page.secrets.values.get(PENDING_FLOW)!)).toMatchObject({
+    owner: page.page,
+    heldUntil: 1_000 + HOLD_MS,
+  });
+  page.time.advance(HOLD_MS);
+  unreachable = false;
+  expect(await page.signIn.saveHeld()).toBe("none");
+  expect(
+    server.requests.filter((r) => r.method === "DELETE").map((r) => r.headers.Authorization),
+  ).toEqual([`Basic ${btoa("astro:app-old")}`]);
+  expect(page.secrets.values.has(PENDING_FLOW)).toBe(false);
+});
+
 test("an approval held is used again only for the same server: scheme, host, port and path (D121)", async () => {
   const server = nextcloud({ password: "app-pass" });
   let unreachable = true;

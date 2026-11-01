@@ -113,8 +113,11 @@ type PendingFlow =
       readonly token: string;
       readonly server: string;
       readonly owner: string;
-      /** Past it, the approval is revoked rather than saved. */
-      readonly heldUntil: number;
+      /**
+       * Past it, the approval is revoked rather than saved; null in what an
+       * earlier build kept, which a page gives one as it takes it up.
+       */
+      readonly heldUntil: number | null;
     } & Credentials);
 
 /** The Web Lock a page holds for as long as it lives, so other pages can tell it is there. */
@@ -153,9 +156,10 @@ function readPending(json: string | null): PendingFlow | null {
     if (token === null || server === null) return null;
     if (value?.["step"] === "approved") {
       const [username, password, owner] = [text("username"), text("password"), text("owner")];
-      const heldUntil = value["heldUntil"];
+      const held = value["heldUntil"];
       if (username === null || password === null || owner === null) return null;
-      if (typeof heldUntil !== "number") return null;
+      // Kept before approvals had a deadline: one is given on take-up, never dropped unrevoked.
+      const heldUntil = typeof held === "number" ? held : null;
       return { step: "approved", token, server, owner, heldUntil, username, password };
     }
     const [loginUrl, endpoint, deadline] = [
@@ -216,13 +220,17 @@ function forgetFlow(pending: SecretStore, token: string, page: string): Promise<
 /**
  * Makes `page` the owner of the kept approval, if its owner is gone (D121):
  * the approval to save, or null when another page that is still there holds
- * it, or none is kept.
+ * it, or none is kept. One kept with no deadline gets one, `now` + `HOLD_MS`.
  */
-function takeUpApproval(pending: SecretStore, page: string): Promise<ApprovedFlow | null> {
+function takeUpApproval(
+  pending: SecretStore,
+  page: string,
+  now: number,
+): Promise<(ApprovedFlow & { readonly heldUntil: number }) | null> {
   return underLock(async () => {
     const kept = readPending(await pending.get(PENDING_FLOW));
     if (kept?.step !== "approved" || (await heldElsewhere(kept, page))) return null;
-    const mine = { ...kept, owner: page };
+    const mine = { ...kept, owner: page, heldUntil: kept.heldUntil ?? now + HOLD_MS };
     await pending.set(PENDING_FLOW, JSON.stringify(mine));
     return mine;
   });
@@ -436,7 +444,7 @@ export class SignIn {
     if (kept?.step === "approved") {
       // Only once its page is gone; one that is there saves it itself.
       try {
-        kept = await takeUpApproval(pending, this.#page);
+        kept = await takeUpApproval(pending, this.#page, this.#clock.now());
       } catch (error) {
         console.error(error);
         kept = null;
@@ -485,9 +493,9 @@ export class SignIn {
     const { pending, http } = this.#options;
     if (!pending) return "none";
     const signal = this.#begin();
-    let approval: ApprovedFlow | null;
+    let approval: (ApprovedFlow & { readonly heldUntil: number }) | null;
     try {
-      approval = await takeUpApproval(pending, this.#page);
+      approval = await takeUpApproval(pending, this.#page, this.#clock.now());
     } catch (error) {
       console.error(error);
       approval = null;

@@ -408,14 +408,24 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       // found none): the user keeps somewhere to write.
       expect(await store.removeLocalCalendarIfUnused()).toBe(false);
       expect((await store.accounts()).map((a) => a.provider)).toEqual(["local", "caldav"]);
-      await store.saveCalendar({
-        accountId: server.id,
-        url: "https://cloud.example.com/remote.php/dav/calendars/astro/personal/",
-        name: "Personal",
-        color: null,
-        components: ["VEVENT", "VTODO"],
-        rights: ALL_RIGHTS,
-      });
+      const served = (slug: string, components: ("VEVENT" | "VTODO")[], rights = ALL_RIGHTS) =>
+        store.saveCalendar({
+          accountId: server.id,
+          url: `https://cloud.example.com/remote.php/dav/calendars/astro/${slug}/`,
+          name: slug,
+          color: null,
+          components,
+          rights,
+        });
+      // Shared read-only, or editable without creating: nowhere to create in yet.
+      await served("shared", ["VEVENT", "VTODO"], NO_RIGHTS);
+      await served("team", ["VEVENT", "VTODO"], { create: false, edit: true, delete: false });
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // Events can be created, tasks not yet: the calendar on this device stays for them.
+      await served("work", ["VEVENT"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // A list for tasks too: it steps aside.
+      await served("tasks", ["VTODO"]);
       expect(await store.removeLocalCalendarIfUnused()).toBe(true);
       expect(await store.accounts()).toEqual([server]);
     });

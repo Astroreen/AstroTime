@@ -227,24 +227,32 @@ export class Store {
   }
 
   /**
-   * Removes the calendar on this device if it holds no item and another
-   * account has calendars of its own now: it steps aside for the server the
-   * user connected (D122), never before that server's calendars are here (a
-   * first sync that failed, or found none, leaves the user somewhere to
-   * write). True when it went.
+   * Removes the calendar on this device if it holds no item and other
+   * accounts' calendars now take new events and new tasks (create rights,
+   * D37): it steps aside for the server the user connected (D122), never
+   * before (a first sync that failed or found none, only read-only or shared
+   * calendars, or none for tasks, leaves the user somewhere to create). True
+   * when it went.
    */
   removeLocalCalendarIfUnused(): Promise<boolean> {
     return this.exclusive(async () => {
       const accounts = await this.db.select().from(schema.accounts);
       const local = accounts.filter((account) => account.provider === "local");
       if (local.length === 0) return false;
-      const [served] = await this.db
-        .select({ id: schema.calendars.id })
-        .from(schema.calendars)
-        .innerJoin(schema.accounts, eq(schema.calendars.accountId, schema.accounts.id))
-        .where(ne(schema.accounts.provider, "local"))
-        .limit(1);
-      if (!served) return false;
+      // Somewhere else to create both events and tasks: a calendar the user
+      // may create in for each, on another account.
+      const served = (
+        await this.db
+          .select({ calendar: schema.calendars })
+          .from(schema.calendars)
+          .innerJoin(schema.accounts, eq(schema.calendars.accountId, schema.accounts.id))
+          .where(ne(schema.accounts.provider, "local"))
+      )
+        .map((row) => toCalendar(row.calendar))
+        .filter((calendar) => calendar.rights.create);
+      const takes = (component: Component) =>
+        served.some((calendar) => calendar.components.includes(component));
+      if (!takes("VEVENT") || !takes("VTODO")) return false;
       let removed = false;
       for (const account of local) {
         const [used] = await this.db

@@ -741,7 +741,8 @@ Decided while building PR 5a-3.
     accounts dialog says calmly that AstroTime signs in as that user once the
     server can be reached. An approval is held for seven days (`heldUntil`);
     past that, its app password is revoked at the next chance and the entry
-    dropped. "Continue" in the dialog uses a held approval again only for the
+    dropped; one an earlier build kept with no deadline gets one (seven days
+    from when a page takes it up), never dropped unrevoked. "Continue" in the dialog uses a held approval again only for the
     same server: scheme, host, port and path, a final slash aside. An approval has an owner, the page
     that holds it; every page holds a Web Lock, `astrotime-page-<id>`, for as
     long as it lives. Another page takes an approval up only when
@@ -793,12 +794,14 @@ Decided while building PR 5a-3.
     never comes.
   - Connecting a server is optional, from the accounts dialog ("Add
     account"; Settings gets an Accounts group in the UI review's time,
-    [design Deferred](design.md#deferred)). Once a server's account has
-    calendars here (its first sync brought them), a calendar on this device
-    that holds no item steps aside (`removeLocalCalendarIfUnused`, which
-    checks both in one transaction, and which the UI calls as the store
-    comes to hold them); before that, a first sync that failed or found
-    none leaves the user somewhere to write. One that holds items stays
+    [design Deferred](design.md#deferred)). Once other accounts' calendars
+    here take new events and new tasks (a calendar with the create right,
+    [D37](#D37), holding `VEVENT`, and one holding `VTODO`), a calendar on
+    this device that holds no item steps aside (`removeLocalCalendarIfUnused`,
+    which checks both in one transaction, and which the UI calls as the store
+    comes to hold a server's calendars); before that (a first sync that
+    failed or found none, only shared or read-only calendars, none for
+    tasks), it stays, so the user always has somewhere to create either. One that holds items stays
     beside the server's, as its own calendar, and its items move to a
     server's calendar one by one in the edit dialog ([D106](#D106)).
     Removing it asks first, and says its items are on no server. Uploading
