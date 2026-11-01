@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { connect, type AddressInfo, type Socket } from "node:net";
 import { createServer } from "node:tls";
 
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 
 import { isTailnetOrLocal } from "./dev-clients.ts";
 
@@ -24,6 +24,9 @@ export function guard(front: {
     if (!isTailnetOrLocal(socket.remoteAddress ?? "")) socket.destroy();
   });
 }
+
+/** The fronts this process runs, by address, with the dev server each forwards to now. */
+const fronts = new Map<string, { http: NonNullable<ViteDevServer["httpServer"]> }>();
 
 export function devTls(env = process.env): Plugin {
   return {
@@ -43,10 +46,19 @@ export function devTls(env = process.env): Plugin {
       const port = Number(portText);
       const http = server.httpServer;
       if (!http) throw new Error("The https front needs the dev server's own HTTP server.");
+      // Vite runs configureServer again when it restarts (an edited config):
+      // the front then stays up and forwards to the new server, so its port
+      // is never asked for twice.
+      const running = fronts.get(`${host}:${port}`);
+      if (running) {
+        running.http = http;
+        return;
+      }
+      const entry: { http: typeof http } = { http };
       // Bytes after the handshake are passed through as they are, so Vite's
       // HMR socket works through it too.
       const front = createServer({ cert: readFileSync(cert), key: readFileSync(key) }, (socket) => {
-        const { address, port: target } = http.address() as AddressInfo;
+        const { address, port: target } = entry.http.address() as AddressInfo;
         const upstream = connect(target, address);
         socket.pipe(upstream).pipe(socket);
         // Either side going away, by an error or a plain close, takes the other.
@@ -55,6 +67,7 @@ export function devTls(env = process.env): Plugin {
         socket.on("error", () => upstream.destroy());
         upstream.on("error", () => socket.destroy());
       });
+      fronts.set(`${host}:${port}`, entry);
       guard(front);
       front.on("error", (error) => {
         server.config.logger.error(`astrotime: the https front failed: ${error.message}`);
@@ -67,7 +80,8 @@ export function devTls(env = process.env): Plugin {
           server.config.logger.info(`  ➜  Https:   https://${name}:${port}/`);
         });
       });
-      http.once("close", () => front.close());
+      // The front ends with the process (dev.sh stops it), not with one Vite server.
+      front.unref();
     },
   };
 }
