@@ -32,6 +32,7 @@ function gate() {
 function servers(byHome: Record<string, MemoryServer>) {
   const connections: string[] = [];
   let hold: Promise<void> | null = null;
+  const held: (() => void)[] = [];
   const connect: Connect = async (account, credentials) => {
     connections.push(`${account.homeUrl} as ${credentials.username}`);
     const server = byHome[account.homeUrl!]!;
@@ -48,12 +49,19 @@ function servers(byHome: Record<string, MemoryServer>) {
     return {
       ...server,
       calendars: async () => {
+        for (const reached of held.splice(0)) reached();
         await waiting;
         return server.calendars();
       },
     } satisfies Provider;
   };
-  return { connect, connections, holdAt: (at: Promise<void> | null) => (hold = at) };
+  return {
+    connect,
+    connections,
+    holdAt: (at: Promise<void> | null) => (hold = at),
+    /** Resolves once a sync waits at the gate, inside an account. */
+    reached: () => new Promise<void>((resolve) => held.push(resolve)),
+  };
 }
 
 async function setup() {
@@ -191,4 +199,43 @@ test("removing an account waits for a running sync, then deletes its secret and 
   expect(await store.accounts()).toEqual([]);
   expect(await store.calendars()).toEqual([]);
   expect(secrets.values.size).toBe(0);
+});
+
+test("a sync queued behind the running one leaves an account being removed alone", async () => {
+  const { store, secrets, net, context, add } = await setup();
+  const { account } = await add("a.example");
+  const held = gate();
+  net.holdAt(held.opened);
+  const inside = net.reached();
+  const running = syncAll(context);
+  await inside;
+  const queued = syncAll(context, { fresh: true });
+  const removing = removeAccount(context, account.id);
+  net.holdAt(null);
+  held.open();
+  await Promise.all([running, removing]);
+  expect((await queued).accounts).toEqual([]);
+  // Only the sync begun before the removal reached the server.
+  expect(net.connections).toHaveLength(1);
+  expect([await store.accounts(), await store.calendars(), secrets.values.size]).toEqual([
+    [],
+    [],
+    0,
+  ]);
+});
+
+test("signing in as another user of the same calendar home adds that user, never takes over", async () => {
+  const { store, secrets, context } = await setup();
+  const as = (username: string) =>
+    saveAccount(context, {
+      name: `${username}@a.example`,
+      serverUrl: "https://a.example/",
+      homeUrl: "https://a.example/",
+      credentials: { username, password: "right" },
+    });
+  const astro = await as("astro");
+  const other = await as("other");
+  expect(other.added).toBe(true);
+  expect((await store.accounts()).map((a) => a.username)).toEqual(["astro", "other"]);
+  expect(JSON.parse(secrets.values.get(`account:${astro.account.id}`)!).username).toBe("astro");
 });

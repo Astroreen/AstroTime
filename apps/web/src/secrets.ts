@@ -40,9 +40,14 @@ async function inStore<T>(
 ): Promise<T> {
   const transaction = db.transaction(store, mode);
   const result = request(work(transaction.objectStore(store)));
+  // Its failure fails the transaction too, which is what the caller hears.
+  result.catch(() => {});
   await new Promise<void>((resolve, reject) => {
     transaction.addEventListener("complete", () => resolve());
-    transaction.addEventListener("error", () => reject(transaction.error));
+    // The failed request's own error: the transaction's is set only as it aborts, after this.
+    transaction.addEventListener("error", (event) =>
+      reject((event.target as IDBRequest | null)?.error ?? transaction.error),
+    );
     transaction.addEventListener("abort", () => reject(transaction.error));
   });
   return result;
@@ -56,9 +61,16 @@ async function keyOf(db: IDBDatabase): Promise<CryptoKey> {
     "encrypt",
     "decrypt",
   ]);
-  // Two tabs making one at once: the first written wins, and both use it.
-  await inStore(db, KEYS, "readwrite", (s) => s.add(key, KEY)).catch(() => {});
-  return (await inStore<CryptoKey | undefined>(db, KEYS, "readonly", (s) => s.get(KEY))) ?? key;
+  try {
+    await inStore(db, KEYS, "readwrite", (s) => s.add(key, KEY));
+    return key;
+  } catch (error) {
+    // Two tabs made one at once: the first written wins, and both use it.
+    if (!(error instanceof DOMException && error.name === "ConstraintError")) throw error;
+    const first = await inStore<CryptoKey | undefined>(db, KEYS, "readonly", (s) => s.get(KEY));
+    if (!first) throw error;
+    return first;
+  }
 }
 
 export function indexedDbSecrets(name = "astrotime-secrets"): SecretStore {

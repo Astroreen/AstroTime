@@ -59,6 +59,8 @@ export interface SyncAllReport {
 interface Runs {
   current: Promise<SyncAllReport> | null;
   next: Promise<SyncAllReport> | null;
+  /** Accounts on their way out: a sync that starts now leaves them alone. */
+  readonly removing: Set<string>;
 }
 
 /** The sync running on each store, and the one waiting to start after it. */
@@ -67,7 +69,7 @@ const runs = new WeakMap<Store, Runs>();
 function runsOf(store: Store): Runs {
   let found = runs.get(store);
   if (!found) {
-    found = { current: null, next: null };
+    found = { current: null, next: null, removing: new Set() };
     runs.set(store, found);
   }
   return found;
@@ -98,7 +100,7 @@ export function syncAll(
 }
 
 function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
-  const run = everyAccount(context);
+  const run = everyAccount(context, state.removing);
   state.current = run;
   const done = () => {
     if (state.current === run) state.current = null;
@@ -107,11 +109,14 @@ function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
   return run;
 }
 
-async function everyAccount(context: SyncContext): Promise<SyncAllReport> {
+async function everyAccount(
+  context: SyncContext,
+  removing: ReadonlySet<string>,
+): Promise<SyncAllReport> {
   const accounts: AccountSync[] = [];
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone.
-    if (account.provider !== "caldav") continue;
+    if (account.provider !== "caldav" || removing.has(account.id)) continue;
     accounts.push(await syncOne(context, account));
   }
   return { accounts, finishedAt: Date.now() };
@@ -175,8 +180,8 @@ async function readCredentials(
 /**
  * Keeps an account the user signed in to: the account in the store, its
  * credentials in the platform's secret store. Signing in to an account that
- * is here already (the same calendar home) replaces its credentials instead,
- * as "sign in again" does.
+ * is here already (the same calendar home and user) replaces its password
+ * instead, as "sign in again" does.
  */
 export async function saveAccount(
   context: Pick<SyncContext, "store" | "secrets">,
@@ -193,12 +198,14 @@ export async function saveAccount(
     password: input.credentials.password,
   });
   const existing = (await store.accounts()).find(
-    (account) => account.provider === "caldav" && account.homeUrl === input.homeUrl,
+    (account) =>
+      account.provider === "caldav" &&
+      account.homeUrl === input.homeUrl &&
+      account.username === input.credentials.username,
   );
   if (existing) {
     await secrets.set(keyOf(existing.id), secret);
-    await store.updateAccount(existing.id, { username: input.credentials.username });
-    return { account: { ...existing, username: input.credentials.username }, added: false };
+    return { account: existing, added: false };
   }
   const account = await store.addAccount({
     provider: "caldav",
@@ -219,12 +226,19 @@ export async function saveAccount(
 /**
  * Removes an account from this device: its credentials first (an account
  * left behind asks to sign in again; a password left behind would be
- * invisible), then its calendars and items. A running sync ends first, so
- * nothing of the account is written while it goes.
+ * invisible), then its calendars and items. Syncs that start from now on
+ * leave it alone, and the running one and the one queued after it end
+ * first, so nothing of the account is written while it goes.
  */
 export async function removeAccount(context: SyncContext, accountId: string): Promise<void> {
   const state = runsOf(context.store);
-  await state.current?.catch(ignore);
-  await context.secrets.delete(keyOf(accountId));
-  await context.store.removeAccount(accountId);
+  state.removing.add(accountId);
+  try {
+    // A sync begun before this call may be inside the account; any later one skips it.
+    await Promise.all([state.current, state.next].map((run) => run?.catch(ignore)));
+    await context.secrets.delete(keyOf(accountId));
+    await context.store.removeAccount(accountId);
+  } finally {
+    state.removing.delete(accountId);
+  }
 }

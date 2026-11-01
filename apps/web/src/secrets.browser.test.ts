@@ -66,3 +66,17 @@ test("a secret sealed under a key that is gone reads as none, so the account ask
   });
   expect(await indexedDbSecrets(name).get("account:a")).toBeNull();
 });
+
+test("two tabs storing their first secret at once agree on one key", async () => {
+  const name = database();
+  const [first, second] = [indexedDbSecrets(name), indexedDbSecrets(name)];
+  await Promise.all([
+    first.set("account:a", "from the first"),
+    second.set("account:b", "from the second"),
+  ]);
+  expect([await first.get("account:b"), await second.get("account:a")]).toEqual([
+    "from the second",
+    "from the first",
+  ]);
+  expect(await raw(name, "keys")).toHaveLength(1);
+});

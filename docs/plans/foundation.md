@@ -512,11 +512,12 @@ Decided while building PR 5a-3.
   migration 5; discovered again only when missing), so a sync does not
   discover first. `saveAccount` and `removeAccount` are the only code that
   spells the credentials' key (`account:<id>`) and JSON. Signing in to an
-  account already here (the same calendar home) replaces its credentials
-  instead of adding a second one. Removing waits for a running sync,
-  deletes the secret first (an account left behind asks to sign in again; a
-  password left behind would be invisible), then the account with its
-  calendars and items. The demo's account (`provider: "demo"`) is never
+  account already here (the same calendar home and user) replaces its
+  password instead of adding a second one. Removing makes every sync that
+  starts from then on leave the account alone, waits for the running one
+  and the one queued after it, deletes the secret first (an account left
+  behind asks to sign in again; a password left behind would be invisible),
+  then the account with its calendars and items. The demo's account (`provider: "demo"`) is never
   synced. `@astrotime/sync` depends on `@astrotime/caldav` for this: it
   opens the providers. Rescheduling the reminders after a sync joins with
   PR 6.
@@ -717,8 +718,9 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
   placement; both themes; i18n; browser-mode tests and Playwright; and
   the accounts and sync wiring: signing in (Login Flow v2, password), the
   web's credentials, and when the UI syncs (on start, on focus, on a timer:
-  [D91](#D91), which closed the Deferred "Scheduling syncs"). Decisions: D1, D13, D14, D15, D16, D17,
-  D19, D42, design D43–D51. It lands in three PRs:
+  [D91](#D91), which closed the Deferred "Scheduling syncs"). Decisions:
+  D1, D13, D14, D15, D16, D17, D19, D42, design D43–D51. It lands in three
+  PRs:
   - **5a-1** — `@astrotime/ui`, the shell, i18n, themes, the Day, 3-day and
     Week views, the undone tasks, demo data, Playwright (D54–D57, design
     D58, D59);
