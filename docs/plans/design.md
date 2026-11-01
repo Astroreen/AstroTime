@@ -300,7 +300,8 @@ the project.
     9:00); the calendar, from the writable ones that hold the item's
     component; the colour, the calendar's or one of nine CSS names; the
     location; the description. A new start keeps the event's length; a new
-    start date moves its end and a weekly rule on the old weekday. An end
+    start date (a task's due without a start) moves its end, and the rule
+    with it ([foundation D105](foundation.md#D105)). An end
     before the start, a due before the start or a repeat ending before the
     item is refused, in words;
   - **creating**: the "+" button makes an event on the day shown from the

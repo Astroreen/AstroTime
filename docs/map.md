@@ -44,10 +44,12 @@ When you add a package, app or module, add its line here in the same PR.
     platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
   - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
     other edit: only the fields changed, in a scope for an occurrence of a
-    series (this, this and following, all). → `plans/foundation.md#D103`,
-    `plans/foundation.md#D105`
+    series (this, this and following, all), a series moved as its
+    occurrence moved; `hasOccurrence`, whether a series still has one.
+    → `plans/foundation.md#D103`, `plans/foundation.md#D105`
   - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
-    `Repeat`, and back. → `plans/foundation.md#D105`
+    `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its
+    start's day. → `plans/foundation.md#D105`
   - `vtimezone.ts` — a VTIMEZONE made from `Intl` for a zone the object
     does not define. → `plans/foundation.md#D104`
   - `mergeObjects` — the three-way merge of a refused write;
@@ -73,8 +75,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `search` — objects by title, case and diacritics aside, over the
       folded `titles` column (`search.ts`, migration 6).
       → `plans/design.md#D97`
-    - every operation that writes is a transaction.
-      → `plans/foundation.md#D99`
+    - every operation that writes is a transaction; `changeLocal`, a
+      change made here that reads and writes in one (the edit dialog's
+      save). → `plans/foundation.md#D99`, `plans/foundation.md#D103`
     - `reminders` — every calendar's reminders in a range of days.
       → `plans/foundation.md#D100`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
@@ -159,7 +162,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
     platform) and `reminderNotification` (its words);
     `components/reminders-context.tsx` and `reminders-switch.tsx`, the
-    "Reminders" setting in the drawer and a tapped reminder opening its day.
+    "Reminders" setting in the drawer and a tapped reminder opening its day
+    and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
