@@ -103,7 +103,12 @@ const againRequest = (account: Account) => ({
   account,
 });
 
-/** An account's menu: sync now, sign in again, remove. `onLeave` closes what it sits in first. */
+/**
+ * An account's menu: sign in again, remove. `onLeave` closes what it sits in
+ * first. No "Sync now" here: a sync is every account's (the accounts
+ * dialog's button says so), and one for a single account is Deferred
+ * (design D137).
+ */
 function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => void }) {
   const { t } = useTranslation();
   const value = useAccounts();
@@ -121,20 +126,15 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
         <Menu.Positioner sideOffset={4} align="end" className="z-[120]">
           <Menu.Popup className="min-w-52 origin-[var(--transform-origin)] rounded-xl bg-raised p-1 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             {syncs(account) && (
-              <>
-                <Menu.Item className={item} onClick={() => void value.scheduler.syncNow()}>
-                  {t("accounts.syncNow")}
-                </Menu.Item>
-                <Menu.Item
-                  className={item}
-                  onClick={() => {
-                    onLeave();
-                    value.signIn(againRequest(account));
-                  }}
-                >
-                  {t("accounts.signInAgain")}
-                </Menu.Item>
-              </>
+              <Menu.Item
+                className={item}
+                onClick={() => {
+                  onLeave();
+                  value.signIn(againRequest(account));
+                }}
+              >
+                {t("accounts.signInAgain")}
+              </Menu.Item>
             )}
             <Menu.Item
               className={`${item} text-danger`}
