@@ -149,7 +149,9 @@ export function wallClockIn(epochMs: number, timeZone: string): string {
   }
   const parts = Object.fromEntries(format.formatToParts(epochMs).map((p) => [p.type, p.value]));
   const local = `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}`;
-  if (wallClocks.size >= WALL_CLOCKS) wallClocks.clear();
+  // The oldest goes first (a Map keeps insertion order), so a layout that
+  // passes the limit keeps what it asked for last instead of starting over.
+  if (wallClocks.size >= WALL_CLOCKS) wallClocks.delete(wallClocks.keys().next().value!);
   wallClocks.set(cacheKey, local);
   return local;
 }
