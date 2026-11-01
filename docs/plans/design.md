@@ -2,7 +2,8 @@
 
 Status: **in progress** — PR 5 of
 [`foundation.md`](foundation.md#pr-5--calendar-grid) builds it; PR 5a-1
-built the shell, both themes and the Day, 3-day and Week views. This plan
+built the shell, both themes and the Day, 3-day and Week views; PR 5a-2 the
+Month and Agenda views. This plan
 owns how AstroTime looks and is laid out (foundation's
 [D18](foundation.md#D18)); where items go is the layout engine's
 ([D42](foundation.md#D42)).
@@ -128,6 +129,57 @@ the project.
   - the UI speaks the first of the user's languages it knows; the week start
     and the clock come from the region of their first language, so
     Lithuanian (`lt-LT`) gets English, Monday and 24 hours (D45).
+- **D86. The Month view, read from the reference** (and from Google's
+  Android app where the reference is silent):
+  - six weeks from the week holding the month's first day, as the reference
+    and the month picker show them; the weekday names above, today's in the
+    accent; the week number (D59's) in a pill column on the left;
+  - each day a tile with its number on top, today's in an accent pill; the
+    days of the months around are dimmed (a fainter tile and number), their
+    items shown as they are;
+  - every item is a one-line chip in its colour, cut short without an
+    ellipsis as in the reference: a task with its check-circle, a done one
+    struck through and muted (D50, D51). An item over several days, a timed
+    one over midnight too, is a span over the days of the week it covers.
+    A week's rows are `layoutSpans` with `timed`: the strip's order first
+    (spans, one-day events, the undone tasks chip on today where D59 puts
+    it, tasks), then timed items in time order;
+  - a tile shows as many rows as its height fits; a day with more gives its
+    last row to "+N" (its hidden items; read out as "N more items on …",
+    plural-aware), and only that day folds, other days keep their rows
+    (`foldWeek`);
+  - a tap on a day, anywhere on its tile or on the part of a span over it,
+    or on its "+N", opens that day in the Day view, as Google's Android app
+    does (its web app opens a popover instead); items open with PR 6;
+  - previous and next (buttons, keys, a swipe) go to the first day of the
+    month before or after; the top bar names the month (D59).
+- **D87. The Agenda**:
+  - the days in order, each with its weekday and date on the left (today's
+    in the accent, as the time grid's headers), which stay in view while
+    the day's items scroll, and a month's name above its first day;
+  - each item a card filled in its colour (D50): the title, and under it
+    "All day", "Day 2 of 3" for an all-day item over several days, or its
+    time (with the dates when it ends on another day); a task with its
+    check-circle, a done one struck through and muted (D51);
+  - a day's all-day items come in the strip's order, then its timed ones in
+    time order (`layoutDay`); an item over several days, a timed one over
+    midnight too, is listed on each day it covers. Days with nothing are
+    left out, except today, which is always there ("Nothing planned today"),
+    so the list has a today to open at; the "N undone tasks" chip heads
+    today's group (D51);
+  - it opens with the anchor (today, unless the user moved) at the top,
+    having read four weeks before it and eight after; within a screen of
+    either end it reads four weeks earlier or eight later, keeping the day
+    on top where it was. It reads on its own up to a year from where it
+    opened; "Show earlier" and "Show later" at its ends go further. So a
+    calendar is never read whole; what was read stays while the view is open;
+  - the top bar names the month of the day at the top of the list, and that
+    day becomes the anchor, so another view opens there; previous and next
+    go to the first day of the month before or after, "today" back to today.
+    No swipe: the list scrolls.
+- **D88. Keys for the views**, Google Calendar's: `d` Day, `x` 3 days (its
+  custom view's key), `w` Week, `m` Month, `a` Agenda, beside D59's `n`/`j`,
+  `p`/`k` and `t`.
 
 ## Deferred
 
@@ -142,6 +194,9 @@ the project.
   the finger lifts, with no slide ([D59](#D59)).
 - **Week numbers by the locale's own rules** — every locale gets ISO's
   numbers; American numbering differs around the new year ([D59](#D59)).
+- **A window over the Agenda** — the days it reads only grow while it is
+  open, and every day read stays in the page; dropping far days, or drawing
+  only the rows on screen, comes when long scrolls need it ([D87](#D87)).
 
 ## PR plan
 
@@ -150,7 +205,7 @@ Foundation's PR 5 builds this plan in two parts:
 - **PR 5a** — the app shell (top bar, drawer, floating button), the five
   views on the layout engine, both themes, i18n (D43–D51); in three PRs,
   as [foundation's PR plan](foundation.md#pr-5--calendar-grid) lists them
-  (D58, D59 came with 5a-1).
+  (D58, D59 came with 5a-1; D86–D88 with 5a-2).
 - **PR 5b** — the tasks screen, the drawer's settings and search (D52,
   D53). Its evidence is screenshots of each view next to the matching
   reference, in both themes.

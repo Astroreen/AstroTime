@@ -37,13 +37,14 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **All-day strip** — the band pinned above the time grid with all-day
   items; it does not scroll away.
 - **Chip** — a small item, of two kinds: in the all-day strip, any item one
-  line high (a **span** in the week's strip, D42); in the time grid, a task
-  with only a due (or start) time, 30 minutes tall (`shape: "chip"` in
-  `layoutDay`).
+  line high (a **span** in the week's strip, D42), and in the Month view
+  every item; in the time grid, a task with only a due (or start) time,
+  30 minutes tall (`shape: "chip"` in `layoutDay`).
 - **Block** — a timed item with a length, drawn from its start to its end
   in the time grid. `shape: "block"` in the layout.
-- **Span** — a chip of the all-day strip of a week or a month drawn as one
-  bar over every day the item covers; a one-day item is a span of one day.
+- **Span** — a chip drawn as one bar over every day the item covers, in
+  the all-day strip of a week and in each week of the Month view (where
+  timed items are spans too); a one-day item is a span of one day.
 - **Cluster** — timed items that overlap, directly or through others; they
   share the column's width (D15).
 - **Tasks screen** — the task lists, as in Google Tasks: a screen on a
@@ -53,11 +54,13 @@ One word per concept. Use these terms in code, docs, commits and UI.
   views, calendars and settings (a sidebar on a wide screen); the "+" button
   that creates an item (design D46).
 - **View** — Day, 3 days, Week, Month or Agenda.
-- **Period** — the days a view shows: one, three, or the locale's week;
-  previous and next move by one period.
+- **Period** — the days a view shows: one, three, the locale's week, or a
+  month's six weeks; previous and next move by one period (by month in the
+  Month view and the Agenda).
 - **Undone tasks chip** — the one chip on today that stands for every
   undone task due before today, "N undone tasks" (design D51).
-- **Agenda** — the view that lists items in time order instead of a grid.
+- **Agenda** — the view that lists items in time order, day by day,
+  instead of a grid ("Расписание" in Russian, as Google's).
 
 ## Sync
 

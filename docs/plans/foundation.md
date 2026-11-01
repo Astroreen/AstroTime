@@ -416,7 +416,9 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **D42. The layout is pure geometry in `@astrotime/core`.** `layoutDay`
   places one day's occurrences in minutes and fractions of a column;
   `layoutSpans` packs the all-day strip of a week (or a month's week) into
-  rows. The UI turns both into pixels, so every view shares one placement and
+  rows; with `timed`, a month's week packs timed items too, after the
+  all-day ones, in time order, each over the days it shows on (`dayRange`,
+  design [D86](design.md#D86)). The UI turns both into pixels, so every view shares one placement and
   the rules are tested without a browser. On top of D14–D16:
   - a timed item lasting 24 hours or more (elapsed, so across a DST change
     too), or covering a whole day of the user's wall clock, goes to the
@@ -448,8 +450,11 @@ Decided while building PR 5a.
   one per write (`liveQuery`), so a sync writing while the app is open shows
   at once ([D5](#D5)). Each object is parsed once while its iCalendar is
   unchanged and its occurrences kept for the last range asked
-  (`ObjectCache`); a series too dense to expand is left out of the view, not
-  the view out ([D33](#D33)).
+  (`ObjectCache`, one for every view); a series too dense to expand is left
+  out of the view, not the view out ([D33](#D33)). The wall clock of an
+  instant in a zone is asked of `Intl` once and remembered (`wallClockIn`),
+  and the layout sorts by keys worked out once per item: a month of a big
+  calendar is laid out in about 15 ms, not 200 (measured in PR 5a-2).
 - **D55. The store finds the undone tasks of design D51.**
   `undoneTasksBefore` returns each task once with the occurrence it counts by
   (`latestUndoneBefore` in `@astrotime/core`), oldest due first. A task is
@@ -481,8 +486,8 @@ Decided while building PR 5a.
 - **Year view** ([D13](#D13); the 3-day view joined the MVP, [D48](design.md#D48)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
-- **Splitting the bundle** — since PR 5a-1 the app's script is about 600 kB
-  (190 kB compressed) and SQLite's wasm 880 kB; they are served precompressed
+- **Splitting the bundle** — since PR 5a-2 the app's script is about 620 kB
+  (200 kB compressed) and SQLite's wasm 880 kB; they are served precompressed
   and revalidated ([D80](#D80)), and splitting comes when the first load needs
   it ([D40](#D40)).
 - **Content Security Policy** for the web image — the app loads nothing from
@@ -500,7 +505,12 @@ Decided while building PR 5a.
   50 000 steps (a minutely or hourly series from years ago); a start point
   or a cache comes when a real calendar hits it ([D33](#D33)). Until then
   such a series shows nowhere: the views and the "N undone tasks" chip
-  leave it out, silently ([D55](#D55)).
+  leave it out, silently ([D55](#D55)). _Measured in PR 5a-2:_ a daily
+  series with a `TZID` from January 2025 takes 50–90 ms to expand into
+  November 2026, so 30 of them make the first read of a new range take
+  about 1.6 s on the main thread (a desktop i7). The object cache keeps one
+  range per object ([D54](#D54)), so each new week, month, or read of the
+  Agenda (design [D87](design.md#D87)) pays it again.
 - **Past days and their undone tasks** — an undone task due before today
   shows only in today's chip (design [D51](design.md#D51)), so a view of
   last week shows none on the days they were due, as in Google Calendar;
@@ -607,7 +617,7 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
   - **5a-1** — `@astrotime/ui`, the shell, i18n, themes, the Day, 3-day and
     Week views, the undone tasks, demo data, Playwright (D54–D57, design
     D58, D59);
-  - **5a-2** — the Month and Agenda views;
+  - **5a-2** — the Month and Agenda views (design D86–D88);
   - **5a-3** — the accounts and sync wiring above; the account button in
     the top bar.
 - **5b** — the tasks screen, the drawer's settings and search, with their
