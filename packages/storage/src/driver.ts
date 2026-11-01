@@ -37,10 +37,22 @@ export async function transaction<T>(driver: SqlDriver, operation: () => Promise
  * A statement got no answer because the tab that ran the web store's
  * database went (docs/plans/foundation.md#D98): it may or may not have run,
  * or the transaction it belonged to is over. The store works again at once,
- * through the next tab.
+ * through the next tab. A store operation that fails with it left nothing of
+ * itself (its transaction was rolled back, D99), unless it is a
+ * `CommitInDoubtError`.
  */
 export class HandOverError extends Error {
   override name = "HandOverError";
+}
+
+/**
+ * A transaction's COMMIT was on its way when the tab running the web store
+ * went (docs/plans/foundation.md#D99): it may or may not have committed, and
+ * nothing can tell which. Read the store again before trying again; never
+ * assume either.
+ */
+export class CommitInDoubtError extends HandOverError {
+  override name = "CommitInDoubtError";
 }
 
 /**

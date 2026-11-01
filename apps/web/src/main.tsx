@@ -18,8 +18,11 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // (docs/plans/foundation.md#D110); the browser keeps it from the DOM's attribute.
 const nonce = document.querySelector<HTMLMetaElement>("meta[property=csp-nonce]")?.nonce;
 
+/** The web store's name on OPFS. */
+const STORE = "astrotime";
+
 async function openStore(): Promise<Store> {
-  const store = await Store.open(await webDriver());
+  const store = await Store.open(await webDriver(STORE));
   // `?demo` in the dev server fills the store with demo data around today;
   // the production build leaves this out, demo module and all.
   if (import.meta.env.DEV && new URLSearchParams(location.search).has("demo")) {
@@ -32,7 +35,7 @@ async function openStore(): Promise<Store> {
 createRoot(root).render(
   <StrictMode>
     <AstroTime
-      platform={webPlatform(openStore())}
+      platform={webPlatform(openStore(), STORE)}
       languages={languages}
       timeZone={timeZone}
       {...(nonce ? { nonce } : {})}

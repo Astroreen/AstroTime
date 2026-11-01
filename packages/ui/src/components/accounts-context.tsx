@@ -50,6 +50,7 @@ export function AccountsProvider({
     store,
     secrets: platform.secrets,
     connect: connectCalDav(platform.http),
+    ...(platform.syncLock ? { lock: platform.syncLock } : {}),
   }));
   const [scheduler] = useState(
     () => new SyncScheduler((fresh) => syncAll(context, { fresh }), browserEnvironment()),

@@ -592,10 +592,23 @@ Decided while building PR 5a-3.
   - 2 seconds after the last of a burst of local changes (`changed()`, for
     the editing of PR 5b and PR 6), and on "Sync now", both `fresh`.
 
-  Android adds background sync ([android D67](android.md#D67)) and the
-  desktop its main-process timer and resume ([desktop D75](desktop.md#D75)),
-  both through `syncAll`. The status shows without getting in the way: the
-  account button in the top bar turns a ring while a sync runs and shows a
+  Every open tab runs these triggers on the one store ([D98](#D98)), so a
+  sync waits for another tab's to end: two at once would each upload the
+  same pending change. The web platform's `syncLock` takes a Web Lock per
+  store (`astrotime-sync:<store>`) around each run of `syncAll`
+  (`SyncContext.lock`), and removing an account takes it too, so no tab's
+  sync is inside an account another tab removes. A tab that closes lets it
+  go. It waits rather than skips: a skipped run has no report, so that
+  tab would show nothing of its accounts, and a `fresh` request must lead
+  to a sync that starts after it; a sync that finds nothing new costs one
+  `PROPFIND` and one `sync-collection` per calendar. A shell with one
+  instance of its store needs no lock.
+
+  Android adds background sync ([android D67](android.md#D67)), which
+  takes the same lock, and the desktop its main-process timer and resume
+  ([desktop D75](desktop.md#D75)), both through `syncAll`. The status
+  shows without getting in the way: the account button in the top bar
+  turns a ring while a sync runs and shows a
   dot when something needs the user (signed out, refused, failed, items the
   sync could not handle, conflicts). Each account says, in the drawer and
   in the accounts dialog, that it syncs, when it last synced, that it is
@@ -648,8 +661,18 @@ Decided while closing the Deferred "One store across tabs".
   lives and dies with the worker that holds the files: when the leader's
   tab closes or is discarded, or its worker fails, both go, the next tab in
   the queue opens the database and says so (`leader`), and the others send
-  there. A tab put away (`pagehide` into the back/forward cache, `freeze`)
-  lets its worker go, and queues again when it is back.
+  there.
+  - **A tab put away** (`pagehide` into the back/forward cache, `freeze`)
+    lets go of everything it holds, so no tab waits on it: its worker, with
+    the store's lock and files if it led; its own Web Lock, so the leader
+    rolls back a transaction it left open and serves the others, as for a
+    closed tab; and its channel. What it had on its way fails with
+    `HandOverError`, and its open transaction is over. Back (`pageshow` from
+    the cache, `resume`), it joins again under a new name, so nothing said
+    to the old one reaches it, queues to lead again, and its views read
+    again. Whether a browser caches or freezes a page holding Web Locks at
+    all varies (Chromium does neither); the tests dispatch the events to an
+    iframe.
   - **Nothing lost, nothing run twice.** A statement on its way when the
     leader goes fails with `HandOverError`: it may or may not have run, and
     nothing proves which, so it is never sent again. A leader that closes
@@ -660,15 +683,20 @@ Decided while closing the Deferred "One store across tabs".
     and its tab's statements fail with `HandOverError` until its `ROLLBACK`,
     never running outside it.
   - **Every tab hears every write.** The leader says `changed` after each
-    commit, and the driver's `SqlDriver.subscribe` (optional; the web driver
-    has it) reaches `Store.subscribe`, so a write in one tab re-renders the
-    others ([D54](#D54)). A tab hears one after a hand-over too, so a read
-    that failed on its way runs again.
+    write transaction that commits, whatever it wrote: rows, the schema, a
+    pragma such as `user_version` (SQLite's commit hook, not a count of
+    changed rows, which leaves the schema out; a `BEGIN IMMEDIATE` that
+    wrote nothing counts too, and the others only read again). A rolled
+    back one changed nothing for the others. The driver's `SqlDriver.subscribe` (optional;
+    the web driver has it) reaches `Store.subscribe`, so a write in one tab
+    re-renders the others ([D54](#D54)). A tab hears one after a hand-over
+    too, so a read that failed on its way runs again.
   - **One tab's transaction at a time** ([D99](#D99)): while a tab's
     transaction is open, the leader holds the other tabs' statements back.
     Each tab holds a Web Lock of its own while its store is open; when the
     leader is granted it, the tab is gone, and its open transaction is
-    rolled back.
+    rolled back. The others go on whatever that `ROLLBACK` says: a tab that
+    is gone never holds them.
   - Every leader sets its connection up alike (foreign keys on), since the
     tabs move between connections without knowing. The pool opens with
     `preserveOnInitFailure`: by default a failed open deletes the pool's
@@ -699,6 +727,20 @@ Decided while closing the Deferred "One store across tabs".
   transaction keeps them whole across tabs ([D98](#D98)): two tabs opening
   an old database at once migrate it once, and a sync in one tab never
   marks synced an edit another tab made meanwhile ([D38](#D38)).
+  - **A COMMIT in doubt.** A store operation that fails with
+    `HandOverError` did nothing: its transaction went with the leader, so
+    trying it again is safe. One whose `COMMIT` was on its way when the
+    leader went fails with `CommitInDoubtError` (a `HandOverError`): it may
+    have committed, and nothing tells. The store's callers never assume
+    either; they read again. A migration step reads the version again and
+    goes on from there, so it never runs twice. The sync engine reports the
+    object (or, outside one, the account's run) as failed and goes on
+    through the next leader; its next run starts from what the store and
+    the server hold, where an upload whose marking was lost is recognised as
+    our own ([D37](#D37)): a creation finds its href holding our version, an
+    update is refused and merged with a server copy that is ours already. A
+    view reads again at the hand-over ([D98](#D98)), so the user sees
+    whether an edit is there.
 
 ## Deferred
 

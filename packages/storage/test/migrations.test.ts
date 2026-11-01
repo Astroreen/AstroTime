@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
+import { CommitInDoubtError, HandOverError, type SqlDriver } from "../src/driver.ts";
 import { migrate, NewerSchemaError, SCHEMA_VERSION } from "../src/migrations.ts";
 import { nodeDriver } from "../src/node.ts";
 
@@ -14,6 +15,32 @@ test("a failing migration leaves nothing of itself and the version unchanged", a
   // The connection is usable again: no transaction was left open.
   await migrate(driver, ["CREATE TABLE a (x);", "CREATE TABLE b (y);"]);
   expect(await driver.query("PRAGMA user_version", [])).toEqual([[2]]);
+});
+
+test("a step cut off by a hand-over is read again: run once if it committed, again if not", async () => {
+  // The web store's leader tab goes (docs/plans/foundation.md#D99): the first
+  // step's COMMIT is in doubt though it went through, the second step's
+  // statement fails and its transaction is rolled back.
+  const inner = nodeDriver();
+  const failures: Record<string, Error> = {
+    "COMMIT;": new CommitInDoubtError("its answer went with the leader"),
+    "CREATE TABLE b (y);\nPRAGMA user_version = 2;": new HandOverError("the leader went"),
+  };
+  const driver: SqlDriver = {
+    ...inner,
+    async script(sql) {
+      const failure = failures[sql];
+      delete failures[sql];
+      if (failure instanceof CommitInDoubtError) await inner.script(sql);
+      if (failure) throw failure;
+      await inner.script(sql);
+    },
+  };
+  await migrate(driver, ["CREATE TABLE a (x);", "CREATE TABLE b (y);"]);
+  expect(await driver.query("PRAGMA user_version", [])).toEqual([[2]]);
+  expect(
+    await driver.query("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name", []),
+  ).toEqual([["a"], ["b"]]);
 });
 
 test("a database from a newer build is refused, not touched", async () => {

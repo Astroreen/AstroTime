@@ -1,4 +1,4 @@
-import { transaction, type SqlDriver } from "./driver.ts";
+import { HandOverError, transaction, type SqlDriver } from "./driver.ts";
 
 /**
  * The store's schema, one script per version (`PRAGMA user_version`).
@@ -93,18 +93,26 @@ export async function migrate(
   // old database at once migrate it once (docs/plans/foundation.md#D99).
   // A failed step leaves nothing of itself; the steps before it stay.
   for (;;) {
-    const done = await transaction(driver, async () => {
-      const [[read] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
-      const version = Number(read);
-      if (version > migrations.length) {
-        throw new NewerSchemaError(
-          `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
-        );
-      }
-      if (version === migrations.length) return true;
-      await driver.script(`${migrations[version]}\nPRAGMA user_version = ${version + 1};`);
-      return false;
-    });
+    let done: boolean;
+    try {
+      done = await transaction(driver, async () => {
+        const [[read] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
+        const version = Number(read);
+        if (version > migrations.length) {
+          throw new NewerSchemaError(
+            `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
+          );
+        }
+        if (version === migrations.length) return true;
+        await driver.script(`${migrations[version]}\nPRAGMA user_version = ${version + 1};`);
+        return false;
+      });
+    } catch (error) {
+      // The leader tab went (D98): the step was rolled back, or its COMMIT is
+      // in doubt. Reading the version again tells which; never run it twice.
+      if (error instanceof HandOverError) continue;
+      throw error;
+    }
     if (done) return;
   }
 }

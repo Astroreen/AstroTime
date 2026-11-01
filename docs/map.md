@@ -68,9 +68,11 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D25`
     - `subscribe` — tells the store of writes made elsewhere.
   - `web/` — every tab on one store: the leader tab's worker (`worker.ts`)
-    runs every tab's statements, the drivers (`index.ts`) follow it and take
-    over when it goes (`protocol.ts`); `HandOverError` when a statement's
-    answer went with it. → `plans/foundation.md#D98`
+    runs every tab's statements, one tab's transaction at a time
+    (`serving.ts`), the drivers (`index.ts`) follow it and take over when it
+    goes (`protocol.ts`); `HandOverError` when a statement's answer went
+    with it, `CommitInDoubtError` when a COMMIT's did.
+    → `plans/foundation.md#D98`, `plans/foundation.md#D99`
   - `schema.ts` (Drizzle) and `migrations.ts` (`PRAGMA user_version`).
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 
@@ -87,8 +89,9 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
   - `syncAll` — the one sync entry every shell calls: every account, joins
-    a running sync; `connectCalDav` opens an account's provider;
-    `saveAccount`, `removeAccount` keep an account with its credentials.
+    a running sync, waits for another tab's (`SyncLock`, D91);
+    `connectCalDav` opens an account's provider; `saveAccount`,
+    `removeAccount` keep an account with its credentials.
     → `plans/foundation.md#D90`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
@@ -140,7 +143,8 @@ When you add a package, app or module, add its line here in the same PR.
 
 - `apps/web` (`@astrotime/web`) — the web app, the first platform: its
   `Platform` (`src/platform.ts`: the web store, HTTP through the proxy,
-  credentials, a new tab for Login Flow, preferences in localStorage) and
+  credentials, a new tab for Login Flow, preferences in localStorage, a
+  Web Lock so the tabs sync one at a time, `plans/foundation.md#D91`) and
   the browser's languages around `@astrotime/ui` (`src/main.tsx`); `?demo`
   in the dev server loads the demo data. → `plans/foundation.md#D12`
   - `src/secrets.ts` — credentials in IndexedDB under a key the page cannot

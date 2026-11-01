@@ -18,6 +18,7 @@ import {
   type Reply,
   type Request,
 } from "./protocol.ts";
+import { serving } from "./serving.ts";
 
 type Sqlite3 = Awaited<ReturnType<typeof sqlite3InitModule>>;
 type Pool = Awaited<ReturnType<Sqlite3["installOpfsSAHPoolVfs"]>>;
@@ -75,64 +76,47 @@ async function lead(name: string): Promise<Leader> {
   // Every leader's connection is set up alike, since drivers move between
   // them without knowing: foreign keys on, as the store's schema expects.
   db.exec("PRAGMA foreign_keys = ON;");
+  // Any write transaction that commits, whatever it wrote: rows, the schema,
+  // `user_version`. A rolled back one changed nothing for the other tabs.
+  let committed = false;
+  sqlite3.capi.sqlite3_commit_hook(
+    db.pointer!,
+    () => {
+      committed = true;
+      return 0;
+    },
+    0,
+  );
   const leader = crypto.randomUUID();
   const channels = names(name);
   const store = new BroadcastChannel(channels.store);
   const clients = new Map<string, { channel: BroadcastChannel; watch: AbortController }>();
-  /** The driver whose transaction is open; the others' statements wait until it ends. */
-  let owner: string | undefined;
-  const waiting: { client: string; request: Request }[] = [];
-  let changes = db.changes(true);
 
-  const announce = (announcement: Announcement) => post(store, announcement);
-
-  /** Who holds the connection after a statement of `client`; tells the others of a commit. */
-  const settle = (client: string): boolean => {
-    const transaction = sqlite3.capi.sqlite3_get_autocommit(db.pointer!) === 0;
-    owner = transaction ? client : undefined;
-    if (!transaction) {
-      // A write rolled back counts too: the other tabs only read again.
-      const total = db.changes(true);
-      if (total !== changes) {
-        changes = total;
-        announce({ type: "changed", by: client });
-      }
-    }
-    return transaction;
-  };
-
-  const execute = (client: string, request: Request) => {
-    let result: { rows?: unknown[][]; error?: string };
-    try {
-      result =
-        request.type === "query"
-          ? {
-              rows: db.exec({
-                sql: request.sql,
-                bind: request.params as never,
-                rowMode: "array",
-                returnValue: "resultRows",
-              }) as unknown[][],
-            }
-          : (db.exec(request.sql), {});
-    } catch (error) {
-      result = { error: messageOf(error) };
-    }
-    const reply: Reply = { type: "result", id: request.id, transaction: settle(client), ...result };
-    const known = clients.get(client);
-    if (known) post(known.channel, reply);
-  };
-
-  // The oldest statement whose driver may use the connection runs next: any
-  // while no transaction is open, else only the owner's.
-  const drain = () => {
-    for (;;) {
-      const next = waiting.findIndex((w) => owner === undefined || owner === w.client);
-      if (next < 0) return;
-      const [{ client, request }] = waiting.splice(next, 1) as [(typeof waiting)[number]];
-      execute(client, request);
-    }
-  };
+  const served = serving(
+    {
+      query: (sql, params) =>
+        db.exec({
+          sql,
+          bind: params as never,
+          rowMode: "array",
+          returnValue: "resultRows",
+        }) as unknown[][],
+      script: (sql) => void db.exec(sql),
+      inTransaction: () => sqlite3.capi.sqlite3_get_autocommit(db.pointer!) === 0,
+      committed: () => {
+        const was = committed;
+        committed = false;
+        return was;
+      },
+    },
+    {
+      reply(client, reply) {
+        const known = clients.get(client);
+        if (known) post(known.channel, reply);
+      },
+      changed: (by) => post(store, { type: "changed", by } satisfies Announcement),
+    },
+  );
 
   const gone = (client: string) => {
     const known = clients.get(client);
@@ -140,15 +124,7 @@ async function lead(name: string): Promise<Leader> {
     clients.delete(client);
     known.watch.abort();
     known.channel.close();
-    for (let i = waiting.length - 1; i >= 0; i--) {
-      if (waiting[i]!.client === client) waiting.splice(i, 1);
-    }
-    if (owner === client) {
-      // A tab gone mid-transaction leaves nothing of it.
-      db.exec("ROLLBACK;");
-      settle(client);
-    }
-    drain();
+    served.gone(client);
   };
 
   const serve = (client: string) => {
@@ -159,10 +135,9 @@ async function lead(name: string): Promise<Leader> {
         watch: new AbortController(),
       };
       clients.set(client, known);
-      known.channel.addEventListener("message", (event: MessageEvent<Request>) => {
-        waiting.push({ client, request: event.data });
-        drain();
-      });
+      known.channel.addEventListener("message", (event: MessageEvent<Request>) =>
+        served.receive(client, event.data),
+      );
       // A driver holds a lock of its own while it is open: granted here, it is gone.
       navigator.locks
         .request(channels.client(client), { signal: known.watch.signal }, () => gone(client))
@@ -176,7 +151,7 @@ async function lead(name: string): Promise<Leader> {
   store.addEventListener("message", (event: MessageEvent<Announcement>) => {
     if (event.data.type === "hello") serve(event.data.client);
   });
-  announce({ type: "leader", leader });
+  post(store, { type: "leader", leader } satisfies Announcement);
 
   let done: () => void = () => {};
   const closed = new Promise<void>((resolve) => (done = resolve));
@@ -185,8 +160,7 @@ async function lead(name: string): Promise<Leader> {
     close() {
       // A transaction left open is rolled back; the statements not run yet
       // go to the next leader (docs/plans/foundation.md#D98).
-      if (owner !== undefined) db.exec("ROLLBACK;");
-      waiting.length = 0;
+      served.close();
       for (const known of clients.values()) {
         known.watch.abort();
         post(known.channel, { type: "bye", leader } satisfies Reply);
@@ -194,9 +168,14 @@ async function lead(name: string): Promise<Leader> {
       }
       clients.clear();
       store.close();
-      db.close();
-      // The files' handles go before the lock, so the next leader opens them at once.
-      pool.pauseVfs();
+      try {
+        db.close();
+        // The files' handles go before the lock, so the next leader opens them at once.
+        pool.pauseVfs();
+      } catch {
+        // The lock goes all the same: the next leader opens the files once
+        // this worker's end lets them go (`open` tries again meanwhile).
+      }
       done();
     },
   };

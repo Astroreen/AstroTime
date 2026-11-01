@@ -1,6 +1,7 @@
 import type { HttpClient } from "@astrotime/caldav";
 import type { SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
+import type { SyncLock } from "@astrotime/sync";
 
 import type { Preferences } from "./preferences.ts";
 
@@ -20,4 +21,9 @@ export interface Platform {
   readonly openExternal: (url: string) => void;
   /** Where this device's choices are kept (the view, hidden calendars). */
   readonly preferences: Preferences;
+  /**
+   * Keeps syncs apart where several instances share the store: the web's
+   * tabs (foundation D91). A shell with one instance of its store has none.
+   */
+  readonly syncLock?: SyncLock;
 }

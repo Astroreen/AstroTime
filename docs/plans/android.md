@@ -199,9 +199,10 @@ were checked on 2026-11-01.
   does, the job does nothing, since the open app syncs itself. The app
   starting while the job leads follows it at once, never waiting, and leads
   when the job closes the store, or when the job's process is killed, which
-  releases the lock with its WebView (two syncs of one account at once are
-  foundation's Deferred "Scheduling syncs"). _Changed by
-  foundation D98:_ the app first asked the job to yield and waited for the
+  releases the lock with its WebView. The job's `syncAll` takes the tabs'
+  sync lock ([foundation D91](foundation.md#D91)), so the app's first sync
+  waits for the job's to end instead of uploading the same change beside
+  it. _Changed by foundation D98:_ the app first asked the job to yield and waited for the
   lock, up to the job's 10 minutes. A run cut short loses nothing: an object is marked
   synced only when the server took it, and a calendar's sync token is saved
   only after its download, so the next sync picks up where it stopped
