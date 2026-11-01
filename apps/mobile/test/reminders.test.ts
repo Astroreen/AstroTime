@@ -496,3 +496,28 @@ test("a tapped reminder reaches the UI, also one that started the app before the
   phone.tap({ reminder: call });
   expect(heard).toEqual(["call", "lunch"]);
 });
+
+test("two instances on one set of preferences (the open app and background sync, D67) never share an id", async () => {
+  const phone = device();
+  const preferences = memoryPreferences();
+  // One lock between them, as the WebViews' shared Web Lock.
+  let held = Promise.resolve();
+  const lock = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = held.then(work);
+    held = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
+  };
+  const make = () => androidReminders({ native: phone.native, preferences, now: () => NOW, lock });
+  // The app reads the kept map when it starts; background sync then hands out an id.
+  const app = make();
+  await make().schedule([reminder("lunch", NOW + 3 * 60 * MINUTE)]);
+  await app.schedule([reminder("call", NOW + 30 * MINUTE)]);
+  // Lunch left the set under its own id; call did not take it.
+  expect(idOf(phone, "lunch")).toBe(1);
+  expect(idOf(phone, "call")).toBe(2);
+  expect(phone.last().cancelled).toEqual([1]);
+  expect([...phone.pending.keys()]).toEqual([2]);
+});

@@ -100,13 +100,17 @@ const permissionOf = (state: NativePermission): ReminderPermission =>
 
 /**
  * Android's `ReminderScheduler`. `onResume` hears the app come to the front,
- * when the permissions may have changed in the system's settings.
+ * when the permissions may have changed in the system's settings. `lock`
+ * keeps each set's diff apart from another instance's on the same
+ * preferences (the open app's and background sync's, D67): under it the
+ * kept map is read again, so neither hands out an id the other did.
  */
 export function androidReminders(options: {
   native: NativeNotifications;
   preferences: Preferences;
   now?: () => number;
   onResume?: (listener: () => void) => void;
+  lock?: <T>(work: () => Promise<T>) => Promise<T>;
 }): ReminderScheduler {
   const { native, preferences, now = () => Date.now() } = options;
   const record = readKept(preferences);
@@ -313,7 +317,13 @@ export function androidReminders(options: {
       const run = queue.then(async () => {
         const next = pending;
         pending = null;
-        if (next) await apply(next);
+        if (!next) return;
+        const { lock } = options;
+        if (!lock) return apply(next);
+        await lock(() => {
+          kept = readKept(preferences);
+          return apply(next);
+        });
       });
       queue = run.catch(() => {});
       return run;

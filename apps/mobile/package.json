@@ -14,6 +14,7 @@
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
     "@astrotime/storage": "workspace:*",
+    "@astrotime/sync": "workspace:*",
     "@astrotime/ui": "workspace:*",
     "@capacitor/android": "catalog:",
     "@capacitor/app": "catalog:",

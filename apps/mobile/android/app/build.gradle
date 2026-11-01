@@ -53,11 +53,15 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation "com.squareup.okhttp3:okhttp:$okhttpVersion"
+    implementation "androidx.work:work-runtime:$workVersion"
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
     testImplementation "junit:junit:$junitVersion"
     testImplementation "com.squareup.okhttp3:mockwebserver3:$okhttpVersion"
     testImplementation "com.squareup.okhttp3:okhttp-tls:$okhttpVersion"
+    testImplementation "org.json:json:$orgJsonVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation "androidx.work:work-testing:$workVersion"
     implementation project(':capacitor-cordova-android-plugins')
 }
 

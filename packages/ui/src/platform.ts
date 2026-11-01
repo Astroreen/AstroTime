@@ -59,7 +59,8 @@ export interface Platform {
   readonly preferences: Preferences;
   /**
    * Keeps syncs apart where several instances share the store: the web's
-   * tabs (foundation D91). A shell with one instance of its store has none.
+   * tabs (foundation D91), Android's app and its background sync (android
+   * D67). A shell with one instance of its store has none.
    */
   readonly syncLock?: SyncLock;
   /** Shows the reminders the UI works out (docs/plans/foundation.md#D101). */

@@ -15,4 +15,8 @@ ext {
     cordovaAndroidVersion = '14.0.1'
     // AstroTime's HTTP plugin (docs/plans/android.md#D62); 5.5 needs compileSdk 37.
     okhttpVersion = '5.4.0'
+    // Background sync (docs/plans/android.md#D67).
+    workVersion = '2.11.0'
+    // The JVM tests' org.json: Android's is a stub there.
+    orgJsonVersion = '20250517'
 }
