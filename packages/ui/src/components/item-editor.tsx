@@ -100,7 +100,7 @@ export function ItemEditor({
   return (
     <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <Dialog.Backdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
         <Dialog.Popup className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}>
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>

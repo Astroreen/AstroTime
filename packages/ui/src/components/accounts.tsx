@@ -218,8 +218,8 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         {attention ? t("accounts.buttonAttention") : ""}
       </span>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
+        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
+        <Dialog.Popup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0 data-ending-style:pointer-events-none">
           {/* Closed by ✕ before its title, as every other dialog (design D137). */}
           <div className="mb-2 flex items-center gap-2">
             <Dialog.Close className={dialogIcon} aria-label={t("accounts.close")}>

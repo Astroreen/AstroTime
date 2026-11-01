@@ -47,7 +47,7 @@ export const dialogIcon =
 
 /** The popup of the details and edit dialogs: the whole screen on a phone, a card on a wide one. */
 export const sheet =
-  "fixed inset-0 flex flex-col overflow-hidden bg-raised text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:max-h-[min(44rem,calc(100dvh-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl data-ending-style:sm:scale-95 data-starting-style:sm:scale-95";
+  "fixed inset-0 flex flex-col overflow-hidden bg-raised text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:max-h-[min(44rem,calc(100dvh-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl data-ending-style:sm:scale-95 data-starting-style:sm:scale-95 data-ending-style:pointer-events-none";
 
 export function ItemDetails({
   target,
@@ -75,7 +75,7 @@ export function ItemDetails({
   return (
     <Dialog.Root open={target !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
         <Dialog.Popup className={`${sheet} z-[110] sm:w-[min(28rem,calc(100vw-2rem))]`}>
           {target && (
             <Body

@@ -46,7 +46,7 @@ export function SettingsScreen({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
         <Dialog.Popup
           className={`${sheet} z-[110] pt-(--inset-top) pb-(--inset-bottom) sm:w-[min(40rem,calc(100vw-2rem))] sm:pt-0 sm:pb-0`}
         >
