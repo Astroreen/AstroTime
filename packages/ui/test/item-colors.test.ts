@@ -9,8 +9,11 @@ import { describe, expect, test } from "vite-plus/test";
 
 const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
-/** The luminance the fill is capped at, as styles.css has it. */
-const CAP = Number(/--dim: min\(1, ([\d.]+) \//.exec(css)?.[1]);
+/** The luminance the fill is capped at, as styles.css has it; the rule not found, no test runs. */
+const capMatch = /--dim: min\(1, ([\d.]+) \//.exec(css);
+if (!capMatch)
+  throw new Error("styles.css has no `--dim: min(1, <cap> / …)`: the model is out of date");
+const CAP = Number(capMatch[1]);
 
 type Rgb = readonly [number, number, number];
 
@@ -61,7 +64,7 @@ function hueOf([r, g, b]: Rgb): number {
 describe("an item's fill (design D120)", () => {
   test("styles.css caps the luminance below where white reaches 4.5:1", () => {
     // White (luminance 1) against the cap: (1 + 0.05) / (CAP + 0.05).
-    expect(CAP).toBeGreaterThan(0);
+    expect(Number.isFinite(CAP) && CAP > 0, `the cap read: ${capMatch[1]}`).toBe(true);
     expect(contrastWithWhite([CAP, CAP, CAP])).toBeGreaterThanOrEqual(4.5);
   });
 
