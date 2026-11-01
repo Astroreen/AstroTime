@@ -433,9 +433,15 @@ function allowed(scopes: Scope[], rights: CalendarRights): Scope[] | null {
  * The scopes a deletion may take in a calendar with these rights (D37,
  * D105): one occurrence, or it and the following ones, change the series (an
  * edit); all of them delete it, as a deletion of an item that does not
- * repeat does. Empty: it cannot be deleted.
+ * repeat does. A series held without its master loses one exception, an
+ * edit, unless it is the last, which deletes the object. Empty: it cannot be
+ * deleted.
  */
 export function deleteScopes(target: Target, rights: CalendarRights): Scope[] {
+  if (!target.object.master && target.recurrenceId !== null) {
+    const last = target.object.exceptions.length <= 1;
+    return (last ? rights.delete : rights.edit) ? ["this"] : [];
+  }
   if (!isOccurrence(target)) return rights.delete ? ["all"] : [];
   // From the first occurrence "this and following" deletes the whole series.
   const following = isFirstOccurrence(target) ? rights.delete : rights.edit;
@@ -501,7 +507,7 @@ export class InDoubtError extends Error {
  * `CommitInDoubtError` is answered by reading again: done if what it wrote is
  * there, else an `InDoubtError` for the user to look.
  */
-export async function changeLocal(
+async function changeLocal(
   store: Store,
   change: (local: LocalChange) => Promise<void>,
 ): Promise<void> {
@@ -701,4 +707,29 @@ export async function deleteTarget(
     if (ics === null) await local.delete(stored.id);
     else await local.save(stored.calendarId, ics, stored.href);
   });
+}
+
+/**
+ * Writes one change of the item opened (a task's completion or star) onto
+ * the object as the store holds it now, through `changeLocal`: an item or an
+ * occurrence gone meanwhile is a `GoneError`, as for saving the form.
+ */
+export async function rewriteTarget(
+  store: Store,
+  target: Target,
+  ics: (object: CalendarObject) => string,
+): Promise<void> {
+  await changeLocal(store, async (local) => {
+    const { stored, object } = await current(local, target);
+    await local.save(stored.calendarId, ics(object), stored.href);
+  });
+}
+
+/** What the user is told when a change made outside the edit dialog did not land (D99, D103). */
+export type Notice = "gone" | "inDoubt" | "failed" | "deleteInDoubt" | "deleteFailed";
+
+/** The notice for a change that failed; a deletion of an item gone already never does. */
+export function noticeOf(error: unknown, action: "change" | "delete"): Notice {
+  if (action === "delete") return error instanceof InDoubtError ? "deleteInDoubt" : "deleteFailed";
+  return error instanceof GoneError ? "gone" : error instanceof InDoubtError ? "inDoubt" : "failed";
 }

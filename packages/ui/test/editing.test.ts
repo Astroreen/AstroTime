@@ -2,7 +2,7 @@
 // the form an item opens with, the changes a form makes (only what the user
 // changed), the scopes offered, the writes to the local store, the words of
 // rules and reminders, and the Conflicts list's two ways out.
-import { CalendarObject, occurrencesBetween, type Event } from "@astrotime/core";
+import { CalendarObject, occurrencesBetween, starTask, type Event } from "@astrotime/core";
 import { CommitInDoubtError, HandOverError, Store, type LocalChange } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
@@ -18,7 +18,9 @@ import {
   GoneError,
   InDoubtError,
   newForm,
+  noticeOf,
   problemOf,
+  rewriteTarget,
   saveForm,
   scopesFor,
   timesOfForm,
@@ -289,6 +291,28 @@ describe("what a calendar's rights offer (D37)", () => {
     expect(deleteScopes(first, rights(true, true, true))).toEqual(["this", "following", "all"]);
   });
 
+  test("a series held without its master: one exception of several is an edit, the last a deletion (D105)", async () => {
+    const { store, byName } = await demo();
+    const exception = (day: string) =>
+      `BEGIN:VEVENT\r\nUID:orphans\r\nDTSTAMP:20261101T000000Z\r\nRECURRENCE-ID;TZID=Europe/Vilnius:${day}T090000\r\nDTSTART;TZID=Europe/Vilnius:${day}T090000\r\nDTEND;TZID=Europe/Vilnius:${day}T100000\r\nSUMMARY:${day}\r\nEND:VEVENT\r\n`;
+    const held = async (href: string, ...days: string[]) =>
+      targetOn(
+        store,
+        await store.saveFromServer(byName("Work").id, {
+          href,
+          etag: '"1"',
+          ics: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\n${days.map(exception).join("")}END:VCALENDAR\r\n`,
+        }),
+        `${days[0]!.slice(0, 4)}-${days[0]!.slice(4, 6)}-${days[0]!.slice(6)}`,
+      );
+    const two = await held("two.ics", "20261105", "20261106");
+    expect(deleteScopes(two, rights(false, true, false))).toEqual(["this"]);
+    expect(deleteScopes(two, rights(false, false, true))).toEqual([]);
+    const last = await held("last.ics", "20261105");
+    expect(deleteScopes(last, rights(false, true, false))).toEqual([]);
+    expect(deleteScopes(last, rights(false, false, true))).toEqual(["this"]);
+  });
+
   test("a new item goes where new items may; an existing one stays, and moves out only where its calendar lets it go", async () => {
     const { byName } = await demo();
     const at = (name: string, r: ReturnType<typeof rights>) => ({ ...byName(name), rights: r });
@@ -547,6 +571,38 @@ describe("saving writes pending changes through the store (D5)", () => {
       ),
     ).rejects.toThrow(InDoubtError);
     expect(await summary()).toBe("Committed");
+  });
+
+  test("a completion or a star onto what the store holds; gone meanwhile, the user is told (D99, D103)", async () => {
+    const { store, rowOf } = await demo();
+    const standup = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const star = (object: CalendarObject) => starTask(object, true, NOW);
+    // A sync changed the series meanwhile: the star goes onto that.
+    const changed = (await rowOf("Work", "demo-standup")).ics.replace(
+      "END:VEVENT",
+      "X-OTHER-CLIENT:kept\r\nEND:VEVENT",
+    );
+    await store.saveFromServer(standup.calendarId, {
+      href: "demo-standup.ics",
+      etag: '"2"',
+      ics: changed,
+    });
+    await rewriteTarget(store, standup, star);
+    expect((await rowOf("Work", "demo-standup")).ics).toContain("X-OTHER-CLIENT:kept\r\n");
+    // The occurrence deleted in another tab, then the whole item.
+    await deleteTarget(store, standup, "this", NOW);
+    const error = await rewriteTarget(store, standup, star).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(GoneError);
+    expect(noticeOf(error, "change")).toBe("gone");
+    await deleteTarget(store, standup, "all", NOW);
+    const all = { ...standup, recurrenceId: null };
+    await expect(rewriteTarget(store, all, star)).rejects.toThrow(GoneError);
+    // A deletion of what is gone already is done; one in doubt or failed says so.
+    await expect(deleteTarget(store, all, "all", NOW)).resolves.toBeUndefined();
+    expect(noticeOf(new InDoubtError("?"), "delete")).toBe("deleteInDoubt");
+    expect(noticeOf(new InDoubtError("?"), "change")).toBe("inDoubt");
+    expect(noticeOf(new Error("disk full"), "delete")).toBe("deleteFailed");
+    expect(noticeOf(new Error("disk full"), "change")).toBe("failed");
   });
 
   test("this and following on another day: the new series' rule names the new days", async () => {

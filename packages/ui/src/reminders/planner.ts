@@ -40,7 +40,7 @@ export type Notification = (reminder: Reminder) => ScheduledReminder["notificati
 export class ReminderPlanner {
   readonly #store: Store;
   readonly #scheduler: ReminderScheduler;
-  readonly #timeZone: string;
+  #timeZone: string;
   readonly #clock: PlannerClock;
   readonly #onSet: (set: readonly ScheduledReminder[]) => void;
   #stop: (() => void) | null = null;
@@ -63,10 +63,12 @@ export class ReminderPlanner {
 
   /**
    * Keeps the platform's set with these words; `null` turns reminders off,
-   * which hands the platform an empty set.
+   * which hands the platform an empty set. A new `timeZone` (the user's
+   * changed while the app is open) places dates and midnight there from now on.
    */
-  update(notification: Notification | null): void {
+  update(notification: Notification | null, timeZone = this.#timeZone): void {
     this.stop();
+    this.#timeZone = timeZone;
     if (!notification) {
       this.#schedule([]);
       return;

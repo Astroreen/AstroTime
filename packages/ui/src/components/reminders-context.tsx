@@ -73,7 +73,7 @@ export function RemindersProvider({
 
   useEffect(() => {
     const words = { t, formats, locale: settings.locale, timeZone };
-    planner.update(enabled ? (reminder) => reminderNotification(reminder, words) : null);
+    planner.update(enabled ? (reminder) => reminderNotification(reminder, words) : null, timeZone);
   }, [planner, enabled, t, formats, settings.locale, timeZone]);
   useEffect(() => () => planner.stop(), [planner]);
 

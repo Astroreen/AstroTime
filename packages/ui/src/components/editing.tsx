@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   calendarsFor,
-  changeLocal,
   deleteScopes,
   deleteTarget,
   followed,
@@ -28,16 +27,20 @@ import {
   isOccurrence,
   itemOf,
   newForm,
+  noticeOf,
   problemOf,
   saveChanges,
+  rewriteTarget,
   saveForm,
   scopesFor,
   scopesForTimes,
   type Form,
+  type Notice,
   type Target,
 } from "../calendar/editing.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
+import { ChangeNotice } from "./change-notice.tsx";
 import { ItemDetails } from "./item-details.tsx";
 import { ItemEditor, type EditorState } from "./item-editor.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
@@ -71,6 +74,11 @@ export interface EditingValue {
    * (design D111); resolves once it is written, or why it was not.
    */
   reschedule(target: Target, times: ItemTimes): Promise<Rescheduled>;
+  /**
+   * Writes one change of an item (a task completed or starred) onto what the
+   * store holds now, telling the user when it did not land.
+   */
+  rewrite(target: Target, ics: (object: CalendarObject) => string): void;
 }
 
 export const EditingContext = createContext<EditingValue | null>(null);
@@ -187,8 +195,18 @@ export function useEditingState({
   /** The calendar the item being edited was in; none for a new item. */
   const fromOf = (current: Editing) => byId(current.initial?.calendarId);
 
-  const write = (work: Promise<unknown>) =>
-    work.then(onChanged, (error: unknown) => console.error(error));
+  const [notice, setNotice] = useState<Notice | null>(null);
+  /** A change made outside the edit dialog; the user is told when it did not land (D99). */
+  const write = (work: Promise<unknown>, action: "change" | "delete" = "change") => {
+    setNotice(null);
+    void work.then(onChanged, (error: unknown) => {
+      const told = noticeOf(error, action);
+      if (told === "failed" || told === "deleteFailed") console.error(error);
+      setNotice(told);
+    });
+  };
+  const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
+    write(rewriteTarget(store, target, ics));
 
   /** Why a save did not land, for the user (D99): gone meanwhile, unclear, or failed. */
   const failureOf = (error: unknown): "gone" | "inDoubt" | "failed" => {
@@ -254,6 +272,7 @@ export function useEditingState({
         }
       });
     },
+    rewrite,
   };
 
   const change = (form: Form) =>
@@ -329,37 +348,28 @@ export function useEditingState({
       scopes: isOccurrence(target) ? deleteScopes(target, rightsOf(byId(target.calendarId))) : [],
       run: (scope) => {
         setDetails(null);
-        void write(deleteTarget(store, target, scope, Date.now()));
+        write(deleteTarget(store, target, scope, Date.now()), "delete");
       },
     });
   };
-
-  const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
-    changeLocal(store, async (local) => {
-      const row = await local.object(target.objectId);
-      if (!row) return;
-      await local.save(row.calendarId, ics(CalendarObject.parse(row.ics)), row.href);
-    });
 
   const complete = () => {
     if (!details || details.item.kind !== "task") return;
     const { object, recurrenceId, item } = details;
     const seriesDone = object.master !== null && isDone(object.master);
     const done = seriesDone || isDone(item);
-    void write(
-      rewrite(details, (current) =>
-        completeTask(current, !done, {
-          now: Date.now(),
-          recurrenceId: seriesDone ? null : recurrenceId,
-        }),
-      ),
+    rewrite(details, (current) =>
+      completeTask(current, !done, {
+        now: Date.now(),
+        recurrenceId: seriesDone ? null : recurrenceId,
+      }),
     );
   };
 
   const star = () => {
     if (!details) return;
     const starred = details.object.master?.kind === "task" && details.object.master.starred;
-    void write(rewrite(details, (current) => starTask(current, !starred, Date.now())));
+    rewrite(details, (current) => starTask(current, !starred, Date.now()));
   };
 
   const calendar = byId(details?.calendarId);
@@ -384,6 +394,7 @@ export function useEditingState({
         onClose={() => setEditing(null)}
       />
       <ScopeDialog request={asking} onClose={() => setAsking(null)} />
+      <ChangeNotice notice={notice} onClose={() => setNotice(null)} />
     </>
   );
   return { value, dialogs };
