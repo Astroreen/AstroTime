@@ -4,7 +4,7 @@
 // any method, follows redirects itself and sends plain http only to the
 // origins it is given with the request. This side shapes what crosses the
 // bridge, and turns the plugin's "offline" into `OfflineError`.
-import type { HttpClient } from "@astrotime/caldav";
+import { ProxyRefusedError, type HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 
 /** One exchange, as the plugin takes it. */
@@ -54,6 +54,12 @@ export function nativeClient(
         throw new OfflineError(`${request.method} ${request.url} could not reach the server.`, {
           cause: error,
         });
+      }
+      // A hop to plain http the user did not type: as the web's proxy says of
+      // a redirect elsewhere, so sign-in names the address to sign in with.
+      if (codeOf(error) === "cleartext") {
+        const origin = /http:\/\/[^\s]+/.exec(String((error as Error).message))?.[0] ?? "";
+        throw new ProxyRefusedError(request, `other-server ${origin}`);
       }
       throw error;
     }

@@ -8,6 +8,7 @@ import { registerPlugin } from "@capacitor/core";
 
 import { cleartextOrigins, nativeClient, type NativeHttp } from "./http.ts";
 import { preferences } from "./preferences.ts";
+import { noReminders } from "./reminders.ts";
 import { memorySecrets } from "./secrets.ts";
 
 const plugin = registerPlugin<NativeHttp>("AstroTimeHttp");
@@ -29,5 +30,6 @@ export function mobilePlatform(store: Promise<Store>): Platform {
       return () => void signingIn.splice(signingIn.indexOf(server), 1);
     },
     preferences,
+    reminders: noReminders,
   };
 }

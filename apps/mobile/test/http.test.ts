@@ -71,17 +71,35 @@ test("a request without a body sends none", async () => {
   expect(requests[0]).not.toHaveProperty("body");
 });
 
-test("the plugin's offline is OfflineError; any other refusal stays what it is", async () => {
+test("the plugin's offline is OfflineError; a hop to plain http names its address; any other refusal stays", async () => {
   const offline = nativeClient(plugin({ code: "offline" }).http, async () => []);
   await expect(offline({ method: "GET", url: "https://a.example/", headers: {} })).rejects.toThrow(
     OfflineError,
   );
-  const refused = nativeClient(plugin({ code: "cleartext" }).http, async () => []);
+  const cleartext = nativeClient(
+    {
+      request: async () => {
+        throw Object.assign(
+          new Error("Plain http to http://b.example:8080 is not an address the user typed."),
+          { code: "cleartext" },
+        );
+      },
+    },
+    async () => [],
+  );
+  await expect(
+    cleartext({ method: "PROPFIND", url: "https://a.example/", headers: {} }),
+  ).rejects.toMatchObject({
+    name: "ProxyRefusedError",
+    reason: "other-server",
+    location: "http://b.example:8080",
+  });
+  const refused = nativeClient(plugin({ code: "redirects" }).http, async () => []);
   const error = await refused({ method: "GET", url: "http://a.example/", headers: {} }).catch(
     (caught: unknown) => caught,
   );
   expect(error).not.toBeInstanceOf(OfflineError);
-  expect(error).toMatchObject({ code: "cleartext" });
+  expect(error).toMatchObject({ code: "redirects" });
 });
 
 test("plain http may reach the accounts' servers and calendar homes and the one being signed in to, nothing else", () => {
