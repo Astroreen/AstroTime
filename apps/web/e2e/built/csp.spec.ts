@@ -67,6 +67,15 @@ test("the built app opens its store, adds an account through the proxy, and brea
   });
   expect(response.status).toBe(201);
 
+  // Every script and wasm the page or its workers fetch: a worker follows the
+  // policy of its own script, not the page's (D110).
+  const files: { path: string; policy: string }[] = [];
+  page.on("response", (answer) => {
+    const path = new URL(answer.url()).pathname;
+    if (/\.(js|wasm)$/.test(path)) {
+      files.push({ path, policy: answer.headers()["content-security-policy"] ?? "" });
+    }
+  });
   const loaded = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
   await openApp(page);
   const policy = (await loaded).headers()["content-security-policy"] ?? "";
@@ -75,6 +84,13 @@ test("the built app opens its store, adds an account through the proxy, and brea
   await expect(
     page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
   ).toBeVisible();
+
+  // The worker's script and SQLite's wasm came with the policy, without a nonce.
+  expect(files.some((file) => file.path.endsWith(".wasm"))).toBe(true);
+  for (const file of files) {
+    expect([file.path, file.policy.includes("default-src 'none'")]).toEqual([file.path, true]);
+    expect([file.path, file.policy.includes("nonce-")]).toEqual([file.path, false]);
+  }
 
   // The page's nonce, as the app reads it for Base UI, is the one its policy names,
   // and a <style> that carries it applies.
