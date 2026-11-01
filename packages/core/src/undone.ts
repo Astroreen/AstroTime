@@ -4,7 +4,7 @@
 // chip on today.
 import type { CalendarObject } from "./calendar-object.ts";
 import type { Item } from "./item.ts";
-import { occurrencesBetween, type Occurrence } from "./occurrences.ts";
+import { firstDay, occurrencesBetween, shiftDate, type Occurrence } from "./occurrences.ts";
 import { wallClockOf } from "./time.ts";
 
 /**
@@ -40,6 +40,14 @@ export function isUndoneBefore(
  * The occurrence by which a task counts in today's "N undone tasks": its
  * latest undone one due before `day`, or `null`. A recurring task counts
  * once (D51).
+ *
+ * A series is read back from `day` a window at a time, each eight times as
+ * wide as the last, instead of from its first occurrence (D118): an
+ * occurrence outside a window ends by the window's start, so one in it due
+ * after that start is the latest. The last window reaches three days before
+ * the first occurrence (`firstDay`; no zone shows one earlier), so it holds
+ * them all: five windows reach back 359 years, and a series is
+ * walked whole at most once, as it was before D118.
  */
 export function latestUndoneBefore(
   object: CalendarObject,
@@ -47,12 +55,21 @@ export function latestUndoneBefore(
   timeZone: string,
 ): Occurrence | null {
   if (object.kind !== "task" || (object.master && isDone(object.master))) return null;
-  const undone = occurrencesBetween(object, { from: "0001-01-01", to: day, timeZone }).filter(
-    (occurrence) => isUndoneBefore(object, occurrence, day, timeZone),
-  );
   const dueOf = (occurrence: Occurrence) => wallClockOf(occurrence.end, timeZone);
-  return undone.reduce<Occurrence | null>(
-    (latest, occurrence) => (!latest || dueOf(occurrence) > dueOf(latest) ? occurrence : latest),
-    null,
-  );
+  const first = firstDay(object);
+  // A task that does not recur has one occurrence, and one with no date none.
+  // Three days early, never before year 1: an ISO string there is "0000-" or
+  // "-00001-", which does not compare as a date.
+  const all = first === null || first < "0001-01-04" ? "0001-01-01" : shiftDate(first, -3);
+  for (let days = 32; ; days *= 8) {
+    const window = object.master?.recurring ? shiftDate(day, -days) : all;
+    const from = window > all ? window : all;
+    const latest = occurrencesBetween(object, { from, to: day, timeZone })
+      .filter((occurrence) => isUndoneBefore(object, occurrence, day, timeZone))
+      .reduce<Occurrence | null>(
+        (found, occurrence) => (!found || dueOf(occurrence) > dueOf(found) ? occurrence : found),
+        null,
+      );
+    if (from === all || (latest && dueOf(latest) > `${from}T00:00:00`)) return latest;
+  }
 }

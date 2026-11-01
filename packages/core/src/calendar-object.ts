@@ -33,6 +33,7 @@ export class CalendarObject {
   };
 
   private constructor(root: ICAL.Component) {
+    shareTimeZones(root);
     const items = ITEM_COMPONENTS.flatMap((name) => root.getAllSubcomponents(name));
     const first = items[0];
     if (!first) throw new CalendarObjectError("The calendar object has no VEVENT or VTODO.");
@@ -83,6 +84,37 @@ export class CalendarObject {
     } finally {
       ICAL.foldLength = previous;
     }
+  }
+}
+
+/**
+ * ical.js zones already made from a VTIMEZONE, by its exact content. Each
+ * zone works out its changes of offset from its first observance (1970 for
+ * most clients) when a time in it is first read: shared by every object with
+ * the same definition, that is done once, not once per object read
+ * (docs/plans/foundation.md#D118). An object whose VTIMEZONE differs in any
+ * way gets its own (D32). Bounded: past the limit the oldest goes.
+ */
+const sharedZones = new Map<string, ICAL.Timezone>();
+const SHARED_ZONES = 200;
+
+/** Puts the shared zones for a calendar's VTIMEZONEs where ical.js looks for them first. */
+function shareTimeZones(root: ICAL.Component): void {
+  // ical.js keeps a calendar's zones by TZID on its root, made when a time first needs one.
+  const cache: unknown = Reflect.get(root, "_timezoneCache");
+  if (!(cache instanceof Map)) return;
+  for (const component of root.getAllSubcomponents("vtimezone")) {
+    const tzid = component.getFirstPropertyValue("tzid");
+    if (typeof tzid !== "string" || cache.has(tzid)) continue;
+    const content = JSON.stringify(component.toJSON());
+    let zone = sharedZones.get(content);
+    if (!zone) {
+      // A copy of its own: the zone keeps no calendar it came from alive.
+      zone = new ICAL.Timezone({ component: new ICAL.Component(JSON.parse(content)), tzid });
+      if (sharedZones.size >= SHARED_ZONES) sharedZones.delete(sharedZones.keys().next().value!);
+      sharedZones.set(content, zone);
+    }
+    cache.set(tzid, zone);
   }
 }
 

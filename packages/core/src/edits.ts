@@ -9,6 +9,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { readItem } from "./item.ts";
+import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
 import { fromIcalTime, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
@@ -618,7 +619,8 @@ function occurrencesUpTo(
   bare.removeAllProperties("exdate");
   const start = bare.getFirstPropertyValue("dtstart") ?? bare.getFirstPropertyValue("due");
   if (!(start instanceof ICAL.Time)) return null;
-  const expansion = new ICAL.RecurExpansion({ component: bare, dtstart: start });
+  // ical.js's own walk, its search for each occurrence bounded (D118).
+  const nextStart = seriesStarts(bare, start, null);
   const keys = new Set<string>();
   const days = new Set<string>();
   const named = (time: ItemTime) =>
@@ -626,7 +628,7 @@ function occurrencesUpTo(
       ? days.has(dayOf(inFrameOf(time, anchor)))
       : keys.has(orderKey(time, anchor));
   for (let step = 0; step < 50_000; step++) {
-    const next = expansion.next();
+    const next = nextStart();
     if (!next) return named;
     const key = orderKey(fromIcalTime(next), anchor);
     if (key > last) return named;

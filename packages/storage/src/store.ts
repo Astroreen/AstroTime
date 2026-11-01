@@ -502,9 +502,9 @@ export class Store {
   /**
    * The occurrence an undone task counts by, remembered per object until its
    * iCalendar, the day or the zone changes: the chip is asked again on every
-   * change to the store, and a series is expanded from its first occurrence.
-   * A series too dense to expand counts as none (foundation's Deferred
-   * "Expanding long series from the middle").
+   * change to the store, and parsing and placing a series cost more than the
+   * query (docs/plans/foundation.md#D118). A series too dense to expand counts
+   * as none (foundation's Deferred "Expanding long series from the middle").
    */
   private undoneOccurrence(object: StoredObject, day: string, timeZone: string): Occurrence | null {
     const known = this.undoneCache.get(object.id);

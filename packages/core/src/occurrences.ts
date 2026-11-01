@@ -2,6 +2,7 @@ import ICAL from "ical.js";
 
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
+import { seriesStarts } from "./recurrence.ts";
 import { fromIcalTime, keepTzid, wallClockOf, type ItemTime } from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
@@ -28,10 +29,10 @@ export interface Range {
 
 /**
  * How many occurrences a series may be walked through before the range.
- * Expansion starts at the series' first occurrence (docs/plans/foundation.md#deferred),
- * so a minutely or hourly series from years ago would take seconds (a daily
- * one may reach back to 1890). Such a series is refused instead of being cut
- * short in silence.
+ * A daily, weekly, monthly or yearly rule starts near the range
+ * (docs/plans/foundation.md#D118); a counted one, or an hourly or minutely
+ * one, walks from its first occurrence, so one from years ago would take
+ * seconds. Such a series is refused instead of being cut short in silence.
  */
 const MAX_STEPS = 50_000;
 
@@ -104,6 +105,8 @@ function overlaps(start: ItemTime, end: ItemTime, range: Range): boolean {
  * range; a caller showing many objects catches it per object.
  * Expands `RRULE`, `RDATE` and `EXDATE`, and puts each exception
  * (`RECURRENCE-ID`) in place of the occurrence it replaces, wherever it moved.
+ * A rule that repeats with its period is walked from near the range, not
+ * from its first occurrence (D118).
  */
 export function occurrencesBetween(object: CalendarObject, range: Range): Occurrence[] {
   const { master, exceptions } = object.components;
@@ -116,13 +119,21 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
   const masterType = master ? anchors(master)?.start : undefined;
   const masterKind = masterType ? fromIcalTime(masterType).type : undefined;
   const replaced = new Set<string>();
+  const remove = (value: ICAL.Time) => {
+    const time = fromIcalTime(value);
+    replaced.add(key(time));
+    if (masterKind && time.type !== masterKind) replaced.add(looseKey(time, masterKind));
+    return time;
+  };
+  // An EXDATE removes its occurrence as a cancelled exception does, matched
+  // the same way (D118).
+  for (const property of master?.getAllProperties("exdate") ?? []) {
+    for (const value of property.getValues()) if (value instanceof ICAL.Time) remove(value);
+  }
   for (const component of exceptions) {
     const value = component.getFirstPropertyValue("recurrence-id");
     if (!(value instanceof ICAL.Time)) continue;
-    const recurrenceId = fromIcalTime(value);
-    replaced.add(key(recurrenceId));
-    if (masterKind && recurrenceId.type !== masterKind)
-      replaced.add(looseKey(recurrenceId, masterKind));
+    const recurrenceId = remove(value);
     // A cancelled exception removes its occurrence (docs/plans/foundation.md#D35).
     if (String(component.getFirstPropertyValue("status") ?? "").toUpperCase() === "CANCELLED")
       continue;
@@ -144,17 +155,22 @@ export function occurrencesBetween(object: CalendarObject, range: Range): Occurr
       if (overlaps(start, end, range)) result.push({ item, recurrenceId: null, start, end });
     } else {
       // Zones are up to 26 hours apart (UTC−12 to UTC+14), so a start can show
-      // more than a day away from its own wall clock.
+      // more than a day away from its own wall clock: an occurrence starting
+      // three days and its length before the range ends before it anywhere.
       const stop = `${shiftDate(range.to, 2)}T00:00:00`;
-      const expansion = new ICAL.RecurExpansion({ component: master, dtstart: span.start });
+      const floor = shiftDate(range.from, -3 - Math.ceil(length.toSeconds() / 86_400));
+      const floorDay = Number(floor.replaceAll("-", ""));
+      const nextStart = seriesStarts(master, span.start, floor);
       for (let step = 0; ; step++) {
-        const next = expansion.next();
+        const next = nextStart();
         if (!next) break;
         if (step >= MAX_STEPS) {
           throw new ExpansionLimitError(
             `The series ${object.uid} needs more than ${MAX_STEPS} steps to reach the range.`,
           );
         }
+        // Before the floor by its fields alone: placing it costs far more than the step.
+        if (next.year * 10_000 + next.month * 100 + next.day < floorDay) continue;
         keepTzid(span.start, next);
         const recurrenceId = fromIcalTime(next);
         if (localOf(recurrenceId) >= stop) break;
@@ -208,7 +224,29 @@ function localOf(time: ItemTime): string {
   return time.type === "date" ? `${time.date}T00:00:00` : time.local;
 }
 
-function shiftDate(date: string, days: number): string {
+/**
+ * The earliest day, on its own wall clock, an occurrence of the object can
+ * start on: its master's start or an RDATE before it (ical.js takes those),
+ * or an exception's own start. `null` when it has no date at all.
+ */
+export function firstDay(object: CalendarObject): string | null {
+  const { master, exceptions } = object.components;
+  const starts = exceptions.flatMap((component) => anchors(component)?.start ?? []);
+  const span = master ? anchors(master) : null;
+  if (master && span) {
+    starts.push(span.start);
+    for (const property of master.getAllProperties("rdate")) {
+      for (const value of property.getValues()) {
+        if (value instanceof ICAL.Time) starts.push(value);
+        else if (value instanceof ICAL.Period) starts.push(value.start);
+      }
+    }
+  }
+  const days = starts.map((time) => localOf(fromIcalTime(time)).slice(0, 10));
+  return days.length > 0 ? days.reduce((a, b) => (b < a ? b : a)) : null;
+}
+
+export function shiftDate(date: string, days: number): string {
   const ms = Date.parse(`${date}T00:00:00Z`) + days * 86_400_000;
   return new Date(ms).toISOString().slice(0, 10);
 }
@@ -257,16 +295,18 @@ export function boundsOf(object: CalendarObject): Bounds {
     if (rules.some((rule) => rule.until === null && rule.count === null)) {
       open = true;
     } else if (rules.length > 0 || master.hasProperty("rdate")) {
-      // Every rule ends: walk to the last occurrence, as far as MAX_STEPS allows.
+      // Every rule ends: walk to the last occurrence, as far as MAX_STEPS
+      // allows (an EXDATE'd last one only widens the bounds).
       const length = lengthOf(span);
-      const expansion = new ICAL.RecurExpansion({ component: master, dtstart: span.start });
+      const nextStart = seriesStarts(master, span.start, null);
       let last: ICAL.Time | null = null;
-      for (let step = 0; step < MAX_STEPS; step++) {
-        const next = expansion.next();
-        if (!next) break;
-        last = keepTzid(span.start, next);
+      let complete = false;
+      for (let step = 0; step < MAX_STEPS && !complete; step++) {
+        const next = nextStart();
+        if (next) last = keepTzid(span.start, next);
+        else complete = true;
       }
-      if (expansion.complete && last) include(last, plus(last, length));
+      if (complete && last) include(last, plus(last, length));
       else open = true;
     }
   }

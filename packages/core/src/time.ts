@@ -110,12 +110,26 @@ function ianaName(tzid: string): string {
   return windowsZone(tzid.trim()) ?? tzid;
 }
 
+/**
+ * Zone names already asked of `Intl`: every zoned time read asks, and making
+ * an `Intl.DateTimeFormat` costs more than the rest of reading the time
+ * (docs/plans/foundation.md#D118). Bounded as `wallClocks` is.
+ */
+const knownZones = new Map<string, boolean>();
+const KNOWN_ZONES = 1000;
+
 function isKnownTimeZone(timeZone: string): boolean {
+  const known = knownZones.get(timeZone);
+  if (known !== undefined) return known;
+  let result: boolean;
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone !== "";
+    result = new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone !== "";
   } catch {
-    return false;
+    result = false;
   }
+  if (knownZones.size >= KNOWN_ZONES) knownZones.delete(knownZones.keys().next().value!);
+  knownZones.set(timeZone, result);
+  return result;
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>();

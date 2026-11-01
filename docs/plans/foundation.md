@@ -547,7 +547,8 @@ Decided while building PR 5a.
   calendar is laid out in about 15 ms, not 200 (measured in PR 5a-2).
 - **D55. The store finds the undone tasks of design D51.**
   `undoneTasksBefore` returns each task once with the occurrence it counts by
-  (`latestUndoneBefore` in `@astrotime/core`), oldest due first. A task is
+  (`latestUndoneBefore` in `@astrotime/core`, a series read back from today,
+  [D118](#D118)), oldest due first. A task is
   **done** when it is completed (`STATUS:COMPLETED` or a `COMPLETED` time) or
   cancelled (`isDone`). Migration 4 adds a `done` column for the master, so
   the query skips done tasks without parsing them; rows written before it
@@ -1130,6 +1131,182 @@ Decided while building PR 6b.
     `scopesFor`'s rule (`scopesForTimes`): the rule stays, so a new day for
     one occurrence offers no "All".
 
+### Long series
+
+Decided while closing the Deferred "Expanding long series from the middle".
+
+- **D118. A series is walked from near the range.** `occurrencesBetween`
+  ([D33](#D33)) no longer walks every series from its first occurrence: a
+  big calendar's series from years ago made each new range take seconds
+  (below), for every view, the Agenda's reads, the undone chip and the
+  reminders.
+  - **Where a rule starts** (`startNear` in `recurrence.ts`). A rule whose
+    occurrences repeat with its period, `FREQ=DAILY`, `WEEKLY`, `MONTHLY` or
+    `YEARLY` with its `INTERVAL` and the parts ical.js works out within one
+    period, starts at `DTSTART` moved on its wall clock by whole periods of
+    the rule (`INTERVAL` days, weeks, months or years; a 31st or 29 February
+    only to a month that has it), so the lattice of periods, the time of day,
+    the zone and its DST changes are the series' own. It starts late enough
+    to be near the range and early enough that ical.js's iterator, quirky
+    only before it settles (the start itself given though the rule does not
+    name it, a week's days before it dropped, BYSETPOS and BYMONTHDAY worked
+    out for its own month first), has settled before anything that can touch
+    the range: by the next month for `DAILY` and `MONTHLY`, a week for
+    `WEEKLY`, the next year for `YEARLY`; and three days and the series'
+    length before the range's first day, as zones are at most 26 hours
+    apart. From there on its starts are ical.js's own walk from `DTSTART`.
+  - **The proof** is by generated series (`packages/core/test/recurrence.test.ts`):
+    every frequency, intervals, BYDAY with and without positions,
+    BYMONTHDAY from either end, BYMONTH, BYSETPOS, BYHOUR in and out of
+    order, WKST, UNTIL, COUNT, RDATE and two rules, starting at the ends of
+    months and in the hours DST skips, with a VTIMEZONE, with a TZID and
+    none (Google), in UTC, floating and all day, in zones north and south,
+    rules that never meet and rules ical.js refuses: the starts walked from
+    near a day far from `DTSTART` are those of ical.js's `RecurExpansion`
+    from `DTSTART`, bounded and read as below (of two rules, AstroTime's own
+    walk from `DTSTART`: ical.js's merge stops both when one ends); the
+    occurrences placed in a range, with EXDATEs and exceptions, are those
+    of the walk from the first one, in the user's zone far east or west;
+    and the undone chip's
+    occurrence, with done, moved and changed exceptions, is the one the walk
+    from the year 1 finds. Each run tests 2 150 series against ical.js, 240
+    placed in ranges and 240 recurring tasks, in chunks of about half a
+    second, so none comes near Vitest's 5 s on a slower runner.
+    `node scripts/sweep-recurrence.ts <seed>…` runs ten times as many for
+    other seeds, by hand, its oracle searching every rule at one time of the
+    day its whole cycle, so that what `neverMeets` knows is checked against
+    ical.js too:
+    105 200 series passed it (seeds 9118, 19118, 39118 and 49118).
+  - **What still walks from `DTSTART`**: a counted rule (where `COUNT` ends
+    depends on every occurrence before), an hourly or finer one, and rules
+    ical.js's iterator does not settle in, which the generated series found:
+    BYMONTH in a monthly rule (ical.js steps through its months without the
+    interval) and, not proven to settle, in a daily or weekly one,
+    BYWEEKNO, BYYEARDAY, a yearly BYMONTHDAY after the 28th or from the
+    month's end, a monthly or yearly rule at more than one time of day (a
+    month without the day gives the next month's first at the other times,
+    and the way there decides which), times of day out of order, and a rule
+    ical.js finds nothing for from `DTSTART`, or refuses from where it would
+    start. Those last are counted (the benchmark prints them, by ical.js's
+    message): on its calendar 6 415 rules started near the range, 28 walked
+    from `DTSTART`, none fell back. A walk skips the starts before the range
+    by their fields, without placing them, so a step costs microseconds;
+    past 50 000 steps it still throws `ExpansionLimitError`
+    ([Deferred](#deferred)).
+  - **A rule that never meets ends.** ical.js's iterator looks for each
+    occurrence in a loop with no end for a daily or finer rule that names
+    days it never reaches (`BYMONTHDAY=31;BYMONTH=4,11`, 30 February, a
+    BYMONTHDAY from the month's end, which a daily rule never matches as
+    ical.js never moves it to another month, `INTERVAL=7` with a BYDAY of
+    another weekday), and its constructor in one for the first month with a
+    fifth weekday (`FREQ=MONTHLY;INTERVAL=24;BYDAY=5MO` from an odd year's
+    February: every month of it a February of 28 days). Before D118 one
+    such event, which anyone can send, hung the views, the undone chip and
+    the reminders on the main thread, and the store's write of it with an
+    UNTIL; `ExpansionLimitError` did not help, as all of it was one step.
+    Now every walk is bounded by the Gregorian calendar's 400-year cycle
+    (146 097 days, 20 871 weeks, 4 800 months), with which a rule's
+    candidates repeat, whole periods at a time. A search for one occurrence
+    tries at most every candidate of 400 years of the rule's periods
+    (`triesFor`: 146 097 for a daily rule at one time of day, times each
+    time of day; 400 years of weeks, months or years times the candidates
+    one holds), steps at most 400 years of days (ical.js steps them one at a
+    time: a daily rule at `INTERVAL=7` steps 7 a candidate, and one at
+    `INTERVAL=999999999` never finished its first step), and ends past the
+    year 9999, which iCalendar cannot write nor `Intl` show (an hourly rule
+    with that interval lands in the year 116106 in one step, and the view
+    failed). The constructor's loops are bounded at 4 800 months and 400
+    years. A rule that ever meets meets within the cycle, so none at every
+    period is cut short: the 29th of February on a Monday takes 14 301 tries
+    from 2073 to 2112 (2100 is not a leap year), as ical.js tries every day
+    of a daily rule, BYMONTH's months or not, and is found. With an INTERVAL
+    the lattice of periods may take up to INTERVAL times as long to come
+    round; a rule meeting less often than every 400 years ends. Hourly and
+    finer rules try as many candidates as a daily one (17 years of hours,
+    101 days of minutes), the one bound not safe by construction: 400 years
+    of hours are 3.5 million tries. A rule that runs out has no more
+    occurrences: its `DTSTART`, the first by RFC 5545, as ical.js gave it,
+    or nothing when the constructor found no first one, as ical.js gives a
+    yearly rule that never meets. What a daily or finer rule never meets in
+    plain sight (a BYMONTHDAY no BYMONTH has, one from the month's end, a
+    BYDAY with a position, the 7-day interval) is known without walking
+    (`neverMeets`) and costs nothing; any other costs its 400 years, about
+    0.12 s a read (0.6 s the first, before the engine warms up;
+    `FREQ=DAILY;BYWEEKNO=53;BYMONTH=2`).
+  - **A rule ical.js refuses is its `DTSTART` alone.** ical.js throws for
+    some rules (`Malformed values in BYDAY part`: a sixth Monday, or a
+    BYDAY with a BYMONTHDAY a month does not meet; BYMONTHDAY in a weekly
+    rule), and before D118 one such object, from any server or invitation,
+    made the whole range fail to draw, in every view. Now `seriesStarts`
+    catches it where every walk goes through (the views, the chip, the
+    reminders, the store's bounds, the edits' check of which occurrences a
+    rule still names): the series is its `DTSTART`, the first occurrence by
+    RFC 5545, everything else in the range draws as ever, and the console
+    says so once per object and version of it, not on every read.
+  - **EXDATE is AstroTime's**, matched as a `RECURRENCE-ID` is
+    ([D35](#D35)): by instant, and by wall clock, or by day when either side
+    is a date, when written as another kind of time than the series' start.
+    RFC 5545 lets an EXDATE be a date (§3.8.5.1) without saying how it meets
+    a timed series; the day is what a client writing one means, and ical.js
+    reads it so too: `EXDATE;VALUE=DATE:20261103` removes the 3 November
+    occurrence of a daily 09:00 series. Of a rule with several a day
+    (`BYHOUR=9,17`, an hourly one) it removes them all, where ical.js
+    removed the first only. Where ical.js compares instants and
+    so misses (an EXDATE at midnight in a zone on an all-day series, a
+    floating 09:00 on a series at 09:00 in Vilnius), AstroTime matches the
+    day or the wall clock, as D35 does for a `RECURRENCE-ID` written so;
+    both forms are tested against ical.js. It also missed an EXDATE right
+    after one that names no occurrence (one left at a series' old time).
+    RDATEs and the rules are merged as ical.js merges them, except that a
+    rule that ends no longer ends the other (two RRULEs; ical.js stopped
+    both).
+  - **The undone chip** (`latestUndoneBefore`, [D55](#D55)) reads a series
+    back from today, 32 days and then eight times as many each time, instead
+    of from the year 1: an occurrence outside a window ends by its start, so
+    one in it due after that start is the latest. The last window reaches
+    three days before the series' first occurrence (`firstDay`: its start,
+    an RDATE or a moved exception before it), so it holds them all; five
+    windows reach back 359 years, and the year 1 is not walked from on top
+    of them. A rule that settles walks only near each window; one that
+    walks from `DTSTART` (a counted or hourly one) does so in each window,
+    skipping the starts before it in microseconds each, so at most six
+    times. An exception moved into a window is found there; one moved
+    earlier ends before the window, so it is no later than one found in it.
+  - **Reading times.** Zone names asked of `Intl` are remembered as wall
+    clocks are ([D54](#D54)): making an `Intl.DateTimeFormat` cost more than
+    the rest of reading a time. Objects with the same VTIMEZONE share one
+    ical.js zone, so its changes of offset since 1970 are worked out once,
+    not for every object read; one whose VTIMEZONE differs in any way has
+    its own ([D32](#D32)). The zone is made from a copy of the VTIMEZONE,
+    so it keeps no calendar alive, and at most 200 are kept. It is put where
+    ical.js keeps a calendar's zones, a field of its own
+    (`_timezoneCache`): a test fails when an ical.js update moves it.
+  - **Not guarded in CI.** The speed below is measured by hand; no test
+    fails when it slows ([Deferred](#deferred)).
+  - **Measured** with `scripts/bench-big-calendar.ts` (run by hand; it
+    prints, nothing passes or fails): 12 230 objects in 3 calendars as PR
+    5a-2 measured them, the 230 series from 2019–2025 (30 daily, 10 of them
+    tasks; 200 weekly), half with a VTIMEZONE and half with a TZID alone, a
+    third reminding; Node 24 on an i7-14700KF, the median of five reads,
+    each of a range not read before:
+
+    | read                             | before |  after |
+    | -------------------------------- | -----: | -----: |
+    | a week, nothing parsed yet       | 15.4 s |  63 ms |
+    | a week, its objects parsed       | 16.3 s |  51 ms |
+    | a month (42 days)                | 15.9 s |  99 ms |
+    | an Agenda read (84 days)         | 16.3 s | 164 ms |
+    | the undone chip                  | 1.87 s |  26 ms |
+    | the reminders set (9 days)       | 5.93 s |  41 ms |
+    | of a week: the 30 daily series   | 5.82 s |  12 ms |
+    | of a week: the 200 weekly series | 9.90 s |  21 ms |
+
+    Storing the calendar (each object parsed and its bounds found) took
+    9.5 s before and 3.1 s after. What a new range costs now is spread
+    over placing each of its objects again (ical.js's time arithmetic), the
+    layout and the query, none of them a fifth of a month's 100 ms
+    ([Deferred](#deferred)).
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -1152,17 +1329,31 @@ Decided while building PR 6b.
   English), and its `tzone://Microsoft/Utc`, `tzone://Microsoft/Custom` and
   `Customized Time Zone`; such a time stays floating until a reader of those
   names is justified by a real file ([D32](#D32)).
-- **Expanding long series from the middle** — `occurrencesBetween` walks a
-  series from its first occurrence and throws `ExpansionLimitError` past
-  50 000 steps (a minutely or hourly series from years ago); a start point
-  or a cache comes when a real calendar hits it ([D33](#D33)). Until then
-  such a series shows nowhere: the views and the "N undone tasks" chip
-  leave it out, silently ([D55](#D55)). _Measured in PR 5a-2:_ a daily
-  series with a `TZID` from January 2025 takes 50–90 ms to expand into
-  November 2026, so 30 of them make the first read of a new range take
-  about 1.6 s on the main thread (a desktop i7). The object cache keeps one
-  range per object ([D54](#D54)), so each new week, month, or read of the
-  Agenda (design [D87](design.md#D87)) pays it again.
+- **Expanding long series from the middle** — since [D118](#D118) a daily,
+  weekly, monthly or yearly rule starts near the range. What still walks
+  from its first occurrence is D118's list: a counted rule (its `COUNT`
+  could be counted arithmetically for the shapes that start near the range,
+  when a real calendar needs it), an hourly or finer one, and the shapes
+  ical.js's iterator does not settle in. Such a walk skips the starts
+  before the range in microseconds each, but past 50 000 steps throws
+  `ExpansionLimitError` (a minutely or hourly series from years ago), and
+  the series then shows nowhere: the views, the "N undone tasks" chip and
+  the reminders leave it out, silently ([D55](#D55), [D100](#D100)). An
+  hourly or finer rule sparser than its bound (17 years of hours, 101 days
+  of minutes between two occurrences) becomes its `DTSTART` alone, also
+  with no sign. The
+  tasks screen (design [D95](design.md#D95)) still places every occurrence
+  of a recurring task from the year 1 to find its current one, as the chip
+  did; it comes when a measured list is slow. A new range places every
+  object in it again, a one-off item too (about 0.1 ms each: a month of
+  D118's calendar in 100 ms, an Agenda read in 160 ms); the object cache
+  could keep a one-off item's occurrence across ranges when that matters.
+- **A guard on the work of a read** — D118's speed is measured by hand
+  (`scripts/bench-big-calendar.ts`), and no test fails when it slows. Time
+  cannot be a test's measure (AGENTS.md), but the work can: the walks'
+  counts (`walks`) on the benchmark's calendar, or ical.js's steps for a
+  week of it, are the same on every machine, and a test could hold them to
+  a budget, when a slowdown slips through review.
 - **Past days and their undone tasks** — an undone task due before today
   shows only in today's chip (design [D51](design.md#D51)), so a view of
   last week shows none on the days they were due, as in Google Calendar;

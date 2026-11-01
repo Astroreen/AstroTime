@@ -26,6 +26,9 @@ When you add a package, app or module, add its line here in the same PR.
     without losing a property. → `plans/foundation.md#D7`, `plans/foundation.md#D34`
   - `occurrencesBetween` — expands a series into the occurrences that touch
     a range of days in the user's zone. → `plans/foundation.md#D33`
+    - `recurrence.ts` — where a series is walked from (`startNear`: whole
+      periods of its rule after `DTSTART`, near the range) and its starts
+      (`seriesStarts`). → `plans/foundation.md#D118`
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
   - `windows-zones.ts` — Windows zone name → IANA, generated from Unicode
     CLDR by `scripts/generate-windows-zones.ts`; do not edit by hand.
@@ -349,6 +352,12 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
   `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
   → `plans/foundation.md#D32`
+- `scripts/bench-big-calendar.ts` — a big calendar read as the views, the
+  undone chip and the reminders read it; prints how long each takes, run by
+  hand. → `plans/foundation.md#D118`
+- `scripts/sweep-recurrence.ts` — the generated series of D118's proof for
+  other seeds, ten times as many as CI's, run by hand.
+  → `plans/foundation.md#D118`
 - `scripts/record-nextcloud-fixtures.ts` — drives Nextcloud's web Calendar
   and Tasks apps in Chromium on a disposable Nextcloud in Docker and records
   what they write as `packages/core/test/fixtures/nextcloud-web-*.ics`.
