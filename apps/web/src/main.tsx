@@ -45,7 +45,10 @@ async function openStore(): Promise<Store> {
 // newer version (docs/plans/foundation.md#D124); the dev server has neither.
 const updates =
   import.meta.env.PROD && "serviceWorker" in navigator
-    ? serviceWorkerUpdates(navigator.serviceWorker, { reload: () => location.reload() })
+    ? serviceWorkerUpdates(navigator.serviceWorker, {
+        reload: () => location.reload(),
+        base: import.meta.env.BASE_URL,
+      })
     : undefined;
 void updates?.register();
 

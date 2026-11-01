@@ -80,7 +80,7 @@ const planning = (page: Page) =>
     .getByRole("list", { name: "Wednesday, November 4" })
     .getByRole("listitem", { name: /^Planning with Radicale, / });
 
-test("with the network gone, a reload shows the calendar with its data; CalDAV and the preset are never kept", async ({
+test("with the network gone, a reload shows the calendar with its data; CalDAV is never kept, the preset only apart from the page", async ({
   page,
   context,
   radicale,
@@ -138,6 +138,9 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     const loaded = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
     await page.reload();
     expect((await loaded).fromServiceWorker()).toBe(true);
+    // The kept page comes with the preset the network's page had (kept apart):
+    // a start with no network or a slow one signs in as the server's page does.
+    await expect(page.locator('meta[name="astrotime-server"]')).toHaveCount(1);
     await expect(planning(page)).toBeVisible();
     // Said calmly: offline, no dot of trouble on the account button.
     const account = page.getByRole("region", { name: /^astro@/ });
@@ -163,8 +166,21 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     await expect(planning(page)).toBeVisible();
 
     // Lie-fi: the server takes the request and never answers. The worker
-    // waits a bounded moment, then the kept page answers; nothing here waits
-    // on a clock, the reload's own load is the event.
+    // waits a bounded moment, then the kept page answers. The page sets the
+    // bound to none first, so nothing here waits on time passing: the
+    // reload's own load is the event.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const reply = new MessageChannel();
+          reply.port1.addEventListener("message", () => resolve());
+          reply.port1.start();
+          navigator.serviceWorker.controller!.postMessage(
+            { type: "astrotime-navigation-bound", ms: 0 },
+            [reply.port2],
+          );
+        }),
+    );
     await close(server);
     server = createServer(() => {});
     await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
@@ -227,13 +243,23 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
   const [first, second] = [join(roots, "first"), join(roots, "second")];
   await cp(DIST, first, { recursive: true });
   await cp(DIST, second, { recursive: true });
+  // A file only the older version has, as a lazily loaded chunk would be.
+  await writeFile(join(first, "assets", "lazy-old.js"), "export const old = true;\n");
+  const firstWorker = await readFile(join(first, "sw.js"), "utf8");
+  expect(firstWorker).toContain('["/",');
+  await writeFile(
+    join(first, "sw.js"),
+    firstWorker.replace('["/",', '["/","/assets/lazy-old.js",'),
+  );
   let { server, port } = await serve(first, radicale);
   try {
     await page.clock.setFixedTime(NOW);
     await page.goto(`http://127.0.0.1:${port}/`);
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
     await activated(page);
-    const [name] = await page.evaluate(() => caches.keys());
+    const [name] = (await page.evaluate(() => caches.keys())).filter(
+      (cache) => cache !== "astrotime-versions",
+    );
     const version = name!.slice("astrotime-".length);
     const worker = await readFile(join(second, "sw.js"), "utf8");
     expect(worker).toContain(version);
@@ -264,9 +290,21 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
     await notice.getByRole("button", { name: "Reload" }).click();
     await reloaded;
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
-    // The newer version runs, and the older's files are gone.
-    expect(await page.evaluate(() => caches.keys())).toEqual(["astrotime-newer-version-00"]);
+    // The newer version runs; the older's files stay, for the tab it still runs.
+    expect((await page.evaluate(() => caches.keys())).toSorted()).toEqual([
+      `astrotime-${version}`,
+      "astrotime-newer-version-00",
+      "astrotime-versions",
+    ]);
     await expect(notice).toHaveCount(0);
+    // That tab asks for a file only its version has, which the server no
+    // longer has: it comes from the older version's cache.
+    expect(
+      await other.evaluate(async () => {
+        const answer = await fetch("/assets/lazy-old.js");
+        return [answer.status, await answer.text()];
+      }),
+    ).toEqual([200, "export const old = true;\n"]);
 
     // The other tab did not reload by itself: it offers the version that now
     // runs it, and loads it when its user asks.

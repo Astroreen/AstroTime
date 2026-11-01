@@ -2,7 +2,15 @@
 import * as caldav from "@astrotime/caldav";
 import { expect, test } from "vite-plus/test";
 
-import { isAppPage, namedFiles, PRESET_MARK, PRESET_META, withoutPreset } from "./page.ts";
+import {
+  isAppPage,
+  namedFiles,
+  PRESET_MARK,
+  PRESET_META,
+  presetOf,
+  withoutPreset,
+  withPresetBack,
+} from "./page.ts";
 
 test("the worker knows the preset by the names the server writes it under", () => {
   expect([PRESET_MARK, PRESET_META]).toEqual([caldav.PRESET_MARK, caldav.PRESET_META]);
@@ -53,4 +61,21 @@ test("only the app's own pages are its navigations: never CalDAV's proxy, the he
   expect(isAppPage("/calendar/day/2026-11-04", "/calendar/")).toBe(true);
   expect(isAppPage("/other/", "/calendar/")).toBe(false);
   expect(isAppPage("/calendar/dav-proxy/x", "/calendar/")).toBe(false);
+});
+
+test("the preset is kept apart and given back to the kept page as the network page had it (D123)", () => {
+  const marked = caldav.withPreset(page, {
+    server: "https://cloud.example.com/$'",
+    username: "astro",
+  });
+  const preset = presetOf(marked);
+  expect(preset).toBe(
+    caldav.presetTags({ server: "https://cloud.example.com/$'", username: "astro" }),
+  );
+  expect(withPresetBack(withoutPreset(marked), preset)).toBe(marked);
+  // An unmarked tag is given back too; a page without one gets nothing back.
+  const loose = `<meta content="astro" name="astrotime-username">`;
+  expect(presetOf(page.replace("</head>", `${loose}</head>`))).toBe(loose);
+  expect(presetOf(page)).toBe("");
+  expect(withPresetBack(page, "")).toBe(page);
 });

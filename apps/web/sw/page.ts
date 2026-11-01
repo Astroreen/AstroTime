@@ -44,3 +44,17 @@ export function isAppPage(pathname: string, base: string): boolean {
   if (rest.startsWith("dav-proxy/") || rest === "dav-proxy" || rest === "healthz") return false;
   return !/\.[^/]+$/.test(rest);
 }
+
+/** The page's preset tags as the server wrote them, to give a kept page back; empty without one. */
+export function presetOf(html: string): string {
+  return [...html.matchAll(BLOCK), ...withoutBlock(html).matchAll(TAG)]
+    .map(([found]) => found)
+    .join("");
+}
+
+const withoutBlock = (html: string) => html.replace(BLOCK, "");
+
+/** A kept page with the preset the latest network page had, in its head. */
+export function withPresetBack(html: string, preset: string): string {
+  return preset === "" ? html : html.replace("</head>", () => `${preset}</head>`);
+}

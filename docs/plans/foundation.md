@@ -513,26 +513,34 @@ Decided while building PR 7.
   - **What it keeps.** On install it keeps this version's files in a cache
     of its own (`astrotime-<version>`) and the page as the server sent it
     then, policy and nonce with it ([D110](#D110)), but without the preset's
-    tags ([D123](#D123)), which only the server says: the block the server
-    marks between `<!-- astrotime-preset -->` comments, and any
-    `<meta name="astrotime-server|username">` however it is written. A page
+    tags ([D123](#D123)): the block the server marks between
+    `<!-- astrotime-preset -->` comments, and any
+    `<meta name="astrotime-server|username">` however it is written. The
+    tags are kept apart and given back to the kept page each time it
+    answers, as the latest network page had them (none, if it had none), so
+    a start with no network, or on a link too slow to begin answering,
+    signs in as the server's page does; they are public ([D123](#D123)). A page
     that names a file this version does not list (a rolling deploy, the page
     newer than the worker) fails the install, so the version that has them
     keeps it. Its files answer from
     the cache; the page comes from the network first (a fresh nonce, the
     preset) and from the cache when there is no network, or when what
     answers is a server error (a reverse proxy's 502, 503 or 504 while the
-    container is down), or when the network has not answered within three
+    container is down), or when the network has not begun to answer within three
     seconds (a connection that stalls, lie-fi, may settle only after tens
-    of seconds). The network's page, when it comes, refreshes the kept one
-    in the background. Only the server's own page is ever kept: an `ok`,
+    of seconds; a page may set the bound, which the tests do, so none waits
+    on time passing). The network's page, when it comes, refreshes the kept
+    one in the background. Only the server's own page is ever kept: an `ok`,
     `basic`, HTML answer that was not redirected (a sign-on's login page, a
     slash added); a version whose page is not one fails its install and
     keeps nothing. It answers only the app's own navigations, under
     its scope: a route of the single-page app, never `/dav-proxy/`, the
     health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
-    of the app's origin, never a file it does not list. Activated, it
-    deletes older versions' caches. The proxy's static serving stays as
+    of the app's origin, never a file it does not list, and the page only to
+    a navigation. Activated, it keeps its own cache and the version
+    before's (`astrotime-versions` lists them), for a tab that still runs
+    the older page and asks for its files (a lazily loaded chunk); older
+    ones go. The proxy's static serving stays as
     [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
     manifest, icons) revalidated, so the browser's check of the worker costs
     a 304.
