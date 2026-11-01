@@ -883,6 +883,77 @@ test("the browser is asked to keep the data once there is something to keep, not
   expect(await answer).toBe("refused");
 });
 
+test("a new event's calendar that no longer takes events stays in the field, and the save says so; none left says that, in Russian (D122)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await emptyStore();
+  const server = await store.addAccount({
+    provider: "caldav",
+    name: "astro@cloud.example.com",
+    serverUrl: `${SERVER}/`,
+    username: "astro",
+  });
+  const work = await store.saveCalendar({
+    accountId: server.id,
+    url: `${SERVER}/remote.php/dav/calendars/astro/work/`,
+    name: "Work",
+    color: null,
+    components: ["VEVENT", "VTODO"],
+    rights: ALL_RIGHTS,
+  });
+  render(Promise.resolve(store), ["en-US"]);
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  const field = dialog.getByRole("combobox", { name: "Calendar" });
+  await expect.element(field).toHaveValue(work.id);
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Refused");
+  // The calendar is shared read-only now: it stays chosen in the field.
+  await store.saveCalendar({ ...work, rights: { create: false, edit: false, delete: false } });
+  await expect.element(field.getByRole("option", { name: "Work" })).toBeInTheDocument();
+  await expect.element(field).toHaveValue(work.id);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect
+    .element(
+      dialog.getByText(
+        "This calendar no longer takes this item. Pick another calendar; nothing was saved.",
+      ),
+    )
+    .toBeInTheDocument();
+  await expect.element(dialog).toBeInTheDocument();
+  expect(await store.pending(work.id)).toEqual([]);
+});
+
+test("a new item with no calendar left to take it says so, in Russian, and keeps the dialog (D122)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await emptyStore();
+  await store.addLocalCalendarIfEmpty({
+    account: "On this device",
+    calendar: "Personal",
+    color: "#4f8fd6",
+  });
+  // The field still offers a calendar the store no longer has, as when the
+  // screen's list has not caught up: the save reads the store's, and none takes it.
+  const behind = Object.assign(Object.create(store) as Store, {
+    changeLocal<T>(change: (local: LocalChange) => Promise<T>): Promise<T> {
+      return store.changeLocal((local) => change({ ...local, calendars: async () => [] }));
+    },
+  });
+  render(Promise.resolve(behind), ["ru-RU"]);
+  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Новое мероприятие" });
+  await dialog.getByRole("textbox", { name: "Название" }).fill("Некуда");
+  await dialog.getByRole("button", { name: "Сохранить" }).click();
+  await expect
+    .element(
+      dialog.getByText("Сейчас ни один календарь не принимает эту запись. Ничего не сохранено."),
+    )
+    .toBeInTheDocument();
+  await expect.element(dialog).toBeInTheDocument();
+  const [personal] = await store.calendars();
+  expect(await store.pending(personal!.id)).toEqual([]);
+});
+
 test("a deployment's preset asks for the password alone, by itself, and not again once closed (D123)", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });

@@ -885,21 +885,33 @@ Decided while building PR 5a-3.
     which checks both in one transaction, and which the UI calls as the store
     comes to hold a server's calendars); before that (a first sync that
     failed or found none, only shared or read-only calendars, none for
-    tasks), it stays, so the user always has somewhere to create either. A new
-    item's dialog left open as it steps aside saves where the dialog then
-    shows, the first calendar that takes it, decided in the save's own
-    transaction (`LocalChange.calendars`), since the screen's list of
-    calendars may not have caught up yet when Save is pressed. A calendar
-    still there that no longer takes the item (read-only now, its components
-    changed) is refused instead (`RefusedError`): the dialog stays open on
-    "this calendar no longer takes this item", since it still shows that
-    calendar chosen, and moving the item where the user did not pick would
-    surprise. A vanished calendar's fallback is no such surprise: the
-    dialog's field already shows the calendar it goes to. One that holds items stays
-    beside the server's, as its own calendar, and its items move to a
-    server's calendar one by one in the edit dialog ([D106](#D106)).
-    Removing it asks first, and says its items are on no server. Uploading
-    them all at once is [Deferred](#deferred).
+    tasks), it stays, so the user always has somewhere to create either.
+    One that holds items stays beside the server's, as its own calendar,
+    and its items move to a server's calendar one by one in the edit dialog
+    ([D106](#D106)). Removing it asks first, and says its items are on no
+    server. Uploading them all at once is [Deferred](#deferred).
+  - Where a new item goes is one rule, `newItemCalendar` (on
+    `firstCalendarFor`: the first calendar that takes it, visible before
+    hidden, in list order), as calendars come and go while its dialog is
+    open (this one stepping aside, one deleted or shared read-only on the
+    server):
+    - its calendar, while that takes the item;
+    - its calendar still, refused, once it is there but no longer takes
+      the item (read-only now, its components changed): the field keeps
+      showing it, the save ends in `RefusedError`, nothing is saved and the
+      dialog stays open on "this calendar no longer takes this item".
+      Moving the item where the user did not pick would surprise;
+    - when its calendar is gone, the first that takes the item, which the
+      field then shows in its place;
+    - none: `NowhereError`, "no calendar takes this item now", nothing
+      saved.
+
+    The field applies the rule to the screen's list, which may lag the
+    store by a moment: it is a best effort. The save applies it again to
+    the calendars read in its own transaction (`LocalChange.calendars`),
+    and that is authoritative: in the moment the two differ, the item goes
+    where the store says, never to a calendar that is gone.
+
   - The accounts dialog says what it is ("Not synced: on this device only")
     and, on the web, where its data lives (D121's address), and invites to
     add an account while there is none of a server. An account offline is
