@@ -601,6 +601,7 @@ export async function changeLocal(
     return store.changeLocal((local) =>
       change({
         object: (id) => local.object(id),
+        calendars: () => local.calendars(),
         async save(calendarId, ics, href) {
           const row = await local.save(calendarId, ics, href);
           written.push({ id: row.id, ics });
@@ -705,7 +706,17 @@ export async function saveForm(
       uid: writes.uid(),
     });
     await changeLocal(store, async (local) => {
-      await local.save(form.calendarId, ics);
+      // The calendar the dialog chose may have gone while it was open: the
+      // calendar on this device stepping aside once a server's calendars
+      // came (foundation D122), or one deleted on the server. Read in this
+      // transaction, the item goes where the dialog then shows it going, the
+      // first calendar that takes it; with none left, it is gone.
+      const calendars = await local.calendars();
+      const into = calendars.some((calendar) => calendar.id === form.calendarId)
+        ? form.calendarId
+        : calendarsFor(calendars, form.kind)[0]?.id;
+      if (!into) throw new GoneError("No calendar takes this item any more.");
+      await local.save(into, ics);
     });
     return;
   }

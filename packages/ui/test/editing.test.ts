@@ -2,7 +2,13 @@
 // the form an item opens with, the changes a form makes (only what the user
 // changed), the scopes offered, the writes to the local store, the words of
 // rules and reminders, and the Conflicts list's two ways out.
-import { CalendarObject, occurrencesBetween, starTask, type Event } from "@astrotime/core";
+import {
+  ALL_RIGHTS,
+  CalendarObject,
+  occurrencesBetween,
+  starTask,
+  type Event,
+} from "@astrotime/core";
 import { CommitInDoubtError, HandOverError, Store, type LocalChange } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
@@ -436,6 +442,64 @@ describe("what a calendar's rights offer (D37)", () => {
 });
 
 describe("saving writes pending changes through the store (D5)", () => {
+  test("a new item whose calendar went while its dialog was open goes to the first that takes it (foundation D122)", async () => {
+    // A first run: the calendar on this device, where the new event's dialog opens.
+    const store = await Store.open(nodeDriver());
+    const local = await store.addLocalCalendarIfEmpty({
+      account: "On this device",
+      calendar: "Personal",
+      color: "#4f8fd6",
+    });
+    const [personal] = await store.calendars(local!.id);
+    const form = {
+      ...newForm("event", { calendarId: personal!.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Made meanwhile",
+    };
+    // Meanwhile the user signed in, and the first sync brings the server's
+    // calendars: the unused calendar on this device steps aside.
+    const server = await store.addAccount({
+      provider: "caldav",
+      name: "astro@cloud.example.com",
+      serverUrl: "https://cloud.example.com/",
+      username: "astro",
+    });
+    const tasks = await store.saveCalendar({
+      accountId: server.id,
+      url: "https://cloud.example.com/remote.php/dav/calendars/astro/tasks/",
+      name: "Tasks",
+      color: null,
+      components: ["VTODO"],
+      rights: ALL_RIGHTS,
+    });
+    const work = await store.saveCalendar({
+      accountId: server.id,
+      url: "https://cloud.example.com/remote.php/dav/calendars/astro/work/",
+      name: "Work",
+      color: null,
+      components: ["VEVENT"],
+      rights: ALL_RIGHTS,
+    });
+    expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+    // Saved: not lost to a calendar that is gone, but in the first that takes events.
+    await saveForm(
+      store,
+      { target: null, initial: null, form, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: () => "meanwhile" },
+    );
+    expect(await store.objectAt(work.id, "meanwhile.ics")).toMatchObject({ pending: "create" });
+    expect(await store.pending(tasks.id)).toEqual([]);
+
+    // No calendar left that takes it: gone, as the dialog says.
+    await store.removeAccount(server.id);
+    await expect(
+      saveForm(
+        store,
+        { target: null, initial: null, form, scope: "all", untitled: "Reminder" },
+        { now: NOW, uid: () => "nowhere" },
+      ),
+    ).rejects.toThrow(GoneError);
+  });
+
   test("a new item under <uid>.ics in its calendar, pending creation", async () => {
     const { store, byName } = await demo();
     const personal = byName("Personal");

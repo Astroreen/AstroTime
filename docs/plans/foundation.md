@@ -879,7 +879,9 @@ Decided while building PR 5a-3.
     failed or found none, only shared or read-only calendars, none for
     tasks), it stays, so the user always has somewhere to create either. A new
     item's dialog left open as it steps aside saves where the dialog then
-    shows, the first calendar that takes it. One that holds items stays
+    shows, the first calendar that takes it, decided in the save's own
+    transaction (`LocalChange.calendars`), since the screen's list of
+    calendars may not have caught up yet when Save is pressed. One that holds items stays
     beside the server's, as its own calendar, and its items move to a
     server's calendar one by one in the edit dialog ([D106](#D106)).
     Removing it asks first, and says its items are on no server. Uploading
