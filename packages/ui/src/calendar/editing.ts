@@ -507,7 +507,7 @@ export class InDoubtError extends Error {
  * `CommitInDoubtError` is answered by reading again: done if what it wrote is
  * there, else an `InDoubtError` for the user to look.
  */
-async function changeLocal(
+export async function changeLocal(
   store: Store,
   change: (local: LocalChange) => Promise<void>,
 ): Promise<void> {
