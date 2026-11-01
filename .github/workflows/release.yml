@@ -60,7 +60,8 @@ jobs:
           fi
           prerelease=()
           case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${prerelease[@]}"
+          # A draft until every platform's files are on it (the publish job).
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes "${prerelease[@]}"
 
   image:
     name: Web image
@@ -104,7 +105,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The job may write the Release; nothing it builds or installs gets the
+      # token: it is not left in .git/config, only passed to the upload step.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       # As CI's Android job: JDK 21 and the SDK packages the build needs.
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -141,7 +146,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The job may write the Release; nothing it builds or installs gets the
+      # token: it is not left in .git/config, only passed to the upload step.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       # Built, then checked as CI checks them: fuses, the AppImage started,
       # the deb installed and started.
@@ -156,3 +165,17 @@ jobs:
         run: |
           mapfile -t files <<< "$FILES"
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
+  publish:
+    name: Publish the Release
+    runs-on: ubuntu-latest
+    # Only once the image and every file are there: a failed job leaves a
+    # draft to re-run, never a public Release missing files.
+    needs: [release, image, android, desktop]
+    permissions:
+      contents: write
+    steps:
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

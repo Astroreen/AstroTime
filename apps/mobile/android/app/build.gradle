@@ -6,6 +6,8 @@ apply plugin: 'org.jetbrains.kotlin.android'
 // release's is higher; a prerelease shares its release's (docs/plans/android.md#D69).
 def astrotimeVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../../../package.json')).version
 def (major, minor, patch) = (astrotimeVersion =~ /^(\d+)\.(\d+)\.(\d+)/)[0][1..3].collect { it as int }
+// Each part has three digits in versionCode: past them two versions would share one.
+if (minor > 999 || patch > 999) throw new GradleException("versionCode holds minor and patch up to 999: ${astrotimeVersion}")
 
 android {
     namespace = "io.github.astroreen.astrotime"

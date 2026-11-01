@@ -434,9 +434,12 @@ were checked on 2026-11-01.
     runs `./gradlew assembleRelease` with no signing config and attaches
     `astrotime-<version>-unsigned.apk` to the tag's GitHub Release, which
     the release workflow's first job creates for both platforms
-    (`gh release create --verify-tag --generate-notes`, a prerelease for a
-    prerelease tag, skipped when it exists); the Android and desktop jobs
-    `need` it (desktop [D79](desktop.md#D79)). An unsigned APK does not
+    (`gh release create --draft --verify-tag --generate-notes`, a prerelease
+    for a prerelease tag, skipped when it exists); the Android and desktop
+    jobs `need` it (desktop [D79](desktop.md#D79)), and a last job publishes
+    the draft once the image and every file are there, so a failed job never
+    leaves a public Release missing files. The upload jobs check out without
+    persisting the token, which only the upload step is given. An unsigned APK does not
     install as it is; no debug-signed build goes on a Release, since a key
     anyone can hold could sign updates to it. The signed release stays
     Deferred.
