@@ -195,6 +195,10 @@ test("an all-day item drags to another day in the strip, keeping its length", as
   const box = (await conference.boundingBox())!;
   const monday = await pointOn(page, "Monday, November 2", 0);
   await drag(page, { x: box.x + 20, y: from.y }, { x: monday.x, y: from.y });
+  // The move landed (it is said once written), so the click is on the item
+  // drawn anew, not on the one held where it was; a click 29 ms after the
+  // release opened nothing on CI.
+  await expect(announced(page)).toHaveText("Moved: Developer conference. November 2 – 4");
   await strip.getByRole("button", { name: "Developer conference, All day" }).click();
   await expect(
     page.getByRole("dialog", { name: "Developer conference" }).getByText("November 2 – 4"),

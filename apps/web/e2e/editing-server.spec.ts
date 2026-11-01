@@ -106,6 +106,11 @@ test("a change the server dropped is told in the accounts dialog and in Settings
   await signIn.getByRole("button", { name: "Sign in" }).click();
   await expect(signIn).toHaveCount(0);
   await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
+  // The first sync has ended, its calendars written: an item made before it
+  // could name a calendar the sync was replacing (seen on CI).
+  await expect(
+    page.getByRole("navigation", { name: "Main menu" }).getByText(/^Synced at /),
+  ).toBeVisible();
 
   // Made here and uploaded.
   await page.getByRole("button", { name: "Create" }).click();
