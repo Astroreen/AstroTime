@@ -1,5 +1,5 @@
 // The evidence for the accounts and sync PR (docs/plans/foundation.md#pr-5--calendar-grid):
-// the first run, the add-account dialog, Login Flow's waiting step (Nextcloud
+// the first run on the calendar on this device (D122), the add-account dialog, Login Flow's waiting step (Nextcloud
 // mocked at the proxy), an error, and an account synced from a real Radicale
 // in the drawer, the Week view and the accounts dialog. Runs only when
 // ASTROTIME_SCREENSHOTS names a directory:
@@ -8,7 +8,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { openApp, PHONE, WIDE } from "./support.ts";
+import { addAccount, openApp, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -19,8 +19,7 @@ type Theme = "dark" | "light";
 
 const TEXT = {
   en: {
-    caldav: "Another CalDAV server",
-    nextcloud: "Sign in to Nextcloud",
+    add: { accounts: /^Accounts/, add: "Add account", dialog: "Add an account" },
     server: "Server address",
     user: "User name",
     password: "Password",
@@ -33,8 +32,7 @@ const TEXT = {
     task: "Renew the domain",
   },
   ru: {
-    caldav: "Другой сервер CalDAV",
-    nextcloud: "Войти в Nextcloud",
+    add: RU_ADD_ACCOUNT,
     server: "Адрес сервера",
     user: "Имя пользователя",
     password: "Пароль",
@@ -110,8 +108,7 @@ async function seeded(language: Language): Promise<CalDavServer> {
 
 async function signIn(page: Page, language: Language, server: CalDavServer) {
   const text = TEXT[language];
-  await page.getByRole("button", { name: text.caldav }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = await addAccount(page, "caldav", text.add);
   await dialog.getByRole("textbox", { name: text.server }).fill(server.url);
   await dialog.getByRole("textbox", { name: text.user }).fill(server.username);
   await dialog.getByLabel(text.password).fill(server.password);
@@ -127,12 +124,15 @@ for (const language of ["en", "ru"] as const) {
     const text = TEXT[language];
     for (const theme of language === "en" ? (["dark", "light"] as const) : (["dark"] as const)) {
       const page = await open(browser, { language, theme, size: PHONE });
-      await expect(page.getByRole("button", { name: text.nextcloud })).toBeVisible();
+      await expect(page.getByRole("button", { name: text.accounts })).toBeVisible();
       await shot(page, `first-run-${theme}-${language}-phone`);
+      await page.getByRole("button", { name: text.accounts }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await shot(page, `first-run-accounts-${theme}-${language}-phone`);
       await page.context().close();
     }
     const page = await open(browser, { language, theme: "dark", size: PHONE });
-    await page.getByRole("button", { name: text.nextcloud }).click();
+    await addAccount(page, "nextcloud", text.add);
     await page.getByRole("textbox", { name: text.server }).fill("cloud.example.com");
     await shot(page, `sign-in-nextcloud-dark-${language}-phone`);
     await page.getByRole("tab", { name: "CalDAV" }).click();
@@ -161,7 +161,7 @@ for (const language of ["en", "ru"] as const) {
         });
       return route.fulfill({ status: 404, json: [] });
     });
-    await page.getByRole("button", { name: text.nextcloud }).click();
+    await addAccount(page, "nextcloud", text.add);
     await page.getByRole("textbox", { name: text.server }).fill("cloud.example.com");
     await page.getByRole("button", { name: text.continue }).click();
     await expect(page.getByRole("dialog").getByRole("status")).toBeVisible();
@@ -172,7 +172,7 @@ for (const language of ["en", "ru"] as const) {
     // A wrong password, from a real Radicale.
     const server = await startRadicale();
     const wrong = await open(browser, { language, theme: "dark", size: PHONE });
-    await wrong.getByRole("button", { name: text.caldav }).click();
+    await addAccount(wrong, "caldav", text.add);
     await wrong.getByRole("textbox", { name: text.server }).fill(server.url);
     await wrong.getByRole("textbox", { name: text.user }).fill(server.username);
     await wrong.getByLabel(text.password).fill("wrong");

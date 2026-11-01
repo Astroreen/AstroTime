@@ -289,7 +289,23 @@ export function useEditingState({
 
   const save = () => {
     if (!editing) return;
-    const { target, initial, state } = editing;
+    const { target, initial } = editing;
+    // A new item whose calendar went while the dialog was open (the calendar
+    // on this device stepping aside, foundation D122) goes where the dialog
+    // shows it going: the first calendar that takes it.
+    const stays = writable(editing.state.form.kind).some(
+      (c) => c.id === editing.state.form.calendarId,
+    );
+    const state =
+      target === null && !stays
+        ? {
+            ...editing.state,
+            form: {
+              ...editing.state.form,
+              calendarId: firstFor(editing.state.form.kind) ?? editing.state.form.calendarId,
+            },
+          }
+        : editing.state;
     const problem = problemOf(state.form, initial);
     if (problem) {
       setEditing({ ...editing, state: { ...state, problem } });

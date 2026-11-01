@@ -59,6 +59,8 @@ export const KEYS = {
   taskSort: "astrotime.taskSort",
   /** Whether the browser was asked to keep the store's data, and its answer (foundation D121). */
   keepData: "astrotime.keepData",
+  /** `dismissed`: the preset's sign-in was closed unsigned, so it opens by itself no more (foundation D123). */
+  presetSignIn: "astrotime.presetSignIn",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */

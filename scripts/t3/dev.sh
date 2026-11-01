@@ -8,6 +8,18 @@ enter_dev_shell "$@"
 ensure_deps
 record_pid dev
 
+# A single-user preset (docs/plans/foundation.md#D123): the CalDAV server and
+# user name signing in asks no more, from a gitignored file such as
+#   ASTROTIME_SERVER_URL=https://cloud.example.com
+#   ASTROTIME_USERNAME=astro
+# No password goes there: the page shows the preset to whoever opens it.
+if [ -f "$ASTROTIME_DEV_DIR/preset.env" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ASTROTIME_DEV_DIR/preset.env"
+  set +a
+fi
+
 # The owner's tailnet devices reach the dev server over https: the web store
 # needs a secure context for OPFS and Web Locks, and plain http is one only on
 # localhost. Vite stays on plain http on 127.0.0.1; in front of it goes
@@ -137,6 +149,13 @@ CONFIG
   fi
 else
   echo "astrotime: no radicale on PATH, so no local CalDAV server (it comes with devenv)" >&2
+fi
+
+# The preset's server goes on the proxy's list, where there is one.
+if [ -n "${ASTROTIME_SERVER_URL:-}" ] && { ! web_is_local || [ -n "${ASTROTIME_PROXY_ALLOW:-}" ]; }; then
+  preset_origin="$(node -p 'new URL(process.argv[1]).origin' "$ASTROTIME_SERVER_URL")"
+  ASTROTIME_PROXY_ALLOW="${ASTROTIME_PROXY_ALLOW:+$ASTROTIME_PROXY_ALLOW,}$preset_origin"
+  export ASTROTIME_PROXY_ALLOW
 fi
 
 if ! web_is_local && [ -z "${ASTROTIME_PROXY_ALLOW:-}" ]; then

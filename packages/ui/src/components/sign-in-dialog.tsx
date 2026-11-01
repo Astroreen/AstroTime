@@ -1,6 +1,7 @@
 // The add-account dialog (docs/plans/foundation.md#D19, D92): Nextcloud through
 // Login Flow v2, or any CalDAV server by password. Signing in again to an
-// account opens it with the account's address and user name.
+// account opens it with the account's address and user name. A single-user
+// deployment's preset (D123) asks for the password alone.
 import type { Account } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
@@ -20,7 +21,8 @@ import { useAccounts } from "./accounts-context.tsx";
 type SignInKind = "nextcloud" | "caldav";
 
 export interface SignInRequest {
-  readonly kind: SignInKind;
+  /** `preset`: the deployment's server and user (D123); the full form without one. */
+  readonly kind: SignInKind | "preset";
   /** Signing in again: the account whose address and user name are filled in. */
   readonly account?: Account;
   /** Takes up the Login Flow a page before this one started (D121). */
@@ -44,13 +46,18 @@ export function SignInDialog({
   onSignedIn: () => void;
 }) {
   const { t } = useTranslation();
+  const { preset } = useAccounts().platform;
   return (
     <Dialog.Root open={request !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-[110] max-h-[calc(100dvh-2rem)] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           <Dialog.Title className="mb-4 text-[22px] leading-tight">
-            {t(request?.account ? "signIn.titleAgain" : "signIn.title")}
+            {request?.account
+              ? t("signIn.titleAgain")
+              : request?.kind === "preset" && preset
+                ? t("signIn.preset.title", { host: new URL(preset.server).host })
+                : t("signIn.title")}
           </Dialog.Title>
           {request && (
             <SignInForm
@@ -94,7 +101,10 @@ function SignInForm({
     (onChange) => signIn.subscribe(onChange),
     () => signIn.state,
   );
-  const [kind, setKind] = useState<SignInKind>(request.kind);
+  const preset = request.kind === "preset" && !request.account ? platform.preset : undefined;
+  // The preset's form, until the user asks for another server.
+  const [presetOnly, setPresetOnly] = useState(preset !== undefined);
+  const [kind, setKind] = useState<SignInKind>(request.kind === "preset" ? "caldav" : request.kind);
   const [server, setServer] = useState(() =>
     request.account ? request.account.serverUrl.replace(/^https:\/\//, "").replace(/\/$/, "") : "",
   );
@@ -197,6 +207,83 @@ function SignInForm({
       )}
     </Field>
   );
+
+  if (preset && presetOnly) {
+    return (
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void signIn.withPassword({
+            server: preset.server,
+            username: preset.username ?? username,
+            password,
+          });
+        }}
+      >
+        {preset.username === null ? (
+          <Field label={t("signIn.username")}>
+            {(id) => (
+              <input
+                id={id}
+                className={input}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+              />
+            )}
+          </Field>
+        ) : (
+          <>
+            <p className="text-sm text-ink-muted">
+              {t("signIn.preset.as", { username: preset.username })}
+            </p>
+            {/* For the browser's password manager, which keys a password by its user. */}
+            <input type="text" hidden readOnly value={preset.username} autoComplete="username" />
+          </>
+        )}
+        <Field label={t("signIn.password")}>
+          {(id) => (
+            <input
+              id={id}
+              className={input}
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              // The one thing asked: the dialog opens on it.
+              autoFocus
+              required
+            />
+          )}
+        </Field>
+        {problem}
+        {actions(t("signIn.submit"))}
+        <div className="flex flex-wrap justify-end gap-1 border-t border-line pt-2">
+          <button
+            type="button"
+            className={textButton}
+            onClick={() => void signIn.withNextcloud({ server: preset.server })}
+          >
+            {t("signIn.preset.loginFlow")}
+          </button>
+          <button
+            type="button"
+            className={textButton}
+            onClick={() => {
+              setPresetOnly(false);
+              setServer("");
+            }}
+          >
+            {t("signIn.preset.other")}
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <Tabs.Root value={kind} onValueChange={(value: SignInKind) => setKind(value)}>

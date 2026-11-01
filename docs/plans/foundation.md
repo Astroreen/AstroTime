@@ -693,8 +693,9 @@ Decided while building PR 5a-3.
   (`NoCalendarHomeError`) or no Nextcloud, a server this AstroTime's
   administrator has not allowed ([D20](#D20)), and a redirect to another
   server, which it names ([D39](#D39)). An account is called
-  `user@host`. An app with no account and no demo shows a first-run screen
-  with both ways in. The account button in the top bar
+  `user@host`. An app with no account and no demo showed a first-run screen
+  with both ways in (_replaced by [D122](#D122)_: it opens on the calendar
+  on this device). The account button in the top bar
   ([design D46](design.md#D46)) opens the accounts dialog (each account
   with its status and menu, "Sync now", "Add account"), as Google's account
   button opens its account sheet; the drawer shows each account with its
@@ -715,7 +716,8 @@ Decided while building PR 5a-3.
     cannot see another origin's. The owner's dev server moved from the
     self-signed front to `tailscale serve`, and T3's preview from
     `127.0.0.1` to the tailnet name, on the day of the report. So the first
-    run says, on the web (`Platform.dataHome`, the origin's host), that
+    run (since [D122](#D122), the calendar on this device in the accounts
+    dialog) says, on the web (`Platform.dataHome`, the origin's host), that
     AstroTime keeps its data in this browser for this address only, and
     another address or browser starts empty; `scripts/t3/README.md` says to
     keep to one address.
@@ -733,16 +735,28 @@ Decided while building PR 5a-3.
     does). Once approved, the entry holds the app password Nextcloud gave in
     the token's place until the account and its secret are saved, so a page
     that goes in between (discovery, the first write) loses nothing: the
-    next one saves it without a new flow. An approval has an owner, the page
+    next one saves it without a new flow, in the background: an approval
+    held never opens the dialog again. The UI tries it on start and whenever
+    the network comes back (`SignIn.saveHeld`), and while it waits, the
+    accounts dialog says calmly that AstroTime signs in as that user once the
+    server can be reached. An approval is held for seven days (`heldUntil`);
+    past that, its app password is revoked at the next chance and the entry
+    dropped; one an earlier build kept with no deadline gets one (seven days
+    from when a page takes it up), never dropped unrevoked. "Continue" in the dialog uses a held approval again only for the
+    same server: scheme, host, port and path, a final slash aside. An approval has an owner, the page
     that holds it; every page holds a Web Lock, `astrotime-page-<id>`, for as
     long as it lives. Another page takes an approval up only when
     `navigator.locks.query()` shows its owner's lock is not held (the page is
     gone), and makes itself the owner under the flow's lock; only the owner
     saves, forgets or revokes it, and a new flow never replaces an approval
-    whose owner lives. Saving fails because the server
-    cannot be reached: the approval is held, and the next try saves it.
-    Fails otherwise (no CalDAV server there), or the user cancels before it
-    is saved: the app password is revoked and forgotten. A waiting flow is
+    whose owner lives. One saver at a time, in a page or across pages: every
+    save of an approval holds a Web Lock of its own, `astrotime-flow-<token>`;
+    the dialog's waits for a background save and then finds nothing left to
+    do, and the background's does nothing while another runs. Saving fails because the server
+    cannot be reached: the approval is held (closing the dialog then leaves
+    it held), and the next try saves it. Fails otherwise (no CalDAV server
+    there), or the user cancels while it is being saved: the app password
+    is revoked and forgotten. A waiting flow is
     forgotten as it expires, fails or is cancelled; a page's load drops one
     past its token's life, or unreadable, without opening the dialog
     (`hasPendingFlow`). Forgetting compares the kept token and deletes under
@@ -764,6 +778,78 @@ Decided while building PR 5a-3.
     Lock, each reading the answer again inside it. A refusal changes nothing else.
   - An insecure context (plain http beyond localhost) never opens the store
     and says so ([D20](#D20)), so it cannot lose anything.
+
+- **D122. Offline-first: the calendar on this device.** The owner's feedback
+  after v0.2.0: the first visit asked to connect WebDAV or Nextcloud before
+  showing anything. Now the app opens on the calendar from the first run,
+  with no account and no network ([D5](#D5) taken to the first screen):
+  - A store with no account at all gets **the calendar on this device**: an
+    account of provider `local` (`local:` its address, never synced, as the
+    demo's is not, [D90](#D90)) with one calendar of events and tasks, named
+    in the language spoken then ("Personal") and shown as "On this device"
+    in the language spoken now. `Store.addLocalCalendarIfEmpty` makes it in
+    one transaction, so two tabs opening an empty store make one; the UI
+    calls it whenever the store has no account, after the last one is
+    removed too, so the app always has somewhere to write.
+  - Its items are created, edited, completed and deleted as any calendar's,
+    with every right. Nothing uploads them, so the store writes them as final
+    (`pending` `none`, a deletion at once): no change waits for a sync that
+    never comes.
+  - Connecting a server is optional, from the accounts dialog ("Add
+    account"; Settings gets an Accounts group in the UI review's time,
+    [design Deferred](design.md#deferred)). Once other accounts' calendars
+    here take new events and new tasks (a calendar with the create right,
+    [D37](#D37), holding `VEVENT`, and one holding `VTODO`), a calendar on
+    this device that holds no item steps aside (`removeLocalCalendarIfUnused`,
+    which checks both in one transaction, and which the UI calls as the store
+    comes to hold a server's calendars); before that (a first sync that
+    failed or found none, only shared or read-only calendars, none for
+    tasks), it stays, so the user always has somewhere to create either. A new
+    item's dialog left open as it steps aside saves where the dialog then
+    shows, the first calendar that takes it. One that holds items stays
+    beside the server's, as its own calendar, and its items move to a
+    server's calendar one by one in the edit dialog ([D106](#D106)).
+    Removing it asks first, and says its items are on no server. Uploading
+    them all at once is [Deferred](#deferred).
+  - The accounts dialog says what it is ("Not synced: on this device only")
+    and, on the web, where its data lives (D121's address), and invites to
+    add an account while there is none of a server. An account offline is
+    said calmly, never as a problem: its line says changes wait for the
+    server, and the account button shows no dot for it ([D91](#D91)).
+  - Every shell has it: the web, Android and the desktop share the UI and
+    the store.
+  - Rejected: keeping the first-run screen with a "Use without an account"
+    button (one more step before the calendar, which is what the owner
+    asked to see); a local calendar made always, beside every server
+    (clutter for the user who only wants Nextcloud's); uploading the local
+    items to the first server added without asking (the user may not want
+    them there).
+- **D123. A single-user deployment names its server and user.** "A password
+  field, no login needed: the calendar is for one person." The web image
+  takes `ASTROTIME_SERVER_URL` (an http or https address) and
+  `ASTROTIME_USERNAME` (optional), and the dev server the same, from the
+  environment or a gitignored `.astrotime-dev/preset.env`
+  (`scripts/t3/dev.sh`). The page carries them as two `<meta>` tags
+  (`astrotime-server`, `astrotime-username`) that the server adds to every
+  answer of the page, as it adds the nonce ([D110](#D110)): no request more,
+  nothing to fetch offline, and a build that holds none. With a preset the
+  add-account dialog asks for the password alone (the user name too when
+  only the server is named), with "Approve in Nextcloud instead" (Login Flow
+  on that server) and "Another server" (the full form); while there is no
+  server's account it opens by itself, once per page, until the user closes
+  it unsigned (`astrotime.presetSignIn` in the preferences; a sign-in clears
+  it). Without a preset nothing changes. The preset's server is the proxy's
+  allowlist when `ASTROTIME_PROXY_ALLOW` is unset, and must be on it when it
+  is set, both read as origins (case, a default port and a final slash
+  aside); a malformed one stops the server at start. The tags are escaped,
+  and put in with a replacer function, so no `$` pattern or markup in a
+  preset changes the page, nor the nonce, which is filled in first.
+  - **Security.** The preset is public: anyone who reaches the page reads it,
+    so it holds no secret, and no password may be given this way. Naming the
+    user tells a visitor which account the instance is for; an instance that
+    must not say so names the server only. The password goes, as ever, from
+    the browser through the stateless proxy to the server ([D20](#D20)),
+    and the browser's password manager is offered the user name with it.
 
 ### The store across tabs
 
@@ -1705,6 +1791,17 @@ errors").
   transaction, so both revoke it and the first one's new password stays
   unrevoked; reading the old secret and writing the new under one lock
   would close that.
+- **Uploading the calendar on this device** ([D122](#D122)) — its items
+  move to a server's calendar one by one, in the edit dialog; offering, when
+  an account is added, to upload them all to one of its calendars comes
+  when someone asks.
+- **Starting the web app with no network** ([D122](#D122)) — once open, the
+  web app works offline, but a page loaded with no network needs a service
+  worker holding the app's files (the image revalidates `index.html` on
+  every load, [D80](#D80)). Android and the desktop start offline already.
+- **A preset on Android and the desktop** ([D123](#D123)) — they have no
+  page served by an AstroTime server; a build-time or first-start preset
+  comes if someone deploys them for one person.
 - **Login Flow across tabs, the rest** ([D121](#D121)) — what ownership
   does not cover: a page frozen in the back/forward cache while it holds its
   lock looks alive, so its approval waits for it to come back (Chromium

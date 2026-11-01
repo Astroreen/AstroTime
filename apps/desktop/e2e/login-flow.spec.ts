@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { chromium, expect, test } from "@playwright/test";
 
 import { externalServer } from "../../../packages/sync/test/servers.ts";
-import { keepPassword, launch, profile } from "./support.ts";
+import { addAccount, keepPassword, launch, profile } from "./support.ts";
 
 const server = externalServer("nextcloud");
 const screenshots = process.env["ASTROTIME_SCREENSHOTS"];
@@ -34,8 +34,7 @@ test("Login Flow v2: the page opens in the system browser, and once approved the
       }),
   );
 
-  await page.getByRole("button", { name: "Sign in to Nextcloud" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add an account" });
+  const dialog = await addAccount(page);
   await dialog.getByRole("textbox", { name: "Server address" }).fill(nextcloud.url);
   await dialog.getByRole("button", { name: "Continue" }).click();
   await expect(dialog.getByRole("heading", { name: "Waiting for Nextcloud" })).toBeVisible();

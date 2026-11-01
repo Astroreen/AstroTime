@@ -9,7 +9,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { extname, join, resolve, sep } from "node:path";
 
-import { proxyHandler } from "@astrotime/caldav";
+import { proxyHandler, withPreset, type Preset } from "@astrotime/caldav";
 
 export const DAV_PROXY_PREFIX = "/dav-proxy/";
 
@@ -86,6 +86,8 @@ export interface ServerOptions {
   readonly allow: readonly string[];
   /** The hosts it answers for (`ASTROTIME_PUBLIC_HOST`, D81); any when absent. */
   readonly hosts?: readonly PublicHost[];
+  /** The server and user name the page names for signing in (D123). */
+  readonly preset?: Preset;
   readonly fetch?: typeof fetch;
 }
 
@@ -145,29 +147,51 @@ function listed(hosts: readonly PublicHost[], header: string | undefined): boole
   );
 }
 
-/** Parses `ASTROTIME_PROXY_ALLOW`: a comma-separated list of origins. */
-export function allowlist(value: string | undefined): string[] {
-  const origins = (value ?? "")
+/**
+ * Parses `ASTROTIME_PROXY_ALLOW`: a comma-separated list of origins. A
+ * preset's server (D123) is the list when none is given, and must be on it
+ * when one is.
+ */
+export function allowlist(value: string | undefined, preset: Preset | null = null): string[] {
+  const entries = (value ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (origins.length === 0) {
+  const presetOrigin = preset && new URL(preset.server).origin;
+  if (entries.length === 0 && presetOrigin) return [presetOrigin];
+  if (entries.length === 0) {
     throw new Error(
       "ASTROTIME_PROXY_ALLOW must list the CalDAV servers the proxy may reach, e.g. https://cloud.example.com",
     );
   }
-  for (const origin of origins) {
-    let parsed: string | null = null;
+  // Each entry as its origin: case, a default port and a final slash aside.
+  const origins = entries.map((entry) => {
+    let url: URL | null = null;
     try {
-      parsed = new URL(origin).origin;
+      url = new URL(entry);
     } catch {
       // Reported below, with the entry that is wrong.
     }
-    if (origin === "*" || parsed !== origin) {
+    const bare =
+      url !== null &&
+      /^https?:$/.test(url.protocol) &&
+      url.pathname === "/" &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password &&
+      !/[?#]$/.test(entry);
+    if (entry === "*" || !url || !bare) {
       throw new Error(
-        `ASTROTIME_PROXY_ALLOW: "${origin}" is not an origin like https://cloud.example.com`,
+        `ASTROTIME_PROXY_ALLOW: "${entry}" is not an origin like https://cloud.example.com`,
       );
     }
+    return url.origin;
+  });
+  if (presetOrigin && !origins.includes(presetOrigin)) {
+    throw new Error(
+      `ASTROTIME_PROXY_ALLOW does not list ${presetOrigin}, ASTROTIME_SERVER_URL's server`,
+    );
   }
   return origins;
 }
@@ -260,7 +284,7 @@ function matches(header: string | undefined, etag: string): boolean {
  * again only when its size or time changes. Each answer reads one open
  * file: its size, ETag and body agree even if the file is replaced meanwhile.
  */
-function staticFiles(root: string) {
+function staticFiles(root: string, preset: Preset | null) {
   const etags = new Map<string, { readonly stamp: string; readonly etag: Promise<string> }>();
   const etagOf = (file: string, handle: FileHandle, info: Stats): Promise<string> => {
     const stamp = `${info.ino}:${info.size}:${info.mtimeMs}`;
@@ -313,7 +337,7 @@ function staticFiles(root: string) {
     }
     const target = found ? file : join(root, "index.html");
     if (extname(target).toLowerCase() === ".html") {
-      await page(target, req, res);
+      await page(target, req, res, preset);
       return;
     }
     const variants = await Promise.all(
@@ -369,13 +393,19 @@ function staticFiles(root: string) {
 
 /**
  * The app's page, with a fresh nonce in its policy and its tags on every
- * answer (D110). It is read whole (under a kilobyte) and sent as it is: not
- * compressed, and with no ETag, so no 304 can pair a stored page with
- * another answer's nonce.
+ * answer (D110), and the preset in its head (D123). It is read whole (under
+ * a kilobyte) and sent as it is: not compressed, and with no ETag, so no 304
+ * can pair a stored page with another answer's nonce.
  */
-async function page(file: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function page(
+  file: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+  preset: Preset | null,
+): Promise<void> {
   const nonce = randomBytes(16).toString("base64");
-  const body = Buffer.from((await readFile(file, "utf8")).replaceAll(NONCE_PLACEHOLDER, nonce));
+  const html = (await readFile(file, "utf8")).replaceAll(NONCE_PLACEHOLDER, nonce);
+  const body = Buffer.from(withPreset(html, preset));
   res.writeHead(200, {
     ...PAGE_HEADERS,
     "Content-Security-Policy": contentSecurityPolicy(nonce),
@@ -407,7 +437,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
     allow: options.allow,
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
-  const serveStatic = staticFiles(root);
+  const serveStatic = staticFiles(root, options.preset ?? null);
   return createServer((req, res) => {
     const url = req.url ?? "/";
     // The cause goes to the log; the client learns only that it failed.

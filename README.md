@@ -41,6 +41,25 @@ proxy answers for every name; `/healthz` answers whatever the `Host`, for
 health checks. Unset, every host is served
 ([D81](docs/plans/foundation.md#D81)).
 
+For one person's calendar, name the server and the user, and signing in
+asks only for the password ([D123](docs/plans/foundation.md#D123)):
+
+```sh
+docker run -d -p 8080:8080 \
+  -e ASTROTIME_SERVER_URL=https://cloud.example.com \
+  -e ASTROTIME_USERNAME=astro \
+  ghcr.io/astroreen/astrotime:latest
+```
+
+`ASTROTIME_SERVER_URL` is then the proxy's allowlist when
+`ASTROTIME_PROXY_ALLOW` is unset (and must be on it when it is set);
+`ASTROTIME_USERNAME` is optional. Both are shown to whoever opens the page:
+never put a password there, and leave the user name out if the instance must
+not say whose it is. Without them the app asks for the server, user name and
+password, or opens Nextcloud's own sign-in; either way it first opens on a
+calendar on the device, with no account
+([D122](docs/plans/foundation.md#D122)).
+
 The container sends the app with a strict Content Security Policy and a
 fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Let the
 reverse proxy pass it on as it is and keep the page out of its cache: a policy

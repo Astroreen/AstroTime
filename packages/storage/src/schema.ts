@@ -5,8 +5,12 @@ import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqli
 
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
-  /** `demo`: the demo data's account, which is never synced (docs/plans/foundation.md#D57). */
-  provider: text("provider", { enum: ["caldav", "demo"] }).notNull(),
+  /**
+   * `demo`: the demo data's account, which is never synced
+   * (docs/plans/foundation.md#D57); `local`: the calendar on this device,
+   * which has no server (docs/plans/foundation.md#D122).
+   */
+  provider: text("provider", { enum: ["caldav", "demo", "local"] }).notNull(),
   name: text("name").notNull(),
   /** The address the user signed in with. */
   serverUrl: text("server_url").notNull(),

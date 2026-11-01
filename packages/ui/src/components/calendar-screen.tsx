@@ -2,8 +2,9 @@
 // button, the drawer (a sidebar on a wide screen, headed by Create), the view
 // and the floating "+" button where no sidebar holds Create (D132); search,
 // the tasks screen and, on a wide screen, Settings open from the top bar
-// (D52, D53, D131, D133), Settings from the drawer on a phone;
-// the first-run screen while there is no account. The view reads the local
+// (D52, D53, D131, D133), Settings from the drawer on a phone. The calendar
+// shows from the first run, with no account: the calendar on this device
+// (docs/plans/foundation.md#D122). The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
 import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
@@ -29,7 +30,7 @@ import {
 import { useEntries, useMediaQuery, useNow, type Entries } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
 import { useSettings } from "../settings.ts";
-import { AccountButton, FirstRun } from "./accounts.tsx";
+import { AccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
@@ -340,9 +341,6 @@ export function CalendarScreen({
       create={wide ? { disabled: !editing.value.canCreate, onCreate: create } : undefined}
     />
   );
-
-  // No account and no demo: the way in (docs/plans/foundation.md#D92).
-  if (lists && lists.accounts.length === 0) return <FirstRun />;
 
   return (
     <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>

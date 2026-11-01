@@ -95,8 +95,13 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Account button** — the avatar at the end of the top bar; it opens the
   **accounts dialog**: each account with its sync status and menu, "Sync
   now", "Add account" (foundation D92).
-- **First-run screen** — what an app with no account (and no demo data)
-  shows instead of the calendar: the ways to add one.
+- **Calendar on this device** — the calendar a store with no account gets,
+  of provider `local`: events and tasks with no server, never synced
+  (foundation D122). It replaced the **first-run screen**, which asked for
+  an account before showing the calendar.
+- **Preset** — the CalDAV server and user name a single-user deployment
+  names for whoever opens it, so signing in asks for the password alone
+  (foundation D123).
 
 ## Sync
 

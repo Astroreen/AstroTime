@@ -120,10 +120,23 @@ export async function launchAgain(userData: string): Promise<number | null> {
   return code;
 }
 
-/** Signs in on the first-run screen, as a user would. */
-export async function signInByPassword(page: Page, server: CalDavServer): Promise<void> {
-  await page.getByRole("button", { name: "Another CalDAV server" }).click();
+/**
+ * Opens the add-account dialog from the accounts dialog, the way in since the
+ * app opens on the calendar on this device (docs/plans/foundation.md#D122).
+ */
+export async function addAccount(page: Page, kind: "nextcloud" | "caldav" = "nextcloud") {
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add account" }).click();
   const dialog = page.getByRole("dialog", { name: "Add an account" });
+  if (kind === "nextcloud") return dialog;
+  // The Nextcloud tab's panel may stay in the tree: CalDAV's own panel holds the form.
+  await dialog.getByRole("tab", { name: "CalDAV" }).click();
+  return dialog.getByRole("tabpanel", { name: "CalDAV" });
+}
+
+/** Signs in by password from the accounts dialog, as a user would. */
+export async function signInByPassword(page: Page, server: CalDavServer): Promise<void> {
+  const dialog = await addAccount(page, "caldav");
   await dialog.getByRole("textbox", { name: "Server address" }).fill(server.url);
   await dialog.getByRole("textbox", { name: "User name" }).fill(server.username);
   await dialog.getByLabel("Password").fill(server.password);

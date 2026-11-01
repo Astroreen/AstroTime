@@ -20,16 +20,23 @@ export const en = {
   "secrets.unprotected.untilQuit": "Keep until AstroTime quits",
   "secrets.unprotected.save": "Save unprotected",
 
-  "firstRun.title": "Your calendars and tasks, from your own server",
-  "firstRun.body":
-    "Sign in to Nextcloud or any CalDAV server. Your data stays there and on this device; AstroTime has no server of its own.",
-  "firstRun.dataHome":
-    "AstroTime keeps your accounts and data in this browser, for {{home}} only. Opened at another address or in another browser, it starts empty.",
-  "firstRun.nextcloud": "Sign in to Nextcloud",
-  "firstRun.caldav": "Another CalDAV server",
+  "local.account": "On this device",
+  "local.calendar": "Personal",
+  "local.status": "Not synced: on this device only",
+  "local.dataHome":
+    "Kept in this browser for {{home}} only. At another address or in another browser, AstroTime starts empty.",
+  "local.hint": "Add an account to sync with Nextcloud or another CalDAV server.",
+  "local.removeTitle": "Delete the calendars on this device?",
+  "local.removeBody":
+    "Their events and tasks are on no server, so they are deleted for good. Move any you want to keep to a server's calendar first, in their edit dialog.",
+  "local.removeConfirm": "Delete",
 
   "signIn.title": "Add an account",
   "signIn.titleAgain": "Sign in again",
+  "signIn.preset.title": "Sign in to {{host}}",
+  "signIn.preset.as": "As {{username}}",
+  "signIn.preset.loginFlow": "Approve in Nextcloud instead",
+  "signIn.preset.other": "Another server",
   "signIn.kind": "Server",
   "signIn.kind.nextcloud": "Nextcloud",
   "signIn.kind.caldav": "CalDAV",
@@ -82,6 +89,7 @@ export const en = {
     "AstroTime could not revoke its app password on the server. You can revoke it in Nextcloud's settings, under Security.",
   "accounts.notRevokedClose": "OK",
   "accounts.demo": "Demo data, on this device only",
+  "accounts.held": "Signing in as {{name}} once the server can be reached.",
   "accounts.noCalendars": "No calendars on this account",
   "accounts.close": "Close",
 

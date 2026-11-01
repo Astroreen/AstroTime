@@ -1,12 +1,13 @@
 // The accounts in the shell (design D46, docs/plans/foundation.md#D91, D92):
 // the account button in the top bar and the accounts dialog it opens, each
-// account's section in the drawer with its calendars and menu, the sync
-// status, and the first-run screen of an app with no accounts.
+// account's section in the drawer with its calendars and menu, and the sync
+// status. The calendar on this device (D122) is an account here too.
 import type { Account, Calendar } from "@astrotime/storage";
 import type { AccountSync } from "@astrotime/sync";
 import { Checkbox } from "@base-ui/react/checkbox";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
+import type { TFunction } from "i18next";
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +19,10 @@ import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
 
+/** An account's name; the calendar on this device's in the language spoken now (D122). */
+export const accountName = (account: Account, t: TFunction) =>
+  account.provider === "local" ? t("local.account") : account.name;
+
 /** Whether an account's last sync left something for the user to do or know. */
 function needsAttention(last: AccountSync | undefined): boolean {
   if (!last) return false;
@@ -26,16 +31,17 @@ function needsAttention(last: AccountSync | undefined): boolean {
 }
 
 /** The first letter of an account's name, on its avatar. */
-const initial = (account: Account | undefined) =>
-  account ? (Array.from(account.name.trim())[0] ?? "?").toLocaleUpperCase() : "?";
+const initial = (name: string | undefined) =>
+  name ? (Array.from(name.trim())[0] ?? "?").toLocaleUpperCase() : "?";
 
 function Avatar({ account, size = "size-8" }: { account: Account | undefined; size?: string }) {
+  const { t } = useTranslation();
   return (
     <span
       aria-hidden="true"
       className={`grid ${size} shrink-0 place-items-center rounded-full bg-accent text-sm font-medium text-on-accent`}
     >
-      {initial(account)}
+      {initial(account && accountName(account, t))}
     </span>
   );
 }
@@ -43,6 +49,7 @@ function Avatar({ account, size = "size-8" }: { account: Account | undefined; si
 /** One line on how an account syncs: syncing, when it last did, or what stops it. */
 function StatusLine({ account, value }: { account: Account; value: AccountsValue }) {
   const { t } = useTranslation();
+  if (account.provider === "local") return <>{t("local.status")}</>;
   if (!syncs(account)) return <>{t("accounts.demo")}</>;
   const { status, settings, timeZone } = value;
   const known: AccountStatus | undefined = status.accounts.get(account.id);
@@ -102,7 +109,7 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={t("accounts.menu", { name: account.name })}
+        aria-label={t("accounts.menu", { name: accountName(account, t) })}
         className="grid size-9 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
       >
         <MoreIcon className="size-5" />
@@ -199,7 +206,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
                 <div className="flex items-center gap-3">
                   <Avatar account={account} size="size-9" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14.5px] font-medium">{account.name}</p>
+                    <p className="truncate text-[14.5px] font-medium">{accountName(account, t)}</p>
                     {/* Said as it changes, so Sync now is heard to run and end. */}
                     <p role="status" className="truncate text-[12.5px] text-ink-muted">
                       <StatusLine account={account} value={value} />
@@ -220,9 +227,25 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
                   </button>
                 )}
                 <Problems last={value.status.accounts.get(account.id)?.last} />
+                {/* The web keeps a store per origin: another address starts empty (D121). */}
+                {account.provider === "local" && value.platform.dataHome ? (
+                  <p className="text-[12.5px] text-ink-muted">
+                    {t("local.dataHome", { home: value.platform.dataHome })}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
+          {value.held && (
+            <p role="status" className="mt-3 px-2 text-[13px] text-ink-muted">
+              {t("accounts.held", {
+                name: `${value.held.username}@${new URL(value.held.server).host}`,
+              })}
+            </p>
+          )}
+          {!accounts.some(syncs) && (
+            <p className="mt-3 px-2 text-[13px] text-ink-muted">{t("local.hint")}</p>
+          )}
           {value.conflicts > 0 && (
             <div role="note" className="mt-3 rounded-2xl bg-danger-soft p-3 text-[13px]">
               <p className="font-medium text-danger">
@@ -253,7 +276,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
               className={`${primaryButton} flex items-center gap-2`}
               onClick={() => {
                 setOpen(false);
-                value.signIn({ kind: "nextcloud" });
+                value.signIn({ kind: value.platform.preset ? "preset" : "nextcloud" });
               }}
             >
               <AddPersonIcon className="size-4" />
@@ -291,10 +314,10 @@ export function AccountSection({
   const { t } = useTranslation();
   const value = useAccounts();
   return (
-    <section aria-label={account.name} className="flex flex-col">
+    <section aria-label={accountName(account, t)} className="flex flex-col">
       <div className="flex items-center gap-1 pt-2 pr-1 pl-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-xs text-ink-muted">{account.name}</h3>
+          <h3 className="truncate text-xs text-ink-muted">{accountName(account, t)}</h3>
           <p className="truncate text-[11px] text-ink-muted">
             <StatusLine account={account} value={value} />
           </p>
@@ -344,49 +367,12 @@ export function AddAccountButton({ onLeave }: { onLeave: () => void }) {
       type="button"
       onClick={() => {
         onLeave();
-        value.signIn({ kind: "nextcloud" });
+        value.signIn({ kind: value.platform.preset ? "preset" : "nextcloud" });
       }}
       className="mt-1 flex h-10 items-center gap-4 rounded-full px-4 text-left text-[14px] hover:bg-raised-hover"
     >
       <AddPersonIcon className="size-5 text-ink-muted" />
       {t("accounts.add")}
     </button>
-  );
-}
-
-/** An app with no account and no demo: what AstroTime is, and the way in. */
-export function FirstRun() {
-  const { t } = useTranslation();
-  const value = useAccounts();
-  return (
-    <main className="grid h-dvh place-items-center bg-canvas p-6 text-ink">
-      <div className="flex max-w-md flex-col items-center gap-4 text-center">
-        <p className="text-[15px] font-medium tracking-tight text-accent">{t("app.name")}</p>
-        <h1 className="text-[26px] leading-tight">{t("firstRun.title")}</h1>
-        <p className="text-[15px] text-ink-muted">{t("firstRun.body")}</p>
-        {/* The web keeps a store per origin: another address starts empty (D121). */}
-        {value.platform.dataHome ? (
-          <p className="text-[13px] text-ink-muted">
-            {t("firstRun.dataHome", { home: value.platform.dataHome })}
-          </p>
-        ) : null}
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <button
-            type="button"
-            className={primaryButton}
-            onClick={() => value.signIn({ kind: "nextcloud" })}
-          >
-            {t("firstRun.nextcloud")}
-          </button>
-          <button
-            type="button"
-            className={textButton}
-            onClick={() => value.signIn({ kind: "caldav" })}
-          >
-            {t("firstRun.caldav")}
-          </button>
-        </div>
-      </div>
-    </main>
   );
 }

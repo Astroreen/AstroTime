@@ -367,6 +367,96 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.objectAt(calendar.id, "s3.ics")).toBeUndefined();
     });
 
+    test("an empty store gets the calendar on this device, once; its changes are final, and it steps aside unused (D122)", async () => {
+      const store = await Store.open(await driver());
+      const names = { account: "On this device", calendar: "Personal", color: "#7c8db5" };
+      const [local, again] = await Promise.all([
+        store.addLocalCalendarIfEmpty(names),
+        store.addLocalCalendarIfEmpty(names),
+      ]);
+      expect([local === null, again === null].toSorted()).toEqual([false, true]);
+      const account = (local ?? again)!;
+      expect(await store.accounts()).toEqual([account]);
+      expect(account).toMatchObject({ provider: "local", name: "On this device" });
+      const [calendar] = await store.calendars(account.id);
+      expect(calendar).toMatchObject({
+        name: "Personal",
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      // Nothing uploads it, so nothing waits: a change is final, a deletion at once.
+      const saved = await store.saveLocal(calendar!.id, task("milk"));
+      expect(saved.pending).toBe("none");
+      expect(
+        (await store.saveLocal(calendar!.id, task("milk", "STATUS:COMPLETED\r\n"))).pending,
+      ).toBe("none");
+      expect(await store.pending(calendar!.id)).toEqual([]);
+      await store.deleteLocal(saved.id);
+      expect(await store.object(saved.id)).toBeUndefined();
+
+      // A store with accounts gets none.
+      expect(await store.addLocalCalendarIfEmpty(names)).toBeNull();
+      // Alone, it stays; with a server's account beside it, unused, it goes.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      const server = await store.addAccount({
+        provider: "caldav",
+        name: "astro@cloud.example.com",
+        serverUrl: "https://cloud.example.com/",
+        username: "astro",
+      });
+      // The server's account has no calendar yet (its first sync failed, or
+      // found none): the user keeps somewhere to write.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      expect((await store.accounts()).map((a) => a.provider)).toEqual(["local", "caldav"]);
+      const served = (slug: string, components: ("VEVENT" | "VTODO")[], rights = ALL_RIGHTS) =>
+        store.saveCalendar({
+          accountId: server.id,
+          url: `https://cloud.example.com/remote.php/dav/calendars/astro/${slug}/`,
+          name: slug,
+          color: null,
+          components,
+          rights,
+        });
+      // Shared read-only, or editable without creating: nowhere to create in yet.
+      await served("shared", ["VEVENT", "VTODO"], NO_RIGHTS);
+      await served("team", ["VEVENT", "VTODO"], { create: false, edit: true, delete: false });
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // Events can be created, tasks not yet: the calendar on this device stays for them.
+      await served("work", ["VEVENT"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // A list for tasks too: it steps aside.
+      await served("tasks", ["VTODO"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+      expect(await store.accounts()).toEqual([server]);
+    });
+
+    test("the calendar on this device stays beside a server's account while it holds items (D122)", async () => {
+      const store = await Store.open(await driver());
+      const local = await store.addLocalCalendarIfEmpty({
+        account: "On this device",
+        calendar: "Personal",
+        color: "#7c8db5",
+      });
+      const [calendar] = await store.calendars(local!.id);
+      await store.saveLocal(calendar!.id, task("milk"));
+      const server = await store.addAccount({
+        provider: "caldav",
+        name: "astro@cloud.example.com",
+        serverUrl: "https://cloud.example.com/",
+        username: "astro",
+      });
+      await store.saveCalendar({
+        accountId: server.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/personal/",
+        name: "Personal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      expect((await store.accounts()).map((a) => a.provider)).toEqual(["local", "caldav"]);
+    });
+
     test("deleting an object that never reached the server removes it at once", async () => {
       const { store, calendar } = await setup();
       const created = await store.saveLocal(calendar.id, task("draft"));

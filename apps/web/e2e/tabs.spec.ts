@@ -24,11 +24,9 @@ test("a second tab works on the same store, and shows at once what the other wri
   page,
 }) => {
   // The first tab opens an empty store, and leads it: no account yet, so
-  // it shows the ways in (docs/plans/foundation.md#D92).
+  // the calendar on this device (docs/plans/foundation.md#D122).
   await openStore(page);
-  await expect(
-    page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
   // The second tab writes the demo data through the first; both show it.
   const second = await page.context().newPage();
   await openDemo(second, "week");

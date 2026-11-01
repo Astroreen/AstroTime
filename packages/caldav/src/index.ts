@@ -22,5 +22,6 @@ export {
   type Credentials,
   type Discovery,
 } from "./provider.ts";
+export { presetFrom, PRESET_META, presetTags, withPreset, type Preset } from "./preset.ts";
 export { proxyHandler, REFUSED, throughProxy, type ProxyOptions } from "./proxy.ts";
 export { followRedirects } from "./redirects.ts";

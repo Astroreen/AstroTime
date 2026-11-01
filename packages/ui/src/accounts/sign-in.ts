@@ -80,6 +80,23 @@ export const FLOW_LIFETIME_MS = 20 * 60_000;
 /** How often a hidden page looks whether it is visible again, sending nothing. */
 const HIDDEN_LOOK_MS = 5_000;
 
+/**
+ * How long an approval is held for a server that cannot be reached; after
+ * that its app password is revoked at the next chance, and dropped (D121).
+ */
+export const HOLD_MS = 7 * 24 * 60 * 60_000;
+
+/** Whether two server addresses are one: scheme, host, port and path, a final slash aside. */
+function sameServer(a: string, b: string): boolean {
+  try {
+    const [x, y] = [new URL(a), new URL(b)];
+    const path = (url: URL) => url.pathname.replace(/\/+$/, "");
+    return x.protocol === y.protocol && x.host === y.host && path(x) === path(y);
+  } catch {
+    return false;
+  }
+}
+
 /** Where a Login Flow under way is kept, in the platform's `pendingSignIn` (D121). */
 export const PENDING_FLOW = "login-flow";
 
@@ -96,6 +113,11 @@ type PendingFlow =
       readonly token: string;
       readonly server: string;
       readonly owner: string;
+      /**
+       * Past it, the approval is revoked rather than saved; null in what an
+       * earlier build kept, which a page gives one as it takes it up.
+       */
+      readonly heldUntil: number | null;
     } & Credentials);
 
 /** The Web Lock a page holds for as long as it lives, so other pages can tell it is there. */
@@ -134,8 +156,11 @@ function readPending(json: string | null): PendingFlow | null {
     if (token === null || server === null) return null;
     if (value?.["step"] === "approved") {
       const [username, password, owner] = [text("username"), text("password"), text("owner")];
+      const held = value["heldUntil"];
       if (username === null || password === null || owner === null) return null;
-      return { step: "approved", token, server, owner, username, password };
+      // Kept before approvals had a deadline: one is given on take-up, never dropped unrevoked.
+      const heldUntil = typeof held === "number" ? held : null;
+      return { step: "approved", token, server, owner, heldUntil, username, password };
     }
     const [loginUrl, endpoint, deadline] = [
       text("loginUrl"),
@@ -195,16 +220,37 @@ function forgetFlow(pending: SecretStore, token: string, page: string): Promise<
 /**
  * Makes `page` the owner of the kept approval, if its owner is gone (D121):
  * the approval to save, or null when another page that is still there holds
- * it, or none is kept.
+ * it, or none is kept. One kept with no deadline gets one, `now` + `HOLD_MS`.
  */
-function takeUpApproval(pending: SecretStore, page: string): Promise<ApprovedFlow | null> {
+function takeUpApproval(
+  pending: SecretStore,
+  page: string,
+  now: number,
+): Promise<(ApprovedFlow & { readonly heldUntil: number }) | null> {
   return underLock(async () => {
     const kept = readPending(await pending.get(PENDING_FLOW));
     if (kept?.step !== "approved" || (await heldElsewhere(kept, page))) return null;
-    const mine = { ...kept, owner: page };
+    const mine = { ...kept, owner: page, heldUntil: kept.heldUntil ?? now + HOLD_MS };
     await pending.set(PENDING_FLOW, JSON.stringify(mine));
     return mine;
   });
+}
+
+/**
+ * Runs `work` as the one saver of the approval of `token`, in this page or
+ * any other (D121): `wait` queues behind a saver that runs; otherwise, while
+ * one runs, nothing is done and `busy` is true.
+ */
+async function asSaver<T>(
+  token: string,
+  wait: boolean,
+  work: () => Promise<T>,
+): Promise<{ busy: false; value: T } | { busy: true }> {
+  const locks = globalThis.navigator?.locks;
+  if (!locks) return { busy: false, value: await work() };
+  return locks.request(`astrotime-flow-${token}`, { ifAvailable: !wait }, async (lock) =>
+    lock ? { busy: false as const, value: await work() } : { busy: true as const },
+  );
 }
 
 /** Whether `page` may still revoke its approval of `token`: no other page took it up. */
@@ -216,20 +262,17 @@ function stillOwns(pending: SecretStore, token: string, page: string): Promise<b
 }
 
 /**
- * Whether a page that just started has a Login Flow to take up: one waiting
- * within its token's life, or one approved and not yet saved whose page is
- * gone. What is kept but past its life, or unreadable, is forgotten here.
+ * Whether a page that just started has a Login Flow to show again: one
+ * waiting for the approval within its token's life. An approval held is
+ * saved in the background instead (`SignIn.saveHeld`). What is kept but
+ * past its life, or unreadable, is forgotten here.
  */
-export async function hasPendingFlow(
-  pending: SecretStore,
-  now = Date.now(),
-  page = currentPage(),
-): Promise<boolean> {
+export async function hasPendingFlow(pending: SecretStore, now = Date.now()): Promise<boolean> {
   return underLock(async () => {
     const raw = await pending.get(PENDING_FLOW);
     if (raw === null) return false;
     const flow = readPending(raw);
-    if (flow?.step === "approved") return !(await heldElsewhere(flow, page));
+    if (flow?.step === "approved") return false;
     if (flow && now < flow.deadline) return true;
     await pending.delete(PENDING_FLOW);
     return false;
@@ -246,6 +289,19 @@ export function pollInterval(elapsed: number): number {
   if (elapsed < 60_000) return 2_000;
   if (elapsed < 5 * 60_000) return 5_000;
   return 15_000;
+}
+
+/**
+ * The approval held for this page to save, if any: its own, or one whose page
+ * is gone; for the accounts' calm line while its server cannot be reached.
+ */
+export async function heldApproval(
+  pending: SecretStore,
+  page = currentPage(),
+): Promise<{ readonly server: string; readonly username: string } | null> {
+  const flow = readPending(await pending.get(PENDING_FLOW));
+  if (flow?.step !== "approved" || (await heldElsewhere(flow, page))) return null;
+  return { server: flow.server, username: flow.username };
 }
 
 /**
@@ -353,7 +409,7 @@ export class SignIn {
     const end = this.#options.signingInTo?.(server);
     try {
       const held = this.#approved;
-      if (held && new URL(held.server).host === new URL(server).host)
+      if (held && sameServer(held.server, server))
         await this.#saveApproved(signal, held.token, held.server, held.credentials);
       else await this.#loginFlow(signal, server);
     } finally {
@@ -405,7 +461,7 @@ export class SignIn {
     if (kept?.step === "approved") {
       // Only once its page is gone; one that is there saves it itself.
       try {
-        kept = await takeUpApproval(pending, this.#page);
+        kept = await takeUpApproval(pending, this.#page, this.#clock.now());
       } catch (error) {
         console.error(error);
         kept = null;
@@ -444,6 +500,60 @@ export class SignIn {
     return true;
   }
 
+  /**
+   * Saves an approval held, with no dialog (D121): this page's own, kept
+   * while its server could not be reached, or one whose page is gone. Past
+   * its `heldUntil` it is revoked instead, and dropped once that is done.
+   * `held`: kept for a later try, the server still unreachable.
+   */
+  async saveHeld(): Promise<"saved" | "held" | "none"> {
+    const { pending, http } = this.#options;
+    if (!pending) return "none";
+    const signal = this.#begin();
+    let approval: (ApprovedFlow & { readonly heldUntil: number }) | null;
+    try {
+      approval = await takeUpApproval(pending, this.#page, this.#clock.now());
+    } catch (error) {
+      console.error(error);
+      approval = null;
+    }
+    if (!approval) {
+      this.#set({ step: "idle" });
+      return "none";
+    }
+    const { token, server, username, password, heldUntil } = approval;
+    // One saver per approval: a save under way (this page's dialog's, or
+    // another page's) is left to finish, and this does nothing.
+    const run = await asSaver(token, false, async (): Promise<"saved" | "held" | "none"> => {
+      // Saved or revoked by another saver since it was taken up: nothing left.
+      if (readPending(await pending.get(PENDING_FLOW))?.token !== token) return "none";
+      if (this.#clock.now() >= heldUntil) {
+        try {
+          await revokeAppPassword(http, server, { username, password });
+        } catch (error) {
+          if (error instanceof OfflineError) return "held";
+          console.error(error);
+        }
+        await this.#forget(token);
+        return "none";
+      }
+      await this.#saveApproved(signal, token, server, { username, password }, false);
+      const state = this.#state;
+      if (state.step === "done") return "saved";
+      if (state.step === "failed" && state.problem === "offline") {
+        // Held for the next try, by this page or another.
+        this.#approved = null;
+        return "held";
+      }
+      return "none";
+    });
+    if (run.busy) {
+      this.#set({ step: "idle" });
+      return "none";
+    }
+    return run.value;
+  }
+
   /** Polls until the user approves, the token expires, or another page ends the flow. */
   async #await(signal: AbortSignal, flow: LoginFlow, server: string, deadline: number) {
     const token = flow.state.token;
@@ -479,7 +589,14 @@ export class SignIn {
             try {
               const { displaced } = await keepFlow(
                 pending,
-                { step: "approved", token, server: named, owner: this.#page, ...credentials },
+                {
+                  step: "approved",
+                  token,
+                  server: named,
+                  owner: this.#page,
+                  heldUntil: this.#clock.now() + HOLD_MS,
+                  ...credentials,
+                },
                 this.#page,
               );
               if (displaced) await this.#revoke(displaced);
@@ -520,7 +637,22 @@ export class SignIn {
     token: string,
     server: string,
     credentials: Credentials,
+    locked = true,
   ): Promise<void> {
+    if (locked) {
+      // One saver per approval (D121): behind a background save of it in
+      // this page, or a page that took it up, and nothing to do once that
+      // one saved or revoked it.
+      await asSaver(token, true, async () => {
+        if (this.#kept === token && !(await this.#stillKept(token))) {
+          if (signal.aborted) return;
+          this.#kept = null;
+          return this.#set({ step: "elsewhere" });
+        }
+        await this.#saveApproved(signal, token, server, credentials, false);
+      });
+      return;
+    }
     this.#approved = { token, server, credentials };
     this.#set({ step: "checking" });
     this.#finishing = true;
@@ -612,11 +744,18 @@ export class SignIn {
    * Resolves once a Login Flow it kept is forgotten (D121).
    */
   cancel(): Promise<void> {
+    const offline = this.#state.step === "failed" && this.#state.problem === "offline";
     this.#attempt?.abort();
     this.#attempt = null;
     this.#set({ step: "idle" });
     // Its account being saved: the save, cancelled, sees to the approval.
     if (this.#finishing) return Promise.resolve();
+    // Approved, but its server unreachable: held, and saved in the
+    // background once it can be (`saveHeld`), not revoked.
+    if (this.#approved && offline) {
+      this.#approved = null;
+      return Promise.resolve();
+    }
     // An approval held revoked; a flow it kept is over for every page; one
     // it was still reading stays.
     if (this.#approved) return this.#abandon();

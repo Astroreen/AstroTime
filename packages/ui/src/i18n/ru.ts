@@ -21,16 +21,23 @@ export const ru = {
   "secrets.unprotected.untilQuit": "Хранить до выхода из AstroTime",
   "secrets.unprotected.save": "Сохранить без защиты",
 
-  "firstRun.title": "Ваши календари и задачи с вашего сервера",
-  "firstRun.body":
-    "Войдите в Nextcloud или любой сервер CalDAV. Данные остаются там и на этом устройстве; своего сервера у AstroTime нет.",
-  "firstRun.dataHome":
-    "AstroTime хранит аккаунты и данные в этом браузере, только для {{home}}. По другому адресу или в другом браузере он открывается пустым.",
-  "firstRun.nextcloud": "Войти в Nextcloud",
-  "firstRun.caldav": "Другой сервер CalDAV",
+  "local.account": "На этом устройстве",
+  "local.calendar": "Личный",
+  "local.status": "Без синхронизации: только на этом устройстве",
+  "local.dataHome":
+    "Хранится в этом браузере только для {{home}}. По другому адресу или в другом браузере AstroTime открывается пустым.",
+  "local.hint": "Добавьте аккаунт, чтобы синхронизировать с Nextcloud или другим сервером CalDAV.",
+  "local.removeTitle": "Удалить календари на этом устройстве?",
+  "local.removeBody":
+    "Их события и задачи не хранятся ни на каком сервере, поэтому удалятся навсегда. Те, что нужно сохранить, сначала перенесите в календарь на сервере в окне правки.",
+  "local.removeConfirm": "Удалить",
 
   "signIn.title": "Добавить аккаунт",
   "signIn.titleAgain": "Войти снова",
+  "signIn.preset.title": "Вход в {{host}}",
+  "signIn.preset.as": "Пользователь {{username}}",
+  "signIn.preset.loginFlow": "Подтвердить в Nextcloud",
+  "signIn.preset.other": "Другой сервер",
   "signIn.kind": "Сервер",
   "signIn.kind.nextcloud": "Nextcloud",
   "signIn.kind.caldav": "CalDAV",
@@ -81,6 +88,7 @@ export const ru = {
     "AstroTime не удалось отозвать пароль приложения на сервере. Его можно отозвать в настройках Nextcloud, в разделе «Безопасность».",
   "accounts.notRevokedClose": "Понятно",
   "accounts.demo": "Демо-данные, только на этом устройстве",
+  "accounts.held": "Вход как {{name}} — как только сервер станет доступен.",
   "accounts.noCalendars": "В этом аккаунте нет календарей",
   "accounts.close": "Закрыть",
 

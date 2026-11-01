@@ -6,7 +6,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { openApp, WIDE } from "./support.ts";
+import { addAccount, openApp, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer & { put: Put } }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -39,8 +39,7 @@ test.use({ viewport: WIDE });
 const wednesday = (page: Page) => page.getByRole("list", { name: "Wednesday, November 4" });
 
 async function signInByPassword(page: Page, server: CalDavServer, password = server.password) {
-  await page.getByRole("button", { name: "Another CalDAV server" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add an account" });
+  const dialog = await addAccount(page, "caldav");
   await dialog.getByRole("textbox", { name: "Server address" }).fill(server.url);
   await dialog.getByRole("textbox", { name: "User name" }).fill(server.username);
   await dialog.getByLabel("Password").fill(password);
@@ -61,9 +60,8 @@ test("an account added by password syncs its calendars into the Week view, and S
     "20261104T150000",
   );
   await openApp(page);
-  await expect(
-    page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
-  ).toBeVisible();
+  // No sign-in in the way: the calendar on this device (D122).
+  await expect(page.getByRole("region", { name: "On this device" })).toBeVisible();
 
   await signInByPassword(page, radicale);
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -72,6 +70,8 @@ test("an account added by password syncs its calendars into the Week view, and S
   ).toBeVisible();
   // The drawer: the account, how it synced, and its calendar with its checkbox (design D46).
   const account = page.getByRole("region", { name: `astro@${new URL(radicale.url).host}` });
+  // With the server's calendars here, the unused calendar on this device steps aside (D122).
+  await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
   await expect(account.getByRole("checkbox", { name: "work" })).toBeChecked();
   await expect(account.getByText(/^Synced at /)).toBeVisible();
 
@@ -136,17 +136,14 @@ test.describe("in Russian", () => {
 
   test("a wrong password says so, and nothing is kept", async ({ page, radicale }) => {
     await openApp(page);
-    await page.getByRole("button", { name: "Другой сервер CalDAV" }).click();
-    const dialog = page.getByRole("dialog", { name: "Добавить аккаунт" });
+    const dialog = await addAccount(page, "caldav", RU_ADD_ACCOUNT);
     await dialog.getByRole("textbox", { name: "Адрес сервера" }).fill(radicale.url);
     await dialog.getByRole("textbox", { name: "Имя пользователя" }).fill(radicale.username);
     await dialog.getByLabel("Пароль").fill("wrong");
     await dialog.getByRole("button", { name: "Войти" }).click();
     await expect(dialog.getByRole("alert")).toHaveText("Неверное имя пользователя или пароль.");
     await dialog.getByRole("button", { name: "Отмена" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Ваши календари и задачи с вашего сервера" }),
-    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "На этом устройстве" })).toBeVisible();
   });
 });
 
@@ -175,8 +172,8 @@ test("removing an account, once confirmed, deletes its calendars from this devic
   await page.getByRole("menuitem", { name: "Remove from this device" }).click();
   const confirm = page.getByRole("alertdialog", { name: `Remove ${name}?` });
   await confirm.getByRole("button", { name: "Remove" }).click();
-  // No account is left: the first-run screen again.
-  await expect(page.getByRole("button", { name: "Sign in to Nextcloud" })).toBeVisible();
+  // No account is left: the calendar on this device again (D122).
+  await expect(page.getByRole("region", { name: "On this device" })).toBeVisible();
 });
 
 test("a server this AstroTime does not carry is named as the administrator's choice (D20)", async ({
@@ -191,8 +188,7 @@ test("a server this AstroTime does not carry is named as the administrator's cho
     }),
   );
   await openApp(page);
-  await page.getByRole("button", { name: "Sign in to Nextcloud" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add an account" });
+  const dialog = await addAccount(page);
   await dialog.getByRole("textbox", { name: "Server address" }).fill("cloud.example.com");
   await dialog.getByRole("button", { name: "Continue" }).click();
   await expect(dialog.getByRole("alert")).toHaveText(

@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { throughProxy } from "@astrotime/caldav";
+import { presetFrom, throughProxy } from "@astrotime/caldav";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { compress } from "../src/compress.ts";
@@ -190,10 +190,65 @@ test("the allowlist is required, and holds origins only", () => {
   expect(() => allowlist("*")).toThrow(/not an origin/);
   expect(() => allowlist("https://cloud.example.com/remote.php")).toThrow(/not an origin/);
   expect(() => allowlist("cloud.example.com")).toThrow(/"cloud.example.com" is not an origin/);
+  expect(() => allowlist("https://cloud.example.com/?x")).toThrow(/not an origin/);
+  expect(() => allowlist("https://u:p@cloud.example.com")).toThrow(/not an origin/);
   expect(allowlist(" https://cloud.example.com , http://10.0.0.2:8080")).toEqual([
     "https://cloud.example.com",
     "http://10.0.0.2:8080",
   ]);
+});
+
+test("a preset's server is the allowlist when none is given, and must be on one that is (D123)", () => {
+  const preset = presetFrom({
+    ASTROTIME_SERVER_URL: "https://cloud.example.com/nextcloud",
+    ASTROTIME_USERNAME: "astro",
+  });
+  expect(preset).toEqual({ server: "https://cloud.example.com/nextcloud", username: "astro" });
+  expect(allowlist(undefined, preset)).toEqual(["https://cloud.example.com"]);
+  expect(allowlist("https://cloud.example.com,https://dav.example.org", preset)).toHaveLength(2);
+  // The same origin spelled otherwise is on the list: case, a default port and a final slash aside.
+  expect(allowlist("HTTPS://Cloud.Example.com:443", preset)).toEqual(["https://cloud.example.com"]);
+  expect(allowlist("https://cloud.example.com/", preset)).toEqual(["https://cloud.example.com"]);
+  expect(() => allowlist("https://dav.example.org", preset)).toThrow(
+    /does not list https:\/\/cloud.example.com/,
+  );
+  expect(presetFrom({})).toBeNull();
+  expect(() => presetFrom({ ASTROTIME_USERNAME: "astro" })).toThrow(/needs ASTROTIME_SERVER_URL/);
+  for (const wrong of [
+    "cloud.example.com",
+    "ftp://cloud.example.com",
+    "https://u:p@cloud.example.com",
+  ])
+    expect(() => presetFrom({ ASTROTIME_SERVER_URL: wrong })).toThrow(/not a server address/);
+});
+
+test("the page names the preset's server and user, escaped, on every route (D123)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(
+    join(root, "index.html"),
+    `<!doctype html><html><head><meta name="csp-nonce" nonce="${NONCE_PLACEHOLDER}" /></head><body></body></html>`,
+  );
+  const server = createAppServer({
+    root,
+    allow: [dav],
+    preset: {
+      server: "https://cloud.example.com/$'",
+      username: `a"<b>&$$$&${NONCE_PLACEHOLDER}`,
+    },
+  });
+  servers.push(server);
+  const base = await listen(server);
+  for (const route of ["/", "/day/2026-11-04"]) {
+    const html = await (await fetch(`${base}${route}`)).text();
+    // Escaped, with `$` patterns as written, and the nonce's placeholder in
+    // the preset left alone: only the page's own tag carries the nonce.
+    expect(html).toContain(
+      `<meta name="astrotime-server" content="https://cloud.example.com/$'" /><meta name="astrotime-username" content="a&quot;&lt;b&gt;&amp;$$$&amp;${NONCE_PLACEHOLDER}" /></head>`,
+    );
+    const nonce = /nonce="([^"]+)"/.exec(html)?.[1];
+    expect(nonce).not.toBe(NONCE_PLACEHOLDER);
+    expect(html.split("</head>")).toHaveLength(2);
+  }
 });
 
 test("an answer that breaks off midway is cut off, never ended as if whole", async () => {

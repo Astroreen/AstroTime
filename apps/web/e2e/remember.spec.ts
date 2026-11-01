@@ -1,6 +1,6 @@
 // The app remembers the user (docs/plans/foundation.md#D121): an account
 // signed in to is there after the browser is closed and opened again, the
-// browser is asked to keep the data, the first run says the data belongs to
+// browser is asked to keep the data, the calendar on this device says the data belongs to
 // this address, and a Login Flow whose tab the browser discarded while the
 // user approved on Nextcloud's page is taken up by the tab loaded anew.
 import { mkdtemp, rm } from "node:fs/promises";
@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { chromium, expect, test, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { NOW, WIDE } from "./support.ts";
+import { addAccount, NOW, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -59,6 +59,8 @@ test("an account is there after the browser is closed and opened again, and the 
   baseURL,
 }) => {
   if (!baseURL) throw new Error("The config gives a baseURL.");
+  // A calendar on the server, for the calendar on this device to step aside for (D122).
+  await radicale.mkcalendar("personal");
   const profile = await mkdtemp(join(tmpdir(), "astrotime-profile-"));
   try {
     const first = await chromium.launchPersistentContext(profile, { baseURL, viewport: WIDE });
@@ -66,17 +68,15 @@ test("an account is there after the browser is closed and opened again, and the 
     await countPersistAsks(page);
     await page.clock.setFixedTime(NOW);
     await page.goto("/");
-    // Each origin has a store of its own: the first run says which this is.
+    // Each origin has a store of its own: the calendar on this device says which this is.
+    await page.getByRole("button", { name: /^Accounts/ }).click();
     await expect(
-      page.getByText(
-        `AstroTime keeps your accounts and data in this browser, for ${new URL(baseURL).host} only.`,
-        {
-          exact: false,
-        },
-      ),
+      page
+        .getByRole("dialog", { name: "Accounts" })
+        .getByText(`Kept in this browser for ${new URL(baseURL).host} only.`, { exact: false }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Another CalDAV server" }).click();
-    const dialog = page.getByRole("dialog", { name: "Add an account" });
+    await page.keyboard.press("Escape");
+    const dialog = await addAccount(page, "caldav");
     await dialog.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
     await dialog.getByRole("textbox", { name: "User name" }).fill(radicale.username);
     await dialog.getByLabel("Password").fill(radicale.password);
@@ -97,7 +97,7 @@ test("an account is there after the browser is closed and opened again, and the 
     await reopened.goto("/");
     const account = reopened.getByRole("region", { name: accountName() });
     await expect(account.getByText(/^Synced at /)).toBeVisible();
-    await expect(reopened.getByRole("button", { name: "Another CalDAV server" })).toHaveCount(0);
+    await expect(reopened.getByRole("region", { name: "On this device" })).toHaveCount(0);
     // Answered before: not asked again (Firefox would ask the user each time).
     expect(await reopened.evaluate(() => (globalThis as Asks).persistAsks)).toBe(0);
     await again.close();
@@ -148,8 +148,7 @@ test("a Login Flow whose tab the browser discarded is taken up by the tab loaded
     );
   await page.clock.setFixedTime(NOW);
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in to Nextcloud" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add an account" });
+  const dialog = await addAccount(page);
   await dialog.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
   await dialog.getByRole("button", { name: "Continue" }).click();
   await expect(dialog.getByRole("status")).toContainText("Approve AstroTime");
