@@ -11,6 +11,8 @@ WORKDIR /src
 RUN corepack enable
 COPY . .
 # No lifecycle scripts: `prepare` installs git hooks, which a build has no use for.
+# Compressing comes last: the server picks a .br/.gz copy by its existence
+# alone, so nothing may change apps/web/dist after it (D80).
 RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm --filter @astrotime/web build \
   && pnpm --filter @astrotime/proxy build \
