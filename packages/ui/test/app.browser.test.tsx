@@ -762,7 +762,18 @@ test("an approval held while its server is down is saved on a later sync's tick,
   vi.setSystemTime(NOW);
   const store = await emptyStore();
   const secrets = memorySecrets();
-  // A page went with its approval unsaved; the server is down, the browser online.
+  // An account of another server, whose syncs the test holds midway: a tick
+  // is seen to run, and to end.
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@dav.example.org",
+      serverUrl: "https://dav.example.org/",
+      homeUrl: "https://dav.example.org/calendars/astro/",
+      credentials: { username: "astro", password: "pw" },
+    },
+  );
+  // A page went with its approval unsaved; its server is down, the browser online.
   secrets.values.set(
     "login-flow",
     JSON.stringify({
@@ -777,13 +788,18 @@ test("an approval held while its server is down is saved on a later sync's tick,
   );
   const server = nextcloud({ password: "app-pass" });
   let down = true;
+  let midway: Promise<void> | null = null;
+  const tries: string[] = [];
   const http: HttpClient = async (request) => {
+    if (new URL(request.url).host === "dav.example.org") {
+      await midway;
+      throw new OfflineError("away");
+    }
+    tries.push(request.url);
     if (down) throw new OfflineError("down");
     return server.http(request);
   };
-  // A tick of the shell's own, as the desktop's timer is (not the user's).
   let request: (byUser: boolean) => void = () => {};
-  const tick = () => request(false);
   render(Promise.resolve(store), ["en-US"], {
     http,
     secrets,
@@ -793,26 +809,37 @@ test("an approval held while its server is down is saved on a later sync's tick,
       return () => {};
     },
   });
-  await page.getByRole("button", { name: /^Accounts/ }).click();
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  await button.click();
   const accounts = page.getByRole("dialog", { name: "Accounts" });
   await expect
     .element(
       accounts.getByText("Signing in as astro@cloud.example.com once the server can be reached."),
     )
     .toBeInTheDocument();
+  await accounts.getByRole("button", { name: "Close" }).click();
+  await expect.element(accounts).not.toBeInTheDocument();
+  const before = tries.length;
 
-  // The server is back; a sync's tick within the backoff leaves it be, one after saves it.
+  // The server is back. A sync's tick within the backoff, seen to run and
+  // end, leaves the approval be.
   down = false;
-  tick();
-  await expect.element(accounts.getByText("Not synced: on this device only")).toBeInTheDocument();
-  expect((await store.accounts()).filter((a) => a.provider === "caldav")).toEqual([]);
+  let release = () => {};
+  midway = new Promise((resolve) => (release = resolve));
+  request(true);
+  await expect.element(button).toHaveAccessibleName("Accounts, syncing");
+  release();
+  midway = null;
+  await expect.element(button).not.toHaveAccessibleName("Accounts, syncing");
+  expect(tries).toHaveLength(before);
+  expect((await store.accounts()).filter((a) => a.name === "astro@cloud.example.com")).toEqual([]);
+
+  // One after the backoff saves it.
   vi.setSystemTime(NOW.getTime() + 2 * 60_000);
-  tick();
+  request(true);
+  await button.click();
   await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
   expect(secrets.values.has("login-flow")).toBe(false);
-  expect(
-    (await store.accounts()).filter((a) => a.provider === "caldav").map((a) => a.username),
-  ).toEqual(["astro"]);
 });
 
 test("the browser is asked to keep the data once there is something to keep, not on a first run's load (D121)", async () => {

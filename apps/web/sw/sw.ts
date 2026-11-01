@@ -67,13 +67,18 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
     // The server's page while it answers (a fresh nonce and the preset); this
-    // version's when there is no network.
+    // version's when there is no network, or when what answers is a server
+    // error (a reverse proxy's 502, 503 or 504 while the container is down).
+    const kept = () => caches.match("/", { cacheName: CACHE });
     event.respondWith(
-      fetch(request).catch(async (error: unknown) => {
-        const kept = await caches.match("/", { cacheName: CACHE });
-        if (kept) return kept;
-        throw error;
-      }),
+      fetch(request).then(
+        async (answer) => (answer.status >= 500 ? ((await kept()) ?? answer) : answer),
+        async (error: unknown) => {
+          const page = await kept();
+          if (page) return page;
+          throw error;
+        },
+      ),
     );
     return;
   }

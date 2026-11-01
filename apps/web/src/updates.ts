@@ -1,8 +1,9 @@
 // The web app's service worker from the page's side (docs/plans/foundation.md#D124):
 // registered in the build, and a newer version, once installed and waiting,
-// told to the UI, which offers to reload into it. A page loads the version
-// that runs; a reload the user asked for moves every tab to the new one,
-// since an older tab's files are no longer kept.
+// told to the UI, which offers to reload into it. Only the tab whose user
+// asked reloads; every other tab, the new version running it now, offers
+// the same and reloads when its user asks, never by itself (an edit dialog
+// open in it keeps its text).
 import type { AppUpdates } from "@astrotime/ui";
 
 /** How often a page in front of the user asks for a newer version: one small request, mostly a 304. */
@@ -23,10 +24,17 @@ export function serviceWorkerUpdates(
   let waiting = false;
   let checked = now();
   // Controlled from the start: a change of controller is a new version taking
-  // over, and the page reloads into it. The first install takes over nothing.
+  // over. The first install takes over nothing.
   const controlled = container.controller !== null;
+  /** This tab's user asked for the new version. */
+  let asked = false;
+  /** The new version runs this tab now: Reload only loads it. */
+  let taken = false;
   container.addEventListener("controllerchange", () => {
-    if (controlled) reload();
+    if (!controlled) return;
+    if (asked) return reload();
+    taken = true;
+    found();
   });
 
   const found = () => {
@@ -51,7 +59,12 @@ export function serviceWorkerUpdates(
       return () => listeners.delete(listener);
     },
     apply() {
-      registration?.waiting?.postMessage("astrotime-update");
+      if (taken) return reload();
+      const waitingWorker = registration?.waiting;
+      if (!waitingWorker) return;
+      asked = true;
+      // A worker has no origin to name; the second argument is what it is handed.
+      waitingWorker.postMessage("astrotime-update", []);
     },
     async register() {
       try {

@@ -5,7 +5,7 @@
 // neither CalDAV (/dav-proxy/) nor the deployment's preset (D123), and a
 // newer version is offered quietly, then runs once the user reloads into it.
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import type { Server } from "node:http";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,7 +96,7 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
   });
   expect(put.status).toBe(201);
   // A single-user deployment (D123): the preset's sign-in, the password alone.
-  const { server, port } = await serve(DIST, radicale, 0, true);
+  let { server, port } = await serve(DIST, radicale, 0, true);
   try {
     await page.clock.setFixedTime(NOW);
     await page.goto(`http://127.0.0.1:${port}/`);
@@ -139,14 +139,26 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     await expect(button.locator(".bg-danger")).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await context.setOffline(false);
+
+    // The network back, but the container down behind its reverse proxy,
+    // which answers 502: the kept page all the same.
+    await close(server);
+    server = createServer((_request, answer) => answer.writeHead(502).end("Bad Gateway"));
+    await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+    const proxied = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
+    await page.reload();
+    const answer = await proxied;
+    expect([answer.fromServiceWorker(), answer.status()]).toEqual([true, 200]);
+    await expect(planning(page)).toBeVisible();
     expect(violations).toEqual([]);
   } finally {
     await close(server);
   }
 });
 
-test("a newer version is offered quietly, and runs once the user reloads into it", async ({
+test("a newer version is offered quietly; the tab whose user asks reloads into it, the others offer it and wait", async ({
   page,
+  context,
   radicale,
   violations,
 }) => {
@@ -171,6 +183,12 @@ test("a newer version is offered quietly, and runs once the user reloads into it
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
     await expect(page.getByText("A new version of AstroTime is ready.")).toHaveCount(0);
 
+    // A second tab, with a mark that a reload would lose.
+    const other = await context.newPage();
+    await other.goto(`http://127.0.0.1:${port}/`);
+    await expect(other.getByRole("button", { name: /^Accounts/ })).toBeVisible();
+    await other.evaluate(() => Object.assign(globalThis, { notReloaded: true }));
+
     // The server now has the newer version; the page looks for it.
     await close(server);
     ({ server } = await serve(second, radicale, port));
@@ -189,6 +207,19 @@ test("a newer version is offered quietly, and runs once the user reloads into it
     // The newer version runs, and the older's files are gone.
     expect(await page.evaluate(() => caches.keys())).toEqual(["astrotime-newer-version-00"]);
     await expect(notice).toHaveCount(0);
+
+    // The other tab did not reload by itself: it offers the version that now
+    // runs it, and loads it when its user asks.
+    const offered = other
+      .getByRole("status")
+      .filter({ hasText: "A new version of AstroTime is ready." });
+    await expect(offered).toBeVisible();
+    expect(await other.evaluate(() => "notReloaded" in globalThis)).toBe(true);
+    const otherReloaded = other.waitForEvent("load");
+    await offered.getByRole("button", { name: "Reload" }).click();
+    await otherReloaded;
+    await expect(other.getByRole("button", { name: /^Accounts/ })).toBeVisible();
+    expect(await other.evaluate(() => "notReloaded" in globalThis)).toBe(false);
     expect(violations).toEqual([]);
   } finally {
     await close(server);

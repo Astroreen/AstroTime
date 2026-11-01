@@ -5,17 +5,27 @@
 // the dev server registers none (src/main.tsx).
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import type { Plugin } from "vite";
 
 const SW = "sw.js";
+
+/** Every file under `dir`, as paths relative to it with `/`, sorted. */
+function filesUnder(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)).split(sep).join("/"))
+    .toSorted();
+}
 
 export function serviceWorker(): Plugin {
   let publicDir = "";
   return {
     name: "astrotime-service-worker",
     apply: "build",
+    // After Vite's own: the page is in the bundle by then.
+    enforce: "post",
     config: () => ({
       build: {
         rollupOptions: {
@@ -37,8 +47,11 @@ export function serviceWorker(): Plugin {
       const built = Object.keys(bundle).filter(
         (file) => file !== SW && file !== "index.html" && !file.endsWith(".map"),
       );
-      const own = publicDir && existsSync(publicDir) ? readdirSync(publicDir).toSorted() : [];
+      const own = publicDir && existsSync(publicDir) ? filesUnder(publicDir) : [];
       for (const file of own) hash.update(file).update(readFileSync(join(publicDir, file)));
+      // The page too: a change to it alone (its tags, the preset's place) is a new version.
+      const page = bundle["index.html"];
+      if (page?.type === "asset") hash.update("index.html").update(page.source);
       const files = ["/", ...[...built, ...own].toSorted().map((file) => `/${file}`)];
       for (const file of files) hash.update(file);
       const version = hash.digest("base64url").slice(0, 16);

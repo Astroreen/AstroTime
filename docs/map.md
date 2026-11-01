@@ -201,6 +201,9 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+  - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
+    the UI shows them, the calendar on this device named in the language
+    spoken now. → `plans/foundation.md#D122`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding

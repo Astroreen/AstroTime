@@ -507,14 +507,17 @@ Decided while building PR 7.
   `apps/web/service-worker.ts`), with the list of every file the build and
   `public/` wrote (the hashed scripts and styles, the store's worker,
   SQLite's wasm, both languages in the bundle, the manifest and icons) and a
-  version, a hash of them. Only the build registers it; the dev server has
+  version, a hash of them and of the page (`public/` walked whole). Only the
+  build registers it; the dev server has
   none.
   - **What it keeps.** On install it keeps this version's files in a cache
     of its own (`astrotime-<version>`) and the page as the server sent it
     then, policy and nonce with it ([D110](#D110)), but without the preset's
     tags ([D123](#D123)), which only the server says. Its files answer from
     the cache; the page comes from the network first (a fresh nonce, the
-    preset) and from the cache only when there is no network. It touches
+    preset) and from the cache when there is no network, or when what
+    answers is a server error (a reverse proxy's 502, 503 or 504 while the
+    container is down). It touches
     nothing else: never `/dav-proxy/`, never a request that is not a `GET`
     of the app's origin, never a file it does not list. Activated, it
     deletes older versions' caches. The proxy's static serving stays as
@@ -526,8 +529,10 @@ Decided while building PR 7.
     `clients.claim`, so a first install reloads nothing). A page the old
     version runs is told (`Platform.updates`) and shows a quiet line, "A new
     version of AstroTime is ready", with Reload and Later; Reload lets it
-    take over, and every tab of the origin reloads into it, since the older
-    files are gone. Unasked, it runs once every tab has closed. A page in
+    take over and reloads that tab. Every other tab, run by the new version
+    from then on, offers the same and reloads only when its user asks, never
+    by itself (an edit dialog open in it keeps its text). Unasked, it runs
+    once every tab has closed. A page in
     front of the user asks for a newer version at most once an hour.
   - **The policy** gains `manifest-src 'self'` and `img-src 'self'` for the
     manifest and icons; `worker-src 'self'` already covers the worker, whose
@@ -548,8 +553,8 @@ Decided while building PR 7.
   - Rejected: Workbox or `vite-plugin-pwa` (a dependency and its own
     conventions for a worker of sixty lines); keeping the page cache-first
     (an old nonce and preset on every load, and an update a load late);
-    reloading a hidden tab by itself (an edit dialog open in it would lose
-    its text).
+    reloading other tabs, hidden or not, by themselves (an edit dialog open
+    in one would lose its text).
 
 ### Layout
 
@@ -842,7 +847,7 @@ Decided while building PR 5a-3.
     demo's is not, [D90](#D90)) with one calendar of events and tasks, named
     in the language spoken then ("Personal"); it and its account are shown
     in the language spoken now ("Personal", "On this device"), the name
-    given where the UI reads its calendars. `Store.addLocalCalendarIfEmpty` makes it in
+    given wherever the UI reads its calendars (`shownCalendars`). `Store.addLocalCalendarIfEmpty` makes it in
     one transaction, so two tabs opening an empty store make one; the UI
     calls it whenever the store has no account, after the last one is
     removed too, so the app always has somewhere to write.

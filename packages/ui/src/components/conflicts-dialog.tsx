@@ -52,8 +52,11 @@ export function ConflictsDialog({
   const { t } = useTranslation();
   const [views, setViews] = useState<ConflictView[]>([]);
   useEffect(
-    () => (open ? liveQuery(store, () => conflictViews(store), setViews) : undefined),
-    [store, open],
+    () =>
+      open
+        ? liveQuery(store, () => conflictViews(store, t("local.calendar")), setViews)
+        : undefined,
+    [store, open, t],
   );
   const act = (work: Promise<void>, changed: boolean) =>
     work.then(

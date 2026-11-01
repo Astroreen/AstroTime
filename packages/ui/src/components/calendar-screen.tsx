@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { addDays } from "../calendar/dates.ts";
 import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
+import { shownCalendars } from "../calendar/calendars.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import { layoutMonth } from "../calendar/month.ts";
@@ -120,15 +121,8 @@ export function CalendarScreen({
         store,
         async () => {
           const accounts = await store.accounts();
-          // The calendar on this device is named in the language spoken now,
-          // as its account is (foundation D122), wherever it is shown.
-          const local = new Set(
-            accounts.filter((account) => account.provider === "local").map((account) => account.id),
-          );
-          // Rows read afresh for this query alone, so named in place.
-          const calendars = await store.calendars();
-          for (const calendar of calendars)
-            if (local.has(calendar.accountId)) calendar.name = t("local.calendar");
+          // Named in the language spoken now (foundation D122).
+          const calendars = await shownCalendars(store, t("local.calendar"));
           return { accounts, calendars };
         },
         (result) => {
