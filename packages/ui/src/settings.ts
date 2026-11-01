@@ -1,6 +1,7 @@
 // The drawer's settings (design D53): this device's theme, language, week
-// start and clock, and whether completed tasks show on the views (D51).
-// Kept in the app's preferences as one value and applied at once.
+// start and clock, whether completed tasks show on the views (D51), and
+// whether reminders notify (foundation D101). Kept in the app's preferences
+// as one value and applied at once.
 import { createContext, useContext } from "react";
 
 import type { LocaleSettings } from "./calendar/locale.ts";
@@ -20,6 +21,8 @@ export interface Settings {
   readonly weekStart: "locale" | (typeof WEEK_STARTS)[number];
   readonly clock: "locale" | (typeof CLOCKS)[number];
   readonly hideCompleted: boolean;
+  /** On unless turned off; they show once the platform may notify (foundation D101). */
+  readonly reminders: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -28,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   weekStart: "locale",
   clock: "locale",
   hideCompleted: false,
+  reminders: true,
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -49,6 +53,7 @@ export function readSettings(stored: string | null): Settings {
     weekStart: oneOf(["locale", ...WEEK_STARTS] as const, value.weekStart, d.weekStart),
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),
     hideCompleted: value.hideCompleted === true,
+    reminders: value.reminders !== false,
   };
 }
 

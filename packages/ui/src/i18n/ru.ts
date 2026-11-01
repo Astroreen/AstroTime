@@ -127,6 +127,14 @@ export const ru = {
   "drawer.views": "Вид",
   "drawer.calendars": "Календари",
 
+  "reminders.setting": "Напоминания",
+  "reminders.whileOpen": "Напоминания приходят, пока AstroTime открыт во вкладке.",
+  "reminders.next": "Следующее: {{title}}, {{when}}.",
+  "reminders.none": "Напоминаний на ближайшие 7 дней нет.",
+  "reminders.denied":
+    "Браузер не пропускает уведомления от AstroTime. Разрешите их в настройках сайта.",
+  "reminders.unsupported": "Этот браузер не умеет показывать уведомления.",
+
   "fab.create": "Создать",
 
   "grid.week": "Неделя {{number}}",
@@ -150,6 +158,13 @@ export const ru = {
   "item.event": "{{title}}, {{time}}",
   "item.task": "Задача: {{title}}, {{time}}",
   "item.taskDone": "Выполненная задача: {{title}}, {{time}}",
+
+  "reminder.body": "{{when}} · {{relative}}",
+  "reminder.onDay": "{{day}}, {{time}}",
+  "reminder.allDay": "{{day}}, весь день",
+  "reminder.due": "Срок: {{when}}",
+  "reminder.starts": "Начало: {{when}}",
+  "reminder.task": "Задача",
 
   undone_one: "{{count}} невыполненная задача",
   undone_few: "{{count}} невыполненные задачи",

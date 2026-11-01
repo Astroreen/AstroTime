@@ -3,10 +3,10 @@
 // "+" button; search and the tasks screen open from the top bar (D52, D53);
 // the first-run screen while there is no account. The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
-import { wallClockOf } from "@astrotime/core";
+import { wallClockOf, type ItemTime } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -40,6 +40,7 @@ import {
 } from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
 import { MonthView } from "./month-view.tsx";
+import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
@@ -186,6 +187,25 @@ export function CalendarScreen({
     setView("day");
     setAnchor(day);
   };
+
+  // A tapped reminder opens its occurrence's day in the Day view (foundation
+  // D101): an event's start, a task's due or start; one with no time only
+  // brings the app forward.
+  const { onOpen } = useReminders();
+  const openReminder = useEffectEvent((time: ItemTime | null) => {
+    if (!time) return;
+    setSearching(false);
+    setDrawerOpen(false);
+    if (!wide) setTasksOpen(false);
+    openDay(wallClockOf(time, timeZone).slice(0, 10));
+  });
+  useEffect(
+    () =>
+      onOpen((reminder) =>
+        openReminder(reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start),
+      ),
+    [onOpen],
+  );
 
   // Keys on a desktop: n or j for the next period, p or k for the previous,
   // t for today; d, x, w, m and a for the views, as Google Calendar's (design D88).

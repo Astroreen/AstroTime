@@ -1,6 +1,6 @@
 // AstroTime's UI, the same in every app (docs/plans/foundation.md#D22): the
 // app brings its platform (docs/plans/android.md#D60: the store, HTTP,
-// secrets, the system browser, where preferences are kept) and the user's
+// secrets, the system browser, where preferences are kept, reminders) and the user's
 // languages, and renders this.
 import { InsecureContextError, type Store } from "@astrotime/storage";
 import { CSPProvider } from "@base-ui/react/csp-provider";
@@ -10,6 +10,7 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import { localeSettings } from "./calendar/locale.ts";
 import { AccountsProvider } from "./components/accounts-context.tsx";
 import { CalendarScreen } from "./components/calendar-screen.tsx";
+import { RemindersProvider } from "./components/reminders-context.tsx";
 import { createI18n } from "./i18n/index.ts";
 import type { Platform } from "./platform.ts";
 import { KEYS, usePreference } from "./preferences.ts";
@@ -88,12 +89,19 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
             settings={settings}
             timeZone={zone}
           >
-            <CalendarScreen
+            <RemindersProvider
+              platform={platform}
               store={opening.store}
-              preferences={preferences}
               settings={settings}
               timeZone={zone}
-            />
+            >
+              <CalendarScreen
+                store={opening.store}
+                preferences={preferences}
+                settings={settings}
+                timeZone={zone}
+              />
+            </RemindersProvider>
           </AccountsProvider>
         ) : (
           <StoreMessage opening={opening} />

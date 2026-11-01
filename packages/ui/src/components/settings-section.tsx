@@ -1,5 +1,6 @@
-// The drawer's settings (design D53): theme, language, week start, clock and
-// "hide completed". Each applies at once and is kept on this device.
+// The drawer's settings (design D53): theme, language, week start, clock,
+// "hide completed" and reminders (foundation D101). Each applies at once and
+// is kept on this device.
 import { Switch } from "@base-ui/react/switch";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "../i18n/index.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
 import { useCalendar } from "./context.ts";
+import { RemindersSwitch } from "./reminders-switch.tsx";
 
 /** A language's name in itself: "English", "Русский". */
 const nativeName = (language: string) => {
@@ -73,6 +75,7 @@ export function SettingsSection() {
           </Switch.Root>
         </label>
       </div>
+      <RemindersSwitch />
     </section>
   );
 }

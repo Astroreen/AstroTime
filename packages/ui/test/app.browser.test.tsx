@@ -7,12 +7,12 @@ import { InsecureContextError, Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { page } from "vite-plus/test/browser/context";
+import { page, userEvent } from "vite-plus/test/browser/context";
 
 import { loadDemo } from "../src/demo/index.ts";
 import { AstroTime, type Platform } from "../src/index.ts";
 import { memoryPreferences } from "../src/preferences.ts";
-import { memorySecrets, nextcloud, SERVER } from "./fakes.ts";
+import { fakeReminders, memorySecrets, nextcloud, SERVER } from "./fakes.ts";
 
 const NOW = new Date("2026-11-04T10:40:00+02:00");
 const timeZone = "Europe/Vilnius";
@@ -40,6 +40,7 @@ function render(store: Promise<Store>, languages: string[], platform: Partial<Pl
         http: unreachable,
         secrets: memorySecrets(),
         openExternal: () => {},
+        reminders: fakeReminders().scheduler,
         ...platform,
       }}
       languages={languages}
@@ -139,6 +140,64 @@ test("completing and starring on the tasks screen write the task to the store, t
   await write;
   const proposal = (await store.pending(list.id)).find((task) => task.uid === "demo-proposal");
   expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
+});
+
+test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day (D101)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  const reminders = fakeReminders("default", "granted");
+  render(Promise.resolve(store), ["en-US"], { reminders: reminders.scheduler });
+  await page.getByRole("button", { name: "Main menu" }).click();
+  const toggle = page.getByRole("switch", { name: "Reminders" });
+  // These tests load no CSS, so the switch itself has no size: its label takes the tap.
+  const label = page.getByText("Reminders", { exact: true });
+  await expect.element(toggle).not.toBeChecked();
+  // Nothing is asked at start, and nothing is scheduled without the permission.
+  expect(reminders.asked).toBe(0);
+  expect(reminders.last).toEqual([]);
+
+  const handed = reminders.next();
+  await label.click();
+  await handed;
+  expect(reminders.asked).toBe(1);
+  await expect.element(toggle).toBeChecked();
+  await expect
+    .element(page.getByText("Reminders show while AstroTime is open in a tab."))
+    .toBeInTheDocument();
+  expect(reminders.last.map((r) => r.notification.title)).toEqual([
+    "Call with Anna",
+    "Write the proposal",
+    "Dentist",
+    "Trip to Tallinn",
+  ]);
+
+  await userEvent.keyboard("{Escape}");
+  reminders.tap(reminders.last.find((r) => r.title === "Dentist")!);
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5" }))
+    .toBeInTheDocument();
+
+  // Turned off: the platform is handed an empty set.
+  await page.getByRole("button", { name: "Main menu" }).click();
+  await label.click();
+  await expect.element(toggle).not.toBeChecked();
+  expect(reminders.last).toEqual([]);
+});
+
+test("Reminders the browser blocks: the switch cannot turn on and says why, in Russian", async () => {
+  const store = await demoStore(["ru-RU"]);
+  const reminders = fakeReminders("denied");
+  render(Promise.resolve(store), ["ru-RU"], { reminders: reminders.scheduler });
+  await page.getByRole("button", { name: "Главное меню" }).click();
+  await expect.element(page.getByRole("switch", { name: "Напоминания" })).toBeDisabled();
+  await expect
+    .element(
+      page.getByText(
+        "Браузер не пропускает уведомления от AstroTime. Разрешите их в настройках сайта.",
+      ),
+    )
+    .toBeInTheDocument();
 });
 
 test("a page that is not a secure context: a message in the user's language", async () => {

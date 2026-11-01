@@ -2,12 +2,14 @@
 // through the CORS proxy on the app's own origin (docs/plans/foundation.md#D39:
 // `/dav-proxy/` in the dev server and in the image alike), credentials in
 // IndexedDB (D89), Login Flow's page in a new tab, preferences in localStorage,
-// and one sync at a time across the tabs (D91).
+// one sync at a time across the tabs (D91), and reminders as notifications
+// while the app is open (D101).
 import { fetchClient, throughProxy } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
 import type { Platform } from "@astrotime/ui";
 
 import { preferences } from "./preferences.ts";
+import { webReminders } from "./reminders.ts";
 import { indexedDbSecrets } from "./secrets.ts";
 
 /** Where the proxy is on the app's origin, as `dav-proxy.ts` and `apps/proxy` serve it. */
@@ -26,6 +28,7 @@ export function webPlatform(store: Promise<Store>, name: string): Platform {
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
     preferences,
     syncLock: tabsSyncLock(name),
+    reminders: webReminders(),
   };
 }
 

@@ -5,7 +5,7 @@
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e screenshots
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { captureNotifications, NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -142,6 +142,70 @@ test("the tasks screen, its panel, the settings and search (design D52, D53)", a
       page.getByRole("list", { name: /Search results|Результаты поиска/ }),
     ).toBeVisible();
     await shot(page, `search-dark-${language}-phone`);
+    await page.context().close();
+  }
+});
+
+test("reminders: the setting, and a notification as the page draws it (foundation D101)", async ({
+  browser,
+}) => {
+  const words = {
+    en: { menu: "Main menu", reminders: "Reminders", next: /^Next: / },
+    ru: { menu: "Главное меню", reminders: "Напоминания", next: /^Следующее: / },
+  } as const;
+  const openOnClock = async (
+    language: Language,
+    theme: Theme,
+    permission: NotificationPermission = "default",
+  ) => {
+    const context = await browser.newContext({
+      locale: LOCALES[language],
+      colorScheme: theme,
+      viewport: PHONE,
+      timezoneId: "Europe/Vilnius",
+    });
+    const page = await context.newPage();
+    // A clock the test moves, and notifications drawn in the page (support.ts).
+    await captureNotifications(page, permission);
+    await page.clock.install({ time: NOW });
+    await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+    await page.goto("/?demo");
+    await expect(
+      page
+        .getByRole("list", { name: /4|ноября/ })
+        .getByRole("listitem")
+        .first(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: words[language].menu }).click();
+    const toggle = page.getByRole("switch", { name: words[language].reminders });
+    await toggle.scrollIntoViewIfNeeded();
+    return { page, toggle };
+  };
+  for (const language of ["en", "ru"] as const) {
+    for (const theme of ["dark", "light"] as const) {
+      const { page, toggle } = await openOnClock(language, theme);
+      await page.context().grantPermissions(["notifications"]);
+      await toggle.click();
+      // The setting's last line, that the web reminds only while it is open.
+      const last = page.getByText(/open in a tab|открыт во вкладке/);
+      await last.scrollIntoViewIfNeeded();
+      await expect(last).toBeInViewport();
+      await expect(page.getByText(words[language].next)).toBeInViewport();
+      await shot(page, `reminders-setting-${theme}-${language}-phone`);
+      await page.keyboard.press("Escape");
+      await page.clock.runFor("20:00");
+      await expect(
+        page.getByRole("region", { name: "Notifications" }).getByRole("button"),
+      ).toBeVisible();
+      await shot(page, `reminder-notification-${theme}-${language}-phone`);
+      await page.context().close();
+    }
+    const { page, toggle } = await openOnClock(language, "dark", "denied");
+    await expect(toggle).toBeDisabled();
+    const why = page.getByText(/blocks notifications|не пропускает уведомления/);
+    await why.scrollIntoViewIfNeeded();
+    await expect(why).toBeInViewport();
+    await shot(page, `reminders-blocked-dark-${language}-phone`);
     await page.context().close();
   }
 });

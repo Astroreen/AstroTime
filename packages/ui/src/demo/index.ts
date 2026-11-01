@@ -46,26 +46,36 @@ const at = (zone: string, day: string, time: string) =>
   `;TZID=${zone}:${compact(day)}T${time.replace(":", "")}00`;
 const date = (day: string) => `;VALUE=DATE:${compact(day)}`;
 
+/** A reminder (`VALARM`) as Nextcloud writes one: `-PT15M`, `;RELATED=END:-PT30M`. */
+const alarm = (trigger: string) =>
+  `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER${trigger.startsWith(";") ? "" : ":"}${trigger}\r\nDESCRIPTION:Reminder\r\nEND:VALARM\r\n`;
+
 function event(
   uid: string,
   summary: string,
   start: string,
   end: string,
   extra: Record<string, string | undefined> = {},
+  alarms: readonly string[] = [],
 ): DemoItem {
   return {
     uid,
     ics: vcalendar(
-      `BEGIN:VEVENT\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, DTSTART: start, DTEND: end, ...extra })}END:VEVENT\r\n`,
+      `BEGIN:VEVENT\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, DTSTART: start, DTEND: end, ...extra })}${alarms.map(alarm).join("")}END:VEVENT\r\n`,
     ),
   };
 }
 
-function task(uid: string, summary: string, fields: Record<string, string | undefined>): DemoItem {
+function task(
+  uid: string,
+  summary: string,
+  fields: Record<string, string | undefined>,
+  alarms: readonly string[] = [],
+): DemoItem {
   return {
     uid,
     ics: vcalendar(
-      `BEGIN:VTODO\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, ...fields })}END:VTODO\r\n`,
+      `BEGIN:VTODO\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, ...fields })}${alarms.map(alarm).join("")}END:VTODO\r\n`,
     ),
   };
 }
@@ -91,11 +101,14 @@ const CALENDARS: readonly DemoCalendar[] = [
             COLOR: "palevioletred",
           },
         ),
+        // Reminders (foundation D100): 15 minutes before, an hour before.
         event(
           "demo-call",
           t("Call with Anna", "Созвон с Анной"),
           at(zone, day(0), "11:15"),
           at(zone, day(0), "11:45"),
+          {},
+          ["-PT15M"],
         ),
         event(
           "demo-lunch",
@@ -114,6 +127,8 @@ const CALENDARS: readonly DemoCalendar[] = [
           t("Dentist", "Стоматолог"),
           at(zone, day(1), "15:00"),
           at(zone, day(1), "16:00"),
+          {},
+          ["-PT1H"],
         ),
         event(
           "demo-concert",
@@ -121,7 +136,15 @@ const CALENDARS: readonly DemoCalendar[] = [
           at(zone, day(3), "19:00"),
           at(zone, day(3), "21:00"),
         ),
-        event("demo-trip", t("Trip to Tallinn", "Поездка в Таллин"), date(day(4)), date(day(6))),
+        // An all-day reminder as Google and Nextcloud write it: 09:00 the day before.
+        event(
+          "demo-trip",
+          t("Trip to Tallinn", "Поездка в Таллин"),
+          date(day(4)),
+          date(day(6)),
+          {},
+          ["-PT15H"],
+        ),
         // Weeks before the rest: the Agenda reads it only when scrolled back to.
         event(
           "demo-exhibition",
@@ -216,10 +239,13 @@ const CALENDARS: readonly DemoCalendar[] = [
           ...done,
         }),
         // A start–due task: a block, like an event.
-        task("demo-proposal", t("Write the proposal", "Написать предложение"), {
-          DTSTART: at(zone, day(1), "10:00"),
-          DUE: at(zone, day(1), "12:00"),
-        }),
+        // Reminding an hour before its due (foundation D100).
+        task(
+          "demo-proposal",
+          t("Write the proposal", "Написать предложение"),
+          { DTSTART: at(zone, day(1), "10:00"), DUE: at(zone, day(1), "12:00") },
+          [";RELATED=END:-PT1H"],
+        ),
         task("demo-bank", t("Call the bank", "Позвонить в банк"), { DUE: date(day(0)), ...done }),
         task("demo-plants", t("Water the plants", "Полить цветы"), { DUE: date(day(2)) }),
         task("demo-desk", t("Tidy the desk", "Разобрать стол"), { DUE: date(day(-2)), ...done }),

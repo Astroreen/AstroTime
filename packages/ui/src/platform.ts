@@ -1,5 +1,5 @@
 import type { HttpClient } from "@astrotime/caldav";
-import type { SecretStore } from "@astrotime/core";
+import type { ReminderScheduler, SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 import type { SyncLock } from "@astrotime/sync";
 
@@ -8,7 +8,7 @@ import type { Preferences } from "./preferences.ts";
 /**
  * What a shell hands the UI's root: its adapters of the platform interfaces
  * (docs/plans/android.md#D60), the same shape on the web, Android and the
- * desktop. Reminders join with PR 6.
+ * desktop.
  */
 export interface Platform {
   /** The local store, opening; created once, outside React. */
@@ -26,4 +26,6 @@ export interface Platform {
    * tabs (foundation D91). A shell with one instance of its store has none.
    */
   readonly syncLock?: SyncLock;
+  /** Shows the reminders the UI works out (docs/plans/foundation.md#D101). */
+  readonly reminders: ReminderScheduler;
 }
