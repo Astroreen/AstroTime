@@ -211,8 +211,13 @@ export function remindersOf(object: CalendarObject, objectId: string, range: Ran
       ? instantOf(alarm.acknowledged, 0, 0, timeZone)
       : Number.NEGATIVE_INFINITY;
     const key = occurrenceKey(recurrenceId);
-    for (let repeat = 0; repeat <= alarm.repeat; repeat++) {
-      const fireAt = first + repeat * (alarm.repeatEverySeconds ?? 0) * 1000;
+    // A server's REPEAT is not bounded: start at the first repeat in the
+    // range, and stop after a set's worth of them.
+    const step = (alarm.repeatEverySeconds ?? 0) * 1000;
+    const start = step > 0 && first < fromMs ? Math.ceil((fromMs - first) / step) : 0;
+    const last = Math.min(alarm.repeat, start + MAX_REMINDERS - 1);
+    for (let repeat = start; repeat <= last; repeat++) {
+      const fireAt = first + repeat * step;
       if (fireAt >= toMs) break;
       if (fireAt < fromMs || fireAt <= acknowledged) continue;
       const same = `${key}@${fireAt}`;
@@ -308,8 +313,9 @@ export function soonestReminders(
   options: { readonly horizonMs?: number; readonly max?: number; readonly backMs?: number } = {},
 ): Reminder[] {
   const { horizonMs = REMINDER_HORIZON_MS, max = MAX_REMINDERS, backMs = 0 } = options;
-  return [...reminders]
-    .filter((reminder) => reminder.fireAt >= nowMs - backMs && reminder.fireAt < nowMs + horizonMs)
-    .toSorted(bySoonest)
-    .slice(0, max);
+  const all = [...reminders].toSorted(bySoonest);
+  // The hour back never takes a place of the ones to come.
+  const back = all.filter((r) => r.fireAt >= nowMs - backMs && r.fireAt < nowMs);
+  const ahead = all.filter((r) => r.fireAt >= nowMs && r.fireAt < nowMs + horizonMs);
+  return [...back, ...ahead.slice(0, max)];
 }

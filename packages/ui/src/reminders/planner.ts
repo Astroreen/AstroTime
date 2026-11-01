@@ -109,7 +109,8 @@ export class ReminderPlanner {
     // Tomorrow the horizon reaches a day further; a full set needs its next
     // reminders once its last one has fired.
     const midnight = zonedToEpoch(`${addDays(today, 1)}T00:00:00`, timeZone);
-    const last = set.length === MAX_REMINDERS ? set.at(-1)!.fireAt + 1 : Infinity;
+    const ahead = set.filter((reminder) => reminder.fireAt >= now);
+    const last = ahead.length === MAX_REMINDERS ? ahead.at(-1)!.fireAt + 1 : Infinity;
     return { set, refreshAt: Math.min(midnight, last) };
   }
 

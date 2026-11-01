@@ -130,7 +130,9 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
   const arm = () => {
     cancel?.();
     cancel = null;
-    if (!leading) return;
+    // Without the permission nothing counts as shown: granted later, what is
+    // still due within its grace shows then.
+    if (!leading || page.notifications?.permission !== "granted") return;
     const now = page.now();
     for (const reminder of set) {
       if (done.has(shownKey(reminder))) continue;

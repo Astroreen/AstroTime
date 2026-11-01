@@ -218,6 +218,18 @@ describe("which alarms notify (D100)", () => {
     ]);
   });
 
+  test("a REPEAT a server made huge costs a set's worth, from the first repeat in range", () => {
+    const object = parse(
+      vevent(
+        "flood",
+        `DTSTART:20261105T080000Z\r\n${display(":-PT10M", "REPEAT:999999999\r\nDURATION:PT1S\r\n")}`,
+      ),
+    );
+    const found = reminders(object);
+    expect(found).toHaveLength(MAX_REMINDERS);
+    expect(new Date(found[0]!.fireAt).toISOString()).toBe("2026-11-05T07:50:00.000Z");
+  });
+
   test("two alarms of one occurrence at the same instant are one reminder", () => {
     const object = parse(
       vevent(
@@ -449,6 +461,15 @@ describe("the set a platform is handed (android D60)", () => {
       { backMs: REMINDER_GRACE_MS },
     );
     expect(back.map((reminder) => reminder.id)).toEqual(["hour", "soon"]);
+    // …and takes no place of the ones to come.
+    const full = soonestReminders([at("past", now - 1), ...many], now, {
+      backMs: REMINDER_GRACE_MS,
+    });
+    expect([full.length, full[0]?.id, full.at(-1)?.id]).toEqual([
+      MAX_REMINDERS + 1,
+      "past",
+      "r099",
+    ]);
   });
 
   test("the ids are the same however the window is cut", () => {
