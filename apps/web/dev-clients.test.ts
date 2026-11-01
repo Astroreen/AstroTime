@@ -12,7 +12,7 @@ describe("isTailnetOrLocal", () => {
       "::1",
       "::ffff:127.0.0.1",
       "100.64.0.1",
-      "100.72.90.18",
+      "100.64.12.34",
       "100.127.255.254",
       "::ffff:100.100.1.2",
       "fd7a:115c:a1e0::1",
@@ -59,7 +59,7 @@ describe("devClients", () => {
   test("with tailnet clients, ends a LAN connection and keeps a tailnet one", () => {
     const connect = serve("tailnet");
     expect(connect("192.168.50.10")).toBe(true);
-    expect(connect("100.72.90.18")).toBe(false);
+    expect(connect("100.64.12.34")).toBe(false);
     expect(connect("::ffff:127.0.0.1")).toBe(false);
   });
 

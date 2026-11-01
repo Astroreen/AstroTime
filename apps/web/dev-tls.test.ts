@@ -28,7 +28,7 @@ describe("devTls", () => {
       configure({
         ASTROTIME_WEB_TLS_CERT: "cert.pem",
         ASTROTIME_WEB_TLS_KEY: "key.pem",
-        ASTROTIME_WEB_HTTPS_HOST: "100.72.90.18",
+        ASTROTIME_WEB_HTTPS_HOST: "100.64.12.34",
         ASTROTIME_WEB_HTTPS_PORT: "https",
       }),
     ).toThrow(/ASTROTIME_WEB_HTTPS_PORT/);
@@ -37,7 +37,7 @@ describe("devTls", () => {
         {
           ASTROTIME_WEB_TLS_CERT: "cert.pem",
           ASTROTIME_WEB_TLS_KEY: "key.pem",
-          ASTROTIME_WEB_HTTPS_HOST: "100.72.90.18",
+          ASTROTIME_WEB_HTTPS_HOST: "100.64.12.34",
           ASTROTIME_WEB_HTTPS_PORT: "5180",
         },
         null,
