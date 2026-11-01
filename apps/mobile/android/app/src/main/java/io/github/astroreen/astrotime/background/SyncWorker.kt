@@ -14,6 +14,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
@@ -74,11 +75,20 @@ private suspend fun failedAsOutcome(work: suspend () -> String): String =
         "failed: ${(error as? RunFailed)?.message ?: error.toString()}"
     }
 
-/** Whether the app's activity is on the screen: then the open app syncs itself. */
+/**
+ * Whether the app's activity is on the screen: then the open app syncs
+ * itself. Counted, not a flag: with two activities at once (split screen),
+ * one stopping leaves the other's start in place.
+ */
 object AppVisibility {
-    @Volatile
+    private val started = AtomicInteger()
+
     @JvmStatic
-    var inFront = false
+    var inFront: Boolean
+        get() = started.get() > 0
+        set(value) {
+            if (value) started.incrementAndGet() else started.updateAndGet { maxOf(0, it - 1) }
+        }
 }
 
 class SyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
