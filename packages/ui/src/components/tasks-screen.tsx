@@ -138,6 +138,19 @@ export function TasksScreen({
   // the open or focused tab is scrolled clear of the fade (design D135).
   const strip = useRef<HTMLDivElement>(null);
   const [hides, setHides] = useState({ start: false, end: false });
+  const openTab = () => strip.current?.querySelector("[role=tab][aria-selected=true]");
+  // How far a tab is past each side's fade, which shows only where that side hides tabs.
+  const slack = (tab: Element) => {
+    const element = strip.current!;
+    const room = element.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    const start = element.scrollLeft > 1 ? FADE : 0;
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1 ? FADE : 0;
+    return { start: left - (room.left + start), end: room.right - end - right };
+  };
+  // Whether the open tab was clear of the fade when last measured: a resize
+  // brings it back only then, so a strip the user scrolled stays (design D135).
+  const openWasClear = useRef(true);
   const measureStrip = () => {
     const element = strip.current;
     if (!element) return;
@@ -146,6 +159,11 @@ export function TasksScreen({
     setHides((current) =>
       current.start === start && current.end === end ? current : { start, end },
     );
+    const open = openTab();
+    if (open) {
+      const { start: before, end: after } = slack(open);
+      openWasClear.current = before >= -1 && after >= -1;
+    }
   };
   // The strip alone scrolls (not the page or the panel), so a tab clears the
   // fade on either side, as far as the strip can go.
@@ -159,23 +177,30 @@ export function TasksScreen({
     else if (right > room.right - FADE)
       element.scrollLeft += Math.ceil(right - (room.right - FADE));
   };
-  const clearOpen = () => clear(strip.current?.querySelector("[role=tab][aria-selected=true]"));
+  const clearOpen = () => clear(openTab());
   const hasLists = lists.length > 0;
   useEffect(() => {
     const element = strip.current;
     if (!element) return;
     // The strip's width, and its tabs' as their names and counts change (a
-    // count, a font, lists arriving): the fade is measured again and the open
-    // tab kept clear of it.
+    // count, a font, lists arriving): the fade is measured again, and the open
+    // tab, clear of it before, is brought clear again if the change covered it.
     const observer = new ResizeObserver(() => {
-      clearOpen();
+      const open = openTab();
+      if (open && openWasClear.current) {
+        const { start, end } = slack(open);
+        if (start < -1 || end < -1) clear(open);
+      }
       measureStrip();
     });
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     return () => observer.disconnect();
   }, [hasLists]);
-  useEffect(clearOpen, [selected]);
+  useEffect(() => {
+    clearOpen();
+    measureStrip();
+  }, [selected]);
   const fade = (side: boolean) => (side ? "transparent" : "black");
   const stripMask =
     hides.start || hides.end
@@ -236,7 +261,14 @@ export function TasksScreen({
               onScroll={measureStrip}
               // A tab reached by Tab is scrolled clear of the fade too.
               onFocus={(event) => {
-                if (event.target.getAttribute("role") === "tab") clear(event.target);
+                // Focus from the keyboard only: a mouse's press focuses the tab
+                // too, and the strip must not move under the pointer before
+                // its click lands.
+                if (
+                  event.target.getAttribute("role") === "tab" &&
+                  event.target.matches(":focus-visible")
+                )
+                  clear(event.target);
               }}
               style={stripMask}
               className="flex items-stretch overflow-x-auto [scrollbar-width:none]"

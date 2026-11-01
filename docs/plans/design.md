@@ -665,9 +665,13 @@ are its decisions.
   wheel and Tab, and the fade is the sign. The chosen tab is scrolled by the
   strip's own `scrollLeft` until it clears the fade, so neither the page
   nor the panel moves. _Since PR (d1):_ a tab reached by the keyboard
-  (Tab, the arrows) is scrolled clear of the fade too, not only one
-  chosen; the open tab is kept clear again when the strip or its tabs
-  change size (a count, a font loading, the lists arriving); and the line
+  (Tab, the arrows; `:focus-visible`) is scrolled clear of the fade too,
+  not only one chosen; a mouse's press, which focuses the tab as well, does
+  not move the strip under the pointer before its click lands (the choice
+  then scrolls it). When the strip or its tabs change size (a count, a font
+  loading, the lists arriving), the open tab is brought clear again only
+  if it was clear before and the change covered it: a strip the user
+  scrolled stays where they put it. And the line
   under the strip is its wrapper's, so the mask no longer fades it at the
   ends.
 - **D136. A closing dialog, popover or menu lets a press through.** While

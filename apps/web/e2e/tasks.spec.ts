@@ -186,4 +186,68 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     expect(right).toBeGreaterThanOrEqual(40);
     expect(left).toBeGreaterThanOrEqual(40);
   });
+
+  test("a mouse's press on a tab does not move the strip under the pointer before its click lands", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.addStyleTag({ content: "[data-tab-strip] [role=tab] { padding-inline: 60px; }" });
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const strip = panel.locator("[data-tab-strip]");
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    // Pressed on its part under the end's fade, the second tab is focused by
+    // the press, and the strip stays where it is until the click.
+    const box = (await second.boundingBox())!;
+    const room = (await strip.boundingBox())!;
+    await page.mouse.move(room.x + room.width - 30, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(second).toBeFocused();
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
+    await page.mouse.up();
+    // The click landed: the tab is chosen, and only now scrolled clear.
+    await expect(second).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("a resize brings the open tab back clear of the fade only if it was clear before", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const strip = panel.locator("[data-tab-strip]");
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    const fromEnd = () =>
+      second.evaluate((tab) => {
+        const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
+        return room.right - tab.getBoundingClientRect().right;
+      });
+    // Laid out and its resize observed: two frames, as ResizeObserver reports before a paint.
+    const frames = () =>
+      page.evaluate(
+        () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+      );
+    await second.dispatchEvent("click");
+    await expect(second).toHaveAttribute("aria-selected", "true");
+    await frames();
+    expect(await fromEnd()).toBeGreaterThanOrEqual(40);
+
+    // The first tab grows (a count, a font): the open second, clear before, is brought clear again.
+    await page.addStyleTag({
+      content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }",
+    });
+    await frames();
+    expect(await fromEnd()).toBeGreaterThanOrEqual(40);
+
+    // The user scrolls back to the start, the open tab under the end's fade:
+    // a resize then leaves the strip where the user put it.
+    await strip.evaluate((element) => element.scrollTo({ left: 0 }));
+    await frames();
+    expect(await fromEnd()).toBeLessThan(40);
+    await page.addStyleTag({
+      content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }",
+    });
+    await frames();
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
+  });
 });
