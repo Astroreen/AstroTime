@@ -259,6 +259,9 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   await expect(dialog.getByLabel("End time")).toHaveValue("16:30");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  // Its fade out has run to its end: until then its backdrop takes the next
+  // press, which on a loaded machine came while it was still there.
+  await expect(page.locator("[data-ending-style]")).toHaveCount(0);
 
   // Cancelled by Escape, its release in the same column makes nothing.
   await drag(
@@ -267,6 +270,9 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
     await pointOn(page, "Saturday, November 7", 15.1),
     false,
   );
+  // The drag has begun (its ghost is drawn) before Escape cancels it: on a
+  // loaded machine the key could otherwise come first and cancel nothing.
+  await expect(page.getByText("2:00 – 3:15 PM", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect(announced(page)).toHaveText("Move cancelled");
