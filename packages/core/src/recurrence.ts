@@ -3,6 +3,8 @@
 // whole periods of the rule after DTSTART, instead of at DTSTART.
 import ICAL from "ical.js";
 
+import { fromIcalTime, wallClockIn } from "./time.ts";
+
 /**
  * The parts with which ical.js's iterator settles into the rule's period:
  * started anywhere on the lattice of whole periods from DTSTART, it gives the
@@ -353,7 +355,7 @@ export function seriesStarts(
     let iterator: ICAL.RecurIterator | null;
     let rule: ICAL.Recur;
     try {
-      rule = property.getFirstValue() as ICAL.Recur;
+      rule = onWallClock(property.getFirstValue() as ICAL.Recur, dtstart);
       // Made first, so a rule ical.js refuses from DTSTART is refused there,
       // and one it finds nothing for from there (a monthly 31st from a month
       // of 30 days, three such months on) stays without occurrences.
@@ -386,13 +388,23 @@ export function seriesStarts(
     return [iterator];
   });
 
+  // An RDATE of a period starts an occurrence at the period's start.
   const dates = master
     .getAllProperties("rdate")
-    .flatMap((property) => property.getValues() as ICAL.Time[]);
-  // As RecurExpansion: an item that does not recur has its start alone.
-  if (rules.length === 0 && dates.length === 0 && !master.hasProperty("recurrence-id")) starts++;
+    .flatMap((property) => property.getValues())
+    .flatMap((value) =>
+      value instanceof ICAL.Period ? [value.start] : value instanceof ICAL.Time ? [value] : [],
+    );
+  // DTSTART is the first instance of the recurrence set (RFC 5545 3.8.5.3),
+  // of RDATEs alone too, where ical.js's RecurExpansion leaves it out; an
+  // RRULE's own walk gives it.
+  if (rules.length === 0 && !master.hasProperty("recurrence-id")) starts++;
   for (let i = 0; i < starts; i++) dates.push(dtstart.clone());
   dates.sort((a, b) => a.compare(b));
+  // An RDATE at DTSTART is the same occurrence.
+  for (let i = dates.length - 1; i > 0; i--) {
+    if (dates[i]!.compare(dates[i - 1]!) === 0) dates.splice(i, 1);
+  }
   // As RecurExpansion: the RDATEs from DTSTART on, or all of them when the
   // first is before it (Google's birthdays).
   let index = dates[0] && dates[0].compare(dtstart) < 0 ? 0 : firstFrom(dates, dtstart);
@@ -414,6 +426,29 @@ export function seriesStarts(
     earliest.next();
     return next;
   };
+}
+
+/**
+ * The rule as ical.js must walk it from `dtstart`. A DTSTART in a zone the
+ * object does not define (Google's and Outlook's: a TZID and no VTIMEZONE,
+ * D32) is a wall clock to ical.js, which compares a UTC UNTIL with it as if
+ * the wall clock were UTC, so the series ended hours early or late. Such an
+ * UNTIL becomes its instant's wall clock in that zone.
+ */
+function onWallClock(rule: ICAL.Recur, dtstart: ICAL.Time): ICAL.Recur {
+  const { until } = rule;
+  if (!until || until.isDate || dtstart.isDate || until.zone !== ICAL.Timezone.utcTimezone) {
+    return rule;
+  }
+  const zone = dtstart.zone;
+  if (zone && zone !== ICAL.Timezone.localTimezone && zone.tzid !== "floating") return rule;
+  const start = fromIcalTime(dtstart);
+  if (start.type !== "zoned") return rule;
+  const walked = rule.clone();
+  walked.until = ICAL.Time.fromDateTimeString(
+    wallClockIn(until.toUnixTime() * 1000, start.timeZone),
+  );
+  return walked;
 }
 
 /** The index of the first time in `sorted` at or after `time`. */

@@ -478,3 +478,73 @@ describe("where a task ends (D42)", () => {
     ).toEqual([[600, 615]]);
   });
 });
+
+describe("RFC 5545's corners", () => {
+  const event = (...lines: string[]) =>
+    CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:corner",
+        "DTSTAMP:20261101T000000Z",
+        ...lines,
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+
+  test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {
+    // Google's way: a TZID and no VTIMEZONE. 09:00 in New York is 14:00Z, so
+    // an UNTIL at 13:59:59Z on the 23rd ends the series the week before.
+    const west = event(
+      "DTSTART;TZID=America/New_York:20261102T090000",
+      "DTEND;TZID=America/New_York:20261102T100000",
+      "RRULE:FREQ=WEEKLY;UNTIL=20261123T135959Z",
+    );
+    expect(
+      starts(occurrencesBetween(west, vilnius("2026-11-01", "2026-12-31")), "America/New_York"),
+    ).toEqual(["2026-11-02T09:00:00", "2026-11-09T09:00:00", "2026-11-16T09:00:00"]);
+    // 23:00 in Vilnius is 21:00Z: an UNTIL at 21:59:59Z on the 23rd keeps the 23rd.
+    const east = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T230000",
+      "DTEND;TZID=Europe/Vilnius:20261102T233000",
+      "RRULE:FREQ=WEEKLY;UNTIL=20261123T215959Z",
+    );
+    expect(starts(occurrencesBetween(east, vilnius("2026-11-01", "2026-12-31")))).toEqual([
+      "2026-11-02T23:00:00",
+      "2026-11-09T23:00:00",
+      "2026-11-16T23:00:00",
+      "2026-11-23T23:00:00",
+    ]);
+  });
+
+  test("an RDATE of a period adds an occurrence at the period's start", () => {
+    const object = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "RRULE:FREQ=WEEKLY;COUNT=3",
+      "RDATE;VALUE=PERIOD:20261104T120000Z/PT2H",
+    );
+    expect(starts(occurrencesBetween(object, vilnius("2026-11-01", "2026-12-01")))).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-04T14:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+    ]);
+  });
+
+  test("a series of RDATEs alone starts with its DTSTART", () => {
+    // RFC 5545 3.8.5.3: DTSTART is the first instance of the recurrence set.
+    const object = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "RDATE;TZID=Europe/Vilnius:20261105T090000",
+    );
+    expect(starts(occurrencesBetween(object, vilnius("2026-11-01", "2026-12-01")))).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-05T09:00:00",
+    ]);
+  });
+});

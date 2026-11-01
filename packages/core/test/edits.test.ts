@@ -1222,6 +1222,28 @@ describe("deleting with a scope (D11)", () => {
     expect(deleteItem(load("nextcloud-web-event-timed.ics"), { now: NOW })).toBeNull();
   });
 
+  test("this and following of a series in a zone the object does not define ends it before that occurrence", () => {
+    // Google's way: a TZID and no VTIMEZONE. The UNTIL written is an instant
+    // in UTC, 13:59:59Z, an hour before 09:00 in New York.
+    const google = calendar([
+      "DTSTART;TZID=America/New_York:20261102T090000",
+      "DTEND;TZID=America/New_York:20261102T100000",
+      "RRULE:FREQ=WEEKLY",
+    ]);
+    const recurrenceId = zonedTime("2026-11-23T09:00:00", "America/New_York");
+    const ics = deleteItem(CalendarObject.parse(google), {
+      now: NOW,
+      scope: "following",
+      recurrenceId,
+    })!;
+    expect(starts(ics)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+    ]);
+    expect(hasOccurrence(CalendarObject.parse(ics), recurrenceId)).toBe(false);
+  });
+
   test("a series held without its master: this exception, or each from it on", () => {
     const exception = (day: string) => [
       `RECURRENCE-ID;TZID=Europe/Vilnius:${day}T090000`,
