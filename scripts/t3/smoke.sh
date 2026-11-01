@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Proves dev.sh and stop.sh: starts everything, checks the page (and the
-# CalDAV proxy when Radicale is there), the proxy's allowlist and Vite's host
-# check, that a second start is refused, and that stop.sh leaves nothing
-# running. CI runs it.
+# Proves dev.sh and stop.sh: starts everything, checks the page over http
+# and through the https front (and the CalDAV proxy when Radicale is there),
+# the proxy's allowlist and Vite's host check, that a second start is
+# refused, and that stop.sh leaves nothing running. CI runs it.
 # Its own directory and ports, so it never meets (or stops) a dev session
 # that is running.
 export ASTROTIME_DEV_DIR="${ASTROTIME_SMOKE_DIR:-$(cd "$(dirname "$0")/../.." && pwd)/.astrotime-dev/smoke}"
 export ASTROTIME_WEB_PORT="${ASTROTIME_SMOKE_WEB_PORT:-5190}"
 export ASTROTIME_DAV_PORT="${ASTROTIME_SMOKE_DAV_PORT:-5242}"
-# The guarded setup the tailnet default gets (scripts/t3/README.md), with or
-# without Tailscale: a wide bind, tailnet clients only, the proxy's allowlist.
-export ASTROTIME_WEB_HOST=0.0.0.0 ASTROTIME_WEB_CLIENTS=tailnet
+# The setup the tailnet gets without `tailscale serve` (scripts/t3/README.md),
+# with or without Tailscale and never touching it: the self-signed https
+# front, here on loopback, tailnet clients only, the proxy's allowlist.
+export ASTROTIME_WEB_TLS=self-signed ASTROTIME_WEB_HTTPS_HOST=127.0.0.1
+export ASTROTIME_WEB_HTTPS_PORT="${ASTROTIME_SMOKE_HTTPS_PORT:-5191}"
 # shellcheck source=env.sh
 source "$(dirname "$0")/env.sh"
 enter_dev_shell "$@"
@@ -45,10 +47,17 @@ fail() {
 # Read whole, then searched: `curl | grep -q` under pipefail can fail a good page.
 page="$(curl -fsS "http://127.0.0.1:$ASTROTIME_WEB_PORT/")" || fail "the page did not load"
 [[ "$page" == *"<title>AstroTime</title>"* ]] || fail "the page is not AstroTime's"
+# The https front, with the certificate dev.sh made for it (no -k).
+https="https://127.0.0.1:$ASTROTIME_WEB_HTTPS_PORT"
+cert="$ASTROTIME_DEV_DIR/tls/cert.pem"
+page="$(curl -fsS --cacert "$cert" "$https/")" || fail "the page did not load over https"
+[[ "$page" == *"<title>AstroTime</title>"* ]] || fail "the page over https is not AstroTime's"
 if command -v radicale >/dev/null 2>&1; then
-  status="$(curl -s -o /dev/null -w '%{http_code}' -X PROPFIND -u astro:astro -H 'Depth: 0' \
-    "http://127.0.0.1:$ASTROTIME_WEB_PORT/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/personal/")"
-  [ "$status" = 207 ] || fail "the CalDAV proxy answered $status"
+  for origin in "http://127.0.0.1:$ASTROTIME_WEB_PORT" "$https"; do
+    status="$(curl -s --cacert "$cert" -o /dev/null -w '%{http_code}' -X PROPFIND -u astro:astro -H 'Depth: 0' \
+      "$origin/dav-proxy/http%3A%2F%2F127.0.0.1%3A$ASTROTIME_DAV_PORT/astro/personal/")"
+    [ "$status" = 207 ] || fail "the CalDAV proxy at $origin answered $status"
+  done
 fi
 # Beyond localhost the proxy reaches only listed servers, and Vite answers
 # only to known host names (DNS rebinding).
@@ -66,5 +75,6 @@ if second="$(bash "$ASTROTIME_ROOT/scripts/t3/dev.sh" 2>&1)"; then fail "a secon
 
 bash "$ASTROTIME_ROOT/scripts/t3/stop.sh"
 if curl -s -o /dev/null "http://127.0.0.1:$ASTROTIME_WEB_PORT/"; then fail "the dev server still answers after stop.sh"; fi
+if curl -sk -o /dev/null "$https/"; then fail "the https front still answers after stop.sh"; fi
 if curl -s -o /dev/null "http://127.0.0.1:$ASTROTIME_DAV_PORT/"; then fail "Radicale still answers after stop.sh"; fi
 echo "smoke: ok"

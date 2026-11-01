@@ -99,8 +99,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   English or Russian (`@astrotime/ui/demo`); `?demo` loads them in the dev
   server (D57).
 - **Tailnet** — the owner's private Tailscale network (100.64.0.0/10,
-  fd7a:115c:a1e0::/48); with Tailscale up, the dev server lets in this
-  machine and tailnet devices only (`scripts/t3/README.md`).
+  fd7a:115c:a1e0::/48); with Tailscale up, tailnet devices reach the dev
+  server over https, and only this machine and they get in
+  (`scripts/t3/README.md`).
 
 ## The docs
 

@@ -29,22 +29,18 @@ export ASTROTIME_DEV_DIR
 mkdir -p "$ASTROTIME_DEV_DIR"
 
 ASTROTIME_WEB_PORT="${ASTROTIME_WEB_PORT:-5180}"
-# With Tailscale, every interface, so the app opens from the owner's other
-# devices, but only loopback and tailnet clients may connect
-# (apps/web/dev-clients.ts); without it, this machine only. A host set by
-# hand (0.0.0.0 for a LAN) is taken as it is, with no client check.
-if [ -z "${ASTROTIME_WEB_HOST:-}" ] && command -v tailscale >/dev/null 2>&1 && [ -n "$(tailscale ip -4 2>/dev/null || true)" ]; then
-  # IPv4 only, which is enough: a tailnet device whose browser tries the
-  # MagicDNS name's IPv6 address first falls back to IPv4. The IPv6 range in
-  # dev-clients.ts serves a hand-set `::`.
-  ASTROTIME_WEB_HOST=0.0.0.0
-  ASTROTIME_WEB_CLIENTS="${ASTROTIME_WEB_CLIENTS:-tailnet}"
-  export ASTROTIME_WEB_CLIENTS
-fi
+# This machine only, on plain http (localhost is a secure context); the
+# owner's tailnet devices reach it over https through a front that dev.sh
+# adds. A host set by hand (0.0.0.0 for a LAN) is taken as it is, with no
+# https front and no client check.
+# shellcheck disable=SC2034 # read by dev.sh
+ASTROTIME_WEB_HOST_BY_HAND="${ASTROTIME_WEB_HOST:+1}"
 ASTROTIME_WEB_HOST="${ASTROTIME_WEB_HOST:-127.0.0.1}"
 
-# True when the dev server is reachable from this machine alone.
+# True when the dev server is reachable from this machine alone: on loopback,
+# with no front letting tailnet devices in.
 web_is_local() {
+  [ -z "${ASTROTIME_WEB_CLIENTS:-}" ] || return 1
   case "$ASTROTIME_WEB_HOST" in
     127.0.0.1 | localhost | ::1) return 0 ;;
     *) return 1 ;;
@@ -133,6 +129,31 @@ is_ours() {
   fi
 }
 
+# What `tailscale serve` proxies https port $2 to, read from its status JSON
+# ($1); nothing when the port is not served or not proxied.
+serve_target() {
+  local re=":$2\": [{][^}]*\"Proxy\": \"([^\"]*)\""
+  [[ "$1" =~ $re ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+# Removes the `tailscale serve` entry dev.sh added (its https port and target
+# are in the dev directory), and nothing else: serve config the owner made
+# stays. Called by dev.sh on exit and by stop.sh, for a dev.sh that was killed.
+serve_off() {
+  local file="$ASTROTIME_DEV_DIR/serve" port target status
+  [ -f "$file" ] || return 0
+  read -r port target <"$file" || true
+  if command -v tailscale >/dev/null 2>&1 && status="$(tailscale serve status --json 2>/dev/null)" &&
+    [ "$(serve_target "$status" "$port" || true)" = "$target" ]; then
+    if ! tailscale serve --yes --https="$port" off </dev/null >/dev/null 2>&1; then
+      echo "astrotime: could not remove tailscale serve's https port $port; see tailscale serve status" >&2
+      return 1
+    fi
+    echo "astrotime: removed tailscale serve's https port $port"
+  fi
+  rm -f "$file"
+}
+
 # Records this script's pid so stop.sh can end it; refuses a second instance.
 record_pid() {
   local file="$ASTROTIME_DEV_DIR/pids/$1.pid"
@@ -148,7 +169,7 @@ record_pid() {
   # On exit (Ctrl-C included) the services are stopped and waited for, so a
   # quick restart does not find their ports still taken.
   # The pid file goes last, so no second dev.sh starts while ports are still taken.
-  trap 'for job in $(jobs -p); do stop_tree "$job" || true; done; rm -f "'"$file"'"' EXIT
+  trap 'for job in $(jobs -p); do stop_tree "$job" || true; done; serve_off || true; rm -f "'"$file"'"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
 }

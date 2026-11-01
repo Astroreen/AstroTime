@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 import { davProxy } from "./dav-proxy.ts";
 import { devClients } from "./dev-clients.ts";
+import { devTls } from "./dev-tls.ts";
 
 // Host names besides localhost and IPs the dev server answers to
 // (comma-separated, `.example.com` for a domain and its subdomains);
@@ -15,7 +16,7 @@ const allowedHosts = process.env["ASTROTIME_WEB_ALLOWED_HOSTS"]
 
 export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
-  plugins: [react({ compiler: true }), tailwindcss(), davProxy(), devClients()],
+  plugins: [react({ compiler: true }), tailwindcss(), davProxy(), devClients(), devTls()],
   ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
   // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
   optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },

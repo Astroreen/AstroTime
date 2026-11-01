@@ -101,6 +101,9 @@ When you add a package, app or module, add its line here in the same PR.
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
     server listens beyond localhost. → `plans/foundation.md#D20`
+  - `dev-tls.ts` — the dev server's https front for the tailnet with a
+    self-signed certificate, when `tailscale serve` may not run.
+    → `plans/foundation.md#D20`
 
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
   static files, `/healthz`, the CalDAV proxy, the Host allowlist; bundled
