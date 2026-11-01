@@ -59,7 +59,7 @@ test("a reminder shows at its time, with what it is about and how soon", async (
   ).toBeVisible();
 });
 
-test("after the laptop slept past them, only a reminder still due shows; a tap opens its day", async ({
+test("after the laptop slept past them, only a reminder still due shows; a tap opens its day and its details", async ({
   page,
 }) => {
   await openDemo(page);
@@ -74,6 +74,11 @@ test("after the laptop slept past them, only a reminder still due shows; a tap o
   await expect(notifications(page).getByRole("button")).toHaveCount(1);
   await dentist.click();
   await expect(dentist).toHaveCount(0);
+  // Its details open over its day.
+  const details = page.getByRole("dialog", { name: "Dentist" });
+  await expect(details).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(details).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Thursday, November 5" })).toBeVisible();
 });
 

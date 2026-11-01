@@ -94,7 +94,8 @@ the project.
   calendar instead of a screen.
   Completing and starring are the only edits here: they write the task
   through the local store (`saveLocal`) and the sync engine uploads them
-  (D5); editing dialogs and dragging are foundation's PR 6. The star is
+  (D5); editing dialogs and dragging are foundation's PR 6. _Since PR 6a:_
+  a task opens its details, and each list has "Add a task" ([D109](#D109)). The star is
   stored as an AstroTime property (`X-ASTROTIME-STARRED:TRUE`),
   so the task's own `PRIORITY` is never touched and other clients keep it
   (AGENTS.md rule 2). _Built in PR 5b:_ what completing writes is
@@ -157,7 +158,10 @@ the project.
     (`foldWeek`);
   - a tap on a day, anywhere on its tile or on the part of a span over it,
     or on its "+N", opens that day in the Day view, as Google's Android app
-    does (its web app opens a popover instead); items open with PR 6;
+    does (its web app opens a popover instead); items open with PR 6.
+    _Changed in PR 6a:_ a tap on an item, a span over several days too,
+    opens its details ([D108](#D108)); the rest of the tile still opens the
+    day;
   - previous and next (buttons, keys, a swipe) go to the first day of the
     month before or after; the top bar names the month (D59).
 - **D87. The Agenda**:
@@ -228,7 +232,8 @@ the project.
   - a read-only list's tasks cannot be completed or starred;
   - "+ New list" and the card's menu are drawn but disabled until lists can
     be made and changed ([Deferred](#deferred)); the "+" button is the
-    calendar's, disabled until PR 6;
+    calendar's, disabled until PR 6 (_since PR 6a_ it makes a task in the
+    list shown, [D109](#D109));
   - on a phone the screen covers the calendar, with a back arrow; from
     1024 px it is a 360 px panel right of the view, its toggle pressed.
 - **D96. The settings, in detail** (D53): one value in the app's
@@ -260,9 +265,78 @@ the project.
   until the view moves on; an undated task opens the tasks screen on its
   list, outlined.
 
+### Decided while building PR 6a
+
+- **D108. The details and edit dialogs, as Google Calendar's**
+  (foundation [D9](foundation.md#D9)–[D11](foundation.md#D11)):
+  - a tap on any item, in any view, in the undone tasks' list, a search
+    result or a task on the tasks screen, opens its **details**: the whole
+    screen on a phone, a card from 640 px; its colour, title, when it is in
+    the user's zone (and the zone it was set in, when another), how it
+    repeats in words ("Every 2 weeks on Monday, Wednesday", "Каждые 2
+    недели в понедельник, среду"), where, its description with its web and
+    mail links opening in a new tab (`noopener`; nothing else is markup),
+    its reminders in words ("15 minutes before", "1 day before at 9:00"
+    for an all-day item), its guests with their answers and a note that
+    AstroTime does not invite, its calendar. Edit and delete show only
+    where the calendar can be written (`readOnly`); a read-only one says
+    so. A search result moves the calendar to its day, as D97 says, and
+    opens its details over it;
+  - the **edit dialog**: the whole screen on a phone, a dialog from 640 px,
+    the title and Save in its bar, closed by its ✕ or Escape, saved by
+    Save or Enter in a one-line field. Creating, it starts with Event and
+    Task to switch. The title; "All day"; the start and end dates (the
+    browser's date field) and times (a list of every quarter of an hour in
+    the user's clock, [D96](#D96), since the browser's time field keeps its
+    own); a task's start and due, each with a switch; the zone when it is
+    not the user's; the repeat (does not repeat, every day, every week on
+    the start's weekday, every weekday, every month on its day, on its nth
+    weekday, every year, "Custom…": every n days, weeks, months or years,
+    the weekdays, the month's day or weekday, and the end: never, on a day,
+    after n times; another client's rule beyond these is kept as written
+    until another is chosen); the reminders (before a timed item: at the
+    start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days, a week; for
+    an all-day item: on the day, a day, two days and a week before, at
+    9:00); the calendar, from the writable ones that hold the item's
+    component; the colour, the calendar's or one of nine CSS names; the
+    location; the description. A new start keeps the event's length; a new
+    start date (a task's due without a start) moves its end, and the rule
+    with it ([foundation D105](foundation.md#D105)). An end
+    before the start, a due before the start or a repeat ending before the
+    item is refused, in words;
+  - **creating**: the "+" button makes an event on the day shown from the
+    next half hour after now, an hour long (Google's prefill); a tap on an
+    empty slot of the time grid makes one from that half hour, an hour long
+    (a press to size it comes with dragging, PR 6b); a tap on a Month
+    tile's empty space keeps opening the day ([D86](#D86)), where Google's
+    Android app creates on a long press ([Deferred](#deferred)). A new item
+    goes in the first writable calendar the views show;
+  - **the scope dialog** asks "This occurrence / This and following
+    occurrences / All occurrences" after Save or Delete on an occurrence of
+    a series, the first chosen; deleting an item that does not repeat asks
+    "Delete this event?" first;
+  - dialogs are labelled by their titles, hold the focus while open and
+    give it back to what opened them.
+- **D109. Tasks in the dialogs** (D52, foundation [D10](foundation.md#D10)):
+  a task's details show its due ("Due Wednesday, November 4, 3:00 PM"),
+  its status and progress, its priority, its tags, its parent and its
+  subtasks' titles, with "Mark completed" (an occurrence of a series in its
+  exception, as D94 completes it) and the star. The edit dialog adds the
+  status (not started, in progress, completed, cancelled), the priority as
+  Nextcloud Tasks offers it (none; high, medium, low written as 1, 5, 9;
+  read 1–4, 5, 6–9), the progress in percent and the tags, comma-separated
+  (`CATEGORIES`). Each list on the tasks screen has "Add a task" at the top
+  of its card, which makes an undated task in that list, as the tasks
+  screen's "+" button does on a phone.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
+- **A long press in the Month view to create** — as Google's Android app
+  does; a tap keeps opening the day ([D108](#D108)).
+- **Dates in the app's own format** — the edit dialog's date field is the
+  browser's, in its language and order; its times are a list in the user's
+  clock ([D108](#D108)).
 - **A view of starred tasks across lists** — the star is stored from PR 5
   ([D52](#D52)); a place that gathers starred tasks comes later.
 - **Search beyond titles** — descriptions, locations, attendees, and the
@@ -277,8 +351,6 @@ the project.
   completing a repeating task writes one exception per occurrence
   ([D94](#D94)); Tasks.org moves the series' start instead, which keeps
   the object small. When real data shows the cost.
-- **Completing from the calendar** — tasks are completed on the tasks
-  screen; a chip on the views opens nothing until PR 6 ([D52](#D52)).
 - **Sorting per list, and "starred recently"** — one order serves every
   list, and the star keeps no time, so starred tasks come first in my
   order rather than by when they were starred ([D95](#D95)).
@@ -304,5 +376,7 @@ Foundation's PR 5 builds this plan in two parts:
   as [foundation's PR plan](foundation.md#pr-5--calendar-grid) lists them
   (D58, D59 came with 5a-1; D86–D88 with 5a-2).
 - **PR 5b** — the tasks screen, the drawer's settings and search (D52,
-  D53; D94–D97 came with it). Its evidence is screenshots of each view
-  next to the matching reference, in both themes.
+  D53; D94–D97 came with it).
+
+Foundation's PR 6a (the details and edit dialogs) brought D108 and D109. Its evidence is screenshots of each view
+next to the matching reference, in both themes.

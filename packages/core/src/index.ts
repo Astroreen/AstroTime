@@ -8,8 +8,33 @@ export {
   type Occurrence,
   type Range,
 } from "./occurrences.ts";
-export { wallClockIn, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
+export { wallClockIn, wallClockOf, zonedTime, zonedToEpoch, type ItemTime } from "./time.ts";
 export { completeTask, starTask } from "./task-edits.ts";
+export {
+  createItem,
+  deleteItem,
+  editItem,
+  hasOccurrence,
+  PRODID,
+  timesOf,
+  type ItemChanges,
+  type ItemTimes,
+  type NewAlarm,
+  type Scope,
+  type TaskStatus,
+} from "./edits.ts";
+export {
+  movedRepeat,
+  nthWeekdayOf,
+  repeatOf,
+  weekdayOf,
+  WEEKDAYS,
+  type Frequency,
+  type Repeat,
+  type RepeatEnd,
+  type RepeatRule,
+  type Weekday,
+} from "./repeat.ts";
 export { isDone, isUndoneBefore, latestUndoneBefore } from "./undone.ts";
 export {
   MAX_REMINDERS,
@@ -32,7 +57,7 @@ export {
   type Placed,
   type Span,
 } from "./layout.ts";
-export { mergeObjects, sameObjects, type Merge } from "./merge.ts";
+export { differences, mergeObjects, sameObjects, type Merge } from "./merge.ts";
 export {
   AuthError,
   OfflineError,

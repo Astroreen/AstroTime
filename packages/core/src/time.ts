@@ -176,6 +176,12 @@ export function zonedToEpoch(local: string, timeZone: string): number {
   return valid.length > 0 ? Math.min(...valid) : before;
 }
 
+/** A wall clock in an IANA zone (or `UTC`) as an `ItemTime`, its instant as `zonedToEpoch` reads it. */
+export function zonedTime(local: string, timeZone: string): Extract<ItemTime, { type: "zoned" }> {
+  const epochMs = timeZone === "UTC" ? Date.parse(`${local}Z`) : zonedToEpoch(local, timeZone);
+  return { type: "zoned", local, timeZone, epochMs };
+}
+
 /** The wall clock at which a time shows to a user in `timeZone`. */
 export function wallClockOf(time: ItemTime, timeZone: string): string {
   switch (time.type) {

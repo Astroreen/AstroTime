@@ -44,7 +44,7 @@ logic worth borrowing.
   engine fetches the server's version and merges field by field when the two
   sides changed different properties. When both changed the same property,
   the server wins and our version goes to the **Conflicts** list, from which
-  the user can apply it again.
+  the user can apply it again. _Built in PR 6a:_ [D107](#D107).
 
 ### Protocol and data
 
@@ -60,13 +60,22 @@ logic worth borrowing.
 - **D9. Events in the MVP UI:** create, edit, delete; all-day and timed;
   recurrence with exceptions (`RRULE`, `EXDATE`, `RECURRENCE-ID`); time
   zones; reminders (`VALARM`) as local notifications; attendees shown, not
-  sent (no iTIP).
+  sent (no iTIP). _Built in PR 6a:_ creating, editing and deleting
+  ([D103](#D103)–[D106](#D106)), reminders added and removed in the edit
+  dialog (their notifications: [D100](#D100)–[D102](#D102)), attendees in
+  the details ([design D108](design.md#D108)).
 - **D10. Tasks in the MVP: the full VTODO.** Summary, description,
   `DTSTART`, `DUE`, status and completion, `PERCENT-COMPLETE`, `PRIORITY`,
   `CATEGORIES`, subtasks (`RELATED-TO`), recurrence, reminders, `CLASS`, and
-  the Nextcloud/Apple extensions for ordering and hidden subtasks.
+  the Nextcloud/Apple extensions for ordering and hidden subtasks. _Built in
+  PR 6a:_ the edit dialog writes a task's summary, description, start, due,
+  recurrence, reminders, status, `PERCENT-COMPLETE`, `PRIORITY` and
+  `CATEGORIES` ([D103](#D103), [design D109](design.md#D109)); subtasks and
+  the parent are shown, not set, and `CLASS` and the ordering extensions are
+  kept, not edited ([Deferred](#deferred)).
 - **D11. Editing an occurrence asks the scope**, as Google does: "This
-  occurrence / This and following / All occurrences".
+  occurrence / This and following / All occurrences". _Built in PR 6a:_
+  what each writes is [D105](#D105).
 
 ### Platforms
 
@@ -614,8 +623,8 @@ Decided while building PR 5a-3.
   in the accounts dialog, that it syncs, when it last synced, that it is
   offline, or what stops it, with the report's `problem` codes and dropped
   changes in words ([D37](#D37), [D38](#D38)) and "Sign in again" when the
-  server refused it. The count of conflicts ([D6](#D6)) is shown there until
-  the Conflicts list comes ([Deferred](#deferred)).
+  server refused it. The count of conflicts ([D6](#D6)) is shown there, with
+  "Review", which opens the Conflicts list ([D107](#D107)).
 
 - **D92. Signing in on the web, and the accounts in the shell.** The
   add-account dialog has two tabs: Nextcloud (Login Flow v2) and CalDAV
@@ -861,8 +870,8 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
     replaces one shown again instead of stacking it.
   - **A tap** brings the tab forward, closes the notification and opens
     the occurrence's day in the Day view (an event's start, a task's due
-    or start); one with no time only brings the app forward. The item's
-    details open once editing's dialogs exist ([Deferred](#deferred)).
+    or start), with its details over it ([D103](#D103)); one with no time
+    opens the details only.
 - **D102. What a notification says.** Its title is the item's (or
   "(No title)"); its body says when it is, as seen when it fires, in the
   user's language, with dates and relative times from `Intl`
@@ -874,6 +883,140 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   minutes", "· in 1 hour", "· now"): minutes up to an hour, and up to three
   hours unless whole, then whole hours. A day or more ahead, the day says
   it; a time already passed says nothing more.
+
+### Editing
+
+Decided while building PR 6a.
+
+- **D103. An edit writes what the user changed, and nothing else.**
+  `editItem` in `@astrotime/core` takes the fields the user changed
+  (`ItemChanges`; the edit dialog compares its form before and after) and
+  writes those properties into the parsed object, keeping their
+  parameters; every other line goes back as it was ([D7](#D7)), as
+  `completeTask` does (design [D94](design.md#D94)). An empty text removes
+  its property. `LAST-MODIFIED` and `DTSTAMP` become now (RFC 5545
+  §3.8.7.2, §3.8.7.3); `SEQUENCE` goes up by one when the time, the rule or
+  an exclusion changes (§3.8.7.4's significant changes, as Google and
+  Nextcloud count them), not for a title, a place, a reminder or a
+  completion (design D94 already leaves it alone for those). A new
+  description drops its HTML twins, Thunderbird's `ALTREP` and Outlook's
+  `X-ALT-DESC`, which would show the old text in their clients. A colour is
+  RFC 7986's `COLOR`, a CSS name, as Nextcloud writes it. A reminder added
+  is `ACTION:DISPLAY` with the item's title as its `DESCRIPTION` (RFC 5545
+  §3.6.6 asks for one), or for an item without a title the word the UI
+  passes in the user's language ("Reminder", "Напоминание"; the core holds
+  no UI strings, AGENTS.md rule 5), and a relative `TRIGGER`, `RELATED=END` before a
+  task's due; one removed goes whole; the others stay byte for byte. A task's
+  status writes what Nextcloud Tasks writes beside it (D94): `COMPLETED`
+  and `PERCENT-COMPLETE:100` when completed. **A new item** (`createItem`)
+  gets a random UUID, `DTSTAMP`, `CREATED` and `LAST-MODIFIED` now,
+  `SEQUENCE:0`, `PRODID:-//AstroTime//AstroTime//EN`, and is stored at
+  `<uid>.ics` in its calendar, the href the sync engine creates it under
+  ([D37](#D37)); every write is a pending change in the store and tells
+  the sync scheduler ([D91](#D91)).
+  - **Onto what the store holds when saving.** A sync or another tab may
+    change the item while its dialog is open; saving reads it again and
+    applies the user's changes to that (`Store.changeLocal`: the read and
+    the writes, a split's two objects or a move's two included, are one
+    transaction, [D99](#D99)), so the other change stays. A reminder
+    removed is found again by what it is, not by its place. An item deleted
+    meanwhile, or an occurrence no longer in its series (excluded, or after
+    a new end), is not written: the dialog says so. A `HandOverError` wrote
+    nothing, so the save runs once more; after a `CommitInDoubtError` the
+    store is read again, and when what the save wrote is not there the
+    dialog says it is unclear whether the change was saved.
+- **D104. An item keeps its zone.** An edited time is written in the zone
+  the item had, with the TZID it was written with (`W. Europe Standard
+  Time` stays, [D32](#D32)); a UTC time (Nextcloud Tasks writes them) is
+  edited on the user's wall clock and written back in UTC; a floating time
+  stays floating; a new item, or a date made a time, takes the user's zone.
+  A TZID the object did not write before and does not define gets a
+  VTIMEZONE (RFC 5545 §3.6.5); one already written without it (Google's
+  IANA names, Outlook's Windows ones) stays as it came. It is made from
+  what `Intl` knows of the zone (`vtimezone`): a yearly rule per
+  observance where the zone's changes follow "the nth or last weekday of a
+  month" (checked twenty years ahead), else an observance per change, from
+  the year before the item's. A VTIMEZONE no longer used stays (D7). The
+  edit dialog names the zone when it is not the user's; choosing another is
+  [deferred](#deferred).
+- **D105. What each scope writes** ([D11](#D11)), on the occurrence opened:
+  - **This occurrence**: its exception, made from the master the first time
+    (design D94's `exceptionOf`, which now moves an event's `DTEND` too)
+    and changed in place after; deleting it adds an `EXDATE` written as the
+    series' start is (its TZID, or a date) and drops its exception.
+  - **This and following** splits the series, as Nextcloud and Google do
+    (`RANGE=THISANDFUTURE` stays unused, [Deferred](#deferred)): the series
+    ends with an `UNTIL` one second before the occurrence, in the type RFC
+    5545 §3.3.10 asks (a date, the day before, for a series of dates; UTC
+    for a zoned one, a date or floating `RECURRENCE-ID` read in its zone
+    ([D35](#D35)); a wall clock for a floating one), a `COUNT` becoming
+    that `UNTIL`; the rest is a new object under a new UID, the master
+    moved to the occurrence with the edit, its own `CREATED` and
+    `SEQUENCE:0`, a `COUNT` left as the occurrences remaining, and the
+    exceptions, `EXDATE`s and `RDATE`s from the occurrence on (moved, not
+    copied: one calendar object per UID, [D34](#D34)). From the first
+    occurrence it is all of them. Deleting ends the series the same way.
+  - **All occurrences** edits the master; so does an edit of a series
+    with no occurrence named. A field the user changed reaches each
+    exception that had the master's value; one changed on its own keeps
+    it. Exceptions and `EXDATE`s that no longer name an occurrence of the
+    new rule go; "does not repeat" drops the rule with its `RDATE`s,
+    `EXDATE`s and exceptions.
+  - **A new time moves the series as the occurrence moved**, in "all" and
+    in the new series of "this and following": every time in it shifts by
+    the same wall-clock time, across a DST change too. A series at 9:00
+    moved to 10:00 is at 10:00, its `RDATE` at 14:00 at 15:00, and its
+    `EXDATE`s and `RECURRENCE-ID`s shift alike, so they still name their
+    occurrences (one of another kind than the start keeps it, [D35](#D35):
+    a date moves by whole days, a floating time on its wall clock, and is
+    matched by day or wall clock when stale ones are dropped); an exception not moved on its own follows with the new
+    times, one moved keeps its own. Made all-day, every time moves by whole
+    days; made timed, each takes the new time of day.
+  - **The rule moves with it** unless the user picked a new one, as
+    Google's repeat menu follows a new date: the days and hours it names
+    shift as the start did, so the new start is one of its occurrences
+    (RFC 5545 leaves a series whose `DTSTART` its rule does not make
+    undefined). Weekdays shift by as many days (Monday, Wednesday and
+    Friday a day later are Tuesday, Thursday and Saturday; "weekly on
+    Tuesday" becomes "on Wednesday"); the start's nth weekday of its month
+    becomes the new day's, as the repeat menu names it (the 2nd Tuesday
+    moved to the 18th is the 3rd Wednesday, a day in the month's last week
+    the last); the start's day of the month (`BYMONTHDAY`) and a yearly
+    rule's month (`BYMONTH`) become the new day's; `BYHOUR` and `BYMINUTE`
+    shift as the start's clock did. Other parts (`BYYEARDAY`, `BYWEEKNO`,
+    `BYSETPOS`) stay as written. The edit dialog shows the moved rule as
+    soon as the date changes (`movedRepeat`), and a rule that only moved is
+    no new rule. "This occurrence" on another day leaves the rule alone:
+    only its exception moves.
+  - **A series held without its master** (only exceptions on the server):
+    deleting this occurrence drops its exception, "this and following"
+    each from it on, the last one the object; an edit changes the one
+    exception. The edit dialog offers no scope for one
+    ([Deferred](#deferred)).
+
+  The edit dialog asks only what Google asks: a new day for one occurrence
+  is not every occurrence's (no "All"), a new rule is not one occurrence's
+  (no "This"), so a new day with a new rule is "This and following" only,
+  and a move to another calendar takes the whole series without asking.
+
+- **D106. Moving an item to another calendar is a creation there and a
+  deletion here**, the same UID at `<uid>.ics`: the provider has no CalDAV
+  `MOVE` ([D37](#D37)), and two pending changes upload through the paths
+  the sync engine already has. A server keeps no history across the move
+  ([Deferred](#deferred)).
+- **D107. The Conflicts list.** The accounts dialog's count of conflicts
+  has "Review", which opens the list: each conflict (`Store.conflicts`)
+  with its item's title and calendar, the fields our refused version and
+  what the calendar holds now (the server's version, or ours merged onto
+  it) differ in, worded (`differences` in `@astrotime/core`: title, time,
+  repeat, reminders, single occurrences…), and both values side by side
+  for the fields that have one. **Keep the server's** drops ours
+  (`removeConflict`); **Apply mine again** saves ours over what the
+  calendar holds as a pending update against the server's version (its
+  base), then drops the conflict, and the next sync uploads it; a creation
+  whose href the server gave another item goes to `<uid>-<random>.ics`. In
+  a read-only calendar only keeping the server's is offered. Ours is
+  applied as it was refused, with its own `DTSTAMP` and `SEQUENCE`.
 
 ## Deferred
 
@@ -927,10 +1070,6 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   runs by hand; a change in the apps' pages breaks it unseen until the next
   recording. A nightly run that records and compares everything but UIDs and
   timestamps comes if the apps' output changes often enough to matter.
-- **The Conflicts list** — our refused versions ([D6](#D6)) are kept in the
-  store and counted in the accounts dialog ([D91](#D91)); the list itself,
-  showing both versions and applying ours again, comes with editing
-  (PR 6), which writes the local changes that can conflict.
 - **Signing in to a server that redirects elsewhere, on Android and the
   desktop** — they follow redirects themselves and drop `Authorization`
   across origins ([android D62](android.md#D62),
@@ -949,13 +1088,36 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   - notifications through a service worker (`showNotification`), which
     mobile browsers require: there `new Notification` fails, and the web
     app shows none (the Android app is the way there);
-  - a tap opening the item's details, once editing's dialogs exist (PR 6);
   - the Android and desktop adapters: [android D66](android.md#D66)
     (PR A3) and [desktop D76](desktop.md#D76).
 
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
+  AstroTime's own "this and following" splits too ([D105](#D105)).
+- **Drag and resize** — moving and sizing items in the time grid
+  ([D14](#D14), [D16](#D16)), and a press-and-drag on an empty slot to make
+  one that long: PR 6b.
+- **Editing guests** — attendees are shown, never added, removed or
+  answered; it comes with sending invitations ([D9](#D9)).
+- **Attachments** — `ATTACH` is kept ([D7](#D7)), not shown or edited.
+- **A time-zone picker** — an item keeps its zone and a new one takes the
+  user's ([D104](#D104)); writing an item in another zone needs a picker.
+- **CalDAV `MOVE`** — a move to another calendar is a creation and a
+  deletion ([D106](#D106)); `MOVE` would keep the server's own record of
+  the item (its history, Nextcloud's shares), when the provider learns it.
+- **Unsaved changes** — closing the edit dialog drops them without asking;
+  Google asks first.
+- **Subtasks and a task's parent from the edit dialog** — `RELATED-TO` is
+  shown in the details, not set; `CLASS` and the ordering extensions are
+  kept, not edited ([D10](#D10)).
+- **A default calendar** — a new item goes in the first writable calendar
+  the views show; remembering the last one used, or choosing a default,
+  comes later.
+- **A series held without its master** — a server holding only exceptions
+  of a series lets each be edited or deleted on its own: the edit dialog
+  asks no scope for one, though `deleteItem` can delete each from one on
+  ([D105](#D105)); "all" and an edit of the following ones need the master.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store
@@ -1061,13 +1223,29 @@ item opens them; PR 5a draws items that do not open yet), the recurrence
 scope dialog, reminders as notifications; the floating "+" button creates
 an event or a task (PR 5a draws it disabled). Decisions: D9, D10, D11.
 
-_Changed:_ reminders as notifications land in a PR of their own, ahead of
-editing: the reminder set in `@astrotime/core` and the store, the planner
-and the "Reminders" setting in the UI, the web's notifications
-(D100–D102). Done when: the set's rules are unit-tested (all-day, floating,
-DST, `RELATED=END`, absolute triggers, `REPEAT`, a series with exceptions,
-tasks), and in the web app a reminder of the demo data shows at its time
-under a controlled clock and a tap opens its day.
+In three PRs:
+
+- **6a** — the details and edit dialogs, creating ("+", an empty slot,
+  "Add a task"), deleting, the scope of an occurrence's edit and deletion,
+  reminders added and removed, and the Conflicts list
+  ([Deferred](#deferred) until then). Decisions: D6, D9, D10, D11,
+  D103–D107, design D108, D109.
+- **6b** — dragging and resizing in the time grid ([D14](#D14), [D16](#D16)).
+- **6c** — reminders as notifications, landed ahead of 6a: the reminder set
+  in `@astrotime/core` and the store, the planner and the "Reminders"
+  setting in the UI, the web's notifications (D100–D102). Done when: the
+  set's rules are unit-tested (all-day, floating, DST, `RELATED=END`,
+  absolute triggers, `REPEAT`, a series with exceptions, tasks), and in the
+  web app a reminder of the demo data shows at its time under a controlled
+  clock and a tap opens its day.
+
+Done when, for 6a: an event and a task are created, edited and deleted
+through the local store and reach a CalDAV server; each scope of an
+occurrence's edit and deletion writes what D105 says, against fixtures from
+Nextcloud, Apple, Google and Outlook and across a DST change; a read-only
+calendar's items open without edit; and the Conflicts list resolves a
+conflict both ways. Screenshots of each dialog in both themes and both
+languages are the evidence.
 
 ### PR 7 — Web proxy and release
 

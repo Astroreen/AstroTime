@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import type { AccountStatus } from "../accounts/scheduler.ts";
 import { AddPersonIcon, MoreIcon, SyncIcon } from "./account-icons.tsx";
 import { useAccounts, type AccountsValue } from "./accounts-context.tsx";
+import { ConflictsDialog } from "./conflicts-dialog.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
@@ -146,6 +147,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   const { t } = useTranslation();
   const value = useAccounts();
   const [open, setOpen] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const attention =
     value.conflicts > 0 ||
     accounts.some((account) => needsAttention(value.status.accounts.get(account.id)?.last));
@@ -217,6 +219,11 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
                 {t("conflicts", { count: value.conflicts })}
               </p>
               <p className="mt-1 text-ink-muted">{t("conflicts.hint")}</p>
+              <div className="mt-1 flex justify-end">
+                <button type="button" className={textButton} onClick={() => setReviewing(true)}>
+                  {t("conflicts.review")}
+                </button>
+              </div>
             </div>
           )}
           <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -245,6 +252,12 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
           </div>
         </Dialog.Popup>
       </Dialog.Portal>
+      <ConflictsDialog
+        store={value.store}
+        open={reviewing}
+        onClose={() => setReviewing(false)}
+        onChanged={() => value.scheduler.changed()}
+      />
     </Dialog.Root>
   );
 }

@@ -1,8 +1,9 @@
 // The built app under its Content Security Policy (docs/plans/foundation.md#D110),
 // served by the web image's own server: the store opens (wasm in a worker, on
-// OPFS), an account is added through /dav-proxy/, and the browser reports not
-// one violation. The production build has no demo data (D57), so the app
-// starts on its first-run screen, which shows only once the store is open.
+// OPFS), an account is added through /dav-proxy/, its event's details and
+// edit dialog open, and the browser reports not one violation. The
+// production build has no demo data (D57), so the app starts on its
+// first-run screen, which shows only once the store is open.
 import { fileURLToPath } from "node:url";
 
 import { test as base, expect } from "@playwright/test";
@@ -63,7 +64,7 @@ test("the built app opens its store, adds an account through the proxy, and brea
       Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}`,
       "Content-Type": "text/calendar",
     },
-    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nDESCRIPTION:Notes: https://example.com/plan. Not a link: javascript:alert(1)\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
   });
   expect(response.status).toBe(201);
 
@@ -123,6 +124,22 @@ test("the built app opens its store, adds an account through the proxy, and brea
       .getByRole("list", { name: "Wednesday, November 4" })
       .getByRole("listitem", { name: /^Planning with Radicale, / }),
   ).toBeVisible();
+
+  // The details show the description's web link as a link, and nothing else
+  // as one; the edit dialog opens over them (foundation D9).
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Planning with Radicale, / })
+    .click();
+  const details = page.getByRole("dialog", { name: "Planning with Radicale" });
+  await expect(details.getByRole("link")).toHaveCount(1);
+  await expect(details.getByRole("link", { name: "https://example.com/plan" })).toHaveAttribute(
+    "href",
+    "https://example.com/plan",
+  );
+  await expect(details.getByText(/javascript:alert\(1\)/)).toBeVisible();
+  await details.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByRole("dialog", { name: "Edit event" })).toBeVisible();
 
   expect(violations).toEqual([]);
 });

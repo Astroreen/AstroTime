@@ -44,7 +44,7 @@ test.describe("Month", () => {
     await expect(page.getByRole("list", { name: "All day" })).toBeVisible();
   });
 
-  test("a tap on a day opens it in the Day view, on a span the day under the finger", async ({
+  test("a tap on a day opens it in the Day view; a tap on an item its details", async ({
     page,
   }) => {
     await page.setViewportSize(WIDE);
@@ -60,10 +60,10 @@ test.describe("Month", () => {
     const conference = day(page, "Thursday, November 5").getByRole("listitem", {
       name: "Developer conference, All day",
     });
-    // The span covers Thursday to Saturday; its middle is over Friday.
+    // The span covers Thursday to Saturday; anywhere on it, it is the item (PR 6).
     const box = (await conference.boundingBox())!;
     await conference.click({ position: { x: box.width / 2, y: box.height / 2 } });
-    await expect(header(page, "Friday, November 6")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Developer conference" })).toBeVisible();
   });
 
   test("previous, next, today and the month picker move by month", async ({ page }) => {

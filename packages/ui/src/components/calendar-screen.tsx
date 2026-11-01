@@ -3,13 +3,14 @@
 // "+" button; search and the tasks screen open from the top bar (D52, D53);
 // the first-run screen while there is no account. The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
-import { wallClockOf, type ItemTime } from "@astrotime/core";
+import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
+import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
@@ -27,9 +28,11 @@ import { useEntries, useMediaQuery, useNow } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
 import { useSettings } from "../settings.ts";
 import { AccountButton, FirstRun } from "./accounts.tsx";
+import { useAccounts } from "./accounts-context.tsx";
 import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
+import { EditingContext, targetOf, useEditingState } from "./editing.tsx";
 import {
   CheckCircleIcon,
   ChevronIcon,
@@ -156,9 +159,28 @@ export function CalendarScreen({
   const taskLists = (lists?.calendars ?? []).filter((calendar) =>
     calendar.components.includes("VTODO"),
   );
+  const { scheduler } = useAccounts();
+  const editing = useEditingState({
+    store,
+    calendars: lists?.calendars ?? [],
+    hidden,
+    timeZone,
+    minutes,
+    colorOf: (target) => validColor(target.item.color) ?? colorOfCalendar(target.calendarId),
+    onChanged: () => scheduler.changed(),
+  });
   const pick = (result: SearchResult) => {
     setSearching(false);
     setQuery("");
+    // A result opens its details, as Google's search does, over the day it moved to.
+    editing.value.open(
+      targetOf(
+        result.stored,
+        CalendarObject.parse(result.stored.ics),
+        result.occurrence?.recurrenceId ?? null,
+        result.occurrence?.item ?? result.item,
+      ),
+    );
     if (result.occurrence) {
       const day = wallClockOf(result.occurrence.start, timeZone).slice(0, 10);
       setAnchor(day);
@@ -188,24 +210,23 @@ export function CalendarScreen({
     setAnchor(day);
   };
 
-  // A tapped reminder opens its occurrence's day in the Day view (foundation
-  // D101): an event's start, a task's due or start; one with no time only
-  // brings the app forward.
+  // A tapped reminder opens its occurrence's day in the Day view, and its
+  // details over it (foundation D101): an event's start, a task's due or
+  // start; one with no time opens only the details.
   const { onOpen } = useReminders();
-  const openReminder = useEffectEvent((time: ItemTime | null) => {
-    if (!time) return;
+  const openReminder = useEffectEvent(async (reminder: ScheduledReminder) => {
+    const time = reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start;
     setSearching(false);
     setDrawerOpen(false);
     if (!wide) setTasksOpen(false);
-    openDay(wallClockOf(time, timeZone).slice(0, 10));
+    if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
+    const stored = await store.object(reminder.objectId);
+    if (!stored || stored.pending === "delete") return;
+    const object = CalendarObject.parse(stored.ics);
+    const item = itemOf(object, reminder.recurrenceId);
+    if (item) editing.value.open(targetOf(stored, object, reminder.recurrenceId, item));
   });
-  useEffect(
-    () =>
-      onOpen((reminder) =>
-        openReminder(reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start),
-      ),
-    [onOpen],
-  );
+  useEffect(() => onOpen((reminder) => void openReminder(reminder)), [onOpen]);
 
   // Keys on a desktop: n or j for the next period, p or k for the previous,
   // t for today; d, x, w, m and a for the views, as Google Calendar's (design D88).
@@ -254,193 +275,198 @@ export function CalendarScreen({
 
   return (
     <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>
-      <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
-        <div className="relative isolate flex h-dvh flex-col bg-canvas text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
-          {searching && (
-            <SearchBar query={query} onQuery={setQuery} onClose={() => setSearching(false)} />
-          )}
-          <header
-            hidden={searching}
-            inert={phoneTasks}
-            aria-hidden={phoneTasks || undefined}
-            className="flex h-14 shrink-0 items-center gap-1 px-1.5"
-          >
-            {wide ? (
+      <EditingContext.Provider value={editing.value}>
+        <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
+          <div className="relative isolate flex h-dvh flex-col bg-canvas text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
+            {searching && (
+              <SearchBar query={query} onQuery={setQuery} onClose={() => setSearching(false)} />
+            )}
+            <header
+              hidden={searching}
+              inert={phoneTasks}
+              aria-hidden={phoneTasks || undefined}
+              className="flex h-14 shrink-0 items-center gap-1 px-1.5"
+            >
+              {wide ? (
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={t("topBar.menu")}
+                  aria-expanded={sidebarOpen}
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <MenuIcon />
+                </button>
+              ) : (
+                <Dialog.Trigger className={iconButton} aria-label={t("topBar.menu")}>
+                  <MenuIcon />
+                </Dialog.Trigger>
+              )}
+              <MonthPicker
+                title={title}
+                anchor={anchor}
+                today={today}
+                weekStart={settings.weekStart}
+                onPick={setAnchor}
+              />
+              <div className="flex-1" />
+              {wide && (
+                <>
+                  <button
+                    type="button"
+                    className={iconButton}
+                    aria-label={t(`nav.previous.${view}`)}
+                    onClick={() => go(-1)}
+                  >
+                    <ChevronIcon direction="left" />
+                  </button>
+                  <button
+                    type="button"
+                    className={iconButton}
+                    aria-label={t(`nav.next.${view}`)}
+                    onClick={() => go(1)}
+                  >
+                    <ChevronIcon direction="right" />
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className={iconButton}
-                aria-label={t("topBar.menu")}
-                aria-expanded={sidebarOpen}
-                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label={t("topBar.search")}
+                title={t("topBar.search")}
+                onClick={() => setSearching(true)}
               >
-                <MenuIcon />
+                <SearchIcon />
               </button>
-            ) : (
-              <Dialog.Trigger className={iconButton} aria-label={t("topBar.menu")}>
-                <MenuIcon />
-              </Dialog.Trigger>
-            )}
-            <MonthPicker
-              title={title}
-              anchor={anchor}
-              today={today}
-              weekStart={settings.weekStart}
-              onPick={setAnchor}
-            />
-            <div className="flex-1" />
-            {wide && (
-              <>
-                <button
-                  type="button"
-                  className={iconButton}
-                  aria-label={t(`nav.previous.${view}`)}
-                  onClick={() => go(-1)}
-                >
-                  <ChevronIcon direction="left" />
-                </button>
-                <button
-                  type="button"
-                  className={iconButton}
-                  aria-label={t(`nav.next.${view}`)}
-                  onClick={() => go(1)}
-                >
-                  <ChevronIcon direction="right" />
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              className={iconButton}
-              aria-label={t("topBar.search")}
-              title={t("topBar.search")}
-              onClick={() => setSearching(true)}
-            >
-              <SearchIcon />
-            </button>
-            <button
-              type="button"
-              className={iconButton}
-              aria-label={t("topBar.today")}
-              title={t("topBar.today")}
-              onClick={() => setAnchor(today)}
-            >
-              <TodayIcon day={formats.dayNumber(today)} />
-            </button>
-            <button
-              type="button"
-              className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
-              aria-label={t("topBar.tasks")}
-              title={t("topBar.tasks")}
-              aria-pressed={tasksOpen}
-              onClick={() => (tasksOpen ? closeTasks() : setTasksOpen(true))}
-            >
-              <CheckCircleIcon />
-            </button>
-            <AccountButton accounts={lists?.accounts ?? []} />
-          </header>
-          <div inert={covered} aria-hidden={covered || undefined} className="flex min-h-0 flex-1">
-            {wide && sidebarOpen && (
-              <nav aria-label={t("topBar.menu")} className="w-64 shrink-0 overflow-y-auto">
-                {drawer}
-              </nav>
-            )}
-            <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
-              {view === "agenda" ? (
-                <AgendaView
-                  store={store}
-                  cache={cache}
-                  ids={ids}
-                  anchor={anchor}
-                  today={today}
-                  undoneColor={undoneColor}
-                  onVisibleDay={setAnchor}
-                  hideCompleted={hideCompleted}
-                />
-              ) : view === "month" ? (
-                <MonthView
-                  month={titleRange(view, days, anchor)[0]}
-                  weeks={layoutMonth(entries, days, layoutContext)}
-                  today={today}
-                  undone={data.undone}
-                  undoneColor={undoneColor}
-                  onOpenDay={openDay}
-                  onSwipe={go}
-                />
-              ) : (
-                <TimeGrid
-                  days={days}
-                  layout={layoutRange(entries, days, layoutContext)}
-                  today={today}
-                  minutes={minutes}
-                  undone={data.undone}
-                  undoneColor={undoneColor}
-                  expanded={expanded}
-                  onExpandedChange={setExpanded}
-                  onSwipe={go}
-                />
-              )}
-              {/* Creating items is PR 6 (docs/plans/foundation.md#pr-6--editing). */}
               <button
                 type="button"
-                disabled
-                aria-label={t("fab.create")}
-                className="absolute right-4 bottom-4 z-[70] grid size-14 place-items-center rounded-2xl bg-fab text-on-fab shadow-lg shadow-black/30"
+                className={iconButton}
+                aria-label={t("topBar.today")}
+                title={t("topBar.today")}
+                onClick={() => setAnchor(today)}
               >
-                <PlusIcon className="size-7" />
+                <TodayIcon day={formats.dayNumber(today)} />
               </button>
-            </main>
-            {wide && tasksOpen && (
-              <aside className="w-[22.5rem] shrink-0 border-l border-line">
+              <button
+                type="button"
+                className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
+                aria-label={t("topBar.tasks")}
+                title={t("topBar.tasks")}
+                aria-pressed={tasksOpen}
+                onClick={() => (tasksOpen ? closeTasks() : setTasksOpen(true))}
+              >
+                <CheckCircleIcon />
+              </button>
+              <AccountButton accounts={lists?.accounts ?? []} />
+            </header>
+            <div inert={covered} aria-hidden={covered || undefined} className="flex min-h-0 flex-1">
+              {wide && sidebarOpen && (
+                <nav aria-label={t("topBar.menu")} className="w-64 shrink-0 overflow-y-auto">
+                  {drawer}
+                </nav>
+              )}
+              <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
+                {view === "agenda" ? (
+                  <AgendaView
+                    store={store}
+                    cache={cache}
+                    ids={ids}
+                    anchor={anchor}
+                    today={today}
+                    undoneColor={undoneColor}
+                    onVisibleDay={setAnchor}
+                    hideCompleted={hideCompleted}
+                  />
+                ) : view === "month" ? (
+                  <MonthView
+                    month={titleRange(view, days, anchor)[0]}
+                    weeks={layoutMonth(entries, days, layoutContext)}
+                    today={today}
+                    undone={data.undone}
+                    undoneColor={undoneColor}
+                    onOpenDay={openDay}
+                    onSwipe={go}
+                  />
+                ) : (
+                  <TimeGrid
+                    days={days}
+                    layout={layoutRange(entries, days, layoutContext)}
+                    today={today}
+                    minutes={minutes}
+                    undone={data.undone}
+                    undoneColor={undoneColor}
+                    expanded={expanded}
+                    onExpandedChange={setExpanded}
+                    onSwipe={go}
+                  />
+                )}
+                {/* A new event on the day shown, from the next half hour (Google). */}
+                <button
+                  type="button"
+                  disabled={!editing.value.canCreate}
+                  aria-label={t("fab.create")}
+                  title={t("fab.create")}
+                  onClick={() => editing.value.create("event", { day: anchor })}
+                  className="absolute right-4 bottom-4 z-[70] grid size-14 place-items-center rounded-2xl bg-fab text-on-fab shadow-lg shadow-black/30"
+                >
+                  <PlusIcon className="size-7" />
+                </button>
+              </main>
+              {wide && tasksOpen && (
+                <aside className="w-[22.5rem] shrink-0 border-l border-line">
+                  <TasksScreen
+                    store={store}
+                    preferences={preferences}
+                    lists={taskLists}
+                    today={today}
+                    now={nowOf(today, minutes)}
+                    wide
+                    focus={taskFocus}
+                    onClose={closeTasks}
+                  />
+                </aside>
+              )}
+            </div>
+            {searching && (
+              <div className="absolute inset-x-0 top-14 bottom-0 z-[75] overflow-y-auto bg-canvas">
+                <SearchResults
+                  store={store}
+                  calendarIds={ids ?? []}
+                  query={query}
+                  today={today}
+                  colorOf={(result) =>
+                    validColor(result.item.color) ?? colorOfCalendar(result.stored.calendarId)
+                  }
+                  onPick={pick}
+                />
+              </div>
+            )}
+            {phoneTasks && !searching && (
+              <div className="absolute inset-0 z-[75]">
                 <TasksScreen
                   store={store}
                   preferences={preferences}
                   lists={taskLists}
                   today={today}
                   now={nowOf(today, minutes)}
-                  wide
+                  wide={false}
                   focus={taskFocus}
                   onClose={closeTasks}
                 />
-              </aside>
+              </div>
             )}
           </div>
-          {searching && (
-            <div className="absolute inset-x-0 top-14 bottom-0 z-[75] overflow-y-auto bg-canvas">
-              <SearchResults
-                store={store}
-                calendarIds={ids ?? []}
-                query={query}
-                today={today}
-                colorOf={(result) =>
-                  validColor(result.item.color) ?? colorOfCalendar(result.stored.calendarId)
-                }
-                onPick={pick}
-              />
-            </div>
-          )}
-          {phoneTasks && !searching && (
-            <div className="absolute inset-0 z-[75]">
-              <TasksScreen
-                store={store}
-                preferences={preferences}
-                lists={taskLists}
-                today={today}
-                now={nowOf(today, minutes)}
-                wide={false}
-                focus={taskFocus}
-                onClose={closeTasks}
-              />
-            </div>
-          )}
-        </div>
-        <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <Dialog.Popup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
-            <Dialog.Title className="sr-only">{t("topBar.menu")}</Dialog.Title>
-            <nav aria-label={t("topBar.menu")}>{drawer}</nav>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+            <Dialog.Popup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
+              <Dialog.Title className="sr-only">{t("topBar.menu")}</Dialog.Title>
+              <nav aria-label={t("topBar.menu")}>{drawer}</nav>
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
+        {editing.dialogs}
+      </EditingContext.Provider>
     </CalendarContext.Provider>
   );
 }

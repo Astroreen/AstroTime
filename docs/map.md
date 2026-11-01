@@ -42,8 +42,19 @@ When you add a package, app or module, add its line here in the same PR.
   - `remindersOf`, `soonestReminders` — the times an object's alarms fire,
     and the reminder set a platform is handed; `ReminderScheduler`, how a
     platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
-  - `mergeObjects` — the three-way merge of a refused write.
-    → `plans/foundation.md#D6`
+  - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
+    other edit: only the fields changed, in a scope for an occurrence of a
+    series (this, this and following, all), a series moved as its
+    occurrence moved; `hasOccurrence`, whether a series still has one.
+    → `plans/foundation.md#D103`, `plans/foundation.md#D105`
+  - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
+    `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its
+    start's day. → `plans/foundation.md#D105`
+  - `vtimezone.ts` — a VTIMEZONE made from `Intl` for a zone the object
+    does not define. → `plans/foundation.md#D104`
+  - `mergeObjects` — the three-way merge of a refused write;
+    `differences`, the fields two versions differ in.
+    → `plans/foundation.md#D6`, `plans/foundation.md#D107`
   - `Provider` — the interface every provider implements.
     → `plans/foundation.md#D37`
   - `SecretStore` — where a platform keeps credentials, never the store.
@@ -64,8 +75,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `search` — objects by title, case and diacritics aside, over the
       folded `titles` column (`search.ts`, migration 6).
       → `plans/design.md#D97`
-    - every operation that writes is a transaction.
-      → `plans/foundation.md#D99`
+    - every operation that writes is a transaction; `changeLocal`, a
+      change made here that reads and writes in one (the edit dialog's
+      save). → `plans/foundation.md#D99`, `plans/foundation.md#D103`
     - `reminders` — every calendar's reminders in a range of days.
       → `plans/foundation.md#D100`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
@@ -132,6 +144,12 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D97`
     - `settings-section.tsx` — the drawer's settings.
       → `plans/design.md#D96`
+    - `editing.tsx` — `useEditing`: any part of the UI opens an item's
+      details or creates one; the details (`item-details.tsx`), the edit
+      dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
+      → `plans/design.md#D108`
+    - `conflicts-dialog.tsx` — the Conflicts list, from the accounts
+      dialog. → `plans/foundation.md#D107`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
@@ -140,6 +158,10 @@ When you add a package, app or module, add its line here in the same PR.
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
+    - `editing.ts` — the edit dialog's form, the changes it makes, the
+      scopes offered and the writes to the store; `words.ts` — rules and
+      reminders in words; `conflicts.ts` — the Conflicts list's two ways
+      out. → `plans/foundation.md#D103`, `plans/foundation.md#D107`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe`, `useNow`, `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
@@ -149,14 +171,16 @@ When you add a package, app or module, add its line here in the same PR.
   - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
     platform) and `reminderNotification` (its words);
     `components/reminders-context.tsx` and `reminders-switch.tsx`, the
-    "Reminders" setting in the drawer and a tapped reminder opening its day.
+    "Reminders" setting in the drawer and a tapped reminder opening its day
+    and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light.
     → `plans/design.md#D58`
   - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev
-    server, tests and screenshots. → `plans/foundation.md#D57`
+    server, tests and screenshots, with a read-only calendar and a conflict
+    to resolve. → `plans/foundation.md#D57`
 
 ## Apps
 
@@ -179,7 +203,11 @@ When you add a package, app or module, add its line here in the same PR.
     `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
     takes the accounts' evidence. → `plans/foundation.md#D92`;
     `reminders.spec.ts` moves `page.clock` and sees notifications through a
-    wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`
+    wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`;
+    `editing.spec.ts` creates, edits and deletes on the demo data,
+    `editing-server.spec.ts` sees an item made here reach Radicale,
+    `editing-screenshots.spec.ts` takes the editing evidence.
+    → `plans/design.md#D108`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,

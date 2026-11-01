@@ -142,7 +142,7 @@ test("completing and starring on the tasks screen write the task to the store, t
   expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
 });
 
-test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day (D101)", async () => {
+test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day and its details (D101)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   const store = await demoStore(["en-US"]);
@@ -165,7 +165,12 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
   await expect
     .element(page.getByText("Reminders show while AstroTime is open in a tab."))
     .toBeInTheDocument();
+  // The set reaches an hour back, to the design review's at 9:50; the next is still ahead.
+  await expect
+    .element(page.getByText(/^Next: Call with Anna, Wed, Nov 4, 11:00\sAM\.$/))
+    .toBeInTheDocument();
   expect(reminders.last.map((r) => r.notification.title)).toEqual([
+    "Design review",
     "Call with Anna",
     "Write the proposal",
     "Dentist",
@@ -174,6 +179,11 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
 
   await userEvent.keyboard("{Escape}");
   reminders.tap(reminders.last.find((r) => r.title === "Dentist")!);
+  // Its details open over its day.
+  const details = page.getByRole("dialog", { name: "Dentist" });
+  await expect.element(details).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(details).not.toBeInTheDocument();
   await expect
     .element(page.getByRole("list", { name: "Thursday, November 5" }))
     .toBeInTheDocument();
@@ -218,6 +228,27 @@ test("a store that does not open for another reason: the failure, not a blank pa
     )
     .toBeInTheDocument();
   expect(quiet).toHaveBeenCalled();
+});
+
+test("an item opens its details; Escape closes them and the focus is back on the item (D14)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  render(Promise.resolve(store), ["en-US"]);
+  const opener = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Design review, / });
+  await expect.element(opener).toBeInTheDocument();
+  const button = opener.element() as HTMLElement;
+  // No stylesheet here, so the button over the item has no size: used in the DOM.
+  button.focus();
+  button.click();
+  const details = page.getByRole("dialog", { name: "Design review" });
+  await expect.element(details).toBeInTheDocument();
+  await expect.element(details.getByText("Calendar: Work")).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(details).not.toBeInTheDocument();
+  await expect.element(opener).toHaveFocus();
 });
 
 // The app's stylesheet lifts a dialog above Base UI's own backdrop; these

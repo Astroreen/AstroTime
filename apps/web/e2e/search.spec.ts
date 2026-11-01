@@ -1,5 +1,6 @@
 // Search (design D53): titles in the local store, case- and
-// diacritics-insensitive; a result jumps to its day or opens its task.
+// diacritics-insensitive; a result opens its details over its day, or over
+// its task on the tasks screen.
 import { expect, test } from "@playwright/test";
 
 import { openDemo, PHONE } from "./support.ts";
@@ -15,6 +16,11 @@ test("a title found jumps the calendar to its day and marks the item", async ({ 
   const results = page.getByRole("list", { name: "Search results" });
   await results.getByRole("button", { name: "Dentist, Tomorrow, 3:00 – 4:00 PM" }).click();
   await expect(field).toHaveCount(0);
+  // Its details first, as Google's search opens them; closed, the day is there.
+  await page
+    .getByRole("dialog", { name: "Dentist" })
+    .getByRole("button", { name: "Close" })
+    .click();
   await expect(page.getByRole("heading", { name: "Thursday, November 5" })).toBeVisible();
   const dentist = page
     .getByRole("list", { name: "Thursday, November 5" })
@@ -30,6 +36,10 @@ test("an undated task found opens on the tasks screen", async ({ page }) => {
   await page
     .getByRole("list", { name: "Search results" })
     .getByRole("button", { name: "Return the library books, No date" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Return the library books" })
+    .getByRole("button", { name: "Close" })
     .click();
   const panel = page.getByRole("region", { name: "Tasks" });
   await expect(panel.getByRole("tab", { name: /^Tasks/ })).toHaveAttribute("aria-selected", "true");
@@ -50,6 +60,7 @@ test.describe("in Russian", () => {
       .getByRole("list", { name: "Результаты поиска" })
       .getByRole("button", { name: "Отправить отчёт, Сегодня, 15:00" })
       .click();
+    await page.keyboard.press("Escape");
     await expect(
       page
         .getByRole("list", { name: "среда, 4 ноября" })
