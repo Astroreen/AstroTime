@@ -57,12 +57,15 @@ async function setup(
   const secrets = shared?.secrets ?? memorySecrets();
   const opened: string[] = [];
   const time = manualClock();
+  const page = crypto.randomUUID();
   const signIn = new SignIn({
     store,
     secrets,
     http: server.http,
     openExternal: (url) => opened.push(url),
     pending: pending ?? secrets,
+    // A page of its own, whose lock nobody holds unless the test does: gone.
+    page,
     clock: time.clock,
   });
   /** Resolves once the state is `step` (or right away if it is). */
@@ -75,7 +78,7 @@ async function setup(
         resolve(signIn.state);
       });
     });
-  return { store, secrets, opened, time, signIn, reaches, server };
+  return { store, secrets, opened, time, signIn, reaches, server, page };
 }
 
 test("what the user types becomes a server address, or is refused", () => {
@@ -371,6 +374,7 @@ test("a new flow that replaces an approval another page left unsaved revokes its
       step: "approved",
       token: "old-t0k3n",
       server: `${SERVER}/`,
+      owner: "a-page-that-went",
       username: "astro",
       password: "app-left",
     }),
@@ -384,6 +388,50 @@ test("a new flow that replaces an approval another page left unsaved revokes its
     step: "waiting",
     token: "t0k3n",
   });
+});
+
+test("an approval is taken up only once the page that holds it is gone, never beside it (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  const page = await setup(server);
+  // A page that lives (it holds its lock) is saving its approval.
+  let leave = () => {};
+  await new Promise<void>((held) => {
+    void navigator.locks.request(
+      "astrotime-page-saving",
+      () =>
+        new Promise<void>((resolve) => {
+          leave = resolve;
+          held();
+        }),
+    );
+  });
+  const approval = JSON.stringify({
+    step: "approved",
+    token: "saving-t0k3n",
+    server: `${SERVER}/`,
+    owner: "saving",
+    username: "astro",
+    password: "app-pass",
+  });
+  page.secrets.values.set(PENDING_FLOW, approval);
+  expect(await hasPendingFlow(page.secrets, 0, page.page)).toBe(false);
+  expect(await page.signIn.resume()).toBe(false);
+  // Nor does a new flow here replace it, or revoke its app password.
+  void page.signIn.withNextcloud({ server: SERVER });
+  await page.reaches("waiting");
+  expect(page.secrets.values.get(PENDING_FLOW)).toBe(approval);
+  expect(server.requests.filter((r) => r.method === "DELETE")).toEqual([]);
+  await page.signIn.cancel();
+  expect(page.secrets.values.get(PENDING_FLOW)).toBe(approval);
+
+  // The page goes before saving it: the next page takes it up, as its own, and saves it.
+  leave();
+  const next = await setup(server, page);
+  expect(await hasPendingFlow(next.secrets, 0, next.page)).toBe(true);
+  expect(await next.signIn.resume()).toBe(true);
+  expect(next.signIn.state).toMatchObject({ step: "done", added: true });
+  expect(next.secrets.values.has(PENDING_FLOW)).toBe(false);
+  expect(server.requests.filter((r) => r.method === "DELETE")).toEqual([]);
 });
 
 test("an approval whose account cannot be saved, or that is cancelled, is revoked and forgotten (D121)", async () => {

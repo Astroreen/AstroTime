@@ -728,7 +728,13 @@ Decided while building PR 5a-3.
     does). Once approved, the entry holds the app password Nextcloud gave in
     the token's place until the account and its secret are saved, so a page
     that goes in between (discovery, the first write) loses nothing: the
-    next one saves it without a new flow. Saving fails because the server
+    next one saves it without a new flow. An approval has an owner, the page
+    that holds it; every page holds a Web Lock, `astrotime-page-<id>`, for as
+    long as it lives. Another page takes an approval up only when
+    `navigator.locks.query()` shows its owner's lock is not held (the page is
+    gone), and makes itself the owner under the flow's lock; only the owner
+    saves, forgets or revokes it, and a new flow never replaces an approval
+    whose owner lives. Saving fails because the server
     cannot be reached: the approval is held, and the next try saves it.
     Fails otherwise (no CalDAV server there), or the user cancels before it
     is saved: the app password is revoked and forgotten. A waiting flow is
@@ -1490,6 +1496,14 @@ Decided while closing the Deferred "Expanding long series from the middle".
   transaction, so both revoke it and the first one's new password stays
   unrevoked; reading the old secret and writing the new under one lock
   would close that.
+- **Login Flow across tabs, the rest** ([D121](#D121)) — what ownership
+  does not cover: a page frozen in the back/forward cache while it holds its
+  lock looks alive, so its approval waits for it to come back (Chromium
+  caches no page that holds a Web Lock, so not there); a browser without Web
+  Locks treats every owner as gone (the web store needs them anyway); two
+  pages that took up one waiting flow both poll it, and only one gets the
+  approval, the other closing as `elsewhere`; a new flow started while
+  another page saves its approval is not kept, so it lives in its page alone.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store
