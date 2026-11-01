@@ -79,6 +79,12 @@ export function publicHosts(value: string | undefined): PublicHost[] | undefined
     const host = splitHost(entry);
     const name = entry.replace(/:\d+$/, "").toLowerCase();
     // Spelled as browsers send it: lower case, punycode, no scheme or path.
+    // Browsers leave the default ports out of Host, so such an entry would never match.
+    if (host?.port === "80" || host?.port === "443") {
+      throw new Error(
+        `ASTROTIME_PUBLIC_HOST: "${entry}" names a default port, which browsers leave out of Host; list it as ${entry.replace(/:\d+$/, "")}`,
+      );
+    }
     if (entry === "*" || host === null || host.hostname !== name) {
       throw new Error(
         `ASTROTIME_PUBLIC_HOST: "${entry}" is not a host name like calendar.example.com or calendar.example.com:8443`,

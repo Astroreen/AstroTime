@@ -501,6 +501,8 @@ describe("the Host allowlist (D81)", () => {
 });
 
 test("ASTROTIME_PUBLIC_HOST lists host names, each with an optional port", () => {
+  expect(() => publicHosts("calendar.example.com:443")).toThrow(/list it as calendar.example.com/);
+  expect(() => publicHosts("calendar.example.com:80")).toThrow(/default port/);
   expect(publicHosts(undefined)).toBeUndefined();
   expect(publicHosts(" , ")).toBeUndefined();
   expect(publicHosts(" Calendar.example.com , cal.example.com:8443, [::1]:8080")).toEqual([
