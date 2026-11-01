@@ -22,6 +22,7 @@ import {
   followed,
   formOf,
   GoneError,
+  RefusedError,
   InDoubtError,
   newForm,
   noticeOf,
@@ -488,6 +489,25 @@ describe("saving writes pending changes through the store (D5)", () => {
     );
     expect(await store.objectAt(work.id, "meanwhile.ics")).toMatchObject({ pending: "create" });
     expect(await store.pending(tasks.id)).toEqual([]);
+
+    // Still there but no longer taking it: refused, nothing saved, and the
+    // dialog keeps the user's choice to change; never moved elsewhere unasked.
+    const chosenWork = { ...form, calendarId: work.id };
+    const save = (uid: string) =>
+      saveForm(
+        store,
+        { target: null, initial: null, form: chosenWork, scope: "all", untitled: "Reminder" },
+        { now: NOW, uid: () => uid },
+      );
+    await store.saveCalendar({ ...work, rights: { create: false, edit: true, delete: true } });
+    await expect(save("read-only")).rejects.toThrow(RefusedError);
+    await store.saveCalendar({ ...work, components: ["VTODO"], rights: ALL_RIGHTS });
+    await expect(save("tasks-only")).rejects.toThrow(RefusedError);
+    expect([
+      await store.objectAt(work.id, "read-only.ics"),
+      await store.objectAt(tasks.id, "read-only.ics"),
+    ]).toEqual([undefined, undefined]);
+    expect(await store.objectAt(work.id, "tasks-only.ics")).toBeUndefined();
 
     // No calendar left that takes it: gone, as the dialog says.
     await store.removeAccount(server.id);

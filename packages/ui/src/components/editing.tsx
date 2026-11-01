@@ -23,6 +23,7 @@ import {
   followed,
   formOf,
   GoneError,
+  RefusedError,
   InDoubtError,
   isOccurrence,
   itemOf,
@@ -209,9 +210,10 @@ export function useEditingState({
   const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
     write(rewriteTarget(store, target, ics));
 
-  /** Why a save did not land, for the user (D99): gone meanwhile, unclear, or failed. */
-  const failureOf = (error: unknown): "gone" | "inDoubt" | "failed" => {
+  /** Why a save did not land, for the user (D99): gone or refused meanwhile, unclear, or failed. */
+  const failureOf = (error: unknown): "gone" | "refused" | "inDoubt" | "failed" => {
     if (error instanceof GoneError) return "gone";
+    if (error instanceof RefusedError) return "refused";
     if (error instanceof InDoubtError) return "inDoubt";
     console.error(error);
     return "failed";
@@ -256,7 +258,11 @@ export function useEditingState({
               onChanged();
               resolve("saved");
             },
-            (error: unknown) => resolve(failureOf(error)),
+            // A move keeps its own calendar, which a new item's refusal is not about.
+            (error: unknown) => {
+              const failure = failureOf(error);
+              resolve(failure === "refused" ? "failed" : failure);
+            },
           );
         };
         const rights = rightsOf(byId(target.calendarId));

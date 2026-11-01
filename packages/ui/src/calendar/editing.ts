@@ -579,6 +579,15 @@ export class GoneError extends Error {
   override name = "GoneError";
 }
 
+/**
+ * The calendar chosen for a new item is still there but no longer takes it
+ * (read-only now, or its components changed): nothing is saved, and the
+ * dialog stays open for another calendar (foundation D122).
+ */
+export class RefusedError extends Error {
+  override name = "RefusedError";
+}
+
 /** The store's leader went as a change committed, and the change is not there to read (D99). */
 export class InDoubtError extends Error {
   override name = "InDoubtError";
@@ -706,15 +715,18 @@ export async function saveForm(
       uid: writes.uid(),
     });
     await changeLocal(store, async (local) => {
-      // The calendar the dialog chose may have gone while it was open: the
-      // calendar on this device stepping aside once a server's calendars
-      // came (foundation D122), or one deleted on the server. Read in this
-      // transaction, the item goes where the dialog then shows it going, the
-      // first calendar that takes it; with none left, it is gone.
+      // The calendars as they are now, in this transaction: the screen's
+      // list may not have caught up (foundation D122).
       const calendars = await local.calendars();
-      const into = calendars.some((calendar) => calendar.id === form.calendarId)
-        ? form.calendarId
-        : calendarsFor(calendars, form.kind)[0]?.id;
+      const chosen = calendars.find((calendar) => calendar.id === form.calendarId);
+      // Still there, but no longer taking it: the user picks again, since the
+      // dialog still shows it chosen and moving the item would surprise.
+      if (chosen && calendarsFor([chosen], form.kind).length === 0)
+        throw new RefusedError("The calendar chosen no longer takes this item.");
+      // Gone while the dialog was open (the calendar on this device stepping
+      // aside, one deleted on the server): the dialog shows the first that
+      // takes it instead, and it goes there; with none left, it is gone.
+      const into = chosen?.id ?? calendarsFor(calendars, form.kind)[0]?.id;
       if (!into) throw new GoneError("No calendar takes this item any more.");
       await local.save(into, ics);
     });
