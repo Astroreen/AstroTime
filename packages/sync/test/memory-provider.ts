@@ -1,6 +1,7 @@
 // A provider over an in-memory server, for the engine's paths a real server
 // will not take on demand: lost answers, failures of one object, outages.
 import {
+  ALL_RIGHTS,
   OfflineError,
   type Provider,
   type RemoteCalendar,
@@ -29,7 +30,7 @@ export function memoryServer(calendarUrl = "https://dav.example/cal/"): MemorySe
         name: "Cal",
         color: null,
         components: ["VEVENT", "VTODO"],
-        readOnly: false,
+        rights: ALL_RIGHTS,
       },
     ],
     beforeWrite: () => {},

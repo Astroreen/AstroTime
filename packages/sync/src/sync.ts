@@ -16,6 +16,7 @@ import type { Calendar, Store, StoredObject } from "@astrotime/storage";
  */
 export type Problem =
   | "read-only"
+  | "no-create"
   | "deletion-reverted"
   | "no-place"
   | "taken-unreadable"
@@ -109,8 +110,9 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
   for (const calendar of (await store.calendars(accountId)).filter((c) => urls.has(c.url))) {
     for (const object of await store.pending(calendar.id)) {
       await isolated(report, absolute(calendar, object.href), async () => {
-        if (calendar.readOnly) await settleReadOnly(store, provider, calendar, object, report);
-        else await upload(store, provider, calendar, object, report);
+        if (allowed(calendar, object.pending))
+          await upload(store, provider, calendar, object, report);
+        else await settleRefused(store, provider, calendar, object, report);
       });
     }
     await isolated(report, calendar.url, () => download(store, provider, calendar, report));
@@ -143,21 +145,33 @@ function absolute(calendar: Calendar, href: string): string {
   return new URL(href, calendar.url).href;
 }
 
+/** Whether the calendar's rights let a pending change of this kind go up (D37). */
+function allowed(calendar: Calendar, pending: StoredObject["pending"]): boolean {
+  const { rights } = calendar;
+  if (pending === "create") return rights.create;
+  if (pending === "delete") return rights.delete;
+  return rights.edit;
+}
+
 /**
- * A change in a calendar the server will not let us write: the server's
- * version comes back and ours goes to the Conflicts list, where the user can
- * copy it elsewhere. A creation has no server version to come back to; it
- * stays pending, reported, until the calendar is writable again.
+ * A change the calendar's rights do not let us make: the server's version
+ * comes back, and an edit of ours goes to the Conflicts list, where the user
+ * can copy it elsewhere. A creation has no server version to come back to;
+ * it stays pending, reported, until the calendar takes new items.
  */
-async function settleReadOnly(
+async function settleRefused(
   store: Store,
   provider: Provider,
   calendar: Calendar,
   object: StoredObject,
   report: SyncReport,
 ) {
+  const { rights } = calendar;
+  const readOnly = !rights.create && !rights.edit && !rights.delete;
   if (object.pending === "create")
-    throw new SyncProblem("read-only", `${calendar.name} is read-only on the server`);
+    throw readOnly
+      ? new SyncProblem("read-only", `${calendar.name} is read-only on the server`)
+      : new SyncProblem("no-create", `${calendar.name} takes no new items on the server`);
   const server = await provider.fetch(absolute(calendar, object.href));
   if (!server) {
     await store.removeObject(object.id);
@@ -173,7 +187,9 @@ async function settleReadOnly(
     report.errors.push({
       href: server.href,
       problem: "deletion-reverted",
-      detail: `${calendar.name} is read-only on the server`,
+      detail: readOnly
+        ? `${calendar.name} is read-only on the server`
+        : `${calendar.name} lets no item be deleted on the server`,
     });
   }
   try {
@@ -349,9 +365,9 @@ async function download(store: Store, provider: Provider, calendar: Calendar, re
     const mine = local.get(object.href);
     if (mine && mine.pending !== "none") {
       // Our own change is still pending (its upload was refused); it is
-      // merged on the next sync. In a read-only calendar it never can be: the
-      // server's version shows, ours goes to the Conflicts list.
-      if (!calendar.readOnly) {
+      // merged on the next sync. Where the calendar's rights refuse it, it
+      // never can be: the server's version shows, ours goes to the Conflicts list.
+      if (allowed(calendar, mine.pending)) {
         // Asked again next time: the server keeps reporting it until ours is merged.
         keepToken = true;
         continue;

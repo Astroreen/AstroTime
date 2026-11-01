@@ -55,8 +55,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `mergeObjects` — the three-way merge of a refused write;
     `differences`, the fields two versions differ in.
     → `plans/foundation.md#D6`, `plans/foundation.md#D107`
-  - `Provider` — the interface every provider implements.
-    → `plans/foundation.md#D37`
+  - `Provider` — the interface every provider implements;
+    `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a
+    calendar. → `plans/foundation.md#D37`
   - `SecretStore` — where a platform keeps credentials, never the store.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
@@ -64,7 +65,7 @@ When you add a package, app or module, add its line here in the same PR.
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
   - `Store` — accounts (with the calendar home discovery found, migration 5),
-    calendars, objects with pending local changes, conflicts; finds objects
+    calendars (with their rights, migration 7), objects with pending local changes, conflicts; finds objects
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `subscribe` — hears every write, for live queries.
       → `plans/foundation.md#D54`
@@ -110,6 +111,11 @@ When you add a package, app or module, add its line here in the same PR.
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
+  - `test/fixtures/` — calendar homes' `PROPFIND` answers from Nextcloud
+    (owned, shared read-only and read-write) and Radicale, for the rights
+    read from `current-user-privilege-set`; where each comes from:
+    [`README.md`](../packages/caldav/test/fixtures/README.md).
+    → `plans/foundation.md#D37`
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
   - `syncAll` — the one sync entry every shell calls: every account, joins
@@ -119,7 +125,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D90`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
-    Login Flow v2 approved in Chromium on Nextcloud's own pages.
+    Login Flow v2 approved in Chromium on Nextcloud's own pages, and on
+    Nextcloud a second user made for the run with calendars shared to it.
 
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
@@ -161,8 +168,11 @@ When you add a package, app or module, add its line here in the same PR.
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
+    - `rights.ts` — `rightsOf`: what the user may do in a calendar, the
+      one check of whether an item can be created, edited or deleted.
+      → `plans/foundation.md#D37`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
-      scopes offered and the writes to the store; `words.ts` — rules and
+      scopes and calendars offered and the writes to the store; `words.ts` — rules and
       reminders in words; `conflicts.ts` — the Conflicts list's two ways
       out. → `plans/foundation.md#D103`, `plans/foundation.md#D107`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),

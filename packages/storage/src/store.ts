@@ -1,6 +1,7 @@
 import {
   boundsOf,
   CalendarObject,
+  type CalendarRights,
   CalendarObjectError,
   ExpansionLimitError,
   isDone,
@@ -35,8 +36,13 @@ import * as schema from "./schema.ts";
 import { containsPattern, foldForSearch, titlesOf } from "./search.ts";
 
 export type Account = typeof schema.accounts.$inferSelect;
-export type Calendar = Omit<typeof schema.calendars.$inferSelect, "components"> & {
+export type Calendar = Omit<
+  typeof schema.calendars.$inferSelect,
+  "components" | "readOnly" | "rights"
+> & {
   readonly components: readonly Component[];
+  /** What the user may do in it (docs/plans/foundation.md#D37). */
+  readonly rights: CalendarRights;
 };
 export type StoredObject = typeof schema.objects.$inferSelect;
 export type Conflict = typeof schema.conflicts.$inferSelect;
@@ -169,10 +175,15 @@ export class Store {
 
   /** Adds a calendar, or updates the one with the same account and URL. Sync state is kept. */
   saveCalendar(
-    input: Pick<Calendar, "accountId" | "url" | "name" | "color" | "components" | "readOnly">,
+    input: Pick<Calendar, "accountId" | "url" | "name" | "color" | "components" | "rights">,
   ): Promise<Calendar> {
     return this.exclusive(async () => {
-      const values = { ...input, components: input.components.join(",") };
+      const values = {
+        ...input,
+        components: input.components.join(","),
+        rights: RIGHTS.filter((right) => input.rights[right]).join(","),
+        readOnly: !input.rights.edit,
+      };
       const [row] = await this.db
         .insert(schema.calendars)
         .values({ ...values, id: crypto.randomUUID() })
@@ -183,6 +194,7 @@ export class Store {
             color: values.color,
             components: values.components,
             readOnly: values.readOnly,
+            rights: values.rights,
           },
         })
         .returning();
@@ -741,6 +753,19 @@ function indexOf(object: CalendarObject) {
   };
 }
 
-function toCalendar(row: typeof schema.calendars.$inferSelect): Calendar {
-  return { ...row, components: row.components.split(",").filter(Boolean) as Component[] };
+const RIGHTS = ["create", "edit", "delete"] as const;
+
+function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
+  // An older build's tab writes `read_only` and not `rights`: where they
+  // disagree on editing, the fresher `read_only` wins.
+  const granted = rights?.split(",") ?? (readOnly ? [] : RIGHTS);
+  return {
+    ...row,
+    components: row.components.split(",").filter(Boolean) as Component[],
+    rights: {
+      create: granted.includes("create"),
+      edit: granted.includes("edit") && !readOnly,
+      delete: granted.includes("delete"),
+    },
+  };
 }

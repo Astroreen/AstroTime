@@ -12,6 +12,7 @@ import { applyMine, conflictViews, keepServer, type ConflictView } from "../cale
 import { addDays } from "../calendar/dates.ts";
 import type { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
+import { rightsOf } from "../calendar/rights.ts";
 import { alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
@@ -112,7 +113,8 @@ function ConflictCard({
     ...named.map((field) => t(`field.${field}` as "field.summary")),
     ...(named.length < view.fields.length ? [t("field.other")] : []),
   ];
-  const readOnly = view.calendar?.readOnly ?? false;
+  // Applying ours again is an edit of what the calendar holds (D37, D107).
+  const readOnly = view.calendar !== undefined && !rightsOf(view.calendar).edit;
   const shown = named.filter((field) => VALUED.has(field));
   return (
     <li aria-label={title} className="rounded-2xl bg-canvas p-3">

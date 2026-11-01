@@ -2,6 +2,7 @@
 // events and tasks around today, titled in English or Russian. No real
 // person's data. The web app loads it in its dev server only
 // (`?demo`, apps/web/src/main.tsx); it is not part of the production bundle.
+import { ALL_RIGHTS, NO_RIGHTS, type CalendarRights } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 
 import { addDays, nowIn } from "../calendar/dates.ts";
@@ -25,8 +26,8 @@ interface DemoCalendar {
   readonly name: Title;
   readonly color: string;
   readonly components: ("VEVENT" | "VTODO")[];
-  /** A calendar the account may not write (a subscription, a share). */
-  readonly readOnly?: boolean;
+  /** What the user may do in it (a share may allow less); every right by default. */
+  readonly rights?: CalendarRights;
   readonly items: (day: (offset: number) => string, language: Language, zone: string) => DemoItem[];
 }
 
@@ -307,7 +308,7 @@ const CALENDARS: readonly DemoCalendar[] = [
     color: "#c98a3d",
     components: ["VEVENT"],
     // A calendar shared read-only: its items open, but nothing in it can change.
-    readOnly: true,
+    rights: NO_RIGHTS,
     items: (day, l) => [
       event(
         "demo-festival",
@@ -326,7 +327,7 @@ export interface DemoData {
     readonly name: string;
     readonly color: string;
     readonly components: ("VEVENT" | "VTODO")[];
-    readonly readOnly: boolean;
+    readonly rights: CalendarRights;
     readonly items: readonly DemoItem[];
   }[];
 }
@@ -341,7 +342,7 @@ export function demoData(language: Language, today: string, timeZone: string): D
       name: calendar.name[language],
       color: calendar.color,
       components: calendar.components,
-      readOnly: calendar.readOnly ?? false,
+      rights: calendar.rights ?? ALL_RIGHTS,
       items: calendar.items(day, language, timeZone),
     })),
   };
@@ -373,7 +374,7 @@ export async function loadDemo(
       name: calendar.name,
       color: calendar.color,
       components: calendar.components,
-      readOnly: calendar.readOnly,
+      rights: calendar.rights,
     });
     for (const item of calendar.items) {
       const object = await store.saveFromServer(saved.id, {

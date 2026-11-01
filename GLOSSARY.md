@@ -14,6 +14,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   changes back. CalDAV is the first; Google and system calendars come later.
 - **Calendar** — one collection on a server (a CalDAV calendar). It may hold
   events, tasks or both (`supported-calendar-component-set`).
+- **Rights** — what the user may do to a calendar's items: create, edit,
+  delete (`CalendarRights`, foundation D37). A **read-only** calendar
+  grants none.
 - **Event** — a `VEVENT`: something that happens at a time.
 - **Task** — a `VTODO`: something to do, possibly with a due time. Never
   "todo" or "reminder" in code or UI.

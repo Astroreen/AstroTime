@@ -20,8 +20,9 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
-import type { Target } from "../calendar/editing.ts";
+import { deleteScopes, type Target } from "../calendar/editing.ts";
 import type { Formats } from "../calendar/format.ts";
+import { rightsOf } from "../calendar/rights.ts";
 import { alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
 import {
@@ -122,7 +123,9 @@ function Body({
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   const { item, object } = target;
-  const readOnly = calendar?.readOnly ?? true;
+  // Each action only where the calendar's rights allow it (D37).
+  const rights = rightsOf(calendar);
+  const canDelete = deleteScopes(target, rights).length > 0;
   const title = item.summary?.trim() || t("item.untitled");
   const times = timesOf(object, target.recurrenceId);
   const rule = repeatOf(object);
@@ -138,27 +141,27 @@ function Body({
   return (
     <>
       <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
-        {!readOnly && (
-          <>
-            <button
-              type="button"
-              className={dialogIcon}
-              aria-label={t("details.edit")}
-              title={t("details.edit")}
-              onClick={onEdit}
-            >
-              <EditIcon className="size-5" />
-            </button>
-            <button
-              type="button"
-              className={dialogIcon}
-              aria-label={t("details.delete")}
-              title={t("details.delete")}
-              onClick={onDelete}
-            >
-              <TrashIcon className="size-5" />
-            </button>
-          </>
+        {rights.edit && (
+          <button
+            type="button"
+            className={dialogIcon}
+            aria-label={t("details.edit")}
+            title={t("details.edit")}
+            onClick={onEdit}
+          >
+            <EditIcon className="size-5" />
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            className={dialogIcon}
+            aria-label={t("details.delete")}
+            title={t("details.delete")}
+            onClick={onDelete}
+          >
+            <TrashIcon className="size-5" />
+          </button>
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
@@ -282,12 +285,12 @@ function Body({
             </Row>
           )}
         </dl>
-        {readOnly && calendar && (
+        {!rights.edit && !canDelete && calendar && (
           <p role="note" className="mt-4 rounded-2xl bg-canvas p-3 text-[13px] text-ink-muted">
             {t("details.readOnly", { calendar: calendar.name })}
           </p>
         )}
-        {task && !readOnly && (
+        {task && rights.edit && (
           <div className="mt-5 flex flex-wrap gap-2">
             <button
               type="button"

@@ -23,7 +23,7 @@ import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { syncAccount } from "../src/index.ts";
-import { externalServer, startRadicale, type CalDavServer } from "./servers.ts";
+import { externalServer, startRadicale, type CalDavServer, type Credentials } from "./servers.ts";
 
 const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
   { name: "Radicale", start: startRadicale },
@@ -41,13 +41,16 @@ const task = (uid: string) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:20261101T080000Z\r\nSUMMARY:${uid}\r\nX-APPLE-SORT-ORDER:5\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`;
 
 /** One device: its own store, and an HTTP client whose network can be cut. */
-async function device(server: CalDavServer, calendarName: string) {
+async function device(
+  server: CalDavServer,
+  calendarName: string,
+  credentials: Credentials = { username: server.username, password: server.password },
+) {
   let online = true;
   const http: HttpClient = async (request) => {
     if (!online) throw new OfflineError("offline");
     return fetchClient()(request);
   };
-  const credentials = { username: server.username, password: server.password };
   const { homeUrl } = await CalDavProvider.discover(http, server.url, credentials);
   const provider = new CalDavProvider(http, credentials, homeUrl);
   const store = await Store.open(nodeDriver());
@@ -55,7 +58,7 @@ async function device(server: CalDavServer, calendarName: string) {
     provider: "caldav",
     name: server.name,
     serverUrl: server.url,
-    username: server.username,
+    username: credentials.username,
   });
   const sync = () => syncAccount(store, provider, account.id);
   const calendar = async () => {
@@ -110,9 +113,49 @@ describe.each(servers)(
         name,
         color: "#0082c9",
         components: ["VTODO"],
-        readOnly: false,
+        rights: { create: true, edit: true, delete: true },
       });
     });
+
+    // Nextcloud only: the tests know its sharing; Radicale's rights are a config file (fixtures cover them).
+    test.runIf(serverName === "Nextcloud")(
+      "a calendar shared read-only grants nothing, one shared read-write everything; a new item in the first waits (D37)",
+      async () => {
+        const [readOnly, readWrite] = [calendarName(), calendarName()];
+        const urls = [await server.mkcalendar(readOnly), await server.mkcalendar(readWrite)];
+        await server.share!(urls[0]!, "read");
+        const sharee = await server.share!(urls[1]!, "read-write");
+        const b = await device(server, readOnly, sharee);
+        await b.sync();
+        // Nextcloud lists a share in the sharee's own home, under a name of its own.
+        const shared = async (name: string) => {
+          const found = (await b.store.calendars()).find((c) =>
+            c.url.includes(`/${name}_shared_by_`),
+          );
+          if (!found) throw new Error(`${name} is not shared with ${sharee.username}`);
+          return found;
+        };
+        expect((await shared(readOnly)).rights).toEqual({
+          create: false,
+          edit: false,
+          delete: false,
+        });
+        expect((await shared(readWrite)).rights).toEqual({
+          create: true,
+          edit: true,
+          delete: true,
+        });
+
+        await b.store.saveLocal((await shared(readOnly)).id, event("refused"));
+        await b.store.saveLocal((await shared(readWrite)).id, event("taken"));
+        const report = await b.sync();
+        expect(report.errors.map((e) => e.problem)).toEqual(["read-only"]);
+        expect(report.uploaded).toBe(1);
+        expect((await b.store.pending((await shared(readOnly)).id)).map((o) => o.uid)).toEqual([
+          "refused",
+        ]);
+      },
+    );
 
     test("changes travel both ways between two devices: create, update, delete", async () => {
       const name = calendarName();

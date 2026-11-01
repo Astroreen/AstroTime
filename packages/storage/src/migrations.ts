@@ -80,6 +80,14 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE objects ADD COLUMN titles TEXT;
   `,
+  // 7: what the user may do in each calendar, finer than read-only
+  // (docs/plans/foundation.md#D37): `create,edit,delete` or some of them.
+  // A calendar that was writable had them all. `read_only` stays, written as
+  // "cannot edit", for a tab of an older build on the same store (D98).
+  `
+  ALTER TABLE calendars ADD COLUMN rights TEXT;
+  UPDATE calendars SET rights = CASE read_only WHEN 0 THEN 'create,edit,delete' ELSE '' END;
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

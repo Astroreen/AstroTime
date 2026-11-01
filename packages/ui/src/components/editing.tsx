@@ -16,7 +16,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  calendarsFor,
   changeLocal,
+  deleteScopes,
   deleteTarget,
   followed,
   formOf,
@@ -28,11 +30,11 @@ import {
   problemOf,
   saveForm,
   scopesFor,
-  writableFor,
   type Form,
   type Target,
 } from "../calendar/editing.ts";
 import { liveQuery } from "../calendar/live.ts";
+import { rightsOf } from "../calendar/rights.ts";
 import { ItemDetails } from "./item-details.tsx";
 import { ItemEditor, type EditorState } from "./item-editor.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
@@ -42,7 +44,7 @@ interface CreateOptions {
   readonly day: string | null;
   /** Minutes past midnight of a tapped slot of the time grid. */
   readonly at?: number;
-  /** The calendar (a task list) it goes in; the first writable one by default. */
+  /** The calendar (a task list) it goes in; the first that takes new items by default. */
   readonly calendarId?: string;
 }
 
@@ -159,11 +161,15 @@ export function useEditingState({
     );
   }, [store, detailsId]);
 
-  const writable = (kind: "event" | "task") => writableFor(calendars, kind);
+  const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
+  // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
+  const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
   const firstFor = (kind: "event" | "task") => {
     const list = writable(kind);
     return (list.find((c) => !hidden.has(c.id)) ?? list[0])?.id ?? null;
   };
+  /** The calendar the item being edited was in; none for a new item. */
+  const fromOf = (current: Editing) => byId(current.initial?.calendarId);
 
   const write = (work: Promise<unknown>) =>
     work.then(onChanged, (error: unknown) => console.error(error));
@@ -198,7 +204,7 @@ export function useEditingState({
     setEditing((current) => {
       if (!current) return current;
       // A kind its calendar cannot hold moves to the first calendar that can.
-      const fits = writable(form.kind).some((c) => c.id === form.calendarId);
+      const fits = writable(form.kind, fromOf(current)).some((c) => c.id === form.calendarId);
       const next = fits ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
       // A rule moves with the item's day (D105).
       const moved = followed(current.state.form, next);
@@ -247,8 +253,10 @@ export function useEditingState({
         },
       );
     };
-    const scopes = scopesFor(target, initial, state.form);
-    if (scopes.length === 0) run("all");
+    const scopes = scopesFor(target, initial, state.form, rightsOf(byId(state.form.calendarId)));
+    // Only a split could save it, and its calendar takes no new items (D37).
+    if (scopes === null) setEditing({ ...editing, state: { ...state, problem: "noSplit" } });
+    else if (scopes.length === 0) run("all");
     else setAsking({ action: "edit", kind: state.form.kind, scopes, run });
   };
 
@@ -268,7 +276,7 @@ export function useEditingState({
     setAsking({
       action: "delete",
       kind: target.item.kind,
-      scopes: isOccurrence(target) ? ["this", "following", "all"] : [],
+      scopes: isOccurrence(target) ? deleteScopes(target, rightsOf(byId(target.calendarId))) : [],
       run: (scope) => {
         setDetails(null);
         void write(deleteTarget(store, target, scope, Date.now()));
@@ -304,7 +312,7 @@ export function useEditingState({
     void write(rewrite(details, (current) => starTask(current, !starred, Date.now())));
   };
 
-  const calendar = details ? calendars.find((c) => c.id === details.calendarId) : undefined;
+  const calendar = byId(details?.calendarId);
   const dialogs = (
     <>
       <ItemDetails
@@ -320,7 +328,7 @@ export function useEditingState({
       />
       <ItemEditor
         state={editing?.state ?? null}
-        calendars={editing ? writable(editing.state.form.kind) : []}
+        calendars={editing ? writable(editing.state.form.kind, fromOf(editing)) : []}
         onChange={change}
         onSave={save}
         onClose={() => setEditing(null)}

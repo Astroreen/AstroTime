@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { liveQuery } from "../calendar/live.ts";
+import { rightsOf } from "../calendar/rights.ts";
 import {
   isSort,
   SORTS,
@@ -235,7 +236,7 @@ export function TasksScreen({
         // A new task in the list shown, undated, as Google Tasks' button makes one.
         <button
           type="button"
-          disabled={!lists.some((list) => list.id === selected && !list.readOnly)}
+          disabled={!lists.some((list) => list.id === selected && rightsOf(list).create)}
           aria-label={t("fab.create")}
           title={t("fab.create")}
           onClick={() => {
@@ -282,7 +283,9 @@ function ListCards({
   const undone = tasks?.undone ?? [];
   const completed = tasks?.completed ?? [];
   const showCompleted = open || completed.some((row) => row.stored.id === actions.found);
-  const readOnly = list.readOnly;
+  // Completing and starring are edits; adding one is a creation (D37).
+  const { create, edit } = rightsOf(list);
+  const readOnly = !edit;
   return (
     <>
       <div className="rounded-2xl bg-tile pb-2">
@@ -294,7 +297,7 @@ function ListCards({
             <MoreIcon className="size-5" />
           </button>
         </div>
-        {!readOnly && (
+        {create && (
           <button
             type="button"
             onClick={() => actions.add(list)}

@@ -59,8 +59,11 @@ export {
 } from "./layout.ts";
 export { differences, mergeObjects, sameObjects, type Merge } from "./merge.ts";
 export {
+  ALL_RIGHTS,
   AuthError,
+  NO_RIGHTS,
   OfflineError,
+  type CalendarRights,
   type Changes,
   type Provider,
   type RemoteCalendar,
