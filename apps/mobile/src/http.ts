@@ -58,8 +58,11 @@ export function nativeClient(
       // A hop to plain http the user did not type: as the web's proxy says of
       // a redirect elsewhere, so sign-in names the address to sign in with.
       if (codeOf(error) === "cleartext") {
-        const origin = /http:\/\/[^\s]+/.exec(String((error as Error).message))?.[0] ?? "";
-        throw new ProxyRefusedError(request, `other-server ${origin}`);
+        const origin = (error as { data?: { origin?: unknown } }).data?.origin;
+        throw new ProxyRefusedError(
+          request,
+          `other-server ${typeof origin === "string" ? origin : ""}`,
+        );
       }
       throw error;
     }

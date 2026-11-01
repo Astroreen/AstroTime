@@ -30,7 +30,8 @@ class HttpPlugin : Plugin() {
             try {
                 call.resolve(write(exchange.run(request)))
             } catch (error: ExchangeException) {
-                call.reject(error.message, error.code, error)
+                val data = if (error is CleartextRefused) JSObject().put("origin", error.origin) else null
+                call.reject(error.message, error.code, error, data)
             } catch (error: Throwable) {
                 // Anything at all (an OutOfMemoryError on a huge answer too):
                 // the call is answered, never left waiting.
@@ -52,7 +53,12 @@ class HttpPlugin : Plugin() {
             url = url,
             headers = headers.keys().asSequence().associateWith { headers.getString(it) ?: "" },
             body = call.getString("body"),
-            cleartext = call.getArray("cleartext")?.toList<String>()?.toSet() ?: emptySet(),
+            cleartext =
+                try {
+                    call.getArray("cleartext")?.toList<String>()?.toSet() ?: emptySet()
+                } catch (error: org.json.JSONException) {
+                    throw InvalidRequest("The cleartext origins are not a list of strings.", error)
+                },
         )
     }
 

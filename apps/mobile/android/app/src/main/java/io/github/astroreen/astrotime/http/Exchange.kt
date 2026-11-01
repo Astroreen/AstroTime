@@ -39,9 +39,16 @@ sealed class ExchangeException(val code: String, message: String, cause: Throwab
 /** The server could not be reached, or the answer broke off. */
 class Offline(message: String, cause: Throwable) : ExchangeException("offline", message, cause)
 
+/** The server's certificate was refused (untrusted, expired, another name): not offline. */
+class Untrusted(message: String, cause: Throwable) :
+    ExchangeException("certificate", message, cause)
+
 /** Plain http to an origin the user did not type. */
 class CleartextRefused(url: HttpUrl) :
-    ExchangeException("cleartext", "Plain http to ${origin(url)} is not an address the user typed.")
+    ExchangeException("cleartext", "Plain http to ${origin(url)} is not an address the user typed.") {
+    /** The hop's origin, handed to the app as data, not read from the message. */
+    val origin: String = origin(url)
+}
 
 class TooManyRedirects(url: String) :
     ExchangeException("redirects", "$url redirected more than $MAX_REDIRECTS times.")
@@ -101,6 +108,8 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
             val response =
                 try {
                     call.execute()
+                } catch (error: javax.net.ssl.SSLException) {
+                    throw Untrusted("$method $url: the server's certificate was refused.", error)
                 } catch (error: IOException) {
                     throw Offline("$method $url could not reach the server.", error)
                 }

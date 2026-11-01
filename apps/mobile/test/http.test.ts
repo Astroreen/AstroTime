@@ -79,10 +79,11 @@ test("the plugin's offline is OfflineError; a hop to plain http names its addres
   const cleartext = nativeClient(
     {
       request: async () => {
-        throw Object.assign(
-          new Error("Plain http to http://b.example:8080 is not an address the user typed."),
-          { code: "cleartext" },
-        );
+        // As Capacitor rejects: the plugin's code, and its data.
+        throw Object.assign(new Error("refused"), {
+          code: "cleartext",
+          data: { origin: "http://b.example:8080" },
+        });
       },
     },
     async () => [],

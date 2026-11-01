@@ -214,6 +214,20 @@ class ExchangeTest {
     }
 
     @Test
+    fun `a certificate the phone does not trust, or for another name, is told apart from offline`() {
+        val stranger = HeldCertificate.Builder().addSubjectAlternativeName("a.test").build()
+        val untrusted = MockWebServer().also {
+            it.useHttps(HandshakeCertificates.Builder().heldCertificate(stranger).build().sslSocketFactory())
+            it.start(LOOPBACK, 0)
+            servers += it
+        }
+        val refused = assertThrows(Untrusted::class.java) { run("PROPFIND", untrusted.at()) }
+        assertEquals("certificate", refused.code)
+        val misnamed = server(https = true)
+        assertThrows(Untrusted::class.java) { run("PROPFIND", misnamed.at("c.test")) }
+    }
+
+    @Test
     fun `an https to http hop is refused before anything is sent`() {
         val secure = server(https = true)
         val plain = server()
