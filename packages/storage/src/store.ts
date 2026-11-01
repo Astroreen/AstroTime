@@ -357,24 +357,50 @@ export class Store {
         ),
       );
     const undone: (UndoneTask & { key: string })[] = [];
+    const seen = new Set<string>();
     for (const object of candidates) {
-      let occurrence: Occurrence | null;
-      try {
-        occurrence = latestUndoneBefore(CalendarObject.parse(object.ics), day, timeZone);
-      } catch (error) {
-        if (error instanceof ExpansionLimitError) continue;
-        throw error;
-      }
+      seen.add(object.id);
+      const occurrence = this.undoneOccurrence(object, day, timeZone);
       if (occurrence) {
         // Ties by title, in code-unit order, the same on every platform.
         const key = `${wallClockOf(occurrence.end, timeZone)} ${occurrence.item.summary ?? ""}`;
         undone.push({ object, occurrence, key });
       }
     }
+    // Objects no longer candidates (done, deleted) leave the cache.
+    for (const id of this.undoneCache.keys()) if (!seen.has(id)) this.undoneCache.delete(id);
     return undone
       .toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
       .map(({ object, occurrence }) => ({ object, occurrence }));
   }
+
+  /**
+   * The occurrence an undone task counts by, remembered per object until its
+   * iCalendar, the day or the zone changes: the chip is asked again on every
+   * change to the store, and a series is expanded from its first occurrence.
+   * A series too dense to expand counts as none (foundation's Deferred
+   * "Expanding long series from the middle").
+   */
+  private undoneOccurrence(object: StoredObject, day: string, timeZone: string): Occurrence | null {
+    const known = this.undoneCache.get(object.id);
+    if (known && known.ics === object.ics && known.day === day && known.timeZone === timeZone) {
+      return known.occurrence;
+    }
+    let occurrence: Occurrence | null;
+    try {
+      occurrence = latestUndoneBefore(CalendarObject.parse(object.ics), day, timeZone);
+    } catch (error) {
+      if (!(error instanceof ExpansionLimitError)) throw error;
+      occurrence = null;
+    }
+    this.undoneCache.set(object.id, { ics: object.ics, day, timeZone, occurrence });
+    return occurrence;
+  }
+
+  private readonly undoneCache = new Map<
+    string,
+    { ics: string; day: string; timeZone: string; occurrence: Occurrence | null }
+  >();
 
   /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
   undated(calendarIds: readonly string[]): Promise<StoredObject[]> {

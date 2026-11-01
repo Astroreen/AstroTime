@@ -1,4 +1,4 @@
-import { StoreInUseError, type SqlDriver } from "../driver.ts";
+import { InsecureContextError, StoreInUseError, type SqlDriver } from "../driver.ts";
 import type { Request, Response } from "./protocol.ts";
 
 type Distribute<T> = T extends unknown ? Omit<T, "id"> : never;
@@ -29,6 +29,12 @@ function hold(name: string): Promise<() => void> {
  * `StoreInUseError` (docs/plans/foundation.md#deferred, "One store across tabs").
  */
 export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
+  // `isSecureContext` alone would do; Web Locks are what this code needs first.
+  if (!globalThis.isSecureContext || !("locks" in navigator)) {
+    throw new InsecureContextError(
+      "The web store needs a secure context (https, or localhost) for OPFS and Web Locks.",
+    );
+  }
   const release = await hold(name);
   const worker = new Worker(new URL("worker.ts", import.meta.url), {
     type: "module",

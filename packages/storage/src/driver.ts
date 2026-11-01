@@ -19,3 +19,11 @@ export interface SqlDriver {
 export class StoreInUseError extends Error {
   override name = "StoreInUseError";
 }
+
+/**
+ * The page is not a secure context (plain `http` beyond localhost), where
+ * browsers offer neither OPFS nor Web Locks, so the web store cannot open.
+ */
+export class InsecureContextError extends Error {
+  override name = "InsecureContextError";
+}

@@ -457,7 +457,18 @@ Decided while building PR 5a.
 - **Expanding long series from the middle** — `occurrencesBetween` walks a
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
-  or a cache comes when a real calendar hits it ([D33](#D33)).
+  or a cache comes when a real calendar hits it ([D33](#D33)). Until then
+  such a series shows nowhere: the views and the "N undone tasks" chip
+  leave it out, silently ([D55](#D55)).
+- **Past days and their undone tasks** — an undone task due before today
+  shows only in today's chip (design [D51](design.md#D51)), so a view of
+  last week shows none on the days they were due, as in Google Calendar;
+  showing them there too, marked overdue, is a later choice.
+- **Plain `http` beyond localhost** — browsers give OPFS and Web Locks only
+  to secure contexts, so the web store opens only over `https` or on
+  localhost; elsewhere the app says so instead of failing
+  (`InsecureContextError`). Self-hosting needs TLS in front (D40 already
+  asks for it); the dev server over the tailnet needs `https` too.
 - **Fixtures from Nextcloud's web calendar** — PR 4's "Done when" first
   asked for objects written by Nextcloud's web calendar; the recordings are
   of objects as Nextcloud serves them back. Recording what its web calendar

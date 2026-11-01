@@ -1,4 +1,4 @@
-export { StoreInUseError, type SqlDriver } from "./driver.ts";
+export { InsecureContextError, StoreInUseError, type SqlDriver } from "./driver.ts";
 export { NewerSchemaError, SCHEMA_VERSION } from "./migrations.ts";
 export {
   Store,

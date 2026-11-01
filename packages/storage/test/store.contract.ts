@@ -353,6 +353,24 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.undoneTasksBefore([], "2026-11-04", "Europe/Vilnius")).toEqual([]);
     });
 
+    test("the undone tasks follow a task that changes, however often they are asked", async () => {
+      const { store, calendar } = await setup();
+      const save = (fields: string, etag: string) =>
+        store.saveFromServer(calendar.id, { href: "t.ics", etag, ics: task("t", fields) });
+      const ask = async (day = "2026-11-04") =>
+        (await store.undoneTasksBefore([calendar.id], day, "UTC")).map((u) => u.occurrence.end);
+      await save("DUE;VALUE=DATE:20261102\r\n", '"1"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-03" }]);
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-03" }]);
+      await save("DUE;VALUE=DATE:20261101\r\n", '"2"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-02" }]);
+      expect(await ask("2026-11-01")).toEqual([]);
+      await save("DUE;VALUE=DATE:20261101\r\nSTATUS:COMPLETED\r\n", '"3"');
+      expect(await ask()).toEqual([]);
+      await save("DUE;VALUE=DATE:20261101\r\n", '"4"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-02" }]);
+    });
+
     test("a listener hears every write until it unsubscribes", async () => {
       const { store, calendar } = await setup();
       let heard = 0;

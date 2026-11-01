@@ -1,7 +1,7 @@
 // AstroTime's UI, the same in every app (docs/plans/foundation.md#D22): the
 // app brings the platform (its store, where preferences are kept, the user's
 // languages) and renders this.
-import { StoreInUseError, type Store } from "@astrotime/storage";
+import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
 import { useEffect, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 
@@ -40,7 +40,9 @@ export function AstroTime({ store, preferences, languages, timeZone }: AstroTime
     store.then(
       (opened) => live && setOpening({ status: "open", store: opened }),
       (error: unknown) => {
-        if (!(error instanceof StoreInUseError)) console.error(error);
+        if (!(error instanceof StoreInUseError || error instanceof InsecureContextError)) {
+          console.error(error);
+        }
         if (live) setOpening({ status: "failed", error });
       },
     );
@@ -75,19 +77,20 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
       </main>
     );
   }
-  const inUse = opening.error instanceof StoreInUseError;
+  const reason =
+    opening.error instanceof StoreInUseError
+      ? "inUse"
+      : opening.error instanceof InsecureContextError
+        ? "insecure"
+        : "failed";
   return (
     <main className="grid h-dvh place-items-center bg-canvas p-6 text-ink">
       <div
         role="alert"
         className="flex max-w-sm flex-col items-start gap-3 rounded-2xl bg-raised p-6"
       >
-        <h1 className="text-lg font-medium">
-          {t(inUse ? "store.inUse.title" : "store.failed.title")}
-        </h1>
-        <p className="text-sm text-ink-muted">
-          {t(inUse ? "store.inUse.body" : "store.failed.body")}
-        </p>
+        <h1 className="text-lg font-medium">{t(`store.${reason}.title`)}</h1>
+        <p className="text-sm text-ink-muted">{t(`store.${reason}.body`)}</p>
         <button
           type="button"
           onClick={() => location.reload()}
