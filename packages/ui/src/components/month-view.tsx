@@ -191,6 +191,8 @@ function DayTile({
           return (
             <div
               key={entry?.key ?? "undone"}
+              // Only places the item: the listitem inside belongs to the list.
+              role="none"
               className="absolute left-0 z-[1] px-[1.5px]"
               style={{
                 top: span.row * ROW,
