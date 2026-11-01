@@ -1,3 +1,4 @@
+import ICAL from "ical.js";
 import { describe, expect, test } from "vite-plus/test";
 
 import {
@@ -15,6 +16,7 @@ import {
   type Repeat,
   type Task,
 } from "../src/index.ts";
+import { movedRule } from "../src/repeat.ts";
 import { fixture, load } from "./support.ts";
 
 const NOW = Date.parse("2026-11-04T08:40:00Z");
@@ -1288,5 +1290,307 @@ describe("deleting with a scope (D11)", () => {
         recurrenceId: vilnius("2026-11-05T09:00:00"),
       }),
     ).toBeNull();
+  });
+});
+
+describe("a series' corners (D142)", () => {
+  const object = (...events: string[][]) => CalendarObject.parse(calendar(...events));
+  const mondays = [
+    "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+    "DTEND;TZID=Europe/Vilnius:20261102T100000",
+  ];
+
+  test("made timed, an all-day series' UNTIL is the end of its day in UTC; made all-day, a date", () => {
+    const allDay = object([
+      "DTSTART;VALUE=DATE:20261102",
+      "DTEND;VALUE=DATE:20261103",
+      "RRULE:FREQ=WEEKLY;UNTIL=20261123",
+    ]);
+    const timed = editItem(
+      allDay,
+      { time: { start: vilnius("2026-11-02T09:00:00"), end: vilnius("2026-11-02T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: { type: "date", date: "2026-11-02" } },
+    ).ics;
+    expect(timed).toContain("RRULE:FREQ=WEEKLY;UNTIL=20261123T215959Z\r\n");
+    expect(starts(timed)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+    const back = editItem(
+      CalendarObject.parse(timed),
+      {
+        time: {
+          start: { type: "date", date: "2026-11-02" },
+          end: { type: "date", date: "2026-11-03" },
+        },
+      },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    ).ics;
+    expect(back).toContain("RRULE:FREQ=WEEKLY;UNTIL=20261123\r\n");
+    expect(starts(back)).toEqual(["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]);
+  });
+
+  test("an occurrence named in another zone is excluded, and stays so, by its instant", () => {
+    const at16 = [
+      "DTSTART;TZID=Europe/Vilnius:20261102T160000",
+      "DTEND;TZID=Europe/Vilnius:20261102T170000",
+    ];
+    // 09:00 in New York is 16:00 in Vilnius: the occurrence of 9 November, moved to 18:00.
+    const moved = object(
+      [...at16, "RRULE:FREQ=WEEKLY;COUNT=4"],
+      [
+        "RECURRENCE-ID;TZID=America/New_York:20261109T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261109T180000",
+        "DTEND;TZID=Europe/Vilnius:20261109T190000",
+      ],
+    );
+    const recurrenceId = zonedTime("2026-11-09T09:00:00", "America/New_York");
+    const deleted = deleteItem(moved, { now: NOW, scope: "this", recurrenceId })!;
+    expect(starts(deleted)).toEqual([
+      "2026-11-02T16:00:00",
+      "2026-11-16T16:00:00",
+      "2026-11-23T16:00:00",
+    ]);
+    // An EXDATE in New York stays on its instant when the series is split before it.
+    const excluded = object([
+      ...at16,
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      "EXDATE;TZID=America/New_York:20261116T090000",
+    ]);
+    const { split } = editItem(
+      excluded,
+      { summary: "Later" },
+      { now: NOW, scope: "following", recurrenceId: vilnius("2026-11-09T16:00:00"), newUid: "v2" },
+    );
+    expect(starts(split!)).toEqual([
+      "2026-11-09T16:00:00",
+      "2026-11-23T16:00:00",
+      "2026-11-30T16:00:00",
+      "2026-12-07T16:00:00",
+    ]);
+    // As the other client wrote it (AGENTS.md rule 2).
+    expect(split).toContain("EXDATE;TZID=America/New_York:20261116T090000\r\n");
+  });
+
+  test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
+    const rdate = "RDATE;TZID=America/New_York:20261104T090000";
+    // And one of its own after the split below, which goes.
+    const source = () =>
+      object([
+        ...mondays,
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        rdate,
+        "RDATE;TZID=Europe/Vilnius:20261118T090000",
+      ]);
+    const { ics } = editItem(
+      source(),
+      { summary: "Renamed" },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain(`${rdate}\r\n`);
+    // Split after it, it stays in the old part as written; before it, it goes with the new one.
+    const after = editItem(
+      source(),
+      { summary: "Later" },
+      { now: NOW, scope: "following", recurrenceId: vilnius("2026-11-09T09:00:00"), newUid: "v2" },
+    );
+    expect(after.ics).toContain(`${rdate}\r\n`);
+    expect(after.ics).not.toContain("20261118T090000");
+    expect(after.split).not.toContain("America/New_York");
+    const before = deleteItem(source(), {
+      now: NOW,
+      scope: "following",
+      recurrenceId: vilnius("2026-11-16T09:00:00"),
+    })!;
+    expect(before).toContain(`${rdate}\r\n`);
+  });
+
+  test("all: a series every other week on two days keeps its pattern when it moves across its week", () => {
+    const source = object([...mondays, "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH"]);
+    // Thursday 5 November moved four days on, to Monday 9 November: each occurrence four days later.
+    const { ics } = editItem(
+      source,
+      { time: { start: vilnius("2026-11-09T09:00:00"), end: vilnius("2026-11-09T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-05T09:00:00") },
+    );
+    expect(starts(ics, "2026-11-01", "2026-12-15")).toEqual([
+      "2026-11-06T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-20T09:00:00",
+      "2026-11-23T09:00:00",
+      "2026-12-04T09:00:00",
+      "2026-12-07T09:00:00",
+    ]);
+  });
+
+  test("this and following from the first occurrence that shows is all of them", () => {
+    // The series' own first occurrence is excluded.
+    const source = () =>
+      object([...mondays, "RRULE:FREQ=WEEKLY", "EXDATE;TZID=Europe/Vilnius:20261102T090000"]);
+    const recurrenceId = vilnius("2026-11-09T09:00:00");
+    expect(deleteItem(source(), { now: NOW, scope: "following", recurrenceId })).toBeNull();
+    const { ics, split } = editItem(
+      source(),
+      { summary: "Renamed" },
+      { now: NOW, scope: "following", recurrenceId, newUid: "v2" },
+    );
+    expect(split).toBeNull();
+    expect(ics).toContain("SUMMARY:Renamed\r\n");
+    expect(starts(ics, "2026-11-01", "2026-11-17")).toEqual([
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+    ]);
+  });
+
+  test("given a time in another zone, a series keeps its zone (D104), and so its UNTIL", () => {
+    const source = object([...mondays, "RRULE:FREQ=WEEKLY;UNTIL=20261123T215959Z"]);
+    const newYork = (local: string) => zonedTime(local, "America/New_York");
+    // 09:00 in New York is 16:00 in Vilnius.
+    const { ics } = editItem(
+      source,
+      { time: { start: newYork("2026-11-02T09:00:00"), end: newYork("2026-11-02T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain("DTSTART;TZID=Europe/Vilnius:20261102T160000\r\n");
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;UNTIL=20261123T215959Z\r\n");
+  });
+
+  test("every other week, days shifted back across the week start shift it back; within a week, it stays", () => {
+    const source = () => object([...mondays, "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH"]);
+    // Monday 2 November two days earlier, to Saturday 31 October: each occurrence two days earlier.
+    const back = editItem(
+      source(),
+      { time: { start: vilnius("2026-10-31T09:00:00"), end: vilnius("2026-10-31T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    ).ics;
+    expect(back).toContain("WKST=SA");
+    expect(starts(back, "2026-10-25", "2026-11-30")).toEqual([
+      "2026-10-31T09:00:00",
+      "2026-11-03T09:00:00",
+      "2026-11-14T09:00:00",
+      "2026-11-17T09:00:00",
+      "2026-11-28T09:00:00",
+    ]);
+    // A day later, Monday and Thursday are Tuesday and Friday of the same weeks.
+    const within = editItem(
+      source(),
+      { time: { start: vilnius("2026-11-03T09:00:00"), end: vilnius("2026-11-03T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    ).ics;
+    expect(within).toContain("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,FR\r\n");
+  });
+
+  test("this and following: a cancelled exception before it removes its occurrence; another shows", () => {
+    const recurrenceId = vilnius("2026-11-09T09:00:00");
+    const before = (...lines: string[]) =>
+      object(
+        [...mondays, "RRULE:FREQ=WEEKLY"],
+        ["RECURRENCE-ID;TZID=Europe/Vilnius:20261102T090000", ...lines],
+      );
+    const cancelled = before(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "STATUS:CANCELLED",
+    );
+    expect(deleteItem(cancelled, { now: NOW, scope: "following", recurrenceId })).toBeNull();
+    const moved = before(
+      "DTSTART;TZID=Europe/Vilnius:20261103T120000",
+      "DTEND;TZID=Europe/Vilnius:20261103T130000",
+    );
+    expect(starts(deleteItem(moved, { now: NOW, scope: "following", recurrenceId })!)).toEqual([
+      "2026-11-03T12:00:00",
+    ]);
+  });
+
+  test("this and following: an RDATE of a period before it shows, so the series is split", () => {
+    const source = object([
+      ...mondays,
+      "RRULE:FREQ=WEEKLY",
+      "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+      "RDATE;VALUE=PERIOD:20261104T120000Z/PT2H",
+    ]);
+    const ended = deleteItem(source, {
+      now: NOW,
+      scope: "following",
+      recurrenceId: vilnius("2026-11-09T09:00:00"),
+    })!;
+    expect(starts(ended)).toEqual(["2026-11-04T14:00:00"]);
+  });
+
+  test("UNTIL moved between a zoned, a floating and an all-day start keeps its day", () => {
+    const rule = (text: string) => ICAL.Recur.fromString(text);
+    const floating = { type: "floating", local: "2026-11-02T09:00:00" } as const;
+    // Zoned to floating: 23:59:59 in Vilnius on the 23rd, on the wall clock.
+    expect(
+      movedRule(
+        rule("FREQ=WEEKLY;UNTIL=20261123T215959Z"),
+        vilnius("2026-11-02T09:00:00"),
+        floating,
+      ).until?.toString(),
+    ).toBe("2026-11-23T23:59:59");
+    // Floating to zoned: the end of that day in Vilnius, in UTC.
+    expect(
+      movedRule(
+        rule("FREQ=WEEKLY;UNTIL=20261123T235959"),
+        floating,
+        vilnius("2026-11-02T09:00:00"),
+      ).until?.toString(),
+    ).toBe("2026-11-23T21:59:59Z");
+    // Floating to all-day: the wall clock's day.
+    expect(
+      movedRule(
+        rule("FREQ=WEEKLY;UNTIL=20261123T235959"),
+        floating,
+        date("2026-11-02"),
+      ).until?.toString(),
+    ).toBe("2026-11-23");
+    // All-day to timed in New York: the date read as a day, its end there in UTC.
+    expect(
+      movedRule(
+        rule("FREQ=WEEKLY;UNTIL=20261123"),
+        date("2026-11-02"),
+        zonedTime("2026-11-02T09:00:00", "America/New_York"),
+      ).until?.toString(),
+    ).toBe("2026-11-24T04:59:59Z");
+  });
+
+  test("an RDATE of a period goes with the part of a split its start is in", () => {
+    const source = () =>
+      object([
+        ...mondays,
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        "RDATE;VALUE=PERIOD:20261104T120000Z/PT2H,20261118T120000Z/PT2H",
+      ]);
+    const recurrenceId = vilnius("2026-11-09T09:00:00");
+    const { ics, split } = editItem(
+      source(),
+      { summary: "Later" },
+      { now: NOW, scope: "following", recurrenceId, newUid: "v2" },
+    );
+    expect(ics).toContain("RDATE;VALUE=PERIOD:20261104T120000Z/PT2H\r\n");
+    expect(ics).not.toContain("20261118T120000Z");
+    expect(split).toContain("RDATE;VALUE=PERIOD:20261118T120000Z/PT2H\r\n");
+    expect(split).not.toContain("20261104T120000Z");
+    const ended = deleteItem(source(), { now: NOW, scope: "following", recurrenceId })!;
+    expect(ended).toContain("RDATE;VALUE=PERIOD:20261104T120000Z/PT2H\r\n");
+    expect(ended).not.toContain("20261118T120000Z");
+  });
+
+  test("an RDATE of a period is kept when the series is edited", () => {
+    const source = object([
+      ...mondays,
+      "RRULE:FREQ=WEEKLY;COUNT=3",
+      "RDATE;VALUE=PERIOD:20261104T120000Z/PT2H",
+      "RDATE;TZID=Europe/Vilnius:20261106T090000",
+    ]);
+    const { ics } = editItem(
+      source,
+      { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain("RDATE;VALUE=PERIOD:20261104T120000Z/PT2H\r\n");
+    expect(ics).toContain("RDATE;TZID=Europe/Vilnius:20261106T100000\r\n");
   });
 });
