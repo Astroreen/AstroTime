@@ -88,6 +88,10 @@ test("each reminder shows at its time, and only once however often the set comes
     ["call", "call · in 15 minutes"],
     ["review", "review · in 15 minutes"],
   ]);
+  // A set without "call" (an edit in flight), then with it again: still once.
+  reminders.schedule([set[1]!]);
+  reminders.schedule(set);
+  expect(shown().filter(([title]) => title === "call")).toHaveLength(1);
 });
 
 test("a new set replaces the old: a reminder gone does not show, one moved later shows then", () => {

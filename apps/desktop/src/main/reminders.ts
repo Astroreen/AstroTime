@@ -40,7 +40,7 @@ export function mainReminders(options: {
   let set: readonly ScheduledReminder[] = [];
   let cancel: (() => void) | null = null;
   /** Reminders shown, or dropped as too old, by id and time: one moved later shows again. */
-  const done = new Set<string>();
+  const done = new Map<string, number>();
 
   // Shows what is due (late by up to LATE_MS), drops what is older, and waits for the next.
   const arm = () => {
@@ -53,7 +53,7 @@ export function mainReminders(options: {
         cancel = clock.after(reminder.fireAt - now, arm);
         return;
       }
-      done.add(shownKey(reminder));
+      done.set(shownKey(reminder), reminder.fireAt);
       const late = now - reminder.fireAt;
       if (late > LATE_MS) continue;
       const { title, body, late: lateBody } = reminder.notification;
@@ -64,8 +64,10 @@ export function mainReminders(options: {
   return {
     schedule(reminders) {
       set = reminders.toSorted((a, b) => a.fireAt - b.fireAt);
-      const keys = new Set(set.map(shownKey));
-      for (const key of done) if (!keys.has(key)) done.delete(key);
+      // Kept while a set could still hold them (the late window), whatever
+      // the set says now: one that leaves and comes back is not shown twice.
+      const now = clock.now();
+      for (const [key, fireAt] of done) if (now - fireAt > LATE_MS) done.delete(key);
       arm();
     },
     wake: arm,

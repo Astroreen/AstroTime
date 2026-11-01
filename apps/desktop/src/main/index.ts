@@ -285,6 +285,10 @@ async function start() {
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
+      // The hidden window's page syncs on the main process's requests (D75):
+      // its timers (the sync's debounce, the store's work) must not be
+      // throttled to once a minute while it is hidden.
+      backgroundThrottling: false,
       // The page learns whether the system shows notifications (D76).
       additionalArguments: Notification.isSupported() ? [NOTIFICATIONS_ARGUMENT] : [],
     },
@@ -297,7 +301,8 @@ async function start() {
     event.preventDefault();
     // Where the desktop shows no tray (GNOME without an extension), a hidden
     // window could not be found again: it is minimized there instead.
-    if (trayless()) window?.minimize();
+    // Hidden only where a tray was made to bring it back.
+    if (trayless() || !tray) window?.minimize();
     else window?.hide();
   });
   window.on("closed", () => (window = undefined));
