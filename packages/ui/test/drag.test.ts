@@ -405,7 +405,7 @@ describe("a drop saved (foundation D113)", () => {
     };
   };
 
-  test("an occurrence asks all three scopes on its day, two on another; an item that does not repeat none", async () => {
+  test("an occurrence asks all three scopes on its day, two on another, as its rights allow; an item that does not repeat none", async () => {
     const { store, byName } = await demo();
     const work = byName("Work");
     const standUp = targetOf((await store.objectAt(work.id, "demo-standup.ics"))!, "2026-11-05");
@@ -420,6 +420,11 @@ describe("a drop saved (foundation D113)", () => {
       "this",
       "following",
     ]);
+    // A split is a new item: a calendar that takes none offers no "following" (D37).
+    const noCreate = { create: false, edit: true, delete: true };
+    expect(
+      scopesForTimes(standUp, moved(held, "move", 1440, timeZone)!, timeZone, noCreate),
+    ).toEqual(["this"]);
     const review = targetOf((await store.objectAt(work.id, "demo-review.ics"))!, "2026-11-04");
     const times = timesOf(review.object, null);
     expect(

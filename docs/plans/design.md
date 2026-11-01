@@ -344,10 +344,11 @@ the project.
 - **D111. Dragging and resizing, as Google Calendar's** (foundation
   [D14](foundation.md#D14), [D16](foundation.md#D16); what a drop writes:
   foundation [D113](foundation.md#D113)):
-  - **what drags**: every item of a calendar that can be written, in the
-    time grid (a block, a task's chip), the all-day strip and the Month; a
-    read-only calendar's items, the undone tasks chip and the Agenda's cards
-    do not. A tap still opens the details;
+  - **what drags**: every item of a calendar whose rights let it be edited
+    (foundation [D37](foundation.md#D37)), in the time grid (a block, a
+    task's chip), the all-day strip and the Month; a read-only calendar's
+    items, the undone tasks chip and the Agenda's cards do not. A tap still
+    opens the details;
   - **the press**: a mouse or a pen drags once it moves 4 px, so a click
     still opens; a finger drags after a long press of 500 ms held still
     (Google's Android app), and one that moves 8 px first scrolls the view
@@ -377,7 +378,8 @@ the project.
     that changes nothing writes nothing and asks nothing;
   - **an occurrence of a series** asks the scope with [D108](#D108)'s
     dialog and its rule: a new time on the same day offers all three, a
-    new day "This occurrence" and "This and following";
+    new day "This occurrence" and "This and following" ("This and
+    following" only where the calendar takes new items, D37);
   - **a press dragged over an empty column** sizes a new event from the
     first slot to the end of the last and opens the edit dialog with it
     ([D108](#D108)'s creating); one that never leaves its slot is a tap;
