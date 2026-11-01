@@ -159,7 +159,7 @@ export function CalendarScreen({
   const taskLists = (lists?.calendars ?? []).filter((calendar) =>
     calendar.components.includes("VTODO"),
   );
-  const { scheduler } = useAccounts();
+  const { platform, scheduler } = useAccounts();
   const editing = useEditingState({
     store,
     calendars: lists?.calendars ?? [],
@@ -228,6 +228,21 @@ export function CalendarScreen({
   });
   useEffect(() => onOpen((reminder) => void openReminder(reminder)), [onOpen]);
 
+  // The system's back button, where there is one (android D68): it closes
+  // what is open, the topmost first, and with nothing open the shell leaves
+  // the app. A dialog, the drawer, a menu or a popover closes as Escape
+  // closes it (Base UI marks the key used); then search, then the tasks screen.
+  const back = useEffectEvent((): boolean => {
+    const escape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    (document.activeElement ?? document.body).dispatchEvent(escape);
+    if (escape.defaultPrevented) return true;
+    if (searching) setSearching(false);
+    else if (tasksOpen) closeTasks();
+    else return false;
+    return true;
+  });
+  useEffect(() => platform.onBack?.(() => back()), [platform]);
+
   // Keys on a desktop: n or j for the next period, p or k for the previous,
   // t for today; d, x, w, m and a for the views, as Google Calendar's (design D88).
   useEffect(() => {
@@ -277,7 +292,7 @@ export function CalendarScreen({
     <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
-          <div className="relative isolate flex h-dvh flex-col bg-canvas text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
+          <div className="relative isolate flex h-dvh flex-col bg-canvas pt-(--inset-top) pr-(--inset-right) pb-(--inset-bottom) pl-(--inset-left) text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
             {searching && (
               <SearchBar query={query} onQuery={setQuery} onClose={() => setSearching(false)} />
             )}
@@ -429,7 +444,7 @@ export function CalendarScreen({
               )}
             </div>
             {searching && (
-              <div className="absolute inset-x-0 top-14 bottom-0 z-[75] overflow-y-auto bg-canvas">
+              <div className="absolute top-[calc(3.5rem+var(--inset-top))] right-(--inset-right) bottom-(--inset-bottom) left-(--inset-left) z-[75] overflow-y-auto bg-canvas">
                 <SearchResults
                   store={store}
                   calendarIds={ids ?? []}
@@ -443,7 +458,7 @@ export function CalendarScreen({
               </div>
             )}
             {phoneTasks && !searching && (
-              <div className="absolute inset-0 z-[75]">
+              <div className="absolute top-(--inset-top) right-(--inset-right) bottom-(--inset-bottom) left-(--inset-left) z-[75]">
                 <TasksScreen
                   store={store}
                   preferences={preferences}
@@ -459,7 +474,7 @@ export function CalendarScreen({
           </div>
           <Dialog.Portal>
             <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-            <Dialog.Popup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
+            <Dialog.Popup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised pt-(--inset-top) pb-(--inset-bottom) pl-(--inset-left) text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
               <Dialog.Title className="sr-only">{t("topBar.menu")}</Dialog.Title>
               <nav aria-label={t("topBar.menu")}>{drawer}</nav>
             </Dialog.Popup>

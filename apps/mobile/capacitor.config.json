@@ -5,6 +5,10 @@
   "plugins": {
     "CapacitorHttp": {
       "enabled": false
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
     }
   }
 }

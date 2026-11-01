@@ -1,5 +1,6 @@
 export {
   AuthError,
+  CertificateError,
   fetchClient,
   HttpError,
   ProxyRefusedError,

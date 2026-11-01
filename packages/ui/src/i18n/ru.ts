@@ -10,6 +10,9 @@ export const ru = {
     "Браузер хранит данные AstroTime только для страниц, открытых по https (или на localhost). Откройте AstroTime по его https-адресу.",
   "store.failed.title": "Не удалось открыть календарь",
   "store.failed.body": "Обновите страницу, чтобы попробовать ещё раз.",
+  "store.outdated.title": "Обновите Android System WebView",
+  "store.outdated.body":
+    "AstroTime хранит календарь на этом телефоне с помощью Android System WebView версии {{minimum}} или новее, а здесь версия {{version}}. Обновите Android System WebView в магазине приложений и откройте AstroTime снова.",
   "store.reload": "Обновить",
 
   "secrets.unprotected.title": "Нет связки ключей, чтобы защитить пароль",
@@ -47,6 +50,8 @@ export const ru = {
   "signIn.problem.address": "Это не веб-адрес. Введите его как cloud.example.com.",
   "signIn.problem.auth": "Неверное имя пользователя или пароль.",
   "signIn.problem.offline": "Сервер недоступен. Проверьте адрес и подключение.",
+  "signIn.problem.certificate":
+    "Сертификат этого сервера не доверен на этом устройстве, истёк или выдан для другого адреса. Если у сервера свой сертификат, установите на это устройство его центр сертификации.",
   "signIn.problem.not-allowed": "Администратор этого AstroTime не разрешил этот сервер.",
   "signIn.problem.other-server":
     "Этот сервер отправляет вас на {{location}}. Войдите с этим адресом.",

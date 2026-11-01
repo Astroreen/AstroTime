@@ -10,11 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "catalog:",
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
     "@astrotime/storage": "workspace:*",
     "@astrotime/ui": "workspace:*",
     "@capacitor/android": "catalog:",
+    "@capacitor/app": "catalog:",
+    "@capacitor/browser": "catalog:",
     "@capacitor/core": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

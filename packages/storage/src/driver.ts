@@ -64,3 +64,22 @@ export class CommitInDoubtError extends HandOverError {
 export class InsecureContextError extends Error {
   override name = "InsecureContextError";
 }
+
+/**
+ * The app's WebView is older than the web store needs (OPFS with synchronous
+ * access handles): Android's System WebView, which the user updates in their
+ * app store (docs/plans/android.md#D61). The shell, which knows its WebView,
+ * throws it instead of opening the store.
+ */
+export class OutdatedWebViewError extends Error {
+  override name = "OutdatedWebViewError";
+  /** The WebView's Chromium major version. */
+  readonly version: number;
+  /** The oldest the store works on. */
+  readonly minimum: number;
+  constructor(version: number, minimum: number) {
+    super(`The WebView is Chromium ${version}; the store needs ${minimum} or newer.`);
+    this.version = version;
+    this.minimum = minimum;
+  }
+}

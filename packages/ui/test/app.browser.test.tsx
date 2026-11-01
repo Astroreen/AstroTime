@@ -3,7 +3,7 @@
 // plainly when it cannot open the store.
 import type { HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
-import { InsecureContextError, Store } from "@astrotime/storage";
+import { InsecureContextError, OutdatedWebViewError, Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vite-plus/test";
@@ -218,6 +218,17 @@ test("a page that is not a secure context: a message in the user's language", as
   await expect.element(page.getByRole("button", { name: "Обновить" })).toBeInTheDocument();
 });
 
+test("a WebView too old for the store: says to update it, in the user's language (android D61)", async () => {
+  render(failing(new OutdatedWebViewError(104, 109)), ["ru-RU"]);
+  const alert = page.getByRole("alert");
+  await expect
+    .element(alert.getByRole("heading", { name: "Обновите Android System WebView" }))
+    .toBeInTheDocument();
+  expect(alert.element().textContent).toContain("версии 109 или новее, а здесь версия 104.");
+  // Reloading does not update it: no button that would do nothing.
+  expect(alert.getByRole("button").elements()).toEqual([]);
+});
+
 test("a store that does not open for another reason: the failure, not a blank page", async () => {
   const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
   cleanups.push(() => quiet.mockRestore());
@@ -377,4 +388,51 @@ test("Login Flow v2 in the UI: it waits, opens the page again, cancels, and fini
   document.dispatchEvent(new Event("visibilitychange"));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   expect((await store.accounts()).map((a) => a.username)).toEqual(["astro"]);
+});
+
+test("the back button closes what is open, the topmost first, then lets the shell leave (android D68)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  let back: (() => boolean) | null = null;
+  render(Promise.resolve(store), ["en-US"], {
+    onBack: (close) => {
+      back = close;
+      return () => {
+        if (back === close) back = null;
+      };
+    },
+  });
+  await expect.element(page.getByRole("button", { name: "Main menu" })).toBeInTheDocument();
+  const press = () => {
+    if (!back) throw new Error("The UI hears no back button.");
+    return back();
+  };
+
+  // The drawer, a dialog opened from the top bar, the editor of a new event.
+  await page.getByRole("button", { name: "Main menu" }).click();
+  await expect.element(page.getByRole("dialog", { name: "Main menu" })).toBeInTheDocument();
+  expect(press()).toBe(true);
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await expect.element(page.getByRole("dialog", { name: "Accounts" })).toBeInTheDocument();
+  expect(press()).toBe(true);
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect.element(page.getByRole("dialog", { name: "New event" })).toBeInTheDocument();
+  expect(press()).toBe(true);
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+
+  // Search, then the tasks screen.
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect.element(page.getByRole("button", { name: "Close search" })).toBeInTheDocument();
+  expect(press()).toBe(true);
+  await expect.element(page.getByRole("button", { name: "Close search" })).not.toBeInTheDocument();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect.element(page.getByRole("region", { name: "Tasks" })).toBeInTheDocument();
+  expect(press()).toBe(true);
+  await expect.element(page.getByRole("region", { name: "Tasks" })).not.toBeInTheDocument();
+
+  // Nothing open: the shell leaves the app.
+  expect(press()).toBe(false);
 });

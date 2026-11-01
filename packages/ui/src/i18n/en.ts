@@ -9,6 +9,9 @@ export const en = {
     "Your browser keeps AstroTime's data only for pages opened over https (or on localhost). Open AstroTime at its https address.",
   "store.failed.title": "Your calendar could not be opened",
   "store.failed.body": "Reload the page to try again.",
+  "store.outdated.title": "Update Android System WebView",
+  "store.outdated.body":
+    "AstroTime keeps your calendar on this phone with Android System WebView {{minimum}} or newer, and this one is {{version}}. Update Android System WebView in your app store, then open AstroTime again.",
   "store.reload": "Reload",
 
   "secrets.unprotected.title": "No keyring to keep your password safe",
@@ -47,6 +50,8 @@ export const en = {
   "signIn.problem.auth": "The user name or password is wrong.",
   "signIn.problem.offline":
     "The server could not be reached. Check the address and your connection.",
+  "signIn.problem.certificate":
+    "This server's certificate is not trusted on this device, has expired, or is for another address. If the server has a certificate of its own, install its CA on this device.",
   "signIn.problem.not-allowed": "This AstroTime's administrator has not allowed this server.",
   "signIn.problem.other-server":
     "This server sends you to {{location}}. Sign in with that address instead.",

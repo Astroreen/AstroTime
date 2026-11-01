@@ -110,3 +110,14 @@ export class ProxyRefusedError extends Error {
     this.location = this.reason === "other-server" ? location : null;
   }
 }
+
+/**
+ * The server's TLS certificate was refused: not trusted on this device (its
+ * own, or from a CA the user has not installed), expired, or for another
+ * name. Not offline: trying again does not help until the certificate or the
+ * device's trust changes. A platform whose HTTP tells it apart throws it
+ * (Android's plugin, docs/plans/android.md#D62); `fetch` cannot.
+ */
+export class CertificateError extends Error {
+  override name = "CertificateError";
+}

@@ -3,6 +3,7 @@
 // errors live here, outside React, so they are tested without a browser.
 import {
   CalDavProvider,
+  CertificateError,
   NoCalendarHomeError,
   ProxyRefusedError,
   startLoginFlow,
@@ -22,6 +23,8 @@ export type SignInProblem =
   | "auth"
   /** The server could not be reached. */
   | "offline"
+  /** The server's certificate is not trusted here, expired, or for another name (android D62). */
+  | "certificate"
   /** The web proxy does not carry this server (D20). */
   | "not-allowed"
   /** The server redirects to another one, at `location` (D39). */
@@ -275,6 +278,7 @@ function accountName(username: string, server: string): string {
 function problemOf(error: unknown, otherwise: SignInProblem): SignInProblem {
   if (error instanceof AuthError) return "auth";
   if (error instanceof OfflineError) return "offline";
+  if (error instanceof CertificateError) return "certificate";
   if (error instanceof ProxyRefusedError)
     return error.reason === "other-server" ? "other-server" : "not-allowed";
   if (error instanceof NoCalendarHomeError) return "not-caldav";
