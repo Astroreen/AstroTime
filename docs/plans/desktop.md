@@ -265,9 +265,11 @@ were checked on 2026-11-01.
 - **Notification actions** — snooze and "mark as done" on a reminder
   ([D76](#D76)).
 - **Moving to Electron 45 and later** — waits for nixpkgs ([D70](#D70)).
-- **A store's process that keeps ending** — it is started again each
-  time, without a limit; a database that crashes it on every open would
-  loop ([D73](#D73)).
+- **A store's process that keeps ending** — after three ends in a row
+  within 10 seconds of starting it is not started again, and the page shows
+  the store failed until the app restarts; telling the user why (a damaged
+  database, a full disk) and offering to start over comes later
+  ([D73](#D73)).
 
 ## PR plan
 

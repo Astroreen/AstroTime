@@ -23,6 +23,8 @@ export function netClient(session: Session): (request: HttpRequest) => Promise<N
 
 /** As Android's plugin bounds a call (android D62). */
 const HOP_CEILING_MS = 5 * 60_000;
+/** The largest answer kept: far beyond a calendar's REPORT, short of the window's memory. */
+const MAX_ANSWER_BYTES = 64 * 1024 * 1024;
 
 function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
   return new Promise((resolve, reject) => {
@@ -60,7 +62,22 @@ function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
     });
     exchange.on("response", (response) => {
       const chunks: Buffer[] = [];
-      response.on("data", (chunk) => chunks.push(chunk));
+      let size = 0;
+      response.on("data", (chunk) => {
+        size += chunk.length;
+        // The main process holds the window too: an answer past any calendar's size is refused.
+        if (size > MAX_ANSWER_BYTES) {
+          exchange.abort();
+          clearTimeout(ceiling);
+          reject(
+            new Error(
+              `${request.method} ${request.url}: the answer is larger than ${MAX_ANSWER_BYTES} bytes.`,
+            ),
+          );
+          return;
+        }
+        chunks.push(chunk);
+      });
       response.on("end", () => {
         clearTimeout(ceiling);
         resolve(
