@@ -54,7 +54,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+          # Drafts included: the tag lookup alone does not find a draft.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          if [ -n "$existing" ]; then
             echo "The Release ${GITHUB_REF_NAME} exists"
             exit 0
           fi
