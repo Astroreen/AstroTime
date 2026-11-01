@@ -33,7 +33,9 @@ export function webPlatform(store: Promise<Store>, name: string): Platform {
     pendingSignIn: secrets,
     // Best-effort storage may be evicted under pressure; asked once there is
     // an account. Chromium grants or refuses silently, Firefox asks the user.
-    keepData: () => void navigator.storage?.persist?.().catch(() => {}),
+    keepData: async () =>
+      Boolean(navigator.storage) &&
+      ((await navigator.storage.persisted()) || navigator.storage.persist()),
     // Each origin has its own store: the same app at another address starts empty.
     dataHome: location.host,
     // A tab of its own, which cannot reach back into this one.

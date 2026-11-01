@@ -725,16 +725,30 @@ Decided while building PR 5a-3.
     token gets the app password; the next page finds it and opens the dialog
     on its waiting step, polling again (`SignIn.resume`, `resumeLoginFlow`),
     without opening Nextcloud's page again ("Open the sign-in page again"
-    does). It is forgotten as the token is spent (approved), expires, fails,
-    or the user cancels; a page that took up a flow another page ended
-    closes its dialog (`elsewhere`), the account coming through the store.
-    The web and Android have a `pendingSignIn` (their secrets); the desktop,
-    whose window lives on while the browser is in front, has none.
+    does). Once approved, the entry holds the app password Nextcloud gave in
+    the token's place until the account and its secret are saved, so a page
+    that goes in between (discovery, the first write) loses nothing: the
+    next one saves it without a new flow. Saving fails because the server
+    cannot be reached: the approval is held, and the next try saves it.
+    Fails otherwise (no CalDAV server there), or the user cancels before it
+    is saved: the app password is revoked and forgotten. A waiting flow is
+    forgotten as it expires, fails or is cancelled; a page's load drops one
+    past its token's life, or unreadable, without opening the dialog
+    (`hasPendingFlow`). Forgetting compares the kept token and deletes under
+    a Web Lock (`astrotime-login-flow`), so a newer flow another page
+    started is never forgotten for an older one; the latest flow started is
+    the one kept. A page that took up a flow another page ended closes its
+    dialog (`elsewhere`), the account coming through the store. The web and
+    Android have a `pendingSignIn` (their secrets); the desktop, whose
+    window lives on while the browser is in front, has none.
   - **Eviction.** A browser may evict best-effort storage when the device runs
     short of space. Once the store holds an account, the UI calls the
-    platform's `keepData` once, the web's `navigator.storage.persist()`:
-    Chromium grants or refuses it silently (by engagement, a bookmark, an
-    installed app), Firefox asks the user. A refusal changes nothing else.
+    platform's `keepData`, the web's `navigator.storage.persist()` (unless
+    `persisted()` already says so): Chromium grants or refuses it silently
+    (by engagement, a bookmark, an installed app), Firefox asks the user. Its
+    answer is kept in the preferences (`astrotime.keepData`), and the UI
+    never asks again once answered, so a user who refused is not asked at
+    every visit. A refusal changes nothing else.
   - An insecure context (plain http beyond localhost) never opens the store
     and says so ([D20](#D20)), so it cannot lose anything.
 
@@ -1474,13 +1488,6 @@ Decided while closing the Deferred "Expanding long series from the middle".
   transaction, so both revoke it and the first one's new password stays
   unrevoked; reading the old secret and writing the new under one lock
   would close that.
-- **A sign-in that ends with its page** ([D121](#D121)) — a page that goes
-  between Login Flow's approval and the account saved (discovery, the first
-  write) loses the app password Nextcloud made: the token is spent, so the
-  next page has nothing to take up, and the user signs in again, leaving an
-  app password nobody uses until revoked in Nextcloud's security settings.
-  Keeping the approved credentials in `pendingSignIn` until the account is
-  saved would close it.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store

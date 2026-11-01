@@ -66,9 +66,11 @@ export interface Platform {
   /**
    * Asks that the store's data be kept, not evicted when the device runs
    * short of space: the web's `navigator.storage.persist()` (foundation
-   * D121). Called once the store holds an account.
+   * D121); resolves with whether it is. Called once the store holds an
+   * account, and never again once answered (the answer is kept in
+   * `preferences`), since Firefox asks the user.
    */
-  readonly keepData?: () => void;
+  readonly keepData?: () => Promise<boolean>;
   /**
    * Where the store lives, for a platform where the same app at another
    * address has a store of its own: the web's origin (foundation D121).

@@ -10,6 +10,7 @@ import { hasPendingFlow } from "../accounts/sign-in.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
+import { KEYS } from "../preferences.ts";
 import { RemoveAccountDialog } from "./remove-account.tsx";
 import { SignInDialog, type SignInRequest } from "./sign-in-dialog.tsx";
 
@@ -92,18 +93,22 @@ export function AccountsProvider({
   }, [platform]);
 
   // Once the store holds an account, the browser is asked to keep its data
-  // rather than evict it under pressure (D121).
+  // rather than evict it under pressure, once on this device: its answer is
+  // kept, granted or refused (D121).
   useEffect(() => {
-    const keep = platform.keepData;
-    if (!keep) return;
+    const { keepData, preferences } = platform;
+    if (!keepData || preferences.get(KEYS.keepData) !== null) return;
     let asked = false;
     return liveQuery(
       store,
       async () => (await store.accounts()).some((account) => account.provider !== "demo"),
       (some) => {
-        if (!some || asked) return;
+        if (!some || asked || preferences.get(KEYS.keepData) !== null) return;
         asked = true;
-        keep();
+        keepData().then(
+          (kept) => preferences.set(KEYS.keepData, kept ? "granted" : "refused"),
+          (error: unknown) => console.error(error),
+        );
       },
     );
   }, [platform, store]);

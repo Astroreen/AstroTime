@@ -57,6 +57,8 @@ export const KEYS = {
   settings: "astrotime.settings",
   taskList: "astrotime.taskList",
   taskSort: "astrotime.taskSort",
+  /** Whether the browser was asked to keep the store's data, and its answer (foundation D121). */
+  keepData: "astrotime.keepData",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */

@@ -24,7 +24,12 @@ test.afterAll(async () => {
 
 const accountName = () => `astro@${new URL(radicale.url).host}`;
 
-type Asks = typeof globalThis & { persistAsks: number; persistAsked: Promise<void> };
+type Asks = typeof globalThis & {
+  persistAsks: number;
+  persistAsked: Promise<void>;
+  /** The answer, as the app keeps it in its preferences. */
+  persistAnswer: Promise<string>;
+};
 
 /** Counts the app's asks to keep its data, from before any of its script runs. */
 async function countPersistAsks(page: Page): Promise<void> {
@@ -33,8 +38,15 @@ async function countPersistAsks(page: Page): Promise<void> {
     const persist = storage.persist.bind(storage);
     const asks = globalThis as Asks;
     let asked = () => {};
+    let answered: (value: string) => void = () => {};
     asks.persistAsks = 0;
     asks.persistAsked = new Promise((resolve) => (asked = resolve));
+    asks.persistAnswer = new Promise((resolve) => (answered = resolve));
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      setItem.call(this, key, value);
+      if (key === "astrotime.keepData") answered(value);
+    };
     storage.persist = () => {
       asks.persistAsks++;
       asked();
@@ -43,7 +55,7 @@ async function countPersistAsks(page: Page): Promise<void> {
   });
 }
 
-test("an account is there after the browser is closed and opened again, and the browser is asked to keep it", async ({
+test("an account is there after the browser is closed and opened again, and the browser is asked to keep it once", async ({
   baseURL,
 }) => {
   if (!baseURL) throw new Error("The config gives a baseURL.");
@@ -70,18 +82,24 @@ test("an account is there after the browser is closed and opened again, and the 
     await dialog.getByLabel("Password").fill(radicale.password);
     await dialog.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByRole("region", { name: accountName() })).toBeVisible();
-    // Asked once the store holds the account, and once only.
+    // Asked once the store holds the account; its answer is kept.
     await page.evaluate(() => (globalThis as Asks).persistAsked);
+    expect(await page.evaluate(() => (globalThis as Asks).persistAnswer)).toMatch(
+      /^(granted|refused)$/,
+    );
     expect(await page.evaluate(() => (globalThis as Asks).persistAsks)).toBe(1);
     await first.close();
 
     const again = await chromium.launchPersistentContext(profile, { baseURL, viewport: WIDE });
     const reopened = again.pages()[0] ?? (await again.newPage());
+    await countPersistAsks(reopened);
     await reopened.clock.setFixedTime(NOW);
     await reopened.goto("/");
     const account = reopened.getByRole("region", { name: accountName() });
     await expect(account.getByText(/^Synced at /)).toBeVisible();
     await expect(reopened.getByRole("button", { name: "Another CalDAV server" })).toHaveCount(0);
+    // Answered before: not asked again (Firefox would ask the user each time).
+    expect(await reopened.evaluate(() => (globalThis as Asks).persistAsks)).toBe(0);
     await again.close();
   } finally {
     await rm(profile, { recursive: true, force: true });
