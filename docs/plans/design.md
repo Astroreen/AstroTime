@@ -47,8 +47,11 @@ the project.
 - **D47. An item's colour is its calendar's**, as the server gives it
   (Apple's `calendar-color` property, which `CalDavProvider` reads into
   `RemoteCalendar.color`), unless the item has its own RFC 7986 `COLOR`.
-  It is drawn darkened where white text needs it ([D120](#D120)); the
-  colour itself, stored and written back, stays the server's.
+  It is drawn darkened where white text needs it ([D120](#D120)): a pale
+  colour is drawn visibly darker, a yellow such as `#f6bf26` as a dark
+  olive, a pale cyan as a slate teal, as Google's own palette is dark
+  enough for white. The colour itself, stored and written back, stays the
+  server's.
 
 ### Read from the reference
 
@@ -457,8 +460,9 @@ the project.
     brighter when clipped. The first version of this pass made the text black or
     white instead, which put black text on the demo's green and blue,
     unlike the reference. A done task's fill is its colour mixed 45% into
-    the grid's and then darkened the same way (in the light theme it is
-    greyer, not lighter); it keeps its strike-through and its text is not
+    the grid's and then darkened the same way: in the dark theme it is darker,
+    in the light one greyer rather than lighter, still muted as D51 asks
+    (less colour than the item it was, with white text at 4.5:1); it keeps its strike-through and its text is not
     faded, as done items are not disabled: they reach 4.5:1 too. An item's
     time is set apart by its weight, not by opacity. The colour is drawn
     the same way wherever it shows (`.item-color`): the undone chip's mark,
