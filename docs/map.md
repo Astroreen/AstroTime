@@ -72,6 +72,10 @@ When you add a package, app or module, add its line here in the same PR.
     `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
     → `plans/foundation.md#D25`
     - `subscribe` — tells the store of writes made elsewhere.
+  - `port.ts` (`@astrotime/storage/port`) — the store over a MessagePort:
+    `portDriver` for the page, `portServer` (on `nodeConnection`) in the
+    process that owns the file, through the web leader's `serving`.
+    → `plans/desktop.md#D73`
   - `web/` — every tab on one store: the leader tab's worker (`worker.ts`)
     runs every tab's statements, one tab's transaction at a time
     (`serving.ts`), the drivers (`index.ts`) follow it and take over when it
@@ -87,6 +91,9 @@ When you add a package, app or module, add its line here in the same PR.
     ETags. → `plans/foundation.md#D2`
   - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`
   - `fetchClient`, `HttpClient` — how it reaches servers on each platform.
+  - `followRedirects` — the redirect rule over a one-hop client, for the
+    shells whose HTTP follows none (the desktop, Android).
+    → `plans/desktop.md#D72`, `plans/android.md#D62`
   - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
@@ -135,6 +142,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D95`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe`, `useNow`, `useMediaQuery`.
+  - `preferences.ts` — `Preferences`, and `localPreferences` in
+    localStorage, the web's and the desktop's.
   - `settings.ts` — the drawer's settings, kept in the preferences and
     applied over the locale. → `plans/design.md#D96`
   - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
@@ -195,6 +204,26 @@ When you add a package, app or module, add its line here in the same PR.
     `MockWebServer` (`app/src/test/`). `src/http.ts` is its TypeScript side.
     → `plans/android.md#D62`
 
+- `apps/desktop` (`@astrotime/desktop`) — the Linux desktop app on
+  Electron: `pnpm --filter @astrotime/desktop build`, then `start` (the dev
+  shell runs nixpkgs' Electron). → `plans/desktop.md`
+  - `src/main/` — the main process: the window and its security settings,
+    `app://astrotime/` with the page's policy (`app-protocol.ts`), the IPC
+    handlers' checks (`checks.ts`), HTTP on `net.request` (`http.ts`), the
+    store's process (`store.ts`). → `plans/desktop.md#D71`,
+    `plans/desktop.md#D72`
+  - `src/store/` — the store's utility process, `node:sqlite` on
+    `astrotime.sqlite3` in userData. → `plans/desktop.md#D73`
+  - `src/preload/` and `src/bridge.ts` — the one object the page gets
+    (`window.astrotime`), and how the store's port reaches it.
+    → `plans/desktop.md#D71`
+  - `src/renderer/` — its `Platform` around `@astrotime/ui`, as the web's.
+  - `e2e/` — Playwright's Electron support under `xvfb-run`: the smoke test
+    (Radicale), HTTP's redirects, a private CA, and the window's screenshots
+    (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
+  - `electron-builder.yml` — packaging; CI builds the unpacked app.
+    → `plans/desktop.md#D78`
+
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
   static files, `/healthz`, the CalDAV proxy, the Host allowlist, the
   Content Security Policy with a nonce per answer; bundled into the Docker
@@ -209,6 +238,8 @@ When you add a package, app or module, add its line here in the same PR.
   isomorphic rule for the core). → `plans/foundation.md#D21`
 - `apps/web/playwright.config.ts` — the end-to-end tests
   (`pnpm --filter @astrotime/web e2e`). → `plans/foundation.md#D57`
+- `apps/desktop/playwright.config.ts` — the desktop's
+  (`xvfb-run -a pnpm --filter @astrotime/desktop e2e`). → `plans/desktop.md#D79`
 - `scripts/t3/` — `dev.sh` starts the web dev server and a local Radicale,
   `stop.sh` stops them, `smoke.sh` proves both. → `../scripts/t3/README.md`
 - `scripts/docs.test.ts` — checks the context library's routes.

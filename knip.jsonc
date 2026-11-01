@@ -9,11 +9,31 @@
     },
     "packages/storage": {
       // One driver per platform, each its own export; the worker is loaded by URL.
-      "entry": ["src/index.ts", "src/node.ts", "src/web/index.ts", "src/web/worker.ts"],
+      "entry": [
+        "src/index.ts",
+        "src/node.ts",
+        "src/port.ts",
+        "src/web/index.ts",
+        "src/web/worker.ts",
+      ],
     },
     "packages/sync": {
       // The integration tests start the dev shell's (or CI's) Radicale.
       "ignoreBinaries": ["radicale"],
+    },
+    "apps/desktop": {
+      // Electron's three parts and the store's utility process, each its own bundle (vite.config.ts).
+      "entry": [
+        "src/main/index.ts",
+        "src/store/index.ts",
+        "src/preload/index.ts",
+        "src/renderer/main.tsx",
+        "vite.config.ts",
+      ],
+      // Loaded by @vitejs/plugin-react when the React Compiler is on.
+      "ignoreDependencies": ["oxc-transform-react"],
+      // The private CA's test makes its certificates with the dev shell's (or CI's) tools.
+      "ignoreBinaries": ["openssl", "certutil"],
     },
     "apps/proxy": {
       "entry": ["src/main.ts", "vite.config.ts"],

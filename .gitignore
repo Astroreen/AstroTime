@@ -11,6 +11,8 @@ node_modules/
 
 # build outputs
 dist/
+# electron-builder's (apps/desktop)
+release/
 build/
 out/
 coverage/

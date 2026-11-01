@@ -152,6 +152,14 @@ were checked on 2026-11-01.
   `cleartext`, `redirects` (past 10) and `invalid` stay errors of their own.
   Reads and writes may take a minute, for a large calendar's `REPORT`.
 
+  _Since desktop PR D1:_ the redirect rule has one implementation,
+  `followRedirects` in `@astrotime/caldav`, over a client that makes one
+  exchange and returns a redirect as it came; the desktop's `net.request`
+  runs under it ([desktop D72](desktop.md#D72)), and the plugin can do the
+  same, each hop returned with OkHttp's redirects off and the adapter
+  following them. It closed the Deferred "one redirect loop for the native
+  shells".
+
 - **D63. The store: sqlite-wasm on OPFS in the WebView.** _Changes
   foundation's [D25](foundation.md#D25)_, which named
   `@capacitor-community/sqlite`. The Android WebView is Chromium, and OPFS
@@ -361,11 +369,11 @@ were checked on 2026-11-01.
 - **System calendars** — foundation's Deferred (`CalendarContract`).
 - **The app's icon and splash screen** — Capacitor's placeholders until
   AstroTime has a design for them ([D61](#D61)).
-- **One redirect loop for the native shells** — a shared redirect loop in
-  `@astrotime/caldav` over a one-hop `HttpClient`, so Android's plugin and
-  the desktop's `net.request` follow one implementation of the redirect rule
-  of [D62](#D62) and [desktop D72](desktop.md#D72) instead of one each
-  (from the review of the platform plans).
+- **One redirect loop for Android too** — the desktop follows redirects
+  through `followRedirects` in `@astrotime/caldav` ([desktop D72](desktop.md#D72));
+  Android's plugin still follows them itself, in Kotlin, by the same rule
+  ([D62](#D62)). Making the plugin one hop at a time under the shared loop
+  would leave one implementation.
 
 ## PR plan
 

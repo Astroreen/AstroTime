@@ -1,0 +1,11 @@
+{
+  // The page: the browser's types only, as a sandboxed renderer has nothing else.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noUncheckedSideEffectImports": false
+  },
+  "include": ["src/renderer", "src/bridge.ts"]
+}

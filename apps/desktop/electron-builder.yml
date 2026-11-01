@@ -1,0 +1,15 @@
+# electron-builder (docs/plans/desktop.md#D78). The app's parts are bundled
+# into plain files (vite.config.ts), so nothing from node_modules is packed
+# and nothing native is rebuilt. CI builds the unpacked app on every PR
+# (`--dir`, D79); the AppImage and deb, the fuses and the release come with PR D4.
+appId: io.github.astroreen.astrotime
+productName: AstroTime
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+npmRebuild: false
+linux:
+  executableName: astrotime
+  category: Office

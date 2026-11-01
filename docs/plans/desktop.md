@@ -1,7 +1,8 @@
 # Desktop plan
 
-Status: **planned** — decided, not yet built; it starts after the Android
-app ([`android.md`](android.md)), as foundation's [D12](foundation.md#D12)
+Status: **in progress** — PR D1 (the shell, the store and HTTP) is built;
+PR D2–D4 are decided, not yet built. It follows the Android app
+([`android.md`](android.md)), as foundation's [D12](foundation.md#D12)
 orders the platforms. This plan owns the Linux desktop app, `apps/desktop`
 (foundation's [D22](foundation.md#D22), [D23](foundation.md#D23)). The
 platform interfaces it implements are named once, in
@@ -38,6 +39,17 @@ were checked on 2026-11-01.
   developer and CI run the same Electron. Everything this plan needs exists
   in 44 (the asynchronous `safeStorage`, `utilityProcess`, `net`).
 
+  _Landed in PR D1:_ the dev shell's nixpkgs (devenv's rolling,
+  nixpkgs-unstable of October 2026) has `electron_44` at 44.3.0 as its
+  newest (its plain `electron` is 43); npm's `electron` is pinned in the
+  catalog to 44.10.0, the newest 44 pnpm's minimum release age lets in. CI
+  and the packages run npm's, the dev shell nixpkgs': the same major, the
+  patch apart. One Vite config builds the parts as Vite environments
+  (`vp build`): the renderer (`src/renderer/`), the main process with the
+  store's utility process (`src/main/`, `src/store/`) as ES modules, and the
+  preload as one CommonJS script, as a sandboxed preload must be.
+  `app.setDesktopName` names the app id's `.desktop` file.
+
 - **D71. A sandboxed renderer with a narrow preload.** The renderer runs
   with `contextIsolation`, `sandbox` and `webSecurity` on and no Node
   integration (Electron's security checklist). Pages load from a
@@ -46,17 +58,29 @@ were checked on 2026-11-01.
   `contextBridge`, with exactly what the adapters need: `http(request)`
   ([D72](#D72)), `secrets` ([D74](#D74)),
   `reminders.schedule` ([D76](#D76)), `openExternal` for an `http(s)` URL
-  ([D77](#D77)), and an event for sync requests ([D75](#D75)); each IPC
+  ([D77](#D77)), an event for sync requests ([D75](#D75)), and
+  `connectStore()` for the store's port; each IPC
   handler checks its arguments and that the sender is the app's own page.
   The store's `MessagePort` ([D73](#D73)) cannot cross `contextBridge`: the
   main process sends it to the preload (`webContents.postMessage`), which
   passes it to the page with `window.postMessage` to the app's own origin.
+  The page asks for it (`connectStore()`) once it listens, on every load,
+  so a port never comes before the page can take it, and a reloaded page
+  gets a new one. PR D1 exposes `http`, `openExternal` and `connectStore`;
+  the rest join with the PRs that use them.
   The page then holds a port that runs SQL, as the web app holds its
   worker: the utility process answers only the store protocol's messages,
   and nothing but the app's own page, under the CSP, runs there.
-  The CSP is `default-src 'self'` with `connect-src 'self'`, `object-src
-  'none'`, `base-uri 'none'`: the renderer reaches no network itself, every
-  request goes through the main process. Navigation away from `app://` and
+  The CSP is the web's ([foundation D110](foundation.md#D110)) without what
+  only the web needs: `default-src 'none'; script-src 'self'; style-src
+  'self' 'nonce-…'; base-uri 'none'; form-action 'none'; frame-ancestors
+  'none'`, with a fresh nonce each time `app://` serves the page (for the
+  styles Base UI adds). No `connect-src`: the renderer reaches no network
+  itself, every request goes through the main process; no `worker-src` and
+  no `'wasm-unsafe-eval'`, since the store runs in its own process
+  ([D73](#D73)). _Changed in PR D1:_ this said `default-src 'self'` with
+  `connect-src 'self'` and `object-src 'none'`, written before D110 built
+  the web's policy from what the app does. Navigation away from `app://` and
   new windows are refused (links open in the system browser), permission
   requests are denied, and the fuses are set at packaging: `RunAsNode`,
   `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`
@@ -70,14 +94,24 @@ were checked on 2026-11-01.
   `HttpClient` sends each request over IPC to the main process, which makes
   it with Electron's `net.request`: Chromium's network stack, so the
   system's proxy settings and certificate store apply, as in a browser.
-  Not yet proven: that a self-hosted Nextcloud with its own CA works once
-  the system trusts it (Chromium on Linux reads NSS's database); PR D1
-  checks it.
+  A self-hosted server with its own CA works once the system trusts the
+  CA: _proven in PR D1_ on Electron 44.3.0, where `net.request` trusted a
+  test CA put in the user's NSS database (`~/.pki/nssdb`, where `certutil`
+  and Chromium's certificate settings put one) and, on its own, one added
+  to the system's bundle (`/etc/ssl/certs/ca-certificates.crt`, which
+  NixOS's `security.pki` and Debian's `update-ca-certificates` write), and
+  refused the same server with neither (`ERR_CERT_AUTHORITY_INVALID`,
+  offline to the app). `apps/desktop/e2e/private-ca.spec.ts` keeps the
+  first in CI.
   Any method and header passes (`PROPFIND`, `REPORT`, `MKCALENDAR`). The
-  request uses `redirect: "manual"` and the adapter follows redirects
-  itself, up to 10, so it knows the URL that answered (the `HttpResponse`
-  contract) and drops `Authorization` when a redirect leaves the origin, as
-  `fetch` does. It runs in an in-memory session of its own with
+  request uses `redirect: "manual"`: each `net.request` is one hop, whose
+  `redirect` event is taken as the answer and not followed, and
+  `followRedirects` in `@astrotime/caldav` follows redirects over it by the
+  rule of [android D62](android.md#D62), up to 10, so it knows the URL that
+  answered (the `HttpResponse` contract) and drops `Authorization` when a
+  redirect leaves the origin, as `fetch` does. Chromium refuses its unsafe
+  ports (6000 and 10080 among them) before connecting: a server on one is
+  offline to the app. It runs in an in-memory session of its own with
   `credentials: "omit"`: no cookies are kept or sent, and no login dialog
   appears. Rejected: `net.fetch`, whose `Response.url` is documented as
   wrong (empty); Node's `fetch`, which uses Node's CA store and ignores the
@@ -88,15 +122,27 @@ were checked on 2026-11-01.
 - **D73. The store in a utility process.** `node:sqlite` ([D25](foundation.md#D25))
   runs in an Electron `utilityProcess` that owns the database file
   (`astrotime.sqlite3` in `userData`). The main process hands the renderer
-  a `MessagePort` to it at start, through the preload ([D71](#D71)), and the renderer's `SqlDriver` speaks the
-  web worker's messages (`packages/storage/src/web/protocol.ts`) over that
-  port, so the web's driver serves both with the port as its only
-  difference. `DatabaseSync` is synchronous: in the main process a long
+  a `MessagePort` to it, through the preload ([D71](#D71)). _Changed in
+  PR D1:_ this said the web's driver would serve both, the port its only
+  difference; the web's driver has since become a leader and its followers
+  over a `BroadcastChannel` and Web Locks ([foundation D98](foundation.md#D98)),
+  which a port needs none of. So the port has a driver of its own,
+  `portDriver` (`@astrotime/storage/port`): it sends the web protocol's
+  statements (`Request` in `packages/storage/src/web/protocol.ts`) and takes
+  their `result`s, and the utility process answers them through the same
+  `serving` the web's leader runs (`portServer` on `nodeConnection`): one
+  page's transaction at a time, and a page that goes mid-transaction (a
+  reload, a crash) is rolled back and holds no one. No leader moves and
+  nobody is told of a commit: one window, one page. `DatabaseSync` is synchronous: in the main process a long
   write (a first sync of a large calendar) would freeze every window and
   every IPC call; in the utility process it blocks only itself. The
-  renderer cannot open files (sandbox, [D71](#D71)). That `node:sqlite`
-  loads in a utility process on Electron 44 is not yet proven; PR D1 proves
-  it first, and the fallback is the main process behind the same port.
+  renderer cannot open files (sandbox, [D71](#D71)). _Proven in PR D1:_
+  `node:sqlite` loads in a utility process on Electron 44.3.0 (Node 24.20.0,
+  SQLite 3.53.4) and on CI's 44.10.0, from the packed asar too; the
+  fallback, the main process behind the same port, was not needed. A
+  database that does not open answers every statement with why, so the page
+  says the store did not open; a process that ends is started again, and
+  the page reloads onto it.
 
 - **D74. Credentials through `safeStorage`, and said so when unprotected.**
   Passwords (app passwords included) are encrypted with the asynchronous
@@ -145,6 +191,8 @@ were checked on 2026-11-01.
   hour, saying when it was due; an older one is dropped. Reminders do not
   fire while the app is not running, as in a browser; closing the window
   does not stop them ([D75](#D75)).
+  _Until PR D3_ the desktop hands the UI a scheduler whose notifications
+  are unsupported, so the setting stays off and says why.
 
 - **D77. Login Flow v2 in the system browser.** The login page opens with
   `shell.openExternal`, where the user's password manager and second factor
@@ -184,6 +232,21 @@ were checked on 2026-11-01.
   ([D70](#D70)), since Electron's downloaded binary does not run there.
   Packaging is CI's job: AppImage tooling is not run in the dev shell.
 
+  _Landed in PR D1:_ two jobs in the aggregate `CI`: `Build desktop`
+  (`vp build`, then `electron-builder --linux --dir`) and `Desktop smoke
+  test` (`apps/desktop/e2e` under `xvfb-run`). Beside the smoke test, two
+  specs check the main process's HTTP through the page's bridge against
+  real servers: redirects (the URL that answered, `Authorization` dropped
+  for another host or port, no cookie kept) and the private CA of
+  [D72](#D72); the window's screenshots run on demand. pnpm never runs
+  Electron's install script (`allowBuilds`), so only the smoke test's job
+  fetches its binary, and that job gives Chromium's sandbox its user
+  namespaces back (`kernel.apparmor_restrict_unprivileged_userns=0`; Ubuntu
+  24.04 keeps them from binaries AppArmor has no profile for). The dev
+  shell's `ELECTRON_OVERRIDE_DIST_PATH` names nixpkgs' wrapper
+  (`${pkgs.electron_44}/bin`), which sets up GTK's modules and the sandbox
+  helper, and the shell adds `xvfb-run` and `certutil` for the tests.
+
 ## Deferred
 
 - **Auto-update** — electron-updater can update an AppImage (and a deb
@@ -202,6 +265,9 @@ were checked on 2026-11-01.
 - **Notification actions** — snooze and "mark as done" on a reminder
   ([D76](#D76)).
 - **Moving to Electron 45 and later** — waits for nixpkgs ([D70](#D70)).
+- **A store's process that keeps ending** — it is started again each
+  time, without a limit; a database that crashes it on every open would
+  loop ([D73](#D73)).
 
 ## PR plan
 
