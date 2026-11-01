@@ -6,6 +6,7 @@
 // newer version is offered quietly, then runs once the user reloads into it.
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -157,12 +158,61 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
     const proxied = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
     await page.reload();
-    const answer = await proxied;
-    expect([answer.fromServiceWorker(), answer.status()]).toEqual([true, 200]);
+    const served = await proxied;
+    expect([served.fromServiceWorker(), served.status()]).toEqual([true, 200]);
+    await expect(planning(page)).toBeVisible();
+
+    // Lie-fi: the server takes the request and never answers. The worker
+    // waits a bounded moment, then the kept page answers; nothing here waits
+    // on a clock, the reload's own load is the event.
+    await close(server);
+    server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+    const stalled = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
+    await page.reload();
+    expect((await stalled).fromServiceWorker()).toBe(true);
     await expect(planning(page)).toBeVisible();
     expect(violations).toEqual([]);
   } finally {
     await close(server);
+  }
+});
+
+test("a page that answers by a redirect (a sign-on in front, a slash added) is never kept: the install fails, keeping nothing", async ({
+  page,
+  radicale,
+}) => {
+  // The app's server, behind a front that sends anything but a navigation to
+  // `/` on to a login page, as a single sign-on proxy does to a worker's fetch.
+  const app = createAppServer({ root: DIST, allow: [new URL(radicale.url).origin] });
+  const front = createServer((request, answer) => {
+    if (request.url === "/login") {
+      answer.writeHead(200, { "Content-Type": "text/html" }).end("<!doctype html><p>Sign in");
+    } else if (request.url === "/" && request.headers["sec-fetch-mode"] !== "navigate") {
+      answer.writeHead(302, { Location: "/login" }).end();
+    } else {
+      app.emit("request", request, answer);
+    }
+  });
+  await new Promise<void>((resolve) => front.listen(0, "127.0.0.1", resolve));
+  const { port } = front.address() as AddressInfo;
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`);
+    await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
+    // The worker's end: activated, or redundant when its install failed.
+    const outcome = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      const worker = registration.installing ?? registration.waiting ?? registration.active!;
+      const done = () => worker.state === "activated" || worker.state === "redundant";
+      if (!done())
+        await new Promise<void>((resolve) =>
+          worker.addEventListener("statechange", () => done() && resolve()),
+        );
+      return { state: worker.state, caches: await caches.keys() };
+    });
+    expect(outcome).toEqual({ state: "redundant", caches: [] });
+  } finally {
+    await close(front);
   }
 });
 

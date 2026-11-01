@@ -522,7 +522,13 @@ Decided while building PR 7.
     the cache; the page comes from the network first (a fresh nonce, the
     preset) and from the cache when there is no network, or when what
     answers is a server error (a reverse proxy's 502, 503 or 504 while the
-    container is down). It answers only the app's own navigations, under
+    container is down), or when the network has not answered within three
+    seconds (a connection that stalls, lie-fi, may settle only after tens
+    of seconds). The network's page, when it comes, refreshes the kept one
+    in the background. Only the server's own page is ever kept: an `ok`,
+    `basic`, HTML answer that was not redirected (a sign-on's login page, a
+    slash added); a version whose page is not one fails its install and
+    keeps nothing. It answers only the app's own navigations, under
     its scope: a route of the single-page app, never `/dav-proxy/`, the
     health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
     of the app's origin, never a file it does not list. Activated, it
@@ -1866,6 +1872,13 @@ errors").
 - **AstroTime's own icon** ([D124](#D124)) — the web app's manifest
   carries a placeholder (a calendar with a check, on the dark canvas); the
   design gives the real one, for the web, Android and the desktop alike.
+- **A held approval's retries after a failure that is not offline**
+  ([D121](#D121)) — the tick retry counts only answers that leave it held;
+  one that ends otherwise does not re-arm it until `online` or a reload.
+- **An update offered to a page loaded by a hard reload** ([D124](#D124)) —
+  such a page has no controller, which `serviceWorkerUpdates` reads once at
+  start, so it never offers the waiting version; it gets it on the next
+  normal load.
 - **A preset on Android and the desktop** ([D123](#D123)) — they have no
   page served by an AstroTime server; a build-time or first-start preset
   comes if someone deploys them for one person.
