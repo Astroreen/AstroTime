@@ -408,6 +408,8 @@ async function record() {
       const ics = await served(await create(page));
       // Nothing of the machine that recorded it: the server's address never belongs in a fixture.
       if (/127\.0\.0\.1|localhost/.test(ics)) throw new Error(`${name} names the test server.`);
+      // Nothing that looks like an address of a person, either.
+      if (/[\w.+-]+@[\w-]+(\.[\w-]+)+/.test(ics)) throw new Error(`${name} has an e-mail address.`);
       writeFileSync(new URL(`nextcloud-web-${name}.ics`, FIXTURES), ics);
       console.log(`recorded nextcloud-web-${name}.ics`);
     }

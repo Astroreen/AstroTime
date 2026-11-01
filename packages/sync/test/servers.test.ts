@@ -305,9 +305,26 @@ describe.each(servers)(
         });
         expect(credentials!.password).not.toBe(server.password);
         // The app password is what AstroTime signs in with from now on.
-        const { homeUrl } = await CalDavProvider.discover(fetchClient(), server.url, credentials!);
-        const provider = new CalDavProvider(fetchClient(), credentials!, homeUrl);
-        expect((await provider.calendars()).map((c) => c.name)).toContain(name);
+        try {
+          const { homeUrl } = await CalDavProvider.discover(
+            fetchClient(),
+            server.url,
+            credentials!,
+          );
+          const provider = new CalDavProvider(fetchClient(), credentials!, homeUrl);
+          expect((await provider.calendars()).map((c) => c.name)).toContain(name);
+        } finally {
+          // The app password goes, as a user would revoke it: a long-lived
+          // server (not the nightly's) keeps no device per run.
+          const revoked = await fetch(new URL("ocs/v2.php/core/apppassword", server.url), {
+            method: "DELETE",
+            headers: {
+              "OCS-APIRequest": "true",
+              Authorization: `Basic ${Buffer.from(`${credentials!.username}:${credentials!.password}`).toString("base64")}`,
+            },
+          });
+          expect(revoked.status).toBe(200);
+        }
       },
     );
 
