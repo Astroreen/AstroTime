@@ -3,7 +3,7 @@
 // unreachable server, an address that is no CalDAV server; and what Login
 // Flow v2 waits through.
 import { AuthError, OfflineError } from "@astrotime/core";
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 
 import {
   CalDavProvider,
@@ -128,4 +128,50 @@ test("Login Flow v2 gives up on a server that keeps failing, and says so", async
   const flow = await startLoginFlow(http, "https://cloud.example.com");
   for (let i = 0; i < 4; i++) expect(await flow.poll()).toBeNull();
   await expect(flow.poll()).rejects.toThrow(/keeps answering 502/);
+});
+
+test("a server that stalls is offline past the ceiling, its answer trickling or not at all (D91)", async () => {
+  vi.useFakeTimers();
+  try {
+    const CEILING = 5 * 60_000;
+    // Neither fetch ends until it is aborted, as a server that never answers.
+    const silent = fetchClient({
+      timeoutMs: CEILING,
+      fetch: ((_input: unknown, init: RequestInit) =>
+        new Promise((_resolve, reject) =>
+          init.signal!.addEventListener("abort", () => reject(init.signal!.reason)),
+        )) as typeof fetch,
+    });
+    const trickling = fetchClient({
+      timeoutMs: CEILING,
+      fetch: (async (_input: unknown, init: RequestInit) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("<multistatus"));
+              init.signal!.addEventListener("abort", () => controller.error(init.signal!.reason));
+            },
+          }),
+        )) as typeof fetch,
+    });
+    const request = { method: "PROPFIND", url: "https://dav.example/", headers: {} };
+    const answers = [silent(request), trickling(request)];
+    for (const answer of answers) answer.catch(() => {});
+    await vi.advanceTimersByTimeAsync(CEILING - 1);
+    expect(vi.getTimerCount()).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    for (const answer of answers) {
+      await expect(answer).rejects.toThrow(OfflineError);
+      await expect(answer).rejects.toThrow("in time");
+    }
+    // An answer in time leaves no timer behind.
+    const quick = fetchClient({
+      timeoutMs: CEILING,
+      fetch: (async () => new Response("ok")) as typeof fetch,
+    });
+    expect((await quick(request)).body).toBe("ok");
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
