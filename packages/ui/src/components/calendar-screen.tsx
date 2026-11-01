@@ -1,5 +1,6 @@
-// The app shell around the views (design D46): the top bar, the drawer (a
-// sidebar on a wide screen), the view and the floating "+" button. The view
+// The app shell around the views (design D46): the top bar with the account
+// button, the drawer (a sidebar on a wide screen), the view and the floating
+// "+" button; the first-run screen while there is no account. The view
 // reads the local store only and follows its changes (docs/plans/foundation.md#D5).
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
@@ -22,6 +23,7 @@ import {
 } from "../calendar/views.ts";
 import { useEntries, useMediaQuery, useNow } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
+import { AccountButton, FirstRun } from "./accounts.tsx";
 import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
@@ -159,8 +161,12 @@ export function CalendarScreen({
         setHidden(next);
       }}
       colorOf={(calendar) => colorOfCalendar(calendar.id)}
+      onLeave={() => setDrawerOpen(false)}
     />
   );
+
+  // No account and no demo: the way in (docs/plans/foundation.md#D92).
+  if (lists && lists.accounts.length === 0) return <FirstRun />;
 
   return (
     <CalendarContext.Provider value={{ formats, timeZone, colorOf }}>
@@ -219,6 +225,7 @@ export function CalendarScreen({
             >
               <TodayIcon day={formats.dayNumber(today)} />
             </button>
+            <AccountButton accounts={lists?.accounts ?? []} />
           </header>
           <div className="flex min-h-0 flex-1">
             {wide && sidebarOpen && (

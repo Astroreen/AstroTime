@@ -1,13 +1,12 @@
-// The web app: the platform pieces (the web store, preferences in
-// localStorage, the browser's languages) around the shared UI
-// (docs/plans/foundation.md#D22).
+// The web app: its platform (`platform.ts`) and the browser's languages
+// around the shared UI (docs/plans/foundation.md#D22).
 import { Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { AstroTime } from "@astrotime/ui";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { preferences } from "./preferences.ts";
+import { webPlatform } from "./platform.ts";
 import "./index.css";
 
 const root = document.querySelector("#root");
@@ -29,11 +28,6 @@ async function openStore(): Promise<Store> {
 
 createRoot(root).render(
   <StrictMode>
-    <AstroTime
-      store={openStore()}
-      preferences={preferences}
-      languages={languages}
-      timeZone={timeZone}
-    />
+    <AstroTime platform={webPlatform(openStore())} languages={languages} timeZone={timeZone} />
   </StrictMode>,
 );

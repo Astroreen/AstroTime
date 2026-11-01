@@ -1,19 +1,19 @@
 // AstroTime's UI, the same in every app (docs/plans/foundation.md#D22): the
-// app brings the platform (its store, where preferences are kept, the user's
-// languages) and renders this.
+// app brings its platform (docs/plans/android.md#D60: the store, HTTP,
+// secrets, the system browser, where preferences are kept) and the user's
+// languages, and renders this.
 import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
 import { useEffect, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 
 import { localeSettings } from "./calendar/locale.ts";
+import { AccountsProvider } from "./components/accounts-context.tsx";
 import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { createI18n } from "./i18n/index.ts";
-import type { Preferences } from "./preferences.ts";
+import type { Platform } from "./platform.ts";
 
 export interface AstroTimeProps {
-  /** The local store, opening; created once, outside React. */
-  readonly store: Promise<Store>;
-  readonly preferences: Preferences;
+  readonly platform: Platform;
   /** The user's languages, most preferred first (`navigator.languages`). */
   readonly languages: readonly string[];
   /** The IANA zone the calendar is shown in; the device's by default. */
@@ -25,7 +25,8 @@ type Opening =
   | { readonly status: "open"; readonly store: Store }
   | { readonly status: "failed"; readonly error: unknown };
 
-export function AstroTime({ store, preferences, languages, timeZone }: AstroTimeProps) {
+export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
+  const { store, preferences } = platform;
   const [settings] = useState(() => localeSettings(languages));
   const [i18n] = useState(() => createI18n(settings.language));
   const [zone] = useState(() => timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -54,12 +55,19 @@ export function AstroTime({ store, preferences, languages, timeZone }: AstroTime
   return (
     <I18nextProvider i18n={i18n}>
       {opening.status === "open" ? (
-        <CalendarScreen
+        <AccountsProvider
+          platform={platform}
           store={opening.store}
-          preferences={preferences}
           settings={settings}
           timeZone={zone}
-        />
+        >
+          <CalendarScreen
+            store={opening.store}
+            preferences={preferences}
+            settings={settings}
+            timeZone={zone}
+          />
+        </AccountsProvider>
       ) : (
         <StoreMessage opening={opening} />
       )}
