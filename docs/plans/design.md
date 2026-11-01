@@ -707,7 +707,7 @@ are its decisions.
   - Settings' calendar groups become one **Accounts** group: each account
     with its avatar, name, how it syncs (text; the dialog's one live
     region says a sync, below) and its menu
-    (sign in again, remove; _since PR (d3)_ no "Sync now" there: it synced
+    (sign in again, remove; _since #58_ no "Sync now" there: it synced
     every account, from one account's menu, so the accounts dialog's own
     "Sync now", which says it is for every account, is the one way; one
     account's sync alone is [Deferred](#deferred)), then its calendars, then "Add

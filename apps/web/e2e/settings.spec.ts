@@ -168,33 +168,35 @@ test("the calendar on this device is named so in Settings (design D137)", async 
   await expect(russian.getByRole("checkbox", { name: "Личный" })).toBeChecked();
 });
 
+/** Opened to its end, a dialog's fade out made long, so it is looked at while it closes. */
+async function slowClosing(page: Page) {
+  await expect(page.locator("[data-starting-style]")).toHaveCount(0);
+  await page.addStyleTag({
+    content: "[data-ending-style] { transition-duration: 60s !important; }",
+  });
+}
+
+/** What is closing now: each element's role and its pointer events. */
+const ending = (page: Page) =>
+  page.locator("[data-ending-style]").evaluateAll((elements) =>
+    elements.map((element) => ({
+      role: element.getAttribute("role"),
+      pointerEvents: getComputedStyle(element).pointerEvents,
+    })),
+  );
+
 test("a closing dialog takes no pointer events, backdrop and popup alike (design D136)", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
-  // Each one's fade out made long, so it is looked at while it closes.
-  const closing = async () => {
-    await expect(page.locator("[data-starting-style]")).toHaveCount(0);
-    await page.addStyleTag({
-      content: "[data-ending-style] { transition-duration: 60s !important; }",
-    });
-  };
-  const ending = () =>
-    page.locator("[data-ending-style]").evaluateAll((elements) =>
-      elements.map((element) => ({
-        role: element.getAttribute("role"),
-        pointerEvents: getComputedStyle(element).pointerEvents,
-      })),
-    );
-
   // A Dialog: Settings, its backdrop and popup.
   await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
-  await closing();
+  await slowClosing(page);
   await page.getByRole("button", { name: "Close settings" }).click();
   await expect(page.locator("[data-ending-style]")).toHaveCount(2);
-  expect(await ending()).toEqual(
+  expect(await ending(page)).toEqual(
     expect.arrayContaining([
       { role: "presentation", pointerEvents: "none" },
       { role: "dialog", pointerEvents: "none" },
@@ -215,19 +217,10 @@ test("a closing alert dialog takes no pointer events, backdrop and popup alike (
   await page.getByRole("menuitem", { name: "Remove from this device" }).click();
   const alert = page.getByRole("alertdialog");
   await expect(alert).toBeVisible();
-  await expect(page.locator("[data-starting-style]")).toHaveCount(0);
-  await page.addStyleTag({
-    content: "[data-ending-style] { transition-duration: 60s !important; }",
-  });
+  await slowClosing(page);
   await alert.getByRole("button", { name: "Cancel" }).click();
   await expect(page.locator("[role=alertdialog][data-ending-style]")).toHaveCount(1);
-  const ending = await page.locator("[data-ending-style]").evaluateAll((elements) =>
-    elements.map((element) => ({
-      role: element.getAttribute("role"),
-      pointerEvents: getComputedStyle(element).pointerEvents,
-    })),
-  );
-  expect(ending).toEqual(
+  expect(await ending(page)).toEqual(
     expect.arrayContaining([
       { role: "presentation", pointerEvents: "none" },
       { role: "alertdialog", pointerEvents: "none" },
