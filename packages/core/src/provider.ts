@@ -11,6 +11,12 @@ export interface RemoteCalendar {
   readonly components: readonly ("VEVENT" | "VTODO")[];
   /** What the user may do in it (docs/plans/foundation.md#D37). */
   readonly rights: CalendarRights;
+  /**
+   * Its sync token and ctag as the listing read them, when the server names
+   * them there: equal to what the device kept, nothing in it changed since
+   * (docs/plans/foundation.md#D127).
+   */
+  readonly state?: SyncState;
 }
 
 /**

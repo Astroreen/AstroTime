@@ -110,3 +110,64 @@ test("a 403 to sync-collection is an expired token only with RFC 6578's precondi
     /403/,
   );
 });
+
+const withData = (name: string) =>
+  `<d:response><d:href>/cal/${name}</d:href><d:propstat><d:prop><d:getetag>"${name}"</d:getetag><c:calendar-data>${ics(name)}</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
+const home207 = (token: string) =>
+  `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/"><d:response><d:href>/cal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:sync-token>${token}</d:sync-token><cs:getctag>c-${token}</cs:getctag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
+
+test("the listing reads every calendar's sync token and ctag; a report's data needs no multiget (D127)", async () => {
+  const requests: string[] = [];
+  const http: HttpClient = async (request) => {
+    const kind = request.body?.includes("calendar-multiget")
+      ? "multiget"
+      : request.body?.includes("sync-collection")
+        ? `sync-collection from "${/<d:sync-token>([^<]*)</.exec(request.body)?.[1]}"`
+        : `${request.method} Depth ${request.headers["Depth"]}`;
+    requests.push(kind);
+    const reply = (body: string) => ({ status: 207, url: request.url, header: () => null, body });
+    if (request.method === "PROPFIND") return reply(home207("t1"));
+    if (kind === "multiget") return reply(multistatus(withData("b.ics"), "t2"));
+    return reply(multistatus(withData("a.ics") + changed("b.ics"), "t2"));
+  };
+  const provider = new CalDavProvider(
+    http,
+    { username: "u", password: "p" },
+    "https://dav.example/",
+  );
+  const [calendar] = await provider.calendars();
+  expect(calendar?.state).toEqual({ syncToken: "t1", ctag: "c-t1" });
+  // A first sync: from no token at all, since the listing names one.
+  const first = await provider.changes(home, { syncToken: null, ctag: null }, new Map());
+  expect(first.changed.map((o) => [o.href, o.ics.includes("UID:")])).toEqual([
+    [`${home}a.ics`, true],
+    [`${home}b.ics`, true],
+  ]);
+  expect(first.syncToken).toBe("t2");
+  // Only `b.ics` came without its data: it alone is asked for.
+  expect(requests).toEqual(["PROPFIND Depth 1", 'sync-collection from ""', "multiget"]);
+});
+
+test("a first sync a server will not answer by sync-collection lists the calendar instead", async () => {
+  const requests: string[] = [];
+  const http: HttpClient = async (request) => {
+    requests.push(request.body?.includes("sync-collection") ? "sync-collection" : request.method);
+    const reply = (status: number, body: string) => ({
+      status,
+      url: request.url,
+      header: () => null,
+      body,
+    });
+    if (request.body?.includes("sync-collection")) return reply(501, "");
+    return reply(207, home207("t1"));
+  };
+  const provider = new CalDavProvider(
+    http,
+    { username: "u", password: "p" },
+    "https://dav.example/",
+  );
+  await provider.calendars();
+  const first = await provider.changes(home, { syncToken: null, ctag: null }, new Map());
+  expect(first.syncToken).toBe("t1");
+  expect(requests).toEqual(["PROPFIND", "sync-collection", "PROPFIND"]);
+});

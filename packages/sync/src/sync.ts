@@ -6,6 +6,7 @@ import {
   sameObjects,
   type Provider,
   type RemoteObject,
+  type SyncState,
   type WriteResult,
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
@@ -90,8 +91,11 @@ export async function syncAccount(
 
 async function run(store: Store, provider: Provider, accountId: string, report: SyncReport) {
   const remote = await provider.calendars();
-  const urls = new Set(remote.map((calendar) => calendar.url));
-  for (const calendar of remote) await store.saveCalendar({ accountId, ...calendar });
+  const listed = new Map(remote.map((calendar) => [calendar.url, calendar.state]));
+  const urls = new Set(listed.keys());
+  // The listing's state is not the device's: it is kept only once the calendar is downloaded.
+  for (const { state: _, ...calendar } of remote)
+    await store.saveCalendar({ accountId, ...calendar });
   for (const calendar of await store.calendars(accountId)) {
     if (urls.has(calendar.url)) continue;
     // A calendar deleted on the server goes with its objects (D38). One that
@@ -108,15 +112,29 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
   }
 
   for (const calendar of (await store.calendars(accountId)).filter((c) => urls.has(c.url))) {
-    for (const object of await store.pending(calendar.id)) {
+    const pending = await store.pending(calendar.id);
+    for (const object of pending) {
       await isolated(report, absolute(calendar, object.href), async () => {
         if (allowed(calendar, object.pending))
           await upload(store, provider, calendar, object, report);
         else await settleRefused(store, provider, calendar, object, report);
       });
     }
+    // Nothing changed there since its last download, and nothing went up: no request (D127).
+    if (pending.length === 0 && unchanged(calendar, listed.get(calendar.url))) continue;
     await isolated(report, calendar.url, () => download(store, provider, calendar, report));
   }
+}
+
+/**
+ * Whether the listing says a calendar is as the device last downloaded it:
+ * its sync token, or without one its ctag, is the one kept then (D127). A
+ * download that left something out keeps neither, so it is never skipped.
+ */
+function unchanged(kept: SyncState, listed: SyncState | undefined): boolean {
+  if (!listed) return false;
+  if (listed.syncToken !== null) return listed.syncToken === kept.syncToken;
+  return listed.ctag !== null && listed.ctag === kept.ctag;
 }
 
 async function isolated(

@@ -104,9 +104,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 
 - `packages/caldav` (`@astrotime/caldav`) — the CalDAV provider.
-  - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars,
-    `sync-collection` with a full listing as fallback, multiget, writes with
-    ETags. → `plans/foundation.md#D2`
+  - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars with
+    their sync tokens, `sync-collection` with the objects' data and a full
+    listing as fallback, multiget, writes with ETags.
+    → `plans/foundation.md#D2`, `plans/foundation.md#D127`
   - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
     `revokeAppPassword`, the app password it gave revoked when its account
     goes. → `plans/foundation.md#D90`
@@ -134,6 +135,9 @@ When you add a package, app or module, add its line here in the same PR.
     `connectCalDav` opens an account's provider; `saveAccount`,
     `removeAccount` keep an account with its credentials.
     → `plans/foundation.md#D90`
+  - `test/budget.test.ts` — the requests each action costs a server, held
+    to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
+    for any `HttpClient`. → `plans/foundation.md#D126`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
     Login Flow v2 approved in Chromium on Nextcloud's own pages, and on
