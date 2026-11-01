@@ -179,14 +179,14 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
 
   await userEvent.keyboard("{Escape}");
   reminders.tap(reminders.last.find((r) => r.title === "Dentist")!);
-  await expect
-    .element(page.getByRole("list", { name: "Thursday, November 5" }))
-    .toBeInTheDocument();
-  // Its details open over the day.
+  // Its details open over its day.
   const details = page.getByRole("dialog", { name: "Dentist" });
   await expect.element(details).toBeInTheDocument();
   await userEvent.keyboard("{Escape}");
   await expect.element(details).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5" }))
+    .toBeInTheDocument();
 
   // Turned off: the platform is handed an empty set.
   await page.getByRole("button", { name: "Main menu" }).click();
