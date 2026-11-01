@@ -19,8 +19,10 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p test"
   },
   "dependencies": {
+    "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
     "@astrotime/storage": "workspace:*",
+    "@astrotime/sync": "workspace:*",
     "@base-ui/react": "catalog:",
     "i18next": "catalog:",
     "react-i18next": "catalog:"

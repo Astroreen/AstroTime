@@ -31,3 +31,4 @@ export {
   type SyncState,
   type WriteResult,
 } from "./provider.ts";
+export type { SecretStore } from "./secrets.ts";

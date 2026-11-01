@@ -277,7 +277,7 @@ export async function loadDemo(
   }
   const data = demoData(localeSettings(languages).language, nowIn(now, timeZone).today, timeZone);
   const account = await store.addAccount({
-    provider: "caldav",
+    provider: "demo",
     name: data.account,
     serverUrl: DEMO_SERVER,
     username: null,

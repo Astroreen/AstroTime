@@ -57,6 +57,14 @@ were checked on 2026-11-01.
   ([D68](#D68)). If PR 5 lands a different shape first, the code is the
   territory: this decision is updated to it.
 
+  _Landed in foundation's PR 5a-3 ([D90](foundation.md#D90),
+  [D91](foundation.md#D91)):_ `Platform` (`@astrotime/ui`) holds `store`
+  (the opening `Store`, on the platform's `SqlDriver`), `http`, `secrets`,
+  `openExternal` and `preferences` (the device's own choices, which PR 5a-1
+  passed beside it); `reminders` joins with PR 6. `syncAll(context, { fresh })`
+  takes the store, the `SecretStore` and `connectCalDav(http)`; `fresh` asks
+  for a sync that starts after the call, still never two at once.
+
 ### The shell
 
 - **D61. `apps/mobile`, Capacitor 8.** `@astrotime/mobile` is a Vite app
@@ -280,6 +288,11 @@ were checked on 2026-11-01.
 - **Widgets, quick settings tile, share target** — none in the first
   release.
 - **System calendars** — foundation's Deferred (`CalendarContract`).
+- **One redirect loop for the native shells** — a shared redirect loop in
+  `@astrotime/caldav` over a one-hop `HttpClient`, so Android's plugin and
+  the desktop's `net.request` follow one implementation of the redirect rule
+  of [D62](#D62) and [desktop D72](desktop.md#D72) instead of one each
+  (from the review of the platform plans).
 
 ## PR plan
 

@@ -14,11 +14,11 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p test"
   },
   "dependencies": {
+    "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
     "@astrotime/storage": "workspace:*"
   },
   "devDependencies": {
-    "@astrotime/caldav": "workspace:*",
     "@types/node": "catalog:"
   }
 }

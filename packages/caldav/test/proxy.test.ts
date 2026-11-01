@@ -163,6 +163,31 @@ test("a redirect to another server is refused, so the browser never carries the 
   expect([response.status, response.headers.get("location")]).toEqual([502, null]);
 });
 
+test("a redirect from http to https on the same host, and a 201's Location, pass mapped", async () => {
+  const answer = (status: number, location: string) => {
+    const { fetchImpl } = upstream(
+      () => new Response(null, { status, headers: { Location: location } }),
+    );
+    return proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl })(
+      new Request(`http://app.localhost${via.to("http://cloud.example.com/.well-known/caldav")}`, {
+        method: "PROPFIND",
+      }),
+    );
+  };
+  const upgrade = await answer(301, "https://cloud.example.com/remote.php/dav/");
+  expect([upgrade.status, upgrade.headers.get("location")]).toEqual([
+    301,
+    via.to("https://cloud.example.com/remote.php/dav/"),
+  ]);
+  const created = await answer(201, "https://files.example.net/new.ics");
+  expect([created.status, created.headers.get("location")]).toEqual([
+    201,
+    via.to("https://files.example.net/new.ics"),
+  ]);
+  // Another port is another server.
+  expect((await answer(301, "https://cloud.example.com:8443/dav/")).status).toBe(502);
+});
+
 test("behind a TLS terminator the app's https page still passes: the host is compared, not the scheme", async () => {
   const { fetchImpl } = upstream(() => new Response("ok"));
   const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });

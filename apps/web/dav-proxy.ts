@@ -6,7 +6,7 @@
 // required.
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { proxyHandler } from "@astrotime/caldav";
+import { proxyHandler, REFUSED } from "@astrotime/caldav";
 import type { Plugin } from "vite";
 
 export const DAV_PROXY_PREFIX = "/dav-proxy/";
@@ -52,6 +52,8 @@ export function davProxy(env = process.env): Plugin {
       server.middlewares.use(DAV_PROXY_PREFIX, (req, res) => {
         if (!allow?.length && !local) {
           res.statusCode = 403;
+          // The app tells the user this server is not allowed here (D39).
+          res.setHeader(REFUSED, "not-allowed");
           res.end(
             "The dev server listens beyond localhost: list the CalDAV servers in ASTROTIME_PROXY_ALLOW.",
           );

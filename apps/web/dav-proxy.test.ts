@@ -20,6 +20,7 @@ function statusFor(env: Record<string, string>, host: string | undefined): numbe
   );
   const res = Object.assign(new EventEmitter(), {
     statusCode: 0,
+    setHeader() {},
     end() {},
   }) as unknown as ServerResponse;
   middleware?.({ url: "/https%3A%2F%2Fdav.example/" } as IncomingMessage, res);

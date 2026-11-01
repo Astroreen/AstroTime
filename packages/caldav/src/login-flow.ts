@@ -1,6 +1,9 @@
 import type { HttpClient } from "./http.ts";
 import type { Credentials } from "./provider.ts";
 
+/** Server errors in a row after which a poll gives up (at a poll every 2 s, about 10 s). */
+const SERVER_ERRORS = 5;
+
 /** A Nextcloud Login Flow v2 in progress (docs/plans/foundation.md#D19). */
 export interface LoginFlow {
   /** The page where the user approves access; open it in a browser. */
@@ -23,6 +26,8 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
   if (start.status !== 200)
     throw new Error(`${serverUrl} does not offer Nextcloud's Login Flow v2 (${start.status}).`);
   const { login, poll } = parseStart(start.body, serverUrl);
+  // Server errors in a row; a server that keeps failing is said to, not waited on.
+  let failing = 0;
   return {
     loginUrl: login,
     async poll() {
@@ -35,8 +40,14 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
         },
         body: `token=${encodeURIComponent(poll.token)}`,
       });
-      // 404 until the user approves.
-      if (response.status === 404) return null;
+      // 404 until the user approves. Rate limited (429, as a proxy in front
+      // of Nextcloud may answer) or a passing server error: not yet, asked
+      // again later; the same error several times in a row is the server's.
+      failing = response.status >= 500 ? failing + 1 : 0;
+      if (failing >= SERVER_ERRORS) {
+        throw new Error(`The login flow failed: the server keeps answering ${response.status}.`);
+      }
+      if (response.status === 404 || response.status === 429 || response.status >= 500) return null;
       if (response.status !== 200) throw new Error(`The login flow failed (${response.status}).`);
       const result = json(response.body) as {
         server?: unknown;

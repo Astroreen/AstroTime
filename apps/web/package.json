@@ -11,13 +11,14 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*",
     "@astrotime/storage": "workspace:*",
     "@astrotime/ui": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@astrotime/caldav": "workspace:*",
     "@playwright/test": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",

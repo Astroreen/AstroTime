@@ -29,6 +29,10 @@
   --color-on-fab: light-dark(#0d3263, #d6e6ff);
   /* The current-time line: white on the dark grid (design D49), a calm red on the light one. */
   --color-now: light-dark(#cf4a3c, #f2f3f5);
+  /* What went wrong (a refused sign-in, a sync that needs the user) and removing. */
+  --color-danger: light-dark(#b3261e, #f2b8b5);
+  --color-on-danger: light-dark(#ffffff, #601410);
+  --color-danger-soft: light-dark(#fbe9e7, #3b2424);
 }
 
 @layer base {

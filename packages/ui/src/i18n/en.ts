@@ -13,6 +13,88 @@ export const en = {
   "store.failed.body": "Reload the page to try again.",
   "store.reload": "Reload",
 
+  "firstRun.title": "Your calendars and tasks, from your own server",
+  "firstRun.body":
+    "Sign in to Nextcloud or any CalDAV server. Your data stays there and on this device; AstroTime has no server of its own.",
+  "firstRun.nextcloud": "Sign in to Nextcloud",
+  "firstRun.caldav": "Another CalDAV server",
+
+  "signIn.title": "Add an account",
+  "signIn.titleAgain": "Sign in again",
+  "signIn.kind": "Server",
+  "signIn.kind.nextcloud": "Nextcloud",
+  "signIn.kind.caldav": "CalDAV",
+  "signIn.server": "Server address",
+  "signIn.serverPlaceholder": "cloud.example.com",
+  "signIn.username": "User name",
+  "signIn.password": "Password",
+  "signIn.nextcloudHelp":
+    "Nextcloud's sign-in page opens in a new tab. Approve AstroTime there: it gets a password of its own, never yours.",
+  "signIn.caldavHelp":
+    "Radicale, Baïkal, Fastmail, iCloud and others: AstroTime finds your calendars at this address.",
+  "signIn.continue": "Continue",
+  "signIn.submit": "Sign in",
+  "signIn.cancel": "Cancel",
+  "signIn.checking": "Checking the server…",
+  "signIn.waiting.title": "Waiting for Nextcloud",
+  "signIn.waiting.body": "Approve AstroTime on the page that opened, then come back here.",
+  "signIn.waiting.reopen": "Open the sign-in page again",
+  "signIn.problem.address": "This is not a web address. Type it like cloud.example.com.",
+  "signIn.problem.auth": "The user name or password is wrong.",
+  "signIn.problem.offline":
+    "The server could not be reached. Check the address and your connection.",
+  "signIn.problem.not-allowed": "This AstroTime's administrator has not allowed this server.",
+  "signIn.problem.other-server":
+    "This server sends you to {{location}}. Sign in with that address instead.",
+  "signIn.problem.not-caldav": "No calendars were found at this address. Is it a CalDAV server?",
+  "signIn.problem.not-nextcloud":
+    "This is not a Nextcloud server, or it does not let apps sign in.",
+  "signIn.problem.expired": "The sign-in page expired. Start again.",
+  "signIn.problem.failed": "Signing in did not work. Try again.",
+
+  "accounts.button": "Accounts",
+  "accounts.buttonSyncing": "Accounts, syncing",
+  "accounts.buttonAttention": "Accounts, something needs your attention",
+  "accounts.title": "Accounts",
+  "accounts.add": "Add account",
+  "accounts.syncNow": "Sync now",
+  "accounts.menu": "Options for {{name}}",
+  "accounts.signInAgain": "Sign in again",
+  "accounts.remove": "Remove from this device",
+  "accounts.removeTitle": "Remove {{name}}?",
+  "accounts.removeBody":
+    "Its calendars and items are deleted from this device, and its password is forgotten. Nothing changes on the server.",
+  "accounts.removeConfirm": "Remove",
+  "accounts.removeCancel": "Cancel",
+  "accounts.demo": "Demo data, on this device only",
+  "accounts.noCalendars": "No calendars on this account",
+  "accounts.close": "Close",
+
+  "sync.syncing": "Syncing…",
+  "sync.never": "Not synced yet",
+  "sync.syncedAt": "Synced at {{time}}",
+  "sync.offline": "Offline: changes wait until the server can be reached",
+  "sync.signed-out": "Signed out: sign in again to sync",
+  "sync.refused": "This AstroTime's administrator does not allow this server",
+  "sync.failed": "The last sync failed; it is tried again later",
+  "sync.problems_one": "{{count}} item could not be synced",
+  "sync.problems_other": "{{count}} items could not be synced",
+  "sync.problem.read-only": "A new item waits: its calendar is read-only on the server.",
+  "sync.problem.deletion-reverted":
+    "A deletion in a read-only calendar was undone; the item is back.",
+  "sync.problem.no-place": "The server has no place for a new item; it waits on this device.",
+  "sync.problem.taken-unreadable":
+    "A new item's place on the server is taken by one that cannot be read.",
+  "sync.problem.calendar-gone-unsent":
+    "A calendar went missing on the server while it holds changes not sent.",
+  "sync.problem.failed": "An item could not be synced; it is tried again next time.",
+  "sync.dropped_one": "{{count}} change was dropped: the server deleted its item",
+  "sync.dropped_other": "{{count}} changes were dropped: the server deleted their items",
+  conflicts_one: "{{count}} change of yours was refused by the server",
+  conflicts_other: "{{count}} changes of yours were refused by the server",
+  "conflicts.hint":
+    "The server's version is shown; yours is kept on this device until the Conflicts list can apply it again.",
+
   "topBar.menu": "Main menu",
   "topBar.today": "Today",
   "topBar.period": "{{period}}, choose a date",
@@ -39,7 +121,6 @@ export const en = {
 
   "drawer.views": "Views",
   "drawer.calendars": "Calendars",
-  "drawer.noCalendars": "No calendars yet",
 
   "fab.create": "Create",
 

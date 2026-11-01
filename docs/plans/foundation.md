@@ -127,9 +127,10 @@ logic worth borrowing.
   - **Any CalDAV server**: address, user name and password; the CalDAV home
     is found through `/.well-known/caldav` (RFC 6764).
 
-  Credentials stay on the device: IndexedDB on the web, the Android Keystore
-  on Android ([android D64](android.md#D64)), the system keyring on the
-  desktop ([desktop D74](desktop.md#D74)).
+  Credentials stay on the device: IndexedDB on the web, sealed with a key
+  the page cannot export ([D89](#D89)), the Android Keystore on Android
+  ([android D64](android.md#D64)), the system keyring on the desktop
+  ([desktop D74](desktop.md#D74)). How the web signs in: [D92](#D92).
 
 - **D20. CORS on the web.** A browser may not read responses from another
   origin unless that server allows it, and Nextcloud does not allow it for
@@ -475,6 +476,106 @@ Decided while building PR 5a.
   accessibility-tree locators; CI's `e2e` job runs it. The same specs take a
   UI pull request's screenshots (`ASTROTIME_SCREENSHOTS`).
 
+### Accounts and syncing
+
+Decided while building PR 5a-3.
+
+- **D89. The web keeps credentials in IndexedDB, sealed with a key it cannot
+  export.** `apps/web`'s `SecretStore` (`indexedDbSecrets`) keeps each
+  account's credentials (JSON, [android D60](android.md#D60)) in an
+  IndexedDB database of their own, `astrotime-secrets`, encrypted with
+  AES-GCM (a new 12-byte IV for every write) under a 256-bit key made with
+  `extractable: false` and kept in the same database. What it guards
+  against: the password in plain sight, in the browser's storage inspector,
+  a search through the profile's files, a copy of the site's data. What it
+  does not: script running in the page, which can use the key to decrypt,
+  and a reader of the disk who knows how the browser stores a `CryptoKey`,
+  whose bytes are in the same profile. Nothing stronger exists on the web
+  without a passphrase asked at every start, which background syncs could
+  not answer either; rejected. A secret that no longer decrypts (its key
+  cleared while it stayed) reads as none, so its account asks to sign in
+  again, as on the desktop ([desktop D74](desktop.md#D74)). WebCrypto needs
+  a secure context, as the store already does (OPFS, Web Locks).
+- **D90. One sync entry, and the accounts' credentials in one place.**
+  `@astrotime/sync` exports `syncAll(context, { fresh })`
+  ([android D60](android.md#D60)). It syncs every account of the store, one
+  after another, through `syncAccount`, and reports each (`AccountSync`):
+  `synced` with its report, or `signed-out` (the server refused the
+  credentials, or none are saved), `refused` (the web proxy does not carry
+  the server), `offline` or `failed`, with the report so far; it never
+  throws for an account. A call while a sync of the same store runs joins
+  it. `fresh` asks for a sync that starts after the call (a local change,
+  an account just added, "Sync now"): the running one's successor, shared
+  by every such call meanwhile. The context is the store, the platform's
+  `SecretStore` and `connectCalDav(http)`, which opens an account's
+  provider at the calendar home kept with the account (`homeUrl`,
+  migration 5; discovered again only when missing), so a sync does not
+  discover first. `saveAccount` and `removeAccount` are the only code that
+  spells the credentials' key (`account:<id>`) and JSON. Signing in to an
+  account already here (the same calendar home and user) replaces its
+  password instead of adding a second one. Removing makes every sync that
+  starts from then on leave the account alone, waits for the running one
+  and the one queued after it, deletes the secret first (an account left
+  behind asks to sign in again; a password left behind would be invisible),
+  then the account with its calendars and items. The demo's account (`provider: "demo"`) is never
+  synced. `@astrotime/sync` depends on `@astrotime/caldav` for this: it
+  opens the providers. Rescheduling the reminders after a sync joins with
+  PR 6.
+- **D91. When the UI syncs.** `SyncScheduler` in `@astrotime/ui` runs the
+  UI's syncs through `syncAll`, so two never run at once, and the triggers
+  are the same in every shell, since the UI is:
+  - on start;
+  - when the app is in front of the user again (the tab visible, the window
+    focused), if the last sync started more than a minute ago;
+  - every 5 minutes while the page is visible and the browser online. A
+    visible app is one the user is looking at, so a change made on another
+    device should show within minutes, and a sync that finds nothing new is
+    one `PROPFIND` of the calendar home and one `sync-collection` per
+    calendar. A hidden tab's timers are throttled anyway; its next visit
+    syncs;
+  - when the network comes back (`online`);
+  - 2 seconds after the last of a burst of local changes (`changed()`, for
+    the editing of PR 5b and PR 6), and on "Sync now", both `fresh`.
+
+  Android adds background sync ([android D67](android.md#D67)) and the
+  desktop its main-process timer and resume ([desktop D75](desktop.md#D75)),
+  both through `syncAll`. The status shows without getting in the way: the
+  account button in the top bar turns a ring while a sync runs and shows a
+  dot when something needs the user (signed out, refused, failed, items the
+  sync could not handle, conflicts). Each account says, in the drawer and
+  in the accounts dialog, that it syncs, when it last synced, that it is
+  offline, or what stops it, with the report's `problem` codes and dropped
+  changes in words ([D37](#D37), [D38](#D38)) and "Sign in again" when the
+  server refused it. The count of conflicts ([D6](#D6)) is shown there until
+  the Conflicts list comes ([Deferred](#deferred)).
+
+- **D92. Signing in on the web, and the accounts in the shell.** The
+  add-account dialog has two tabs: Nextcloud (Login Flow v2) and CalDAV
+  (address, user name, password); its steps live outside React (`SignIn` in
+  `@astrotime/ui`). A typed address without a scheme is `https://`; a path
+  is kept. Login Flow opens Nextcloud's page with `openExternal` (a new tab
+  with `noopener` on the web) and offers to open it again, since a browser
+  may block a tab opened after the flow's first request; it polls as
+  [android D65](android.md#D65) says (every 2 seconds, at once when the
+  page is visible again, giving up after 20 minutes), waits through a moment
+  offline, a 429 or a 5xx, and Cancel stops it. Then discovery and the
+  first sync. The proxy marks its own refusals (`x-astrotime-refused`:
+  `not-allowed`, or `other-server <origin>`), which `fetchClient` turns into
+  `ProxyRefusedError`, so the dialog tells apart a wrong password, an
+  unreachable server, an address that is no CalDAV server
+  (`NoCalendarHomeError`) or no Nextcloud, a server this AstroTime's
+  administrator has not allowed ([D20](#D20)), and a redirect to another
+  server, which it names ([D39](#D39)). An account is called
+  `user@host`. An app with no account and no demo shows a first-run screen
+  with both ways in. The account button in the top bar
+  ([design D46](design.md#D46)) opens the accounts dialog (each account
+  with its status and menu, "Sync now", "Add account"), as Google's account
+  button opens its account sheet; the drawer shows each account with its
+  status and menu (sync now, sign in again, remove) above its calendars.
+  "Sync now" syncs every account ([D90](#D90)). Removing asks first. "Sign
+  in again" opens the dialog with the account's address and user name, on
+  Nextcloud's tab for a Nextcloud account.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -486,10 +587,11 @@ Decided while building PR 5a.
 - **Year view** ([D13](#D13); the 3-day view joined the MVP, [D48](design.md#D48)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
-- **Splitting the bundle** — since PR 5a-2 the app's script is about 620 kB
-  (200 kB compressed) and SQLite's wasm 880 kB; they are served precompressed
-  and revalidated ([D80](#D80)), and splitting comes when the first load needs
-  it ([D40](#D40)).
+- **Splitting the bundle** — since PR 5a-3 the app's script is about 790 kB
+  (250 kB compressed; the CalDAV provider and the sync engine joined it) and
+  SQLite's wasm 880 kB; they are served precompressed and revalidated
+  ([D80](#D80)), and splitting comes when the first load needs it
+  ([D40](#D40)).
 - **Content Security Policy** for the web image — the app loads nothing from
   another origin (system fonts, its own icons); it needs wasm and a worker
   from its own origin, and Base UI's `CSPProvider` takes a nonce for the
@@ -530,12 +632,16 @@ Decided while building PR 5a.
   runs by hand; a change in the apps' pages breaks it unseen until the next
   recording. A nightly run that records and compares everything but UIDs and
   timestamps comes if the apps' output changes often enough to matter.
-- **Scheduling syncs** — `syncAccount` runs when called; when and how often
-  the apps call it (on start, on focus, on a timer, Android background sync)
-  is decided with each app: the web (the UI's own triggers, which every
-  shell inherits) with PR 5a's accounts and sync wiring, Android in
-  [android.md D67](android.md#D67), the desktop in
-  [desktop.md D75](desktop.md#D75).
+- **The Conflicts list** — our refused versions ([D6](#D6)) are kept in the
+  store and counted in the accounts dialog ([D91](#D91)); the list itself,
+  showing both versions and applying ours again, comes with editing
+  (PR 6), which writes the local changes that can conflict.
+- **Signing in to a server that redirects elsewhere, on Android and the
+  desktop** — they follow redirects themselves and drop `Authorization`
+  across origins ([android D62](android.md#D62),
+  [desktop D72](desktop.md#D72)), so discovery there ends in a refused
+  password; naming the other server, as the web does ([D92](#D92)), comes
+  with their sign-in (PR A2, PR D2).
 
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
@@ -612,14 +718,15 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
   placement; both themes; i18n; browser-mode tests and Playwright; and
   the accounts and sync wiring: signing in (Login Flow v2, password), the
   web's credentials, and when the UI syncs (on start, on focus, on a timer:
-  Deferred "Scheduling syncs"). Decisions: D1, D13, D14, D15, D16, D17,
-  D19, D42, design D43–D51. It lands in three PRs:
+  [D91](#D91), which closed the Deferred "Scheduling syncs"). Decisions:
+  D1, D13, D14, D15, D16, D17, D19, D42, design D43–D51. It lands in three
+  PRs:
   - **5a-1** — `@astrotime/ui`, the shell, i18n, themes, the Day, 3-day and
     Week views, the undone tasks, demo data, Playwright (D54–D57, design
     D58, D59);
   - **5a-2** — the Month and Agenda views (design D86–D88);
   - **5a-3** — the accounts and sync wiring above; the account button in
-    the top bar.
+    the top bar (D89–D92).
 - **5b** — the tasks screen, the drawer's settings and search, with their
   buttons in the top bar (search, the tasks toggle), which 5a leaves out.
   Decisions: design D52, D53.

@@ -5,11 +5,15 @@ import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqli
 
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
-  provider: text("provider", { enum: ["caldav"] }).notNull(),
+  /** `demo`: the demo data's account, which is never synced (docs/plans/foundation.md#D57). */
+  provider: text("provider", { enum: ["caldav", "demo"] }).notNull(),
   name: text("name").notNull(),
+  /** The address the user signed in with. */
   serverUrl: text("server_url").notNull(),
   username: text("username"),
   createdAt: integer("created_at").notNull(),
+  /** The calendar home discovery found (migration 5); `null`: discover it again. */
+  homeUrl: text("home_url"),
 });
 
 export const calendars = sqliteTable(
