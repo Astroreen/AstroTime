@@ -243,7 +243,8 @@ the project.
   12 or 24 hours. "Hide completed tasks" hides completed tasks' chips on
   every view, never the undone chip (D51). In the drawer each setting's
   name sits above its value, as Android's settings list them, so nothing
-  is squeezed in the sidebar.
+  is squeezed in the sidebar. _Since:_ "Reminders", a switch, last
+  ([foundation D101](foundation.md#D101)).
 - **D97. Search, in detail** (D53): `Store.search` finds the objects whose
   title holds the text, in the visible calendars, at most 50, the latest
   start first. Migration 6 adds a `titles` column: every component's

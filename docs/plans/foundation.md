@@ -574,8 +574,8 @@ Decided while building PR 5a-3.
   behind asks to sign in again; a password left behind would be invisible),
   then the account with its calendars and items. The demo's account (`provider: "demo"`) is never
   synced. `@astrotime/sync` depends on `@astrotime/caldav` for this: it
-  opens the providers. Rescheduling the reminders after a sync joins with
-  PR 6.
+  opens the providers. The reminders follow a sync through the store: its
+  writes hand the platform a new set ([D101](#D101)).
 - **D91. When the UI syncs.** `SyncScheduler` in `@astrotime/ui` runs the
   UI's syncs through `syncAll`, so two never run at once, and the triggers
   are the same in every shell, since the UI is:
@@ -746,6 +746,130 @@ Decided while closing the Deferred "One store across tabs".
     view reads again at the hand-over ([D98](#D98)), so the user sees
     whether an edit is there.
 
+### Reminders
+
+Decided while building PR 6's reminders as notifications ([D9](#D9),
+[D10](#D10); the set's shape is [android D60](android.md#D60)).
+
+- **D100. How an alarm becomes a reminder.** `remindersOf` in
+  `@astrotime/core` turns a calendar object's `VALARM`s into the times they
+  fire within a range of days in the user's zone; `soonestReminders` cuts
+  the set a platform is handed: from now, 7 days ahead, at most 100, the
+  soonest first (ties by id). A reminder whose time has passed is not in it.
+  - **What notifies.** `ACTION:DISPLAY` and `AUDIO`; an alarm without
+    `ACTION` reads as `DISPLAY`. `EMAIL` is not ours (a server such as
+    Nextcloud sends it), `NONE` (RFC 9074, Apple's placeholder) and
+    `PROCEDURE` or unknown actions do nothing. They stay in the object
+    unchanged, as everything does ([D7](#D7)).
+  - **What a relative trigger counts from.** `START` (the default) is an
+    event's start, a task's `DTSTART`, or its `DUE` when it has no start:
+    RFC 5545 requires a `DTSTART` for such an alarm, and the due is the only
+    time such a task has, so the alarm fires at a time the user can foresee
+    instead of never. `RELATED=END` is an event's end (`DTEND`, or
+    `DTSTART` + `DURATION`, or RFC 5545's default) and a task's due, or its
+    start when it has none. A task with neither reminds only by an absolute
+    trigger.
+  - **Days of the wall clock.** On a zoned time an offset's weeks and days
+    are days of its zone's wall clock and the rest is exact (RFC 5545
+    §3.3.6): `-P1D` before 09:00 is 09:00 the day before across a DST
+    change, `-PT24H` is 24 hours. A date (an all-day item, a task due on a
+    date) counts from the start of its day in the user's zone, as RFC 5545
+    says, and a floating time is read in the user's zone when the set is
+    computed; on both the whole offset is wall-clock time. That is what
+    Google and Nextcloud mean when they write an all-day item's reminder as
+    hours from midnight (`-PT15H`: 09:00 the day before; `PT9H`: 09:00 on
+    the day), so it stays 09:00 on a DST day instead of moving an hour.
+  - **Absolute triggers** (`TRIGGER;VALUE=DATE-TIME`) fire once at their
+    instant (a floating one in the user's zone), about their item; on a
+    series' master, about the series as a whole (no one occurrence).
+  - **`REPEAT` and `DURATION`** fire again, each its own reminder; one
+    without the other, or a `DURATION` not positive, does not repeat.
+  - **Series.** Each occurrence reminds by the alarms of the item that
+    shows there: the master's, or an exception's own (an exception replaces
+    its occurrence whole, RFC 5545; a client that changes one occurrence
+    copies the alarms into it when it means them). `EXDATE` and a cancelled occurrence ([D35](#D35))
+    remind of nothing, and an occurrence moved elsewhere reminds where it
+    moved. A series too dense to expand reminds of nothing, as the views
+    leave it out ([Deferred](#deferred)).
+  - **Done and cancelled.** A done task ([D55](#D55): completed or
+    cancelled) and a cancelled event do not remind; a done master makes
+    every occurrence done, and a completed exception its own.
+  - **Acknowledged.** An alarm acknowledged at or after a time it fires
+    does not fire then: RFC 9074's `ACKNOWLEDGED` (Apple writes it) and
+    Thunderbird's `X-MOZ-LASTACK` on the item, whichever is later. A series
+    still reminds of its later occurrences. RFC 9074's snooze is a further
+    alarm with an absolute trigger, so it fires; other clients' snoozes are
+    [deferred](#deferred).
+  - **The id** is stable while the item and its alarm stay:
+    `<object id>/<occurrence>/<repeat>/<alarm>`, the occurrence by its
+    recurrence id (an instant, a floating time or a date; `-` for an item
+    that does not recur), the alarm by its RFC 9074 `UID`, else its place in
+    the item. Two alarms of one occurrence at the same instant (Apple's
+    `DISPLAY` and `AUDIO`) are one reminder.
+  - **The store finds them** (`Store.reminders(range)`) without a column of
+    its own: the objects whose iCalendar holds a `VALARM`, not deleted here,
+    not done tasks; every such task wherever its dates are (an absolute
+    alarm can remind of an overdue or undated one), and the events ending
+    after the range starts less 7 days (an event's alarm fires before it or
+    while it runs; one a week after its end, which RFC 5545 allows and no
+    client we know writes, is not found). Every calendar reminds, hidden
+    ones too: hiding is how this device shows a calendar, as in Google
+    Calendar, where notifications are a calendar's own setting
+    ([Deferred](#deferred)). Each object's reminders are kept while its
+    iCalendar, the range and the zone stay.
+- **D101. Who hands the set over, and the web's notifications.**
+  `ReminderScheduler` ([android D60](android.md#D60)) lives in
+  `@astrotime/core`: `schedule(reminders)` replaces every reminder handed
+  over before, `onOpen` reports a tapped one, and beside them
+  `permission()`, `requestPermission()` (from a gesture) and
+  `whileOpenOnly`. Each reminder carries its notification's words
+  ([D102](#D102)). The platform is the shell's `Platform.reminders`.
+  - **When.** `ReminderPlanner` in `@astrotime/ui` computes the set from the
+    store and hands it over on start, after every write to the store
+    (`Store.subscribe`: a sync's writes and the changes made here alike, a
+    burst costing one more run, as `liveQuery` does), at midnight in the
+    user's zone (the horizon moves a day), and once the last reminder of a
+    full set has fired. Turned off, it hands over an empty set. A shell
+    without the UI (Android's background job, [android D67](android.md#D67))
+    runs the same planner after `syncAll`.
+  - **The setting.** "Reminders", a switch at the end of the drawer's
+    settings ([design D96](design.md#D96): `reminders` in the one settings
+    value): on unless the user turned it off, shown on once the platform may
+    notify; on the web, turning it on asks the browser's permission from that
+    tap, never at start. Under it, the next reminder ("Next: Call with Anna,
+    Wed, Nov 4, 11:00 AM."), that the web reminds only while open, or that
+    the browser blocks notifications or has none.
+  - **The web reminds only while AstroTime is open in a tab.** It has no
+    backend ([D3](#D3)) and so no push server, and Notification Triggers
+    were never standardized; Android ([android D66](android.md#D66)) and the
+    desktop ([desktop D76](desktop.md#D76)) fire with the app closed. The
+    setting says so. `webReminders` (`apps/web`) keeps one `setTimeout` for
+    the next reminder and checks again whenever the tab is in front again
+    (visible, focused, thawed, back from the bfcache), since a hidden tab's
+    timers run once a minute and a sleeping laptop's not at all: a reminder
+    missed by up to 5 minutes shows on waking, an older one is dropped as
+    stale (the desktop fires them up to an hour late, saying when they were
+    due, from its own copy of the set). One tab shows reminders: the one
+    holding the Web Lock `astrotime-reminders`; every other tab computes the
+    same set and waits in the lock's queue, taking over when that tab
+    closes. A notification's tag is its reminder's id, so the browser
+    replaces one shown again instead of stacking it.
+  - **A tap** brings the tab forward, closes the notification and opens
+    the occurrence's day in the Day view (an event's start, a task's due
+    or start); one with no time only brings the app forward. The item's
+    details open once editing's dialogs exist ([Deferred](#deferred)).
+- **D102. What a notification says.** Its title is the item's (or
+  "(No title)"); its body says when it is, as seen when it fires, in the
+  user's language, with dates and relative times from `Intl`
+  (`reminderNotification` in `@astrotime/ui`): an event's time range, with
+  its day when that is another day ("Tomorrow, 10:00 – 11:00"); an all-day
+  event's day ("Tomorrow, all day"); a task's due, or its start when it has
+  none ("Due 3:00 PM", "Due today", "Starts tomorrow, 9:00"); "Task" for
+  one with no date. A time less than a day ahead adds how soon ("· in 15
+  minutes", "· in 1 hour", "· now"): minutes up to an hour, and up to three
+  hours unless whole, then whole hours. A day or more ahead, the day says
+  it; a time already passed says nothing more.
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -808,6 +932,21 @@ Decided while closing the Deferred "One store across tabs".
   [desktop D72](desktop.md#D72)), so discovery there ends in a refused
   password; naming the other server, as the web does ([D92](#D92)), comes
   with their sign-in (PR A2, PR D2).
+
+- **More of reminders** ([D100](#D100), [D101](#D101)):
+  - snoozing and dismissing from AstroTime (writing `ACKNOWLEDGED` and an
+    RFC 9074 snooze alarm back, a local change for the sync engine), and
+    reading Thunderbird's `X-MOZ-SNOOZE-TIME` and Apple's snooze extensions,
+    which are kept as written;
+  - per-calendar default reminders and turning one calendar's reminders off
+    (every calendar reminds, hidden ones too);
+  - `EMAIL` alarms, which a server sends (Nextcloud does), not a client;
+  - notifications through a service worker (`showNotification`), which
+    mobile browsers require: there `new Notification` fails, and the web
+    app shows none (the Android app is the way there);
+  - a tap opening the item's details, once editing's dialogs exist (PR 6);
+  - the Android and desktop adapters: [android D66](android.md#D66)
+    (PR A3) and [desktop D76](desktop.md#D76).
 
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
@@ -916,6 +1055,14 @@ Drag and resize, the details and edit dialogs for events and tasks (an
 item opens them; PR 5a draws items that do not open yet), the recurrence
 scope dialog, reminders as notifications; the floating "+" button creates
 an event or a task (PR 5a draws it disabled). Decisions: D9, D10, D11.
+
+_Changed:_ reminders as notifications land in a PR of their own, ahead of
+editing: the reminder set in `@astrotime/core` and the store, the planner
+and the "Reminders" setting in the UI, the web's notifications
+(D100–D102). Done when: the set's rules are unit-tested (all-day, floating,
+DST, `RELATED=END`, absolute triggers, `REPEAT`, a series with exceptions,
+tasks), and in the web app a reminder of the demo data shows at its time
+under a controlled clock and a tap opens its day.
 
 ### PR 7 — Web proxy and release
 
