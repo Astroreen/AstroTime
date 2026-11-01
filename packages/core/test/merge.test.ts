@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { CalendarObject, mergeObjects, sameObjects, type Event } from "../src/index.ts";
+import {
+  CalendarObject,
+  differences,
+  editItem,
+  mergeObjects,
+  sameObjects,
+  zonedTime,
+  type Event,
+} from "../src/index.ts";
+import { fixture } from "./support.ts";
 
 const object = (fields: Record<string, string>, extra = "") =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\nBEGIN:VEVENT\r\nUID:m\r\n${Object.entries(
@@ -267,4 +276,34 @@ test("an exception spelled in another zone by the server is the same occurrence"
   );
   const merged = CalendarObject.parse(mergeObjects(start, local, server).ics);
   expect(merged.exceptions.map((e) => e.summary)).toEqual(["Moved (ours)"]);
+});
+
+describe("the fields two versions differ in, for the Conflicts list (D6)", () => {
+  const now = Date.parse("2026-11-04T08:40:00Z");
+  const vilnius = (local: string) => zonedTime(local, "Europe/Vilnius");
+
+  test("the title, the time and the reminders by name; bookkeeping aside", () => {
+    const source = fixture("nextcloud-web-event-timed.ics");
+    const ours = editItem(
+      CalendarObject.parse(source),
+      {
+        summary: "Planning v2",
+        time: { start: vilnius("2026-11-16T12:00:00"), end: vilnius("2026-11-16T13:00:00") },
+        alarms: { remove: [], add: [{ relatedTo: "start", offsetSeconds: -600 }] },
+      },
+      { now },
+    ).ics;
+    expect(differences(source, ours)).toEqual(["alarms", "summary", "time"]);
+    expect(differences(source, CalendarObject.parse(source).serialize())).toEqual([]);
+  });
+
+  test("an exception added, changed or gone is a difference in the occurrences", () => {
+    const source = fixture("nextcloud-web-event-recurring.ics");
+    const ours = editItem(
+      CalendarObject.parse(source),
+      { summary: "Standup v2" },
+      { now, scope: "this", recurrenceId: vilnius("2026-11-23T09:00:00") },
+    ).ics;
+    expect(differences(source, ours)).toEqual(["occurrences"]);
+  });
 });

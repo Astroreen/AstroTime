@@ -311,3 +311,30 @@ export function sameObjects(a: string, b: string): boolean {
     })
   );
 }
+
+/**
+ * The fields in which two versions of an object differ, bookkeeping aside,
+ * for the Conflicts list (D6): property names as ical.js reads them
+ * (`summary`, `location`), `time` for the item's times, `alarms` for its
+ * reminders, and `occurrences` when an exception differs, was added or went.
+ */
+export function differences(a: string, b: string): string[] {
+  const ia = itemsOf(CalendarObject.parse(a));
+  const ib = itemsOf(CalendarObject.parse(b));
+  const names = new Set<string>();
+  for (const key of new Set([...ia.keys(), ...ib.keys()])) {
+    const [ca, cb] = [ia.get(key), ib.get(key)];
+    const exception = !key.endsWith("@");
+    if (!ca || !cb) {
+      names.add("occurrences");
+      continue;
+    }
+    const [fa, fb] = [fieldsOf(ca), fieldsOf(cb)];
+    for (const name of new Set([...fa.keys(), ...fb.keys()])) {
+      if (fa.get(name) === fb.get(name)) continue;
+      if (exception) names.add("occurrences");
+      else names.add(name === TIME_FIELD ? "time" : name === "@valarm" ? "alarms" : name);
+    }
+  }
+  return [...names].toSorted();
+}

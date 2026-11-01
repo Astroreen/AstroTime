@@ -52,18 +52,20 @@ export function starTask(object: CalendarObject, starred: boolean, now: number):
   return copy.serialize();
 }
 
-const utc = (epochMs: number) => ICAL.Time.fromJSDate(new Date(epochMs), true);
+/** @internal An instant as an ical.js UTC time. */
+export const utc = (epochMs: number) => ICAL.Time.fromJSDate(new Date(epochMs), true);
 
-function touch(component: ICAL.Component, now: ICAL.Time): void {
+/** @internal `LAST-MODIFIED` and `DTSTAMP` to `now` (RFC 5545 §3.8.7.2, §3.8.7.3). */
+export function touch(component: ICAL.Component, now: ICAL.Time): void {
   component.updatePropertyWithValue("last-modified", now.clone());
   component.updatePropertyWithValue("dtstamp", now.clone());
 }
 
-/** A deep copy of jCal, which is plain JSON. */
-const copyOf = <T>(jcal: T): T => JSON.parse(JSON.stringify(jcal)) as T;
+/** @internal A deep copy of jCal, which is plain JSON. */
+export const copyOf = <T>(jcal: T): T => JSON.parse(JSON.stringify(jcal)) as T;
 
-/** The component to change: the master, or the exception of one occurrence. */
-function componentOf(object: CalendarObject, recurrenceId: ItemTime | null): ICAL.Component {
+/** @internal The component to change: the master, or the exception of one occurrence. */
+export function componentOf(object: CalendarObject, recurrenceId: ItemTime | null): ICAL.Component {
   const { master, exceptions } = object.components;
   if (recurrenceId === null) {
     // A server may hold only exceptions of a series; the first stands for it.
@@ -82,32 +84,34 @@ function componentOf(object: CalendarObject, recurrenceId: ItemTime | null): ICA
   return exception;
 }
 
-function sameTime(a: ItemTime, b: ItemTime): boolean {
+/** @internal The same instant, or the same date or wall clock for a time of no zone. */
+export function sameTime(a: ItemTime, b: ItemTime): boolean {
   if (a.type === "zoned" && b.type === "zoned") return a.epochMs === b.epochMs;
   if (a.type === "date" && b.type === "date") return a.date === b.date;
   return a.type === "floating" && b.type === "floating" && a.local === b.local;
 }
 
 /**
- * A new exception for one occurrence (RFC 5545 §3.8.4.4): a copy of the
- * master without its recurrence, moved to the occurrence. A task's
- * occurrences are anchored at `DTSTART`, else at `DUE` (as
- * `occurrencesBetween` places them); a `DUE` after a `DTSTART` keeps its distance.
+ * @internal A new exception for one occurrence (RFC 5545 §3.8.4.4): a copy
+ * of the master without its recurrence, moved to the occurrence. Occurrences
+ * are anchored at `DTSTART`, a task's without one at `DUE` (as
+ * `occurrencesBetween` places them); a `DTEND` or a `DUE` after a `DTSTART`
+ * keeps its distance.
  */
-function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICAL.Component {
+export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICAL.Component {
   const exception = new ICAL.Component(copyOf(master.toJSON()));
   for (const name of ["rrule", "rdate", "exdate"]) exception.removeAllProperties(name);
   const start = exception.getFirstProperty("dtstart");
-  const due = exception.getFirstProperty("due");
-  const anchor = start ?? due;
+  const end = exception.getFirstProperty(master.name === "vevent" ? "dtend" : "due");
+  const anchor = start ?? end;
   const from = anchor?.getFirstValue();
   if (!anchor || !(from instanceof ICAL.Time)) {
-    throw new CalendarObjectError("A task with neither DTSTART nor DUE has no occurrences.");
+    throw new CalendarObjectError("An item with neither DTSTART nor DUE has no occurrences.");
   }
   const at = like(from, recurrenceId);
-  const dueValue = due?.getFirstValue();
-  if (start && due && dueValue instanceof ICAL.Time) {
-    due.setValue(plus(at, lengthOf({ start: from, end: dueValue })));
+  const endValue = end?.getFirstValue();
+  if (start && end && endValue instanceof ICAL.Time) {
+    end.setValue(plus(at, lengthOf({ start: from, end: endValue })));
   }
   anchor.setValue(at);
   // RECURRENCE-ID is written as the anchor is: its TZID, or a date.
