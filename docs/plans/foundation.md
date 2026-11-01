@@ -1056,7 +1056,9 @@ Decided while building PR 6b.
   - **A move** shifts both ends by the same wall-clock time, so a block
     keeps the length it is drawn with, onto a day the clocks change too; a
     start that lands in the hour the clocks skip goes forward (RFC 5545
-    §3.3.5), and its end keeps the elapsed length after it.
+    §3.3.5), and the end keeps its wall clock, as every move's does; only
+    where that would leave it at or before the moved start (an item no
+    longer than the skipped hour) it keeps the elapsed length instead.
   - **A chip** ([D16](#D16)) moves its due, or its start when it has no due;
     a task's start on a date goes with its due by the days the chip moved,
     so it is never due before it starts.

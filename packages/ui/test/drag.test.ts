@@ -167,6 +167,13 @@ describe("what a drop gives an event", () => {
     const early = event(zoned("2026-03-28T03:00:00"), zoned("2026-03-28T04:00:00"));
     const times = moved(early, "move", 24 * 60, timeZone)!;
     expect(walls(times)).toEqual(["2026-03-29T04:00:00", "2026-03-29T05:00:00"]);
+    // A longer one keeps its end's wall clock, as every move does: it ends
+    // where it is drawn to, an hour shorter that night.
+    const longer = event(zoned("2026-03-28T03:00:00"), zoned("2026-03-28T05:00:00"));
+    expect(walls(moved(longer, "move", 24 * 60, timeZone)!)).toEqual([
+      "2026-03-29T04:00:00",
+      "2026-03-29T05:00:00",
+    ]);
   });
 
   test("its end resizes by the slots, at least 15 minutes after the start, at most its midnight", () => {
