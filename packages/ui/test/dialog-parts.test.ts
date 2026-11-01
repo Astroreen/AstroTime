@@ -1,7 +1,8 @@
 // Every Dialog and AlertDialog takes its backdrop and popup from
 // `dialog-parts.tsx`, which makes a closing one let a press through (design
 // D136): a dialog that used Base UI's parts directly would swallow the press
-// that follows its closing.
+// that follows its closing. That the parts do so is seen in a browser, on
+// the app's own styles: `apps/web/e2e/settings.spec.ts`.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -20,19 +21,4 @@ test("no dialog uses Base UI's Backdrop or Popup directly (design D136)", () => 
     )
     .map(({ file, line }) => `${file}:${line}`);
   expect(direct).toEqual([]);
-});
-
-test("the parts give a closing backdrop and popup no pointer events", () => {
-  const parts = readFileSync(join(components, "dialog-parts.tsx"), "utf8");
-  expect(parts).toContain('const closing = "data-ending-style:pointer-events-none";');
-  for (const part of [
-    "Dialog.Backdrop",
-    "Dialog.Popup",
-    "AlertDialog.Backdrop",
-    "AlertDialog.Popup",
-  ]) {
-    expect(parts).toContain(
-      `<${part} {...props} className={\`\${className ?? ""} \${closing}\`} />`,
-    );
-  }
 });

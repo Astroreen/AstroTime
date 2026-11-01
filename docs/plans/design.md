@@ -693,12 +693,24 @@ are its decisions.
   own backdrop catches what falls outside it. A double click on the month
   picker's day is tested to act once: it picks the day, and its second
   click, passing the closing picker to the grid, makes no event there.
+  **Unverified against Base UI's menus and popovers:** no test was found
+  that tells the old global rule from this one there (a menu's and the
+  month picker's double click pass under both, Base UI making them inert
+  itself), so that the narrowing changes nothing for them rests on reading
+  Base UI's positioners, not on a test. What is tested is the dialogs:
+  `apps/web/e2e/settings.spec.ts` closes a Dialog and an AlertDialog with a
+  long fade and finds each backdrop and popup without pointer events, on
+  the app's own styles, and fails without the parts' class.
 - **D137. The accounts in Settings, one row for a calendar, and the scale
   everywhere** (the two Deferred items D131 and D134 left, once the first
   run became the calendar on this device, [foundation D122](foundation.md#D122)):
   - Settings' calendar groups become one **Accounts** group: each account
-    with its avatar, name, how it syncs (said as it changes) and its menu
-    (sync now, sign in again, remove), then its calendars, then "Add
+    with its avatar, name, how it syncs (text; the dialog's one live
+    region says a sync, below) and its menu
+    (sign in again, remove; _since PR (d3)_ no "Sync now" there: it synced
+    every account, from one account's menu, so the accounts dialog's own
+    "Sync now", which says it is for every account, is the one way; one
+    account's sync alone is [Deferred](#deferred)), then its calendars, then "Add
     account". The same account row (`AccountRow`) is the accounts
     dialog's, Settings' and, compact, the drawer's head, and the same
     calendar row the drawer's (`CalendarRow`, `calendar-row.tsx`): one
@@ -851,6 +863,12 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   ([D120](#D120)). The same holds for the drawer's calendar checkbox on
   the dark drawer (1.4.11): its label names the calendar. A floor on the
   fill's lightness in the dark theme would close both.
+- **Syncing one account** — "Sync now" syncs every account (the accounts
+  dialog's button); one account alone needs `syncAll` to take an account
+  filter, and its joining of runs ([foundation D129](foundation.md#D129):
+  a trigger joins the run going) to know each run's scope, so a full
+  trigger never joins a one-account run. Thread B's sync engine
+  ([D137](#D137)).
 - **A calendar's colour and name, changed here** — Settings and the drawer
   show and hide a calendar ([D131](#D131)); changing its colour or name is a
   write to the server (`PROPPATCH` of `calendar-color`, `displayname`)
@@ -882,7 +900,8 @@ next to the matching reference, in both themes.
 
 The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`),
 D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`), D136
-(`fix/closing-popups-and-strip`) and D137 (`feat/settings-accounts`);
+(`fix/closing-popups-and-strip`) and D137 (`feat/settings-accounts`,
+`fix/review-leftovers-c`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its

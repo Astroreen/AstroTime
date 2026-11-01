@@ -1106,6 +1106,19 @@ test("a signed-out account offers to sign in again wherever it is shown, and its
   // The dialog's one live region, silent while nothing changes; the row's line is text.
   expect(dialog.getByRole("status").elements()).toHaveLength(1);
   expect(dialog.getByRole("status").element().textContent).toBe("");
+  // The account's menu offers what is the account's own: no "Sync now",
+  // which syncs every account and is the dialog's (design D137).
+  await dialog.getByRole("button", { name: "Options for astro@cloud.example.com" }).click();
+  const menu = page.getByRole("menu");
+  await expect.element(menu).toBeInTheDocument();
+  expect(
+    menu
+      .getByRole("menuitem")
+      .elements()
+      .map((item) => item.textContent),
+  ).toEqual(["Sign in again", "Remove from this device"]);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(menu).not.toBeInTheDocument();
   await userEvent.keyboard("{Escape}");
   await expect.element(dialog).not.toBeInTheDocument();
 
