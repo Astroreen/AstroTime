@@ -56,16 +56,17 @@ export function RemindersProvider({
   const { settings: chosen, change } = useSettings();
   const enabled = chosen.reminders && permission === "granted";
   const [next, setNext] = useState<ScheduledReminder | null | undefined>(undefined);
-  const [planner] = useState(
-    () =>
-      new ReminderPlanner({
-        store,
-        scheduler,
-        timeZone,
-        clock: browserClock(),
-        onSet: (set) => setNext(set[0] ?? null),
-      }),
-  );
+  const [planner] = useState(() => {
+    const clock = browserClock();
+    return new ReminderPlanner({
+      store,
+      scheduler,
+      timeZone,
+      clock,
+      // The set reaches an hour back (foundation D100); the next is the first still ahead.
+      onSet: (set) => setNext(set.find((reminder) => reminder.fireAt >= clock.now()) ?? null),
+    });
+  });
   const [onOpen] = useState(
     () => (listener: (reminder: ScheduledReminder) => void) => scheduler.onOpen(listener),
   );

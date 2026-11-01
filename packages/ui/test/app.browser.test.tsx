@@ -165,6 +165,10 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
   await expect
     .element(page.getByText("Reminders show while AstroTime is open in a tab."))
     .toBeInTheDocument();
+  // The set reaches an hour back, to the design review's at 9:50; the next is still ahead.
+  await expect
+    .element(page.getByText(/^Next: Call with Anna, Wed, Nov 4, 11:00\sAM\.$/))
+    .toBeInTheDocument();
   expect(reminders.last.map((r) => r.notification.title)).toEqual([
     "Design review",
     "Call with Anna",
