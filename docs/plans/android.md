@@ -133,7 +133,12 @@ were checked on 2026-11-01.
   static and by domain, so the base config permits cleartext and the plugin
   holds the line itself: it refuses an `http` request unless its origin is
   a saved account's or the one being signed in to, so nothing the user did
-  not type goes out unencrypted.
+  not type goes out unencrypted. The list comes with each request from the
+  app's own code in the WebView, which loads nothing but the app's origin:
+  the line holds as long as that code does, as the store's does. A refused
+  certificate (untrusted, expired, another name) is the plugin's
+  `certificate` error, not offline; a handshake the network broke stays
+  offline.
 
   _Built in PR A1_ (`AstroTimeHttp`: `Exchange.kt`, `HttpPlugin.kt`;
   `apps/mobile/src/http.ts`), on OkHttp 5.4.0: 5.5 needs `compileSdk` 37,
@@ -269,6 +274,8 @@ were checked on 2026-11-01.
   What this decision builds on holds between two WebViews of one process;
   the WorkManager job runs in the app's process too. What PR A4 still proves
   is the headless WebView opening the store from a job with no activity.
+  The two-WebView check ran with a probe not kept in the repository (its log
+  is with PR A1's evidence); PR A4's own test re-proves it.
 
 - **D68. Back button, theme, edge to edge.** The back button
   (`@capacitor/app`) closes what is open (a dialog, the drawer, the tasks

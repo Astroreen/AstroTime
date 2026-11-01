@@ -110,9 +110,11 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
             val response =
                 try {
                     call.execute()
-                } catch (error: javax.net.ssl.SSLException) {
-                    throw Untrusted("$method $url: the server's certificate was refused.", error)
                 } catch (error: IOException) {
+                    // Only a refused certificate is the server's: a handshake the network broke is offline.
+                    if (refusedCertificate(error)) {
+                        throw Untrusted("$method $url: the server's certificate was refused.", error)
+                    }
                     throw Offline("$method $url could not reach the server.", error)
                 }
             response.use {
@@ -166,3 +168,9 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
     private fun joined(headers: Headers): Map<String, String> =
         headers.names().associate { name -> name.lowercase() to headers.values(name).joinToString(", ") }
 }
+
+/** A peer not verified (another name), or a certificate the trust store refused (untrusted, expired). */
+private fun refusedCertificate(error: Throwable): Boolean =
+    generateSequence(error) { it.cause }.take(8).any {
+        it is javax.net.ssl.SSLPeerUnverifiedException || it is java.security.cert.CertificateException
+    }
