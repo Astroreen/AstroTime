@@ -5,7 +5,11 @@ One word per concept. Use these terms in code, docs, commits and UI.
 ## The product
 
 - **Account** — one sign-in to one server through one provider (a Nextcloud
-  user, for example). Holds its credentials and its calendars.
+  user, for example). Holds its credentials and its calendars. Named
+  `user@host` in the UI.
+- **Calendar home** — the collection that holds an account's calendars on
+  a CalDAV server, found by discovery (RFC 6764) and kept with the account
+  (`homeUrl`).
 - **Provider** — the code that brings an account's calendars in and writes
   changes back. CalDAV is the first; Google and system calendars come later.
 - **Calendar** — one collection on a server (a CalDAV calendar). It may hold
@@ -61,6 +65,11 @@ One word per concept. Use these terms in code, docs, commits and UI.
   undone task due before today, "N undone tasks" (design D51).
 - **Agenda** — the view that lists items in time order, day by day,
   instead of a grid ("Расписание" in Russian, as Google's).
+- **Account button** — the avatar at the end of the top bar; it opens the
+  **accounts dialog**: each account with its sync status and menu, "Sync
+  now", "Add account" (foundation D92).
+- **First-run screen** — what an app with no account (and no demo data)
+  shows instead of the calendar: the ways to add one.
 
 ## Sync
 
@@ -68,6 +77,15 @@ One word per concept. Use these terms in code, docs, commits and UI.
   truth.
 - **Sync engine** — `syncAccount` in `@astrotime/sync`, which reconciles
   the local store with a provider (D37).
+- **`syncAll`** — the one sync entry every shell calls: every account in
+  turn, joining a sync already running (D90). The UI calls it on its
+  **sync triggers** (start, back in front, a timer, the network back, a
+  local change: D91).
+- **Sync status** — how an account's last sync went, as the UI shows it:
+  syncing, synced at a time, offline, signed out, refused, failed, with
+  the items it could not handle.
+- **Signed out** — an account whose server refused its credentials (or
+  that has none saved); it syncs again once the user signs in again.
 - **Live query** — a query of the local store that runs again whenever the
   store changes, so a view shows what a sync wrote (`liveQuery`, D54).
 - **Sync token** — the server's marker of the last state we saw
@@ -92,7 +110,11 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Platform interfaces** — what the shared code needs from a platform and
   cannot do itself: HTTP, SQLite, secrets, reminders, sync triggers; named
   once in android plan D60. A shell's implementation of one is an
-  **adapter**; all of them together are the shell's `Platform`.
+  **adapter**; all of them together are the shell's **Platform** (the
+  `Platform` object it hands the UI's root).
+- **Secret store** — where a platform keeps an account's credentials
+  (`SecretStore`): IndexedDB on the web (foundation D89), the Keystore on
+  Android, the keyring on the desktop. Never the local store.
 - **Background sync** — a sync the operating system starts while the app is
   not open (Android's WorkManager, android plan D67).
 

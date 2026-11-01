@@ -40,12 +40,15 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D6`
   - `Provider` — the interface every provider implements.
     → `plans/foundation.md#D37`
+  - `SecretStore` — where a platform keeps credentials, never the store.
+    → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
-  - `Store` — accounts, calendars, objects with pending local changes,
-    conflicts; finds objects by date range. → `plans/foundation.md#D36`
+  - `Store` — accounts (with the calendar home discovery found, migration 5),
+    calendars, objects with pending local changes, conflicts; finds objects
+    by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `subscribe` — hears every write, for live queries.
       → `plans/foundation.md#D54`
     - `undoneTasksBefore` — the undone tasks due before today.
@@ -64,23 +67,37 @@ When you add a package, app or module, add its line here in the same PR.
     ETags. → `plans/foundation.md#D2`
   - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`
   - `fetchClient`, `HttpClient` — how it reaches servers on each platform.
-  - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space.
-    → `plans/foundation.md#D39`
+  - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
+    own refusals come to the app as `ProxyRefusedError`.
+    → `plans/foundation.md#D39`, `plans/foundation.md#D92`
+  - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
+  - `syncAll` — the one sync entry every shell calls: every account, joins
+    a running sync; `connectCalDav` opens an account's provider;
+    `saveAccount`, `removeAccount` keep an account with its credentials.
+    → `plans/foundation.md#D90`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
     Login Flow v2 approved in Chromium on Nextcloud's own pages.
 
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
-  - `AstroTime` — the root: the app gives it its store (opening), where
-    preferences are kept (`Preferences`), the user's languages and zone.
+  - `AstroTime` — the root: the app gives it its `Platform` (the store,
+    HTTP, secrets, `openExternal`, `Preferences`), the user's languages and
+    zone. → `plans/android.md#D60`
+  - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
+    the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
+    `plans/foundation.md#D92`
   - `components/` — the shell (top bar, month picker, drawer, floating
     button), the time grid of Day, 3 days and Week with the all-day strip
     and the undone tasks chip, the Month (`month-view.tsx`,
     `plans/design.md#D86`) and the Agenda (`agenda-view.tsx`,
     `plans/design.md#D87`). → `plans/design.md#D46`
+    - `accounts.tsx`, `sign-in-dialog.tsx`, `remove-account.tsx` — the
+      account button and dialog, each account in the drawer, the sync
+      status, the first-run screen, adding and removing an account.
+      → `plans/foundation.md#D92`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
@@ -97,13 +114,19 @@ When you add a package, app or module, add its line here in the same PR.
 
 ## Apps
 
-- `apps/web` (`@astrotime/web`) — the web app, the first platform: the web
-  store, preferences in localStorage and the browser's languages around
-  `@astrotime/ui` (`src/main.tsx`); `?demo` in the dev server loads the demo
-  data. → `plans/foundation.md#D12`
+- `apps/web` (`@astrotime/web`) — the web app, the first platform: its
+  `Platform` (`src/platform.ts`: the web store, HTTP through the proxy,
+  credentials, a new tab for Login Flow, preferences in localStorage) and
+  the browser's languages around `@astrotime/ui` (`src/main.tsx`); `?demo`
+  in the dev server loads the demo data. → `plans/foundation.md#D12`
+  - `src/secrets.ts` — credentials in IndexedDB under a key the page cannot
+    export. → `plans/foundation.md#D89`
   - `e2e/` — Playwright against the dev server on the demo data with a
     frozen clock; `screenshots.spec.ts` takes a UI PR's evidence
-    (`ASTROTIME_SCREENSHOTS`). → `plans/foundation.md#D57`
+    (`ASTROTIME_SCREENSHOTS`). → `plans/foundation.md#D57`;
+    `accounts.spec.ts` signs in to a real Radicale (the one
+    `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
+    takes the accounts' evidence. → `plans/foundation.md#D92`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
