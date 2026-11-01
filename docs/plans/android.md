@@ -1,7 +1,9 @@
 # Android plan
 
-Status: **planned** — decided, not yet built; it starts once foundation's
-[PR 5](foundation.md#pr-5--calendar-grid) has landed the shared UI. This
+Status: **in progress** — [PR A1](#pr-a1--the-shell-http-and-the-store)
+(the shell, HTTP and the store) is built; A2–A5 are decided, not yet built.
+It started once foundation's
+[PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
 plan owns the Android app, `apps/mobile` (foundation's [D12](foundation.md#D12),
 [D22](foundation.md#D22), [D23](foundation.md#D23)), and the **platform
 interfaces** every shell implements ([D60](#D60)); the desktop plan
@@ -69,6 +71,12 @@ were checked on 2026-11-01.
   takes the store, the `SecretStore` and `connectCalDav(http)`; `fresh` asks
   for a sync that starts after the call, still never two at once.
 
+  _Added in PR A1:_ `signingInTo(server)`, optional, returns the function
+  that ends it: the sign-in (`SignIn`) tells the platform which server it is
+  signing in to (the address typed, then the one Nextcloud names), so
+  Android's plugin lets plain http reach it before it is a saved account
+  ([D62](#D62)). The web leaves it out: its proxy keeps its own allowlist.
+
 ### The shell
 
 - **D61. `apps/mobile`, Capacitor 8.** `@astrotime/mobile` is a Vite app
@@ -85,6 +93,15 @@ were checked on 2026-11-01.
   a new origin is an empty store. The store needs a System WebView of
   Chromium 109 or newer; on an older one the app says to update the WebView
   instead of failing. `CapacitorHttp`'s patching of `fetch` stays off.
+
+  _Built in PR A1_ with Capacitor 8.6.0 (`capacitor.config.json`, since the
+  CLI's loader of a `.ts` config needs TypeScript's JavaScript API, which
+  TypeScript 7 does not ship), Capacitor's own `android/` template, Gradle
+  8.14.4 (Kotlin 2.4 calls 8.14.3 deprecated) and Kotlin 2.4.21 for the
+  plugin. _Moved to PR A2:_ the message for an older WebView. It needs a
+  store error of its own that the shared UI words in both languages, beside
+  the shell's other manners; until then an older WebView shows the store's
+  general failure.
 
 ### Platform adapters
 
@@ -118,6 +135,18 @@ were checked on 2026-11-01.
   a saved account's or the one being signed in to, so nothing the user did
   not type goes out unencrypted.
 
+  _Built in PR A1_ (`AstroTimeHttp`: `Exchange.kt`, `HttpPlugin.kt`;
+  `apps/mobile/src/http.ts`), on OkHttp 5.4.0: 5.5 needs `compileSdk` 37,
+  beyond Capacitor 8's 36. The TypeScript adapter sends with each request the
+  origins plain http may reach, the http ones among the saved accounts'
+  addresses and calendar homes and the servers being signed in to
+  (`signingInTo`, [D60](#D60)); the plugin checks every hop against them.
+  `Authorization` dropped on leaving the origin stays dropped for the rest of
+  the redirects, as `fetch` does. The plugin rejects with a code the adapter
+  reads: `offline` (also an answer that broke off) becomes `OfflineError`;
+  `cleartext`, `redirects` (past 10) and `invalid` stay errors of their own.
+  Reads and writes may take a minute, for a large calendar's `REPORT`.
+
 - **D63. The store: sqlite-wasm on OPFS in the WebView.** _Changes
   foundation's [D25](foundation.md#D25)_, which named
   `@capacitor-community/sqlite`. The Android WebView is Chromium, and OPFS
@@ -134,6 +163,13 @@ were checked on 2026-11-01.
   WebView answers. If eviction is real, the native plugin comes in behind
   the same `SqlDriver`, and only pending changes are at stake (the rest is
   on the server).
+
+  _Checked in PR A1:_ the Android System WebView (Chromium 133, on an
+  Android 16 emulator) answers `persist()` with `false`, and `persisted()`
+  is `false`: the store is best-effort storage, as a site's is in a browser
+  that has not granted it. Whether the WebView ever evicts it under storage
+  pressure is still not verified; the native plugin stays
+  [deferred](#deferred) until it is.
 
 - **D64. Credentials under a Keystore key: `@aparajita/capacitor-secure-storage`.**
   The `SecretStore` adapter uses `@aparajita/capacitor-secure-storage`
@@ -224,6 +260,16 @@ were checked on 2026-11-01.
   opens the store; if it cannot, the app syncs only while open and
   background sync goes to Deferred.
 
+  _Checked in PR A1_, on an Android 16 emulator (WebView 133): a second
+  WebView of the app, created without a window in the same process and
+  serving a page on `https://localhost`, sees the same OPFS files (the store's
+  `opfs-sahpool` directory), sees the first WebView's Web Lock on the store
+  (`navigator.locks.query()` lists it, and a request with `ifAvailable` gets
+  none), and exchanges messages with it over a `BroadcastChannel` both ways.
+  What this decision builds on holds between two WebViews of one process;
+  the WorkManager job runs in the app's process too. What PR A4 still proves
+  is the headless WebView opening the store from a job with no activity.
+
 - **D68. Back button, theme, edge to edge.** The back button
   (`@capacitor/app`) closes what is open (a dialog, the drawer, the tasks
   screen), then goes back in the UI's history, and at the first screen
@@ -241,18 +287,29 @@ were checked on 2026-11-01.
 ### Build and release
 
 - **D69. Build, CI, release and the dev shell.**
-  - **Dev shell:** devenv's `android` module (it composes nixpkgs'
-    `androidenv`, accepts the SDK licence, and points Gradle at nixpkgs'
-    `aapt2`, which the Maven one cannot replace on NixOS), with platform
-    36, build tools 36.0.0 and JDK 21 (what Capacitor 8's Gradle build
-    needs) and without the emulator, system images and NDK, which keeps
-    the download small. Android Studio is not part of it; a device or an
-    emulator outside the shell runs the debug APK.
+  - **Dev shell:** nixpkgs' `androidenv`, composed in `devenv.nix` (the SDK
+    licence accepted and its packages, which nixpkgs marks unfree,
+    permitted by name in `devenv.yaml`), with platform 36, build tools
+    35.0.0, platform-tools and the command-line tools, and JDK 21 (what
+    Capacitor 8's Gradle build needs); Gradle is pointed at nixpkgs'
+    `aapt2`, which the Maven one cannot replace on NixOS. No emulator,
+    system images, NDK, CMake or old SDK tools, and `sdkmanager` runs on
+    the shell's headless JDK 21 rather than the full JDK 17 that
+    `androidenv` wraps it with: the SDK adds about 450 MB and the JDK
+    565 MB, 1.0 GB in all (1.8 GB with `androidenv`'s JDK). Android Studio
+    is not part of it; a device or an emulator outside the shell runs the
+    debug APK. _Changed in PR A1:_ devenv's `android` module was the plan,
+    but it always adds an emulator launcher with an SDK of its own
+    (platform 35, command-line tools 8.0) and the old SDK tools 26.1.1, and
+    writes `local.properties` and `.android/` into the repository's root;
+    and the build tools are 35.0.0, not 36.0.0, because the Android Gradle
+    Plugin (8.13) uses 35.0.0 unless a module says otherwise, and
+    Capacitor's own library modules do not.
   - **CI:** a job on every PR builds the UI, `cap sync`s it and runs
     `./gradlew assembleDebug test` on `ubuntu-latest`, with JDK 21 from
     `actions/setup-java` (the runner's default JDK moves to 25 with Ubuntu
     26.04) and the SDK packages it needs installed by the job itself
-    (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`, a no-op
+    (`sdkmanager "platforms;android-36" "build-tools;35.0.0"`, a no-op
     where the image has them), so a new runner image cannot take them
     away. The debug APK, signed with the run's throwaway debug key and so
     installable for trying the app, is the run's artifact (each run's
@@ -295,6 +352,8 @@ were checked on 2026-11-01.
 - **Widgets, quick settings tile, share target** — none in the first
   release.
 - **System calendars** — foundation's Deferred (`CalendarContract`).
+- **The app's icon and splash screen** — Capacitor's placeholders until
+  AstroTime has a design for them ([D61](#D61)).
 - **One redirect loop for the native shells** — a shared redirect loop in
   `@astrotime/caldav` over a one-hop `HttpClient`, so Android's plugin and
   the desktop's `net.request` follow one implementation of the redirect rule
@@ -315,6 +374,10 @@ password (credentials held in memory until PR A2); the dev shell's SDK; the
 CI job with the debug APK. Decisions: D60, D61, D62, D63, D69 (dev shell,
 CI, tests).
 
+_As built:_ `SecretStore` and `syncAll` had come with foundation's PR 5a-3,
+and `ReminderScheduler` comes with foundation's PR 6 ([D60](#D60)); A1 adds
+`signingInTo`. The message for an older WebView moved to A2 ([D61](#D61)).
+
 Done when: the debug APK from CI installs on a phone or an emulator, signs
 in to a Radicale or a Nextcloud by password, and shows its items from the
 local store after a restart without a network; the plugin's Gradle tests
@@ -326,13 +389,14 @@ same OPFS files, the first one's Web Lock and its `BroadcastChannel`s
 ### PR A2 — Credentials, Login Flow v2, the shell's manners
 
 The Keystore-backed `SecretStore`, Login Flow v2 in a Custom Tab, the back
-button, the theme and edge to edge. Decisions: D64, D65, D68.
+button, the theme and edge to edge, the message for an older WebView
+(moved here from A1). Decisions: D61 (that message), D64, D65, D68.
 
 Done when: credentials survive a restart and are unreadable in the app's
 data without the Keystore; a Nextcloud account is added through Login
 Flow v2 on a phone; back closes the drawer, then leaves the app; the top
 bar and the floating button clear the status and navigation bars in both
-themes (screenshots).
+themes (screenshots); a WebView older than Chromium 109 says to update it.
 
 ### PR A3 — Reminders
 

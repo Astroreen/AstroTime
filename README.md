@@ -56,6 +56,13 @@ vp dev apps/web  # the web app; CalDAV goes through its /dav-proxy/
 vp check && vp run -r typecheck && vp test run
 ```
 
+The Android app's debug APK (the dev shell has the SDK and JDK 21):
+
+```sh
+vp run --filter @astrotime/mobile build && pnpm --filter @astrotime/mobile sync
+(cd apps/mobile/android && ./gradlew assembleDebug test)
+```
+
 Or everything at once (the dev server and a local CalDAV server):
 `scripts/t3/dev.sh`, stopped with `scripts/t3/stop.sh`
 ([details](scripts/t3/README.md)).
