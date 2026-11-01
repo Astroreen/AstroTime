@@ -185,8 +185,13 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
     let gone: () => void = () => {};
     const closed = new Promise<void>((resolve) => (gone = resolve));
     thread.addEventListener("message", (event: MessageEvent<Report>) => {
-      if (event.data.type === "failed") fail(new Error(event.data.error));
-      else gone();
+      if (event.data.type === "failed") {
+        fail(new Error(event.data.error));
+        // A leader that failed after opening may still hold the files' handles:
+        // the worker goes with them, so the next tab can open the database.
+        thread.terminate();
+        gone();
+      } else gone();
     });
     // A worker that fails to load or crashes answers nothing again.
     thread.addEventListener("error", (event) => {
