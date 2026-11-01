@@ -17,3 +17,9 @@ export async function openDemo(
   }
   await page.goto("/?demo");
 }
+
+/** Opens the app on an empty store (no demo) with the clock frozen at `NOW`. */
+export async function openApp(page: Page): Promise<void> {
+  await page.clock.setFixedTime(NOW);
+  await page.goto("/");
+}

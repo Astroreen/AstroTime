@@ -57,6 +57,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/chromium
+      # The accounts' specs sign in to a real Radicale (apps/web/e2e/accounts.spec.ts).
+      - run: pipx install radicale==3.8.0
       # Playwright starts the web app's dev server and loads the demo data (apps/web/e2e).
       - run: pnpm --filter @astrotime/web e2e
       - name: Playwright's traces, when a test failed
