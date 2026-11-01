@@ -24,6 +24,8 @@ import { addDays } from "./dates.ts";
 export interface Entry {
   /** Unique among the entries: the stored object and the occurrence. */
   readonly key: string;
+  /** The stored object it comes from. */
+  readonly objectId: string;
   readonly occurrence: Occurrence;
   readonly object: CalendarObject;
   readonly calendarId: string;
@@ -94,6 +96,7 @@ function expand(object: CalendarObject, row: StoredObject, range: Range): Entry[
   const seriesDone = object.master !== null && isDone(object.master);
   return occurrences.map((occurrence) => ({
     key: `${row.id}/${JSON.stringify(occurrence.recurrenceId)}`,
+    objectId: row.id,
     occurrence,
     object,
     calendarId: row.calendarId,

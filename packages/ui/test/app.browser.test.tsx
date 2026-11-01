@@ -97,6 +97,50 @@ test("draws today from the local store, and follows the store as a sync writes t
   await expect.element(late).not.toBeInTheDocument();
 });
 
+test("completing and starring on the tasks screen write the task to the store, to upload (D52)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  render(Promise.resolve(store), ["en-US"]);
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page.getByRole("tab", { name: /^Tasks/ }).click();
+  const list = (await store.calendars()).find((calendar) => calendar.name === "Tasks")!;
+  const before = (await store.tasks([list.id])).find((task) => task.uid === "demo-report")!;
+  /** The next write to the store. */
+  const written = () =>
+    new Promise<void>((resolve) => {
+      const stop = store.subscribe(() => {
+        stop();
+        resolve();
+      });
+    });
+
+  const report = page.getByRole("checkbox", { name: "Send the report" });
+  await expect.element(report).toBeInTheDocument();
+  let write = written();
+  // No stylesheet here, so the empty circle has no size: clicked in the DOM.
+  // The e2e tests click it as it is drawn.
+  (report.element() as HTMLElement).click();
+  await write;
+  const [completed] = await store.pending(list.id);
+  expect(completed).toMatchObject({ id: before.id, href: before.href, pending: "update" });
+  // Only what completing writes changed (AGENTS.md rule 2).
+  expect(completed!.ics).toBe(
+    before.ics
+      .replace("DTSTAMP:20260101T000000Z", "DTSTAMP:20261104T084000Z")
+      .replace(
+        "END:VTODO",
+        "STATUS:COMPLETED\r\nCOMPLETED:20261104T084000Z\r\nPERCENT-COMPLETE:100\r\nLAST-MODIFIED:20261104T084000Z\r\nEND:VTODO",
+      ),
+  );
+
+  write = written();
+  await page.getByRole("button", { name: "Star: Write the proposal" }).click();
+  await write;
+  const proposal = (await store.pending(list.id)).find((task) => task.uid === "demo-proposal");
+  expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
+});
+
 test("a store another tab holds: a message in the user's language", async () => {
   render(failing(new StoreInUseError("held")), ["ru-RU"]);
   await expect

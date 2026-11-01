@@ -19,6 +19,9 @@ export class Formats {
   readonly #weekdayNarrow: Intl.DateTimeFormat;
   readonly #fullDate: Intl.DateTimeFormat;
   readonly #shortDate: Intl.DateTimeFormat;
+  readonly #shortDateYear: Intl.DateTimeFormat;
+  readonly #weekdayLong: Intl.DateTimeFormat;
+  readonly #relativeDay: Intl.RelativeTimeFormat;
   readonly #month: Intl.DateTimeFormat;
   readonly #monthYear: Intl.DateTimeFormat;
   readonly #hour: Intl.DateTimeFormat;
@@ -35,6 +38,9 @@ export class Formats {
     this.#weekdayNarrow = at({ weekday: "narrow" });
     this.#fullDate = at({ weekday: "long", day: "numeric", month: "long" });
     this.#shortDate = at({ weekday: "short", day: "numeric", month: "short" });
+    this.#shortDateYear = at({ weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    this.#weekdayLong = at({ weekday: "long" });
+    this.#relativeDay = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
     this.#month = at({ month: "long" });
     this.#monthYear = at({ month: "long", year: "numeric" });
     // 24 hours: "09:00", as the reference; 12 hours: "9 AM".
@@ -76,6 +82,22 @@ export class Formats {
   /** "Tue, Nov 3". */
   shortDate(day: string): string {
     return this.#shortDate.format(utcDate(day));
+  }
+
+  /** "Today", "Tomorrow", "Yesterday"; else "Thu, Nov 5", with the year when it is not `today`'s. */
+  day(day: string, today: string): string {
+    const offset = Math.round((utcDate(day).getTime() - utcDate(today).getTime()) / 86_400_000);
+    if (Math.abs(offset) <= 1) {
+      return capitalize(this.#relativeDay.format(offset, "day"), this.#locale);
+    }
+    const format = day.slice(0, 4) === today.slice(0, 4) ? this.#shortDate : this.#shortDateYear;
+    return format.format(utcDate(day));
+  }
+
+  /** "Monday", "Понедельник": a weekday by its ISO number (1 is Monday). */
+  weekdayName(weekday: number): string {
+    // 2024-01-01 was a Monday.
+    return capitalize(this.#weekdayLong.format(utcDate(`2024-01-0${weekday}`)), this.#locale);
   }
 
   /** "November", "October – November", "December 2026 – January 2027": the year only when it is not `currentYear`. */

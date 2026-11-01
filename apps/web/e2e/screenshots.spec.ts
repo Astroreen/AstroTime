@@ -92,3 +92,56 @@ test("the strip expanded, the undone tasks, the drawer and the month picker", as
     await page.context().close();
   }
 });
+
+test("the tasks screen, its panel, the settings and search (design D52, D53)", async ({
+  browser,
+}) => {
+  for (const language of ["en", "ru"] as const) {
+    const tasks = language === "en" ? "Tasks" : "Задачи";
+    const completed = language === "en" ? /^Completed/ : /^Выполненные/;
+    for (const theme of ["dark", "light"] as const) {
+      const page = await open(browser, { language, theme, size: PHONE }, "day");
+      await page.getByRole("button", { name: tasks, exact: true }).click();
+      const panel = page.getByRole("region", { name: tasks });
+      await panel.getByRole("tab", { name: new RegExp(`^${tasks}`) }).click();
+      await expect(panel.getByRole("checkbox").first()).toBeVisible();
+      await shot(page, `tasks-${theme}-${language}-phone`);
+      if (theme === "dark") {
+        await panel.getByRole("button", { name: completed }).click();
+        await expect(panel.getByRole("checkbox", { checked: true }).first()).toBeVisible();
+        await shot(page, `tasks-completed-${theme}-${language}-phone`);
+      }
+      await page.context().close();
+    }
+    const wide = await open(
+      browser,
+      { language, theme: language === "en" ? "dark" : "light", size: WIDE },
+      "week",
+    );
+    await wide.getByRole("button", { name: tasks, exact: true }).click();
+    await expect(
+      wide.getByRole("region", { name: tasks }).getByRole("checkbox").first(),
+    ).toBeVisible();
+    await shot(wide, `tasks-panel-${language === "en" ? "dark" : "light"}-${language}-wide`);
+    await wide.context().close();
+
+    const page = await open(browser, { language, theme: "dark", size: PHONE }, "day");
+    await page
+      .getByRole("button", { name: language === "en" ? "Main menu" : "Главное меню" })
+      .click();
+    const settings = page.getByRole("region", {
+      name: language === "en" ? "Settings" : "Настройки",
+    });
+    await settings.scrollIntoViewIfNeeded();
+    await expect(settings).toBeInViewport();
+    await shot(page, `settings-dark-${language}-phone`);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: language === "en" ? "Search" : "Поиск" }).click();
+    await page.getByRole("searchbox").fill(language === "en" ? "the" : "на");
+    await expect(
+      page.getByRole("list", { name: /Search results|Результаты поиска/ }),
+    ).toBeVisible();
+    await shot(page, `search-dark-${language}-phone`);
+    await page.context().close();
+  }
+});

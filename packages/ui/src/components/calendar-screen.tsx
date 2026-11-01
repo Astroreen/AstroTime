@@ -1,10 +1,12 @@
 // The app shell around the views (design D46): the top bar with the account
 // button, the drawer (a sidebar on a wide screen), the view and the floating
-// "+" button; the first-run screen while there is no account. The view
-// reads the local store only and follows its changes (docs/plans/foundation.md#D5).
+// "+" button; search and the tasks screen open from the top bar (D52, D53);
+// the first-run screen while there is no account. The view reads the local
+// store only and follows its changes (docs/plans/foundation.md#D5).
+import { wallClockOf } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -23,13 +25,23 @@ import {
 } from "../calendar/views.ts";
 import { useEntries, useMediaQuery, useNow } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
+import { useSettings } from "../settings.ts";
 import { AccountButton, FirstRun } from "./accounts.tsx";
 import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
-import { ChevronIcon, MenuIcon, PlusIcon, TodayIcon } from "./icons.tsx";
+import {
+  CheckCircleIcon,
+  ChevronIcon,
+  MenuIcon,
+  PlusIcon,
+  SearchIcon,
+  TodayIcon,
+} from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
 import { MonthView } from "./month-view.tsx";
+import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
+import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 
 /** A calendar without a colour of its own (design D47). */
@@ -53,9 +65,11 @@ export function CalendarScreen({
   timeZone: string;
 }) {
   const { t } = useTranslation();
-  const [formats] = useState(() => new Formats(settings));
+  // Made again when the settings change the language, week or clock (D53).
+  const formats = useMemo(() => new Formats(settings), [settings]);
   const { today, minutes } = useNow(timeZone);
   const wide = useMediaQuery("(min-width: 1024px)");
+  const { hideCompleted } = useSettings().settings;
 
   const [view, setView] = usePreference<View>(
     preferences,
@@ -67,7 +81,19 @@ export function CalendarScreen({
     JSON.stringify([...ids]),
   );
   const [anchor, setAnchor] = useState(today);
+  // A tab left open overnight: an anchor on today moves on to the new today.
+  const [seenToday, setSeenToday] = useState(today);
+  if (seenToday !== today) {
+    setSeenToday(today);
+    if (anchor === seenToday) setAnchor(today);
+  }
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [taskFocus, setTaskFocus] = useState<TaskFocus | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  // The item a search jumped to, marked while its day is the one jumped to.
+  const [found, setFound] = useState<{ objectId: string; anchor: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
@@ -112,6 +138,44 @@ export function CalendarScreen({
     validColor(entry.occurrence.item.color) ?? colorOfCalendar(entry.calendarId);
   const layoutContext = { today, timeZone, undone: data.undone.length };
   const undoneColor = (task: UndoneTask) => colorOfCalendar(task.object.calendarId);
+  // "Hide completed" hides completed tasks' chips on every view, not the undone chip (D51).
+  const entries = hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries;
+  const foundId = found?.anchor === anchor ? found.objectId : null;
+
+  // A search's item is scrolled to once it is drawn.
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!foundId || scrolledTo.current === `${foundId}/${anchor}`) return;
+    const element = document.querySelector("main [data-found]");
+    if (!element) return;
+    element.scrollIntoView({ block: "center" });
+    scrolledTo.current = `${foundId}/${anchor}`;
+  });
+
+  const taskLists = (lists?.calendars ?? []).filter((calendar) =>
+    calendar.components.includes("VTODO"),
+  );
+  const pick = (result: SearchResult) => {
+    setSearching(false);
+    setQuery("");
+    if (result.occurrence) {
+      const day = wallClockOf(result.occurrence.start, timeZone).slice(0, 10);
+      setAnchor(day);
+      setFound({ objectId: result.stored.id, anchor: day });
+      if (!wide) setTasksOpen(false);
+    } else {
+      // An undated task lives on the tasks screen only (docs/plans/foundation.md#D16).
+      setTaskFocus({ calendarId: result.stored.calendarId, objectId: result.stored.id });
+      setTasksOpen(true);
+    }
+  };
+  // Closed, the tasks screen forgets the task a search asked for.
+  const closeTasks = () => {
+    setTasksOpen(false);
+    setTaskFocus(null);
+  };
+  const phoneTasks = !wide && tasksOpen;
+  const covered = phoneTasks || searching;
 
   const go = (direction: 1 | -1) => setAnchor((current) => stepAnchor(view, current, direction));
   const pickView = (next: View) => {
@@ -169,10 +233,18 @@ export function CalendarScreen({
   if (lists && lists.accounts.length === 0) return <FirstRun />;
 
   return (
-    <CalendarContext.Provider value={{ formats, timeZone, colorOf }}>
+    <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>
       <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
-        <div className="isolate flex h-dvh flex-col bg-canvas text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
-          <header className="flex h-14 shrink-0 items-center gap-1 px-1.5">
+        <div className="relative isolate flex h-dvh flex-col bg-canvas text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
+          {searching && (
+            <SearchBar query={query} onQuery={setQuery} onClose={() => setSearching(false)} />
+          )}
+          <header
+            hidden={searching}
+            inert={phoneTasks}
+            aria-hidden={phoneTasks || undefined}
+            className="flex h-14 shrink-0 items-center gap-1 px-1.5"
+          >
             {wide ? (
               <button
                 type="button"
@@ -219,15 +291,34 @@ export function CalendarScreen({
             <button
               type="button"
               className={iconButton}
+              aria-label={t("topBar.search")}
+              title={t("topBar.search")}
+              onClick={() => setSearching(true)}
+            >
+              <SearchIcon />
+            </button>
+            <button
+              type="button"
+              className={iconButton}
               aria-label={t("topBar.today")}
               title={t("topBar.today")}
               onClick={() => setAnchor(today)}
             >
               <TodayIcon day={formats.dayNumber(today)} />
             </button>
+            <button
+              type="button"
+              className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
+              aria-label={t("topBar.tasks")}
+              title={t("topBar.tasks")}
+              aria-pressed={tasksOpen}
+              onClick={() => (tasksOpen ? closeTasks() : setTasksOpen(true))}
+            >
+              <CheckCircleIcon />
+            </button>
             <AccountButton accounts={lists?.accounts ?? []} />
           </header>
-          <div className="flex min-h-0 flex-1">
+          <div inert={covered} aria-hidden={covered || undefined} className="flex min-h-0 flex-1">
             {wide && sidebarOpen && (
               <nav aria-label={t("topBar.menu")} className="w-64 shrink-0 overflow-y-auto">
                 {drawer}
@@ -247,7 +338,7 @@ export function CalendarScreen({
               ) : view === "month" ? (
                 <MonthView
                   month={titleRange(view, days, anchor)[0]}
-                  weeks={layoutMonth(data.entries, days, layoutContext)}
+                  weeks={layoutMonth(entries, days, layoutContext)}
                   today={today}
                   undone={data.undone}
                   undoneColor={undoneColor}
@@ -257,7 +348,7 @@ export function CalendarScreen({
               ) : (
                 <TimeGrid
                   days={days}
-                  layout={layoutRange(data.entries, days, layoutContext)}
+                  layout={layoutRange(entries, days, layoutContext)}
                   today={today}
                   minutes={minutes}
                   undone={data.undone}
@@ -277,7 +368,49 @@ export function CalendarScreen({
                 <PlusIcon className="size-7" />
               </button>
             </main>
+            {wide && tasksOpen && (
+              <aside className="w-[22.5rem] shrink-0 border-l border-line">
+                <TasksScreen
+                  store={store}
+                  preferences={preferences}
+                  lists={taskLists}
+                  today={today}
+                  now={nowOf(today, minutes)}
+                  wide
+                  focus={taskFocus}
+                  onClose={closeTasks}
+                />
+              </aside>
+            )}
           </div>
+          {searching && (
+            <div className="absolute inset-x-0 top-14 bottom-0 z-[75] overflow-y-auto bg-canvas">
+              <SearchResults
+                store={store}
+                calendarIds={visible.map((calendar) => calendar.id)}
+                query={query}
+                today={today}
+                colorOf={(result) =>
+                  validColor(result.item.color) ?? colorOfCalendar(result.stored.calendarId)
+                }
+                onPick={pick}
+              />
+            </div>
+          )}
+          {phoneTasks && !searching && (
+            <div className="absolute inset-0 z-[75]">
+              <TasksScreen
+                store={store}
+                preferences={preferences}
+                lists={taskLists}
+                today={today}
+                now={nowOf(today, minutes)}
+                wide={false}
+                focus={taskFocus}
+                onClose={closeTasks}
+              />
+            </div>
+          )}
         </div>
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
@@ -289,4 +422,10 @@ export function CalendarScreen({
       </Dialog.Root>
     </CalendarContext.Provider>
   );
+}
+
+/** The wall clock at `minutes` past midnight of `today`, `2026-11-04T10:40:00`. */
+function nowOf(today: string, minutes: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${today}T${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
 }
