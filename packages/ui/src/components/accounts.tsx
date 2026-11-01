@@ -98,7 +98,7 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
   const { t } = useTranslation();
   const value = useAccounts();
   const item =
-    "flex h-10 cursor-default items-center rounded-lg px-3 text-sm outline-none data-highlighted:bg-raised-hover";
+    "flex h-10 cursor-default items-center rounded-lg px-3 text-sm -outline-offset-2 data-highlighted:bg-raised-hover";
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -177,6 +177,10 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
           />
         )}
       </Dialog.Trigger>
+      {/* A sync that comes to need the user is said, not only shown as the dot. */}
+      <span role="status" className="sr-only">
+        {attention && !value.status.running ? t("accounts.buttonAttention") : ""}
+      </span>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
@@ -191,7 +195,8 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
                   <Avatar account={account} size="size-9" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14.5px] font-medium">{account.name}</p>
-                    <p className="truncate text-[12.5px] text-ink-muted">
+                    {/* Said as it changes, so Sync now is heard to run and end. */}
+                    <p role="status" className="truncate text-[12.5px] text-ink-muted">
                       <StatusLine account={account} value={value} />
                     </p>
                   </div>
@@ -285,7 +290,7 @@ export function AccountSection({
       <div className="flex items-center gap-1 pt-2 pr-1 pl-4">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-xs text-ink-muted">{account.name}</h3>
-          <p className="truncate text-[11px] text-ink-muted/80">
+          <p className="truncate text-[11px] text-ink-muted">
             <StatusLine account={account} value={value} />
           </p>
         </div>

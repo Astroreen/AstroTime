@@ -110,6 +110,7 @@ export const en = {
 
   "topBar.menu": "Main menu",
   "topBar.today": "Today",
+  "topBar.todayLabel": "Today, {{date}}",
   "topBar.period": "{{period}}, choose a date",
   "topBar.search": "Search",
   "topBar.tasks": "Tasks",

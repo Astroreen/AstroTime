@@ -181,9 +181,11 @@ export function TasksScreen({
                         ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
                         : list.name
                     }
-                    className="group flex h-12 items-center gap-2 px-4 text-[15px] whitespace-nowrap text-ink-muted outline-none hover:text-ink focus-visible:bg-raised data-active:text-accent"
+                    className="group flex h-12 items-center gap-2 px-4 text-[15px] whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised data-active:text-accent"
                   >
                     {list.name}
+                    {/* Apart as words, as the name says them (WCAG 2.5.3). */}
+                    {count > 0 && " "}
                     {count > 0 && (
                       // The open list's count shows in its card instead, as in the reference.
                       <span
@@ -210,11 +212,7 @@ export function TasksScreen({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
             {lists.map((list) => (
-              <Tabs.Panel
-                key={list.id}
-                value={list.id}
-                className="flex flex-col gap-3 outline-none"
-              >
+              <Tabs.Panel key={list.id} value={list.id} className="flex flex-col gap-3 rounded-xl">
                 <ListCards
                   list={list}
                   tasks={byList.get(list.id)}
@@ -365,7 +363,7 @@ function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }
                 <Menu.RadioItem
                   key={option}
                   value={option}
-                  className="flex h-10 cursor-default items-center gap-3 px-4 text-[14px] outline-none data-highlighted:bg-raised-hover"
+                  className="flex h-10 cursor-default items-center gap-3 px-4 text-[14px] -outline-offset-2 data-highlighted:bg-raised-hover"
                 >
                   <span className="grid size-4 place-items-center text-accent">
                     <Menu.RadioItemIndicator>

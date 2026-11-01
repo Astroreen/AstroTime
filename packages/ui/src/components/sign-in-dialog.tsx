@@ -23,7 +23,7 @@ export const primaryButton =
 export const textButton =
   "rounded-full px-4 py-2 text-sm font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 const input =
-  "h-11 w-full rounded-lg bg-canvas px-3 text-[15px] text-ink ring-1 ring-line outline-none placeholder:text-ink-muted/70 focus:ring-2 focus:ring-accent";
+  "h-11 w-full rounded-lg bg-canvas px-3 text-[15px] text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent";
 
 export function SignInDialog({
   request,

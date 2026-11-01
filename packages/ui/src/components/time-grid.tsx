@@ -336,7 +336,7 @@ function Strip({
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] overflow-y-auto"}`}
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${rows}, 22px)`,
+        gridTemplateRows: `repeat(${rows}, 24px)`,
         minHeight: rows === 0 ? 4 : undefined,
       }}
     >

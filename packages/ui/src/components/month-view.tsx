@@ -18,7 +18,7 @@ import { GhostChip, StripChip } from "./items.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
 /** Pixels: the day's number above its chips, one row of chips, the gap between tiles. */
-const NUMBER = 25;
+const NUMBER = 26;
 const ROW = 17;
 const GAP = 3;
 
@@ -94,6 +94,7 @@ export function MonthView(props: MonthViewProps) {
     <DragContext.Provider value={drag.value}>
       <div
         ref={root}
+        data-view="month"
         className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
         {...swipe}
       >
@@ -243,18 +244,18 @@ function DayTile({
       data-outside={outside || undefined}
       onClick={onClick}
     >
-      <div className="flex justify-center pt-[3px]">
+      <div className="flex justify-center pt-px">
         <button
           type="button"
           aria-label={name}
           aria-current={isToday ? "date" : undefined}
           onClick={() => onOpenDay(day)}
           className={[
-            "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-[13px] leading-none tabular-nums focus-visible:outline-2 focus-visible:outline-accent",
+            "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[13px] leading-none tabular-nums focus-visible:outline-2 focus-visible:outline-accent",
             isToday
               ? "bg-accent font-semibold text-on-accent"
               : outside
-                ? "text-ink-muted/70 hover:bg-raised"
+                ? "text-ink-muted hover:bg-raised"
                 : "text-ink hover:bg-raised",
           ].join(" ")}
         >

@@ -36,6 +36,26 @@
 }
 
 @layer base {
+  /*
+   * A focus ring wherever an element has none of its own (WCAG 2.4.7);
+   * the UI's own rings use the same accent.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  /*
+   * Asked for less motion (WCAG 2.3.3): no slides, fades or scales; things
+   * appear at once. The sync spinner keeps turning: it says sync runs.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition-duration: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
   :root {
     color-scheme: light dark;
     /*
@@ -74,11 +94,9 @@
   .item {
     --fill: var(--item);
     background: var(--fill);
-    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
   }
   .item[data-done] {
     --fill: color-mix(in oklab, var(--item) 45%, var(--color-tile));
-    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0 / 0.7);
   }
   .item[data-done] .item-title-wrap,
   .item[data-done] .item-title {
@@ -88,8 +106,9 @@
     display: block;
     overflow-wrap: anywhere;
   }
+  /* Set apart by its weight, not by fading: faded, it would lose its contrast. */
   .item-time {
-    opacity: 0.85;
+    font-weight: 400;
   }
   /* The item a search jumped to (design D53). */
   [data-found] {
@@ -120,8 +139,24 @@
   :root[data-dragging="resize"] * {
     cursor: ns-resize;
   }
-  /* A mark on a calendar's colour (the drawer's checkbox), dark or light by that colour. */
+  /* A mark on a calendar's colour (the drawer's checkbox), black or white by that colour. */
   .item-on-color {
-    color: oklch(from var(--calendar) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
+    --fill: var(--calendar);
+  }
+  /*
+   * The text on a calendar's colour (`--fill`, design D120): black or white,
+   * whichever contrasts more by WCAG's relative luminance, computed from the
+   * fill's linear-light channels. Their contrasts are equal at a luminance of
+   * 0.1791, where each is 4.58:1, so any fill gets at least 4.5:1, the
+   * contrast small text needs.
+   */
+  .item,
+  .item-on-color {
+    color: color(
+      from var(--fill) srgb-linear
+        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
+        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
+        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
+    );
   }
 }

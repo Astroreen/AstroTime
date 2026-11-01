@@ -127,7 +127,7 @@ export function SearchResults({
               type="button"
               aria-label={`${title}, ${time}`}
               onClick={() => onPick(result)}
-              className="flex w-full items-start gap-4 px-5 py-2.5 text-left hover:bg-raised focus-visible:bg-raised focus-visible:outline-none"
+              className="flex w-full items-start gap-4 px-5 py-2.5 text-left hover:bg-raised focus-visible:bg-raised focus-visible:-outline-offset-2"
               style={{ "--item": colorOf(result) } as CSSProperties}
             >
               <span aria-hidden="true" className="grid h-5 w-[18px] shrink-0 place-items-center">
@@ -137,8 +137,9 @@ export function SearchResults({
                   <span className="size-3 rounded-full bg-[var(--item)]" />
                 )}
               </span>
+              {/* The space keeps the title and the time apart as words, as the name says them (WCAG 2.5.3). */}
               <span className="flex min-w-0 flex-col">
-                <span className="text-[15px] break-words text-ink">{title}</span>
+                <span className="text-[15px] break-words text-ink">{title}</span>{" "}
                 <span className="text-[13px] text-ink-muted">{time}</span>
               </span>
             </button>

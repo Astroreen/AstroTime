@@ -66,7 +66,7 @@ export interface EditorState {
 }
 
 const field =
-  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-[15px] text-ink ring-1 ring-line outline-none placeholder:text-ink-muted/70 focus:ring-2 focus:ring-accent [color-scheme:inherit]";
+  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-[15px] text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 
 export function ItemEditor({
   state,
@@ -186,7 +186,7 @@ function Fields({
         value={form.summary}
         autoFocus={!existing}
         onChange={(e) => set({ summary: e.target.value })}
-        className="h-12 w-full border-b border-line bg-transparent px-1 text-[22px] text-ink outline-none placeholder:text-ink-muted/70 focus:border-accent"
+        className="h-12 w-full border-b border-line bg-transparent px-1 text-[22px] text-ink outline-none placeholder:text-ink-muted focus:border-accent"
       />
 
       <Section icon={<ClockIcon className="size-5" />}>
