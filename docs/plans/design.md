@@ -659,7 +659,9 @@ dialog ([D108](#D108)) did wrong, and does now:
     be given none (`problemOf`).
   - **A new start keeps the length over midnight** (`withStartTime`), as
     Google moves the end: 22:00–02:00 started at 23:00 ends at 03:00 the
-    next day; 22:00–23:00 started at 23:30 ends at 00:30.
+    next day; 22:00–23:00 started at 23:30 ends at 00:30. The length is
+    the wall clock's, as Google's: across a DST change an hour stays an
+    hour on the clock.
   - **Save with nothing changed asks nothing** of an occurrence of a
     series, as a drop that changes nothing ([D111](#D111)); it writes
     nothing either.

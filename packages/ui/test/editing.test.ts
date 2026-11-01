@@ -241,7 +241,6 @@ describe("the form's corners", () => {
   test("an event without a length (no DTEND) saves while its times are as they were", () => {
     const initial = formOf(event("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n"), timeZone);
     expect(problemOf({ ...initial, summary: "Ping 2" }, initial)).toBeNull();
-    // Given a time, it lasts.
     // A new start moves its end with it, and it keeps no length.
     const later = withStartTime(initial, "10:00");
     expect(later).toMatchObject({ startTime: "10:00", endDate: "2026-11-05", endTime: "10:00" });
@@ -415,6 +414,48 @@ describe("saving writes pending changes through the store (D5)", () => {
     const row = await store.objectAt(personal.id, "new-one.ics");
     expect(row).toMatchObject({ pending: "create", uid: "new-one" });
     expect((CalendarObject.parse(row!.ics).master as Event).summary).toBe("Haircut");
+  });
+
+  test("an event with no DTEND takes a new title and still has none", async () => {
+    const { store, byName } = await demo();
+    const personal = byName("Personal");
+    const stored = await store.saveFromServer(personal.id, {
+      href: "ping.ics",
+      etag: '"1"',
+      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VEVENT\r\nUID:ping\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nSUMMARY:Ping\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    });
+    const target = await targetOn(store, stored, "2026-11-05");
+    const initial = formOf(target, timeZone);
+    const form = { ...initial, summary: "Ping 2" };
+    expect(problemOf(form, initial)).toBeNull();
+    await saveForm(
+      store,
+      { target, initial, form, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: uids },
+    );
+    const row = (await store.objectAt(personal.id, "ping.ics"))!;
+    expect(row).toMatchObject({ pending: "update" });
+    expect(row.ics).toContain("SUMMARY:Ping 2\r\n");
+    expect(row.ics).not.toContain("DTEND");
+    expect(row.ics).not.toContain("DURATION");
+  });
+
+  test("a series saved with nothing changed asks no scope and writes nothing", async () => {
+    const { store, rowOf } = await demo();
+    const before = await rowOf("Work", "demo-standup");
+    const target = await targetOn(store, before, "2026-11-05");
+    const initial = formOf(target, timeZone);
+    expect(scopesFor(target, initial, { ...initial })).toEqual([]);
+    let writes = 0;
+    const stop = store.subscribe(() => writes++);
+    await saveForm(
+      store,
+      { target, initial, form: { ...initial }, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: uids },
+    );
+    stop();
+    expect(writes).toBe(0);
+    expect(await rowOf("Work", "demo-standup")).toEqual(before);
   });
 
   test("this and following: the old series updated, the rest a new pending creation", async () => {
