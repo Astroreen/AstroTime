@@ -47,6 +47,28 @@ reverse proxy pass it on as it is and keep the page out of its cache: a policy
 added there applies on top of this one, and a cached page would give everyone
 the same nonce.
 
+## Downloads
+
+Each release on [GitHub Releases](https://github.com/Astroreen/AstroTime/releases)
+carries the Linux and Android apps; the web app is the image above.
+
+**Linux** (x64 and arm64):
+
+- Debian and Ubuntu: `astrotime-<version>-amd64.deb` (or `-arm64.deb`),
+  installed with `sudo apt install ./astrotime-<version>-amd64.deb`. It
+  brings an AppArmor profile, so on Ubuntu 24.04 the app keeps Chromium's
+  sandbox: prefer it there.
+- Any distribution: `astrotime-<version>-x86_64.AppImage` (or
+  `-arm64.AppImage`); make it executable and run it. It needs `libfuse2`
+  (Ubuntu 24.04: `sudo apt install libfuse2t64`). Where the system keeps
+  user namespaces from it, as Ubuntu 24.04 does, it starts without
+  Chromium's sandbox ([D78](docs/plans/desktop.md#D78)).
+
+**Android:** `astrotime-<version>-unsigned.apk` is not signed yet, so
+Android does not install it as it is; sign it with a key of your own
+(`apksigner sign`) to try it. Signed releases come later
+([D69](docs/plans/android.md#D69)).
+
 ## Development
 
 ```sh

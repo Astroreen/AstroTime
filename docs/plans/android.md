@@ -3,8 +3,9 @@
 Status: **in progress** — [PR A1](#pr-a1--the-shell-http-and-the-store)
 (the shell, HTTP and the store) and
 [PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners) (credentials,
-Login Flow v2, the shell's manners) are built; A3–A5 are decided, not yet
-built.
+Login Flow v2, the shell's manners) and
+[PR A5](#pr-a5--the-release-apk) (the release APK) are built; A3 and A4
+are decided, not yet built.
 It started once foundation's
 [PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
 plan owns the Android app, `apps/mobile` (foundation's [D12](foundation.md#D12),
@@ -504,12 +505,24 @@ were checked on 2026-11-01.
     runs `./gradlew assembleRelease` with no signing config and attaches
     `astrotime-<version>-unsigned.apk` to the tag's GitHub Release, which
     the release workflow's first job creates for both platforms
-    (`gh release create --verify-tag --generate-notes`, a prerelease for a
-    prerelease tag, skipped when it exists); the Android and desktop jobs
-    `need` it (desktop [D79](desktop.md#D79)). An unsigned APK does not
+    (`gh release create --draft --verify-tag --generate-notes`, a prerelease
+    for a prerelease tag, skipped when it exists); the Android and desktop
+    jobs `need` it (desktop [D79](desktop.md#D79)), and a last job publishes
+    the draft once the image and every file are there, so a failed job never
+    leaves a public Release missing files. The upload jobs check out without
+    persisting the token, which only the upload step is given. An unsigned APK does not
     install as it is; no debug-signed build goes on a Release, since a key
     anyone can hold could sign updates to it. The signed release stays
     Deferred.
+    _Landed in PR A5:_ the APK carries the product's version: Gradle reads
+    the root `package.json` (`versionName` as it is, `versionCode` =
+    major × 1,000,000 + minor × 1,000 + patch, so each release's is higher;
+    a prerelease shares its release's). CI's Android job builds
+    `assembleRelease` beside the debug APK and runs the release's own check,
+    `scripts/release-apk.sh`: the APK renamed, `apksigner verify` reporting
+    it unsigned, and `aapt2 dump badging` showing the version. The release
+    workflow's `android` job runs the same script and uploads the file with
+    `gh release upload --clobber`.
   - **Tests:** the TypeScript side of each adapter is unit-tested in Node
     with the plugin replaced (errors to `OfflineError`, the notification
     set's diff, the ids); the Kotlin HTTP plugin is tested by Gradle with

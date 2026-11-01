@@ -1,6 +1,9 @@
-# docs/plans/foundation.md, D28: a `v*` tag publishes the web app's image to
-# GHCR (ghcr.io/astroreen/astrotime). The tag must match the version in
-# package.json. The Android APK joins this workflow with apps/mobile.
+# docs/plans/foundation.md, D28 and D41: a `v*` tag publishes every platform.
+# The first job checks the tag (on main, CI passed, matches package.json)
+# and creates its GitHub Release; then the web image goes to GHCR
+# (ghcr.io/astroreen/astrotime), the unsigned APK (docs/plans/android.md#D69)
+# and the AppImage and deb for x64 and arm64 (docs/plans/desktop.md#D79) to
+# the Release.
 name: Release
 
 on:
@@ -12,14 +15,13 @@ permissions:
   contents: read
 
 jobs:
-  image:
-    name: Web image
+  release:
+    name: GitHub Release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       checks: read
-      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,6 +48,34 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}" >&2
             exit 1
           fi
+      # One Release for every platform's files; a prerelease for a
+      # prerelease tag (v1.0.0-rc.1). A re-run finds it made.
+      - name: The tag's Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Drafts included: the tag lookup alone does not find a draft.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          if [ -n "$existing" ]; then
+            echo "The Release ${GITHUB_REF_NAME} exists"
+            exit 0
+          fi
+          prerelease=()
+          case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
+          # A draft until every platform's files are on it (the publish job).
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes "${prerelease[@]}"
+
+  image:
+    name: Web image
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -69,3 +99,86 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  android:
+    name: Android APK
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      # The job may write the Release; nothing it builds or installs gets the
+      # token: it is not left in .git/config, only passed to the upload step.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # As CI's Android job: JDK 21 and the SDK packages the build needs.
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"'
+      - run: vp run --filter @astrotime/mobile build
+      - run: pnpm --filter @astrotime/mobile sync
+      # No signing config: the release is unsigned until a release key
+      # exists (docs/plans/android.md#D69, Deferred).
+      - run: ./gradlew assembleRelease --console=plain
+        working-directory: apps/mobile/android
+      - name: Upload astrotime-<version>-unsigned.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk="$(bash scripts/release-apk.sh)"
+          gh release upload "$GITHUB_REF_NAME" "$apk" --clobber
+
+  desktop:
+    name: Desktop (${{ matrix.arch }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      # The job may write the Release; nothing it builds or installs gets the
+      # token: it is not left in .git/config, only passed to the upload step.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Built, then checked as CI checks them: fuses, the AppImage started,
+      # the deb installed and started.
+      - id: packages
+        uses: ./.github/actions/desktop-packages
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Upload the AppImage and the deb
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILES: ${{ steps.packages.outputs.files }}
+        run: |
+          mapfile -t files <<< "$FILES"
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
+  publish:
+    name: Publish the Release
+    runs-on: ubuntu-latest
+    # Only once the image and every file are there: a failed job leaves a
+    # draft to re-run, never a public Release missing files.
+    needs: [release, image, android, desktop]
+    permissions:
+      contents: write
+    steps:
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

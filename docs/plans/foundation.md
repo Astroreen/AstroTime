@@ -224,10 +224,17 @@ logic worth borrowing.
   a nightly job runs them against a real Nextcloud. Claude reviews every PR
   and answers `@claude`. Dependabot updates the actions, which are pinned to
   commit SHAs, and the image's base images, pinned by digest ([D41](#D41)).
-- **D28. Releases on a `v*` tag:** the web Docker image to GHCR and an
-  Android APK to GitHub Releases (unsigned at first); the desktop build
-  joins when it exists. How: [android D69](android.md#D69),
-  [desktop D79](desktop.md#D79).
+- **D28. Releases on a `v*` tag:** the web Docker image to GHCR, and to
+  the tag's GitHub Release the Android APK (unsigned at first) and the
+  desktop's AppImage and deb for x64 and arm64. One workflow
+  (`.github/workflows/release.yml`): its first job checks the tag
+  ([D41](#D41)) and creates the Release as a draft; the image, Android and
+  desktop jobs `need` it, so nothing is published from a tag that fails the
+  check, and a last job publishes the draft once every file is on it. The
+  image is pushed by its own job, so a failed APK or desktop build leaves
+  the image tags public with the Release still a draft; a re-run of the
+  failed job finishes it.
+  How: [android D69](android.md#D69), [desktop D79](desktop.md#D79).
 - **D29. License: AGPL-3.0.** The web app is meant to be self-hosted; a
   modified hosted copy must share its code. It matches Nextcloud's license.
 - **D30. Repository and branches.** `Astroreen/AstroTime`, public. `main` is

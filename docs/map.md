@@ -308,8 +308,8 @@ When you add a package, app or module, add its line here in the same PR.
     sync and reminder, the theme), Login Flow v2
     against a Nextcloud (`ASTROTIME_NEXTCLOUD_*`), and the screenshots
     (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
-  - `electron-builder.yml` — packaging; CI builds the unpacked app.
-    → `plans/desktop.md#D78`
+  - `electron-builder.yml` — packaging: the AppImage and deb, the fuses,
+    the deb's dependencies. → `plans/desktop.md#D78`
 
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
   static files, `/healthz`, the CalDAV proxy, the Host allowlist, the
@@ -340,7 +340,15 @@ When you add a package, app or module, add its line here in the same PR.
 - `devenv.nix` — the dev shell: Node 24, pnpm, Radicale, Playwright's
   Chromium, and the Android SDK and JDK 21 for `apps/mobile`.
   → `plans/android.md#D69`
-- `.github/workflows/` — CI (with the image built and started, and the
-  Android debug APK as an artifact), the nightly
-  Nextcloud run, the release of the image on a `v*` tag, Claude review,
-  `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`
+- `.github/workflows/` — CI (with the image built and started, the
+  Android debug APK as an artifact, and the desktop's packages built and
+  started on x64 and arm64), the nightly Nextcloud run, the release of
+  every platform on a `v*` tag (`release.yml`), Claude review, `@claude`.
+  → `plans/foundation.md#D27`, `plans/foundation.md#D28`
+- `.github/actions/desktop-packages/` — builds the AppImage and deb, reads
+  their fuses back, starts the AppImage and starts the installed deb on a
+  virtual display (`start.sh`); CI and the release share it.
+  → `plans/desktop.md#D79`
+- `scripts/release-apk.sh` — names the unsigned release APK
+  `astrotime-<version>-unsigned.apk` and checks it is unsigned and carries
+  the version; CI and the release share it. → `plans/android.md#D69`
