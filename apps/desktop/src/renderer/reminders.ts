@@ -22,5 +22,7 @@ export function desktopReminders(reminders: Bridge["reminders"]): ReminderSchedu
     permission,
     requestPermission: async () => permission(),
     whileOpenOnly: false,
+    // The system's notifications: the setting does not speak of a browser (android D60).
+    native: true,
   };
 }

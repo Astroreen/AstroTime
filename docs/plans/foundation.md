@@ -894,7 +894,12 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
     notify; on the web, turning it on asks the browser's permission from that
     tap, never at start. Under it, the next reminder ("Next: Call with Anna,
     Wed, Nov 4, 11:00 AM."), that the web reminds only while open, or that
-    the browser blocks notifications or has none.
+    the browser blocks notifications or has none. _Since android PR A3:_ a
+    platform that asks by itself (`asksWhenNeeded`, Android) is handed the
+    set while the permission is still `default`, so it asks the first time
+    there is a reminder; an app's setting (`native`) names the system's
+    settings instead of the browser's, and says when reminders may come
+    late ([android D66](android.md#D66)).
   - **The web reminds only while AstroTime is open in a tab.** It has no
     backend ([D3](#D3)) and so no push server, and Notification Triggers
     were never standardized; Android ([android D66](android.md#D66)) and the

@@ -95,6 +95,15 @@ were checked on 2026-11-01.
   words gained `late`, the body of one shown late
   ([foundation D102](foundation.md#D102)).
 
+  _Added in PR A3 ([D66](#D66)):_ `ReminderScheduler` gained four optional
+  members, all Android's so far. `asksWhenNeeded`: the platform asks the
+  permission itself, so the UI hands it the set while the permission is
+  still `default` (the web's stays empty until granted). `native`: the
+  permission is the system's, so the setting's words name the system's
+  settings, not a browser's. `inexact()`: reminders may come late, which
+  the setting says. `onPermissionChange(listener)`: the permission or
+  `inexact` changed without the UI asking. The desktop sets `native` too.
+
 ### The shell
 
 - **D61. `apps/mobile`, Capacitor 8.** `@astrotime/mobile` is a Vite app
@@ -299,6 +308,68 @@ were checked on 2026-11-01.
   permission (Android 13 and later) is asked the first time there is a
   reminder to schedule, not at start. A tap opens the app on the item.
 
+  _Built in PR A3_ (`apps/mobile/src/reminders.ts`, `androidReminders`), on
+  `@capacitor/local-notifications` 8.3.1:
+  - **The diff.** The map in the app's preferences (`astrotime.reminders`,
+    the WebView's localStorage) holds, per stable id, the integer id and the
+    time and words it was scheduled with, beside the counter ids come from.
+    A reminder gone from the set is cancelled (a notification already shown
+    stays on the screen: the plugin cancels only what is still to come); a
+    new one, or one whose time or words changed, is scheduled under its id,
+    which replaces its alarm; the rest is left. The first set of each run
+    arms every reminder ahead again, since alarms do not survive the app
+    being force-stopped, updated, or its exact alarms revoked (Android then
+    restarts it). Sets are applied one at a time, the latest winning.
+  - **The ids** come from a counter kept with the map, from 1, wrapping
+    before Java's largest `int` past the ids in use; an id freed is not
+    handed out again until the counter wraps. The map is written before
+    Android is called, so an id is never handed out twice; a set Android
+    refuses is scheduled again with the next, under the same ids. One that
+    fired and then moved ahead (the item edited to later) gets a new id, so
+    the notification already shown is not taken off the screen.
+  - **Past reminders.** The set reaches an hour back
+    ([foundation D100](foundation.md#D100)). One handed over before has
+    fired from its alarm, and is never shown again. One that reaches
+    Android already past (an item synced in after its time) shows at once
+    if it is 5 minutes late at most, as on the web
+    ([foundation D101](foundation.md#D101)), saying when it was due once
+    more than a minute late (its `late` words, as the desktop's,
+    [desktop D76](desktop.md#D76)), and is dropped if older: with
+    the alarms held by Android, only a late sync makes one late, and an hour
+    late would only say something stale. One edited into the past beyond
+    that has its alarm for the old time cancelled. After a reboot the
+    plugin's boot receiver arms what is still ahead and shows what came due
+    while the phone was off, 15 seconds after boot, however old: that is
+    the plugin's, not the adapter's.
+  - **The permission** is asked by the adapter once, the first time a set
+    holds a reminder ahead (so the user sees why), and remembered: after a
+    refusal the "Reminders" switch asks again, as on the web; refused twice,
+    Android stops asking and the setting says to allow notifications in the
+    system's settings. Nothing is scheduled without it (the plugin would ask
+    on every set). Back in front the adapter reads both permissions again
+    and the setting follows.
+  - **Exact alarms.** `USE_EXACT_ALARM`, and `SCHEDULE_EXACT_ALARM` with
+    `maxSdkVersion` 32 (the plugin declares it for every version; the
+    app's manifest replaces it). When exact alarms are off (only possible
+    up to 12L), notifications are scheduled inexact rather than the plugin
+    opening the system's settings on every set, and the setting says
+    reminders may come a few minutes late. Checked on the emulator
+    (Android 16): `dumpsys alarm` shows the alarm `window=0`,
+    `exactAllowReason=policy_permission`.
+  - **The channel** `reminders`, created by `MainActivity` at every start
+    with high importance (shown over the screen, with a sound) and named
+    from Android's resources in the system's language (`values`,
+    `values-ru`); the status bar icon is a bell (`ic_stat_reminder`). The
+    plugin's own "Default" channel exists beside it, unused.
+  - **A tap** comes back as the plugin's `localNotificationActionPerformed`
+    with the reminder in `extra`; one that started the app is kept until the
+    UI listens. The UI opens its day and its details
+    ([foundation D101](foundation.md#D101)).
+  - **Until PR A4** the set is computed only while the app runs: on start,
+    after each sync and edit, at midnight. A reminder up to 7 days after the
+    app was last open fires; one further ahead fires only if the app is
+    opened in between. PR A4's background sync closes this ([D67](#D67)).
+
 - **D67. Background sync: WorkManager and a headless WebView, our own
   plugin.** A periodic WorkManager job (every hour, only with a network,
   WorkManager's minimum is 15 minutes) runs while the app is closed. The
@@ -477,6 +548,11 @@ were checked on 2026-11-01.
   Android's plugin still follows them itself, in Kotlin, by the same rule
   ([D62](#D62)). Making the plugin one hop at a time under the shared loop
   would leave one implementation.
+- **A reminder Android did not fire** — an alarm whose time passed is taken
+  as fired; after a force-stop (which clears the app's alarms), one due in
+  the 5 minutes before the app opens again is not shown late. Telling a
+  fired alarm from a cleared one needs the plugin's delivered list
+  ([D66](#D66)).
 
 ## PR plan
 
@@ -535,6 +611,13 @@ Done when: a reminder fires on time with the app closed and after a
 reboot; editing or deleting the item on the server moves or removes it
 after the next sync; unit tests cover the set's diff and the ids (no two
 reminders share an integer id).
+
+_As built:_ `ReminderScheduler` gained optional members for a platform that
+asks by itself and whose permission is the system's ([D60](#D60)); a
+reminder past shows within 5 minutes when it first reaches Android, and the
+boot receiver's catch-up is the plugin's ([D66](#D66)). Until A4 the set
+reaches 7 days from the app's last run. Checked on an Android 16 emulator
+against a local Radicale, the WebView driven over CDP.
 
 ### PR A4 — Background sync
 

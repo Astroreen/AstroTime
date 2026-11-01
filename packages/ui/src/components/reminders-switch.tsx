@@ -14,7 +14,7 @@ import { useReminders } from "./reminders-context.tsx";
 export function RemindersSwitch() {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
-  const { permission, enabled, whileOpenOnly, next, turn } = useReminders();
+  const { permission, enabled, whileOpenOnly, inexact, native, next, turn } = useReminders();
   const hint = useId();
   const blocked = permission === "denied" || permission === "unsupported";
   // "Next: Call with Anna, Wed, Nov 4, 11:00 AM", once the set is known.
@@ -25,12 +25,14 @@ export function RemindersSwitch() {
     const when = t("reminder.onDay", { day: formats.shortDate(local.slice(0, 10)), time });
     return t("reminders.next", { title: reminder.notification.title, when });
   };
+  // An app's permission is the system's, a page's the browser's.
   const notes = blocked
-    ? [t(`reminders.${permission}`)]
+    ? [t(native ? `reminders.${permission}.app` : `reminders.${permission}`)]
     : enabled
       ? [
           ...(next === undefined ? [] : [nextLine(next)]),
           ...(whileOpenOnly ? [t("reminders.whileOpen")] : []),
+          ...(inexact ? [t("reminders.inexact")] : []),
         ]
       : [];
   return (

@@ -19,6 +19,10 @@ export interface RemindersValue {
   readonly enabled: boolean;
   /** Reminders fire only while the app is open (the web). */
   readonly whileOpenOnly: boolean;
+  /** Reminders may come late: the system fires them inexactly (Android, android D66). */
+  readonly inexact: boolean;
+  /** The permission is the system's to give (an app), not a browser's. */
+  readonly native: boolean;
   /** The next reminder the platform has, once it has a set; `undefined` before. */
   readonly next: ScheduledReminder | null | undefined;
   /** Turns reminders on (asking the platform's permission, from this gesture) or off. */
@@ -52,9 +56,14 @@ export function RemindersProvider({
   const scheduler = platform.reminders;
   const formats = useMemo(() => new Formats(settings), [settings]);
   const [permission, setPermission] = useState(() => scheduler.permission());
+  const [inexact, setInexact] = useState(() => scheduler.inexact?.() ?? false);
   // On unless turned off in the settings: where the platform may already notify, reminders show.
   const { settings: chosen, change } = useSettings();
   const enabled = chosen.reminders && permission === "granted";
+  // A platform that asks by itself (Android, android D66) has the set before
+  // it may notify, so it can ask the first time there is a reminder.
+  const planned =
+    enabled || (chosen.reminders && permission === "default" && scheduler.asksWhenNeeded === true);
   const [next, setNext] = useState<ScheduledReminder | null | undefined>(undefined);
   const [planner] = useState(() => {
     const clock = browserClock();
@@ -73,18 +82,24 @@ export function RemindersProvider({
 
   useEffect(() => {
     const words = { t, formats, locale: settings.locale, timeZone };
-    planner.update(enabled ? (reminder) => reminderNotification(reminder, words) : null, timeZone);
-  }, [planner, enabled, t, formats, settings.locale, timeZone]);
+    planner.update(planned ? (reminder) => reminderNotification(reminder, words) : null, timeZone);
+  }, [planner, planned, t, formats, settings.locale, timeZone]);
   useEffect(() => () => planner.stop(), [planner]);
 
-  // The permission can change in the browser's settings while the app is open.
+  // The permission can change in the browser's settings while the app is
+  // open, and a platform may ask or learn of a change by itself.
   useEffect(() => {
-    const update = () => setPermission(scheduler.permission());
+    const update = () => {
+      setPermission(scheduler.permission());
+      setInexact(scheduler.inexact?.() ?? false);
+    };
     document.addEventListener("visibilitychange", update);
     window.addEventListener("focus", update);
+    const stop = scheduler.onPermissionChange?.(update);
     return () => {
       document.removeEventListener("visibilitychange", update);
       window.removeEventListener("focus", update);
+      stop?.();
     };
   }, [scheduler]);
 
@@ -92,6 +107,8 @@ export function RemindersProvider({
     permission,
     enabled,
     whileOpenOnly: scheduler.whileOpenOnly,
+    inexact,
+    native: scheduler.native === true,
     next: enabled ? next : undefined,
     async turn(on) {
       change({ reminders: on });

@@ -144,6 +144,11 @@ export const en = {
   "reminders.denied":
     "This browser blocks notifications from AstroTime. Allow them in the site's settings.",
   "reminders.unsupported": "This browser cannot show notifications.",
+  "reminders.denied.app":
+    "Notifications from AstroTime are off. Allow them in the system's settings for AstroTime.",
+  "reminders.unsupported.app": "This system cannot show notifications.",
+  "reminders.inexact":
+    "Exact alarms are off for AstroTime in the system's settings, so reminders may come a few minutes late.",
 
   "fab.create": "Create",
 

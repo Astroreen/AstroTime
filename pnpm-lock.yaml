@@ -27,6 +27,9 @@ catalogs:
     '@capacitor/core':
       specifier: 8.6.0
       version: 8.6.0
+    '@capacitor/local-notifications':
+      specifier: 8.3.1
+      version: 8.3.1
     '@playwright/test':
       specifier: 1.61.1
       version: 1.61.1
@@ -206,6 +209,9 @@ importers:
       '@capacitor/core':
         specifier: 'catalog:'
         version: 8.6.0
+      '@capacitor/local-notifications':
+        specifier: 'catalog:'
+        version: 8.3.1(@capacitor/core@8.6.0)
       react:
         specifier: 'catalog:'
         version: 19.3.1
@@ -476,6 +482,11 @@ packages:
 
   '@capacitor/keyboard@8.0.6':
     resolution: {integrity: sha512-Bbe+9V0qaT6dzEFJEK7BUWR01l2+vZE8FM5ITF/WgKtx+G6eGZ6d5+YiSMRJBAK0VGjdO59v8yiQ10Doa5KyvQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/local-notifications@8.3.1':
+    resolution: {integrity: sha512-F7zu/+p/mIR958YP4axOkeI5hBKRaXDyYjbNPrAil2wWfd7OxScPSTvP9t85NpQ0eULVRu0/sntoxOg6ck477A==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -3611,6 +3622,10 @@ snapshots:
       '@capacitor/core': 8.6.0
 
   '@capacitor/keyboard@8.0.6(@capacitor/core@8.6.0)':
+    dependencies:
+      '@capacitor/core': 8.6.0
+
+  '@capacitor/local-notifications@8.3.1(@capacitor/core@8.6.0)':
     dependencies:
       '@capacitor/core': 8.6.0
 
