@@ -61,11 +61,16 @@ When you add a package, app or module, add its line here in the same PR.
     - `search` — objects by title, case and diacritics aside, over the
       folded `titles` column (`search.ts`, migration 6).
       → `plans/design.md#D97`
-  - `StoreInUseError` — another tab holds the web store.
-    → `plans/foundation.md#D56`
+    - every operation that writes is a transaction.
+      → `plans/foundation.md#D99`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
     `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
     → `plans/foundation.md#D25`
+    - `subscribe` — tells the store of writes made elsewhere.
+  - `web/` — every tab on one store: the leader tab's worker (`worker.ts`)
+    runs every tab's statements, the drivers (`index.ts`) follow it and take
+    over when it goes (`protocol.ts`); `HandOverError` when a statement's
+    answer went with it. → `plans/foundation.md#D98`
   - `schema.ts` (Drizzle) and `migrations.ts` (`PRAGMA user_version`).
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 

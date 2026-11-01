@@ -3,7 +3,7 @@
 // plainly when it cannot open the store.
 import type { HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
-import { Store, StoreInUseError } from "@astrotime/storage";
+import { InsecureContextError, Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vite-plus/test";
@@ -141,12 +141,10 @@ test("completing and starring on the tasks screen write the task to the store, t
   expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
 });
 
-test("a store another tab holds: a message in the user's language", async () => {
-  render(failing(new StoreInUseError("held")), ["ru-RU"]);
+test("a page that is not a secure context: a message in the user's language", async () => {
+  render(failing(new InsecureContextError("http")), ["ru-RU"]);
   await expect
-    .element(
-      page.getByRole("alert").getByRole("heading", { name: "AstroTime открыт в другой вкладке" }),
-    )
+    .element(page.getByRole("alert").getByRole("heading", { name: "Этот адрес не защищён" }))
     .toBeInTheDocument();
   await expect.element(page.getByRole("button", { name: "Обновить" })).toBeInTheDocument();
 });

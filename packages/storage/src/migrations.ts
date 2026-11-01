@@ -1,4 +1,4 @@
-import type { SqlDriver } from "./driver.ts";
+import { transaction, type SqlDriver } from "./driver.ts";
 
 /**
  * The store's schema, one script per version (`PRAGMA user_version`).
@@ -89,22 +89,23 @@ export async function migrate(
   migrations: readonly string[] = MIGRATIONS,
 ): Promise<void> {
   await driver.script("PRAGMA foreign_keys = ON;");
-  const [[version] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
-  if (Number(version) > migrations.length) {
-    throw new NewerSchemaError(
-      `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
-    );
-  }
-  for (let next = Number(version); next < migrations.length; next++) {
-    try {
-      await driver.script(
-        `BEGIN;\n${migrations[next]}\nPRAGMA user_version = ${next + 1};\nCOMMIT;`,
-      );
-    } catch (error) {
-      // A failed script leaves its transaction open; nothing of it may stay.
-      await driver.script("ROLLBACK;").catch(() => {});
-      throw error;
-    }
+  // Each step reads the version in its own transaction: two tabs opening an
+  // old database at once migrate it once (docs/plans/foundation.md#D99).
+  // A failed step leaves nothing of itself; the steps before it stay.
+  for (;;) {
+    const done = await transaction(driver, async () => {
+      const [[read] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
+      const version = Number(read);
+      if (version > migrations.length) {
+        throw new NewerSchemaError(
+          `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
+        );
+      }
+      if (version === migrations.length) return true;
+      await driver.script(`${migrations[version]}\nPRAGMA user_version = ${version + 1};`);
+      return false;
+    });
+    if (done) return;
   }
 }
 

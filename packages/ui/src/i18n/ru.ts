@@ -5,8 +5,6 @@ export const ru = {
   "app.name": "AstroTime",
 
   "store.opening": "Открываем календарь…",
-  "store.inUse.title": "AstroTime открыт в другой вкладке",
-  "store.inUse.body": "Закройте его там и обновите эту вкладку.",
   "store.insecure.title": "Этот адрес не защищён",
   "store.insecure.body":
     "Браузер хранит данные AstroTime только для страниц, открытых по https (или на localhost). Откройте AstroTime по его https-адресу.",

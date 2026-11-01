@@ -25,7 +25,7 @@ import {
 } from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 
-import type { SqlDriver } from "./driver.ts";
+import { transaction, type SqlDriver } from "./driver.ts";
 import { migrate } from "./migrations.ts";
 import * as schema from "./schema.ts";
 import { containsPattern, foldForSearch, titlesOf } from "./search.ts";
@@ -73,17 +73,24 @@ export class Store {
       },
       { schema },
     );
-    return new Store(db, driver);
+    const store = new Store(db, driver);
+    // Writes from elsewhere (another tab, on the web) are heard as this store's own.
+    store.unsubscribe = driver.subscribe?.(() => store.notify());
+    return store;
   }
 
+  private unsubscribe: (() => void) | undefined;
+
   close(): Promise<void> {
+    this.unsubscribe?.();
     return this.driver.close();
   }
 
   /**
    * Calls `listener` after every write, before the write's promise resolves,
-   * so a view reads the store again (a sync writes while the app is open).
-   * Returns the function that stops it.
+   * so a view reads the store again (a sync writes while the app is open),
+   * and after another tab's (docs/plans/foundation.md#D98). Returns the
+   * function that stops it.
    */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -572,16 +579,16 @@ export class Store {
   }
 
   /**
-   * Runs read-then-write operations one at a time, so two of them never
-   * interleave on the one connection (a second `saveLocal` of a new object
-   * must see the first one's row).
+   * Runs read-then-write operations one at a time, each in a transaction
+   * (docs/plans/foundation.md#D99), so two of them never interleave (a second
+   * `saveLocal` of a new object must see the first one's row), not even from
+   * two tabs on one database, and a failed one leaves nothing of itself.
    */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.queue.then(async () => {
       try {
-        return await operation();
+        return await transaction(this.driver, operation);
       } finally {
-        // A failed operation may have written part of its work: readers ask again.
         this.notify();
       }
     });

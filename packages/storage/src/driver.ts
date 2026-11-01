@@ -10,14 +10,37 @@ export interface SqlDriver {
   /** Runs a script of several statements; a script that needs a transaction says BEGIN and COMMIT. */
   script(sql: string): Promise<void>;
   close(): Promise<void>;
+  /**
+   * Calls `listener` when someone else changed the database (another tab, on
+   * the web: docs/plans/foundation.md#D98), so the store tells its own
+   * listeners. Returns the function that stops it. A driver whose database
+   * no one else writes has none.
+   */
+  subscribe?(listener: () => void): () => void;
+}
+
+/** Runs `operation` in a transaction of its own, rolled back if it fails. */
+export async function transaction<T>(driver: SqlDriver, operation: () => Promise<T>): Promise<T> {
+  await driver.script("BEGIN IMMEDIATE;");
+  try {
+    const result = await operation();
+    await driver.script("COMMIT;");
+    return result;
+  } catch (error) {
+    // A statement that failed may have ended the transaction already.
+    await driver.script("ROLLBACK;").catch(() => {});
+    throw error;
+  }
 }
 
 /**
- * The database is held by another open store (another tab, on the web) and
- * cannot be opened here until that one closes it.
+ * A statement got no answer because the tab that ran the web store's
+ * database went (docs/plans/foundation.md#D98): it may or may not have run,
+ * or the transaction it belonged to is over. The store works again at once,
+ * through the next tab.
  */
-export class StoreInUseError extends Error {
-  override name = "StoreInUseError";
+export class HandOverError extends Error {
+  override name = "HandOverError";
 }
 
 /**

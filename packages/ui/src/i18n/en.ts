@@ -4,8 +4,6 @@ export const en = {
   "app.name": "AstroTime",
 
   "store.opening": "Opening your calendar…",
-  "store.inUse.title": "AstroTime is open in another tab",
-  "store.inUse.body": "Close it there, then reload this tab.",
   "store.insecure.title": "This address is not secure",
   "store.insecure.body":
     "Your browser keeps AstroTime's data only for pages opened over https (or on localhost). Open AstroTime at its https address.",

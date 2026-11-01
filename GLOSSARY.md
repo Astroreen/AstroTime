@@ -92,6 +92,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   the items it could not handle.
 - **Signed out** — an account whose server refused its credentials (or
   that has none saved); it syncs again once the user signs in again.
+- **Leader tab** — the tab whose worker has the web store's database open
+  and runs the statements of every tab; the others follow it. When it goes,
+  the next tab leads: a **hand-over** (foundation D98).
 - **Live query** — a query of the local store that runs again whenever the
   store changes, so a view shows what a sync wrote (`liveQuery`, D54).
 - **Sync token** — the server's marker of the last state we saw

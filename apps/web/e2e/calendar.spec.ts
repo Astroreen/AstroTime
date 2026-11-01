@@ -214,11 +214,3 @@ test("hiding a calendar in the drawer hides its items", async ({ page }) => {
   await page.getByRole("checkbox", { name: "Work" }).click();
   await expect(review).toBeVisible();
 });
-
-test("a second tab says the calendar is open in another tab", async ({ page }) => {
-  await openDemo(page, "week");
-  await expect(header(page, "Wednesday, November 4")).toBeVisible();
-  const second = await page.context().newPage();
-  await second.goto("/");
-  await expect(second.getByRole("alert")).toContainText("AstroTime is open in another tab");
-});
