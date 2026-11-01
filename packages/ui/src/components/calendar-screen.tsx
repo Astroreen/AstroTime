@@ -372,7 +372,7 @@ export function CalendarScreen({
                 <>
                   <button
                     type="button"
-                    className="ml-2 h-9 shrink-0 rounded-full border border-line px-4 text-[14px] font-medium text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+                    className="ml-2 h-9 shrink-0 rounded-full border border-line px-4 text-body font-medium text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
                     // Its name begins with what it shows and says the day (WCAG 2.5.3).
                     aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
                     onClick={() => setAnchor(today)}

@@ -36,14 +36,14 @@ export function MonthPicker({
     >
       <Popover.Trigger
         aria-label={t("topBar.period", { period: title })}
-        className="flex min-w-0 items-center gap-0.5 rounded-lg py-1 pr-1 pl-2 text-[21px] leading-tight hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+        className="flex min-w-0 items-center gap-0.5 rounded-lg py-1 pr-1 pl-2 text-headline leading-tight hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
       >
         <span className="truncate">{title}</span>
         <CaretIcon className="size-5 shrink-0" />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={4} align="start" className="z-50">
-          <Popover.Popup className="w-72 origin-[var(--transform-origin)] rounded-2xl bg-raised p-3 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Popover.Popup className="w-72 origin-[var(--transform-origin)] rounded-xl bg-raised p-3 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <div className="mb-2 flex items-center justify-between">
               <button
                 type="button"
@@ -66,7 +66,7 @@ export function MonthPicker({
               </button>
             </div>
             <div
-              className="grid grid-cols-7 text-center text-[11px] text-ink-muted"
+              className="grid grid-cols-7 text-center text-tiny text-ink-muted"
               aria-hidden="true"
             >
               {formats.weekdayInitials().map((initial, i) => (
@@ -91,7 +91,7 @@ export function MonthPicker({
                       setOpen(false);
                     }}
                     className={[
-                      "mx-auto grid size-8 place-items-center rounded-full text-[13px]",
+                      "mx-auto grid size-8 place-items-center rounded-full text-small",
                       isToday
                         ? "bg-accent font-semibold text-on-accent"
                         : selected

@@ -208,6 +208,8 @@ export const ru = {
   "tasks.tab": "{{list}}, {{undone}}",
   "tasks.newList": "Создать список",
   "tasks.noLists": "Списков задач пока нет",
+  "tasks.noListsHint":
+    "Список задач — это календарь с задачами. Создайте его в Nextcloud Tasks или другом клиенте, и он появится здесь после синхронизации.",
   "tasks.sort": "Сортировка",
   "tasks.sort.mine": "Мой порядок",
   "tasks.sort.date": "Дата",
@@ -224,6 +226,7 @@ export const ru = {
   "search.close": "Закрыть поиск",
   "search.results": "Результаты поиска",
   "search.hint": "Найдите мероприятие или задачу по названию",
+  "search.scope": "Поиск идёт только по показанным календарям.",
   "search.none": "Ничего не найдено",
   "search.noDate": "Без даты",
 

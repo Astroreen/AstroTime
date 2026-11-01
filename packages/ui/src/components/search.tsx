@@ -17,7 +17,8 @@ import { useTranslation } from "react-i18next";
 import { addDays } from "../calendar/dates.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { useCalendar } from "./context.ts";
-import { BackIcon, CheckCircleIcon } from "./icons.tsx";
+import { EmptyState } from "./empty-state.tsx";
+import { BackIcon, CheckCircleIcon, SearchIcon } from "./icons.tsx";
 
 export interface SearchResult {
   readonly stored: StoredObject;
@@ -58,7 +59,7 @@ export function SearchBar({
         }}
         aria-label={t("search.label")}
         placeholder={t("search.label")}
-        className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-[16px] text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-accent"
+        className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-row text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-accent"
       />
     </div>
   );
@@ -111,10 +112,22 @@ export function SearchResults({
   };
 
   if (query.trim() === "") {
-    return <p className="px-5 py-4 text-[14px] text-ink-muted">{t("search.hint")}</p>;
+    return (
+      <EmptyState
+        icon={<SearchIcon className="size-6" />}
+        title={t("search.hint")}
+        hint={t("search.scope")}
+      />
+    );
   }
   if (results.query === query && results.found.length === 0) {
-    return <p className="px-5 py-4 text-[14px] text-ink-muted">{t("search.none")}</p>;
+    return (
+      <EmptyState
+        icon={<SearchIcon className="size-6" />}
+        title={t("search.none")}
+        hint={t("search.scope")}
+      />
+    );
   }
   return (
     <ul aria-label={t("search.results")} className="flex flex-col py-1">
@@ -139,8 +152,8 @@ export function SearchResults({
               </span>
               {/* The space keeps the title and the time apart as words, as the name says them (WCAG 2.5.3). */}
               <span className="flex min-w-0 flex-col">
-                <span className="text-[15px] break-words text-ink">{title}</span>{" "}
-                <span className="text-[13px] text-ink-muted">{time}</span>
+                <span className="text-row break-words text-ink">{title}</span>{" "}
+                <span className="text-small text-ink-muted">{time}</span>
               </span>
             </button>
           </li>

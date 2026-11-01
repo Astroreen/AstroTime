@@ -25,6 +25,7 @@ import {
 } from "../calendar/tasks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
 import { useCalendar } from "./context.ts";
+import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
 import {
   BackIcon,
@@ -146,7 +147,7 @@ export function TasksScreen({
             <BackIcon />
           </button>
         )}
-        <h1 className="min-w-0 flex-1 truncate px-2 text-[21px] leading-tight">
+        <h1 className="min-w-0 flex-1 truncate px-2 text-headline leading-tight">
           {t("tasks.title")}
         </h1>
         {wide && (
@@ -161,7 +162,11 @@ export function TasksScreen({
         )}
       </header>
       {lists.length === 0 || selected === null ? (
-        <p className="px-5 py-4 text-[14px] text-ink-muted">{t("tasks.noLists")}</p>
+        <EmptyState
+          icon={<CheckCircleIcon className="size-6" />}
+          title={t("tasks.noLists")}
+          hint={t("tasks.noListsHint")}
+        />
       ) : (
         <Tabs.Root
           value={selected}
@@ -181,7 +186,7 @@ export function TasksScreen({
                         ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
                         : list.name
                     }
-                    className="group flex h-12 items-center gap-2 px-4 text-[15px] whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised data-active:text-accent"
+                    className="group flex h-12 items-center gap-2 px-4 text-row whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised data-active:text-accent"
                   >
                     {list.name}
                     {/* Apart as words, as the name says them (WCAG 2.5.3). */}
@@ -190,7 +195,7 @@ export function TasksScreen({
                       // The open list's count shows in its card instead, as in the reference.
                       <span
                         aria-hidden="true"
-                        className="rounded-full bg-pill px-2 py-0.5 text-[12.5px] leading-none text-ink group-data-active:hidden"
+                        className="rounded-full bg-pill px-2 py-0.5 text-note leading-none text-ink group-data-active:hidden"
                       >
                         {count}
                       </span>
@@ -204,7 +209,7 @@ export function TasksScreen({
             <button
               type="button"
               disabled
-              className="flex h-12 items-center gap-1.5 px-4 text-[15px] whitespace-nowrap text-ink-muted"
+              className="flex h-12 items-center gap-1.5 px-4 text-row whitespace-nowrap text-ink-muted"
             >
               <PlusIcon className="size-5" />
               {t("tasks.newList")}
@@ -283,7 +288,7 @@ function ListCards({
     <>
       <div className="rounded-2xl bg-tile pb-2">
         <div className="flex items-center gap-1 pt-2 pr-2 pl-5">
-          <h2 className="min-w-0 flex-1 truncate text-[19px] font-medium">{list.name}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-title font-medium">{list.name}</h2>
           <SortMenu sort={sort} onSort={onSort} />
           {/* Renaming and deleting lists come with list management (docs/plans/design.md#deferred). */}
           <button type="button" disabled className={iconButton} aria-label={t("tasks.listMenu")}>
@@ -294,14 +299,14 @@ function ListCards({
           <button
             type="button"
             onClick={() => actions.add(list)}
-            className="mx-2 flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-accent hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+            className="mx-2 flex h-11 items-center gap-3 rounded-xl px-3 text-row font-medium text-accent hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
           >
             <CheckCircleIcon className="size-[22px]" />
             {t("tasks.add")}
           </button>
         )}
         {undone.length === 0 ? (
-          <p className="px-5 pt-1 pb-3 text-[14px] text-ink-muted">
+          <p className="px-5 pt-1 pb-3 text-body text-ink-muted">
             {t(completed.length > 0 ? "tasks.allDone" : "tasks.none")}
           </p>
         ) : (
@@ -324,7 +329,7 @@ function ListCards({
             type="button"
             aria-expanded={showCompleted}
             onClick={() => setOpen(!showCompleted)}
-            className="flex h-14 w-full items-center gap-2 rounded-2xl pr-4 pl-5 text-left text-[16px] font-medium hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex h-14 w-full items-center gap-2 rounded-2xl pr-4 pl-5 text-left text-row font-medium hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
           >
             <span className="min-w-0 flex-1">{t("tasks.completed", { n: completed.length })}</span>
             <ChevronIcon direction={showCompleted ? "up" : "down"} className="size-5" />
@@ -363,7 +368,7 @@ function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }
                 <Menu.RadioItem
                   key={option}
                   value={option}
-                  className="flex h-10 cursor-default items-center gap-3 px-4 text-[14px] -outline-offset-2 data-highlighted:bg-raised-hover"
+                  className="flex h-10 cursor-default items-center gap-3 px-4 text-body -outline-offset-2 data-highlighted:bg-raised-hover"
                 >
                   <span className="grid size-4 place-items-center text-accent">
                     <Menu.RadioItemIndicator>
@@ -433,13 +438,13 @@ function TaskItem({
           <button
             type="button"
             onClick={() => actions.open(row)}
-            className={`text-left text-[15.5px] leading-snug break-words focus-visible:outline-2 focus-visible:outline-accent ${row.done ? "text-ink-muted line-through" : ""}`}
+            className={`text-left text-row leading-snug break-words focus-visible:outline-2 focus-visible:outline-accent ${row.done ? "text-ink-muted line-through" : ""}`}
           >
             {title}
           </button>
           {dueText && (
             <span
-              className={`flex items-center gap-1 text-[12.5px] ${overdue ? "text-danger" : "text-ink-muted"}`}
+              className={`flex items-center gap-1 text-note ${overdue ? "text-danger" : "text-ink-muted"}`}
             >
               {dueText}
               {row.recurring && (

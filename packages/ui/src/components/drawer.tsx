@@ -54,14 +54,14 @@ export function DrawerContent({
             type="button"
             disabled={create.disabled}
             onClick={create.onCreate}
-            className="flex h-14 items-center gap-3 rounded-2xl bg-fab pr-6 pl-4 text-[15px] font-medium text-on-fab shadow-md shadow-black/15 hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
+            className="flex h-14 items-center gap-3 rounded-2xl bg-fab pr-6 pl-4 text-row font-medium text-on-fab shadow-md shadow-black/15 hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
           >
             <PlusIcon className="size-6" />
             {t("fab.create")}
           </button>
         </div>
       ) : (
-        <p className="px-4 pb-3 text-[19px] font-medium tracking-tight">{t("app.name")}</p>
+        <p className="px-4 pb-3 text-title font-medium tracking-tight">{t("app.name")}</p>
       )}
       <h2 className="sr-only">{t("drawer.views")}</h2>
       <ul className="flex flex-col">
@@ -71,7 +71,7 @@ export function DrawerContent({
               type="button"
               aria-current={v === view ? "true" : undefined}
               onClick={() => onView(v)}
-              className={`flex h-11 w-full items-center gap-4 rounded-full px-4 text-left text-[14.5px] ${
+              className={`flex h-11 w-full items-center gap-4 rounded-full px-4 text-left text-body ${
                 v === view ? "bg-accent-soft font-medium" : "hover:bg-raised-hover"
               }`}
             >
@@ -82,7 +82,7 @@ export function DrawerContent({
         ))}
       </ul>
       <hr className="mx-4 my-2 border-line" />
-      <h2 className="px-4 pt-1 pb-1 text-[13px] font-medium text-ink-muted">
+      <h2 className="px-4 pt-1 pb-1 text-small font-medium text-ink-muted">
         {t("drawer.calendars")}
       </h2>
       {accounts.map((account) => (
@@ -103,7 +103,7 @@ export function DrawerContent({
           <button
             type="button"
             onClick={onSettings}
-            className="flex h-11 w-full items-center gap-4 rounded-full px-4 text-left text-[14.5px] hover:bg-raised-hover"
+            className="flex h-11 w-full items-center gap-4 rounded-full px-4 text-left text-body hover:bg-raised-hover"
           >
             <SettingsIcon className="size-5 text-ink-muted" />
             {t("settings.title")}

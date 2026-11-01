@@ -196,6 +196,8 @@ export const en = {
   "tasks.tab": "{{list}}, {{undone}}",
   "tasks.newList": "New list",
   "tasks.noLists": "No task lists yet",
+  "tasks.noListsHint":
+    "A task list is a calendar that holds tasks. Make one in Nextcloud Tasks or another client, and it appears here after the next sync.",
   "tasks.sort": "Sort",
   "tasks.sort.mine": "My order",
   "tasks.sort.date": "Date",
@@ -212,6 +214,7 @@ export const en = {
   "search.close": "Close search",
   "search.results": "Search results",
   "search.hint": "Find events and tasks by their title",
+  "search.scope": "Only the calendars shown are searched.",
   "search.none": "Nothing found",
   "search.noDate": "No date",
 

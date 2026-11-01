@@ -160,7 +160,7 @@ export function TimeGrid(props: TimeGridProps) {
               {HOURS.slice(1).map((hour) => (
                 <span
                   key={hour}
-                  className="absolute right-1.5 -translate-y-1/2 text-[11px] text-ink-muted tabular-nums"
+                  className="absolute right-1.5 -translate-y-1/2 text-tiny text-ink-muted tabular-nums"
                   style={{ top: hour * HOUR }}
                 >
                   {formats.hour(hour)}
@@ -268,13 +268,13 @@ export function DayHeader({
     >
       <span
         aria-hidden="true"
-        className={`text-[11.5px] ${isToday ? "font-semibold text-accent" : "text-ink-muted"}`}
+        className={`text-chip ${isToday ? "font-semibold text-accent" : "text-ink-muted"}`}
       >
         {formats.weekday(day)}
       </span>
       <span
         aria-hidden="true"
-        className={`grid size-8 place-items-center rounded-full text-[19px] leading-none ${
+        className={`grid size-8 place-items-center rounded-full text-title leading-none ${
           isToday ? "bg-accent font-medium text-on-accent" : "text-ink"
         }`}
       >
@@ -381,7 +381,7 @@ function Strip({
             type="button"
             aria-label={t("grid.moreLabel", { count, day: formats.fullDate(day) })}
             onClick={() => onExpandedChange(true)}
-            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-[13px] text-ink-muted -outline-offset-2 hover:bg-raised"
+            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-small text-ink-muted -outline-offset-2 hover:bg-raised"
           >
             {t("grid.more", { count })}
           </button>

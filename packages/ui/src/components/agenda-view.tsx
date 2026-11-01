@@ -191,7 +191,7 @@ export function AgendaView({
 
   const year = today.slice(0, 4);
   const endButton =
-    "mx-auto block rounded-full px-4 py-2 text-[13px] text-ink-muted hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent";
+    "mx-auto block rounded-full px-4 py-2 text-small text-ink-muted hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent";
   return (
     <div
       ref={scroller}
@@ -207,7 +207,7 @@ export function AgendaView({
           return (
             <div key={day}>
               {newMonth && (
-                <h2 className="px-4 pt-4 pb-1 text-[15px] font-medium">
+                <h2 className="px-4 pt-4 pb-1 text-row font-medium">
                   {formats.period(day, day, year)}
                 </h2>
               )}

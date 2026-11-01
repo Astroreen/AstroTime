@@ -612,6 +612,33 @@ are its decisions.
   and the account at the right. The arrows sat at the far right, away from
   the title they change. On a phone the bar is as it was (D46, D59): the
   menu, the period, search, today's date as an icon, tasks, the account.
+- **D134. One scale for type, one rule for corners, and empty screens that
+  say what to do.**
+  - **Type**: eight sizes, each a role, as tokens in `styles.css`
+    (`text-tiny` 11 px: hour labels, weekday names, week numbers;
+    `text-chip` 11.5 px: an item's title on the grid, the strip and the
+    Month; `text-note` 12.5 px: hints and second lines; `text-small` 13 px:
+    group headings and secondary text; `text-body` 14 px; `text-row` 15 px:
+    a list's main line, a tab, the search field; `text-title` 19 px: a
+    dialog's or a day's title; `text-headline` 22 px: a screen's title, the
+    period). The UI had grown sixteen sizes in half-pixel steps (11 to 26
+    px), so two lists side by side rarely matched; each was mapped to the
+    nearest role, none moved by more than a pixel. The accounts' and
+    sign-in's screens keep theirs until they are reworked (Deferred).
+  - **Corners**: an item 4–8 px, as dense as the reference (D43); a menu
+    and a popover 12 px; a card in a screen (a task list's, a Settings
+    group) and the Create button 16 px; a dialog 24 px; buttons and fields
+    that are one line, a full pill, a select 8 px. The month picker was the
+    one popover at 16 px.
+  - **Empty screens**: search before a word is typed and when nothing is
+    found, and the tasks screen with no task list, show what is empty and
+    what to do (an icon in a soft circle, a line, a hint: "Only the
+    calendars shown are searched", "A task list is a calendar that holds
+    tasks…") in the middle of the free space, instead of one grey line at
+    the top.
+  - **Create in the light theme** is a deeper tonal blue
+    (`--color-fab`), so the screen's main action stands off the light
+    canvas as it does off the dark one.
 
 ## Deferred
 
@@ -690,6 +717,9 @@ are its decisions.
   through the provider and the sync engine, or a colour kept on this device
   only. Google offers both per calendar. A menu on each calendar's row in
   the drawer comes with it.
+- **The type scale in the accounts' screens** — the account dialog, the
+  first run and sign-in keep their own sizes while they are reworked; they
+  take [D134](#D134)'s roles after.
 - **Accounts in Settings** — adding, removing and signing in again stay in
   the account dialog (the top bar's account button) while the first run and
   the accounts are reworked; Settings gets an Accounts group then
@@ -713,7 +743,8 @@ Foundation's PR 6a (the details and edit dialogs) brought D108 and D109;
 PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each view
 next to the matching reference, in both themes.
 
-The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`);
+The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`) and
+D134 (`feat/ui-consistency`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its
