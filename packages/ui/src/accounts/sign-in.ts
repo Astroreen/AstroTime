@@ -96,6 +96,8 @@ export interface SignInOptions {
   readonly secrets: SecretStore;
   readonly http: HttpClient;
   readonly openExternal: (url: string) => void;
+  /** The platform's `signingInTo`: the server is being signed in to, until the returned function. */
+  readonly signingInTo?: (server: string) => () => void;
   readonly clock?: Clock;
 }
 
@@ -141,6 +143,15 @@ export class SignIn {
     const signal = this.#begin();
     const server = serverAddress(input.server);
     if (!server) return this.#fail(signal, "address");
+    const end = this.#options.signingInTo?.(server);
+    try {
+      await this.#loginFlow(signal, server);
+    } finally {
+      end?.();
+    }
+  }
+
+  async #loginFlow(signal: AbortSignal, server: string) {
     let flow: LoginFlow;
     try {
       flow = await startLoginFlow(this.#options.http, server);
@@ -200,13 +211,26 @@ export class SignIn {
   }
 
   async #finish(signal: AbortSignal, server: string, credentials: Credentials) {
-    const { http, store, secrets } = this.#options;
-    const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
-    if (signal.aborted) return;
-    const { account, added } = await saveAccount(
-      { store, secrets },
-      { name: accountName(credentials.username, server), serverUrl: server, homeUrl, credentials },
-    );
+    const { http, store, secrets, signingInTo } = this.#options;
+    // Once saved, the account is one of the platform's own.
+    const end = signingInTo?.(server);
+    let saved: Awaited<ReturnType<typeof saveAccount>>;
+    try {
+      const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
+      if (signal.aborted) return;
+      saved = await saveAccount(
+        { store, secrets },
+        {
+          name: accountName(credentials.username, server),
+          serverUrl: server,
+          homeUrl,
+          credentials,
+        },
+      );
+    } finally {
+      end?.();
+    }
+    const { account, added } = saved;
     if (signal.aborted) {
       // Cancelled while it was saved: an account it added goes again. One it
       // signed in to again keeps its new password, as the user meant it to.

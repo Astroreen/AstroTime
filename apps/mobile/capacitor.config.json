@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.astroreen.astrotime",
+  "appName": "AstroTime",
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  }
+}

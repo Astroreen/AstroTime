@@ -105,8 +105,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
-    HTTP, secrets, `openExternal`, `Preferences`, reminders), the user's
-    languages and zone. → `plans/android.md#D60`
+    HTTP, secrets, `openExternal`, `Preferences`, reminders, and on Android
+    `signingInTo`), the user's languages and zone. → `plans/android.md#D60`
   - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
     the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
     `plans/foundation.md#D92`
@@ -181,6 +181,20 @@ When you add a package, app or module, add its line here in the same PR.
     self-signed certificate, when `tailscale serve` may not run.
     → `plans/foundation.md#D20`
 
+- `apps/mobile` (`@astrotime/mobile`) — the Android app: Capacitor around
+  `@astrotime/ui`, with its `Platform` (`src/platform.ts`: the web store in
+  the WebView, HTTP through the plugin below, credentials in memory until
+  PR A2) and the committed Gradle project (`android/`). Build the APK with
+  `vp run --filter @astrotime/mobile build`, `pnpm --filter
+  @astrotime/mobile sync`, then `./gradlew assembleDebug test` in
+  `android/`. → `plans/android.md#D61`
+  - `AstroTimeHttp` — AstroTime's Capacitor plugin on OkHttp
+    (`android/app/src/main/java/io/github/astroreen/astrotime/http/`): any
+    method, the redirect rule, `Authorization` only to the request's origin,
+    plain http only to an address the user typed; tested by Gradle on
+    `MockWebServer` (`app/src/test/`). `src/http.ts` is its TypeScript side.
+    → `plans/android.md#D62`
+
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
   static files, `/healthz`, the CalDAV proxy, the Host allowlist, the
   Content Security Policy with a nonce per answer; bundled into the Docker
@@ -205,6 +219,10 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/record-nextcloud-fixtures.ts` — drives Nextcloud's web Calendar
   and Tasks apps in Chromium on a disposable Nextcloud in Docker and records
   what they write as `packages/core/test/fixtures/nextcloud-web-*.ics`.
-- `.github/workflows/` — CI (with the image built and started), the nightly
+- `devenv.nix` — the dev shell: Node 24, pnpm, Radicale, Playwright's
+  Chromium, and the Android SDK and JDK 21 for `apps/mobile`.
+  → `plans/android.md#D69`
+- `.github/workflows/` — CI (with the image built and started, and the
+  Android debug APK as an artifact), the nightly
   Nextcloud run, the release of the image on a `v*` tag, Claude review,
   `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`

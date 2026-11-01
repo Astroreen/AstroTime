@@ -19,6 +19,12 @@ export interface Platform {
   readonly secrets: SecretStore;
   /** Opens a URL in the system browser: Login Flow v2's page (a new tab on the web). */
   readonly openExternal: (url: string) => void;
+  /**
+   * Signing in to `server` (the address typed, or the one Nextcloud named)
+   * begins; the function it returns ends it. A shell that sends plain http
+   * only to saved accounts lets it reach this server meanwhile (android D62).
+   */
+  readonly signingInTo?: (server: string) => () => void;
   /** Where this device's choices are kept (the view, hidden calendars). */
   readonly preferences: Preferences;
   /**
