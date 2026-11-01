@@ -3,6 +3,8 @@
 // whole periods of the rule after DTSTART, instead of at DTSTART.
 import ICAL from "ical.js";
 
+import { fromIcalTime, wallClockIn, zoneOrigin } from "./time.ts";
+
 /**
  * The parts with which ical.js's iterator settles into the rule's period:
  * started anywhere on the lattice of whole periods from DTSTART, it gives the
@@ -353,7 +355,7 @@ export function seriesStarts(
     let iterator: ICAL.RecurIterator | null;
     let rule: ICAL.Recur;
     try {
-      rule = property.getFirstValue() as ICAL.Recur;
+      rule = onWallClock(property.getFirstValue() as ICAL.Recur, dtstart);
       // Made first, so a rule ical.js refuses from DTSTART is refused there,
       // and one it finds nothing for from there (a monthly 31st from a month
       // of 30 days, three such months on) stays without occurrences.
@@ -386,18 +388,25 @@ export function seriesStarts(
     return [iterator];
   });
 
+  // An RDATE of a period starts an occurrence at the period's start.
   const dates = master
     .getAllProperties("rdate")
-    .flatMap((property) => property.getValues() as ICAL.Time[]);
-  // As RecurExpansion: an item that does not recur has its start alone.
-  if (rules.length === 0 && dates.length === 0 && !master.hasProperty("recurrence-id")) starts++;
+    .flatMap((property) => property.getValues())
+    .flatMap((value) =>
+      value instanceof ICAL.Period ? [value.start] : value instanceof ICAL.Time ? [value] : [],
+    )
+    .map((value) => inFrameOf(value, dtstart));
+  // DTSTART is the first instance of the recurrence set (RFC 5545 3.8.5.3),
+  // of RDATEs alone too, where ical.js's RecurExpansion leaves it out; an
+  // RRULE's own walk gives it.
+  if (rules.length === 0 && !master.hasProperty("recurrence-id")) starts++;
   for (let i = 0; i < starts; i++) dates.push(dtstart.clone());
   dates.sort((a, b) => a.compare(b));
   // As RecurExpansion: the RDATEs from DTSTART on, or all of them when the
   // first is before it (Google's birthdays).
   let index = dates[0] && dates[0].compare(dtstart) < 0 ? 0 : firstFrom(dates, dtstart);
 
-  return () => {
+  const step = () => {
     let earliest: ICAL.RecurIterator | null = null;
     for (const iterator of iterators) {
       if (!iterator.completed && (!earliest || earliest.last.compare(iterator.last) > 0)) {
@@ -414,6 +423,68 @@ export function seriesStarts(
     earliest.next();
     return next;
   };
+  // The set is the union of the rules' and the RDATEs' starts (RFC 5545
+  // 3.8.5.3): a start two of them give (an RDATE at DTSTART beside an RRULE,
+  // two rules that meet) is one occurrence. Both come in order, so the same
+  // start comes twice in a row.
+  let last: ICAL.Time | null = null;
+  return () => {
+    for (;;) {
+      const next = step();
+      if (!next || !last || next.compare(last) !== 0) {
+        last = next;
+        return next;
+      }
+    }
+  };
+}
+
+/**
+ * An RDATE as ical.js can compare it with the rule's starts, which are on
+ * `dtstart`'s clock: ical.js compares a wall clock it holds for a zone the
+ * object does not define (D32) as if it were UTC. For such a start, an RDATE
+ * at an instant of its own (UTC, or another zone) becomes that instant's
+ * wall clock in the start's zone; beside a start ical.js places, an RDATE in
+ * a zone the object does not define becomes its instant in UTC. So the
+ * series' set is merged, and a start two of them give is one, by instant
+ * (D141). In the hour a DST change repeats, a wall clock is its first
+ * instant.
+ */
+function inFrameOf(time: ICAL.Time, dtstart: ICAL.Time): ICAL.Time {
+  if (time.isDate || dtstart.isDate) return time;
+  const start = zoneOrigin(dtstart);
+  const own = zoneOrigin(time);
+  const value = fromIcalTime(time);
+  if (value.type !== "zoned") return time;
+  if (start.kind === "undefined") {
+    if (own.kind === "undefined" && own.timeZone === start.timeZone) return time;
+    return ICAL.Time.fromDateTimeString(wallClockIn(value.epochMs, start.timeZone));
+  }
+  if ((start.kind === "defined" || start.kind === "utc") && own.kind === "undefined") {
+    return ICAL.Time.fromJSDate(new Date(value.epochMs), true);
+  }
+  return time;
+}
+
+/**
+ * The rule as ical.js must walk it from `dtstart`. A DTSTART in a zone the
+ * object does not define (Google's and Outlook's: a TZID and no VTIMEZONE,
+ * D32) is a wall clock to ical.js, which compares a UTC UNTIL with it as if
+ * the wall clock were UTC, so the series ended hours early or late. Such an
+ * UNTIL becomes its instant's wall clock in that zone.
+ */
+function onWallClock(rule: ICAL.Recur, dtstart: ICAL.Time): ICAL.Recur {
+  const { until } = rule;
+  if (!until || zoneOrigin(until).kind !== "utc") return rule;
+  const origin = zoneOrigin(dtstart);
+  if (origin.kind !== "undefined") return rule;
+  const walked = rule.clone();
+  // In the hour a DST change repeats, the wall clock stands for both of its
+  // instants: an occurrence at it is kept.
+  walked.until = ICAL.Time.fromDateTimeString(
+    wallClockIn(until.toUnixTime() * 1000, origin.timeZone),
+  );
+  return walked;
 }
 
 /** The index of the first time in `sorted` at or after `time`. */

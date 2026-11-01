@@ -34,33 +34,55 @@ function localOf(time: ICAL.Time): string {
 }
 
 /**
- * Converts an ical.js time. A TZID the object defines in a VTIMEZONE is
- * resolved by ical.js; a TZID it does not define (Google, some Android
- * clients) is taken as an IANA name and resolved through `Intl`, or else as a
- * Windows zone name (Outlook, Exchange) and mapped to IANA. A TZID none of
- * these knows stays floating (docs/plans/foundation.md#D32).
+ * Where an ical.js time's zone comes from: a date has none; UTC; a TZID the
+ * object defines in a VTIMEZONE, which ical.js resolves itself (`defined`); a
+ * TZID it does not define (Google, some Android clients, Outlook's Windows
+ * names), which ical.js holds as a wall clock and AstroTime resolves through
+ * `Intl` (`undefined`); or none, or a TZID nothing knows (`floating`)
+ * (docs/plans/foundation.md#D32). `fromIcalTime` and the walk of a series'
+ * `UNTIL` (D141) both tell the cases apart by this alone.
  */
-export function fromIcalTime(time: ICAL.Time): ItemTime {
-  if (time.isDate) {
-    return { type: "date", date: `${pad(time.year, 4)}-${pad(time.month)}-${pad(time.day)}` };
-  }
-  const local = localOf(time);
+export type ZoneOrigin =
+  | { readonly kind: "date" }
+  | { readonly kind: "utc" }
+  | { readonly kind: "defined"; readonly timeZone: string }
+  | { readonly kind: "undefined"; readonly timeZone: string }
+  | { readonly kind: "floating" };
+
+export function zoneOrigin(time: ICAL.Time): ZoneOrigin {
+  if (time.isDate) return { kind: "date" };
   const zone = time.zone;
-  if (zone === ICAL.Timezone.utcTimezone) {
-    return { type: "zoned", local, timeZone: "UTC", epochMs: time.toUnixTime() * 1000 };
-  }
+  if (zone === ICAL.Timezone.utcTimezone) return { kind: "utc" };
   if (zone && zone !== ICAL.Timezone.localTimezone && zone.tzid !== "floating") {
-    return {
-      type: "zoned",
-      local,
-      timeZone: ianaName(zone.tzid),
-      epochMs: time.toUnixTime() * 1000,
-    };
+    return { kind: "defined", timeZone: ianaName(zone.tzid) };
   }
   const tzid = tzidOf(time);
   const timeZone = tzid === undefined ? undefined : resolveUndefinedTzid(tzid);
-  if (timeZone) return { type: "zoned", local, timeZone, epochMs: zonedToEpoch(local, timeZone) };
-  return { type: "floating", local };
+  return timeZone ? { kind: "undefined", timeZone } : { kind: "floating" };
+}
+
+/** Converts an ical.js time, its zone as `zoneOrigin` finds it. */
+export function fromIcalTime(time: ICAL.Time): ItemTime {
+  const origin = zoneOrigin(time);
+  if (origin.kind === "date") {
+    return { type: "date", date: `${pad(time.year, 4)}-${pad(time.month)}-${pad(time.day)}` };
+  }
+  const local = localOf(time);
+  switch (origin.kind) {
+    case "utc":
+      return { type: "zoned", local, timeZone: "UTC", epochMs: time.toUnixTime() * 1000 };
+    case "defined":
+      return { type: "zoned", local, timeZone: origin.timeZone, epochMs: time.toUnixTime() * 1000 };
+    case "undefined":
+      return {
+        type: "zoned",
+        local,
+        timeZone: origin.timeZone,
+        epochMs: zonedToEpoch(local, origin.timeZone),
+      };
+    case "floating":
+      return { type: "floating", local };
+  }
 }
 
 /** The IANA zone for a TZID the object does not define: itself, or a Windows zone name's. */

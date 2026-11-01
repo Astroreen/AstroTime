@@ -1355,8 +1355,43 @@ too many requests.
   both send data in a `sync-collection`. A server that names neither token
   nor ctag is downloaded every sync, as before.
 
+### Recurrence's corners
+
+Found by the logic QA after v0.2.0 (the owner's feedback: "silly logic
+errors").
+
+- **D141. A series' set is RFC 5545's where ical.js strays.**
+  `seriesStarts` (`recurrence.ts`, [D118](#D118)) follows RFC 5545 in four
+  places where ical.js does not:
+  - **A UTC `UNTIL` bounds by its instant** in a zone the object does not
+    define ([D32](#D32): Google's and Outlook's TZID with no VTIMEZONE).
+    ical.js has such a `DTSTART` as a wall clock and compared the `UNTIL`
+    with it as if the wall clock were UTC, so a series ended hours early or
+    late: "this and following" ([D105](#D105)) left the occurrence it ended
+    before, west of UTC, and dropped the last one, east of it. The `UNTIL`
+    is walked as its instant's wall clock in that zone; in the hour a DST
+    change repeats, that wall clock stands for both instants, and an
+    occurrence at it is kept. Which zones these are is `zoneOrigin`'s
+    (`time.ts`) to say, the one place `fromIcalTime` asks too: a floating,
+    all-day or UTC start, or one whose VTIMEZONE the object has, keeps its
+    rule as ical.js reads it.
+  - **An `RDATE` of a period** (`VALUE=PERIOD`) is an occurrence at the
+    period's start, of the series' length; it threw, and blanked the range of
+    every view it was in.
+  - **`DTSTART` is the first instance** of a series of `RDATE`s alone
+    (RFC 5545 3.8.5.3), where ical.js's `RecurExpansion` leaves it out.
+  - **The set is a union** (RFC 5545 3.8.5.3), merged by instant: a start
+    the `RRULE`s and `RDATE`s give more than once (an `RDATE` at `DTSTART`,
+    beside a rule or not, written in UTC or another zone) is one occurrence.
+    An `RDATE` at an instant of its own beside a start in a zone the object
+    does not define is put on that start's wall clock first, since ical.js
+    compares that wall clock as if it were UTC.
+
 ## Deferred
 
+- **An `RDATE` period's own length** — an occurrence from an `RDATE` of a
+  period lasts as long as the series, not the period ([D141](#D141)); no
+  client AstroTime has seen writes one.
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by
