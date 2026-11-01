@@ -490,9 +490,12 @@ export class Store {
    */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.queue.then(async () => {
-      const value = await operation();
-      this.notify();
-      return value;
+      try {
+        return await operation();
+      } finally {
+        // A failed operation may have written part of its work: readers ask again.
+        this.notify();
+      }
     });
     this.queue = result.then(
       () => {},
