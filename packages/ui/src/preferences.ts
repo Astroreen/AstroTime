@@ -1,6 +1,6 @@
 // This device's own choices (the view, which calendars show, the drawer's
 // settings, the tasks screen's list and order). Each app
-// brings the storage: `localStorage` on the web, Capacitor's later.
+// brings the storage: `localStorage` on the web and in Android's WebView.
 import { useState } from "react";
 
 export interface Preferences {

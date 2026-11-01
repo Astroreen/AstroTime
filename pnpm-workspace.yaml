@@ -4,6 +4,9 @@ packages:
 
 catalog:
   "@base-ui/react": 1.9.0
+  "@capacitor/android": 8.6.0
+  "@capacitor/cli": 8.6.0
+  "@capacitor/core": 8.6.0
   "@playwright/test": 1.61.1
   "@tailwindcss/vite": 4.3.3
   "@types/node": 24.19.2

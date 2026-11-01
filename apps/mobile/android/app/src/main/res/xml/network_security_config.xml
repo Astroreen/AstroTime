@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  docs/plans/android.md#D62: the system's CAs and the ones the user installed
+  (a self-hosted server's own), and plain http allowed here because it cannot
+  be allowed per address: AstroTime's HTTP plugin refuses it unless the user
+  typed the address (a saved account's, or the one being signed in to).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,33 @@
+{
+  "name": "@astrotime/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The AstroTime Android app: the shared UI in a Capacitor shell (docs/plans/android.md#D61)",
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "sync": "cap sync android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*",
+    "@astrotime/storage": "workspace:*",
+    "@astrotime/ui": "workspace:*",
+    "@capacitor/android": "catalog:",
+    "@capacitor/core": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "oxc-transform-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:"
+  }
+}
