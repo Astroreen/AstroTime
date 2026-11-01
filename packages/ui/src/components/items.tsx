@@ -7,7 +7,33 @@ import { useTranslation } from "react-i18next";
 
 import type { Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
+import { targetOf, useEditing } from "./editing.tsx";
 import { CheckCircleIcon } from "./icons.tsx";
+
+/**
+ * A button over the whole item that opens its details (D14): the item stays
+ * a list item named by its title and time, and the button says the same.
+ */
+function Opener({ entry, label }: { entry: Entry; label: string }) {
+  const { open } = useEditing();
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() =>
+        open(
+          targetOf(
+            { id: entry.objectId, calendarId: entry.calendarId },
+            entry.object,
+            entry.occurrence.recurrenceId,
+            entry.occurrence.item,
+          ),
+        )
+      }
+      className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+    />
+  );
+}
 
 /** When an item is: "All day", its time, or its start and end. */
 function useItemTime(): (entry: Entry, allDay: boolean) => string {
@@ -71,14 +97,15 @@ export function StripChip({
   const { colorOf, found } = useCalendar();
   const label = useItemLabel();
   const task = entry.occurrence.item.kind === "task";
+  const name = label(entry, allDay);
   return (
     <div
       role="listitem"
-      aria-label={label(entry, allDay)}
+      aria-label={name}
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
       className={[
-        "item flex h-full items-center leading-none font-medium",
+        "item relative flex h-full items-center leading-none font-medium",
         dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1 rounded-[5px] px-1.5 text-[13px]",
         continuesBefore ? "rounded-l-none" : "",
         continuesAfter ? "rounded-r-none" : "",
@@ -87,6 +114,7 @@ export function StripChip({
     >
       {task && <CheckCircleIcon className={`${dense ? "size-3" : "size-3.5"} shrink-0`} />}
       <Title entry={entry} wrap={false} clip={dense} />
+      <Opener entry={entry} label={name} />
     </div>
   );
 }
@@ -110,12 +138,13 @@ export function AgendaCard({
   const label = useItemLabel();
   const time = part ? t("agenda.dayOf", part) : timeOf(entry, allDay);
   const task = entry.occurrence.item.kind === "task";
+  const name = label(entry, allDay, time);
   return (
     <div
       role="listitem"
-      aria-label={label(entry, allDay, time)}
+      aria-label={name}
       data-done={entry.done || undefined}
-      className="item flex min-h-11 items-center gap-2 rounded-[8px] px-2.5 py-1.5"
+      className="item relative flex min-h-11 items-center gap-2 rounded-[8px] px-2.5 py-1.5"
       style={itemStyle(colorOf(entry))}
     >
       {task && <CheckCircleIcon className="size-4 shrink-0" />}
@@ -125,6 +154,7 @@ export function AgendaCard({
         </span>
         <span className="item-time truncate text-[12px] leading-tight">{time}</span>
       </span>
+      <Opener entry={entry} label={name} />
     </div>
   );
 }
@@ -149,10 +179,11 @@ export function TimedItem({
   const height = ((bottom - top) / 60) * HOUR - 2;
   const task = entry.occurrence.item.kind === "task";
   const showTime = shape === "block" && !compact && height >= 38;
+  const name = label(entry, false);
   return (
     <div
       role="listitem"
-      aria-label={label(entry, false)}
+      aria-label={name}
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
       className={[
@@ -180,6 +211,7 @@ export function TimedItem({
           {formats.timeRange(entry.occurrence.start, entry.occurrence.end, timeZone)}
         </span>
       )}
+      <Opener entry={entry} label={name} />
     </div>
   );
 }

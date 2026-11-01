@@ -4,12 +4,19 @@
 // current-time line.
 import type { Span } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
-import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type CSSProperties,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import type { RangeLayout } from "../calendar/query.ts";
 import { useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
+import { useEditing } from "./editing.tsx";
 import { ChevronIcon } from "./icons.tsx";
 import { HOUR, StripChip, TimedItem } from "./items.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
@@ -65,6 +72,16 @@ export function TimeGrid(props: TimeGridProps) {
   }, []);
 
   const swipe = useSwipe(onSwipe);
+  const editing = useEditing();
+  // A tap on an empty slot creates an event there, an hour long, from the
+  // half hour tapped (Google); a press to size it comes with dragging.
+  const createAt = (day: string) => (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!editing.canCreate || target?.closest("[role=listitem], button")) return;
+    const top = event.currentTarget.getBoundingClientRect().top;
+    const slot = Math.floor(((event.clientY - top) / HOUR) * 2) * 30;
+    editing.create("event", { day, at: Math.max(0, Math.min(slot, 23 * 60 + 30)) });
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -120,6 +137,7 @@ export function TimeGrid(props: TimeGridProps) {
               role="list"
               aria-label={formats.fullDate(column.day)}
               className="relative"
+              onClick={createAt(column.day)}
             >
               {HOURS.map((hour) => (
                 <div

@@ -1,7 +1,7 @@
 // The Month view (design D49, D86): the week numbers in a pill column, each
 // day a tile with its number and its items as one-line chips, a span over
 // the week's days for an item over several; as many rows as the tiles fit,
-// then "+N". A day, or its "+N", opens in the Day view.
+// then "+N". A day, or its "+N", opens in the Day view; an item, its details.
 import { isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -112,8 +112,6 @@ function Week({
           key={day}
           {...props}
           day={day}
-          days={week.days}
-          index={index}
           spans={shown.filter(({ span }) => span.firstDay === index)}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
@@ -125,8 +123,6 @@ function Week({
 
 function DayTile({
   day,
-  days,
-  index,
   spans,
   more,
   moreRow,
@@ -137,8 +133,6 @@ function DayTile({
   onOpenDay,
 }: MonthViewProps & {
   day: string;
-  days: readonly string[];
-  index: number;
   /** The spans that start on this day (or, continued, at the week's start). */
   spans: readonly StripSpan[];
   /** How many items "+N" stands for; 0 for none. */
@@ -151,14 +145,12 @@ function DayTile({
   const isToday = day === today;
   const name = formats.fullDate(day);
 
-  // A tap on the tile opens its day; on a span's part over a later day, that day.
+  // A tap on the tile opens its day. Buttons act on their own: the number,
+  // "+N", the undone chip, and every item, which opens its details (PR 6).
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
-    // Buttons (the number, "+N", the undone chip) and what they open act on their own.
     if (!target || !event.currentTarget.contains(target) || target.closest("button")) return;
-    const box = event.currentTarget.getBoundingClientRect();
-    const after = Math.max(0, Math.floor((event.clientX - box.left) / (box.width + GAP)));
-    onOpenDay(days[Math.min(days.length - 1, index + after)]!);
+    onOpenDay(day);
   };
 
   return (

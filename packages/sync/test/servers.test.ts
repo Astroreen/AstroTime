@@ -8,7 +8,15 @@ import {
   throughProxy,
   type HttpClient,
 } from "@astrotime/caldav";
-import { CalendarObject, OfflineError, type Event } from "@astrotime/core";
+import {
+  CalendarObject,
+  createItem,
+  editItem,
+  occurrencesBetween,
+  OfflineError,
+  zonedTime,
+  type Event,
+} from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { chromium } from "playwright";
@@ -139,6 +147,73 @@ describe.each(servers)(
       await b.sync();
       expect(await a.sync()).toMatchObject({ removed: 1 });
       expect(await a.summaries()).toEqual([]);
+    });
+
+    test("a series made and split here reaches another device as two series with their own times (D11)", async () => {
+      const name = calendarName();
+      await server.mkcalendar(name);
+      const [a, b] = [await device(server, name), await device(server, name)];
+      await a.sync();
+      const vilnius = (local: string) => zonedTime(local, "Europe/Vilnius");
+      const now = Date.parse("2026-11-01T08:00:00Z");
+      // Weekly on Mondays at 9:00 in Vilnius, with the VTIMEZONE core makes for it.
+      const series = createItem(
+        "event",
+        {
+          summary: "Swim",
+          time: { start: vilnius("2026-10-19T09:00:00"), end: vilnius("2026-10-19T10:00:00") },
+          repeat: {
+            frequency: "WEEKLY",
+            interval: 1,
+            weekdays: [],
+            monthlyWeekday: null,
+            end: { type: "count", count: 4 },
+          },
+        },
+        { now, uid: `swim-${run}` },
+      );
+      await a.store.saveLocal((await a.calendar()).id, series);
+      expect(await a.sync()).toMatchObject({ uploaded: 1, errors: [] });
+      // This and following, from November 2: an hour later, under a new UID.
+      const [stored] = await a.store.objectsBetween([(await a.calendar()).id], week);
+      const { ics, split } = editItem(
+        CalendarObject.parse(stored!.ics),
+        { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+        {
+          now,
+          scope: "following",
+          recurrenceId: vilnius("2026-11-02T09:00:00"),
+          newUid: `swim2-${run}`,
+        },
+      );
+      await a.store.saveLocal(stored!.calendarId, ics, stored!.href);
+      await a.store.saveLocal(stored!.calendarId, split!);
+      expect(await a.sync()).toMatchObject({ uploaded: 2, errors: [] });
+
+      await b.sync();
+      const starts = (
+        await b.store.objectsBetween([(await b.calendar()).id], {
+          from: "2026-10-01",
+          to: "2026-12-01",
+          timeZone: "UTC",
+        })
+      )
+        .flatMap((o) =>
+          occurrencesBetween(CalendarObject.parse(o.ics), {
+            from: "2026-10-01",
+            to: "2026-12-01",
+            timeZone: "Europe/Vilnius",
+          }),
+        )
+        .map((o) => (o.start.type === "zoned" ? o.start.local : ""))
+        .toSorted();
+      // Summer time ended on October 25: the wall clock stays.
+      expect(starts).toEqual([
+        "2026-10-19T09:00:00",
+        "2026-10-26T09:00:00",
+        "2026-11-02T10:00:00",
+        "2026-11-09T10:00:00",
+      ]);
     });
 
     test("a calendar deleted on the server goes with its objects (D38), though Nextcloud keeps it in its trash bin", async () => {

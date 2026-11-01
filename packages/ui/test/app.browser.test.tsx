@@ -220,6 +220,27 @@ test("a store that does not open for another reason: the failure, not a blank pa
   expect(quiet).toHaveBeenCalled();
 });
 
+test("an item opens its details; Escape closes them and the focus is back on the item (D14)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  render(Promise.resolve(store), ["en-US"]);
+  const opener = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Design review, / });
+  await expect.element(opener).toBeInTheDocument();
+  const button = opener.element() as HTMLElement;
+  // No stylesheet here, so the button over the item has no size: used in the DOM.
+  button.focus();
+  button.click();
+  const details = page.getByRole("dialog", { name: "Design review" });
+  await expect.element(details).toBeInTheDocument();
+  await expect.element(details.getByText("Calendar: Work")).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(details).not.toBeInTheDocument();
+  await expect.element(opener).toHaveFocus();
+});
+
 // The app's stylesheet lifts a dialog above Base UI's own backdrop; these
 // tests load no CSS, so a dialog's buttons get the clicks only with this.
 const lift = document.createElement("style");

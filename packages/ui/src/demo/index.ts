@@ -16,6 +16,8 @@ type Title = Record<Language, string>;
 interface DemoItem {
   readonly uid: string;
   readonly ics: string;
+  /** A change of ours the server refused, waiting in the Conflicts list (D6). */
+  readonly conflict?: string;
 }
 
 interface DemoCalendar {
@@ -23,6 +25,8 @@ interface DemoCalendar {
   readonly name: Title;
   readonly color: string;
   readonly components: ("VEVENT" | "VTODO")[];
+  /** A calendar the account may not write (a subscription, a share). */
+  readonly readOnly?: boolean;
   readonly items: (day: (offset: number) => string, language: Language, zone: string) => DemoItem[];
 }
 
@@ -57,11 +61,13 @@ function event(
   end: string,
   extra: Record<string, string | undefined> = {},
   alarms: readonly string[] = [],
+  /** Lines written as they are: repeated properties such as guests. */
+  raw = "",
 ): DemoItem {
   return {
     uid,
     ics: vcalendar(
-      `BEGIN:VEVENT\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, DTSTART: start, DTEND: end, ...extra })}${alarms.map(alarm).join("")}END:VEVENT\r\n`,
+      `BEGIN:VEVENT\r\n${lines({ UID: uid, DTSTAMP: "20260101T000000Z", SUMMARY: summary, DTSTART: start, DTEND: end, ...extra })}${raw}${alarms.map(alarm).join("")}END:VEVENT\r\n`,
     ),
   };
 }
@@ -122,14 +128,25 @@ const CALENDARS: readonly DemoCalendar[] = [
           at(zone, day(-1), "18:00"),
           at(zone, day(-1), "20:30"),
         ),
-        event(
-          "demo-dentist",
-          t("Dentist", "Стоматолог"),
-          at(zone, day(1), "15:00"),
-          at(zone, day(1), "16:00"),
-          {},
-          ["-PT1H"],
-        ),
+        {
+          ...event(
+            "demo-dentist",
+            t("Dentist", "Стоматолог"),
+            at(zone, day(1), "15:00"),
+            at(zone, day(1), "16:00"),
+            {},
+            ["-PT1H"],
+          ),
+          // Moved here an hour later while the server had it changed too.
+          conflict: event(
+            "demo-dentist",
+            t("Dentist, check-up", "Стоматолог, осмотр"),
+            at(zone, day(1), "16:00"),
+            at(zone, day(1), "17:00"),
+            {},
+            ["-PT1H"],
+          ).ics,
+        },
         event(
           "demo-concert",
           t("Concert at the philharmonic", "Концерт в филармонии"),
@@ -183,11 +200,27 @@ const CALENDARS: readonly DemoCalendar[] = [
           },
         ),
         // With Personal's call at 11:15, three that overlap and cascade (D15).
+        // With a place, a description with a link, guests and a reminder: the details show them all.
         event(
           "demo-review",
           t("Design review", "Обзор дизайна"),
           at(zone, day(0), "10:00"),
           at(zone, day(0), "11:30"),
+          {
+            LOCATION: t("Room 4\\, second floor", "Переговорная 4\\, второй этаж"),
+            DESCRIPTION: t(
+              "The new month view. Notes: https://example.com/review",
+              "Новый вид месяца. Заметки: https://example.com/review",
+            ),
+          },
+          ["-PT10M"],
+          [
+            `ORGANIZER;CN=${t("Anna Berg", "Анна Берг")}:mailto:anna@example.com`,
+            `ATTENDEE;CN=${t("Anna Berg", "Анна Берг")};PARTSTAT=ACCEPTED:mailto:anna@example.com`,
+            `ATTENDEE;CN=${t("Marta Lind", "Марта Линд")};PARTSTAT=TENTATIVE:mailto:marta@example.com`,
+            "ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:team@example.com",
+            "",
+          ].join("\r\n"),
         ),
         event(
           "demo-budget",
@@ -268,6 +301,22 @@ const CALENDARS: readonly DemoCalendar[] = [
       ];
     },
   },
+  {
+    slug: "holidays",
+    name: { en: "Holidays", ru: "Праздники" },
+    color: "#c98a3d",
+    components: ["VEVENT"],
+    // A calendar shared read-only: its items open, but nothing in it can change.
+    readOnly: true,
+    items: (day, l) => [
+      event(
+        "demo-festival",
+        l === "en" ? "Town festival" : "Городской праздник",
+        date(day(5)),
+        date(day(6)),
+      ),
+    ],
+  },
 ];
 
 export interface DemoData {
@@ -277,6 +326,7 @@ export interface DemoData {
     readonly name: string;
     readonly color: string;
     readonly components: ("VEVENT" | "VTODO")[];
+    readonly readOnly: boolean;
     readonly items: readonly DemoItem[];
   }[];
 }
@@ -291,6 +341,7 @@ export function demoData(language: Language, today: string, timeZone: string): D
       name: calendar.name[language],
       color: calendar.color,
       components: calendar.components,
+      readOnly: calendar.readOnly ?? false,
       items: calendar.items(day, language, timeZone),
     })),
   };
@@ -322,14 +373,15 @@ export async function loadDemo(
       name: calendar.name,
       color: calendar.color,
       components: calendar.components,
-      readOnly: false,
+      readOnly: calendar.readOnly,
     });
     for (const item of calendar.items) {
-      await store.saveFromServer(saved.id, {
+      const object = await store.saveFromServer(saved.id, {
         href: `${item.uid}.ics`,
         etag: '"demo"',
         ics: item.ics,
       });
+      if (item.conflict) await store.addConflict(object.id, item.conflict);
     }
   }
 }

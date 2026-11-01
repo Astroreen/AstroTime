@@ -23,9 +23,12 @@ import {
   type TaskRow,
 } from "../calendar/tasks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
+import { useAccounts } from "./accounts-context.tsx";
 import { useCalendar } from "./context.ts";
+import { targetOf, useEditing } from "./editing.tsx";
 import {
   BackIcon,
+  CheckCircleIcon,
   CheckIcon,
   ChevronIcon,
   CloseIcon,
@@ -108,10 +111,14 @@ export function TasksScreen({
     timeZone,
   });
 
+  const { scheduler } = useAccounts();
+  const editing = useEditing();
   const write = (row: TaskRow, ics: string) => {
-    store
-      .saveLocal(row.stored.calendarId, ics, row.stored.href)
-      .catch((error: unknown) => console.error(error));
+    store.saveLocal(row.stored.calendarId, ics, row.stored.href).then(
+      // A local change goes up soon (docs/plans/foundation.md#D91).
+      () => scheduler.changed(),
+      (error: unknown) => console.error(error),
+    );
   };
   const actions: Actions = {
     complete: (row, done) =>
@@ -120,6 +127,8 @@ export function TasksScreen({
         completeTask(row.object, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
       ),
     star: (row) => write(row, starTask(row.object, !row.starred, Date.now())),
+    open: (row) => editing.open(targetOf(row.stored, row.object, row.recurrenceId, row.task)),
+    add: (list) => editing.create("task", { day: null, calendarId: list.id }),
     found,
     today,
     now,
@@ -223,11 +232,16 @@ export function TasksScreen({
         </Tabs.Root>
       )}
       {!wide && (
-        // Creating tasks is PR 6, as on the calendar (docs/plans/foundation.md#pr-6--editing).
+        // A new task in the list shown, undated, as Google Tasks' button makes one.
         <button
           type="button"
-          disabled
+          disabled={!lists.some((list) => list.id === selected && !list.readOnly)}
           aria-label={t("fab.create")}
+          title={t("fab.create")}
+          onClick={() => {
+            const list = lists.find((l) => l.id === selected);
+            if (list) actions.add(list);
+          }}
           className="absolute right-4 bottom-4 grid size-14 place-items-center rounded-2xl bg-fab text-on-fab shadow-lg shadow-black/30"
         >
           <PlusIcon className="size-7" />
@@ -240,6 +254,10 @@ export function TasksScreen({
 interface Actions {
   readonly complete: (row: TaskRow, done: boolean) => void;
   readonly star: (row: TaskRow) => void;
+  /** Its details (docs/plans/foundation.md#D14). */
+  readonly open: (row: TaskRow) => void;
+  /** A new undated task in the list. */
+  readonly add: (list: Calendar) => void;
   /** The object a search asked to show. */
   readonly found: string | null;
   readonly today: string;
@@ -276,6 +294,16 @@ function ListCards({
             <MoreIcon className="size-5" />
           </button>
         </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => actions.add(list)}
+            className="mx-2 flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-accent hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <CheckCircleIcon className="size-[22px]" />
+            {t("tasks.add")}
+          </button>
+        )}
         {undone.length === 0 ? (
           <p className="px-5 pt-1 pb-3 text-[14px] text-ink-muted">
             {t(completed.length > 0 ? "tasks.allDone" : "tasks.none")}
@@ -406,11 +434,13 @@ function TaskItem({
           </Checkbox.Indicator>
         </Checkbox.Root>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5">
-          <span
-            className={`text-[15.5px] leading-snug break-words ${row.done ? "text-ink-muted line-through" : ""}`}
+          <button
+            type="button"
+            onClick={() => actions.open(row)}
+            className={`text-left text-[15.5px] leading-snug break-words focus-visible:outline-2 focus-visible:outline-accent ${row.done ? "text-ink-muted line-through" : ""}`}
           >
             {title}
-          </span>
+          </button>
           {dueText && (
             <span
               className={`flex items-center gap-1 text-[12.5px] ${overdue ? "text-danger" : "text-ink-muted"}`}

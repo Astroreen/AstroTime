@@ -1,12 +1,13 @@
 // The "N undone tasks" chip on today (design D51): one chip for every undone
 // task due before today, which opens the list of them.
-import { wallClockOf } from "@astrotime/core";
+import { CalendarObject, wallClockOf } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { Popover } from "@base-ui/react/popover";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
 import { useCalendar } from "./context.ts";
+import { targetOf, useEditing } from "./editing.tsx";
 import { CheckCircleIcon } from "./icons.tsx";
 
 export function UndoneChip({
@@ -21,6 +22,7 @@ export function UndoneChip({
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
+  const { open } = useEditing();
   const first = tasks[0];
   return (
     <Popover.Root>
@@ -61,7 +63,7 @@ export function UndoneChip({
                 return (
                   <li
                     key={`${task.object.id}/${JSON.stringify(task.occurrence.recurrenceId)}`}
-                    className="flex items-start gap-2 rounded-lg px-2 py-1.5"
+                    className="relative flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-raised-hover"
                   >
                     <CheckCircleIcon
                       className="mt-px size-4 shrink-0"
@@ -75,6 +77,22 @@ export function UndoneChip({
                         {t("undone.due", { date: due })}
                       </span>
                     </span>
+                    {/* Its details, as a tap on any item opens them (D14). */}
+                    <button
+                      type="button"
+                      aria-label={item.summary?.trim() || t("item.untitled")}
+                      onClick={() =>
+                        open(
+                          targetOf(
+                            task.object,
+                            CalendarObject.parse(task.object.ics),
+                            task.occurrence.recurrenceId,
+                            item,
+                          ),
+                        )
+                      }
+                      className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent"
+                    />
                   </li>
                 );
               })}

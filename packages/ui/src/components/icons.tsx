@@ -166,3 +166,70 @@ export const RepeatIcon = (props: Props) => (
     <path d="M17 3l3 3-3 3M4 11V9.5A3.5 3.5 0 0 1 7.5 6H20M7 21l-3-3 3-3M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H4" />
   </Icon>
 );
+
+export const EditIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+  </Icon>
+);
+
+export const TrashIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />
+  </Icon>
+);
+
+export const ClockIcon = (props: Props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Icon>
+);
+
+export const BellIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16zM10 20.5a2 2 0 0 0 4 0" />
+  </Icon>
+);
+
+export const PlaceIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" />
+    <circle cx="12" cy="10" r="2.3" />
+  </Icon>
+);
+
+export const NotesIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M4 6h16M4 11h16M4 16h10" />
+  </Icon>
+);
+
+export const CalendarIcon = (props: Props) => (
+  <Icon {...props}>
+    <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </Icon>
+);
+
+export const PeopleIcon = (props: Props) => (
+  <Icon {...props}>
+    <circle cx="9" cy="8.5" r="3.2" />
+    <path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.8c1.8.6 3 2.2 3.4 4.7" />
+  </Icon>
+);
+
+export const PaletteIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.6 0-.9.7-1.4 1.6-1.4h2.1a4 4 0 0 0 4-4C20.5 6.8 16.7 3.5 12 3.5z" />
+    <circle cx="7.8" cy="11" r="1" />
+    <circle cx="10.5" cy="7.5" r="1" />
+    <circle cx="15" cy="7.8" r="1" />
+  </Icon>
+);
+
+export const SubtasksIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M5 4v11a3 3 0 0 0 3 3h11M15 14l4 4-4 4" />
+  </Icon>
+);

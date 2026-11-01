@@ -27,6 +27,9 @@ export class Formats {
   readonly #hour: Intl.DateTimeFormat;
   readonly #time: Intl.DateTimeFormat;
   readonly #dateTime: Intl.DateTimeFormat;
+  readonly #monthDay: Intl.DateTimeFormat;
+  readonly #date: Intl.DateTimeFormat;
+  readonly #dayDate: Intl.DateTimeFormat;
 
   constructor({ locale, hour12, weekStart }: LocaleSettings) {
     const at = (options: Intl.DateTimeFormatOptions) =>
@@ -48,6 +51,9 @@ export class Formats {
       hour12 ? { hour: "numeric", ...clock } : { hour: "2-digit", minute: "2-digit", ...clock },
     );
     this.#time = at({ hour: "numeric", minute: "2-digit", ...clock });
+    this.#monthDay = at({ month: "long", day: "numeric" });
+    this.#date = at({ day: "numeric", month: "short", year: "numeric" });
+    this.#dayDate = at({ weekday: "long", day: "numeric", month: "long", year: "numeric" });
     this.#dateTime = at({
       month: "short",
       day: "numeric",
@@ -133,6 +139,32 @@ export class Formats {
     const e = wallClockOf(end, timeZone);
     const format = s.slice(0, 10) === e.slice(0, 10) ? this.#time : this.#dateTime;
     return format.formatRange(new Date(`${s}Z`), new Date(`${e}Z`));
+  }
+
+  /** "November 4", "4 ноября": a yearly rule's day. */
+  monthDay(day: string): string {
+    return this.#monthDay.format(utcDate(day));
+  }
+
+  /** "Dec 31, 2026": a rule's last day, a reminder's date. */
+  date(day: string): string {
+    return this.#date.format(utcDate(day));
+  }
+
+  /** "Wednesday, November 4", with the year when it is not `currentYear`. */
+  longDate(day: string, currentYear: string): string {
+    const format = day.slice(0, 4) === currentYear ? this.#fullDate : this.#dayDate;
+    return capitalize(format.format(utcDate(day)), this.#locale);
+  }
+
+  /** "November 4 – 6", "4–6 ноября": the days of an item over several. */
+  dateRange(first: string, last: string): string {
+    return capitalize(this.#monthDay.formatRange(utcDate(first), utcDate(last)), this.#locale);
+  }
+
+  /** "9:30", "09:30", "9:30 AM": a wall clock `HH:MM` in the user's clock. */
+  clock(time: string): string {
+    return this.#time.format(new Date(`2024-01-01T${time}:00Z`));
   }
 
   /**

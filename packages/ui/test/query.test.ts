@@ -123,6 +123,7 @@ describe("the demo data on the views", () => {
     expect((await store.calendars()).map((c) => c.name).toSorted()).toEqual([
       "Задачи",
       "Личное",
+      "Праздники",
       "Работа",
     ]);
   });
