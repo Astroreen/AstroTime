@@ -19,13 +19,15 @@ export function UpdateNotice({ updates }: { updates: AppUpdates }) {
   return (
     <div
       role="status"
-      className="fixed bottom-4 left-1/2 z-[120] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-2xl bg-raised p-2 pl-4 text-[14px] text-ink shadow-lg ring-1 ring-line"
+      // Above the system bar, and on a phone above the "+" button, which it
+      // would cover there (design D132, D134).
+      className="fixed bottom-[calc(var(--inset-bottom)+5.5rem)] left-1/2 z-[120] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-2xl bg-raised p-2 pl-4 text-body text-ink shadow-lg ring-1 ring-line sm:bottom-[calc(var(--inset-bottom)+1rem)]"
     >
       <p className="flex-1 py-1">{t("update.ready")}</p>
       <button
         type="button"
         onClick={() => updates.apply()}
-        className="rounded-full px-4 py-2 text-sm font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
+        className="rounded-full px-4 py-2 text-body font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
       >
         {t("update.reload")}
       </button>

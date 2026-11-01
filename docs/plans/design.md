@@ -709,7 +709,10 @@ are its decisions.
     sign-in, removing an account, the keyring question and the store's
     error screen took its roles, and Tailwind's own sizes left in the UI
     (`text-xs`, `text-sm`, `text-lg`) became `text-note`, `text-body` and
-    `text-title`, so a size is chosen by its role only.
+    `text-title`, so a size is chosen by its role only; the update notice
+    ([foundation D124](foundation.md#D124)) too, which now also sits above
+    the system bar, and on a phone above the "+" button it covered
+    ([D132](#D132)).
 
 ### Decided in the logic QA (after v0.2.0)
 
