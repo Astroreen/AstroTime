@@ -181,3 +181,38 @@ test("cancelled while the account was being saved, the account it added goes aga
   expect(await secrets.get(`account:${added}`)).toBeNull();
   expect(signIn.state.step).not.toBe("done");
 });
+
+test("the platform hears which server is being signed in to, for as long as it takes (android D62)", async () => {
+  const server = nextcloud({ password: "app-pass", approveAfter: 0 });
+  const store = await Store.open(nodeDriver());
+  const time = manualClock();
+  const signingIn: string[] = [];
+  /** Each request with the servers being signed in to as it went out. */
+  const seen: [string, string[]][] = [];
+  const signIn = new SignIn({
+    store,
+    secrets: memorySecrets(),
+    http: (request) => {
+      seen.push([new URL(request.url).pathname, [...signingIn]]);
+      return server.http(request);
+    },
+    openExternal: () => {},
+    signingInTo: (address) => {
+      signingIn.push(address);
+      return () => void signingIn.splice(signingIn.indexOf(address), 1);
+    },
+    clock: time.clock,
+  });
+  await signIn.withPassword({ server: "cloud.example.com", username: "astro", password: "nope" });
+  expect(signIn.state).toMatchObject({ step: "failed", problem: "auth" });
+  expect(seen.length).toBeGreaterThan(0);
+  expect(seen.every(([, servers]) => servers.includes(`${SERVER}/`))).toBe(true);
+  expect(signingIn).toEqual([]);
+
+  seen.length = 0;
+  await signIn.withNextcloud({ server: "cloud.example.com" });
+  expect(signIn.state).toMatchObject({ step: "done", added: true });
+  expect(seen.map(([path]) => path)).toContain("/login/v2/poll");
+  expect(seen.every(([, servers]) => servers.includes(`${SERVER}/`))).toBe(true);
+  expect(signingIn).toEqual([]);
+});

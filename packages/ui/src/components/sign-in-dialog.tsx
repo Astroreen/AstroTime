@@ -77,6 +77,7 @@ function SignInForm({
         secrets: platform.secrets,
         http: platform.http,
         openExternal: platform.openExternal,
+        ...(platform.signingInTo ? { signingInTo: platform.signingInTo } : {}),
       }),
   );
   const state = useSyncExternalStore(
