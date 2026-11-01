@@ -207,14 +207,47 @@ export function switchKind(form: Form, kind: "event" | "task"): Form {
     return { ...form, kind, allDay: true, endDate: form.startDate || form.endDate, startDate: "" };
   }
   const day = form.endDate || form.startDate;
+  // A task keeps one day: an end at or before the start was the next day's
+  // (an event over midnight), or there was none, an hour as a new event's.
+  if (form.endTime > form.startTime) {
+    return { ...form, kind, allDay: false, startDate: day, endDate: day };
+  }
+  const past = form.endTime < form.startTime;
+  const end = past ? minutesOf(form.endTime) + 1440 : minutesOf(form.startTime) + 60;
   return {
     ...form,
     kind,
     allDay: false,
     startDate: day,
-    endDate: day,
-    startTime: form.startTime,
-    endTime: form.endTime > form.startTime ? form.endTime : form.startTime,
+    endDate: addDays(day, Math.floor(end / 1440)),
+    endTime: clockOf(end),
+  };
+}
+
+const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+const clockOf = (minutes: number) =>
+  `${pad(Math.floor((minutes % 1440) / 60))}:${pad(minutes % 60)}`;
+
+/**
+ * A new start time: a timed event keeps its length, as Google moves its end
+ * with it, over midnight too (design D108).
+ */
+export function withStartTime(form: Form, startTime: string): Form {
+  if (form.kind !== "event" || form.allDay || !form.startDate || !form.endDate) {
+    return { ...form, startTime };
+  }
+  const days = Math.round(
+    (Date.parse(`${form.endDate}T00:00:00Z`) - Date.parse(`${form.startDate}T00:00:00Z`)) /
+      86_400_000,
+  );
+  const length = days * 1440 + minutesOf(form.endTime) - minutesOf(form.startTime);
+  if (length <= 0) return { ...form, startTime };
+  const end = minutesOf(startTime) + length;
+  return {
+    ...form,
+    startTime,
+    endDate: addDays(form.startDate, Math.floor(end / 1440)),
+    endTime: clockOf(end),
   };
 }
 
@@ -284,12 +317,21 @@ function compare(a: ItemTime, b: ItemTime): number {
   return localOf(a).localeCompare(localOf(b));
 }
 
-/** Why a form cannot be saved, as a catalog key; `null` when it can. */
-export function problemOf(form: Form): Problem | null {
+/**
+ * Why a form cannot be saved, as a catalog key; `null` when it can. An event
+ * lasts, unless it already had no length (no `DTEND`, as RFC 5545 allows,
+ * from another client) and its times are as they were; a task may be due
+ * when it starts.
+ */
+export function problemOf(form: Form, initial: Form | null = null): Problem | null {
   if (form.kind === "event" && (!form.startDate || !form.endDate)) return "noDate";
   const { start, end } = timesOfForm(form);
-  // An event lasts; a task may be due when it starts.
-  if (start && end && form.kind === "event" && compare(end, start) <= 0) return "endBeforeStart";
+  if (start && end && form.kind === "event") {
+    const length = compare(end, start);
+    if (length < 0 || (length === 0 && !(initial && sameTimes(initial, form)))) {
+      return "endBeforeStart";
+    }
+  }
   if (start && end && form.kind === "task" && compare(end, start) < 0) return "dueBeforeStart";
   const repeat = form.repeat;
   const first = form.startDate || form.endDate;
@@ -297,6 +339,21 @@ export function problemOf(form: Form): Problem | null {
     return "untilBeforeStart";
   }
   return null;
+}
+
+/** Whether a form's times are another's. */
+function sameTimes(a: Form, b: Form): boolean {
+  const keys = [
+    "kind",
+    "allDay",
+    "startDate",
+    "startTime",
+    "endDate",
+    "endTime",
+    "zone",
+    "utc",
+  ] as const;
+  return keys.every((key) => a[key] === b[key]);
 }
 
 /** The same rule: weekdays in any order are the same days. */
@@ -391,6 +448,8 @@ export function scopesFor(
 ): Scope[] | null {
   if (!target || !initial || !isOccurrence(target)) return [];
   if (initial.calendarId !== form.calendarId) return [];
+  // Nothing to save asks nothing, as a drop that changes nothing (D111).
+  if (Object.keys(changesOf(initial, form, "")).length === 0) return [];
   const day = initial.startDate !== form.startDate || initial.endDate !== form.endDate;
   return allowed(scopesOf(ruleChanged(initial, form), day), rights);
 }

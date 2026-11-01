@@ -290,7 +290,7 @@ export function useEditingState({
   const save = () => {
     if (!editing) return;
     const { target, initial, state } = editing;
-    const problem = problemOf(state.form);
+    const problem = problemOf(state.form, initial);
     if (problem) {
       setEditing({ ...editing, state: { ...state, problem } });
       return;

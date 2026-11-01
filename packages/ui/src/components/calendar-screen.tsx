@@ -284,7 +284,13 @@ export function CalendarScreen({
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
+      // A dialog's keys are its own: the scope question and a confirmation are alertdialogs.
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable], [role=dialog], [role=alertdialog]",
+        )
+      )
+        return;
       // The letter typed on a Latin layout (Dvorak's t is t); on another
       // script the key's place, so a Russian layout's ь is m.
       const typed = event.key.toLowerCase();
