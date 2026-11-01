@@ -115,10 +115,16 @@ export function androidReminders(options: {
   const { native, preferences, now = () => Date.now() } = options;
   const record = readKept(preferences);
   let kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
-  // Without a record (unreadable, or the preferences cleared) the alarms
-  // Android still holds are no one's: their ids would be handed out again
-  // while they still fire. The first set cancels them all.
-  let orphans = record === null;
+  // The ids the plugin holds a record of, as the last set read them: none is
+  // handed out again while it is held. One the kept map does not know is no
+  // one's: the record was cleared or unreadable, or its write was lost (the
+  // headless WebView of background sync is destroyed right after its run,
+  // D67, and nothing proves localStorage was flushed by then). Every set
+  // cancels those, so the map heals whatever the storage did.
+  let held = new Set<number>();
+  // A shown notification keeps its record once cancelled (the plugin only
+  // marks it so): cancelled once per run, not again with every set.
+  const cancelledOrphans = new Set<number>();
   let permission: ReminderPermission = "default";
   let exact = true;
   // The first set of a run arms every reminder ahead again: alarms do not
@@ -136,7 +142,7 @@ export function androidReminders(options: {
   const allocate = (): number => {
     const used = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
     let id = kept.next;
-    while (used.has(id)) id = id >= MAX_ID ? 1 : id + 1;
+    while (used.has(id) || held.has(id)) id = id >= MAX_ID ? 1 : id + 1;
     kept.next = id >= MAX_ID ? 1 : id + 1;
     return id;
   };
@@ -220,20 +226,17 @@ export function androidReminders(options: {
     // Cancelling needs no permission, nor does reading what the plugin holds.
     // The plugin's cancel stops an alarm and leaves a notification already
     // shown on screen. A failed read is tried again with the next set, and
-    // this one is scheduled all the same: an id handed out since is skipped
-    // then, as scheduling under an id replaced the old alarm it had.
-    if (orphans) {
-      try {
-        const { notifications } = await native.getPending();
-        const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
-        await cancel(
-          notifications.map(({ id }) => id).filter((id) => !ours.has(id)),
-          [],
-        );
-        orphans = false;
-      } catch {
-        // Read again with the next set.
-      }
+    // this one is scheduled all the same, with the ids last read: an id
+    // handed out meanwhile replaced whatever alarm it had.
+    try {
+      const { notifications } = await native.getPending();
+      held = new Set(notifications.map(({ id }) => id));
+      const ours = new Set(Object.values(kept.scheduled).map((entry) => entry.id));
+      const orphans = [...held].filter((id) => !ours.has(id) && !cancelledOrphans.has(id));
+      await cancel(orphans, []);
+      for (const id of orphans) cancelledOrphans.add(id);
+    } catch {
+      // Read again with the next set.
     }
     await refresh();
     const at = now();

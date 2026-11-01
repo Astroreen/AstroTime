@@ -14,7 +14,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** The plugin's names, from its 8.0.1 (`SecureStorage.java`, `base.ts`). */
-private const val PREFERENCES = "WSSecureStorageSharedPreferences"
+internal const val PREFERENCES = "WSSecureStorageSharedPreferences"
 const val SECRET_PREFIX = "capacitor-storage_"
 private const val SEPARATOR = '\u0010'
 

@@ -43,8 +43,9 @@ class SyncWorkerTest {
 
     @Test
     fun withNoCredentialsNoWebViewIsStarted() {
-        // A freshly installed app keeps none.
-        if (KeystoreSecrets.anyAccount(context)) return
+        // Signed out of everything: no account's credentials kept.
+        val kept = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        kept.edit().apply { kept.all.keys.filter { it.startsWith("${SECRET_PREFIX}account:") }.forEach(::remove) }.commit()
         assertEquals(NO_ACCOUNT, runWorker())
     }
 

@@ -341,6 +341,16 @@ were checked on 2026-11-01.
     `@capacitor/local-notifications` 8.3.1). A read that fails does not
     stop the set: it is tried with the next one, skipping the ids handed out
     since, as scheduling under an id already replaced its old alarm.
+    _Since PR A4_ ([D67](#D67)) every set reads what the plugin holds, not
+    only the first set without a map: an id the plugin holds is never handed
+    out again, and one the map does not know is cancelled as no one's. The
+    map lives in localStorage, and background sync's WebView is destroyed
+    right after its run; nothing proves Chromium flushed the write by then,
+    so the map heals whatever the storage did (a lost write, a cleared
+    record) instead of trusting it. A shown notification keeps its record
+    after a cancel (the plugin only marks it cancelled, and `getPending`
+    does not say so), so it reads as held, its id stays out until the user
+    dismisses it, and it is cancelled once per run, not with every set.
   - **Past reminders.** The set reaches an hour back
     ([foundation D100](foundation.md#D100)). One handed over before has
     fired from its alarm, and is never shown again. One that reaches
@@ -484,7 +494,13 @@ were checked on 2026-11-01.
     lock by the web's name, `src/locks.ts`), so the two never sync at once;
     and `androidReminders` takes the Web Lock `astrotime-reminder-ids`
     around each set and reads the kept ids again under it, so neither hands
-    out an id the other did (a test fails without the read).
+    out an id the other did (a test fails without the read); the switch
+    asking for the permission writes `asked` under it too, on the record as
+    kept now. What the plugin holds is read with every set besides
+    ([D66](#D66)), so a map write lost with the WebView heals: on the
+    emulator, the map written by a run did reach the disk when the process
+    was killed right after it (`am kill`), but the design does not depend on
+    that.
   - **The bridge: a small interface of our own, not a second Capacitor
     Bridge.** Capacitor's `Bridge` is built on an `AppCompatActivity`, and
     the plugins reach for it (`LocalNotificationsPlugin.load()` calls
@@ -544,6 +560,10 @@ were checked on 2026-11-01.
     run is stopped and its WebView destroyed, whatever it waits for; every
     request has its own ceiling besides (D62). Destroying the WebView lets
     go of the store's Web Lock, so an app that started meanwhile leads.
+  - **A failure is an outcome.** Whatever a run throws (a WebView missing
+    or being updated, the Keystore, the preferences) is logged as the run's
+    outcome and the job still succeeds, so the next hour tries again; only
+    WorkManager's cancellation goes on up (`jobOutcome`, `outcomeOf`).
   - **Nothing to do.** No account's credentials in the secure storage's
     preferences (signed out of everything, or never signed in): the worker
     ends before any WebView starts. An account with none saved is signed

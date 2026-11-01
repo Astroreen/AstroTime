@@ -14,6 +14,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
@@ -39,10 +40,38 @@ const val NO_ACCOUNT = "No account's credentials are kept: nothing to do."
  * that it was stopped. Stopping cancels the run, which destroys its WebView.
  */
 suspend fun outcomeOf(limitMs: Long, run: suspend () -> JSONObject): String =
-    try {
+    failedAsOutcome {
         withTimeoutOrNull(limitMs) { run() }?.toString() ?: "stopped after ${limitMs / 60_000} minutes"
-    } catch (error: RunFailed) {
-        "failed: ${error.message}"
+    }
+
+/**
+ * What the job did: nothing while the app is in front (read once: an app that
+ * comes to the front during a run waits for its sync, the sync lock, and
+ * syncs after it; stopping a run mid-sync would gain nothing, D67), nothing
+ * with no account's credentials (no WebView is started for nothing), else the
+ * run's outcome. Any failure is an outcome too, never the worker's.
+ */
+suspend fun jobOutcome(inFront: Boolean, anyAccount: () -> Boolean, run: suspend () -> String): String =
+    failedAsOutcome {
+        when {
+            inFront -> APP_OPEN
+            !anyAccount() -> NO_ACCOUNT
+            else -> run()
+        }
+    }
+
+/**
+ * A failure as the outcome it is (a WebView missing or being updated, the
+ * Keystore, the preferences): logged, and the next hour tries again, as D67
+ * says. Only a cancellation (WorkManager stopping the job) goes on up.
+ */
+private suspend fun failedAsOutcome(work: suspend () -> String): String =
+    try {
+        work()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        "failed: ${(error as? RunFailed)?.message ?: error.toString()}"
     }
 
 /** Whether the app's activity is on the screen: then the open app syncs itself. */
@@ -56,14 +85,8 @@ class SyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         val context = applicationContext
         val outcome =
-            when {
-                // Read once: an app that comes to the front during a run waits
-                // for its sync (the sync lock) and syncs after it; the run goes
-                // on, since stopping it mid-sync would gain nothing (D67).
-                AppVisibility.inFront -> APP_OPEN
-                // Signed out of every account: no WebView is started for nothing.
-                !KeystoreSecrets.anyAccount(context) -> NO_ACCOUNT
-                else -> outcomeOf(RUN_LIMIT_MS) { HeadlessRun(context).run() }
+            jobOutcome(AppVisibility.inFront, { KeystoreSecrets.anyAccount(context) }) {
+                outcomeOf(RUN_LIMIT_MS) { HeadlessRun(context).run() }
             }
         Log.i(TAG, "Background sync: $outcome")
         // A run that failed is not retried sooner: the next hour's tries again,

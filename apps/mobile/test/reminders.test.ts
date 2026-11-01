@@ -549,3 +549,44 @@ test("the switch asking keeps asked on the record as kept now, not over ids hand
   expect(idOf(phone, "call")).toBe(2);
   expect(phone.last().cancelled).toEqual([1]);
 });
+
+test("a lost write of the kept map heals: a held id is not handed out again, and its alarm is cancelled (D67)", async () => {
+  const phone = device();
+  const preferences = memoryPreferences();
+  const make = () => androidReminders({ native: phone.native, preferences, now: () => NOW });
+  await make().schedule([reminder("call", NOW + 30 * MINUTE)]);
+  const before = preferences.values.get(KEPT_KEY)!;
+  // Background sync hands out an id, then its write of the map is lost.
+  await make().schedule([
+    reminder("call", NOW + 30 * MINUTE),
+    reminder("lunch", NOW + 3 * 60 * MINUTE),
+  ]);
+  expect(idOf(phone, "lunch")).toBe(2);
+  preferences.values.set(KEPT_KEY, before);
+  // The app's next run: id 2 is held by an alarm the map does not know.
+  const since = phone.calls.length;
+  await make().schedule([reminder("call", NOW + 30 * MINUTE), reminder("gym", NOW + 60 * MINUTE)]);
+  expect(idOf(phone, "gym")).toBe(3);
+  expect(phone.calls.slice(since).flatMap(({ cancelled }) => cancelled)).toEqual([2]);
+  expect([...phone.pending.keys()].toSorted()).toEqual([1, 3]);
+});
+
+test("an orphan still held (a shown notification keeps its record) is cancelled once a run, and its id stays out", async () => {
+  const phone = device();
+  const app = androidReminders({
+    native: phone.native,
+    preferences: memoryPreferences(),
+    now: () => NOW,
+  });
+  // Shown and no one's: the plugin keeps its record after a cancel, only marked cancelled.
+  phone.pending.set(1, { id: 1 } as NativeNotification);
+  const cancelled: number[] = [];
+  phone.native.cancel = async ({ notifications }) => {
+    cancelled.push(...notifications.map(({ id }) => id));
+  };
+  await app.schedule([reminder("call", NOW + 30 * MINUTE)]);
+  await app.schedule([reminder("call", NOW + 30 * MINUTE), reminder("gym", NOW + 60 * MINUTE)]);
+  expect(cancelled).toEqual([1]);
+  expect(idOf(phone, "call")).toBe(2);
+  expect(idOf(phone, "gym")).toBe(3);
+});
