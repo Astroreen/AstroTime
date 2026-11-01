@@ -81,12 +81,12 @@ export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
             settings={settings}
             timeZone={zone}
           >
-          <CalendarScreen
-            store={opening.store}
-            preferences={preferences}
-            settings={settings}
-            timeZone={zone}
-          />
+            <CalendarScreen
+              store={opening.store}
+              preferences={preferences}
+              settings={settings}
+              timeZone={zone}
+            />
           </AccountsProvider>
         ) : (
           <StoreMessage opening={opening} />

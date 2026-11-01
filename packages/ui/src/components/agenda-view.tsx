@@ -68,6 +68,8 @@ export interface AgendaViewProps {
   readonly undoneColor: (task: UndoneTask) => string;
   /** The day at the top of the list changed as the user scrolled. */
   readonly onVisibleDay: (day: string) => void;
+  /** "Hide completed tasks" (design D96): completed tasks leave the list. */
+  readonly hideCompleted?: boolean;
 }
 
 export function AgendaView({
@@ -78,6 +80,7 @@ export function AgendaView({
   today,
   undoneColor,
   onVisibleDay,
+  hideCompleted = false,
 }: AgendaViewProps) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
@@ -87,13 +90,18 @@ export function AgendaView({
   const days = useMemo(
     () =>
       data
-        ? agendaDays(data.entries, data.from, data.to, {
-            today,
-            timeZone,
-            undone: data.undone.length,
-          })
+        ? agendaDays(
+            hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries,
+            data.from,
+            data.to,
+            {
+              today,
+              timeZone,
+              undone: data.undone.length,
+            },
+          )
         : [],
-    [data, today, timeZone],
+    [data, today, timeZone, hideCompleted],
   );
 
   const scroller = useRef<HTMLDivElement>(null);

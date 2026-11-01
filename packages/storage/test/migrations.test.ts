@@ -99,7 +99,10 @@ test("migration 6 leaves titles unknown on older rows, and search still finds th
   await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 5));
   const ics = (uid: string, summary: string) =>
     `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:${uid}\r\nSUMMARY:${summary}\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`;
-  await driver.query("INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0, NULL)", []);
+  await driver.query(
+    "INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0, NULL)",
+    [],
+  );
   await driver.query(
     "INSERT INTO calendars (id, account_id, url, name, components) VALUES ('c', 'a', 'https://x/c/', 'C', 'VTODO')",
     [],

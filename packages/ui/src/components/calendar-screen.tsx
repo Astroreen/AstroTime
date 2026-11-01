@@ -334,6 +334,7 @@ export function CalendarScreen({
                   today={today}
                   undoneColor={undoneColor}
                   onVisibleDay={setAnchor}
+                  hideCompleted={hideCompleted}
                 />
               ) : view === "month" ? (
                 <MonthView
@@ -387,7 +388,7 @@ export function CalendarScreen({
             <div className="absolute inset-x-0 top-14 bottom-0 z-[75] overflow-y-auto bg-canvas">
               <SearchResults
                 store={store}
-                calendarIds={visible.map((calendar) => calendar.id)}
+                calendarIds={ids ?? []}
                 query={query}
                 today={today}
                 colorOf={(result) =>
