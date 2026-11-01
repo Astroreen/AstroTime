@@ -7,7 +7,10 @@ export const PHONE = { width: 412, height: 915 };
 export const WIDE = { width: 1440, height: 900 };
 
 /** Opens the app on the demo data with the clock frozen at `NOW`. */
-export async function openDemo(page: Page, view?: "day" | "3days" | "week"): Promise<void> {
+export async function openDemo(
+  page: Page,
+  view?: "day" | "3days" | "week" | "month" | "agenda",
+): Promise<void> {
   await page.clock.setFixedTime(NOW);
   if (view) {
     await page.addInitScript((value) => localStorage.setItem("astrotime.view", value), view);
