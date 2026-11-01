@@ -4,6 +4,7 @@
 // reminders (foundation D101) and, on the desktop, whether closing the
 // window quits (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
+import { Checkbox } from "@base-ui/react/checkbox";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
 import { useId, type CSSProperties, type ReactNode } from "react";
@@ -13,7 +14,7 @@ import { LANGUAGES } from "../i18n/index.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { useCalendar } from "./context.ts";
-import { CloseIcon } from "./icons.tsx";
+import { CheckIcon, CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 
@@ -139,23 +140,28 @@ function SettingsGroups({
       {accounts.map((account) => {
         const own = calendars.filter((calendar) => calendar.accountId === account.id);
         if (own.length === 0) return null;
-        // Each account's calendars and whether the views show them, as the drawer's checkboxes.
+        // Each account's calendars and whether the views show them: the
+        // drawer's checkbox, in the calendar's colour, so one state is one
+        // widget wherever it is met (D131).
         return (
           <Group key={account.id} title={t("settings.calendarsOf", { account: account.name })}>
             {own.map((calendar) => (
-              <Toggle
+              <label
                 key={calendar.id}
-                label={calendar.name}
-                checked={!hidden.has(calendar.id)}
-                onChange={(shown) => onToggle(calendar.id, shown)}
-                mark={
-                  <span
-                    aria-hidden="true"
-                    className="item-color size-3 shrink-0 rounded-full bg-[var(--item-fill)]"
-                    style={{ "--item": colorOf(calendar) } as CSSProperties}
-                  />
-                }
-              />
+                className="flex min-h-12 cursor-pointer items-center gap-4 px-4 text-[14px]"
+              >
+                <Checkbox.Root
+                  checked={!hidden.has(calendar.id)}
+                  onCheckedChange={(shown) => onToggle(calendar.id, shown)}
+                  className="item-color grid size-[18px] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--item-fill)] data-checked:bg-[var(--item-fill)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  style={{ "--item": colorOf(calendar) } as CSSProperties}
+                >
+                  <Checkbox.Indicator className="flex text-white data-unchecked:hidden">
+                    <CheckIcon className="size-3.5" strokeWidth="2.6" />
+                  </Checkbox.Indicator>
+                </Checkbox.Root>
+                <span className="min-w-0 flex-1 truncate">{calendar.name}</span>
+              </label>
             ))}
           </Group>
         );
@@ -195,20 +201,16 @@ function Toggle({
   checked,
   onChange,
   hint,
-  mark,
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   hint?: string;
-  /** Drawn before the label: a calendar's colour. */
-  mark?: ReactNode;
 }) {
   const hintId = useId();
   return (
     <div className="flex flex-col px-4 text-[14px]">
       <label className="flex min-h-12 min-w-0 cursor-pointer items-center gap-3">
-        {mark}
         <span className="min-w-0 flex-1">{label}</span>
         <Switch.Root
           checked={checked}

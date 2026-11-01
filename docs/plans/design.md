@@ -579,9 +579,10 @@ are its decisions.
   calendars; on the desktop the settings no longer push the calendars up the
   sidebar. Inside, groups, each a card under its name, as Android's settings
   group them: _General_ (theme, language), _Views_ (week start, clock, hide
-  completed tasks), _Calendars of_ each account (each calendar with its
-  colour and a switch: shown in the views or not, the same setting as the
-  drawer's checkbox), _Notifications_ (reminders) and, on the desktop only,
+  completed tasks), _Calendars of_ each account (each calendar with the
+  drawer's checkbox in its colour: shown in the views or not; one state is
+  one widget, a checkbox, wherever it is met, not a checkbox in the drawer
+  and a switch here), _Notifications_ (reminders) and, on the desktop only,
   _Desktop app_ (keep running, [desktop D75](desktop.md#D75)). A setting's
   name is on the left and its value on the right; a value too wide wraps
   under its name, so nothing scrolls sideways at 320 px. Each still applies
@@ -601,9 +602,10 @@ are its decisions.
   sidebar (a phone, a tablet, a desktop with the sidebar closed) the "+"
   button floats bottom right with Material 3's margins, 16 px on a phone and
   24 px from 640 px, inside the system bars' insets ([android
-  D68](android.md#D68)). The time grid keeps 80 px below midnight, as the
-  Agenda and the tasks list already did, so the button never hides the last
-  hour for good.
+  D68](android.md#D68)). Where the button floats, the time grid keeps 80 px
+  below midnight, as the Agenda and the tasks list already did, so it never
+  hides the last hour for good; under a sidebar's Create the grid ends at
+  midnight.
 - **D133. The top bar on a wide screen is in Google's web order**: the menu,
   "Today" as a word in an outlined pill, previous and next, then the period
   they move (the month picker's button); search, Settings, the tasks toggle

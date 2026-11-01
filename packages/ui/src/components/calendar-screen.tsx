@@ -489,6 +489,7 @@ export function CalendarScreen({
                     expanded={expanded}
                     onExpandedChange={setExpanded}
                     onSwipe={go}
+                    floating={!sidebar}
                   />
                 )}
                 {/* Material 3's margins: 16 px on a phone, 24 px from 640 px (D132). */}

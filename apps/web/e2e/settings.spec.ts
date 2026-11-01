@@ -71,7 +71,7 @@ test("theme, week start, clock, hide completed and language apply at once and ar
   await expect(strip.getByRole("button", { name: "3 undone tasks" })).toBeVisible();
 
   // A calendar hidden in Settings is hidden in the drawer too: one setting (D131).
-  await inSettings(page, (settings) => settings.getByRole("switch", { name: "Work" }).click());
+  await inSettings(page, (settings) => settings.getByRole("checkbox", { name: "Work" }).click());
   await expect(
     page.getByRole("navigation", { name: "Main menu" }).getByRole("checkbox", { name: "Work" }),
   ).not.toBeChecked();
