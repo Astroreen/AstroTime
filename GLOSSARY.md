@@ -31,7 +31,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Subtask** — a task whose `RELATED-TO` names a parent task.
 - **Reminder** — a `VALARM` of an event or a task: the notification it asks
   for before it starts or is due (foundation D9). A task itself is never a
-  reminder.
+  reminder. In code a `Reminder` is one time an alarm fires (each
+  occurrence and each repeat its own); the reminders a platform is handed,
+  7 days ahead and at most 100, are the **reminder set** (foundation D100).
 - **Due** — a task's `DUE`. A task is **overdue** when its due has passed
   and it is not completed.
 

@@ -146,7 +146,12 @@ describe("events", () => {
     ]);
     expect(event.location).toBe("Apple Park\nOne Apple Park Way, Cupertino");
     expect(event.start).toMatchObject({ epochMs: Date.parse("2026-11-05T19:00:00Z") });
-    expect(event.alarms[0]).toMatchObject({ action: "AUDIO", trigger: { offsetSeconds: -900 } });
+    expect(event.alarms[0]).toMatchObject({
+      action: "AUDIO",
+      trigger: { offsetSeconds: -900 },
+      uid: "1F2E3D4C-5B6A-4789-8A9B-0C1D2E3F4A5B",
+      acknowledged: { type: "zoned", timeZone: "UTC", epochMs: Date.parse("2026-11-05T18:45:00Z") },
+    });
   });
 
   test("Thunderbird: an all-day span with an exclusive end, and escapes", () => {
@@ -377,7 +382,11 @@ describe("as Nextcloud's web Calendar and Tasks apps write them", () => {
       {
         action: "DISPLAY",
         description: "This is an event reminder.",
-        trigger: { type: "relative", relatedTo: "start", offsetSeconds: -900 },
+        trigger: { type: "relative", relatedTo: "start", offsetSeconds: -900, offsetDays: 0 },
+        repeat: 0,
+        repeatEverySeconds: null,
+        uid: null,
+        acknowledged: null,
       },
     ]);
   });

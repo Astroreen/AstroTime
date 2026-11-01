@@ -122,6 +122,14 @@ export const en = {
   "drawer.views": "Views",
   "drawer.calendars": "Calendars",
 
+  "reminders.setting": "Reminders",
+  "reminders.whileOpen": "Reminders show while AstroTime is open in a tab.",
+  "reminders.next": "Next: {{title}}, {{when}}.",
+  "reminders.none": "No reminders in the next 7 days.",
+  "reminders.denied":
+    "This browser blocks notifications from AstroTime. Allow them in the site's settings.",
+  "reminders.unsupported": "This browser cannot show notifications.",
+
   "fab.create": "Create",
 
   "grid.week": "Week {{number}}",
@@ -143,6 +151,13 @@ export const en = {
   "item.event": "{{title}}, {{time}}",
   "item.task": "Task: {{title}}, {{time}}",
   "item.taskDone": "Completed task: {{title}}, {{time}}",
+
+  "reminder.body": "{{when}} · {{relative}}",
+  "reminder.onDay": "{{day}}, {{time}}",
+  "reminder.allDay": "{{day}}, all day",
+  "reminder.due": "Due {{when}}",
+  "reminder.starts": "Starts {{when}}",
+  "reminder.task": "Task",
 
   undone_one: "{{count}} undone task",
   undone_other: "{{count}} undone tasks",

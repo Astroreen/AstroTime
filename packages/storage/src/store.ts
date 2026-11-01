@@ -1,11 +1,14 @@
 import {
   boundsOf,
   CalendarObject,
+  CalendarObjectError,
   ExpansionLimitError,
   isDone,
   latestUndoneBefore,
   type Occurrence,
   type Range,
+  type Reminder,
+  remindersOf,
   wallClockOf,
 } from "@astrotime/core";
 import {
@@ -16,6 +19,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
   lt,
   lte,
   ne,
@@ -47,6 +51,13 @@ export interface UndoneTask {
 
 /** The most a zone is from UTC; a range of days is widened by it to find candidates. */
 const ZONE_SLACK_MS = 14 * 3_600_000;
+
+/**
+ * How long after an event ends its alarms are still looked for: an event's
+ * alarm fires before it or while it runs, and RFC 5545 allows one after,
+ * which no client we know writes (docs/plans/foundation.md#D100).
+ */
+const EVENT_ALARM_LAG_MS = 7 * 86_400_000;
 
 /**
  * The local store, the UI's source of truth (docs/plans/foundation.md#D5).
@@ -512,6 +523,75 @@ export class Store {
       .toSorted((a, b) => (b.startMs ?? -Infinity) - (a.startMs ?? -Infinity))
       .slice(0, limit);
   }
+
+  /**
+   * The reminders of every calendar, hidden ones too, that fire within the
+   * range's days in its zone, soonest first (docs/plans/foundation.md#D100).
+   * Candidates are the objects with a `VALARM` that are not deleted here nor
+   * done tasks: every task, wherever its dates are (an alarm at a time of its
+   * own can remind of an overdue or undated one), and the events that end
+   * after the range starts, less `EVENT_ALARM_LAG_MS`. Each is computed
+   * once while its iCalendar, the range and the zone stay; a series too
+   * dense to expand reminds of nothing (foundation's Deferred "Expanding long
+   * series from the middle").
+   */
+  async reminders(range: Range): Promise<Reminder[]> {
+    const fromMs = Date.parse(`${range.from}T00:00:00Z`) - ZONE_SLACK_MS;
+    const candidates = await this.db
+      .select({ id: schema.objects.id, ics: schema.objects.ics })
+      .from(schema.objects)
+      .where(
+        and(
+          ne(schema.objects.pending, "delete"),
+          or(isNull(schema.objects.done), eq(schema.objects.done, false)),
+          // LIKE ignores ASCII case, as iCalendar's names do.
+          like(schema.objects.ics, "%BEGIN:VALARM%"),
+          or(
+            eq(schema.objects.kind, "task"),
+            isNull(schema.objects.endMs),
+            gte(schema.objects.endMs, fromMs - EVENT_ALARM_LAG_MS),
+          ),
+        ),
+      );
+    const seen = new Set<string>();
+    const reminders: Reminder[] = [];
+    for (const object of candidates) {
+      seen.add(object.id);
+      const known = this.reminderCache.get(object.id);
+      if (
+        known &&
+        known.ics === object.ics &&
+        known.from === range.from &&
+        known.to === range.to &&
+        known.timeZone === range.timeZone
+      ) {
+        reminders.push(...known.reminders);
+        continue;
+      }
+      let found: Reminder[];
+      try {
+        found = remindersOf(CalendarObject.parse(object.ics), object.id, range);
+      } catch (error) {
+        // A series too dense to expand reminds of nothing, as the views leave
+        // it out; and one odd object never costs every other its reminders.
+        if (!(error instanceof ExpansionLimitError || error instanceof CalendarObjectError)) {
+          throw error;
+        }
+        found = [];
+      }
+      this.reminderCache.set(object.id, { ...range, ics: object.ics, reminders: found });
+      reminders.push(...found);
+    }
+    for (const id of this.reminderCache.keys()) if (!seen.has(id)) this.reminderCache.delete(id);
+    return reminders.toSorted(
+      (a, b) => a.fireAt - b.fireAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+  }
+
+  private readonly reminderCache = new Map<
+    string,
+    { ics: string; from: string; to: string; timeZone: string; reminders: Reminder[] }
+  >();
 
   /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
   undated(calendarIds: readonly string[]): Promise<StoredObject[]> {

@@ -1,7 +1,13 @@
-// Fakes for the accounts' tests: a Nextcloud that answers Login Flow v2 and
-// CalDAV discovery, and a secret store in memory.
+// Fakes for the UI's tests: a Nextcloud that answers Login Flow v2 and
+// CalDAV discovery, a secret store in memory, and a platform's reminders.
 import type { HttpClient, HttpRequest, HttpResponse } from "@astrotime/caldav";
-import { OfflineError, type SecretStore } from "@astrotime/core";
+import {
+  OfflineError,
+  type ReminderPermission,
+  type ReminderScheduler,
+  type ScheduledReminder,
+  type SecretStore,
+} from "@astrotime/core";
 
 export const SERVER = "https://cloud.example.com";
 
@@ -85,5 +91,51 @@ export function memorySecrets(): SecretStore & { values: Map<string, string> } {
     get: async (key) => values.get(key) ?? null,
     set: async (key, value) => void values.set(key, value),
     delete: async (key) => void values.delete(key),
+  };
+}
+
+/**
+ * A platform's reminders that keep every set they are handed, ask the
+ * permission as the user would answer `answer`, and tap like the user.
+ */
+export function fakeReminders(permission: ReminderPermission = "granted", answer = permission) {
+  let current = permission;
+  const sets: (readonly ScheduledReminder[])[] = [];
+  const listeners = new Set<(reminder: ScheduledReminder) => void>();
+  const waiting = new Set<() => void>();
+  const scheduler: ReminderScheduler = {
+    schedule(reminders) {
+      sets.push(reminders);
+      for (const resolve of waiting) resolve();
+      waiting.clear();
+    },
+    onOpen(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    permission: () => current,
+    requestPermission: async () => {
+      asked++;
+      current = answer;
+      return current;
+    },
+    whileOpenOnly: true,
+  };
+  let asked = 0;
+  return {
+    scheduler,
+    sets,
+    get asked() {
+      return asked;
+    },
+    /** The set handed over last. */
+    get last(): readonly ScheduledReminder[] {
+      return sets.at(-1) ?? [];
+    },
+    /** Resolves at the next set handed over. */
+    next: () => new Promise<void>((resolve) => waiting.add(resolve)),
+    tap(reminder: ScheduledReminder) {
+      for (const listener of listeners) listener(reminder);
+    },
   };
 }

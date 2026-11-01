@@ -39,6 +39,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `completeTask`, `starTask` — the tasks screen's two edits, a series'
     occurrence through its exception, nothing else changed.
     → `plans/design.md#D94`
+  - `remindersOf`, `soonestReminders` — the times an object's alarms fire,
+    and the reminder set a platform is handed; `ReminderScheduler`, how a
+    platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
   - `mergeObjects` — the three-way merge of a refused write.
     → `plans/foundation.md#D6`
   - `Provider` — the interface every provider implements.
@@ -63,6 +66,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D97`
     - every operation that writes is a transaction.
       → `plans/foundation.md#D99`
+    - `reminders` — every calendar's reminders in a range of days.
+      → `plans/foundation.md#D100`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
     `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
     → `plans/foundation.md#D25`
@@ -100,8 +105,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
-    HTTP, secrets, `openExternal`, `Preferences`), the user's languages and
-    zone. → `plans/android.md#D60`
+    HTTP, secrets, `openExternal`, `Preferences`, reminders), the user's
+    languages and zone. → `plans/android.md#D60`
   - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
     the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
     `plans/foundation.md#D92`
@@ -132,6 +137,11 @@ When you add a package, app or module, add its line here in the same PR.
     `useSwipe`, `useNow`, `useMediaQuery`.
   - `settings.ts` — the drawer's settings, kept in the preferences and
     applied over the locale. → `plans/design.md#D96`
+  - `reminders/` — `ReminderPlanner` (when the reminder set goes to the
+    platform) and `reminderNotification` (its words);
+    `components/reminders-context.tsx` and `reminders-switch.tsx`, the
+    "Reminders" setting in the drawer and a tapped reminder opening its day.
+    → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light.
@@ -144,17 +154,23 @@ When you add a package, app or module, add its line here in the same PR.
 - `apps/web` (`@astrotime/web`) — the web app, the first platform: its
   `Platform` (`src/platform.ts`: the web store, HTTP through the proxy,
   credentials, a new tab for Login Flow, preferences in localStorage, a
-  Web Lock so the tabs sync one at a time, `plans/foundation.md#D91`) and
+  Web Lock so the tabs sync one at a time, `plans/foundation.md#D91`,
+  reminders) and
   the browser's languages around `@astrotime/ui` (`src/main.tsx`); `?demo`
   in the dev server loads the demo data. → `plans/foundation.md#D12`
   - `src/secrets.ts` — credentials in IndexedDB under a key the page cannot
     export. → `plans/foundation.md#D89`
+  - `src/reminders.ts` — `webReminders`: notifications while the app is open,
+    from the one tab holding the `astrotime-reminders` Web Lock.
+    → `plans/foundation.md#D101`
   - `e2e/` — Playwright against the dev server on the demo data with a
     frozen clock; `screenshots.spec.ts` takes a UI PR's evidence
     (`ASTROTIME_SCREENSHOTS`). → `plans/foundation.md#D57`;
     `accounts.spec.ts` signs in to a real Radicale (the one
     `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
-    takes the accounts' evidence. → `plans/foundation.md#D92`
+    takes the accounts' evidence. → `plans/foundation.md#D92`;
+    `reminders.spec.ts` moves `page.clock` and sees notifications through a
+    wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,

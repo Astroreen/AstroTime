@@ -12,8 +12,25 @@ export interface Alarm {
         readonly type: "relative";
         readonly relatedTo: "start" | "end";
         readonly offsetSeconds: number;
+        /**
+         * The weeks and days of the offset, in days, also counted in
+         * `offsetSeconds`: RFC 5545 §3.3.6 makes them days of the wall clock,
+         * so `-P1D` before a time keeps that time across a DST change.
+         */
+        readonly offsetDays: number;
       }
     | { readonly type: "absolute"; readonly at: ItemTime };
+  /** `REPEAT`: how many more times it fires, every `repeatEverySeconds`; 0 without both. */
+  readonly repeat: number;
+  /** `DURATION` between repeats; `null` without `REPEAT` and a positive `DURATION`. */
+  readonly repeatEverySeconds: number | null;
+  /** RFC 9074 `UID`, which identifies the alarm across edits. */
+  readonly uid: string | null;
+  /**
+   * When it was last acknowledged: its RFC 9074 `ACKNOWLEDGED` (Apple), or
+   * the item's `X-MOZ-LASTACK` (Thunderbird), whichever is later.
+   */
+  readonly acknowledged: ItemTime | null;
 }
 
 /** An `ATTENDEE` or the `ORGANIZER`. */
@@ -111,7 +128,7 @@ function participant(property: ICAL.Property): Participant {
   };
 }
 
-function alarm(component: ICAL.Component): Alarm {
+function alarm(component: ICAL.Component, lastAck: ItemTime | null): Alarm {
   const property = component.getFirstProperty("trigger");
   const value = property?.getFirstValue();
   const trigger: Alarm["trigger"] =
@@ -124,12 +141,56 @@ function alarm(component: ICAL.Component): Alarm {
               ? "end"
               : "start",
           offsetSeconds: value instanceof ICAL.Duration ? value.toSeconds() : 0,
+          offsetDays:
+            value instanceof ICAL.Duration
+              ? (value.isNegative ? -1 : 1) * (value.weeks * 7 + value.days) || 0
+              : 0,
         };
+  const repeat = integer(component, "repeat") ?? 0;
+  const every = component.getFirstPropertyValue("duration");
+  const everySeconds = every instanceof ICAL.Duration ? every.toSeconds() : 0;
+  const repeats = repeat > 0 && everySeconds > 0;
+  const acknowledged = utcTime(component, "acknowledged");
   return {
     action: text(component, "action") ?? "DISPLAY",
     description: text(component, "description"),
     trigger,
+    repeat: repeats ? repeat : 0,
+    repeatEverySeconds: repeats ? everySeconds : null,
+    uid: text(component, "uid"),
+    acknowledged: later(acknowledged, lastAck),
   };
+}
+
+/**
+ * A UTC time ical.js reads as text: RFC 9074's `ACKNOWLEDGED`, which it does
+ * not know yet, and Thunderbird's `X-MOZ-LASTACK`.
+ */
+function utcTime(component: ICAL.Component, name: string): ItemTime | null {
+  const value = component.getFirstPropertyValue(name);
+  if (value instanceof ICAL.Time) return fromIcalTime(value);
+  const match = typeof value === "string" ? UTC_TIME.exec(value.trim()) : null;
+  if (!match) return null;
+  const [, y, mo, d, h, mi, s] = match;
+  return {
+    type: "zoned",
+    local: `${y}-${mo}-${d}T${h}:${mi}:${s}`,
+    timeZone: "UTC",
+    epochMs: Date.UTC(+y!, +mo! - 1, +d!, +h!, +mi!, +s!),
+  };
+}
+
+const UTC_TIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
+
+/** The later of two times by instant (dates and floating times read in UTC; only a tie-break). */
+function later(a: ItemTime | null, b: ItemTime | null): ItemTime | null {
+  if (!a || !b) return a ?? b;
+  return roughMs(b) > roughMs(a) ? b : a;
+}
+
+function roughMs(value: ItemTime): number {
+  if (value.type === "zoned") return value.epochMs;
+  return Date.parse(`${value.type === "date" ? `${value.date}T00:00:00` : value.local}Z`);
 }
 
 /** `start` + `duration`, keeping the TZID (`keepTzid`). */
@@ -173,7 +234,9 @@ function fields(component: ICAL.Component): ItemFields {
     created: time(component, "created"),
     lastModified: time(component, "last-modified"),
     recurring: component.hasProperty("rrule") || component.hasProperty("rdate"),
-    alarms: component.getAllSubcomponents("valarm").map(alarm),
+    alarms: component
+      .getAllSubcomponents("valarm")
+      .map((valarm) => alarm(valarm, utcTime(component, "x-moz-lastack"))),
   };
 }
 

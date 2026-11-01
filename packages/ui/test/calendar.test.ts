@@ -190,8 +190,17 @@ describe("the drawer's settings override the locale (D53)", () => {
   });
 
   test("what was stored is read back; anything unreadable is the default", () => {
-    const chosen = { theme: "light", language: "ru", weekStart: 6, clock: 24, hideCompleted: true };
+    const chosen = {
+      theme: "light",
+      language: "ru",
+      weekStart: 6,
+      clock: 24,
+      hideCompleted: true,
+      reminders: false,
+    };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
+    // Reminders are on unless turned off (foundation D101).
+    expect(readSettings('{"reminders":"no"}').reminders).toBe(true);
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(

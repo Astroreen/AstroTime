@@ -46,7 +46,8 @@ were checked on 2026-11-01.
   become reminders (all-day and floating items, `RELATED=END`, absolute
   triggers, `REPEAT`, a series' exceptions, tasks with only a due) is
   decided where the set is first built: foundation's PR 6, reminders as
-  notifications ([D9](foundation.md#D9)). `@astrotime/sync`, which
+  notifications ([D9](foundation.md#D9)). _Decided there:_
+  [foundation D100](foundation.md#D100)–[D102](foundation.md#D102). `@astrotime/sync`, which
   reaches the store and the providers, also exports one sync entry,
   `syncAll()`: it syncs every account, joins a sync already running instead
   of starting a second, and reschedules the reminders afterwards. The UI's
@@ -61,7 +62,10 @@ were checked on 2026-11-01.
   [D91](foundation.md#D91)):_ `Platform` (`@astrotime/ui`) holds `store`
   (the opening `Store`, on the platform's `SqlDriver`), `http`, `secrets`,
   `openExternal` and `preferences` (the device's own choices, which PR 5a-1
-  passed beside it); `reminders` joins with PR 6. `syncAll(context, { fresh })`
+  passed beside it); `reminders` joined with foundation's reminders
+  ([D101](foundation.md#D101)): `ReminderScheduler` has `permission()`,
+  `requestPermission()` and `whileOpenOnly` beside `schedule` and `onOpen`,
+  and each reminder brings its notification's words. `syncAll(context, { fresh })`
   takes the store, the `SecretStore` and `connectCalDav(http)`; `fresh` asks
   for a sync that starts after the call, still never two at once.
 
