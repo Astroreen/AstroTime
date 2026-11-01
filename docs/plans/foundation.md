@@ -1432,7 +1432,8 @@ too many requests.
   fails the sync counts the same. Only a sync that goes through clears the
   count: a timeout or a refusal between two `503`s does not shorten the
   next wait. A `401` holds the account until its saved credentials change
-  (signing in again), since every refused password counts against the
+  (signing in again); a retry that goes nowhere (offline, a timeout, a
+  failure of another kind) lifts no hold, of either kind, since every refused password counts against the
   address in Nextcloud's brute-force protection, which then slows and
   refuses the user's other devices too. A held account's last result is
   reported again, with no request; offline holds nothing, as no request
@@ -1443,7 +1444,13 @@ too many requests.
   says "Offline: changes wait until the server can be reached"; the report
   names the soonest end of a hold (`retryAt`), and `SyncScheduler` plans a
   sync a second after it, so the change goes up then with no trigger or
-  user needed. A busy server shows as offline in the UI. Holds live in
+  user needed: in a visible tab, or a hidden one that holds a change of its
+  own ([D129](#D129)); any other hidden tab waits for its next visit. A held
+  account's result is not news: its "offline" does not make the next
+  trigger due, so triggers during a hold keep the one-minute gap. Each tab
+  (each instance of the store) keeps its own holds: another tab learns of a
+  busy server or a refused password with one request of its own, at its
+  own next trigger, its syncs one at a time behind the Web Lock. A busy server shows as offline in the UI. Holds live in
   memory, per instance of the store ([Deferred](#deferred)).
 - **D129. Triggers close together make one sync.** An automatic trigger
   ([D91](#D91): coming back, the 5-minute timer, the network's return)

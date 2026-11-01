@@ -85,6 +85,11 @@ export interface SyncAllReport {
    * device until it can go up. `null` when none is held for a time.
    */
   readonly retryAt: number | null;
+  /**
+   * The accounts this run left alone (D128): their result is the one they
+   * were held with, not news, so it does not hurry the next sync.
+   */
+  readonly held: readonly string[];
 }
 
 interface Runs {
@@ -184,16 +189,24 @@ async function everyAccount(
   retry: boolean,
 ): Promise<SyncAllReport> {
   const accounts: AccountSync[] = [];
+  const held: string[] = [];
   const known = new Set<string>();
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone.
     if (account.provider !== "caldav" || state.removing.has(account.id)) continue;
     known.add(account.id);
-    accounts.push(await syncOne(context, state.holds, account, retry));
+    const result = await syncOne(context, state.holds, account, retry);
+    if (result.held) held.push(account.id);
+    accounts.push(result.sync);
   }
   for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
   const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
-  return { accounts, finishedAt: Date.now(), retryAt: ends.length > 0 ? Math.min(...ends) : null };
+  return {
+    accounts,
+    finishedAt: Date.now(),
+    retryAt: ends.length > 0 ? Math.min(...ends) : null,
+    held,
+  };
 }
 
 async function syncOne(
@@ -201,7 +214,7 @@ async function syncOne(
   holds: Map<string, Hold>,
   account: Account,
   retry: boolean,
-): Promise<AccountSync> {
+): Promise<{ readonly sync: AccountSync; readonly held: boolean }> {
   const accountId = account.id;
   const now = context.now ?? Date.now;
   let secret: string | null = null;
@@ -209,17 +222,19 @@ async function syncOne(
     secret = await context.secrets.get(keyOf(accountId));
     const credentials = parseSecret(secret)?.credentials ?? null;
     if (!credentials) {
-      return {
+      const sync: AccountSync = {
         accountId,
         status: "signed-out",
         detail: "No credentials are saved for this account.",
         report: null,
       };
+      return { sync, held: false };
     }
     const held = holds.get(accountId);
     // Refused credentials stay refused until they change; a busy server is
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
-    if (held && !retry && (held.refused === secret || now() < held.until)) return held.last;
+    if (held && !retry && (held.refused === secret || now() < held.until))
+      return { sync: held.last, held: true };
     const provider = await context.connect(account, credentials);
     const result: AccountSync = {
       accountId,
@@ -227,7 +242,7 @@ async function syncOne(
       report: await syncAccount(context.store, provider, accountId),
     };
     holds.delete(accountId);
-    return result;
+    return { sync: result, held: false };
   } catch (error) {
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
@@ -241,7 +256,7 @@ async function syncOne(
             : "failed";
     const result: AccountSync = { accountId, status, detail, report };
     holdBack(holds, result, error, secret, now(), Math.random());
-    return result;
+    return { sync: result, held: false };
   }
 }
 
@@ -261,18 +276,27 @@ function holdBack(
   now: number,
   random: number,
 ): void {
-  // Only a sync that went through clears the count of busy answers: a
-  // timeout or a refusal between two 503s does not shorten the next wait.
-  const strikesBefore = holds.get(last.accountId)?.strikes ?? 0;
+  // Only a sync that went through clears a hold, or new credentials a
+  // refusal: a timeout or a refusal between two 503s does not shorten the
+  // next wait, and a retry that went nowhere does not lift a refusal.
+  const before = holds.get(last.accountId);
+  const strikesBefore = before?.strikes ?? 0;
+  // The refusal stands while these are still the credentials refused.
+  const refused = before?.refused === secret ? secret : null;
   if (error instanceof AuthError) {
     holds.set(last.accountId, { last, refused: secret, until: 0, strikes: strikesBefore });
     return;
   }
   const busy = error instanceof ServerBusyError;
   if (!busy && !(error instanceof HttpError && error.status >= 500)) {
-    // Nothing to hold back for, but the count stays.
-    if (strikesBefore === 0) holds.delete(last.accountId);
-    else holds.set(last.accountId, { last, refused: null, until: 0, strikes: strikesBefore });
+    // Nothing new to hold back for: what was held stays held.
+    if (before)
+      holds.set(last.accountId, {
+        last: refused === null ? last : before.last,
+        refused,
+        until: before.until,
+        strikes: strikesBefore,
+      });
     return;
   }
   const strikes = strikesBefore + 1;
@@ -284,7 +308,12 @@ function holdBack(
     backoff * (0.8 + 0.4 * random),
     asked === null ? 0 : Math.min(asked, RETRY_AFTER_MAX_MS),
   );
-  holds.set(last.accountId, { last, refused: null, until: now + wait, strikes });
+  holds.set(last.accountId, {
+    last: refused === null ? last : before!.last,
+    refused,
+    until: now + wait,
+    strikes,
+  });
 }
 
 // Accounts and their credentials. The credentials are the platform's

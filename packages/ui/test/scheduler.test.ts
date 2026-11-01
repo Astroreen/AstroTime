@@ -100,7 +100,7 @@ function fakePage() {
 function recorder() {
   const calls: boolean[] = [];
   const requests: SyncRequest[] = [];
-  let report: SyncAllReport = { accounts: [], finishedAt: 0, retryAt: null };
+  let report: SyncAllReport = { accounts: [], finishedAt: 0, retryAt: null, held: [] };
   return {
     calls,
     requests,
@@ -145,6 +145,7 @@ test("offline, the timer skips; the network coming back syncs at once", async ()
     accounts: [{ accountId: "a", status: "offline", detail: "offline", report: null }],
     finishedAt: 0,
     retryAt: null,
+    held: [],
   });
   const scheduler = new SyncScheduler(sync, page.env);
   scheduler.start();
@@ -249,6 +250,7 @@ test("the status says a sync runs, and each account's last result and time", asy
     accounts: [{ accountId: "a", status: "synced", report }],
     finishedAt: 10,
     retryAt: null,
+    held: [],
   });
   await first;
   const second = scheduler.syncNow();
@@ -256,6 +258,7 @@ test("the status says a sync runs, and each account's last result and time", asy
     accounts: [{ accountId: "a", status: "offline", detail: "offline", report: null }],
     finishedAt: 20,
     retryAt: null,
+    held: [],
   });
   await second;
   expect(scheduler.status.running).toBe(false);
@@ -265,7 +268,7 @@ test("the status says a sync runs, and each account's last result and time", asy
   });
   // An account removed meanwhile is not in the next report, and leaves the status.
   const third = scheduler.syncNow();
-  finish({ accounts: [], finishedAt: 30, retryAt: null });
+  finish({ accounts: [], finishedAt: 30, retryAt: null, held: [] });
   await third;
   expect(scheduler.status.accounts.has("a")).toBe(false);
 });
@@ -328,4 +331,62 @@ test("a change made while a busy server is held goes up once the hold ends, with
   await settled();
   expect((await store.object(stored!.id))?.pending).toBe("none");
   expect(server.objects.get("https://a.example/cal/t.ics")?.ics).toContain("SUMMARY:after");
+});
+
+test("an account held as offline does not hurry the triggers: within a minute they make no sync (D128, D129)", async () => {
+  const page = fakePage();
+  const { calls, sync, report } = recorder();
+  report({
+    accounts: [{ accountId: "a", status: "offline", detail: "429", report: null }],
+    finishedAt: 0,
+    retryAt: null,
+    held: ["a"],
+  });
+  const scheduler = new SyncScheduler(sync, page.env);
+  scheduler.start();
+  await Promise.resolve();
+  for (let i = 0; i < 5; i++) {
+    page.pass(5_000);
+    page.hide();
+    page.show();
+    page.goOffline();
+    page.goOnline();
+    page.ring(SYNC_EVERY_MS);
+  }
+  expect(calls).toHaveLength(1);
+});
+
+test("a hold's end syncs a hidden tab only for a change of its own; a visible tab always (D129)", async () => {
+  const page = fakePage();
+  const { calls, sync, report } = recorder();
+  const held: SyncAllReport = {
+    accounts: [{ accountId: "a", status: "offline", detail: "429", report: null }],
+    finishedAt: 0,
+    retryAt: 1_000_000 + 120_000,
+    held: [],
+  };
+  report(held);
+  const scheduler = new SyncScheduler(sync, page.env);
+  scheduler.start();
+  await Promise.resolve();
+  // Hidden, nothing of its own to send: the hold's end waits for its next visit.
+  page.hide();
+  page.elapse(122_000);
+  expect(calls).toHaveLength(1);
+  page.show();
+  expect(calls).toHaveLength(2);
+  await Promise.resolve();
+
+  // Hidden with a change of its own held back: the hold's end sends it.
+  scheduler.changed();
+  page.tick(CHANGE_DEBOUNCE_MS);
+  expect(calls).toHaveLength(3);
+  await Promise.resolve();
+  page.hide();
+  report({ ...held, retryAt: page.env.now() + 120_000 });
+  scheduler.changed();
+  page.tick(CHANGE_DEBOUNCE_MS);
+  await Promise.resolve();
+  page.elapse(122_000);
+  expect(calls).toHaveLength(5);
 });

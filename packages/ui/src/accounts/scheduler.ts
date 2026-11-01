@@ -184,6 +184,7 @@ export class SyncScheduler {
 
   /** Something changed on this device: it goes up shortly, in one sync per burst. */
   changed(): void {
+    this.#unsent = true;
     this.#cancelChange?.();
     this.#cancelChange = this.#environment.after(CHANGE_DEBOUNCE_MS, () => {
       this.#cancelChange = null;
@@ -202,12 +203,15 @@ export class SyncScheduler {
     const env = this.#environment;
     this.#cancelRetry = env.after(Math.max(0, at - env.now()) + 1_000, () => {
       this.#cancelRetry = null;
-      // Offline then: the network's return syncs.
-      if (env.online()) void this.#run(AUTOMATIC);
+      // Offline then: the network's return syncs. A hidden tab syncs by
+      // itself only for a change of its own (D129); otherwise its next visit.
+      if (env.online() && (env.visible() || this.#unsent)) void this.#run(AUTOMATIC);
     });
   }
 
   #stopped = false;
+  /** A change made here may not have gone up yet: the last syncs since did not all go through. */
+  #unsent = false;
 
   /** Whether an automatic trigger syncs: the last sync is a minute old, or found a server offline. */
   #due(): boolean {
@@ -220,7 +224,13 @@ export class SyncScheduler {
     this.#update({ running: true });
     try {
       const report = await this.#sync(request);
-      this.#lastOffline = report.accounts.some((account) => account.status === "offline");
+      // A held account's offline is old news (D128): it does not hurry the next trigger.
+      const held = new Set(report.held);
+      this.#lastOffline = report.accounts.some(
+        (account) => account.status === "offline" && !held.has(account.accountId),
+      );
+      // A change made here is sent once every account took a sync.
+      if (report.accounts.every((account) => account.status === "synced")) this.#unsent = false;
       this.#retryAt(report.retryAt);
       // Every account syncAll knows is in its report: one removed meanwhile drops out.
       const before = this.#status.accounts;

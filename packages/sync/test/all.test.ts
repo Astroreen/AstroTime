@@ -499,6 +499,43 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     expect(tries()).toBe(3);
   });
 
+  test("a retry that goes nowhere keeps the hold: a refusal stays until new credentials, a busy hold until its time", async () => {
+    const { context, tries, answer } = await turnedAway();
+    answer(async () => {
+      throw new AuthError("refused");
+    });
+    await syncAll(context);
+    // "Sync now" while the network is down: nothing learnt of the credentials.
+    answer(async () => {
+      throw new OfflineError("offline");
+    });
+    await syncAll(context, { retry: true });
+    expect(tries()).toBe(2);
+    // The next automatic trigger: still refused, no request.
+    expect((await syncAll(context, { fresh: true })).accounts[0]).toMatchObject({
+      status: "signed-out",
+    });
+    expect(tries()).toBe(2);
+
+    // A busy hold, and a retry that times out: the hold keeps its time.
+    const busy = await turnedAway();
+    busy.answer(async () => {
+      throw new ServerBusyError("429", 600_000);
+    });
+    await syncAll(busy.context);
+    busy.answer(async () => {
+      throw new OfflineError("timeout");
+    });
+    await syncAll(busy.context, { retry: true });
+    busy.pass(300_000);
+    busy.answer(async () => {});
+    const during = await syncAll(busy.context);
+    expect([busy.tries(), during.held]).toEqual([2, [expect.any(String)]]);
+    busy.pass(301_000);
+    expect((await syncAll(busy.context)).accounts[0]).toMatchObject({ status: "synced" });
+    expect(busy.tries()).toBe(3);
+  });
+
   test("a 429 or 503 holds the server for its Retry-After, when longer than the backoff's step", async () => {
     const { context, tries, answer, pass } = await turnedAway();
     answer(async () => {
