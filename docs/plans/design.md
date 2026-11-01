@@ -646,6 +646,31 @@ are its decisions.
     (`--color-fab`), so the screen's main action stands off the light
     canvas as it does off the dark one.
 
+### Decided in the logic QA (after v0.2.0)
+
+The owner's feedback 5 on v0.2.0: "silly logic errors". What the edit
+dialog ([D108](#D108)) did wrong, and does now:
+
+- **D143. The edit dialog's corners.**
+  - **An event with no length saves.** One another client wrote with no
+    `DTEND` (RFC 5545: it ends when it starts) was refused as "ends before
+    it starts" even for a new title. It keeps no length wherever it moves,
+    its end moving with its start; only an event that had a length may not
+    be given none (`problemOf`).
+  - **A new start keeps the length over midnight** (`withStartTime`), as
+    Google moves the end: 22:00–02:00 started at 23:00 ends at 03:00 the
+    next day; 22:00–23:00 started at 23:30 ends at 00:30. The length is
+    the wall clock's, as Google's: across a DST change an hour stays an
+    hour on the clock.
+  - **Save with nothing changed asks nothing** of an occurrence of a
+    series, as a drop that changes nothing ([D111](#D111)); it writes
+    nothing either.
+  - **Event, task, event keeps the event's times** while creating: a task
+    holds one day, so an end at or before the start was the next day's.
+  - **A dialog keeps its keys**: the view and period keys
+    ([D88](#D88)) do nothing behind the scope question or a confirmation
+    (`alertdialog`), as behind any other dialog.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).

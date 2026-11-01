@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   switchKind,
+  withStartTime,
   withStartDate,
   type AlarmChoice,
   type Form,
@@ -204,7 +205,7 @@ function Fields({
               date={form.startDate}
               time={form.startTime}
               onDate={(date) => onChange(withStartDate(form, date))}
-              onTime={(startTime) => set(keepLength(form, startTime))}
+              onTime={(startTime) => onChange(withStartTime(form, startTime))}
             />
             <DateTime
               form={form}
@@ -371,17 +372,6 @@ function Fields({
 
 function todayOf(timeZone: string): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone }).format(Date.now());
-}
-
-/** A new start keeps the event's length, as Google moves its end with it. */
-function keepLength(form: Form, startTime: string): Partial<Form> {
-  if (form.kind !== "event" || form.startDate !== form.endDate) return { startTime };
-  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-  const length = minutes(form.endTime) - minutes(form.startTime);
-  const end = minutes(startTime) + Math.max(length, 0);
-  if (length <= 0 || end >= 1440) return { startTime };
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return { startTime, endTime: `${pad(Math.floor(end / 60))}:${pad(end % 60)}` };
 }
 
 function Section({ icon, children }: { icon: ReactNode; children: ReactNode }) {

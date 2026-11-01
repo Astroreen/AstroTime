@@ -23,8 +23,10 @@ import {
   rewriteTarget,
   saveForm,
   scopesFor,
+  switchKind,
   timesOfForm,
   withStartDate,
+  withStartTime,
   type Form,
   type Target,
 } from "../src/calendar/editing.ts";
@@ -228,6 +230,70 @@ describe("the form", () => {
   });
 });
 
+describe("the form's corners", () => {
+  const event = (lines: string) => {
+    const object = CalendarObject.parse(
+      `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VEVENT\r\nUID:e\r\nDTSTAMP:20261101T000000Z\r\n${lines}SUMMARY:Ping\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+    );
+    return { objectId: "o", calendarId: "c", object, recurrenceId: null, item: object.master! };
+  };
+
+  test("an event without a length (no DTEND) saves while its times are as they were", () => {
+    const initial = formOf(event("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n"), timeZone);
+    expect(problemOf({ ...initial, summary: "Ping 2" }, initial)).toBeNull();
+    // A new start moves its end with it, and it keeps no length.
+    const later = withStartTime(initial, "10:00");
+    expect(later).toMatchObject({ startTime: "10:00", endDate: "2026-11-05", endTime: "10:00" });
+    expect(problemOf(later, initial)).toBeNull();
+    // An end before the start is refused still; one that had a length may not lose it.
+    expect(problemOf({ ...initial, endTime: "08:00" }, initial)).toBe("endBeforeStart");
+    const hour = { ...initial, endTime: "10:00" };
+    expect(problemOf({ ...hour, endTime: "09:00" }, hour)).toBe("endBeforeStart");
+  });
+
+  test("a new start keeps the event's length over midnight", () => {
+    const night = formOf(
+      event(
+        "DTSTART;TZID=Europe/Vilnius:20261105T220000\r\nDTEND;TZID=Europe/Vilnius:20261106T020000\r\n",
+      ),
+      timeZone,
+    );
+    expect(withStartTime(night, "23:00")).toMatchObject({
+      startDate: "2026-11-05",
+      startTime: "23:00",
+      endDate: "2026-11-06",
+      endTime: "03:00",
+    });
+    const late = formOf(
+      event(
+        "DTSTART;TZID=Europe/Vilnius:20261105T220000\r\nDTEND;TZID=Europe/Vilnius:20261105T230000\r\n",
+      ),
+      timeZone,
+    );
+    expect(withStartTime(late, "23:30")).toMatchObject({ endDate: "2026-11-06", endTime: "00:30" });
+    expect(withStartTime(late, "09:00")).toMatchObject({ endDate: "2026-11-05", endTime: "10:00" });
+  });
+
+  test("an event over midnight made a task and back keeps its length", () => {
+    const form = newForm("event", {
+      calendarId: "c",
+      day: "2026-11-05",
+      minutes: 0,
+      at: 23 * 60 + 30,
+      timeZone,
+    });
+    expect(form).toMatchObject({ endDate: "2026-11-06", endTime: "00:30" });
+    const back = switchKind(switchKind(form, "task"), "event");
+    expect(back).toMatchObject({
+      startDate: "2026-11-05",
+      startTime: "23:30",
+      endDate: "2026-11-06",
+      endTime: "00:30",
+    });
+    expect(problemOf(back)).toBeNull();
+  });
+});
+
 describe("the scopes offered (D11)", () => {
   test("all three; a new day not for all; a new rule not for one; none for an item that does not repeat", async () => {
     const { store, rowOf } = await demo();
@@ -252,6 +318,8 @@ describe("the scopes offered (D11)", () => {
     const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
     const form = formOf(single, timeZone);
     expect(scopesFor(single, form, { ...form, summary: "x" })).toEqual([]);
+    // Saved with nothing changed, a series asks nothing (it writes nothing).
+    expect(scopesFor(target, initial, { ...initial })).toEqual([]);
   });
 });
 
@@ -346,6 +414,48 @@ describe("saving writes pending changes through the store (D5)", () => {
     const row = await store.objectAt(personal.id, "new-one.ics");
     expect(row).toMatchObject({ pending: "create", uid: "new-one" });
     expect((CalendarObject.parse(row!.ics).master as Event).summary).toBe("Haircut");
+  });
+
+  test("an event with no DTEND takes a new title and still has none", async () => {
+    const { store, byName } = await demo();
+    const personal = byName("Personal");
+    const stored = await store.saveFromServer(personal.id, {
+      href: "ping.ics",
+      etag: '"1"',
+      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VEVENT\r\nUID:ping\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nSUMMARY:Ping\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    });
+    const target = await targetOn(store, stored, "2026-11-05");
+    const initial = formOf(target, timeZone);
+    const form = { ...initial, summary: "Ping 2" };
+    expect(problemOf(form, initial)).toBeNull();
+    await saveForm(
+      store,
+      { target, initial, form, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: uids },
+    );
+    const row = (await store.objectAt(personal.id, "ping.ics"))!;
+    expect(row).toMatchObject({ pending: "update" });
+    expect(row.ics).toContain("SUMMARY:Ping 2\r\n");
+    expect(row.ics).not.toContain("DTEND");
+    expect(row.ics).not.toContain("DURATION");
+  });
+
+  test("a series saved with nothing changed asks no scope and writes nothing", async () => {
+    const { store, rowOf } = await demo();
+    const before = await rowOf("Work", "demo-standup");
+    const target = await targetOn(store, before, "2026-11-05");
+    const initial = formOf(target, timeZone);
+    expect(scopesFor(target, initial, { ...initial })).toEqual([]);
+    let writes = 0;
+    const stop = store.subscribe(() => writes++);
+    await saveForm(
+      store,
+      { target, initial, form: { ...initial }, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: uids },
+    );
+    stop();
+    expect(writes).toBe(0);
+    expect(await rowOf("Work", "demo-standup")).toEqual(before);
   });
 
   test("this and following: the old series updated, the rest a new pending creation", async () => {

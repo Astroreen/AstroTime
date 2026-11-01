@@ -179,6 +179,37 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
     await expect(item(page, "Thursday, November 5", /^Stand-up, 9:00/)).toBeVisible();
   });
 
+  test("the scope question keeps its keys: a view's key does nothing behind it", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await opener(page, "Friday, November 6", /^Stand-up, /).click();
+    await page
+      .getByRole("dialog", { name: "Stand-up" })
+      .getByRole("button", { name: "Delete" })
+      .click();
+    const scope = page.getByRole("alertdialog", { name: "Delete recurring event" });
+    await expect(scope.getByRole("button", { name: "Delete" })).toBeFocused();
+    await page.keyboard.press("m");
+    await page.keyboard.press("n");
+    await scope.getByRole("button", { name: "Cancel" }).click();
+    await expect(scope).toHaveCount(0);
+    const details = page.getByRole("dialog", { name: "Stand-up" });
+    await details.press("Escape");
+    await expect(details).toHaveCount(0);
+    // Still the Week, the same week.
+    await expect(page.getByRole("heading", { name: "Friday, November 6" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sunday, November 1" })).toBeVisible();
+  });
+
+  test("saving a series with nothing changed asks nothing", async ({ page }) => {
+    await openDemo(page, "week");
+    const dialog = await editItem(page, "Thursday, November 5", /^Stand-up, /, "Stand-up");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  });
+
   test("deleting this and following ends the series", async ({ page }) => {
     await openDemo(page, "week");
     await opener(page, "Thursday, November 5", /^Stand-up, /).click();
