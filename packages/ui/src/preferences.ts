@@ -1,6 +1,7 @@
 // This device's own choices (the view, which calendars show, the drawer's
 // settings, the tasks screen's list and order). Each app
-// brings the storage: `localStorage` on the web and in Android's WebView.
+// brings the storage: `localStorage` on the web, the desktop and in
+// Android's WebView (`localPreferences`).
 import { useState } from "react";
 
 export interface Preferences {
@@ -16,6 +17,24 @@ export function memoryPreferences(initial: Record<string, string> = {}): Prefere
     set: (key, value) => void values.set(key, value),
   };
 }
+
+/** Preferences in the page's localStorage: the web app's, and the desktop's on `app://`. */
+export const localPreferences: Preferences = {
+  get: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Storage refused (full, or disabled): the choice lasts this visit only.
+    }
+  },
+};
 
 /** A preference as React state, written through on every change. */
 export function usePreference<T>(
