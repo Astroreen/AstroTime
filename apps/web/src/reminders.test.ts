@@ -160,13 +160,14 @@ test("after a sleep a reminder missed by a few minutes shows on waking; an older
   expect(fake.shown.map((s) => s.tag)).toEqual(["recent", "next"]);
 });
 
-test("woken, a new set that no longer holds a just-missed reminder still lets it show", () => {
+test("woken, a new set arriving before the wake shows a just-missed reminder it holds, and not one it dropped", () => {
   const fake = fakePage();
   const reminders = webReminders(fake.page);
-  reminders.schedule([reminder("a", 10)]);
-  // Asleep past it: no timer ran, and a sync's set arrives before the wake is heard.
+  reminders.schedule([reminder("a", 10), reminder("b", 11)]);
+  // Asleep past both: no timer ran, and a sync's set arrives before the wake
+  // is heard. It reaches back an hour (D100), so "a" is in it; "b" was deleted.
   fake.lapse(12 * MINUTE);
-  reminders.schedule([]);
+  reminders.schedule([reminder("a", 10)]);
   expect(fake.shown.map((s) => s.tag)).toEqual(["a"]);
 });
 

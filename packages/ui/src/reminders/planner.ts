@@ -8,6 +8,7 @@ import {
   type Reminder,
   type ReminderScheduler,
   type ScheduledReminder,
+  REMINDER_GRACE_MS,
   soonestReminders,
   zonedToEpoch,
 } from "@astrotime/core";
@@ -99,8 +100,11 @@ export class ReminderPlanner {
     // the day; the set itself starts now and reaches 7 days ahead.
     const all = await this.#store.reminders({ from: today, to: addDays(today, 8), timeZone });
     // New objects: the store keeps the reminders it computed.
-    const set = soonestReminders(all, now).map((reminder): ScheduledReminder =>
-      Object.assign({}, reminder, { notification: notification(reminder) }),
+    // An hour back too: a reminder missed in a sleep, which the platform
+    // shows within its own grace, is not lost to a set computed on waking.
+    const set = soonestReminders(all, now, { backMs: REMINDER_GRACE_MS }).map(
+      (reminder): ScheduledReminder =>
+        Object.assign({}, reminder, { notification: notification(reminder) }),
     );
     // Tomorrow the horizon reaches a day further; a full set needs its next
     // reminders once its last one has fired.

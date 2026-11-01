@@ -5,6 +5,7 @@ import {
   ExpansionLimitError,
   MAX_REMINDERS,
   remindersOf,
+  REMINDER_GRACE_MS,
   soonestReminders,
   type Reminder,
 } from "../src/index.ts";
@@ -441,6 +442,13 @@ describe("the set a platform is handed (android D60)", () => {
     const capped = soonestReminders(many.toReversed(), now);
     expect(capped).toHaveLength(MAX_REMINDERS);
     expect(capped.at(-1)?.id).toBe("r099");
+    // Reaching back, for a platform's grace: the hour just passed, not before.
+    const back = soonestReminders(
+      [at("hour", now - 60 * 60_000), at("older", now - 60 * 60_000 - 1), at("soon", now + 1)],
+      now,
+      { backMs: REMINDER_GRACE_MS },
+    );
+    expect(back.map((reminder) => reminder.id)).toEqual(["hour", "soon"]);
   });
 
   test("the ids are the same however the window is cut", () => {

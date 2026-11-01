@@ -15,6 +15,7 @@ export {
   MAX_REMINDERS,
   REMINDER_HORIZON_MS,
   remindersOf,
+  REMINDER_GRACE_MS,
   soonestReminders,
   type Reminder,
   type ReminderPermission,

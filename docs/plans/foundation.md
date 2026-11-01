@@ -755,7 +755,12 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   `@astrotime/core` turns a calendar object's `VALARM`s into the times they
   fire within a range of days in the user's zone; `soonestReminders` cuts
   the set a platform is handed: from now, 7 days ahead, at most 100, the
-  soonest first (ties by id). A reminder whose time has passed is not in it.
+  soonest first (ties by id). It also reaches an hour back
+  (`REMINDER_GRACE_MS`), so a reminder missed in a sleep is not lost to a
+  set computed on waking: each platform shows such a one within its own
+  grace (the web 5 minutes, [D101](#D101); the desktop an hour,
+  [desktop D76](desktop.md#D76)) and drops it after; one turned off,
+  deleted or edited away is not in the new set, so it never shows.
   - **What notifies.** `ACTION:DISPLAY` and `AUDIO`; an alarm without
     `ACTION` reads as `DISPLAY`. `EMAIL` is not ours (a server such as
     Nextcloud sends it), `NONE` (RFC 9074, Apple's placeholder) and

@@ -295,14 +295,21 @@ function bySoonest(a: Reminder, b: Reminder): number {
  * `nowMs` on within the horizon, the soonest first, at most `MAX_REMINDERS`.
  * A reminder whose time has passed is not in it.
  */
+/**
+ * How far back the set handed to a platform reaches: a reminder missed in a
+ * sleep stays in it this long, and each platform shows it within its own
+ * grace (the web 5 minutes, the desktop an hour) and drops it after.
+ */
+export const REMINDER_GRACE_MS = 60 * 60_000;
+
 export function soonestReminders(
   reminders: Iterable<Reminder>,
   nowMs: number,
-  options: { readonly horizonMs?: number; readonly max?: number } = {},
+  options: { readonly horizonMs?: number; readonly max?: number; readonly backMs?: number } = {},
 ): Reminder[] {
-  const { horizonMs = REMINDER_HORIZON_MS, max = MAX_REMINDERS } = options;
+  const { horizonMs = REMINDER_HORIZON_MS, max = MAX_REMINDERS, backMs = 0 } = options;
   return [...reminders]
-    .filter((reminder) => reminder.fireAt >= nowMs && reminder.fireAt < nowMs + horizonMs)
+    .filter((reminder) => reminder.fireAt >= nowMs - backMs && reminder.fireAt < nowMs + horizonMs)
     .toSorted(bySoonest)
     .slice(0, max);
 }
