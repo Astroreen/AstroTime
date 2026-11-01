@@ -77,6 +77,8 @@ const realClock: Clock = {
 
 /** How long Login Flow v2's token lives (android D65). */
 export const FLOW_LIFETIME_MS = 20 * 60_000;
+/** How often a hidden page looks whether it is visible again, sending nothing. */
+const HIDDEN_LOOK_MS = 5_000;
 
 /** Where a Login Flow under way is kept, in the platform's `pendingSignIn` (D121). */
 export const PENDING_FLOW = "login-flow";
@@ -677,9 +679,11 @@ export class SignIn {
     this.#wake = stop;
     try {
       await this.#clock.wait(ms, woken.signal);
-      // Out of sight, nobody is approving here: the user's return polls (D130).
-      if (!woken.signal.aborted && !this.#visible()) {
-        await new Promise((resolve) => woken.signal.addEventListener("abort", resolve));
+      // Out of sight, nobody is approving here: no poll until the user is
+      // back (D130), which `pollNow` says at once; looked at again now and
+      // then without a request, in case nobody calls it.
+      while (!woken.signal.aborted && !this.#visible()) {
+        await this.#clock.wait(HIDDEN_LOOK_MS, woken.signal);
       }
     } finally {
       signal.removeEventListener("abort", stop);

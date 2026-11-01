@@ -280,7 +280,7 @@ test("a change made while a busy server is held goes up once the hold ends, with
   const connect: Connect = async () => ({
     ...server,
     calendars: async () => {
-      if (busy) throw new ServerBusyError("429", 60_000);
+      if (busy) throw new ServerBusyError("429", 120_000);
       return server.calendars();
     },
   });
@@ -320,7 +320,7 @@ test("a change made while a busy server is held goes up once the hold ends, with
 
   // The server is back before the hold ends: nothing is asked of it until then.
   busy = false;
-  page.elapse(59_000);
+  page.elapse(119_000);
   await settled();
   expect((await store.object(stored!.id))?.pending).toBe("update");
   // The hold ends: a sync runs by itself, and the edit goes up.

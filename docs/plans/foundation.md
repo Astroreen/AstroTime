@@ -1464,7 +1464,7 @@ too many requests.
   | focus and visibility together   | 1 + N                     | 1                                            |
   | 5-minute timer, visible         | 1 + N each                | 1 each, none within a minute of another sync |
   | a refused password, per trigger | 1 (a `401`) for ever      | 1, then none until signed in again           |
-  | a `429`, per trigger            | 1 + more for ever         | 1, then none for a minute or more           |
+  | a `429`, per trigger            | 1 + more for ever         | 1, then none for a minute or more            |
 
 - **D130. Login Flow v2 polls less as it waits.** Its poll ([D92](#D92),
   [android D65](android.md#D65)) is every 2 seconds for the first minute,
