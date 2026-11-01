@@ -25,6 +25,12 @@ export interface Out {
   reply(client: string, reply: Reply): void;
   /** `client`'s statement committed a write: every other tab reads again. */
   changed(client: string): void;
+  /**
+   * The connection is stuck in a transaction nobody owns (its ROLLBACK
+   * failed): this leader cannot serve on, and must stop, so another opens
+   * the database afresh (SQLite rolls the journal back when it does).
+   */
+  lost(error: Error): void;
 }
 
 export interface Serving {
@@ -82,15 +88,19 @@ export function serving(connection: Connection, out: Out): Serving {
   };
 
   /** Ends the owner's transaction, whatever ROLLBACK says: nobody else may wait on it. */
-  const rollBack = () => {
-    if (owner === undefined) return;
-    owner = undefined;
+  /** Ends a gone tab's transaction; false when the connection is stuck in it. */
+  const rollBack = (): boolean => {
+    if (owner === undefined) return true;
     try {
       connection.script("ROLLBACK;");
     } catch {
-      // Ended already, or a connection that cannot: either way it no longer
-      // belongs to a tab, and the others go on.
+      // Ended already, or a connection that cannot: which one, it says next.
     }
+    // Still in it: another tab's statements would run inside the gone tab's
+    // transaction, so nothing more runs here.
+    if (connection.inTransaction()) return false;
+    owner = undefined;
+    return true;
   };
 
   return {
@@ -103,7 +113,11 @@ export function serving(connection: Connection, out: Out): Serving {
         if (waiting[i]!.client === client) waiting.splice(i, 1);
       }
       // A tab gone mid-transaction leaves nothing of it.
-      if (owner === client) rollBack();
+      if (owner === client && !rollBack()) {
+        waiting.length = 0;
+        out.lost(new Error("A transaction of a tab that went could not be rolled back."));
+        return;
+      }
       drain();
     },
     close() {

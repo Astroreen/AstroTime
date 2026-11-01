@@ -13,6 +13,7 @@ function leader() {
   const db = new DatabaseSync(":memory:");
   let rollbackFails = false;
   const replies: { client: string; reply: Reply }[] = [];
+  const lost: Error[] = [];
   const served = serving(
     {
       query(sql, params) {
@@ -27,7 +28,11 @@ function leader() {
       inTransaction: () => db.isTransaction,
       committed: () => false,
     },
-    { reply: (client, reply) => replies.push({ client, reply }), changed: () => {} },
+    {
+      reply: (client, reply) => replies.push({ client, reply }),
+      changed: () => {},
+      lost: (error) => lost.push(error),
+    },
   );
   let ids = 0;
   const send = (client: string, sql: string): number => {
@@ -37,7 +42,7 @@ function leader() {
   };
   const answered = (id: number) =>
     replies.find(({ reply }) => reply.type === "result" && reply.id === id)?.reply;
-  return { db, served, send, answered, failRollback: () => (rollbackFails = true) };
+  return { db, served, send, answered, lost, failRollback: () => (rollbackFails = true) };
 }
 
 test("a statement of another tab waits for the open transaction, and runs once it ends", () => {
@@ -51,8 +56,8 @@ test("a statement of another tab waits for the open transaction, and runs once i
   expect(answered(count)).toMatchObject({ rows: [[1]], transaction: false });
 });
 
-test("a tab gone mid-transaction is rolled back and the others go on, even when its ROLLBACK fails", () => {
-  const { served, send, answered, failRollback } = leader();
+test("a tab gone mid-transaction is rolled back and the others go on; a ROLLBACK that fails stops the leader", () => {
+  const { served, send, answered, lost, failRollback } = leader();
   send("a", "CREATE TABLE t (x)");
   send("a", "BEGIN IMMEDIATE");
   send("a", "INSERT INTO t VALUES (1)");
@@ -60,12 +65,17 @@ test("a tab gone mid-transaction is rolled back and the others go on, even when 
   served.gone("a");
   expect(answered(count)).toMatchObject({ rows: [[0]], transaction: false });
 
-  // A ROLLBACK that fails leaves nobody waiting on a tab that is gone either.
+  expect(lost).toEqual([]);
+
+  // A ROLLBACK that fails leaves the connection in the gone tab's
+  // transaction: nobody else's statement runs inside it; the leader stops.
   send("a", "BEGIN IMMEDIATE");
-  const held = send("b", "SELECT count(*) FROM t");
+  send("a", "INSERT INTO t VALUES (2)");
+  const held = send("b", "INSERT INTO t VALUES (3)");
   failRollback();
   served.gone("a");
-  expect(answered(held)).toBeDefined();
+  expect(answered(held)).toBeUndefined();
+  expect(lost).toHaveLength(1);
 });
 
 test("a tab gone drops its waiting statements; the others' still run", () => {

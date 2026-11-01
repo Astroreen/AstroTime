@@ -115,6 +115,8 @@ async function lead(name: string): Promise<Leader> {
         if (known) post(known.channel, reply);
       },
       changed: (by) => post(store, { type: "changed", by } satisfies Announcement),
+      // The tab terminates this worker on it, which closes the database and lets the lock go.
+      lost: (error) => report({ type: "failed", error: messageOf(error) }),
     },
   );
 

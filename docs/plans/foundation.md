@@ -695,8 +695,12 @@ Decided while closing the Deferred "One store across tabs".
     transaction is open, the leader holds the other tabs' statements back.
     Each tab holds a Web Lock of its own while its store is open; when the
     leader is granted it, the tab is gone, and its open transaction is
-    rolled back. The others go on whatever that `ROLLBACK` says: a tab that
-    is gone never holds them.
+    rolled back. A tab that is gone never holds the others: if that
+    `ROLLBACK` fails and leaves the connection in its transaction, no other
+    statement runs inside it; the leader stops (its worker ends, with the
+    files and the lock), and the next leader opens the database afresh,
+    which rolls the journal back. A migration step outlasts five hand-overs
+    in a row, then the opening fails.
   - Every leader sets its connection up alike (foreign keys on), since the
     tabs move between connections without knowing. The pool opens with
     `preserveOnInitFailure`: by default a failed open deletes the pool's
