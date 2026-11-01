@@ -100,8 +100,11 @@ function showWindow() {
   window.focus();
 }
 
-/** Asks the page for a sync: the main process's triggers and the tray's "Sync now" (D75). */
-const requestSync = () => window?.webContents.send(CHANNELS.sync);
+/**
+ * Asks the page for a sync: the main process's triggers and the tray's
+ * "Sync now" (D75), which is the user's own (`byUser`, foundation D128).
+ */
+const requestSync = (byUser = false) => window?.webContents.send(CHANNELS.sync, byUser);
 
 /** Applies the page's settings: the frame's theme, the tray and the menu in the user's words. */
 function applyShell(next: ShellState) {
@@ -109,7 +112,10 @@ function applyShell(next: ShellState) {
   nativeTheme.themeSource = next.theme;
   const { words } = next;
   const quit: MenuItemConstructorOptions = { label: words.quit, click: () => app.quit() };
-  const syncNow: MenuItemConstructorOptions = { label: words.syncNow, click: requestSync };
+  const syncNow: MenuItemConstructorOptions = {
+    label: words.syncNow,
+    click: () => requestSync(true),
+  };
   // Where the desktop shows no tray, Quit stays in the window's menu (Alt shows it).
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -278,7 +284,7 @@ async function start() {
   backgroundTriggers({
     every: (ms, run) => setInterval(run, ms),
     power: powerMonitor,
-    sync: requestSync,
+    sync: () => requestSync(),
     wake: () => reminders.wake(),
   });
 

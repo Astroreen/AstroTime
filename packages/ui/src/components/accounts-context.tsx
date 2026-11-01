@@ -55,11 +55,18 @@ export function AccountsProvider({
     ...(platform.syncLock ? { lock: platform.syncLock } : {}),
   }));
   const [scheduler] = useState(
-    () => new SyncScheduler((fresh) => syncAll(context, { fresh }), browserEnvironment()),
+    () => new SyncScheduler((request) => syncAll(context, request), browserEnvironment()),
   );
   useEffect(() => scheduler.start(), [scheduler]);
-  // The shell's own triggers (desktop D75), each a sync that starts after it.
-  useEffect(() => platform.onSyncRequest?.(() => void scheduler.syncNow()), [platform, scheduler]);
+  // The shell's own triggers (desktop D75), each a sync that starts after
+  // it; the tray's "Sync now" is the user's own (D128).
+  useEffect(
+    () =>
+      platform.onSyncRequest?.(
+        (byUser) => void (byUser ? scheduler.syncNow() : scheduler.requested()),
+      ),
+    [platform, scheduler],
+  );
   const status = useSyncExternalStore(
     (onChange) => scheduler.subscribe(onChange),
     () => scheduler.status,

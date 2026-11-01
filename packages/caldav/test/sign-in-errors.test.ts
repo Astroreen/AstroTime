@@ -2,7 +2,7 @@
 // (docs/plans/foundation.md#D92): the proxy's own refusals (D20, D39), an
 // unreachable server, an address that is no CalDAV server; and what Login
 // Flow v2 waits through.
-import { AuthError, OfflineError } from "@astrotime/core";
+import { AuthError, OfflineError, ServerBusyError } from "@astrotime/core";
 import { expect, test, vi } from "vite-plus/test";
 
 import {
@@ -105,7 +105,9 @@ test("Login Flow v2 waits through a rate limit or a busy server while the user a
     return { status, url: request.url, header: () => null, body: JSON.stringify(body) };
   };
   const flow = await startLoginFlow(http, "https://cloud.example.com");
-  expect([await flow.poll(), await flow.poll()]).toEqual([null, null]);
+  // Said as a busy server, which the sign-in waits out (foundation D130).
+  await expect(flow.poll()).rejects.toThrow(ServerBusyError);
+  await expect(flow.poll()).rejects.toThrow(ServerBusyError);
   expect(await flow.poll()).toMatchObject({ username: "astro", password: "app" });
 });
 
@@ -174,4 +176,24 @@ test("a server that stalls is offline past the ceiling, its answer trickling or 
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("a 503 that says how long to wait is waited out, never counted toward giving up (foundation D130)", async () => {
+  const http: HttpClient = async (request) => {
+    const start = request.url.endsWith("/index.php/login/v2");
+    const body = start
+      ? {
+          poll: { token: "t", endpoint: "https://cloud.example.com/login/v2/poll" },
+          login: "https://cloud.example.com/login/v2/flow/x",
+        }
+      : {};
+    return {
+      status: start ? 200 : 503,
+      url: request.url,
+      header: (name: string) => (name === "retry-after" ? "10" : null),
+      body: JSON.stringify(body),
+    };
+  };
+  const flow = await startLoginFlow(http, "https://cloud.example.com");
+  for (let i = 0; i < 10; i++) await expect(flow.poll()).rejects.toThrow(ServerBusyError);
 });

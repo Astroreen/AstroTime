@@ -2,6 +2,8 @@ import {
   ALL_RIGHTS,
   AuthError as CredentialsRefused,
   OfflineError,
+  retryAfter,
+  ServerBusyError,
   type CalendarRights,
   type Changes,
   type Provider,
@@ -282,7 +284,6 @@ export class CalDavProvider implements Provider {
         // 403 and 409 mean an expired token only with RFC 6578's precondition;
         // otherwise they are what they say (a revoked share, say).
         if (
-          from !== "" &&
           (response.status === 403 || response.status === 409) &&
           !response.body.includes("valid-sync-token")
         ) {
@@ -462,6 +463,12 @@ async function send(
     headers: { ...request.headers, Authorization: authorization },
   });
   if (response.status === 401) throw new AuthError(request);
+  // Rate limited, or down for a while: the sync stops and waits (D128).
+  if ((response.status === 429 || response.status === 503) && !accept.includes(response.status))
+    throw new ServerBusyError(
+      `${request.method} ${request.url} answered ${response.status}.`,
+      retryAfter(response.header("retry-after")),
+    );
   if (response.status >= 400 && !accept.includes(response.status))
     throw new HttpError(request, response);
   return response;

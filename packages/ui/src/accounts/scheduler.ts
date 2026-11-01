@@ -1,12 +1,17 @@
-// When the UI syncs (docs/plans/foundation.md#D91): on start, when the app is
-// back in front of the user, every few minutes while it is, after a local
-// change, and when the network comes back. Every trigger calls `syncAll`,
-// which joins a sync already running, so two never run at once.
+// When the UI syncs (docs/plans/foundation.md#D91, D129): on start, when the
+// app is back in front of the user, every few minutes while it is, after a
+// local change, and when the network comes back. Every trigger calls
+// `syncAll`, which joins a sync already running, so two never run at once;
+// the automatic ones wait out a minute after the last sync, so several at
+// once make one.
 import type { AccountSync, SyncAllReport } from "@astrotime/sync";
 
 /** A sync while the app is visible: often enough to see another device's change soon. */
 export const SYNC_EVERY_MS = 5 * 60_000;
-/** Coming back to the app syncs only when the last sync started longer ago than this. */
+/**
+ * An automatic trigger (coming back, the timer, the network) syncs only when the last sync started longer ago than this, or
+ * found a server offline (D129).
+ */
 export const REFOCUS_GAP_MS = 60_000;
 /** A burst of local changes is sent once, this long after the last of them. */
 export const CHANGE_DEBOUNCE_MS = 2_000;
@@ -59,6 +64,8 @@ export function browserEnvironment(): SyncEnvironment {
   };
 }
 
+const AUTOMATIC: SyncRequest = { fresh: false, retry: false };
+
 /** One account's latest sync, for the UI. */
 export interface AccountStatus {
   readonly last: AccountSync;
@@ -73,17 +80,34 @@ export interface SyncStatus {
   readonly accounts: ReadonlyMap<string, AccountStatus>;
 }
 
+/**
+ * How a sync is asked for (`syncAll`'s options): `fresh`, one that starts
+ * after the call; `retry`, the user's own, which tries accounts a server
+ * turned away too (D128).
+ */
+export interface SyncRequest {
+  readonly fresh: boolean;
+  readonly retry: boolean;
+}
+
 /** Runs the UI's syncs and says how they went. */
 export class SyncScheduler {
-  readonly #sync: (fresh: boolean) => Promise<SyncAllReport>;
+  readonly #sync: (request: SyncRequest) => Promise<SyncAllReport>;
   readonly #environment: SyncEnvironment;
   readonly #listeners = new Set<() => void>();
   #status: SyncStatus;
   #running = 0;
   #lastStart = Number.NEGATIVE_INFINITY;
+  /** The last sync that ended found an account's server offline. */
+  #lastOffline = false;
   #cancelChange: (() => void) | null = null;
+  /** The sync planned for when a busy server's hold ends (D128). */
+  #cancelRetry: (() => void) | null = null;
 
-  constructor(sync: (fresh: boolean) => Promise<SyncAllReport>, environment: SyncEnvironment) {
+  constructor(
+    sync: (request: SyncRequest) => Promise<SyncAllReport>,
+    environment: SyncEnvironment,
+  ) {
     this.#sync = sync;
     this.#environment = environment;
     this.#status = { running: false, offline: !environment.online(), accounts: new Map() };
@@ -100,17 +124,19 @@ export class SyncScheduler {
 
   /** Syncs now and keeps syncing on the triggers; returns the function that stops them. */
   start(): () => void {
+    this.#stopped = false;
     const env = this.#environment;
     let stopTimer: (() => void) | null = null;
     const startTimer = () => {
       stopTimer?.();
       stopTimer = env.every(SYNC_EVERY_MS, () => {
-        if (env.visible() && env.online()) void this.#run(false);
+        if (env.visible() && env.online() && this.#due()) void this.#run(AUTOMATIC);
       });
     };
     const stops = [
+      // The tab shown and the window focused come together: one sync.
       env.on("visible", () => {
-        if (env.online() && env.now() - this.#lastStart >= REFOCUS_GAP_MS) void this.#run(false);
+        if (env.online() && this.#due()) void this.#run(AUTOMATIC);
         startTimer();
       }),
       // A hidden tab's timers are throttled anyway; the next visit syncs.
@@ -118,42 +144,94 @@ export class SyncScheduler {
         stopTimer?.();
         stopTimer = null;
       }),
+      // Every tab hears the network come back; the one in front syncs, the
+      // others on their next visit.
       env.on("online", () => {
         this.#update({ offline: false });
-        void this.#run(false);
+        if (env.visible() && this.#due()) void this.#run(AUTOMATIC);
       }),
       env.on("offline", () => this.#update({ offline: true })),
     ];
-    void this.#run(false);
+    void this.#run(AUTOMATIC);
     if (env.visible()) startTimer();
     return () => {
       for (const stop of stops) stop();
       stopTimer?.();
       this.#cancelChange?.();
       this.#cancelChange = null;
+      this.#cancelRetry?.();
+      this.#cancelRetry = null;
+      this.#stopped = true;
     };
   }
 
-  /** "Sync now", and an account just added: a sync that starts after this call. */
+  /**
+   * "Sync now", and an account just added: the user's own, a sync that
+   * starts after this call and tries every account (D128).
+   */
   syncNow(): Promise<void> {
-    return this.#run(true);
+    return this.#run({ fresh: true, retry: true });
+  }
+
+  /**
+   * A shell's own trigger, its timer or the machine's resume (desktop D75):
+   * a sync that starts after it, but not the user's, so an account a server
+   * turned away stays alone (D128).
+   */
+  requested(): Promise<void> {
+    return this.#run({ fresh: true, retry: false });
   }
 
   /** Something changed on this device: it goes up shortly, in one sync per burst. */
   changed(): void {
+    this.#unsent = true;
     this.#cancelChange?.();
     this.#cancelChange = this.#environment.after(CHANGE_DEBOUNCE_MS, () => {
       this.#cancelChange = null;
-      void this.#run(true);
+      void this.#run({ fresh: true, retry: false });
     });
   }
 
-  async #run(fresh: boolean): Promise<void> {
+  /**
+   * Plans a sync for when a busy server's hold ends, a second after, so a
+   * change made meanwhile goes up then without waiting for another trigger.
+   */
+  #retryAt(at: number | null): void {
+    this.#cancelRetry?.();
+    this.#cancelRetry = null;
+    if (at === null || this.#stopped) return;
+    const env = this.#environment;
+    this.#cancelRetry = env.after(Math.max(0, at - env.now()) + 1_000, () => {
+      this.#cancelRetry = null;
+      // Offline then: the network's return syncs. A hidden tab syncs by
+      // itself only for a change of its own (D129); otherwise its next visit.
+      if (env.online() && (env.visible() || this.#unsent)) void this.#run(AUTOMATIC);
+    });
+  }
+
+  #stopped = false;
+  /** A change made here may not have gone up yet: the last syncs since did not all go through. */
+  #unsent = false;
+
+  /** Whether an automatic trigger syncs: the last sync is a minute old, or found a server offline. */
+  #due(): boolean {
+    return this.#lastOffline || this.#environment.now() - this.#lastStart >= REFOCUS_GAP_MS;
+  }
+
+  async #run(request: SyncRequest): Promise<void> {
     this.#lastStart = this.#environment.now();
     this.#running++;
     this.#update({ running: true });
     try {
-      const report = await this.#sync(fresh);
+      const report = await this.#sync(request);
+      // A held account's offline is old news (D128): it does not hurry the next trigger.
+      const held = new Set(report.held);
+      this.#lastOffline = report.accounts.some(
+        (account) => account.status === "offline" && !held.has(account.accountId),
+      );
+      // A change made here is sent once every account took a sync.
+      if (report.accounts.every((account) => account.status === "synced")) this.#unsent = false;
+      this.#retryAt(report.retryAt);
       // Every account syncAll knows is in its report: one removed meanwhile drops out.
       const before = this.#status.accounts;
       const accounts = new Map<string, AccountStatus>();

@@ -28,7 +28,8 @@ const bridge: Bridge = {
     onOpen: (listener) => listen(CHANNELS.reminderOpened, listener),
   },
   shell: (state) => ipcRenderer.send(CHANNELS.shell, state),
-  onSyncRequest: (listener) => listen(CHANNELS.sync, () => listener()),
+  onSyncRequest: (listener) =>
+    listen<[unknown]>(CHANNELS.sync, (byUser) => listener(byUser === true)),
 };
 
 contextBridge.exposeInMainWorld("astrotime", bridge);

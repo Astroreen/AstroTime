@@ -306,7 +306,8 @@ Decided while building PR 4.
   `@astrotime/caldav` implements it and knows nothing of the store. One sync
   replaces the account's calendar list, then per calendar uploads pending
   changes first and downloads the server's changes after, so a refused write
-  is merged before anything comes down. A refused write is merged three ways
+  is merged before anything comes down; a calendar the listing says is
+  unchanged is not downloaded ([D127](#D127)). A refused write is merged three ways
   against the object's **base** (the server's version the change started
   from, kept by the store) and tried once more; refused again, or edited on
   this device meanwhile, it waits for the next sync. Properties that hold a
@@ -634,9 +635,10 @@ Decided while building PR 5a-3.
   - every 5 minutes while the page is visible and the browser online. A
     visible app is one the user is looking at, so a change made on another
     device should show within minutes, and a sync that finds nothing new is
-    one `PROPFIND` of the calendar home ([D127](#D127)). A hidden tab's timers are throttled anyway; its next visit
-    syncs;
-  - when the network comes back (`online`);
+    one `PROPFIND` of the calendar home ([D127](#D127)). A hidden tab's
+    timers are throttled anyway; its next visit syncs;
+  - when the network comes back (`online`), in the visible tab
+    ([D129](#D129));
   - 2 seconds after the last of a burst of local changes (`changed()`, for
     the editing of PR 5b and PR 6), and on "Sync now", both `fresh`.
 
@@ -649,8 +651,8 @@ Decided while building PR 5a-3.
   go. It waits rather than skips: a skipped run has no report, so that
   tab would show nothing of its accounts, and a `fresh` request must lead
   to a sync that starts after it; a sync that finds nothing new costs one
-  `PROPFIND` ([D127](#D127)). A shell with one
-  instance of its store needs no lock. A sync never holds the lock for
+  `PROPFIND` ([D127](#D127)). A shell with one instance of its store needs
+  no lock. A sync never holds the lock for
   ever: every request of every shell has a ceiling of 5 minutes with its
   answer, after which the server is offline (the web's `fetchClient({
   timeoutMs })`, the desktop's hop, [desktop D72](desktop.md#D72), and
@@ -677,9 +679,10 @@ Decided while building PR 5a-3.
   is kept. Login Flow opens Nextcloud's page with `openExternal` (a new tab
   with `noopener` on the web) and offers to open it again, since a browser
   may block a tab opened after the flow's first request; it polls as
-  [android D65](android.md#D65) says (every 2 seconds, at once when the
-  page is visible again, giving up after 20 minutes), waits through a moment
-  offline, a 429 or a 5xx, and Cancel stops it. Then discovery and the
+  [D130](#D130) says (less often as the minutes pass, not while out of
+  sight, at once when the page is visible again, giving up after 20
+  minutes), waits through a moment offline, a 429 or a 5xx, and Cancel
+  stops it. Then discovery and the
   first sync. The proxy marks its own refusals (`x-astrotime-refused`:
   `not-allowed`, or `other-server <origin>`), which `fetchClient` turns into
   `ProxyRefusedError`, so the dialog tells apart a wrong password, an
@@ -1442,6 +1445,76 @@ too many requests.
   both send data in a `sync-collection`. A server that names neither token
   nor ctag is downloaded every sync, as before.
 
+- **D128. A server that turns AstroTime away is left alone.** A `429` or a
+  `503` stops a sync as offline does ([D37](#D37)): `ServerBusyError` in
+  `@astrotime/core`, an `OfflineError` with the answer's `Retry-After`
+  (seconds or a date; the web proxy passes the header, [D39](#D39)).
+  `syncAll` then holds the account for the backoff's current step: a
+  minute, doubled with every such answer in a row up to half an hour, a
+  fifth either way so that devices do not return together. A `Retry-After`
+  is honoured, but never below that step: a longer one (at most 6 hours)
+  makes the hold longer, while `Retry-After: 0` or a date gone by leaves
+  the step. A `5xx` that fails the sync counts the same. Only a sync that
+  goes through clears the count: a timeout or a refusal between two `503`s
+  does not shorten the next wait. A `401` holds the account until its
+  saved credentials change (signing in again), since every refused
+  password counts against the address in Nextcloud's brute-force
+  protection, which then slows and refuses the user's other devices too. A
+  retry that goes nowhere (offline, a timeout, a failure of another kind)
+  lifts no hold of either kind. A held account's last result is reported
+  again, with no request, and the report names it in `held`, from the run
+  that turned it away on; offline holds nothing, as no request reached the
+  server. Only the user's own sync tries a held account
+  (`syncAll`'s `retry`: "Sync now", an account just added): not a local
+  change's, not a timer's, not the desktop's or Android's. A change made
+  while its account is held stays pending on this device, and the account
+  says "Offline: changes wait until the server can be reached"; the report
+  names the soonest end of a hold (`retryAt`), and `SyncScheduler` plans a
+  sync a second after it, so the change goes up then with no trigger or
+  user needed: in a visible tab, or a hidden one that holds a change of its
+  own ([D129](#D129)); any other hidden tab waits for its next visit. A held
+  account's result is not news: its "offline" does not make the next
+  trigger due, so triggers during a hold keep the one-minute gap. Each tab
+  (each instance of the store) keeps its own holds, in memory
+  ([Deferred](#deferred)): another tab learns of a busy server or a
+  refused password with one request of its own, at its own next trigger,
+  its syncs one at a time behind the Web Lock. A busy server shows as
+  offline in the UI.
+- **D129. Triggers close together make one sync.** An automatic trigger
+  ([D91](#D91): coming back, the 5-minute timer, the network's return)
+  syncs only if the last sync started over a minute ago, or found a server
+  offline: the tab shown and the window focused, a network that flickers,
+  the timer just after a local change's sync, all make one. The network's
+  return syncs in the visible tab only; the others sync on their next
+  visit, so N open tabs no longer make N syncs. A local change's sync and
+  "Sync now" are `fresh` and always run. The desktop's timer and resume
+  ([desktop D75](desktop.md#D75)) reach the UI as
+  `SyncScheduler.requested()`: `fresh`, without `retry`; its tray's "Sync
+  now" is the user's own (`onSyncRequest`'s `byUser`). A hidden tab never
+  syncs by itself except for its own local changes.
+
+  | trigger, per account            | before                    | after                                        |
+  | ------------------------------- | ------------------------- | -------------------------------------------- |
+  | the network back, T tabs open   | T syncs of 1 + N requests | 1 request, the visible tab                   |
+  | focus and visibility together   | 1 + N                     | 1                                            |
+  | 5-minute timer, visible         | 1 + N each                | 1 each, none within a minute of another sync |
+  | a refused password, per trigger | 1 (a `401`) for ever      | 1, then none until signed in again           |
+  | a `429`, per trigger            | 1 + more for ever         | 1, then none for a minute or more            |
+
+- **D130. Login Flow v2 polls less as it waits.** Its poll ([D92](#D92),
+  [android D65](android.md#D65)) is every 2 seconds for the first minute,
+  while the user is likely approving, then every 5 seconds until five
+  minutes have passed, then every 15 (`pollInterval`); before, every 2
+  seconds for its 20 minutes, up to 600 requests. While AstroTime is out of
+  sight (`visibilityState` hidden: the web tab behind Nextcloud's, Android
+  under the Custom Tab) it does not poll at all; coming back polls at once,
+  as before. A `429` or `503` waits for its `Retry-After`, and is never
+  counted among the five server errors in a row that end the flow; a wait
+  past the token's life ends it at once as expired, to be tried again
+  later. A wait of 20 minutes with AstroTime in sight is now at most 30 +
+  48 + 60 = 138 polls, and one out of sight is the start and one poll on
+  return.
+
 ### Recurrence's corners
 
 Found by the logic QA after v0.2.0 (the owner's feedback: "silly logic
@@ -1626,6 +1699,24 @@ errors").
   build tells old tabs to reload. A tab of a build before D98 holds the lock
   without serving: a new tab says it is opening until that tab is closed or
   reloaded.
+
+- **Holds shared between instances** — [D128](#D128)'s holds live in each
+  instance's memory: each web tab, the desktop's page and Android's
+  background run (a new WebView each hour) learns a refused password or a
+  busy server with one request of its own. Keeping them in the store would
+  make that one request per device; it comes if a server still sees too
+  many.
+- **Android's hourly job beside the open app** — the background sync
+  ([android D67](android.md#D67)) waits for the app's sync lock but does not
+  know the app synced a minute ago, so it costs one more request an hour
+  while the app is open. A "last synced" kept in the store could let it
+  skip.
+- **A busy server in words** — a `429` or `503` shows as offline
+  ([D128](#D128)); its own words ("the server asks to wait until 14:05")
+  need a status of their own in the accounts' UI.
+- **Discovery for an account without a home** — an account from before
+  migration 5 has no `homeUrl`, and `connectCalDav` discovers it again at
+  every sync (two more requests) without keeping it.
 
 ## PR plan
 

@@ -1,11 +1,18 @@
 import {
   CalDavProvider,
+  HttpError,
   ProxyRefusedError,
   revokeAppPassword,
   type Credentials,
   type HttpClient,
 } from "@astrotime/caldav";
-import { AuthError, OfflineError, type Provider, type SecretStore } from "@astrotime/core";
+import {
+  AuthError,
+  OfflineError,
+  ServerBusyError,
+  type Provider,
+  type SecretStore,
+} from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
 
 import { syncAccount, type SyncReport } from "./sync.ts";
@@ -26,6 +33,8 @@ export interface SyncContext {
    * this instance is the store's only one.
    */
   readonly lock?: SyncLock;
+  /** The time, for how long a busy server is left alone (D128); `Date.now` by default. */
+  readonly now?: () => number;
 }
 
 /**
@@ -70,14 +79,51 @@ export interface SyncAllReport {
   /** Every account that syncs, in the store's order; the demo's never does. */
   readonly accounts: readonly AccountSync[];
   readonly finishedAt: number;
+  /**
+   * When the soonest account held for a busy or failing server may be tried
+   * again (D128), for a sync then: a change made meanwhile waits on this
+   * device until it can go up. `null` when none is held for a time.
+   */
+  readonly retryAt: number | null;
+  /**
+   * The accounts held after this run (D128): left alone by it, or turned
+   * away in it. Their "offline" waits for the hold, so it does not hurry the
+   * next sync.
+   */
+  readonly held: readonly string[];
 }
 
 interface Runs {
   current: Promise<SyncAllReport> | null;
   next: Promise<SyncAllReport> | null;
+  /** Whether the queued `next` is to try held accounts too (`retry`). */
+  retryNext: boolean;
   /** Accounts on their way out: a sync that starts now leaves them alone. */
   readonly removing: Map<string, number>;
+  /** Accounts a sync leaves alone for now, by id (D128). */
+  readonly holds: Map<string, Hold>;
 }
+
+/**
+ * Why an account is left alone, and what its last sync said, said again
+ * meanwhile without a request (docs/plans/foundation.md#D128).
+ */
+interface Hold {
+  readonly last: AccountSync;
+  /** The saved secret the server refused: held until the user signs in again. */
+  readonly refused: string | null;
+  /** A busy or failing server: held until then. */
+  readonly until: number;
+  /** Busy or failing answers in a row, for the next wait. */
+  readonly strikes: number;
+}
+
+/** The first wait after a busy or failing answer, doubled each time after. */
+const BACKOFF_FIRST_MS = 60_000;
+/** The longest wait between two tries of a busy or failing server. */
+const BACKOFF_MAX_MS = 30 * 60_000;
+/** The longest `Retry-After` heeded; a longer one is read as this. */
+const RETRY_AFTER_MAX_MS = 6 * 3_600_000;
 
 /** The sync running on each store, and the one waiting to start after it. */
 const runs = new WeakMap<Store, Runs>();
@@ -85,7 +131,7 @@ const runs = new WeakMap<Store, Runs>();
 function runsOf(store: Store): Runs {
   let found = runs.get(store);
   if (!found) {
-    found = { current: null, next: null, removing: new Map() };
+    found = { current: null, next: null, retryNext: false, removing: new Map(), holds: new Map() };
     runs.set(store, found);
   }
   return found;
@@ -100,25 +146,36 @@ const ignore = () => {};
  * needs a sync that starts after the call (a local change, an account just
  * added): it gets the running one's successor, which every such call during
  * the run shares. With the context's `lock`, a sync waits for another
- * instance's sync of the store to end (D91).
+ * instance's sync of the store to end (D91). An account whose server refused
+ * its saved credentials, or asked to be left alone, is not tried again
+ * meanwhile (D128): its last result stands, unless `retry` (the user asked)
+ * says to try it anyway, which implies `fresh`.
  */
 export function syncAll(
   context: SyncContext,
-  options: { readonly fresh?: boolean } = {},
+  options: { readonly fresh?: boolean; readonly retry?: boolean } = {},
 ): Promise<SyncAllReport> {
   const state = runsOf(context.store);
-  if (!state.current) return state.next ?? begin(context, state);
-  if (!options.fresh) return state.current;
+  const retry = options.retry ?? false;
+  if (!state.current) {
+    if (!state.next) return begin(context, state, retry);
+    state.retryNext ||= retry;
+    return state.next;
+  }
+  if (!options.fresh && !retry) return state.current;
+  state.retryNext ||= retry;
   state.next ??= state.current.then(ignore, ignore).then(() => {
     state.next = null;
-    return begin(context, state);
+    const retrying = state.retryNext;
+    state.retryNext = false;
+    return begin(context, state, retrying);
   });
   return state.next;
 }
 
-function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
+function begin(context: SyncContext, state: Runs, retry: boolean): Promise<SyncAllReport> {
   // After another instance's sync, not beside it: one pending change goes up once.
-  const run = alone(context, () => everyAccount(context, state.removing));
+  const run = alone(context, () => everyAccount(context, state, retry));
   state.current = run;
   const done = () => {
     if (state.current === run) state.current = null;
@@ -129,35 +186,68 @@ function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
 
 async function everyAccount(
   context: SyncContext,
-  removing: ReadonlyMap<string, number>,
+  state: Runs,
+  retry: boolean,
 ): Promise<SyncAllReport> {
+  const now = context.now ?? Date.now;
   const accounts: AccountSync[] = [];
+  const held: string[] = [];
+  const known = new Set<string>();
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone.
-    if (account.provider !== "caldav" || removing.has(account.id)) continue;
-    accounts.push(await syncOne(context, account));
+    if (account.provider !== "caldav" || state.removing.has(account.id)) continue;
+    known.add(account.id);
+    const result = await syncOne(context, state.holds, account, retry);
+    // Held now, by this run's own answer too: its next sync waits for the hold.
+    const hold = state.holds.get(account.id);
+    const holding = !!hold && (hold.refused !== null || hold.until > now());
+    if (result.held || holding) held.push(account.id);
+    accounts.push(result.sync);
   }
-  return { accounts, finishedAt: Date.now() };
+  for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
+  const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
+  return {
+    accounts,
+    finishedAt: now(),
+    retryAt: ends.length > 0 ? Math.min(...ends) : null,
+    held,
+  };
 }
 
-async function syncOne(context: SyncContext, account: Account): Promise<AccountSync> {
+async function syncOne(
+  context: SyncContext,
+  holds: Map<string, Hold>,
+  account: Account,
+  retry: boolean,
+): Promise<{ readonly sync: AccountSync; readonly held: boolean }> {
   const accountId = account.id;
+  const now = context.now ?? Date.now;
+  let secret: string | null = null;
   try {
-    const credentials = await readCredentials(context.secrets, accountId);
+    secret = await context.secrets.get(keyOf(accountId));
+    const credentials = parseSecret(secret)?.credentials ?? null;
     if (!credentials) {
-      return {
+      const sync: AccountSync = {
         accountId,
         status: "signed-out",
         detail: "No credentials are saved for this account.",
         report: null,
       };
+      return { sync, held: false };
     }
+    const held = holds.get(accountId);
+    // Refused credentials stay refused until they change; a busy server is
+    // left alone until its time (D128). The user's own "Sync now" tries anyway.
+    if (held && !retry && (held.refused === secret || now() < held.until))
+      return { sync: held.last, held: true };
     const provider = await context.connect(account, credentials);
-    return {
+    const result: AccountSync = {
       accountId,
       status: "synced",
       report: await syncAccount(context.store, provider, accountId),
     };
+    holds.delete(accountId);
+    return { sync: result, held: false };
   } catch (error) {
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
@@ -169,8 +259,66 @@ async function syncOne(context: SyncContext, account: Account): Promise<AccountS
           : error instanceof ProxyRefusedError
             ? "refused"
             : "failed";
-    return { accountId, status, detail, report };
+    const result: AccountSync = { accountId, status, detail, report };
+    holdBack(holds, result, error, secret, now(), Math.random());
+    return { sync: result, held: false };
   }
+}
+
+/**
+ * What a failed sync of an account holds back (D128): refused credentials,
+ * until they change; a server that answered 429 or 503, or failed with a 5xx,
+ * for its `Retry-After`, or else a minute doubled with every such answer in
+ * a row up to half an hour, give or take a fifth so that devices do not
+ * come back at once. Offline (no answer at all) holds nothing: no request
+ * reached the server, and the network's return syncs (D91).
+ */
+function holdBack(
+  holds: Map<string, Hold>,
+  last: AccountSync,
+  error: unknown,
+  secret: string | null,
+  now: number,
+  random: number,
+): void {
+  // Only a sync that went through clears a hold, or new credentials a
+  // refusal: a timeout or a refusal between two 503s does not shorten the
+  // next wait, and a retry that went nowhere does not lift a refusal.
+  const before = holds.get(last.accountId);
+  const strikesBefore = before?.strikes ?? 0;
+  // The refusal stands while these are still the credentials refused.
+  const refused = before?.refused === secret ? secret : null;
+  if (error instanceof AuthError) {
+    holds.set(last.accountId, { last, refused: secret, until: 0, strikes: strikesBefore });
+    return;
+  }
+  const busy = error instanceof ServerBusyError;
+  if (!busy && !(error instanceof HttpError && error.status >= 500)) {
+    // Nothing new to hold back for: what was held stays held.
+    if (before)
+      holds.set(last.accountId, {
+        last: refused === null ? last : before.last,
+        refused,
+        until: before.until,
+        strikes: strikesBefore,
+      });
+    return;
+  }
+  const strikes = strikesBefore + 1;
+  const backoff = Math.min(BACKOFF_FIRST_MS * 2 ** (strikes - 1), BACKOFF_MAX_MS);
+  // The backoff's step is the floor: a Retry-After only makes it longer, so
+  // `Retry-After: 0` or a date gone by never makes a loop of tries.
+  const asked = busy ? error.retryAfterMs : null;
+  const wait = Math.max(
+    backoff * (0.8 + 0.4 * random),
+    asked === null ? 0 : Math.min(asked, RETRY_AFTER_MAX_MS),
+  );
+  holds.set(last.accountId, {
+    last: refused === null ? last : before!.last,
+    refused,
+    until: now + wait,
+    strikes,
+  });
 }
 
 // Accounts and their credentials. The credentials are the platform's
@@ -179,19 +327,17 @@ async function syncOne(context: SyncContext, account: Account): Promise<AccountS
 
 const keyOf = (accountId: string) => `account:${accountId}`;
 
-async function readCredentials(
-  secrets: SecretStore,
-  accountId: string,
-): Promise<Credentials | null> {
-  return (await readSecret(secrets, accountId))?.credentials ?? null;
-}
-
 /** The credentials kept for an account, and whether Login Flow v2 gave its password. */
 async function readSecret(
   secrets: SecretStore,
   accountId: string,
 ): Promise<{ readonly credentials: Credentials; readonly loginFlow: boolean } | null> {
-  const value = await secrets.get(keyOf(accountId));
+  return parseSecret(await secrets.get(keyOf(accountId)));
+}
+
+function parseSecret(
+  value: string | null,
+): { readonly credentials: Credentials; readonly loginFlow: boolean } | null {
   if (value === null) return null;
   try {
     const parsed = JSON.parse(value) as {

@@ -33,6 +33,7 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
           ETag: '"1"',
           "Set-Cookie": "s=1",
           DAV: "1, calendar-access",
+          "Retry-After": "120",
           "X-Powered-By": "PHP",
         },
       }),
@@ -75,6 +76,7 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
     "content-type",
     "dav",
     "etag",
+    "retry-after",
   ]);
 });
 

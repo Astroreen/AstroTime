@@ -271,7 +271,8 @@ were checked on 2026-11-01.
   Nextcloud's flow has no callback: the client polls, through the plugin of
   [D62](#D62), so CORS never applies and no deep link is needed. The shared
   sign-in screen (the same on every platform) polls every 2 seconds while
-  it waits, at once when the user returns to the app (`browserFinished`,
+  it waits (less often as the minutes pass, and not while the app is out of
+  sight, since [foundation D130](foundation.md#D130)), at once when the user returns to the app (`browserFinished`,
   `visibilitychange`), and gives up after 20 minutes, when Nextcloud's
   token expires. `@capacitor/browser`'s `close()` does nothing on Android,
   so once the flow is approved the plugin of [D62](#D62) brings the app's

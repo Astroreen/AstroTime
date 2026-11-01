@@ -588,7 +588,7 @@ test("a sync that comes to need the user is said once, not again after each sync
     await held;
     return server.http(request);
   };
-  let requestSync = () => {};
+  let requestSync: (byUser: boolean) => void = () => {};
   render(Promise.resolve(store), ["en-US"], {
     http,
     secrets,
@@ -611,7 +611,7 @@ test("a sync that comes to need the user is said once, not again after each sync
     subtree: true,
   });
   held = new Promise((resolve) => (release = resolve));
-  requestSync();
+  requestSync(true);
   await expect.element(button).toHaveAccessibleName("Accounts, syncing");
   expect(region.textContent).toBe("Accounts, something needs your attention");
   held = null;

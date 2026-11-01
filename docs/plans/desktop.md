@@ -220,8 +220,10 @@ were checked on 2026-11-01.
   running in it, so the shared UI's sync and reminders run as they do with
   the window open: the main process's timer (`setInterval`, 15 minutes)
   and `powerMonitor`'s `resume` send the page a sync request
-  (`onSyncRequest` on the `Platform`, run as "Sync now" through the UI's
-  `SyncScheduler`, so it joins or follows a running sync), and the
+  (`onSyncRequest` on the `Platform`, run through the UI's
+  `SyncScheduler`, so it joins or follows a running sync; since
+  [foundation D128](foundation.md#D128) only the tray's "Sync now" is the
+  user's own, which tries an account a server turned away), and the
   sync's writes reach the reminder planner as any write does. A hidden
   window's page is `hidden` to the UI, so its own 5-minute timer stops
   ([foundation D91](foundation.md#D91)) and only the main process's runs;
