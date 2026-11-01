@@ -39,3 +39,35 @@ test("migration 2 makes each synced object its own base; an unsent change's base
     ["unsent", null],
   ]);
 });
+
+test("migration 4 leaves done unknown on older rows, so the undone query still parses them", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const { Store } = await import("../src/index.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 3));
+  const ics = (uid: string, extra: string) =>
+    `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDUE;VALUE=DATE:20261102\r\n${extra}END:VTODO\r\nEND:VCALENDAR\r\n`;
+  const start = Date.parse("2026-11-01T10:00:00Z");
+  await driver.query("INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0)", []);
+  await driver.query(
+    "INSERT INTO calendars (id, account_id, url, name, components) VALUES ('c', 'a', 'https://x/c/', 'C', 'VTODO')",
+    [],
+  );
+  for (const [uid, extra] of [
+    ["open", ""],
+    ["closed", "STATUS:COMPLETED\r\n"],
+  ] as const) {
+    await driver.query(
+      "INSERT INTO objects (id, calendar_id, href, uid, kind, ics, pending, start_ms, end_ms, updated_at) VALUES (?, 'c', ?, ?, 'task', ?, 'none', ?, ?, 0)",
+      [uid, `${uid}.ics`, uid, ics(uid, extra), start, start + 86_400_000],
+    );
+  }
+  const store = await Store.open(driver);
+  expect(await driver.query("SELECT id, done FROM objects ORDER BY id", [])).toEqual([
+    ["closed", null],
+    ["open", null],
+  ]);
+  expect(
+    (await store.undoneTasksBefore(["c"], "2026-11-04", "UTC")).map((u) => u.object.uid),
+  ).toEqual(["open"]);
+});

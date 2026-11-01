@@ -17,6 +17,8 @@ export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
   plugins: [react({ compiler: true }), tailwindcss(), davProxy(), devClients()],
   ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
+  // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
+  optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
   build: {
     outDir: "dist",
     emptyOutDir: true,

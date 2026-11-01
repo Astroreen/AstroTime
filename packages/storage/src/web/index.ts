@@ -1,17 +1,52 @@
-import type { SqlDriver } from "../driver.ts";
+import { InsecureContextError, StoreInUseError, type SqlDriver } from "../driver.ts";
 import type { Request, Response } from "./protocol.ts";
 
 type Distribute<T> = T extends unknown ? Omit<T, "id"> : never;
 
 /**
+ * Holds a Web Lock named after the database while the driver is open, so a
+ * second tab learns at once that the database is taken. Returns the
+ * function that lets it go.
+ */
+function hold(name: string): Promise<() => void> {
+  return new Promise((resolve, reject) => {
+    navigator.locks
+      .request(`astrotime-store:${name}`, { ifAvailable: true }, (lock) => {
+        if (!lock) {
+          reject(new StoreInUseError(`The store "${name}" is open in another tab.`));
+          return;
+        }
+        // The lock lasts until this promise settles.
+        return new Promise<void>((release) => resolve(release));
+      })
+      .catch(reject);
+  });
+}
+
+/**
  * The web store's driver: SQLite in a worker, kept on OPFS under `name`.
- * One tab at a time may hold a database; a second tab's open fails.
+ * One tab at a time may hold a database; a second tab's open fails with
+ * `StoreInUseError` (docs/plans/foundation.md#deferred, "One store across tabs").
  */
 export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
-  const worker = new Worker(new URL("worker.ts", import.meta.url), {
-    type: "module",
-    name: "astrotime-store",
-  });
+  // `isSecureContext` alone would do; Web Locks are what this code needs first.
+  if (!globalThis.isSecureContext || !("locks" in navigator)) {
+    throw new InsecureContextError(
+      "The web store needs a secure context (https, or localhost) for OPFS and Web Locks.",
+    );
+  }
+  const release = await hold(name);
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("worker.ts", import.meta.url), {
+      type: "module",
+      name: "astrotime-store",
+    });
+  } catch (error) {
+    // No worker, no store: the lock goes with it, so a retry can take it.
+    release();
+    throw error;
+  }
   const waiting = new Map<
     number,
     { resolve: (rows: unknown[][]) => void; reject: (error: Error) => void }
@@ -52,6 +87,7 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
     await send({ type: "open", name });
   } catch (error) {
     worker.terminate();
+    release();
     throw error;
   }
   return {
@@ -65,6 +101,7 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
       } finally {
         // A broken worker still holds its thread until it is terminated.
         worker.terminate();
+        release();
       }
     },
   };

@@ -1,7 +1,8 @@
 # Design plan
 
-Status: **in progress** — decided, not yet built; PR 5 of
-[`foundation.md`](foundation.md#pr-5--calendar-grid) builds it. This plan
+Status: **in progress** — PR 5 of
+[`foundation.md`](foundation.md#pr-5--calendar-grid) builds it; PR 5a-1
+built the shell, both themes and the Day, 3-day and Week views. This plan
 owns how AstroTime looks and is laid out (foundation's
 [D18](foundation.md#D18)); where items go is the layout engine's
 ([D42](foundation.md#D42)).
@@ -76,7 +77,8 @@ the project.
   tasks screen only. A recurring task counts once, by its
   latest occurrence before today that is undone: an occurrence is done when
   its own exception (`RECURRENCE-ID`) says `STATUS:COMPLETED`, or when the
-  series itself is completed. In the Agenda view the chip heads
+  series itself is completed (_done_ is completed or cancelled, as
+  foundation's [D55](foundation.md#D55) reads it). In the Agenda view the chip heads
   today's group. D16's "hide
   completed" toggle stays, in the drawer, and hides completed tasks' chips on
   every view. When the all-day strip holds more than
@@ -98,6 +100,35 @@ the project.
   week start and the clock (D44, D45), and "hide completed" (D51). Search,
   in the top bar, finds items by title in the local store.
 
+### Decided while building PR 5a
+
+- **D58. The look is tokens in one stylesheet** (`packages/ui/src/styles.css`).
+  Colours are CSS custom properties written with `light-dark()`; the root's
+  `color-scheme` follows the system, and `data-theme="light"` or `"dark"` on
+  the root element overrides it, so D53's setting only sets that attribute.
+  An item's text is dark or light by its fill's OKLCH lightness (CSS
+  relative colours), so any calendar colour reads (D47); a done task's fill
+  is its colour mixed 45% into the grid's. Fonts are the system's and the
+  icons AstroTime's own SVG, so nothing loads from another origin (D43). An
+  hour is 56 px tall; from 1024 px wide the drawer is a sidebar (D46).
+- **D59. Details read from the reference for the time grid:**
+  - the top bar names the month, both months across a change of month
+    ("October – November"), and the year only when it is not this one; prev
+    and next buttons sit in it on a wide screen, a horizontal swipe moves on
+    a touch screen, and `n`/`j`, `p`/`k` and `t` move on a keyboard; search,
+    the tasks toggle (5b) and the account (5a-3) join it with their screens;
+  - the week number is ISO's, of the week the first day belongs to in the
+    locale's weeks (the reference's 3 days from Sunday, November 1 show 44);
+  - the strip folds when it needs more than three rows: two rows, then "+N"
+    per day; "+N" and the chevron expand the whole strip in place;
+  - the "N undone tasks" chip sits where a one-day task titled first would:
+    after longer spans and one-day events, before the day's tasks, as in the
+    reference (D51);
+  - on open the grid shows two hours before now on today, else the morning;
+  - the UI speaks the first of the user's languages it knows; the week start
+    and the clock come from the region of their first language, so
+    Lithuanian (`lt-LT`) gets English, Monday and 24 hours (D45).
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
@@ -105,13 +136,21 @@ the project.
   ([D52](#D52)); a place that gathers starred tasks comes later.
 - **Search beyond titles** — descriptions, locations, attendees, and the
   server's own search ([D53](#D53)).
+- **A day header opens that day** — as Google does; the headers are not
+  buttons yet ([D59](#D59)).
+- **A swipe the page follows** — the swipe moves to the next period once
+  the finger lifts, with no slide ([D59](#D59)).
+- **Week numbers by the locale's own rules** — every locale gets ISO's
+  numbers; American numbering differs around the new year ([D59](#D59)).
 
 ## PR plan
 
 Foundation's PR 5 builds this plan in two parts:
 
 - **PR 5a** — the app shell (top bar, drawer, floating button), the five
-  views on the layout engine, both themes, i18n (D43–D51).
+  views on the layout engine, both themes, i18n (D43–D51); in three PRs,
+  as [foundation's PR plan](foundation.md#pr-5--calendar-grid) lists them
+  (D58, D59 came with 5a-1).
 - **PR 5b** — the tasks screen, the drawer's settings and search (D52,
   D53). Its evidence is screenshots of each view next to the matching
   reference, in both themes.

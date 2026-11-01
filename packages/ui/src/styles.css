@@ -1,0 +1,84 @@
+/*
+ * AstroTime's look (design D43, D44): dense like Google Calendar, in a calm
+ * palette of its own; system fonts, nothing loaded from elsewhere. Dark was
+ * designed first. The theme follows the system (`color-scheme: light dark`
+ * and `light-dark()`); `data-theme="light"` or `"dark"` on the root element
+ * overrides it (the setting is PR 5b's, design D53).
+ *
+ * Imported after `@import "tailwindcss"`, it adds the tokens as Tailwind
+ * colours and lets Tailwind find the classes the UI uses.
+ */
+@source "./";
+
+@theme {
+  /* The chrome around the grid: the top bar, the gutters, between tiles. */
+  --color-canvas: light-dark(#eef0f4, #1b1d23);
+  /* An hour of a day in the time grid. */
+  --color-tile: light-dark(#ffffff, #111318);
+  /* What sits above the canvas: the drawer, popovers, the undone chip. */
+  --color-raised: light-dark(#ffffff, #262a33);
+  --color-raised-hover: light-dark(#e6e9ef, #313641);
+  --color-ink: light-dark(#1b1e25, #e6e8ed);
+  --color-ink-muted: light-dark(#5b6271, #9aa1ad);
+  --color-line: light-dark(#d8dce4, #343843);
+  --color-accent: light-dark(#3565c4, #a8c7fa);
+  --color-on-accent: light-dark(#ffffff, #0c1d36);
+  --color-accent-soft: light-dark(#dae5fa, #2d3a52);
+  --color-pill: light-dark(#e0e4eb, #2b2f38);
+  --color-fab: light-dark(#d2e2fc, #1f456f);
+  --color-on-fab: light-dark(#0d3263, #d6e6ff);
+  /* The current-time line: white on the dark grid (design D49), a calm red on the light one. */
+  --color-now: light-dark(#cf4a3c, #f2f3f5);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  html,
+  body {
+    height: 100%;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  /*
+   * An item filled in its colour (`--item`, design D47, D50), its text dark
+   * or light by the fill's lightness. A done task is muted and struck
+   * through (design D51).
+   */
+  .item {
+    --fill: var(--item);
+    background: var(--fill);
+    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
+  }
+  .item[data-done] {
+    --fill: color-mix(in oklab, var(--item) 45%, var(--color-tile));
+    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0 / 0.7);
+  }
+  .item[data-done] .item-title-wrap,
+  .item[data-done] .truncate {
+    text-decoration: line-through;
+  }
+  .item-title-wrap {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .item-time {
+    opacity: 0.85;
+  }
+  /* A mark on a calendar's colour (the drawer's checkbox), dark or light by that colour. */
+  .item-on-color {
+    color: oklch(from var(--calendar) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
+  }
+}

@@ -3,8 +3,8 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "noUncheckedSideEffectImports": false
   },
-  "include": ["src", "vite.config.ts", "dav-proxy.ts"]
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts", "dav-proxy.ts"]
 }

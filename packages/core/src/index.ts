@@ -8,7 +8,8 @@ export {
   type Occurrence,
   type Range,
 } from "./occurrences.ts";
-export { wallClockOf, type ItemTime } from "./time.ts";
+export { wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
+export { isDone, isUndoneBefore, latestUndoneBefore } from "./undone.ts";
 export {
   isAllDay,
   layoutDay,

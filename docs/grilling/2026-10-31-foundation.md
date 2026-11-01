@@ -85,4 +85,5 @@ added D53 (settings in the drawer, search) to make D44–D46 buildable.
 
 ## Left open on purpose
 
-- The i18n library, chosen in PR 5 (D17).
+- The i18n library, chosen in PR 5 (D17). _Chosen in PR 5a:_ i18next, see
+  [D17](../plans/foundation.md#D17).

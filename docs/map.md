@@ -32,6 +32,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D32`
   - `layoutDay`, `layoutSpans`, `isAllDay` — where items go on the views:
     the all-day strip, the time grid, overlaps. → `plans/foundation.md#D42`
+  - `isDone`, `isUndoneBefore`, `latestUndoneBefore` — done tasks, and the
+    undone ones that roll over to today. → `plans/design.md#D51`,
+    `plans/foundation.md#D55`
   - `mergeObjects` — the three-way merge of a refused write.
     → `plans/foundation.md#D6`
   - `Provider` — the interface every provider implements.
@@ -41,6 +44,12 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/storage` (`@astrotime/storage`) — the local store.
   - `Store` — accounts, calendars, objects with pending local changes,
     conflicts; finds objects by date range. → `plans/foundation.md#D36`
+    - `subscribe` — hears every write, for live queries.
+      → `plans/foundation.md#D54`
+    - `undoneTasksBefore` — the undone tasks due before today.
+      → `plans/foundation.md#D55`
+  - `StoreInUseError` — another tab holds the web store.
+    → `plans/foundation.md#D56`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
     `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
     → `plans/foundation.md#D25`
@@ -60,13 +69,32 @@ When you add a package, app or module, add its line here in the same PR.
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`).
 
-`ui` is created by the PRs that first need them
-(`plans/foundation.md#D23`, `plans/foundation.md#pr-plan`).
+- `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
+  → `plans/foundation.md#D22`
+  - `AstroTime` — the root: the app gives it its store (opening), where
+    preferences are kept (`Preferences`), the user's languages and zone.
+  - `components/` — the shell (top bar, month picker, drawer, floating
+    button) and the time grid of Day, 3 days and Week with the all-day
+    strip and the undone tasks chip. → `plans/design.md#D46`
+  - `calendar/` — the views (`views.ts`), days, the locale's week and clock
+    (`locale.ts`), `Intl` formats, the query path to the layout
+    (`query.ts`, `ObjectCache`) and `liveQuery`. → `plans/foundation.md#D54`
+  - `i18n/` — i18next and the English and Russian catalogs.
+    → `plans/foundation.md#D17`
+  - `styles.css` — the theme's tokens, dark and light.
+    → `plans/design.md#D58`
+  - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev
+    server, tests and screenshots. → `plans/foundation.md#D57`
 
 ## Apps
 
-- `apps/web` (`@astrotime/web`) — the web app, the first platform; a
-  placeholder screen for now. → `plans/foundation.md#D12`
+- `apps/web` (`@astrotime/web`) — the web app, the first platform: the web
+  store, preferences in localStorage and the browser's languages around
+  `@astrotime/ui` (`src/main.tsx`); `?demo` in the dev server loads the demo
+  data. → `plans/foundation.md#D12`
+  - `e2e/` — Playwright against the dev server on the demo data with a
+    frozen clock; `screenshots.spec.ts` takes a UI PR's evidence
+    (`ASTROTIME_SCREENSHOTS`). → `plans/foundation.md#D57`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
@@ -81,6 +109,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `vite.config.ts` — Vite+ config: tests (`unit` in Node, `browser` in
   headless Chromium for `*.browser.test.ts`), format, lint (with the
   isomorphic rule for the core). → `plans/foundation.md#D21`
+- `apps/web/playwright.config.ts` — the end-to-end tests
+  (`pnpm --filter @astrotime/web e2e`). → `plans/foundation.md#D57`
 - `scripts/t3/` — `dev.sh` starts the web dev server and a local Radicale,
   `stop.sh` stops them, `smoke.sh` proves both. → `../scripts/t3/README.md`
 - `scripts/docs.test.ts` — checks the context library's routes.

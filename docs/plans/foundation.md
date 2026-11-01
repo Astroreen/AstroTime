@@ -105,8 +105,15 @@ logic worth borrowing.
     are struck through and muted; the roll-over is one "N undone tasks" chip
     on today; "hide completed" lives in the drawer's settings._
 - **D17. English and Russian from the first screen.** Every UI string goes
-  through an i18n library (Lingui or i18next, chosen in PR 5); no strings in
-  code.
+  through an i18n library; no strings in code. _Chosen in PR 5a:_ **i18next**
+  with react-i18next. It needs no build step or macro plugin (Lingui's
+  extraction and macros would add one to Vite+, oxc and the React Compiler),
+  and its plurals are CLDR's through `Intl.PluralRules`, Russian's four
+  forms included. The catalogs are flat (`packages/ui/src/i18n/`); the
+  English one types the keys of `t()`, the compiler checks that the Russian
+  one has the same keys, and a test checks each plural against its
+  language's categories. Dates, weekday and month names come from `Intl`,
+  not the catalogs.
 - **D18. The visual design is decided later**, in its own plan, before
   PR 5. Until then UI work is structure and behaviour. _Decided:_ the
   [design plan](design.md), from Google Calendar's Android app.
@@ -381,6 +388,38 @@ Decided while building the layout engine, ahead of PR 5's screens.
     switches to equal columns too, so no item hides another;
   - in the strip, longer spans come first, then events before tasks.
 
+### The calendar UI
+
+Decided while building PR 5a.
+
+- **D54. The views read the store through live queries.** `Store.subscribe`
+  calls its listeners after every write; a view's query runs again when the
+  store changes, and a burst of writes during a run costs one more run, not
+  one per write (`liveQuery`), so a sync writing while the app is open shows
+  at once ([D5](#D5)). Each object is parsed once while its iCalendar is
+  unchanged and its occurrences kept for the last range asked
+  (`ObjectCache`); a series too dense to expand is left out of the view, not
+  the view out ([D33](#D33)).
+- **D55. The store finds the undone tasks of design D51.**
+  `undoneTasksBefore` returns each task once with the occurrence it counts by
+  (`latestUndoneBefore` in `@astrotime/core`), oldest due first. A task is
+  **done** when it is completed (`STATUS:COMPLETED` or a `COMPLETED` time) or
+  cancelled (`isDone`). Migration 4 adds a `done` column for the master, so
+  the query skips done tasks without parsing them; rows written before it
+  hold `NULL` and are parsed.
+- **D56. One tab holds the web store, and says so.** The web driver holds a
+  Web Lock named after its database while it is open; a second tab gets
+  `StoreInUseError` at once, and the UI tells the user, in their language,
+  to close the other tab. Sharing the store between tabs stays
+  [deferred](#deferred).
+- **D57. Demo data and end-to-end tests.** `@astrotime/ui/demo` holds
+  invented calendars around today, titled in English or Russian; the web dev
+  server loads them with `?demo`, and the production build leaves them out
+  (`import.meta.env.DEV`). Playwright (`apps/web/e2e/`) runs against the dev
+  server on the demo data with the clock frozen (`page.clock`), with role and
+  accessibility-tree locators; CI's `e2e` job runs it. The same specs take a
+  UI pull request's screenshots (`ASTROTIME_SCREENSHOTS`).
+
 ## Deferred
 
 - **Google provider** — Google Calendar and Google Tasks through their REST
@@ -393,9 +432,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
 - **Static files served whole** — the image reads each file into memory
-  with no `ETag`, `Last-Modified` or compression; the bundle is small
-  today. Precompressed assets and conditional requests come when PR 5's app
-  makes the bundle large ([D40](#D40)).
+  with no `ETag`, `Last-Modified` or compression. Since PR 5a-1 the app's
+  script is about 600 kB (190 kB compressed) and SQLite's wasm 880 kB;
+  precompressed assets, conditional requests and splitting the bundle come
+  next ([D40](#D40)).
 - **A Host allowlist in the image** — the proxy compares `Origin` with
   `Host`, so against DNS rebinding the image relies on the reverse proxy in
   front answering only for its own server name; an optional
@@ -404,8 +444,10 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Base images by digest** — the Dockerfile uses `node:24-alpine` by tag;
   pinning it by digest, with Dependabot for Docker, makes releases
   reproducible ([D41](#D41)).
-- **Content Security Policy** for the web image — once the app's own needs
-  (wasm, workers) are known from PR 5 ([D40](#D40)).
+- **Content Security Policy** for the web image — the app loads nothing from
+  another origin (system fonts, its own icons); it needs wasm and a worker
+  from its own origin, and Base UI's `CSPProvider` takes a nonce for the
+  styles it adds ([D40](#D40)).
 - **Display-style Windows TZIDs** — Outlook's desktop export can write
   `TZID:(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna`, the
   zone's display name, which CLDR's table does not carry (only as comments, in
@@ -415,18 +457,30 @@ Decided while building the layout engine, ahead of PR 5's screens.
 - **Expanding long series from the middle** — `occurrencesBetween` walks a
   series from its first occurrence and throws `ExpansionLimitError` past
   50 000 steps (a minutely or hourly series from years ago); a start point
-  or a cache comes when a real calendar hits it ([D33](#D33)).
+  or a cache comes when a real calendar hits it ([D33](#D33)). Until then
+  such a series shows nowhere: the views and the "N undone tasks" chip
+  leave it out, silently ([D55](#D55)).
+- **Past days and their undone tasks** — an undone task due before today
+  shows only in today's chip (design [D51](design.md#D51)), so a view of
+  last week shows none on the days they were due, as in Google Calendar;
+  showing them there too, marked overdue, is a later choice.
+- **Plain `http` beyond localhost** — browsers give OPFS and Web Locks only
+  to secure contexts, so the web store opens only over `https` or on
+  localhost; elsewhere the app says so instead of failing
+  (`InsecureContextError`). Self-hosting needs TLS in front (D40 already
+  asks for it); the dev server over the tailnet needs `https` too.
 - **Fixtures from Nextcloud's web calendar** — PR 4's "Done when" first
   asked for objects written by Nextcloud's web calendar; the recordings are
   of objects as Nextcloud serves them back. Recording what its web calendar
-  writes needs a browser driving it, which comes with Playwright e2e.
+  writes needs a browser driving it; Playwright e2e exists since PR 5a
+  ([D57](#D57)).
 - **Finer write rights** — a calendar is read-only unless its privilege
   set grants `write`, `write-content` or `all`; a share that lets one edit
   but not create (`bind`) or delete (`unbind`) is taken as fully writable,
   and its refused creations show as errors ([D37](#D37)).
 - **Login Flow v2 end to end** — the flow is tested against Nextcloud up to
   the approval page; approving it needs a browser driving Nextcloud's login,
-  which comes with Playwright e2e ([D19](#D19)).
+  which Playwright can do since PR 5a ([D19](#D19), [D57](#D57)).
 - **Scheduling syncs** — `syncAccount` runs when called; when and how often
   the apps call it (on start, on focus, on a timer, Android background sync)
   is decided with each app: the web (the UI's own triggers, which every
@@ -434,17 +488,12 @@ Decided while building the layout engine, ahead of PR 5's screens.
   [android.md D67](android.md#D67), the desktop in
   [desktop.md D75](desktop.md#D75).
 
-- **Overdue tasks on today** — D16's roll-over needs the store to find
-  undone tasks due before today; it comes with PR 5a's calendar views
-  (design D51).
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
-- **Playwright e2e** — set up in PR 5, when there is UI to test. Browser-mode
-  tests run since PR 3.
 - **One store across tabs** — the web store opens its database in one tab;
-  a second tab fails to open it until a `SharedWorker` or a lock hands it
-  over ([D25](#D25)).
+  a second tab is told so ([D56](#D56)) until a `SharedWorker` or a lock
+  hands the store over ([D25](#D25)).
 
 ## PR plan
 
@@ -511,9 +560,16 @@ In two parts, as the [design plan](design.md#pr-plan) splits it ([D18](#D18)):
   the accounts and sync wiring: signing in (Login Flow v2, password), the
   web's credentials, and when the UI syncs (on start, on focus, on a timer:
   Deferred "Scheduling syncs"). Decisions: D1, D13, D14, D15, D16, D17,
-  D19, D42, design D43–D51.
-- **5b** — the tasks screen, the drawer's settings and search. Decisions:
-  design D52, D53.
+  D19, D42, design D43–D51. It lands in three PRs:
+  - **5a-1** — `@astrotime/ui`, the shell, i18n, themes, the Day, 3-day and
+    Week views, the undone tasks, demo data, Playwright (D54–D57, design
+    D58, D59);
+  - **5a-2** — the Month and Agenda views;
+  - **5a-3** — the accounts and sync wiring above; the account button in
+    the top bar.
+- **5b** — the tasks screen, the drawer's settings and search, with their
+  buttons in the top bar (search, the tasks toggle), which 5a leaves out.
+  Decisions: design D52, D53.
 
 Done when, for 5a: each view renders real objects from the local store, in
 both themes and both languages, as the references describe, and an account
@@ -524,8 +580,10 @@ of each, set against the reference's description, are the evidence.
 
 ### PR 6 — Editing
 
-Drag and resize, the details and edit dialogs for events and tasks, the
-recurrence scope dialog, reminders as notifications. Decisions: D9, D10, D11.
+Drag and resize, the details and edit dialogs for events and tasks (an
+item opens them; PR 5a draws items that do not open yet), the recurrence
+scope dialog, reminders as notifications; the floating "+" button creates
+an event or a task (PR 5a draws it disabled). Decisions: D9, D10, D11.
 
 ### PR 7 — Web proxy and release
 

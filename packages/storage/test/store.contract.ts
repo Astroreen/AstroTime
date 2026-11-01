@@ -314,6 +314,84 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.hrefs(calendar.id)).toEqual([]);
     });
 
+    test("undone tasks due before today are found once each, with the occurrence they count by (D51)", async () => {
+      const { store, calendar } = await setup();
+      const save = (uid: string, fields: string) =>
+        store.saveFromServer(calendar.id, {
+          href: `${uid}.ics`,
+          etag: '"1"',
+          ics: task(uid, fields),
+        });
+      await save("yesterday", "DUE;VALUE=DATE:20261103\r\n");
+      await save("last-week", "DUE:20261028T090000Z\r\n");
+      await save("done", "DUE;VALUE=DATE:20261102\r\nSTATUS:COMPLETED\r\n");
+      await save("today", "DUE;VALUE=DATE:20261104\r\n");
+      await save("undated", "");
+      await save("daily", "DUE;VALUE=DATE:20261101\r\nRRULE:FREQ=DAILY\r\n");
+      await store.saveFromServer(calendar.id, {
+        href: "event.ics",
+        etag: '"1"',
+        ics: event("event", "20261102T090000Z", "20261102T100000Z"),
+      });
+      const deleted = await save("deleted", "DUE;VALUE=DATE:20261102\r\n");
+      await store.deleteLocal(deleted.id);
+
+      const undone = await store.undoneTasksBefore([calendar.id], "2026-11-04", "Europe/Vilnius");
+      expect(undone.map((u) => [u.object.uid, u.occurrence.end])).toEqual([
+        [
+          "last-week",
+          {
+            type: "zoned",
+            local: "2026-10-28T09:00:00",
+            timeZone: "UTC",
+            epochMs: Date.parse("2026-10-28T09:00:00Z"),
+          },
+        ],
+        ["daily", { type: "date", date: "2026-11-04" }],
+        ["yesterday", { type: "date", date: "2026-11-04" }],
+      ]);
+      expect(await store.undoneTasksBefore([], "2026-11-04", "Europe/Vilnius")).toEqual([]);
+    });
+
+    test("the undone tasks follow a task that changes, however often they are asked", async () => {
+      const { store, calendar } = await setup();
+      const save = (fields: string, etag: string) =>
+        store.saveFromServer(calendar.id, { href: "t.ics", etag, ics: task("t", fields) });
+      const ask = async (day = "2026-11-04") =>
+        (await store.undoneTasksBefore([calendar.id], day, "UTC")).map((u) => u.occurrence.end);
+      await save("DUE;VALUE=DATE:20261102\r\n", '"1"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-03" }]);
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-03" }]);
+      await save("DUE;VALUE=DATE:20261101\r\n", '"2"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-02" }]);
+      expect(await ask("2026-11-01")).toEqual([]);
+      await save("DUE;VALUE=DATE:20261101\r\nSTATUS:COMPLETED\r\n", '"3"');
+      expect(await ask()).toEqual([]);
+      await save("DUE;VALUE=DATE:20261101\r\n", '"4"');
+      expect(await ask()).toEqual([{ type: "date", date: "2026-11-02" }]);
+    });
+
+    test("a listener hears every write until it unsubscribes", async () => {
+      const { store, calendar } = await setup();
+      let heard = 0;
+      const unsubscribe = store.subscribe(() => heard++);
+      await store.saveFromServer(calendar.id, { href: "l.ics", etag: '"1"', ics: task("l") });
+      expect(heard).toBe(1);
+      await store.saveLocal(calendar.id, task("m"));
+      await store.setSyncState(calendar.id, { syncToken: "1", ctag: null });
+      expect(heard).toBe(3);
+      // Reads are not writes.
+      await store.objectsBetween([calendar.id], {
+        from: "2026-11-01",
+        to: "2026-11-02",
+        timeZone: "UTC",
+      });
+      expect(heard).toBe(3);
+      unsubscribe();
+      await store.saveLocal(calendar.id, task("n"));
+      expect(heard).toBe(3);
+    });
+
     test("conflicts keep our refused version and go with their object", async () => {
       const { store, account, calendar } = await setup();
       const object = await store.saveFromServer(calendar.id, {

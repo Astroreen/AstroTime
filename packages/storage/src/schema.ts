@@ -52,6 +52,8 @@ export const objects = sqliteTable(
     /** `boundsOf` from `@astrotime/core`: `null` start is undated, `null` end is unending. */
     startMs: integer("start_ms"),
     endMs: integer("end_ms"),
+    /** The master is a completed or cancelled task (`isDone`); `null` before migration 4. */
+    done: integer("done", { mode: "boolean" }),
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [
