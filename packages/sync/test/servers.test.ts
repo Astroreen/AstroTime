@@ -287,10 +287,10 @@ describe.each(servers)(
           const page = await browser.newPage();
           await page.goto(flow.loginUrl);
           await page.getByRole("heading", { name: "Connect to your account" }).waitFor();
-          await page.getByRole("button", { name: "Log in" }).click();
+          await page.getByRole("button", { name: "Log in", exact: true }).click();
           await page.getByRole("textbox", { name: /^Account name/ }).fill(server.username);
           await page.getByRole("textbox", { name: "Password" }).fill(server.password);
-          await page.getByRole("button", { name: "Log in" }).click();
+          await page.getByRole("button", { name: "Log in", exact: true }).click();
           await page.getByRole("button", { name: "Grant access" }).click();
           // Shown once Nextcloud has stored the app password for the poll.
           await page.getByRole("heading", { name: "Account connected" }).waitFor();
