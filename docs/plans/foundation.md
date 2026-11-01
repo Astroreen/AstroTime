@@ -228,8 +228,12 @@ logic worth borrowing.
   the tag's GitHub Release the Android APK (unsigned at first) and the
   desktop's AppImage and deb for x64 and arm64. One workflow
   (`.github/workflows/release.yml`): its first job checks the tag
-  ([D41](#D41)) and creates the Release; the image, Android and desktop
-  jobs `need` it, so nothing is published from a tag that fails the check.
+  ([D41](#D41)) and creates the Release as a draft; the image, Android and
+  desktop jobs `need` it, so nothing is published from a tag that fails the
+  check, and a last job publishes the draft once every file is on it. The
+  image is pushed by its own job, so a failed APK or desktop build leaves
+  the image tags public with the Release still a draft; a re-run of the
+  failed job finishes it.
   How: [android D69](android.md#D69), [desktop D79](desktop.md#D79).
 - **D29. License: AGPL-3.0.** The web app is meant to be self-hosted; a
   modified hosted copy must share its code. It matches Nextcloud's license.
