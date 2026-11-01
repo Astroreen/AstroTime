@@ -107,9 +107,35 @@ jobs:
           test "$status" = 403
           if docker run --rm astrotime:ci 2> refusal.log; then echo "started without ASTROTIME_PROXY_ALLOW" >&2; exit 1; fi
           grep -q "ASTROTIME_PROXY_ALLOW must list" refusal.log
+      - name: The image sends assets precompressed and answers a known ETag with 304 (D80)
+        run: |
+          asset=$(curl -fsS http://127.0.0.1:8080/ | grep -o '/assets/index-[^"]*\.js' | head -n 1)
+          curl -fsS -o /dev/null -D br.headers -H 'Accept-Encoding: gzip, br' "http://127.0.0.1:8080${asset}"
+          cat br.headers
+          grep -qi '^content-encoding: br' br.headers
+          grep -qi '^vary: accept-encoding' br.headers
+          curl -fsS -o /dev/null -D gzip.headers -H 'Accept-Encoding: gzip' "http://127.0.0.1:8080${asset}"
+          grep -qi '^content-encoding: gzip' gzip.headers
+          etag=$(tr -d '\r' < br.headers | awk -F': ' 'tolower($1) == "etag" { print $2 }')
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept-Encoding: gzip, br' -H "If-None-Match: ${etag}" "http://127.0.0.1:8080${asset}")
+          test "$status" = 304
+          curl -fsS -o /dev/null -D page.headers http://127.0.0.1:8080/week/2026-11-02
+          grep -qi '^cache-control: no-cache' page.headers
+      - name: With ASTROTIME_PUBLIC_HOST, the image refuses other hosts but answers its health check (D81)
+        run: |
+          docker run -d --name listed --network host -e PORT=8081 -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com -e ASTROTIME_PUBLIC_HOST=calendar.example.com astrotime:ci
+          curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8081/healthz
+          curl -fsS -H 'Host: calendar.example.com' http://127.0.0.1:8081/ | grep -q "<title>AstroTime</title>"
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: elsewhere.example' http://127.0.0.1:8081/)
+          test "$status" = 421
+          curl -fsS -H 'Host: elsewhere.example' http://127.0.0.1:8081/healthz | grep -q ok
+          if docker run --rm -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com -e ASTROTIME_PUBLIC_HOST=https://calendar.example.com astrotime:ci 2> refusal.log; then echo "started with a URL in ASTROTIME_PUBLIC_HOST" >&2; exit 1; fi
+          grep -q "ASTROTIME_PUBLIC_HOST: " refusal.log
       - name: The server's log, when a check above failed
         if: failure()
-        run: docker logs web || true
+        run: |
+          docker logs web || true
+          docker logs listed || true
 
   dev-scripts:
     name: Dev scripts

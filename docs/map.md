@@ -101,8 +101,10 @@ When you add a package, app or module, add its line here in the same PR.
     server listens beyond localhost. → `plans/foundation.md#D20`
 
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
-  static files, `/healthz`, the CalDAV proxy; bundled into the Docker image
-  (`Dockerfile`). → `plans/foundation.md#D40`
+  static files, `/healthz`, the CalDAV proxy, the Host allowlist; bundled
+  into the Docker image (`Dockerfile`). → `plans/foundation.md#D40`, `#D81`
+  - `compress.ts` — precompresses the built app (brotli, gzip) when the image
+    is built. → `plans/foundation.md#D80`
 
 ## Tooling
 

@@ -32,6 +32,15 @@ original `Host`, port included, on (nginx: `proxy_set_header Host
 $http_host;` — `$host` drops the port; Caddy and Traefik pass it by
 default).
 
+`ASTROTIME_PUBLIC_HOST` is optional: the comma-separated host names the
+container answers for, such as `calendar.example.com` (any port) or
+`calendar.example.com:8443` (that port only; browsers leave out 80 and 443,
+so list those as the bare name), IPv6 in brackets (`[2001:db8::1]`). Any
+other `Host` gets 421, which keeps DNS rebinding out even if the reverse
+proxy answers for every name; `/healthz` answers whatever the `Host`, for
+health checks. Unset, every host is served
+([D81](docs/plans/foundation.md#D81)).
+
 ## Development
 
 ```sh

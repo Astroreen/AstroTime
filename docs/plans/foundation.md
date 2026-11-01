@@ -201,7 +201,7 @@ logic worth borrowing.
   protection. Integration tests against Radicale run on every PR from PR 4;
   a nightly job runs them against a real Nextcloud. Claude reviews every PR
   and answers `@claude`. Dependabot updates the actions, which are pinned to
-  commit SHAs.
+  commit SHAs, and the image's base images, pinned by digest ([D41](#D41)).
 - **D28. Releases on a `v*` tag:** the web Docker image to GHCR and an
   Android APK to GitHub Releases (unsigned at first); the desktop build
   joins when it exists. How: [android D69](android.md#D69),
@@ -341,9 +341,11 @@ Decided while building PR 7.
   JavaScript file with the workspace packages it needs, and runs on
   `node:24-alpine` next to `apps/web/dist`, as the unprivileged `node` user.
   It serves the app (hashed assets as immutable, every other path as the
-  single-page app), `/healthz`, and the CalDAV proxy of [D39](#D39).
+  single-page app, precompressed and revalidated by `ETag`, [D80](#D80)),
+  `/healthz`, and the CalDAV proxy of [D39](#D39).
   `ASTROTIME_PROXY_ALLOW` is required and holds origins only; the server
-  refuses to start without it. TLS is the job of the reverse proxy in front.
+  refuses to start without it. TLS is the job of the reverse proxy in front;
+  the hosts it answers for can be listed in the image too ([D81](#D81)).
   Proxied answers are streamed and sent `Cache-Control: no-store`; requests
   are capped at 10 MB (413, refused before reading when announced), and slow
   ones are cut off. A missing file under `assets/` is a 404, never the app,
@@ -357,7 +359,50 @@ Decided while building PR 7.
   release that is not a prerelease, `:latest`, for amd64 and arm64. The
   build stage runs on the builder's platform (its output is JavaScript), so
   arm64 needs no emulation. A tag publishes only a commit on `main` whose
-  `CI` passed. CI builds and starts the image on every PR.
+  `CI` passed. CI builds and starts the image on every PR. Every `FROM` names
+  its base image by digest, the tag kept to read
+  (`node:24-alpine@sha256:…`, the multi-arch index), so a tag builds the
+  same image whenever it is built; Dependabot proposes the new digest weekly,
+  never a new Node major (that one moves with the dev shell's and CI's).
+- **D80. Static files are streamed, precompressed and revalidated.** The
+  image's build writes a `.br` (brotli, best quality) and a `.gz` (gzip,
+  level 9) next to every text file of the app (`apps/proxy/src/compress.ts`),
+  kept only where smaller; nothing is compressed per request. The server
+  picks one by `Accept-Encoding`: the highest q wins, a tie goes to brotli,
+  then gzip, then the file as it is, which is also what a client without the
+  header or one that refuses everything gets (never a 406); `Vary:
+  Accept-Encoding` on every answer that carries a file (200 and 304). Each variant has a strong `ETag`
+  from its content (SHA-256, cut to 22 base64url characters), and a matching
+  `If-None-Match` is a 304; there is no `Last-Modified`, since a build that
+  rewrites timestamps (`SOURCE_DATE_EPOCH`) would give two builds of
+  `index.html` the same date. Files are streamed from disk, never held in
+  memory; the server keeps only each file's ETag, hashed once and again only
+  when its size or time changes, so memory is bounded by the number of files
+  in the image. The root is taken as read-only, as it is in the image: each
+  answer reads one open file, so its size, ETag and body agree, but a file
+  rewritten in place with the same size within one clock tick keeps its old
+  ETag. HEAD answers GET's headers. `index.html`, on every route of
+  the single-page app, is `no-cache` (revalidated on every load); only files
+  under `assets/` are immutable ([D40](#D40)). Ranges are not served: the
+  files are small enough to fetch whole. A path ending in `.br` or `.gz` is
+  a 404: the copies are reached only through `Accept-Encoding`.
+- **D81. The image can answer only for its own hosts.**
+  `ASTROTIME_PUBLIC_HOST`, optional, lists the host names the server answers
+  for, comma-separated: `calendar.example.com` matches on any port,
+  `calendar.example.com:8443` on that port only (browsers leave out 80 and
+  443, so list those as the bare name), an IPv6 address goes in brackets
+  (`[2001:db8::1]`); names are matched case-insensitively and are written as
+  browsers send them (punycode, no scheme, path or `*`), or the server refuses
+  to start. A request whose `Host` is not listed is answered 421 Misdirected
+  Request (RFC 9110: this server cannot answer for that name; 400 would say
+  the request itself is malformed) before it reaches the app or the proxy,
+  and so is an HTTP/1.0 request with no `Host`; an HTTP/1.1 one without it
+  is malformed, and Node refuses it with 400 first. This holds the line
+  against DNS rebinding in the image itself, where [D39](#D39)'s Origin check, which compares with `Host`,
+  cannot. `/healthz` answers whatever the `Host`: it tells nothing, and
+  health checks come by loopback (Docker's `HEALTHCHECK`) or by the
+  container's own address (Kubernetes sends the pod's IP). Unset, every host
+  is served, as before.
 
 ### Layout
 
@@ -431,19 +476,10 @@ Decided while building PR 5a.
 - **Year view** ([D13](#D13); the 3-day view joined the MVP, [D48](design.md#D48)).
 - **Windows** — checked last, if at all ([D12](#D12)).
 - **Signed Android release** — the APK is unsigned at first ([D28](#D28)).
-- **Static files served whole** — the image reads each file into memory
-  with no `ETag`, `Last-Modified` or compression. Since PR 5a-1 the app's
-  script is about 600 kB (190 kB compressed) and SQLite's wasm 880 kB;
-  precompressed assets, conditional requests and splitting the bundle come
-  next ([D40](#D40)).
-- **A Host allowlist in the image** — the proxy compares `Origin` with
-  `Host`, so against DNS rebinding the image relies on the reverse proxy in
-  front answering only for its own server name; an optional
-  `ASTROTIME_PUBLIC_HOST` would make the image hold that line itself
-  ([D40](#D40)).
-- **Base images by digest** — the Dockerfile uses `node:24-alpine` by tag;
-  pinning it by digest, with Dependabot for Docker, makes releases
-  reproducible ([D41](#D41)).
+- **Splitting the bundle** — since PR 5a-1 the app's script is about 600 kB
+  (190 kB compressed) and SQLite's wasm 880 kB; they are served precompressed
+  and revalidated ([D80](#D80)), and splitting comes when the first load needs
+  it ([D40](#D40)).
 - **Content Security Policy** for the web image — the app loads nothing from
   another origin (system fonts, its own icons); it needs wasm and a worker
   from its own origin, and Base UI's `CSPProvider` takes a nonce for the
@@ -588,7 +624,8 @@ an event or a task (PR 5a draws it disabled). Decisions: D9, D10, D11.
 ### PR 7 — Web proxy and release
 
 `apps/proxy` and the Docker image, its allowlist, the release workflow that
-publishes it to GHCR on a `v*` tag. Decisions: D20, D28, D40, D41.
+publishes it to GHCR on a `v*` tag. Decisions: D20, D28, D40, D41; later
+D80 and D81.
 
 Done when: the image builds in CI, serves the app, proxies to an allowed
 server and refuses an unlisted one, and refuses to start without an

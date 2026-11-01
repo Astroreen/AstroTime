@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "vp build",
+    "compress": "node src/compress.ts ../web/dist",
     "start": "node src/main.ts",
     "typecheck": "tsc --noEmit"
   },

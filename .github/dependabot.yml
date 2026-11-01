@@ -1,5 +1,6 @@
 # docs/plans/foundation.md, D27: proposes the updates of the actions every
-# workflow pins to a commit SHA, with the release in the comment.
+# workflow pins to a commit SHA, with the release in the comment; and D41:
+# of the Dockerfile's base images, pinned by digest with the tag kept.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -15,3 +16,20 @@ updates:
           - "*"
     commit-message:
       prefix: ci
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # A new digest of node:24-alpine, not a new Node: the major goes with
+    # the dev shell and CI's, by hand.
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+    groups:
+      images:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: build
