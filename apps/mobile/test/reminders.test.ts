@@ -521,3 +521,31 @@ test("two instances on one set of preferences (the open app and background sync,
   expect(phone.last().cancelled).toEqual([1]);
   expect([...phone.pending.keys()]).toEqual([2]);
 });
+
+test("the switch asking keeps asked on the record as kept now, not over ids handed out since (D67)", async () => {
+  const phone = device();
+  const preferences = memoryPreferences();
+  let held = Promise.resolve();
+  const lock = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = held.then(work);
+    held = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
+  };
+  const make = () => androidReminders({ native: phone.native, preferences, now: () => NOW, lock });
+  const app = make();
+  // Background sync hands out an id while the app is open.
+  await make().schedule([reminder("lunch", NOW + 3 * 60 * MINUTE)]);
+  // The setting's switch asks: its write must not put the app's old record back.
+  await app.requestPermission();
+  expect(JSON.parse(preferences.values.get(KEPT_KEY)!)).toMatchObject({
+    asked: true,
+    next: 2,
+    scheduled: { lunch: { id: 1 } },
+  });
+  await app.schedule([reminder("call", NOW + 30 * MINUTE)]);
+  expect(idOf(phone, "call")).toBe(2);
+  expect(phone.last().cancelled).toEqual([1]);
+});

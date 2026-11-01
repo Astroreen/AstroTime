@@ -530,7 +530,15 @@ were checked on 2026-11-01.
     `astrotime-background:no-port`, which native hears through
     `WebChromeClient.onReceivedTitle` without the object. A signal of failure
     only, so it races nothing; the review of #37 replaced a "hello" the page
-    sent, which `onPageFinished` could overtake and so fail a healthy run. An answer or a call
+    sent, which `onPageFinished` could overtake and so fail a healthy run.
+    A script that does not load, or throws before the page started, can
+    never say done either: a small classic script ahead of the bundle in
+    `background.html` hears it (an `error` in the capture phase) and sets the
+    title to `astrotime-background:no-script`. And since every file is the
+    app's own, any file that answers an error status (`onReceivedHttpError`)
+    fails the run; the page declares an empty icon, or the WebView's own
+    request for `/favicon.ico` would. The app's pages have no Content
+    Security Policy on Android, so the inline script needs no hash. An answer or a call
     that comes after the run is over (the watchdog, a `done` during an
     exchange) reaches no WebView and throws nothing (`Gate`). Past 9 minutes (`withTimeoutOrNull`, under WorkManager's own 10) the
     run is stopped and its WebView destroyed, whatever it waits for; every
@@ -670,8 +678,9 @@ were checked on 2026-11-01.
   in the repository's secrets, then F-Droid and Google Play ([D69](#D69)).
 - **Emulator tests in CI** — `android-emulator-runner` on a KVM runner, a
   smoke test of the HTTP plugin and the store on a real WebView ([D69](#D69));
-  background sync's instrumented test (`SyncWorkerTest`, [D67](#D67)) is
-  ready for it.
+  background sync's instrumented tests (`SyncWorkerTest`,
+  `PluginNotificationsTest`, [D67](#D67)) are ready for it; until then they
+  run on a local emulator only.
 - **Capacitor 9** — when it is stable: minSdk 26, target 37 ([D61](#D61)).
 - **The native SQLite plugin** — only if OPFS in the WebView proves
   evictable or slow ([D63](#D63)).

@@ -18,6 +18,9 @@ const port = (globalThis as { AstroTimeBackground?: NativePort }).AstroTimeBackg
 /** The title that tells native the object is missing (`HeadlessRun`'s `NO_PORT`). */
 const NO_PORT = "astrotime-background:no-port";
 
+// The page runs: from here its own handlers say what goes wrong (`background.html`).
+(globalThis as { astrotimeBackgroundStarted?: boolean }).astrotimeBackgroundStarted = true;
+
 if (!port) {
   document.title = NO_PORT;
 } else {

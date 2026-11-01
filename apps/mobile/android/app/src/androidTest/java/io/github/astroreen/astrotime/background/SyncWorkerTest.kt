@@ -5,10 +5,13 @@
 package io.github.astroreen.astrotime.background
 
 import android.content.Context
+import android.webkit.WebResourceResponse
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.webkit.WebViewAssetLoader
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
+import java.io.ByteArrayInputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -53,6 +56,37 @@ class SyncWorkerTest {
                 runBlocking { HeadlessRun(context, setOf("https://elsewhere.test")).run() }
             }
         assertEquals("The page found no AstroTimeBackground.", error.message)
+    }
+
+    /** The APK's files, but `broken` answers in place of the ones it answers for. */
+    private fun filesWith(broken: (String) -> WebResourceResponse?): WebViewAssetLoader.PathHandler {
+        val real = PublicAssets(context)
+        return WebViewAssetLoader.PathHandler { path -> broken(path) ?: real.handle(path) }
+    }
+
+    @Test
+    fun aPageWhoseBundleIsMissingEndsTheRunAtOnce() {
+        val files =
+            filesWith { path ->
+                if (path.startsWith("assets/")) WebResourceResponse("text/plain", null, 404, "Not Found", emptyMap(), null) else null
+            }
+        val error = assertThrows(RunFailed::class.java) { runBlocking { HeadlessRun(context, files = files).run() } }
+        assertTrue(error.message!!, error.message!!.endsWith("answered 404."))
+    }
+
+    @Test
+    fun aPageWhoseScriptDoesNotRunEndsTheRunAtOnce() {
+        // Served fine, but not JavaScript: no 404 to hear, only the page's own title.
+        val files =
+            filesWith { path ->
+                if (path.startsWith("assets/background-") && path.endsWith(".js")) {
+                    WebResourceResponse("text/javascript", null, ByteArrayInputStream("this is not JavaScript (".toByteArray()))
+                } else {
+                    null
+                }
+            }
+        val error = assertThrows(RunFailed::class.java) { runBlocking { HeadlessRun(context, files = files).run() } }
+        assertEquals("The page's script did not load or run.", error.message)
     }
 
     @Test

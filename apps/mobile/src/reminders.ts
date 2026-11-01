@@ -162,6 +162,28 @@ export function androidReminders(options: {
       update({ permission: permissionOf(display), exact: exact_alarm === "granted" });
   };
 
+  // Whether this instance's set holds the lock now (`schedule`).
+  let applying = false;
+
+  /**
+   * Keeps that the app asked. The switch asks outside a set: its write takes
+   * the lock and goes on the record as kept now, so ids another instance
+   * handed out since are not written over (the review of #37). Within a set
+   * the lock is held and the record fresh already.
+   */
+  const keepAsked = async () => {
+    const write = async () => {
+      kept.asked = true;
+      save();
+    };
+    const { lock } = options;
+    if (!lock || applying) return write();
+    await lock(async () => {
+      kept = readKept(preferences) ?? kept;
+      await write();
+    });
+  };
+
   /**
    * Asks the user; the answer outranks any read still on its way. Kept as
    * asked once answered: a prompt the app ended in is asked again.
@@ -177,8 +199,7 @@ export function androidReminders(options: {
           failed = true;
           throw error;
         });
-        kept.asked = true;
-        save();
+        await keepAsked();
         reads++;
         update({ permission: permissionOf(display) });
         return permission;
@@ -320,10 +341,15 @@ export function androidReminders(options: {
         if (!next) return;
         const { lock } = options;
         if (!lock) return apply(next);
-        await lock(() => {
+        await lock(async () => {
           // The other instance may have handed out ids since: its record wins.
           kept = readKept(preferences) ?? kept;
-          return apply(next);
+          applying = true;
+          try {
+            await apply(next);
+          } finally {
+            applying = false;
+          }
         });
       });
       queue = run.catch(() => {});

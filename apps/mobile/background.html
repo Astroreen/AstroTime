@@ -3,6 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <title>AstroTime background sync</title>
+    <!-- No icon to fetch: the WebView would ask for /favicon.ico, and any
+         file that does not load fails the run (HeadlessRun). -->
+    <link rel="icon" href="data:," />
+    <!-- Before the bundle, so it hears the bundle fail: a script that does not
+         load, or one that throws before the page started, can never tell
+         native it is done; the title tells it instead (HeadlessRun,
+         docs/plans/android.md#D67). The app's pages have no CSP on Android. -->
+    <script>
+      addEventListener(
+        "error",
+        (event) => {
+          if (event.target instanceof HTMLScriptElement || !globalThis.astrotimeBackgroundStarted)
+            document.title = "astrotime-background:no-script";
+        },
+        true,
+      );
+    </script>
   </head>
   <body>
     <script type="module" src="/src/background/main.ts"></script>
