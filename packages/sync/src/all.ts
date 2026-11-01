@@ -86,8 +86,9 @@ export interface SyncAllReport {
    */
   readonly retryAt: number | null;
   /**
-   * The accounts this run left alone (D128): their result is the one they
-   * were held with, not news, so it does not hurry the next sync.
+   * The accounts held after this run (D128): left alone by it, or turned
+   * away in it. Their "offline" waits for the hold, so it does not hurry the
+   * next sync.
    */
   readonly held: readonly string[];
 }
@@ -188,6 +189,7 @@ async function everyAccount(
   state: Runs,
   retry: boolean,
 ): Promise<SyncAllReport> {
+  const now = context.now ?? Date.now;
   const accounts: AccountSync[] = [];
   const held: string[] = [];
   const known = new Set<string>();
@@ -196,14 +198,17 @@ async function everyAccount(
     if (account.provider !== "caldav" || state.removing.has(account.id)) continue;
     known.add(account.id);
     const result = await syncOne(context, state.holds, account, retry);
-    if (result.held) held.push(account.id);
+    // Held now, by this run's own answer too: its next sync waits for the hold.
+    const hold = state.holds.get(account.id);
+    const holding = !!hold && (hold.refused !== null || hold.until > now());
+    if (result.held || holding) held.push(account.id);
     accounts.push(result.sync);
   }
   for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
   const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
   return {
     accounts,
-    finishedAt: Date.now(),
+    finishedAt: now(),
     retryAt: ends.length > 0 ? Math.min(...ends) : null,
     held,
   };

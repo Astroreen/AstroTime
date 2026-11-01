@@ -536,6 +536,23 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     expect(busy.tries()).toBe(3);
   });
 
+  test("an account turned away in this very run is named held already, and the report's time is the context's", async () => {
+    const { context, account, answer } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("429", null);
+    });
+    const first = await syncAll(context);
+    expect(first.held).toEqual([account.id]);
+    expect(first.accounts[0]).toMatchObject({ status: "offline" });
+    expect(first.finishedAt).toBe(context.now());
+    // Offline with no hold is news: not held.
+    const offline = await turnedAway();
+    offline.answer(async () => {
+      throw new OfflineError("offline");
+    });
+    expect((await syncAll(offline.context)).held).toEqual([]);
+  });
+
   test("a 429 or 503 holds the server for its Retry-After, when longer than the backoff's step", async () => {
     const { context, tries, answer, pass } = await turnedAway();
     answer(async () => {

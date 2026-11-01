@@ -1423,21 +1423,23 @@ too many requests.
 - **D128. A server that turns AstroTime away is left alone.** A `429` or a
   `503` stops a sync as offline does ([D37](#D37)): `ServerBusyError` in
   `@astrotime/core`, an `OfflineError` with the answer's `Retry-After`
-  (seconds or a date; the web proxy passes the header,
-  [D39](#D39)). `syncAll` then holds the account: no request for a
+  (seconds or a date; the web proxy passes the header, [D39](#D39)).
+  `syncAll` then holds the account for the backoff's current step: a
   minute, doubled with every such answer in a row up to half an hour, a
-  fifth either way so that devices do not return together, or for its
-  `Retry-After` when that is longer (at most 6 hours): `Retry-After: 0` or
-  a date gone by never shortens the wait below the step. A `5xx` that
-  fails the sync counts the same. Only a sync that goes through clears the
-  count: a timeout or a refusal between two `503`s does not shorten the
-  next wait. A `401` holds the account until its saved credentials change
-  (signing in again); a retry that goes nowhere (offline, a timeout, a
-  failure of another kind) lifts no hold, of either kind, since every refused password counts against the
-  address in Nextcloud's brute-force protection, which then slows and
-  refuses the user's other devices too. A held account's last result is
-  reported again, with no request; offline holds nothing, as no request
-  reached the server. Only the user's own sync tries a held account
+  fifth either way so that devices do not return together. A `Retry-After`
+  is honoured, but never below that step: a longer one (at most 6 hours)
+  makes the hold longer, while `Retry-After: 0` or a date gone by leaves
+  the step. A `5xx` that fails the sync counts the same. Only a sync that
+  goes through clears the count: a timeout or a refusal between two `503`s
+  does not shorten the next wait. A `401` holds the account until its
+  saved credentials change (signing in again), since every refused
+  password counts against the address in Nextcloud's brute-force
+  protection, which then slows and refuses the user's other devices too. A
+  retry that goes nowhere (offline, a timeout, a failure of another kind)
+  lifts no hold of either kind. A held account's last result is reported
+  again, with no request, and the report names it in `held`, from the run
+  that turned it away on; offline holds nothing, as no request reached the
+  server. Only the user's own sync tries a held account
   (`syncAll`'s `retry`: "Sync now", an account just added): not a local
   change's, not a timer's, not the desktop's or Android's. A change made
   while its account is held stays pending on this device, and the account
@@ -1448,10 +1450,11 @@ too many requests.
   own ([D129](#D129)); any other hidden tab waits for its next visit. A held
   account's result is not news: its "offline" does not make the next
   trigger due, so triggers during a hold keep the one-minute gap. Each tab
-  (each instance of the store) keeps its own holds: another tab learns of a
-  busy server or a refused password with one request of its own, at its
-  own next trigger, its syncs one at a time behind the Web Lock. A busy server shows as offline in the UI. Holds live in
-  memory, per instance of the store ([Deferred](#deferred)).
+  (each instance of the store) keeps its own holds, in memory
+  ([Deferred](#deferred)): another tab learns of a busy server or a
+  refused password with one request of its own, at its own next trigger,
+  its syncs one at a time behind the Web Lock. A busy server shows as
+  offline in the UI.
 - **D129. Triggers close together make one sync.** An automatic trigger
   ([D91](#D91): coming back, the 5-minute timer, the network's return)
   syncs only if the last sync started over a minute ago, or found a server
