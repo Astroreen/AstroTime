@@ -119,6 +119,8 @@ class HandlersTest {
             call(4, "secrets.get", JSONObject().put("key", "account:a")).getString("value"),
         )
         assertTrue(call(5, "secrets.get", JSONObject().put("key", "account:b")).isNull("value"))
+        // Nothing but an account's credentials: any other key is refused.
+        assertEquals("failed", call(6, "secrets.get", JSONObject().put("key", "other")).getString("code"))
     }
 
     @Test

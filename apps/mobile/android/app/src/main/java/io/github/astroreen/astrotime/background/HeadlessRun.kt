@@ -108,7 +108,10 @@ class HeadlessRun(
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest,
-                            ): WebResourceResponse? = assets.shouldInterceptRequest(request.url)
+                            ): WebResourceResponse =
+                                // The app's files, and nothing from the network: HTTP goes through native.
+                                assets.shouldInterceptRequest(request.url)
+                                    ?: WebResourceResponse("text/plain", null, 403, "Forbidden", emptyMap(), null)
 
                             override fun onReceivedError(
                                 view: WebView,

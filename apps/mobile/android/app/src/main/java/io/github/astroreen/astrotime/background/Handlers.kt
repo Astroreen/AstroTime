@@ -88,7 +88,12 @@ class Handlers(
     private fun call(method: String, params: JSONObject): Any? =
         when (method) {
             "http" -> jsonOf(exchange.run(requestOf(params)))
-            "secrets.get" -> secrets.get(params.getString("key"))
+            // An account's credentials only (`@astrotime/sync`'s `account:<id>`), whatever else the store holds.
+            "secrets.get" ->
+                params.getString("key").let { key ->
+                    if (!key.startsWith("account:")) throw IllegalArgumentException("Not an account's key: $key")
+                    secrets.get(key)
+                }
             // Nobody can be asked in the background: a request is a check.
             "notifications.check", "notifications.request" ->
                 JSONObject().put("display", granted(notifications.enabled()))
