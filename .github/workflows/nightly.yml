@@ -39,5 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
+      # The Login Flow v2 test approves access on Nextcloud's own pages in Chromium.
+      - uses: ./.github/actions/chromium
       - run: pipx install radicale==3.8.0
       - run: vp test run --project unit packages/sync

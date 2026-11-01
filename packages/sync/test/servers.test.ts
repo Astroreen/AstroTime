@@ -11,6 +11,7 @@ import {
 import { CalendarObject, OfflineError, type Event } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
+import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { syncAccount } from "../src/index.ts";
@@ -272,11 +273,55 @@ describe.each(servers)(
     });
 
     test.runIf(serverName === "Nextcloud")(
-      "Nextcloud starts a Login Flow v2 that waits for the user (D19)",
+      "Login Flow v2 end to end: the user approves in a browser and the app password reaches CalDAV (D19)",
       async () => {
+        const name = calendarName();
+        await server.mkcalendar(name);
         const flow = await startLoginFlow(fetchClient(), server.url);
         expect(new URL(flow.loginUrl).origin).toBe(new URL(server.url).origin);
         expect(await flow.poll()).toBeNull();
+
+        // The user's side, on Nextcloud's own pages: sign in, then grant access.
+        const browser = await chromium.launch();
+        try {
+          const page = await browser.newPage();
+          await page.goto(flow.loginUrl);
+          await page.getByRole("heading", { name: "Connect to your account" }).waitFor();
+          await page.getByRole("button", { name: "Log in", exact: true }).click();
+          await page.getByRole("textbox", { name: /^Account name/ }).fill(server.username);
+          await page.getByRole("textbox", { name: "Password" }).fill(server.password);
+          await page.getByRole("button", { name: "Log in", exact: true }).click();
+          await page.getByRole("button", { name: "Grant access" }).click();
+          // Shown once Nextcloud has stored the app password for the poll.
+          await page.getByRole("heading", { name: "Account connected" }).waitFor();
+        } finally {
+          await browser.close();
+        }
+
+        const credentials = await flow.poll();
+        if (!credentials) throw new Error("The flow gave no app password once approved.");
+        try {
+          expect(credentials).toMatchObject({
+            server: server.url.replace(/\/$/, ""),
+            username: server.username,
+          });
+          expect(credentials.password).not.toBe(server.password);
+          // The app password is what AstroTime signs in with from now on.
+          const { homeUrl } = await CalDavProvider.discover(fetchClient(), server.url, credentials);
+          const provider = new CalDavProvider(fetchClient(), credentials, homeUrl);
+          expect((await provider.calendars()).map((c) => c.name)).toContain(name);
+        } finally {
+          // The app password goes, as a user would revoke it: a long-lived
+          // server (not the nightly's) keeps no device per run.
+          const revoked = await fetch(new URL("ocs/v2.php/core/apppassword", server.url), {
+            method: "DELETE",
+            headers: {
+              "OCS-APIRequest": "true",
+              Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64")}`,
+            },
+          });
+          expect(revoked.status).toBe(200);
+        }
       },
     );
 

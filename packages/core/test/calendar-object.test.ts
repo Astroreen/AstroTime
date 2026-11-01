@@ -337,6 +337,89 @@ describe("tasks (D10)", () => {
   });
 });
 
+// Recorded from Nextcloud's own web apps by scripts/record-nextcloud-fixtures.ts
+// (fixtures/README.md), in a browser on Europe/Vilnius.
+describe("as Nextcloud's web Calendar and Tasks apps write them", () => {
+  test("Calendar: a timed event with a location, a description and a category", () => {
+    const event = load("nextcloud-web-event-timed.ics").master as Event;
+    expect(event).toMatchObject({
+      summary: "Planning",
+      location: "Room 4, second floor",
+      description: "Agenda:\n- the week ahead\n- blockers",
+      categories: ["Work"],
+      status: "CONFIRMED",
+      sequence: 2,
+      recurring: false,
+      start: {
+        type: "zoned",
+        local: "2026-11-16T10:00:00",
+        timeZone: "Europe/Vilnius",
+        epochMs: Date.parse("2026-11-16T08:00:00Z"),
+      },
+      end: { type: "zoned", local: "2026-11-16T11:00:00" },
+    });
+  });
+
+  test("Calendar: all-day events end the day after their last", () => {
+    expect(load("nextcloud-web-event-allday.ics").master).toMatchObject({
+      start: { type: "date", date: "2026-11-17" },
+      end: { type: "date", date: "2026-11-18" },
+    });
+    expect(load("nextcloud-web-event-multiday.ics").master).toMatchObject({
+      start: { type: "date", date: "2026-11-18" },
+      end: { type: "date", date: "2026-11-21" },
+    });
+  });
+
+  test("Calendar: a reminder fifteen minutes before the start", () => {
+    const event = load("nextcloud-web-event-reminder.ics").master as Event;
+    expect(event.alarms).toEqual([
+      {
+        action: "DISPLAY",
+        description: "This is an event reminder.",
+        trigger: { type: "relative", relatedTo: "start", offsetSeconds: -900 },
+      },
+    ]);
+  });
+
+  test("Calendar: a series with one occurrence moved and one deleted", () => {
+    const object = load("nextcloud-web-event-recurring.ics");
+    expect(object.master).toMatchObject({ summary: "Standup", recurring: true });
+    expect(object.exceptions).toHaveLength(1);
+    expect(object.exceptions[0]).toMatchObject({
+      summary: "Standup (moved)",
+      recurrenceId: { type: "zoned", local: "2026-11-30T09:00:00", timeZone: "Europe/Vilnius" },
+      start: { local: "2026-11-30T11:00:00" },
+    });
+  });
+
+  test("Tasks: times in UTC, a date-only due date, completion, a parent", () => {
+    expect(load("nextcloud-web-task-due.ics").master).toMatchObject({
+      kind: "task",
+      start: null,
+      due: { type: "zoned", timeZone: "UTC", epochMs: Date.parse("2026-11-20T08:00:00Z") },
+    });
+    expect(load("nextcloud-web-task-start-due.ics").master).toMatchObject({
+      start: { type: "zoned", epochMs: Date.parse("2026-11-16T08:00:00Z") },
+      due: { type: "zoned", epochMs: Date.parse("2026-11-18T09:00:00Z") },
+    });
+    expect(load("nextcloud-web-task-completed.ics").master).toMatchObject({
+      due: { type: "date", date: "2026-11-10" },
+      status: "COMPLETED",
+      percentComplete: 100,
+      completed: { type: "zoned", timeZone: "UTC" },
+    });
+    expect(load("nextcloud-web-task-subtask.ics").master).toMatchObject({
+      summary: "Pack the books",
+      parentUid: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+    expect(load("nextcloud-web-task-priority-categories.ics").master).toMatchObject({
+      priority: 1,
+      categories: ["Errands", "Family"],
+    });
+  });
+});
+
 describe("invalid objects", () => {
   const wrap = (body: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${body}END:VCALENDAR\r\n`;
 

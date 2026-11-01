@@ -39,7 +39,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D6`
   - `Provider` — the interface every provider implements.
     → `plans/foundation.md#D37`
-  - `test/fixtures/` — iCalendar as each client writes it.
+  - `test/fixtures/` — iCalendar as each client writes it; where each file
+    comes from: [`README.md`](../packages/core/test/fixtures/README.md).
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
   - `Store` — accounts, calendars, objects with pending local changes,
@@ -67,7 +68,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
   - `test/servers.test.ts` — the provider and the engine against Radicale
-    (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`).
+    (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
+    Login Flow v2 approved in Chromium on Nextcloud's own pages.
 
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
@@ -120,6 +122,9 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
   `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
   → `plans/foundation.md#D32`
+- `scripts/record-nextcloud-fixtures.ts` — drives Nextcloud's web Calendar
+  and Tasks apps in Chromium on a disposable Nextcloud in Docker and records
+  what they write as `packages/core/test/fixtures/nextcloud-web-*.ics`.
 - `.github/workflows/` — CI (with the image built and started), the nightly
   Nextcloud run, the release of the image on a `v*` tag, Claude review,
   `@claude`. → `plans/foundation.md#D27`, `plans/foundation.md#D41`
