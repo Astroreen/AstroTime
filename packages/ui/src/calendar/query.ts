@@ -198,6 +198,7 @@ export function undoneChip(today: string): Occurrence {
     parentUid: null,
     sortOrder: null,
     hideSubtasks: false,
+    starred: false,
   };
   return {
     item,
