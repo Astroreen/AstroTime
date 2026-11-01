@@ -295,7 +295,8 @@ test("a press while a closing dialog still fades out reaches the grid and drags 
   await page.addStyleTag({
     content: "[data-ending-style] { transition-duration: 60s !important; }",
   });
-  await page.keyboard.press("Escape");
+  // Closed by its ✕: a key could come before the focus is in the dialog.
+  await dialog.getByRole("button", { name: "Close without saving" }).click();
   await expect(page.locator("[data-ending-style]").first()).toBeAttached();
   await drag(
     page,
@@ -308,6 +309,30 @@ test("a press while a closing dialog still fades out reaches the grid and drags 
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect(announced(page)).toHaveText("Move cancelled");
+});
+
+test("a double click on the month picker's day acts once: it picks the day and makes no event (design D136)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
+  // The month picker, over the grid.
+  await page.getByRole("button", { name: "November, choose a date" }).click();
+  const twelfth = page
+    .getByRole("dialog", { name: "November 2026" })
+    .getByRole("button", { name: "Thursday, November 12" });
+  await expect(twelfth).toBeVisible();
+  // Opened to the end: closed while it still fades in, it closes at once.
+  await expect(page.locator("[data-starting-style]")).toHaveCount(0);
+  // The fade out made long, so the second click surely comes while it runs.
+  await page.addStyleTag({
+    content: "[data-ending-style] { transition-duration: 60s !important; }",
+  });
+  await twelfth.dblclick();
+  // The first click picked the day. The second passes the closing picker
+  // (Base UI makes it inert) to the grid, where a lone click makes nothing.
+  await expect(page.getByRole("heading", { name: "Thursday, November 12" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
 });
 
 test("keys move a focused item and say where it went; Shift moves its end", async ({ page }) => {

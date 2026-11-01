@@ -674,16 +674,21 @@ are its decisions.
   scrolled stays where they put it. And the line
   under the strip is its wrapper's, so the mask no longer fades it at the
   ends.
-- **D136. A closing dialog, popover or menu lets a press through.** While
-  one fades out (Base UI marks it `data-ending-style`), it takes no
-  pointer events: one rule in `styles.css`. A backdrop on its way out used
+- **D136. A closing dialog lets a press through.** While a dialog's
+  backdrop and popup fade out (Base UI marks them `data-ending-style`), they
+  take no pointer events (`data-ending-style:pointer-events-none` on every
+  Dialog and AlertDialog backdrop and popup, the sheet's too). A backdrop on its way out used
   to swallow the next press, so a drag begun on the grid just after closing
   the edit dialog did nothing, and the press went nowhere a user could see
   (it surfaced as a test that failed one run in seven on a loaded machine,
   then was found to be a real flaw). Google Calendar's grid takes the press
-  as soon as a dialog starts to close. The rule is every element Base UI
-  marks closing, a collapsing panel too, not only popups and backdrops, on
-  purpose: nothing is meant to be pressed while it goes.
+  as soon as a dialog starts to close. _Narrowed in PR (d2):_ to dialogs only (the
+  first version took every element Base UI marks closing, a collapsing
+  panel too). Menus and popovers are Base UI's: it makes a closing one
+  inert, so a press passes it whatever this rule says, and a modal menu's
+  own backdrop catches what falls outside it. A double click on the month
+  picker's day is tested to act once: it picks the day, and its second
+  click, passing the closing picker to the grid, makes no event there.
 - **D137. The accounts in Settings, one row for a calendar, and the scale
   everywhere** (the two Deferred items D131 and D134 left, once the first
   run became the calendar on this device, [foundation D122](foundation.md#D122)):
