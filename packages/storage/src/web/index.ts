@@ -36,10 +36,17 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
     );
   }
   const release = await hold(name);
-  const worker = new Worker(new URL("worker.ts", import.meta.url), {
-    type: "module",
-    name: "astrotime-store",
-  });
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("worker.ts", import.meta.url), {
+      type: "module",
+      name: "astrotime-store",
+    });
+  } catch (error) {
+    // No worker, no store: the lock goes with it, so a retry can take it.
+    release();
+    throw error;
+  }
   const waiting = new Map<
     number,
     { resolve: (rows: unknown[][]) => void; reject: (error: Error) => void }
