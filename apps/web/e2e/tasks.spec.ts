@@ -132,7 +132,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Задачи", exact: true }).click();
     const panel = page.getByRole("region", { name: "Задачи" });
-    const strip = panel.getByRole("tablist").locator("..");
+    const strip = panel.locator("[data-tab-strip]");
     const first = panel.getByRole("tab", { name: /^Задачи/ });
     const second = panel.getByRole("tab", { name: /^Личное/ });
     const fadesStart = /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/;
@@ -146,7 +146,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await strip.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
     await expect(strip).toHaveCSS("mask-image", fadesStart);
     const under = await first.evaluate((tab) => {
-      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
       return tab.getBoundingClientRect().left < room.left + 40;
     });
     expect(under).toBe(true);
@@ -157,10 +157,103 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await expect(first).toHaveAttribute("aria-selected", "true");
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
     const clear = await first.evaluate((tab) => {
-      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
       const { left, right } = tab.getBoundingClientRect();
       return left >= room.left && right <= room.right - 40;
     });
     expect(clear).toBe(true);
+  });
+
+  test("a tab reached by the keyboard is scrolled clear of the fade", async ({ page }) => {
+    await openDemo(page, "week");
+    // Wider tabs, so the second one sits under the end's fade at the start.
+    await page.addStyleTag({ content: "[data-tab-strip] [role=tab] { padding-inline: 60px; }" });
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    const edges = () =>
+      second.evaluate((tab) => {
+        const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
+        const { left, right } = tab.getBoundingClientRect();
+        return { left: left - room.left, right: room.right - right };
+      });
+    expect((await edges()).right).toBeLessThan(40);
+    // Tab to the open first tab, then the arrow to the second.
+    await panel.getByRole("tab", { name: /^Задачи/ }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(second).toBeFocused();
+    const { left, right } = await edges();
+    expect(right).toBeGreaterThanOrEqual(40);
+    expect(left).toBeGreaterThanOrEqual(40);
+  });
+
+  test("a mouse's press on a tab does not move the strip under the pointer before its click lands", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.addStyleTag({ content: "[data-tab-strip] [role=tab] { padding-inline: 60px; }" });
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const strip = panel.locator("[data-tab-strip]");
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    // Pressed on its part under the end's fade, the second tab is focused by
+    // the press, and the strip stays where it is until the click.
+    const box = (await second.boundingBox())!;
+    const room = (await strip.boundingBox())!;
+    await page.mouse.move(room.x + room.width - 30, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(second).toBeFocused();
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
+    await page.mouse.up();
+    // The click landed: the tab is chosen, and only now scrolled clear.
+    await expect(second).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("a resize brings the open tab back clear of the fade only if it was clear before", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const strip = panel.locator("[data-tab-strip]");
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    const fromEnd = () =>
+      second.evaluate((tab) => {
+        const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
+        return room.right - tab.getBoundingClientRect().right;
+      });
+    // Each resize the strip handles is counted: a step waits for the next one,
+    // so the observer has run, whatever it then did.
+    const resized = async (change: () => Promise<unknown>) => {
+      const before = (await strip.getAttribute("data-resized")) ?? "";
+      await change();
+      await expect(strip).not.toHaveAttribute("data-resized", before);
+    };
+    const noStartFade = /^linear-gradient\(to right, rgb\(0, 0, 0\),/;
+    // Chosen, the second tab is clear of the end's fade as the strip opens.
+    await second.dispatchEvent("click");
+    await expect(second).toHaveAttribute("aria-selected", "true");
+    expect(await fromEnd()).toBeGreaterThanOrEqual(40);
+
+    // The first tab grows (a count, a font): the open second, clear before, is brought clear again.
+    await resized(() =>
+      page.addStyleTag({
+        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }",
+      }),
+    );
+    expect(await fromEnd()).toBeGreaterThanOrEqual(40);
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+
+    // The user scrolls back to the start, the open tab under the end's fade:
+    // a resize then leaves the strip where the user put it.
+    await strip.evaluate((element) => element.scrollTo({ left: 0 }));
+    await expect(strip).toHaveCSS("mask-image", noStartFade);
+    expect(await fromEnd()).toBeLessThan(40);
+    await resized(() =>
+      page.addStyleTag({
+        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }",
+      }),
+    );
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
   });
 });

@@ -259,9 +259,6 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   await expect(dialog.getByLabel("End time")).toHaveValue("16:30");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  // Its fade out has run to its end: until then its backdrop takes the next
-  // press, which on a loaded machine came while it was still there.
-  await expect(page.locator("[data-ending-style]")).toHaveCount(0);
 
   // Cancelled by Escape, its release in the same column makes nothing.
   await drag(
@@ -277,6 +274,40 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   await page.mouse.up();
   await expect(announced(page)).toHaveText("Move cancelled");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("a press while a closing dialog still fades out reaches the grid and drags (design D136)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
+  await drag(
+    page,
+    await pointOn(page, "Saturday, November 7", 14.1),
+    await pointOn(page, "Saturday, November 7", 16.4),
+  );
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog).toBeVisible();
+  // Opened to the end: closed while it still fades in, it closes at once.
+  await expect(page.locator("[data-starting-style]")).toHaveCount(0);
+  // The fade out made long, so the press surely comes while it runs: what
+  // is checked is where the press goes, not how fast the test is.
+  await page.addStyleTag({
+    content: "[data-ending-style] { transition-duration: 60s !important; }",
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-ending-style]").first()).toBeAttached();
+  await drag(
+    page,
+    await pointOn(page, "Saturday, November 7", 14.1),
+    await pointOn(page, "Saturday, November 7", 15.1),
+    false,
+  );
+  // The backdrop on its way out let the press through: the grid drags.
+  await expect(page.getByText("2:00 – 3:15 PM", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(announced(page)).toHaveText("Move cancelled");
 });
 
 test("keys move a focused item and say where it went; Shift moves its end", async ({ page }) => {

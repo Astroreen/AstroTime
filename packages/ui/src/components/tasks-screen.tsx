@@ -135,9 +135,22 @@ export function TasksScreen({
   };
 
   // The tab strip's hidden sides, so each fades out while it hides tabs, and
-  // the open list's tab is scrolled into view (design D135).
+  // the open or focused tab is scrolled clear of the fade (design D135).
   const strip = useRef<HTMLDivElement>(null);
   const [hides, setHides] = useState({ start: false, end: false });
+  const openTab = () => strip.current?.querySelector("[role=tab][aria-selected=true]");
+  // How far a tab is past each side's fade, which shows only where that side hides tabs.
+  const slack = (tab: Element) => {
+    const element = strip.current!;
+    const room = element.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    const start = element.scrollLeft > 1 ? FADE : 0;
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1 ? FADE : 0;
+    return { start: left - (room.left + start), end: room.right - end - right };
+  };
+  // Whether the open tab was clear of the fade when last measured: a resize
+  // brings it back only then, so a strip the user scrolled stays (design D135).
+  const openWasClear = useRef(true);
   const measureStrip = () => {
     const element = strip.current;
     if (!element) return;
@@ -146,27 +159,51 @@ export function TasksScreen({
     setHides((current) =>
       current.start === start && current.end === end ? current : { start, end },
     );
+    const open = openTab();
+    if (open) {
+      const { start: before, end: after } = slack(open);
+      openWasClear.current = before >= -1 && after >= -1;
+    }
   };
+  // The strip alone scrolls (not the page or the panel), so a tab clears the
+  // fade on either side, as far as the strip can go. FADE on both sides even
+  // where a side shows none (unlike `slack`): there the strip is at its end,
+  // and the browser clamps the scroll, so it comes to the same.
+  const clear = (tab: Element | null | undefined) => {
+    const element = strip.current;
+    if (!element || !tab) return;
+    const room = element.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    // Whole pixels, rounded away from the fade: scrollLeft keeps no fraction.
+    if (left < room.left + FADE) element.scrollLeft -= Math.ceil(room.left + FADE - left);
+    else if (right > room.right - FADE)
+      element.scrollLeft += Math.ceil(right - (room.right - FADE));
+  };
+  const clearOpen = () => clear(openTab());
   const hasLists = lists.length > 0;
   useEffect(() => {
     const element = strip.current;
     if (!element) return;
-    // The strip's width, and its tabs' as their names and counts change.
-    const observer = new ResizeObserver(measureStrip);
+    // The strip's width, and its tabs' as their names and counts change (a
+    // count, a font, lists arriving): the fade is measured again, and the open
+    // tab, clear of it before, is brought clear again if the change covered it.
+    const observer = new ResizeObserver(() => {
+      const open = openTab();
+      if (open && openWasClear.current) {
+        const { start, end } = slack(open);
+        if (start < -1 || end < -1) clear(open);
+      }
+      measureStrip();
+      // How many resizes were handled: a test sees one was.
+      element.dataset["resized"] = String(Number(element.dataset["resized"] ?? 0) + 1);
+    });
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     return () => observer.disconnect();
   }, [hasLists]);
   useEffect(() => {
-    // The strip alone scrolls (not the page or the panel), so the tab clears
-    // the fade on either side, as far as the strip can go.
-    const element = strip.current;
-    const tab = element?.querySelector("[role=tab][aria-selected=true]");
-    if (!element || !tab) return;
-    const room = element.getBoundingClientRect();
-    const { left, right } = tab.getBoundingClientRect();
-    if (left < room.left + FADE) element.scrollLeft -= room.left + FADE - left;
-    else if (right > room.right - FADE) element.scrollLeft += right - (room.right - FADE);
+    clearOpen();
+    measureStrip();
   }, [selected]);
   const fade = (side: boolean) => (side ? "transparent" : "black");
   const stripMask =
@@ -219,53 +256,68 @@ export function TasksScreen({
           onValueChange={(value) => setChosen(String(value))}
           className="flex min-h-0 flex-1 flex-col"
         >
-          {/* Wider than the panel, the strip scrolls; a side with more fades out (design D135). */}
-          <div
-            ref={strip}
-            onScroll={measureStrip}
-            style={stripMask}
-            className="flex shrink-0 items-stretch overflow-x-auto border-b border-line [scrollbar-width:none]"
-          >
-            <Tabs.List aria-label={t("tasks.lists")} className="relative flex">
-              {lists.map((list) => {
-                const count = byList.get(list.id)?.undoneCount ?? 0;
-                return (
-                  <Tabs.Tab
-                    key={list.id}
-                    value={list.id}
-                    aria-label={
-                      count > 0
-                        ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
-                        : list.name
-                    }
-                    className="group flex h-12 items-center gap-2 px-4 text-row whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised data-active:text-accent"
-                  >
-                    {list.name}
-                    {/* Apart as words, as the name says them (WCAG 2.5.3). */}
-                    {count > 0 && " "}
-                    {count > 0 && (
-                      // The open list's count shows in its card instead, as in the reference.
-                      <span
-                        aria-hidden="true"
-                        className="rounded-full bg-pill px-2 py-0.5 text-note leading-none text-ink group-data-active:hidden"
-                      >
-                        {count}
-                      </span>
-                    )}
-                  </Tabs.Tab>
-                );
-              })}
-              <Tabs.Indicator className="absolute bottom-0 left-0 h-[3px] w-(--active-tab-width) translate-x-(--active-tab-left) rounded-t-full bg-accent transition-[translate,width] duration-150" />
-            </Tabs.List>
-            {/* Creating a list on the server is later work (docs/plans/design.md#deferred). */}
-            <button
-              type="button"
-              disabled
-              className="flex h-12 items-center gap-1.5 px-4 text-row whitespace-nowrap text-ink-muted"
+          {/* Wider than the panel, the strip scrolls; a side with more fades out (design D135).
+              The line under it is its wrapper's, so the mask does not fade it. */}
+          <div className="shrink-0 border-b border-line">
+            <div
+              ref={strip}
+              data-tab-strip=""
+              onScroll={measureStrip}
+              // A tab reached by Tab is scrolled clear of the fade too.
+              onFocus={(event) => {
+                // Focus from the keyboard only: a mouse's press focuses the tab
+                // too, and the strip must not move under the pointer before
+                // its click lands.
+                if (
+                  event.target.getAttribute("role") === "tab" &&
+                  event.target.matches(":focus-visible")
+                )
+                  clear(event.target);
+              }}
+              style={stripMask}
+              className="flex items-stretch overflow-x-auto [scrollbar-width:none]"
             >
-              <PlusIcon className="size-5" />
-              {t("tasks.newList")}
-            </button>
+              <Tabs.List aria-label={t("tasks.lists")} className="relative flex">
+                {lists.map((list) => {
+                  const count = byList.get(list.id)?.undoneCount ?? 0;
+                  return (
+                    <Tabs.Tab
+                      key={list.id}
+                      value={list.id}
+                      aria-label={
+                        count > 0
+                          ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
+                          : list.name
+                      }
+                      className="group flex h-12 items-center gap-2 px-4 text-row whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised data-active:text-accent"
+                    >
+                      {list.name}
+                      {/* Apart as words, as the name says them (WCAG 2.5.3). */}
+                      {count > 0 && " "}
+                      {count > 0 && (
+                        // The open list's count shows in its card instead, as in the reference.
+                        <span
+                          aria-hidden="true"
+                          className="rounded-full bg-pill px-2 py-0.5 text-note leading-none text-ink group-data-active:hidden"
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </Tabs.Tab>
+                  );
+                })}
+                <Tabs.Indicator className="absolute bottom-0 left-0 h-[3px] w-(--active-tab-width) translate-x-(--active-tab-left) rounded-t-full bg-accent transition-[translate,width] duration-150" />
+              </Tabs.List>
+              {/* Creating a list on the server is later work (docs/plans/design.md#deferred). */}
+              <button
+                type="button"
+                disabled
+                className="flex h-12 items-center gap-1.5 px-4 text-row whitespace-nowrap text-ink-muted"
+              >
+                <PlusIcon className="size-5" />
+                {t("tasks.newList")}
+              </button>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
             {lists.map((list) => (
