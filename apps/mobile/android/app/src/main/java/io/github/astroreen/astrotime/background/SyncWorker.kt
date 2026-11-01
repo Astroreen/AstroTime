@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 private const val TAG = "AstroTimeSync"
 
@@ -33,6 +34,17 @@ const val OUTCOME = "outcome"
 const val APP_OPEN = "The app is open and syncs itself: nothing to do."
 const val NO_ACCOUNT = "No account's credentials are kept: nothing to do."
 
+/**
+ * What one run did, within `limitMs`: the page's report, why it failed, or
+ * that it was stopped. Stopping cancels the run, which destroys its WebView.
+ */
+suspend fun outcomeOf(limitMs: Long, run: suspend () -> JSONObject): String =
+    try {
+        withTimeoutOrNull(limitMs) { run() }?.toString() ?: "stopped after ${limitMs / 60_000} minutes"
+    } catch (error: RunFailed) {
+        "failed: ${error.message}"
+    }
+
 /** Whether the app's activity is on the screen: then the open app syncs itself. */
 object AppVisibility {
     @Volatile
@@ -45,16 +57,13 @@ class SyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWork
         val context = applicationContext
         val outcome =
             when {
+                // Read once: an app that comes to the front during a run waits
+                // for its sync (the sync lock) and syncs after it; the run goes
+                // on, since stopping it mid-sync would gain nothing (D67).
                 AppVisibility.inFront -> APP_OPEN
                 // Signed out of every account: no WebView is started for nothing.
                 !KeystoreSecrets.anyAccount(context) -> NO_ACCOUNT
-                else ->
-                    try {
-                        withTimeoutOrNull(RUN_LIMIT_MS) { HeadlessRun(context).run() }?.toString()
-                            ?: "stopped after ${RUN_LIMIT_MS / 60_000} minutes"
-                    } catch (error: RunFailed) {
-                        "failed: ${error.message}"
-                    }
+                else -> outcomeOf(RUN_LIMIT_MS) { HeadlessRun(context).run() }
             }
         Log.i(TAG, "Background sync: $outcome")
         // A run that failed is not retried sooner: the next hour's tries again,

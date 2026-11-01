@@ -19,4 +19,6 @@ ext {
     workVersion = '2.11.0'
     // The JVM tests' org.json: Android's is a stub there.
     orgJsonVersion = '20250517'
+    // The JVM tests' virtual time, at the coroutines WorkManager brings.
+    coroutinesTestVersion = '1.9.0'
 }

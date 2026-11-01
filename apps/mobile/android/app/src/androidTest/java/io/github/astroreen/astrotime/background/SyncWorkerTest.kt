@@ -12,6 +12,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,6 +43,16 @@ class SyncWorkerTest {
         // A freshly installed app keeps none.
         if (KeystoreSecrets.anyAccount(context)) return
         assertEquals(NO_ACCOUNT, runWorker())
+    }
+
+    @Test
+    fun aPageThatFindsNoObjectEndsTheRunAtOnce() {
+        // The object injected for another origin only: the page finds none.
+        val error =
+            assertThrows(RunFailed::class.java) {
+                runBlocking { HeadlessRun(context, setOf("https://elsewhere.test")).run() }
+            }
+        assertEquals("The page found no AstroTimeBackground.", error.message)
     }
 
     @Test

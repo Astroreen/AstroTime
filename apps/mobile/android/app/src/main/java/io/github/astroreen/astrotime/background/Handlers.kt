@@ -47,6 +47,9 @@ class Handlers(
     /** The page is done, with what it reports (`{ report }` or `{ error }`). */
     private val done: (JSONObject) -> Unit,
 ) {
+    // Messages come on the WebView's thread, one at a time.
+    private var ended = false
+
     /** One message from the page; `reply` takes the answer, as JSON text. */
     fun receive(message: String, reply: (String) -> Unit) {
         val json =
@@ -58,7 +61,11 @@ class Handlers(
         val method = json.optString("method")
         val params = json.optJSONObject("params") ?: JSONObject()
         if (!json.has("id")) {
-            if (method == "done") done(params)
+            // The first done wins: the page's error handlers may say it again.
+            if (method == "done" && !ended) {
+                ended = true
+                done(params)
+            }
             return
         }
         val id = json.get("id")

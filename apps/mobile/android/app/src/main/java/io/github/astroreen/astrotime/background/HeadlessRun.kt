@@ -4,15 +4,16 @@
 // origin, `https://localhost`, so it shares the open app's OPFS store, Web
 // Locks and BroadcastChannels, and it answers the page's calls (`Handlers`)
 // through the one object it injects, for that origin only. It ends when the
-// page says it is done; when the page loaded without ever reaching that
-// object, failed to load, or lost its renderer; the WebView is destroyed
-// whatever happens, which lets go of the store.
+// page says it is done; when the page says in its title that it found no
+// such object, failed to load, or lost its renderer; the WebView is
+// destroyed whatever happens, which lets go of the store.
 package io.github.astroreen.astrotime.background
 
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -37,9 +38,19 @@ private const val ORIGIN = "https://localhost"
 /** The name the page finds native's object under (`apps/mobile/src/background/main.ts`). */
 private const val PORT = "AstroTimeBackground"
 
+/**
+ * The page's title when it finds no object under that name: a signal of
+ * failure only, heard without the object, so nothing races a healthy run.
+ */
+private const val NO_PORT = "astrotime-background:no-port"
+
 class RunFailed(message: String) : Exception(message)
 
-class HeadlessRun(private val context: Context) {
+/**
+ * `origins`: where the object is injected, the app's origin; a test gives
+ * another to see a page that finds none.
+ */
+class HeadlessRun(private val context: Context, private val origins: Set<String> = setOf(ORIGIN)) {
     /** Loads the page and returns what it reports (`{ report }` or `{ error }`). */
     suspend fun run(): JSONObject =
         withContext(Dispatchers.Main) {
@@ -61,13 +72,9 @@ class HeadlessRun(private val context: Context) {
                         Handlers(Exchange(), KeystoreSecrets(context), PluginNotifications(context), gate::work) {
                             main.post { finish(Result.success(it)) }
                         }
-                    // The page says hello in its first script: loaded without
-                    // it, the page never reached this object, and nothing will.
-                    var heard = false
-                    WebViewCompat.addWebMessageListener(webView, PORT, setOf(ORIGIN)) { _, message, _, isMainFrame, reply ->
+                    WebViewCompat.addWebMessageListener(webView, PORT, origins) { _, message, _, isMainFrame, reply ->
                         val data = message.data
                         if (isMainFrame && data != null) {
-                            heard = true
                             // An answer after the run is over has no page to reach (`Gate`).
                             handlers.receive(data) { answer -> main.post { gate.reply { reply.postMessage(answer) } } }
                         }
@@ -91,10 +98,6 @@ class HeadlessRun(private val context: Context) {
                                 request: WebResourceRequest,
                             ): WebResourceResponse? = assets.shouldInterceptRequest(request.url)
 
-                            override fun onPageFinished(view: WebView, url: String) {
-                                if (!heard) finish(Result.failure(RunFailed("The page loaded without reaching $PORT.")))
-                            }
-
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
@@ -109,6 +112,12 @@ class HeadlessRun(private val context: Context) {
                                 finish(Result.failure(RunFailed("The WebView's renderer went (crashed: ${detail.didCrash()}).")))
                                 // Handled: the app goes on; the WebView is destroyed below.
                                 return true
+                            }
+                        }
+                    webView.webChromeClient =
+                        object : WebChromeClient() {
+                            override fun onReceivedTitle(view: WebView, title: String?) {
+                                if (title == NO_PORT) finish(Result.failure(RunFailed("The page found no $PORT.")))
                             }
                         }
                     webView.loadUrl("$ORIGIN/background.html")

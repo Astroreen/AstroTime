@@ -468,8 +468,11 @@ were checked on 2026-11-01.
     `BroadcastChannel` and localStorage are the open app's, as A1 found.
   - **The open app.** _Changed:_ the job does not ask who leads the store
     (`navigator.locks.query()`) but whether `MainActivity` is on the screen
-    (`AppVisibility`, set in `onStart` and `onStop`). In front, the run does
-    nothing: the app syncs itself. Not in front, it runs even while the
+    (`AppVisibility`, set in `onStart` and `onStop`), read once as a run
+    starts. In front, the run does nothing: the app syncs itself. An app
+    that comes to the front during a run is not a reason to stop it: its
+    first sync waits for the run's (the sync lock) and finds little left,
+    and a run stopped mid-sync would only have to start over. Not in front, it runs even while the
     app's WebView lives on in the background and leads the store: the UI
     syncs only while it is visible (`SyncScheduler`), so "nothing while the
     app leads" would never sync as long as Android keeps the process cached.
@@ -520,10 +523,14 @@ were checked on 2026-11-01.
     It closes the store and tells native it is done, with its report or its
     error; an `error` or `unhandledrejection` anywhere does the same.
   - **The end and its bound.** The page's `done` is the event a run waits
-    for; native takes the first and ignores any after it. A main frame that
-    does not load and a renderer that goes end it too, and so does a page
-    that loaded without saying hello, which it does in its first script:
-    without native's object it could never say done. An answer or a call
+    for; native takes the first and ignores any after it (the page's error
+    handlers may say it again). A main frame that does not load and a
+    renderer that goes end it too, and so does a page that finds no native
+    object, which could never say done: it sets its title to
+    `astrotime-background:no-port`, which native hears through
+    `WebChromeClient.onReceivedTitle` without the object. A signal of failure
+    only, so it races nothing; the review of #37 replaced a "hello" the page
+    sent, which `onPageFinished` could overtake and so fail a healthy run. An answer or a call
     that comes after the run is over (the watchdog, a `done` during an
     exchange) reaches no WebView and throws nothing (`Gate`). Past 9 minutes (`withTimeoutOrNull`, under WorkManager's own 10) the
     run is stopped and its WebView destroyed, whatever it waits for; every

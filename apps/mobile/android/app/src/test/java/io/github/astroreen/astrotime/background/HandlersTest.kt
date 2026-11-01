@@ -157,11 +157,17 @@ class HandlersTest {
     }
 
     @Test
+    fun `the first done wins, as the page's error handler may say it again`() {
+        handlers.receive("""{"method":"done","params":{"error":"boom"}}""") {}
+        handlers.receive("""{"method":"done","params":{"report":{"accounts":[]}}}""") {}
+        assertEquals(listOf("boom"), done.map { it.getString("error") })
+    }
+
+    @Test
     fun `the end is heard, and nothing is answered for it`() {
         var answered = false
         handlers.receive("""{"method":"done","params":{"report":{"accounts":[]}}}""") { answered = true }
         handlers.receive("not json") { answered = true }
-        handlers.receive("""{"method":"hello","params":{}}""") { answered = true }
         assertFalse(answered)
         assertEquals(1, done.size)
         assertTrue(done.single().has("report"))
