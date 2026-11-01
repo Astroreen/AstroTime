@@ -18,7 +18,17 @@ export interface CalDavServer {
   mkcalendar(name: string, components?: readonly string[]): Promise<string>;
   /** Deletes a calendar as another client would. */
   deleteCalendar(url: string): Promise<void>;
+  /**
+   * Shares a calendar with a second user, made for the tests, and returns
+   * that user's credentials; only on servers whose sharing the tests know (Nextcloud).
+   */
+  share?(url: string, access: "read" | "read-write"): Promise<Credentials>;
   stop(): Promise<void>;
+}
+
+export interface Credentials {
+  readonly username: string;
+  readonly password: string;
 }
 
 async function freePort(): Promise<number> {
@@ -102,6 +112,8 @@ export function externalServer(name: string): CalDavServer | null {
   // The server outlives the tests; what they create is deleted at the end, or
   // every later run would sync it all again.
   const created: string[] = [];
+  const ocs = { Authorization: authorization, "OCS-APIRequest": "true" };
+  let sharee: Credentials | null = null;
   return {
     name,
     url,
@@ -126,9 +138,42 @@ export function externalServer(name: string): CalDavServer | null {
     async deleteCalendar(calendarUrl) {
       await fetch(calendarUrl, { method: "DELETE", headers: { Authorization: authorization } });
     },
+    // The admin makes the second user through Nextcloud's provisioning API
+    // and shares as its web Calendar does, with an <oc:share> on the calendar.
+    async share(calendarUrl, access) {
+      if (!sharee) {
+        const user = {
+          username: `sharee-${Date.now().toString(36)}`,
+          password: crypto.randomUUID(),
+        };
+        const response = await fetch(new URL("ocs/v1.php/cloud/users", url), {
+          method: "POST",
+          headers: { ...ocs, "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ userid: user.username, password: user.password }),
+        });
+        if (!(await response.text()).includes("<status>ok</status>"))
+          throw new Error(`Could not add the user ${user.username}: ${response.status}`);
+        sharee = user;
+      }
+      const response = await fetch(calendarUrl, {
+        method: "POST",
+        headers: { Authorization: authorization, "Content-Type": "application/xml" },
+        body: `<?xml version="1.0"?><oc:share xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><oc:set><d:href>principal:principals/users/${sharee.username}</d:href>${access === "read-write" ? "<oc:read-write/>" : ""}</oc:set></oc:share>`,
+      });
+      if (response.status >= 300)
+        throw new Error(`Sharing ${calendarUrl}: ${response.status} ${await response.text()}`);
+      return sharee;
+    },
     async stop() {
       for (const calendarUrl of created.splice(0)) {
         await fetch(calendarUrl, { method: "DELETE", headers: { Authorization: authorization } });
+      }
+      if (sharee) {
+        await fetch(new URL(`ocs/v1.php/cloud/users/${sharee.username}`, url), {
+          method: "DELETE",
+          headers: ocs,
+        });
+        sharee = null;
       }
     },
   };

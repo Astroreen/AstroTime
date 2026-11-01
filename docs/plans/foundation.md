@@ -278,8 +278,9 @@ Decided while building PR 2.
 - **D38. Who wins a deletion.** A calendar or an object deleted on the
   server is deleted here, with any pending change to it; a calendar that
   merely went missing from a listing while it holds unsent changes stays,
-  reported, until a listing without it finds it has none. In a read-only
-  calendar a deletion of ours comes back, reported. A deletion of ours
+  reported, until a listing without it finds it has none. In a calendar
+  that lets nothing be deleted (read-only, or a share without `unbind`,
+  [D37](#D37)) a deletion of ours comes back, reported. A deletion of ours
   the server refuses because the object changed there is dropped: the object
   comes back as the server has it. An edit of an object deleted on this
   device before the deletion is uploaded revives it as an update. Otherwise
@@ -310,10 +311,21 @@ Decided while building PR 4.
   is still our change's base, the write goes against the ETag it has now;
   if it changed, our change is merged as for a refused write; if it is gone,
   D38 applies. A refused write with no base keeps the server's version and
-  lists ours as a conflict, unless both are the same. In a read-only
-  calendar a pending edit gives way at once: the server's version comes back
-  and ours goes to the Conflicts list; a new item there waits, reported,
-  until the calendar is writable. An object a multiget leaves out is fetched
+  lists ours as a conflict, unless both are the same. **What the user may
+  do in a calendar** is its `rights`, kept with it in the store (migration
+  7): `create` a new item, `edit` one, `delete` one. The CalDAV provider
+  reads them from the calendar's `current-user-privilege-set` (RFC 3744):
+  `bind` creates, `write-content` edits, `unbind` deletes, and `write` or
+  `all` grant all three (Radicale lists `all` without its parts, Nextcloud
+  lists the parts too); `write-properties` (a share's own name and colour)
+  and CalDAV's `read-free-busy` grant none, and a server that reports no
+  set grants all. Nextcloud gives an owner and a read-write share every
+  right and a read-only share none; a server may grant `write-content`
+  without `bind` or `unbind`. A pending change its right does not allow
+  never goes up: an edit gives way at once, the server's version comes
+  back and ours goes to the Conflicts list; a deletion comes back (D38); a
+  new item waits, reported, until the calendar takes new items. The UI
+  offers only what the rights allow (design [D108](design.md#D108)). An object a multiget leaves out is fetched
   on its own; one that still cannot be read keeps no sync token, so the next
   sync lists everything again. The time of an item (`DTSTART`, `DTEND`,
   `DURATION`, `DUE`) is one field, and an attendee is identified by their
@@ -323,7 +335,8 @@ Decided while building PR 4.
   taken href it learns of leaves the newer edit pending for the next one.
   Through the web proxy, a server it cannot reach is offline, like no answer. The report's
   `errors` carry a `problem` code the UI words in the user's language
-  (`read-only`, `deletion-reverted`, `no-place`, `taken-unreadable`,
+  (`read-only`, `no-create` for a new item in a calendar that edits but
+  takes no new items, `deletion-reverted`, `no-place`, `taken-unreadable`,
   `calendar-gone-unsent`, `failed`) and an English `detail` for the logs.
   An object with no ETag on either side is fetched again, never taken as
   unchanged.
@@ -1015,7 +1028,8 @@ Decided while building PR 6a.
   calendar holds as a pending update against the server's version (its
   base), then drops the conflict, and the next sync uploads it; a creation
   whose href the server gave another item goes to `<uid>-<random>.ics`. In
-  a read-only calendar only keeping the server's is offered. Ours is
+  a calendar that lets nothing be edited ([D37](#D37)) only keeping the
+  server's is offered. Ours is
   applied as it was refused, with its own `DTSTAMP` and `SEQUENCE`.
 
 ## Deferred
@@ -1062,10 +1076,6 @@ Decided while building PR 6a.
   asks for it). The dev server over the tailnet has it: `tailscale serve`,
   or a self-signed front until the owner allows that ([D20](#D20),
   `scripts/t3/README.md`).
-- **Finer write rights** — a calendar is read-only unless its privilege
-  set grants `write`, `write-content` or `all`; a share that lets one edit
-  but not create (`bind`) or delete (`unbind`) is taken as fully writable,
-  and its refused creations show as errors ([D37](#D37)).
 - **Recording Nextcloud's web apps in CI** — `scripts/record-nextcloud-fixtures.ts`
   runs by hand; a change in the apps' pages breaks it unseen until the next
   recording. A nightly run that records and compares everything but UIDs and
@@ -1111,7 +1121,7 @@ Decided while building PR 6a.
 - **Subtasks and a task's parent from the edit dialog** — `RELATED-TO` is
   shown in the details, not set; `CLASS` and the ordering extensions are
   kept, not edited ([D10](#D10)).
-- **A default calendar** — a new item goes in the first writable calendar
+- **A default calendar** — a new item goes in the first calendar that takes new items
   the views show; remembering the last one used, or choosing a default,
   comes later.
 - **A series held without its master** — a server holding only exceptions

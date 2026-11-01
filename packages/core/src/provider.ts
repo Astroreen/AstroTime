@@ -9,8 +9,25 @@ export interface RemoteCalendar {
   readonly name: string;
   readonly color: string | null;
   readonly components: readonly ("VEVENT" | "VTODO")[];
-  readonly readOnly: boolean;
+  /** What the user may do in it (docs/plans/foundation.md#D37). */
+  readonly rights: CalendarRights;
 }
+
+/**
+ * What the user may do to a calendar's items, as its server grants it:
+ * add new ones, change the ones it holds, delete them. A read-only
+ * calendar grants none.
+ */
+export interface CalendarRights {
+  readonly create: boolean;
+  readonly edit: boolean;
+  readonly delete: boolean;
+}
+
+/** A calendar the user owns, or one whose server does not say. */
+export const ALL_RIGHTS: CalendarRights = { create: true, edit: true, delete: true };
+/** A read-only calendar. */
+export const NO_RIGHTS: CalendarRights = { create: false, edit: false, delete: false };
 
 /** One calendar object resource on the server. */
 export interface RemoteObject {

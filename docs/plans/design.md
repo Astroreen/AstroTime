@@ -229,7 +229,9 @@ the project.
     Google Tasks shows a repeating task's current instance; completing it
     (D94) brings the next one, and a series with every occurrence done is
     completed;
-  - a read-only list's tasks cannot be completed or starred;
+  - a list's tasks can be completed or starred only where it allows edits,
+    and "Add a task" shows only where it takes new items
+    ([foundation D37](foundation.md#D37));
   - "+ New list" and the card's menu are drawn but disabled until lists can
     be made and changed ([Deferred](#deferred)); the "+" button is the
     calendar's, disabled until PR 6 (_since PR 6a_ it makes a task in the
@@ -278,9 +280,13 @@ the project.
     mail links opening in a new tab (`noopener`; nothing else is markup),
     its reminders in words ("15 minutes before", "1 day before at 9:00"
     for an all-day item), its guests with their answers and a note that
-    AstroTime does not invite, its calendar. Edit and delete show only
-    where the calendar can be written (`readOnly`); a read-only one says
-    so. A search result moves the calendar to its day, as D97 says, and
+    AstroTime does not invite, its calendar. Each action shows only where
+    the calendar's rights allow it ([foundation D37](foundation.md#D37),
+    `rightsOf`, the one check every part of the UI asks): Edit, and a
+    task's Complete and Star, with `edit`; Delete when a scope is left:
+    one occurrence or the following ones are an edit of the series, all
+    of them or an item that does not repeat a deletion (`delete`). A
+    calendar that allows neither says it is read-only. A search result moves the calendar to its day, as D97 says, and
     opens its details over it;
   - the **edit dialog**: the whole screen on a phone, a dialog from 640 px,
     the title and Save in its bar, closed by its ✕ or Escape, saved by
@@ -297,8 +303,10 @@ the project.
     until another is chosen); the reminders (before a timed item: at the
     start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days, a week; for
     an all-day item: on the day, a day, two days and a week before, at
-    9:00); the calendar, from the writable ones that hold the item's
-    component; the colour, the calendar's or one of nine CSS names; the
+    9:00); the calendar, from those that hold the item's component and
+    take new items, or for an existing item its own, and others only when
+    its own lets it be deleted (a move is a creation there and a deletion
+    here, [foundation D106](foundation.md#D106)); the colour, the calendar's or one of nine CSS names; the
     location; the description. A new start keeps the event's length; a new
     start date (a task's due without a start) moves its end, and the rule
     with it ([foundation D105](foundation.md#D105)). An end
@@ -310,10 +318,12 @@ the project.
     (a press to size it comes with dragging, PR 6b); a tap on a Month
     tile's empty space keeps opening the day ([D86](#D86)), where Google's
     Android app creates on a long press ([Deferred](#deferred)). A new item
-    goes in the first writable calendar the views show;
+    goes in the first calendar that takes new items the views show;
   - **the scope dialog** asks "This occurrence / This and following
     occurrences / All occurrences" after Save or Delete on an occurrence of
-    a series, the first chosen; deleting an item that does not repeat asks
+    a series, the first chosen; "This and following" splits the series, a
+    new item, so a calendar that takes none does not offer it, and an edit
+    only a split could save (a new rule on a new day) says so instead; deleting an item that does not repeat asks
     "Delete this event?" first;
   - dialogs are labelled by their titles, hold the focus while open and
     give it back to what opened them.

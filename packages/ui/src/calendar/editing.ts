@@ -4,6 +4,7 @@
 // nothing else is rewritten, D7), the scopes an occurrence's edit may take,
 // and the writes through the local store (D5) that the sync engine uploads.
 import {
+  ALL_RIGHTS,
   CalendarObject,
   createItem,
   deleteItem,
@@ -16,6 +17,7 @@ import {
   WEEKDAYS,
   zonedTime,
   type Alarm,
+  type CalendarRights,
   type Item,
   type ItemChanges,
   type ItemTime,
@@ -34,6 +36,7 @@ import {
 } from "@astrotime/storage";
 
 import { addDays } from "./dates.ts";
+import { rightsOf } from "./rights.ts";
 
 /** An item opened from a view, a search or the tasks screen: one occurrence of a stored object. */
 export interface Target {
@@ -366,23 +369,64 @@ function repeatsOrHasDates(object: CalendarObject): boolean {
  * The scopes an occurrence's edit may take, as Google offers them: a new
  * rule is not one occurrence's; a new day is not every occurrence's (a rule
  * that only moved with the day is no new rule); a move to another calendar
- * takes the whole series. Empty: no question to ask.
+ * takes the whole series. "This and following" splits the series, a new item
+ * in its calendar (D105), so only a calendar that takes new items offers it
+ * (D37). Empty: no question to ask; `null`: only a split could save it, and
+ * its calendar takes none.
  */
-export function scopesFor(target: Target | null, initial: Form | null, form: Form): Scope[] {
+export function scopesFor(
+  target: Target | null,
+  initial: Form | null,
+  form: Form,
+  rights: CalendarRights = ALL_RIGHTS,
+): Scope[] | null {
   if (!target || !initial || !isOccurrence(target)) return [];
   if (initial.calendarId !== form.calendarId) return [];
   const repeat = ruleChanged(initial, form);
   const day = initial.startDate !== form.startDate || initial.endDate !== form.endDate;
-  if (repeat && day) return ["following"];
-  if (repeat) return ["following", "all"];
-  if (day) return ["this", "following"];
-  return ["this", "following", "all"];
+  const scopes: Scope[] =
+    repeat && day
+      ? ["following"]
+      : repeat
+        ? ["following", "all"]
+        : day
+          ? ["this", "following"]
+          : ["this", "following", "all"];
+  const allowed = scopes.filter((scope) => scope !== "following" || rights.create);
+  return allowed.length > 0 ? allowed : null;
 }
 
-/** The calendars an item of this kind can be written to: writable, holding its component. */
-export function writableFor(calendars: readonly Calendar[], kind: "event" | "task"): Calendar[] {
+/**
+ * The scopes a deletion may take in a calendar with these rights (D37,
+ * D105): one occurrence, or it and the following ones, change the series (an
+ * edit); all of them delete it, as a deletion of an item that does not
+ * repeat does. Empty: it cannot be deleted.
+ */
+export function deleteScopes(target: Target, rights: CalendarRights): Scope[] {
+  if (!isOccurrence(target)) return rights.delete ? ["all"] : [];
+  return [
+    ...(rights.edit ? (["this", "following"] as const) : []),
+    ...(rights.delete ? (["all"] as const) : []),
+  ];
+}
+
+/**
+ * The calendars an item of this kind can be saved in, holding its component
+ * (D37): for a new item, those that take new items; for one in `from`, that
+ * calendar, and the others that take new items only when `from` lets it go,
+ * since a move is a creation there and a deletion here (D106).
+ */
+export function calendarsFor(
+  calendars: readonly Calendar[],
+  kind: "event" | "task",
+  from?: Calendar,
+): Calendar[] {
   const component = kind === "event" ? "VEVENT" : "VTODO";
-  return calendars.filter((c) => !c.readOnly && c.components.includes(component));
+  return calendars.filter((c) => {
+    if (!c.components.includes(component)) return false;
+    if (c.id === from?.id) return rightsOf(c).edit;
+    return rightsOf(c).create && (from === undefined || rightsOf(from).delete);
+  });
 }
 
 interface Writes {

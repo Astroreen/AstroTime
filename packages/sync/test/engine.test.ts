@@ -1,4 +1,4 @@
-import { OfflineError, type Provider } from "@astrotime/core";
+import { ALL_RIGHTS, NO_RIGHTS, OfflineError, type Provider } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
@@ -133,7 +133,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const { store, sync, calendar } = await device(server);
     await store.saveLocal(calendar.id, task("kept", "Kept"));
     await sync();
-    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    server.calendarList = [{ ...server.calendarList[0]!, rights: NO_RIGHTS }];
     await store.saveLocal(calendar.id, task("locked"));
     await store.saveLocal(calendar.id, task("kept", "Ours"));
     const report = await sync();
@@ -249,7 +249,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const { store, sync, calendar } = await device(server);
     await store.saveLocal(calendar.id, task("shared", "Original"));
     await sync();
-    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    server.calendarList = [{ ...server.calendarList[0]!, rights: NO_RIGHTS }];
     await store.saveLocal(calendar.id, task("shared", "Ours"));
     const href = `${calendarUrl}shared.ics`;
     server.objects.set(href, { etag: '"owner"', ics: task("shared", "Owner's") });
@@ -386,7 +386,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const { store, sync, calendar } = await device(server);
     await store.saveLocal(calendar.id, task("junk", "One"));
     await sync();
-    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    server.calendarList = [{ ...server.calendarList[0]!, rights: NO_RIGHTS }];
     const href = `${calendarUrl}junk.ics`;
     await store.saveLocal(calendar.id, task("junk", "Ours"));
     server.objects.set(href, { etag: '"bad"', ics: "not a calendar" });
@@ -399,7 +399,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const { store, sync, calendar } = await device(server);
     await store.saveLocal(calendar.id, task("keep"));
     await sync();
-    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    server.calendarList = [{ ...server.calendarList[0]!, rights: NO_RIGHTS }];
     const row = (await store.objectAt(calendar.id, `${calendarUrl}keep.ics`))!;
     await store.deleteLocal(row.id);
     const report = await sync();
@@ -412,7 +412,7 @@ describe("the sync engine's harder paths (review of #4)", () => {
     const { store, sync, calendar } = await device(server);
     await store.saveLocal(calendar.id, task("ro", "One"));
     await sync();
-    server.calendarList = [{ ...server.calendarList[0]!, readOnly: true }];
+    server.calendarList = [{ ...server.calendarList[0]!, rights: NO_RIGHTS }];
     await store.saveLocal(calendar.id, task("ro", "Ours"));
     const fetchServer = server.fetch.bind(server);
     server.fetch = async (h) => {
@@ -424,5 +424,91 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect((await store.objectAt(calendar.id, `${calendarUrl}ro.ics`))?.ics).toContain(
       "SUMMARY:Edited while it settled",
     );
+  });
+});
+
+describe("finer write rights (D37)", () => {
+  /** A device with "a" and "b" synced, then the calendar's rights changed on the server. */
+  async function shared(rights: { create: boolean; edit: boolean; delete: boolean }) {
+    const server = memoryServer(calendarUrl);
+    const dev = await device(server);
+    await dev.store.saveLocal(dev.calendar.id, task("a", "A"));
+    await dev.store.saveLocal(dev.calendar.id, task("b", "B"));
+    await dev.sync();
+    server.calendarList = [{ ...server.calendarList[0]!, rights }];
+    const row = async (uid: string) =>
+      dev.store.objectAt(dev.calendar.id, `${calendarUrl}${uid}.ics`);
+    // One change of each kind: a new item, an edit of "a", a deletion of "b".
+    await dev.store.saveLocal(dev.calendar.id, task("new", "New"));
+    await dev.store.saveLocal(dev.calendar.id, task("a", "Ours"));
+    await dev.store.deleteLocal((await row("b"))!.id);
+    const writes: string[] = [];
+    server.beforeWrite = (method, href) => {
+      writes.push(`${method} ${href.slice(calendarUrl.length)}`);
+    };
+    return { server, ...dev, row, writes };
+  }
+
+  test("without bind a new item waits, reported, and nothing is sent for it; the edit and the deletion go up", async () => {
+    const { server, store, sync, calendar, row, writes } = await shared({
+      create: false,
+      edit: true,
+      delete: true,
+    });
+    const report = await sync();
+    expect(report.errors).toEqual([
+      {
+        href: `${calendarUrl}new.ics`,
+        problem: "no-create",
+        detail: "Cal takes no new items on the server",
+      },
+    ]);
+    expect(writes.toSorted()).toEqual(["remove b.ics", "update a.ics"]);
+    expect((await store.pending(calendar.id)).map((o) => [o.uid, o.pending])).toEqual([
+      ["new", "create"],
+    ]);
+    expect((await row("a"))?.pending).toBe("none");
+
+    // Granted later: it goes up on the next sync.
+    server.calendarList = [{ ...server.calendarList[0]!, rights: ALL_RIGHTS }];
+    expect(await sync()).toMatchObject({ uploaded: 1, errors: [] });
+    expect(server.objects.has(`${calendarUrl}new.ics`)).toBe(true);
+  });
+
+  test("without unbind a deletion comes back, reported; the new item and the edit go up", async () => {
+    const { server, sync, row, writes } = await shared({ create: true, edit: true, delete: false });
+    const report = await sync();
+    expect(report.errors.map((e) => [e.problem, e.detail])).toEqual([
+      ["deletion-reverted", "Cal lets no item be deleted on the server"],
+    ]);
+    expect(writes.toSorted()).toEqual(["create new.ics", "update a.ics"]);
+    expect((await row("b"))?.pending).toBe("none");
+    expect(server.objects.has(`${calendarUrl}b.ics`)).toBe(true);
+    expect(report.conflicts).toBe(0);
+  });
+
+  test("without write-content an edit gives way, ours a conflict; the new item and the deletion go up", async () => {
+    const { server, store, sync, row, writes } = await shared({
+      create: true,
+      edit: false,
+      delete: true,
+    });
+    const report = await sync();
+    expect([report.errors, report.conflicts]).toEqual([[], 1]);
+    expect(writes.toSorted()).toEqual(["create new.ics", "remove b.ics"]);
+    expect((await row("a"))?.ics).toContain("SUMMARY:A");
+    expect((await row("a"))?.pending).toBe("none");
+    expect((await store.conflicts())[0]?.localIcs).toContain("SUMMARY:Ours");
+    expect(server.objects.get(`${calendarUrl}a.ics`)?.ics).toContain("SUMMARY:A");
+  });
+
+  test("the calendar's rights reach the store with every listing", async () => {
+    const { store, sync, calendar } = await shared({ create: false, edit: true, delete: false });
+    await sync();
+    expect((await store.calendars(calendar.accountId))[0]?.rights).toEqual({
+      create: false,
+      edit: true,
+      delete: false,
+    });
   });
 });

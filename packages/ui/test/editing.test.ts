@@ -9,7 +9,9 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { applyMine, conflictViews, keepServer } from "../src/calendar/conflicts.ts";
 import {
+  calendarsFor,
   changesOf,
+  deleteScopes,
   deleteTarget,
   followed,
   formOf,
@@ -248,6 +250,55 @@ describe("the scopes offered (D11)", () => {
     const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
     const form = formOf(single, timeZone);
     expect(scopesFor(single, form, { ...form, summary: "x" })).toEqual([]);
+  });
+});
+
+describe("what a calendar's rights offer (D37)", () => {
+  const rights = (create: boolean, edit: boolean, del: boolean) => ({ create, edit, delete: del });
+
+  test("a calendar that takes no new items offers no split: a new rule on a new day cannot be saved there", async () => {
+    const { store, rowOf } = await demo();
+    const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const initial = formOf(target, timeZone);
+    const editOnly = rights(false, true, true);
+    expect(scopesFor(target, initial, { ...initial, summary: "x" }, editOnly)).toEqual([
+      "this",
+      "all",
+    ]);
+    const nextDay = followed(initial, {
+      ...initial,
+      startDate: "2026-11-06",
+      endDate: "2026-11-06",
+    });
+    expect(scopesFor(target, initial, nextDay, editOnly)).toEqual(["this"]);
+    expect(scopesFor(target, initial, { ...nextDay, repeat: null }, editOnly)).toBeNull();
+  });
+
+  test("deleting: one occurrence or the following ones are edits, all of them or a single item a deletion", async () => {
+    const { store, rowOf } = await demo();
+    const series = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
+    expect(deleteScopes(series, rights(true, true, true))).toEqual(["this", "following", "all"]);
+    expect(deleteScopes(series, rights(true, true, false))).toEqual(["this", "following"]);
+    expect(deleteScopes(series, rights(false, false, true))).toEqual(["all"]);
+    expect(deleteScopes(single, rights(true, true, false))).toEqual([]);
+    expect(deleteScopes(single, rights(false, false, true))).toEqual(["all"]);
+  });
+
+  test("a new item goes where new items may; an existing one stays, and moves out only where its calendar lets it go", async () => {
+    const { byName } = await demo();
+    const at = (name: string, r: ReturnType<typeof rights>) => ({ ...byName(name), rights: r });
+    const own = at("Work", rights(false, true, false));
+    const other = at("Personal", rights(true, true, true));
+    const holidays = byName("Holidays");
+    const calendars = [own, other, holidays];
+    const names = (list: readonly { name: string }[]) => list.map((c) => c.name);
+    expect(names(calendarsFor(calendars, "event"))).toEqual(["Personal"]);
+    expect(names(calendarsFor(calendars, "event", own))).toEqual(["Work"]);
+    expect(
+      names(calendarsFor(calendars, "event", { ...own, rights: rights(false, true, true) })),
+    ).toEqual(["Work", "Personal"]);
+    expect(names(calendarsFor(calendars, "event", holidays))).toEqual([]);
   });
 });
 

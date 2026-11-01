@@ -84,6 +84,7 @@ export const en = {
   "sync.problems_one": "{{count}} item could not be synced",
   "sync.problems_other": "{{count}} items could not be synced",
   "sync.problem.read-only": "A new item waits: its calendar is read-only on the server.",
+  "sync.problem.no-create": "A new item waits: its calendar takes no new items on the server.",
   "sync.problem.deletion-reverted":
     "A deletion in a read-only calendar was undone; the item is back.",
   "sync.problem.no-place": "The server has no place for a new item; it waits on this device.",
@@ -289,6 +290,8 @@ export const en = {
   "edit.problem.dueBeforeStart": "The due date cannot be before the start.",
   "edit.problem.untilBeforeStart": "The repeat cannot end before the item starts.",
   "edit.problem.noDate": "Pick a date.",
+  "edit.problem.noSplit":
+    "This calendar takes no new items, so the series cannot be split here: change the date or the repeat, not both.",
   "edit.problem.gone":
     "This is no longer on your calendar: it was deleted or moved elsewhere. Nothing was saved.",
   "edit.problem.inDoubt":

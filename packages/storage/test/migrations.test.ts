@@ -157,3 +157,35 @@ test("migration 6 leaves titles unknown on older rows, and search still finds th
   await store.saveFromServer("c", { href: "new.ics", etag: null, ics: ics("new", "Банк, снова") });
   expect((await store.search(["c"], "банк")).map((o) => o.uid)).toEqual(["new", "old"]);
 });
+
+test("migration 7 gives a writable calendar every right and a read-only one none; a row an older build writes reads from read_only", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const { Store } = await import("../src/index.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 6));
+  await driver.query(
+    "INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0, NULL)",
+    [],
+  );
+  for (const [id, readOnly] of [
+    ["mine", 0],
+    ["shared", 1],
+  ] as const) {
+    await driver.query(
+      "INSERT INTO calendars (id, account_id, url, name, components, read_only) VALUES (?, 'a', ?, ?, 'VEVENT', ?)",
+      [id, `https://x/${id}/`, id, readOnly],
+    );
+  }
+  const store = await Store.open(driver);
+  // A tab of an older build on the same store (D98) adds a calendar without rights.
+  await driver.query(
+    "INSERT INTO calendars (id, account_id, url, name, components, read_only) VALUES ('old', 'a', 'https://x/old/', 'old', 'VEVENT', 1)",
+    [],
+  );
+  const rights = Object.fromEntries((await store.calendars()).map((c) => [c.id, c.rights]));
+  expect(rights).toEqual({
+    mine: { create: true, edit: true, delete: true },
+    shared: { create: false, edit: false, delete: false },
+    old: { create: false, edit: false, delete: false },
+  });
+});

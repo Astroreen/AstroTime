@@ -1,6 +1,8 @@
 import {
+  ALL_RIGHTS,
   AuthError as CredentialsRefused,
   OfflineError,
+  type CalendarRights,
   type Changes,
   type Provider,
   type RemoteCalendar,
@@ -450,7 +452,6 @@ async function propfindOne(
 
 function toCalendar(response: DavResponse, base: string): RemoteCalendar {
   const components = componentsOf(response.props["supported-calendar-component-set"]);
-  const privileges = JSON.stringify(response.props["current-user-privilege-set"] ?? {});
   return {
     url: collection(canonicalHref(response.href, base)),
     name:
@@ -458,11 +459,26 @@ function toCalendar(response: DavResponse, base: string): RemoteCalendar {
       decodeURIComponent(new URL(response.href, base).pathname.split("/").findLast(Boolean) ?? ""),
     color: color(text(response.props["calendar-color"])),
     components,
-    // No privilege set means the server does not say; take it as writable.
-    readOnly:
-      response.props["current-user-privilege-set"] !== undefined &&
-      !/"(write|write-content|all)"/.test(privileges),
+    rights: rightsOf(response.props["current-user-privilege-set"]),
   };
+}
+
+/**
+ * What the user may do in a calendar, from its `current-user-privilege-set`
+ * (RFC 3744 §5.4): `bind` adds an item to it, `write-content` changes one,
+ * `unbind` deletes one (§3.1–3.10); `write` holds all three and `all` holds
+ * everything (§3.2, §3.12). Servers list an aggregate's parts beside it
+ * (Nextcloud) or not (Radicale's `all`), so either counts. No set at all
+ * means the server does not say: taken as every right (D37).
+ */
+function rightsOf(set: unknown): CalendarRights {
+  if (set === undefined) return ALL_RIGHTS;
+  const listed =
+    set && typeof set === "object" ? ((set as { privilege?: unknown[] }).privilege ?? []) : [];
+  const privileges = new Set(listed.flatMap(children));
+  const has = (privilege: string) =>
+    privileges.has(privilege) || privileges.has("write") || privileges.has("all");
+  return { create: has("bind"), edit: has("write-content"), delete: has("unbind") };
 }
 
 function componentsOf(set: unknown): ("VEVENT" | "VTODO")[] {

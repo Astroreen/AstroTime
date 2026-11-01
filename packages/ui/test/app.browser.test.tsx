@@ -251,6 +251,58 @@ test("an item opens its details; Escape closes them and the focus is back on the
   await expect.element(opener).toHaveFocus();
 });
 
+test("a calendar shared to edit, without adding or deleting: its item shows Edit, not Delete, and it is offered for no new item (D37)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  const [demo] = await store.accounts();
+  const team = await store.saveCalendar({
+    accountId: demo!.id,
+    url: "https://demo.invalid/team/",
+    name: "Team",
+    color: "#7a5cc4",
+    components: ["VEVENT"],
+    rights: { create: false, edit: true, delete: false },
+  });
+  await store.saveFromServer(team.id, {
+    href: "sync.ics",
+    etag: '"1"',
+    ics: event("sync", "Team sync"),
+  });
+  render(Promise.resolve(store), ["en-US"]);
+  const options = (dialog: ReturnType<typeof page.getByRole>) =>
+    [
+      ...(dialog.getByRole("combobox", { name: "Calendar" }).element() as HTMLSelectElement)
+        .options,
+    ].map((option) => option.text);
+
+  const opener = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Team sync, / });
+  await expect.element(opener).toBeInTheDocument();
+  (opener.element() as HTMLElement).click();
+  const details = page.getByRole("dialog", { name: "Team sync" });
+  await expect.element(details.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  expect(details.getByRole("button", { name: "Delete" }).elements()).toEqual([]);
+  expect(details.getByRole("note").elements()).toEqual([]);
+
+  // Its edit stays in Team: moving it out would delete it there.
+  (details.getByRole("button", { name: "Edit" }).element() as HTMLElement).click();
+  const editor = page.getByRole("dialog", { name: "Edit event" });
+  await expect.element(editor).toBeInTheDocument();
+  expect(options(editor)).toEqual(["Team"]);
+  (editor.getByRole("button", { name: "Close without saving" }).element() as HTMLElement).click();
+  await expect.element(editor).not.toBeInTheDocument();
+  (details.getByRole("button", { name: "Close", exact: true }).element() as HTMLElement).click();
+  await expect.element(details).not.toBeInTheDocument();
+
+  // A new event goes in a calendar that takes new items: not Team, not the read-only Holidays.
+  (page.getByRole("button", { name: "Create" }).element() as HTMLElement).click();
+  const creating = page.getByRole("dialog", { name: "New event" });
+  await expect.element(creating).toBeInTheDocument();
+  expect(options(creating)).toEqual(["Personal", "Work"]);
+});
+
 // The app's stylesheet lifts a dialog above Base UI's own backdrop; these
 // tests load no CSS, so a dialog's buttons get the clicks only with this.
 const lift = document.createElement("style");

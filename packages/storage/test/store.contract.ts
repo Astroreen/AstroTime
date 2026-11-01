@@ -1,6 +1,7 @@
 // The store's behaviour, run against every driver: `store.test.ts` (Node) and
 // `store.browser.test.ts` (sqlite-wasm on OPFS in Chromium).
 import { describe, expect, test } from "vite-plus/test";
+import { ALL_RIGHTS, NO_RIGHTS } from "@astrotime/core";
 
 import { SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
 
@@ -30,7 +31,7 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       name: "Personal",
       color: "#0082c9",
       components: ["VEVENT", "VTODO"],
-      readOnly: false,
+      rights: ALL_RIGHTS,
     });
     return { store, account, calendar };
   }
@@ -61,6 +62,16 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         },
       ]);
       expect((await store.accounts()).map((a) => a.name)).toEqual(["Nextcloud"]);
+    });
+
+    test("a calendar keeps what the user may do in it, and saving it again replaces that (D37)", async () => {
+      const { store, account, calendar } = await setup();
+      expect(calendar.rights).toEqual(ALL_RIGHTS);
+      const shared = { create: false, edit: true, delete: false };
+      await store.saveCalendar({ ...calendar, rights: shared });
+      expect((await store.calendars(account.id)).map((c) => c.rights)).toEqual([shared]);
+      await store.saveCalendar({ ...calendar, rights: NO_RIGHTS });
+      expect((await store.calendars(account.id)).map((c) => c.rights)).toEqual([NO_RIGHTS]);
     });
 
     test("an account keeps the calendar home discovery found, and signing in again replaces it", async () => {
@@ -414,7 +425,7 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         name: "Other",
         color: null,
         components: ["VTODO"],
-        readOnly: false,
+        rights: ALL_RIGHTS,
       });
       const save = (calendarId: string, uid: string, ics: string) =>
         store.saveFromServer(calendarId, { href: `${uid}.ics`, etag: '"1"', ics });
@@ -480,7 +491,7 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         name: "Work",
         color: null,
         components: ["VEVENT"],
-        readOnly: true,
+        rights: NO_RIGHTS,
       });
       const alarm = (trigger: string) =>
         `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER${trigger}\r\nEND:VALARM\r\n`;
