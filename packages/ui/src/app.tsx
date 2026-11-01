@@ -11,6 +11,7 @@ import { localeSettings } from "./calendar/locale.ts";
 import { AccountsProvider } from "./components/accounts-context.tsx";
 import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { RemindersProvider } from "./components/reminders-context.tsx";
+import { UnprotectedDialog } from "./components/unprotected-dialog.tsx";
 import { createI18n } from "./i18n/index.ts";
 import type { Platform } from "./platform.ts";
 import { KEYS, usePreference } from "./preferences.ts";
@@ -106,6 +107,9 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
         ) : (
           <StoreMessage opening={opening} />
         )}
+        {platform.unprotectedPrompt ? (
+          <UnprotectedDialog prompt={platform.unprotectedPrompt} />
+        ) : null}
       </SettingsContext.Provider>
     </I18nextProvider>
   );

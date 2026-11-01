@@ -1,6 +1,6 @@
 // The desktop app's main process (docs/plans/desktop.md): the window and its
-// security settings (D71), the app:// scheme, HTTP from here (D72), and the
-// store in a utility process (D73).
+// security settings (D71), the app:// scheme, HTTP from here (D72), the
+// store in a utility process (D73), and credentials through safeStorage (D74).
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,7 @@ import {
   ipcMain,
   nativeTheme,
   protocol,
+  safeStorage,
   session,
   shell,
   type IpcMainEvent,
@@ -19,8 +20,9 @@ import {
 
 import { APP_SCHEME, APP_URL, CHANNELS, type HttpAnswer } from "../bridge.ts";
 import { appFiles } from "./app-protocol.ts";
-import { checkRequest, isAppUrl, isWebUrl } from "./checks.ts";
+import { checkRequest, checkSecret, checkSecretKey, isAppUrl, isWebUrl } from "./checks.ts";
 import { netClient } from "./http.ts";
+import { secretsFile } from "./secrets.ts";
 import { storeProcess } from "./store.ts";
 
 /** The app id (D70): it names the .desktop file, which xdg-desktop-portal needs to know the app. */
@@ -111,6 +113,23 @@ async function start() {
       if (error instanceof OfflineError) return { offline: error.message };
       throw error;
     }
+  });
+  const secrets = secretsFile({
+    path: join(app.getPath("userData"), "secrets.json"),
+    encryption: safeStorage,
+    linux: process.platform === "linux",
+  });
+  ipcMain.handle(CHANNELS.secretsGet, (event, key: unknown) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    return secrets.get(checkSecretKey(key));
+  });
+  ipcMain.handle(CHANNELS.secretsSet, (event, key: unknown, value: unknown, saving: unknown) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    return secrets.set(checkSecretKey(key), ...checkSecret(value, saving));
+  });
+  ipcMain.handle(CHANNELS.secretsDelete, (event, key: unknown) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    return secrets.delete(checkSecretKey(key));
   });
   ipcMain.on(CHANNELS.store, (event) => {
     if (fromApp(event)) event.sender.postMessage(CHANNELS.store, null, [store.connect()]);

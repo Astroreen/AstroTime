@@ -129,6 +129,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
     the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
     `plans/foundation.md#D92`
+    - `unprotected.ts` — `UnprotectedPrompt`, the question a shell asks
+      before saving a password no keyring protects; its dialog is
+      `components/unprotected-dialog.tsx`. → `plans/desktop.md#D74`
   - `components/` — the shell (top bar, month picker, drawer, floating
     button), the time grid of Day, 3 days and Week with the all-day strip
     and the undone tasks chip, the Month (`month-view.tsx`,
@@ -238,8 +241,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `src/main/` — the main process: the window and its security settings,
     `app://astrotime/` with the page's policy (`app-protocol.ts`), the IPC
     handlers' checks (`checks.ts`), HTTP on `net.request` (`http.ts`), the
-    store's process (`store.ts`). → `plans/desktop.md#D71`,
-    `plans/desktop.md#D72`
+    store's process (`store.ts`), credentials in `secrets.json` through
+    `safeStorage` (`secrets.ts`). → `plans/desktop.md#D71`,
+    `plans/desktop.md#D72`, `plans/desktop.md#D74`
   - `src/store/` — the store's utility process, `node:sqlite` on
     `astrotime.sqlite3` in userData. → `plans/desktop.md#D73`
   - `src/preload/` and `src/bridge.ts` — the one object the page gets
@@ -247,7 +251,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/desktop.md#D71`
   - `src/renderer/` — its `Platform` around `@astrotime/ui`, as the web's.
   - `e2e/` — Playwright's Electron support under `xvfb-run`: the smoke test
-    (Radicale), HTTP's redirects, a private CA, and the window's screenshots
+    (Radicale), HTTP's redirects, a private CA, credentials with a keyring
+    of the test's own and without one (`keyringSession`), Login Flow v2
+    against a Nextcloud (`ASTROTIME_NEXTCLOUD_*`), and the screenshots
     (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
   - `electron-builder.yml` — packaging; CI builds the unpacked app.
     → `plans/desktop.md#D78`

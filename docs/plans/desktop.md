@@ -1,7 +1,8 @@
 # Desktop plan
 
-Status: **in progress** — PR D1 (the shell, the store and HTTP) is built;
-PR D2–D4 are decided, not yet built. It follows the Android app
+Status: **in progress** — PR D1 (the shell, the store and HTTP) and PR D2
+(credentials and Login Flow v2) are built; PR D3–D4 are decided, not yet
+built. It follows the Android app
 ([`android.md`](android.md)), as foundation's [D12](foundation.md#D12)
 orders the platforms. This plan owns the Linux desktop app, `apps/desktop`
 (foundation's [D22](foundation.md#D22), [D23](foundation.md#D23)). The
@@ -67,7 +68,8 @@ were checked on 2026-11-01.
   The page asks for it (`connectStore()`) once it listens, on every load,
   so a port never comes before the page can take it, and a reloaded page
   gets a new one. PR D1 exposes `http`, `openExternal` and `connectStore`;
-  the rest join with the PRs that use them.
+  the rest join with the PRs that use them (PR D2: `secrets`, with `get`,
+  `set` and `delete`, each checked as `http` is).
   The page then holds a port that runs SQL, as the web app holds its
   worker: the utility process answers only the store protocol's messages,
   and nothing but the app's own page, under the CSP, runs there.
@@ -161,6 +163,32 @@ were checked on 2026-11-01.
   (a changed keyring, a profile copied to another machine) leaves its
   account asking to sign in again, never a crash or an empty account.
 
+  _Landed in PR D2:_ the main process keeps the file (`src/main/secrets.ts`,
+  behind the preload's `secrets`): `{ "version": 1, "secrets": { key: entry } }`,
+  each entry `{ "saved": "keyring", "value": <ciphertext in base64> }` or
+  `{ "saved": "unprotected", "value": <the value> }`, written whole beside
+  it and moved over it, readable by the user only. What the backend's name
+  does not tell: Chromium falls back to its fixed key wherever it reaches no
+  keyring, whatever backend it names (`--password-store=gnome-libsecret`
+  with no Secret Service running still says `gnome_libsecret`), and marks
+  that ciphertext `v10`, the keyring's `v11` (_shown on Electron 44.3.0_);
+  so a value counts as protected only when the backend is not `basic_text`,
+  `isAsyncEncryptionAvailable()` holds, and its ciphertext is not `v10`.
+  Otherwise the main process writes nothing and answers `no-keyring`, and
+  the page asks through the shared UI: `UnprotectedPrompt` (`@astrotime/ui`,
+  the `Platform`'s optional `unprotectedPrompt`), a translated alert dialog
+  over the sign-in dialog, which waits for it. It asks at every save
+  (signing in, signing in again); Escape answers "until the app quits",
+  the choice that writes nothing. A password kept until the app quits lives
+  in the main process, so a page that reloads (its store's process started
+  again, [D73](#D73)) keeps it, and an older entry for the key leaves the
+  file, as the user chose not to keep it on disk. One saved unprotected is
+  the value itself, since the fixed key would hide it from nothing but a
+  glance, and it moves into the keyring the first time it is read with one
+  there. An entry that does not decrypt stays in the file, for the keyring
+  that may come back; a file that is not this format reads as no secrets,
+  and the next save writes a new one.
+
 ### Behaviour
 
 - **D75. One instance, alive with its window closed.** A second launch
@@ -200,6 +228,19 @@ were checked on 2026-11-01.
   Android ([D65](android.md#D65)). Nextcloud's flow has no callback, so no
   URL scheme is registered. Rejected: a login page in an Electron window,
   which would see the user's password.
+
+  _Landed in PR D2:_ nothing desktop-specific was needed beyond the bridge:
+  the shared `SignIn` polls through the `Platform`'s `http`, which is the
+  main process's `net.request` ([D72](#D72)), and `openExternal` is
+  `shell.openExternal` for an http(s) URL. A window beside the browser
+  stays visible while the user approves, so `visibilitychange` never fires;
+  the sign-in dialog now polls at once when the window is focused again
+  too (foundation [D92](foundation.md#D92)'s "at once when the page is
+  visible again"). The e2e (`login-flow.spec.ts`) runs against a
+  Nextcloud named by `ASTROTIME_NEXTCLOUD_*` (the nightly's, or a
+  disposable one), takes the URL from a stubbed `shell.openExternal` in
+  the main process, approves it in Playwright's Chromium on Nextcloud's own
+  pages, and sees the account sync.
 
 ### Build and release
 
@@ -247,6 +288,17 @@ were checked on 2026-11-01.
   (`${pkgs.electron_44}/bin`), which sets up GTK's modules and the sandbox
   helper, and the shell adds `xvfb-run` and `certutil` for the tests.
 
+  _Since PR D2:_ the e2e launch the app with `--password-store=basic`, or
+  with `gnome-libsecret` and a keyring of the test's own (`keyringSession`:
+  a D-Bus session bus and an unlocked gnome-keyring in a temporary
+  directory), so no test reaches the developer's keyring. On CI's
+  `ubuntu-latest` under `xvfb-run` there is no keyring: no desktop session
+  names one, so Chromium picks `basic_text` (reproduced under `xvfb-run`
+  with the desktop's variables and session bus unset), so the smoke test's job installs `dbus`, `gnome-keyring`
+  and `libsecret-1-0` and both paths run on every PR; the dev shell has
+  `dbus` and `gnome-keyring` too. The nightly runs the Login Flow e2e
+  against its Nextcloud (`Desktop Login Flow v2 against Nextcloud`).
+
 ## Deferred
 
 - **Auto-update** — electron-updater can update an AppImage (and a deb
@@ -265,6 +317,10 @@ were checked on 2026-11-01.
 - **Notification actions** — snooze and "mark as done" on a reminder
   ([D76](#D76)).
 - **Moving to Electron 45 and later** — waits for nixpkgs ([D70](#D70)).
+- **Remembering how to keep passwords without a keyring** — the app asks at
+  every save; a setting that remembers the answer, and one to move a kept
+  password into the profile later, come if asking proves tiresome
+  ([D74](#D74)).
 - **A store's process that keeps ending** — after three ends in a row
   within 10 seconds of starting it is not started again, and the page shows
   the store failed until the app restarts; telling the user why (a damaged
@@ -303,8 +359,8 @@ Done when: credentials survive a restart with a keyring; without one
 (`--password-store=basic` forces it) the prompt appears and nothing is
 written before the choice; an entry that does not decrypt asks to sign in
 again; the login page opens in the system browser and
-the poll stops once approved (up to Nextcloud's approval page in tests,
-foundation's Deferred "Login Flow v2 end to end").
+the poll stops once approved (in tests through Nextcloud's approval, in
+Playwright's Chromium standing in for the system browser).
 
 ### PR D3 — Living in the background
 

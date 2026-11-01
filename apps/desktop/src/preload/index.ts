@@ -8,6 +8,11 @@ import { CHANNELS, STORE_PORT, type Bridge } from "../bridge.ts";
 
 const bridge: Bridge = {
   http: (request) => ipcRenderer.invoke(CHANNELS.http, request),
+  secrets: {
+    get: (key) => ipcRenderer.invoke(CHANNELS.secretsGet, key),
+    set: (key, value, saving) => ipcRenderer.invoke(CHANNELS.secretsSet, key, value, saving),
+    delete: (key) => ipcRenderer.invoke(CHANNELS.secretsDelete, key),
+  },
   openExternal: (url) => ipcRenderer.send(CHANNELS.openExternal, url),
   connectStore: () => ipcRenderer.send(CHANNELS.store),
 };

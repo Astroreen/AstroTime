@@ -2,7 +2,7 @@
 // request it can send as it is, nothing that would go elsewhere or split it.
 import { expect, test } from "vite-plus/test";
 
-import { checkRequest, isAppUrl, isWebUrl } from "./checks.ts";
+import { checkRequest, checkSecret, checkSecretKey, isAppUrl, isWebUrl } from "./checks.ts";
 
 const request = { method: "PROPFIND", url: "https://dav.example/", headers: { Depth: "0" } };
 
@@ -44,4 +44,20 @@ test("the app's own pages are app://astrotime/ only; the browser opens http(s) o
   expect(isWebUrl("http://192.168.1.2:5232/")).toBe(true);
   expect(isWebUrl("file:///etc/hostname")).toBe(false);
   expect(isWebUrl("javascript:alert(1)")).toBe(false);
+});
+
+test("a secret's key, value and saving are checked; nothing else passes (D74)", () => {
+  expect(checkSecretKey("account:7")).toBe("account:7");
+  expect(checkSecret('{"username":"astro"}', "keyring")).toEqual([
+    '{"username":"astro"}',
+    "keyring",
+  ]);
+  expect(checkSecret("", "until-quit")).toEqual(["", "until-quit"]);
+  for (const key of [undefined, 7, "", "k".repeat(257)]) {
+    expect(() => checkSecretKey(key)).toThrow(TypeError);
+  }
+  expect(() => checkSecret(7, "keyring")).toThrow(TypeError);
+  expect(() => checkSecret("x".repeat(65_537), "keyring")).toThrow(TypeError);
+  expect(() => checkSecret("x", "plain")).toThrow(TypeError);
+  expect(() => checkSecret("x", undefined)).toThrow(TypeError);
 });

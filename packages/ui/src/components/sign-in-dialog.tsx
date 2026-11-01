@@ -101,13 +101,19 @@ function SignInForm({
       }),
     [signIn, onDone],
   );
-  // Back from Nextcloud's page: ask at once whether it was approved (android D65).
+  // Back from Nextcloud's page: ask at once whether it was approved (android
+  // D65). A tab comes back visible; a desktop window beside the browser was
+  // visible all along and comes back focused (desktop D77).
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") signIn.pollNow();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [signIn]);
 
   if (state.step === "checking" || state.step === "done") {

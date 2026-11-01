@@ -3,6 +3,7 @@ import type { ReminderScheduler, SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 import type { SyncLock } from "@astrotime/sync";
 
+import type { UnprotectedPrompt } from "./accounts/unprotected.ts";
 import type { Preferences } from "./preferences.ts";
 
 /**
@@ -17,6 +18,12 @@ export interface Platform {
   readonly http: HttpClient;
   /** Where accounts' credentials are kept; never the store (foundation D36). */
   readonly secrets: SecretStore;
+  /**
+   * Where `secrets` may find nothing to protect a password with (the desktop
+   * without a keyring, desktop D74), it asks here before saving, and the UI
+   * asks the user.
+   */
+  readonly unprotectedPrompt?: UnprotectedPrompt;
   /** Opens a URL in the system browser: Login Flow v2's page (a new tab on the web). */
   readonly openExternal: (url: string) => void;
   /**

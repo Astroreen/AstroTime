@@ -11,6 +11,12 @@ export const en = {
   "store.failed.body": "Reload the page to try again.",
   "store.reload": "Reload",
 
+  "secrets.unprotected.title": "No keyring to keep your password safe",
+  "secrets.unprotected.body":
+    "AstroTime keeps passwords in your desktop's keyring, such as GNOME Keyring or KWallet, but none is running. Saved now, the password would lie in your profile unprotected, for anyone who can read your files. You can keep it only until AstroTime quits and sign in again next time.",
+  "secrets.unprotected.untilQuit": "Keep until AstroTime quits",
+  "secrets.unprotected.save": "Save unprotected",
+
   "firstRun.title": "Your calendars and tasks, from your own server",
   "firstRun.body":
     "Sign in to Nextcloud or any CalDAV server. Your data stays there and on this device; AstroTime has no server of its own.",

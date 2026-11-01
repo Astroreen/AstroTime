@@ -1,5 +1,6 @@
 # docs/plans/foundation.md, D27: the CalDAV integration tests against a real
 # Nextcloud, nightly and by hand; Radicale runs them on every PR in ci.yml.
+# And the desktop app's Login Flow v2 against it (docs/plans/desktop.md#D77).
 name: Nightly
 
 on:
@@ -43,3 +44,44 @@ jobs:
       - uses: ./.github/actions/chromium
       - run: pipx install radicale==3.8.0
       - run: vp test run --project unit packages/sync
+
+  desktop-login-flow:
+    name: Desktop Login Flow v2 against Nextcloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      nextcloud:
+        image: nextcloud:31-apache
+        ports:
+          - 8080:80
+        env:
+          SQLITE_DATABASE: nextcloud
+          NEXTCLOUD_ADMIN_USER: astro
+          NEXTCLOUD_ADMIN_PASSWORD: astrotime-test-password
+          NEXTCLOUD_TRUSTED_DOMAINS: localhost 127.0.0.1
+        options: >-
+          --health-cmd "curl -fsS http://localhost/status.php | grep -q installed.:true"
+          --health-interval 5s
+          --health-retries 120
+          --health-start-period 30s
+    env:
+      ASTROTIME_NEXTCLOUD_URL: http://127.0.0.1:8080/
+      ASTROTIME_NEXTCLOUD_USERNAME: astro
+      ASTROTIME_NEXTCLOUD_PASSWORD: astrotime-test-password
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # The test approves access on Nextcloud's own pages in Chromium, as the
+      # system browser would (apps/desktop/e2e/login-flow.spec.ts).
+      - uses: ./.github/actions/chromium
+      # As ci.yml's desktop smoke test: Electron's binary and Chromium's sandbox.
+      - run: node apps/desktop/node_modules/electron/install.js
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: xvfb-run -a -s "-screen 0 1440x900x24" pnpm --filter @astrotime/desktop e2e login-flow
+      - name: Playwright's traces, when a test failed
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-login-flow-traces
+          path: apps/desktop/test-results/
+          retention-days: 7
