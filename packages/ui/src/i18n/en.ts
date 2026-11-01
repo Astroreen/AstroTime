@@ -467,6 +467,7 @@ export const en = {
   "alarm.after": "{{amount}} after the start",
   "alarm.beforeEnd": "{{amount}} before the end",
   "alarm.afterEnd": "{{amount}} after the end",
+  "alarm.afterDue": "{{amount}} after the due time",
   "alarm.atStart": "At the start",
   "alarm.atEnd": "At the end",
   "alarm.atDue": "At the due time",

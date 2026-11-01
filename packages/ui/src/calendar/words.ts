@@ -1,7 +1,14 @@
 // A series' rule and an item's reminders in words, in the user's language
 // (docs/plans/foundation.md#D17): "Every 2 weeks on Monday, Wednesday",
 // "Каждые 2 недели в понедельник, среду", "15 minutes before".
-import { WEEKDAYS, type Alarm, type ItemTime, type Repeat, type Weekday } from "@astrotime/core";
+import {
+  WEEKDAYS,
+  wallClockOf,
+  type Alarm,
+  type ItemTime,
+  type Repeat,
+  type Weekday,
+} from "@astrotime/core";
 import type { TFunction } from "i18next";
 
 import type { Formats } from "./format.ts";
@@ -112,13 +119,16 @@ export function alarmWords(
   const { trigger } = alarm;
   if (trigger.type === "absolute") {
     const at = trigger.at;
-    const day = at.type === "date" ? at.date : formats.date(dayOf(at));
+    // The day it rings on in the user's zone, as its time.
+    const day = at.type === "date" ? at.date : formats.date(wallClockOf(at, timeZone).slice(0, 10));
     return t("alarm.at", {
       time: at.type === "date" ? day : `${day}, ${formats.time(at, timeZone)}`,
     });
   }
   const offset = trigger.offsetSeconds;
-  if (options.allDay && trigger.relatedTo === "start") {
+  // An all-day item's day starts its start; a task's due date too, its END
+  // (core's `remindersOf`): both count from that day's midnight.
+  if (options.allDay && (trigger.relatedTo === "start" || options.task)) {
     const days = Math.floor(offset / DAY);
     const time = formats.clock(clockOf(offset - days * DAY));
     if (days === 0) return t("alarm.onTheDay", { time });
@@ -138,6 +148,7 @@ export function alarmWords(
   if (trigger.relatedTo === "end" && !options.task) {
     return t(offset < 0 ? "alarm.beforeEnd" : "alarm.afterEnd", { amount: words });
   }
+  if (trigger.relatedTo === "end" && offset > 0) return t("alarm.afterDue", { amount: words });
   return t(offset < 0 ? "alarm.before" : "alarm.after", { amount: words });
 }
 

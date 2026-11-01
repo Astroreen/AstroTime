@@ -1162,7 +1162,9 @@ Decided while building PR 6a.
   - **"This and following" from the first occurrence that shows** is all of
     them: one before it that an EXDATE or a cancelled exception removes does
     not count, so no object is left with no occurrence (an edit's old
-    series, a deletion's whole object goes).
+    series, a deletion's whole object goes). An exception before it counts
+    even when an EXDATE names its occurrence too, as the views show it
+    ([D34](#D34)).
   - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
     made all-day or timed (`movedRule`): it ends on the same day, written
     as a date for an all-day series, as 23:59:59 that day in the start's

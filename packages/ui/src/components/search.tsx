@@ -15,6 +15,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
+import type { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { useCalendar } from "./context.ts";
 import { EmptyState } from "./empty-state.tsx";
@@ -25,6 +26,29 @@ export interface SearchResult {
   readonly item: Item;
   /** The next occurrence from today, else the last one; `null`: an undated task. */
   readonly occurrence: Occurrence | null;
+}
+
+/**
+ * When a result is: its day, and its time or times; a task by its due, the
+ * day and the time it is due on.
+ */
+export function resultWhen(
+  { item, occurrence }: SearchResult,
+  context: { noDate: string; formats: Formats; timeZone: string; today: string },
+): string {
+  const { noDate, formats, timeZone, today } = context;
+  if (!occurrence) return noDate;
+  const { start, end } = occurrence;
+  if (item.kind === "task" && end.type !== "date") {
+    return `${formats.day(wallClockOf(end, timeZone).slice(0, 10), today)}, ${formats.time(end, timeZone)}`;
+  }
+  const day = formats.day(wallClockOf(start, timeZone).slice(0, 10), today);
+  if (start.type === "date") return day;
+  const time =
+    item.kind === "task" || wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
+      ? formats.time(item.kind === "task" ? end : start, timeZone)
+      : formats.timeRange(start, end, timeZone);
+  return `${day}, ${time}`;
 }
 
 /** The search field that stands in for the top bar while searching. */
@@ -99,17 +123,8 @@ export function SearchResults({
     );
   }, [store, ids, query, today, timeZone]);
 
-  const when = ({ item, occurrence }: SearchResult) => {
-    if (!occurrence) return t("search.noDate");
-    const { start, end } = occurrence;
-    const day = formats.day(wallClockOf(start, timeZone).slice(0, 10), today);
-    if (start.type === "date") return day;
-    const time =
-      item.kind === "task" || wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
-        ? formats.time(item.kind === "task" ? end : start, timeZone)
-        : formats.timeRange(start, end, timeZone);
-    return `${day}, ${time}`;
-  };
+  const when = (result: SearchResult) =>
+    resultWhen(result, { noDate: t("search.noDate"), formats, timeZone, today });
 
   if (query.trim() === "") {
     return (

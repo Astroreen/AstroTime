@@ -1504,6 +1504,29 @@ describe("a series' corners (D142)", () => {
     ]);
   });
 
+  test("this and following: an exception before it shows though its occurrence is excluded", () => {
+    // The views place every exception, one whose RECURRENCE-ID an EXDATE
+    // names too (D34): the old series keeps it, and so is no empty object.
+    const source = object(
+      [...mondays, "RRULE:FREQ=WEEKLY", "EXDATE;TZID=Europe/Vilnius:20261102T090000"],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261102T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261103T120000",
+        "DTEND;TZID=Europe/Vilnius:20261103T130000",
+      ],
+    );
+    expect(starts(source.serialize(), "2026-11-01", "2026-11-10")).toEqual([
+      "2026-11-03T12:00:00",
+      "2026-11-09T09:00:00",
+    ]);
+    const ended = deleteItem(source, {
+      now: NOW,
+      scope: "following",
+      recurrenceId: vilnius("2026-11-09T09:00:00"),
+    })!;
+    expect(starts(ended)).toEqual(["2026-11-03T12:00:00"]);
+  });
+
   test("this and following: an RDATE of a period before it shows, so the series is split", () => {
     const source = object([
       ...mondays,

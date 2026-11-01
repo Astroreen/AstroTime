@@ -827,6 +827,62 @@ describe("in words", () => {
     );
   });
 
+  test("a rule every 21st day, week, month or year reads as Russian counts it", () => {
+    const every = (frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY", interval: number) =>
+      repeatWords(
+        { ...weekly, frequency, interval, weekdays: [], monthlyWeekday: null },
+        start,
+        ru,
+        ruFormats,
+      );
+    expect(every("DAILY", 21)).toBe("Каждый 21 день");
+    expect(every("WEEKLY", 31)).toBe("Каждую 31 неделю в среду");
+    expect(every("MONTHLY", 21)).toBe("Каждый 21 месяц, 4 числа");
+    expect(every("YEARLY", 101)).toBe("Каждый 101 год, 4 ноября");
+    expect(every("DAILY", 22)).toBe("Каждые 22 дня");
+    expect(every("DAILY", 25)).toBe("Каждые 25 дней");
+  });
+
+  test("a task's reminder before its due date reads as the day and time it rings", () => {
+    // The edit dialog relates a task's reminders to its due (RELATED=END), and
+    // a due date counts from its day's midnight, as an all-day item's start does.
+    const due = (offsetSeconds: number) => ({
+      trigger: { type: "relative" as const, relatedTo: "end" as const, offsetSeconds },
+    });
+    const task = { allDay: true, task: true };
+    expect(alarmWords(due(9 * 3600), task, en, formats, timeZone)).toBe("On the day at 9:00 AM");
+    expect(alarmWords(due(-15 * 3600), task, en, formats, timeZone)).toBe(
+      "1 day before at 9:00 AM",
+    );
+    expect(alarmWords(due(-(6 * 86400 + 15 * 3600)), task, ru, ruFormats, timeZone)).toBe(
+      "За 1 неделю в 9:00",
+    );
+    // A timed due: after it, not after a start.
+    const timedTask = { allDay: false, task: true };
+    expect(alarmWords(due(600), timedTask, en, formats, timeZone)).toBe(
+      "10 minutes after the due time",
+    );
+    expect(alarmWords(due(-600), timedTask, ru, ruFormats, timeZone)).toBe("За 10 минут");
+  });
+
+  test("a reminder at a time of its own reads on the user's day", () => {
+    // 22:30Z on 4 November is 01:30 on the 5th in Moscow.
+    const at = {
+      trigger: {
+        type: "absolute" as const,
+        at: {
+          type: "zoned" as const,
+          local: "2026-11-04T22:30:00",
+          timeZone: "UTC",
+          epochMs: Date.parse("2026-11-04T22:30:00Z"),
+        },
+      },
+    };
+    expect(alarmWords(at, { allDay: false, task: false }, en, formats, "Europe/Moscow")).toBe(
+      "On Nov 5, 2026, 1:30 AM",
+    );
+  });
+
   test("a reminder: before a timed item, or on and before an all-day one", () => {
     const relative = (offsetSeconds: number) => ({
       trigger: { type: "relative" as const, relatedTo: "start" as const, offsetSeconds },
