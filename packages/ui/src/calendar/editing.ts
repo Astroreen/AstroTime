@@ -568,6 +568,39 @@ export function calendarsFor(
   });
 }
 
+/**
+ * The calendar a new item goes to by default: the first that takes it,
+ * visible before hidden, in the order the calendars are listed. The edit
+ * dialog's choice and the save's fallback are this one list (D122).
+ */
+export function firstCalendarFor(
+  calendars: readonly Calendar[],
+  kind: "event" | "task",
+  hidden: ReadonlySet<string> = new Set(),
+): Calendar | undefined {
+  const list = calendarsFor(calendars, kind);
+  return list.find((calendar) => !hidden.has(calendar.id)) ?? list[0];
+}
+
+/**
+ * Where a new item goes, from the calendar its form names and the calendars
+ * as they are (foundation D122): that one while it takes the item; that one
+ * still, but `refused`, while it is there and no longer takes it (read-only
+ * now, its components changed: the dialog keeps showing it, and the user
+ * picks again); else, when it is gone, the first that takes the item; none
+ * when no calendar does. The dialog's field shows this, and the save uses it.
+ */
+export function newItemCalendar(
+  calendars: readonly Calendar[],
+  form: Pick<Form, "kind" | "calendarId">,
+  hidden?: ReadonlySet<string>,
+): { readonly calendar: Calendar; readonly refused: boolean } | null {
+  const chosen = calendars.find((calendar) => calendar.id === form.calendarId);
+  if (chosen) return { calendar: chosen, refused: calendarsFor([chosen], form.kind).length === 0 };
+  const first = firstCalendarFor(calendars, form.kind, hidden);
+  return first ? { calendar: first, refused: false } : null;
+}
+
 interface Writes {
   readonly now: number;
   /** A new UID, for a new item or the series "this and following" starts. */
@@ -586,6 +619,11 @@ export class GoneError extends Error {
  */
 export class RefusedError extends Error {
   override name = "RefusedError";
+}
+
+/** No calendar takes a new item now: nothing is saved (foundation D122). */
+export class NowhereError extends Error {
+  override name = "NowhereError";
 }
 
 /** The store's leader went as a change committed, and the change is not there to read (D99). */
@@ -705,6 +743,8 @@ export async function saveForm(
     readonly scope: Scope;
     /** What a reminder added to an item without a title says, in the user's language. */
     readonly untitled: string;
+    /** The calendars hidden from the views, which a new item's fallback passes over first. */
+    readonly hidden?: ReadonlySet<string>;
   },
   writes: Writes,
 ): Promise<void> {
@@ -716,19 +756,12 @@ export async function saveForm(
     });
     await changeLocal(store, async (local) => {
       // The calendars as they are now, in this transaction: the screen's
-      // list may not have caught up (foundation D122).
-      const calendars = await local.calendars();
-      const chosen = calendars.find((calendar) => calendar.id === form.calendarId);
-      // Still there, but no longer taking it: the user picks again, since the
-      // dialog still shows it chosen and moving the item would surprise.
-      if (chosen && calendarsFor([chosen], form.kind).length === 0)
-        throw new RefusedError("The calendar chosen no longer takes this item.");
-      // Gone while the dialog was open (the calendar on this device stepping
-      // aside, one deleted on the server): the dialog shows the first that
-      // takes it instead, and it goes there; with none left, it is gone.
-      const into = chosen?.id ?? calendarsFor(calendars, form.kind)[0]?.id;
-      if (!into) throw new GoneError("No calendar takes this item any more.");
-      await local.save(into, ics);
+      // list may not have caught up (foundation D122). Where it goes is what
+      // the dialog shows (`newItemCalendar`, the same rule and list).
+      const into = newItemCalendar(await local.calendars(), form, request.hidden);
+      if (!into) throw new NowhereError("No calendar takes this item now.");
+      if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
+      await local.save(into.calendar.id, ics);
     });
     return;
   }

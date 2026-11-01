@@ -63,7 +63,15 @@ export interface EditorState {
   readonly existing: boolean;
   readonly form: Form;
   /** Why the form cannot be saved, or why saving it did not work. */
-  readonly problem: Problem | "failed" | "gone" | "refused" | "inDoubt" | "noSplit" | null;
+  readonly problem:
+    | Problem
+    | "failed"
+    | "gone"
+    | "refused"
+    | "nowhere"
+    | "inDoubt"
+    | "noSplit"
+    | null;
   readonly saving: boolean;
 }
 

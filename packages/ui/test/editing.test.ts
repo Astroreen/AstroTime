@@ -19,14 +19,17 @@ import {
   changesOf,
   deleteScopes,
   deleteTarget,
+  firstCalendarFor,
   followed,
   formOf,
   GoneError,
-  RefusedError,
   InDoubtError,
   newForm,
+  newItemCalendar,
   noticeOf,
+  NowhereError,
   problemOf,
+  RefusedError,
   rewriteTarget,
   saveForm,
   scopesFor,
@@ -443,6 +446,43 @@ describe("what a calendar's rights offer (D37)", () => {
 });
 
 describe("saving writes pending changes through the store (D5)", () => {
+  test("a new item's calendar: the dialog's field and the save are one rule on one list (foundation D122)", async () => {
+    const calendar = (id: string, components: ("VEVENT" | "VTODO")[], create = true) =>
+      ({
+        id,
+        accountId: "a",
+        url: `https://cloud.example.com/${id}/`,
+        name: id,
+        color: null,
+        components,
+        rights: { create, edit: true, delete: true },
+        syncToken: null,
+        ctag: null,
+      }) as const;
+    const list = [
+      calendar("shared", ["VEVENT"], false),
+      calendar("tasks", ["VTODO"]),
+      calendar("work", ["VEVENT"]),
+      calendar("home", ["VEVENT", "VTODO"]),
+    ];
+    const event = { kind: "event" as const, calendarId: "work" };
+    // Chosen and taking it: that one.
+    expect(newItemCalendar(list, event)).toEqual({ calendar: list[2], refused: false });
+    // Chosen, there, no longer taking it: that one still, refused.
+    expect(newItemCalendar(list, { ...event, calendarId: "tasks" })).toEqual({
+      calendar: list[1],
+      refused: true,
+    });
+    // Gone: the first that takes it, visible before hidden, as the dialog's default is.
+    const gone = { ...event, calendarId: "gone" };
+    expect(newItemCalendar(list, gone)?.calendar.id).toBe("work");
+    expect(newItemCalendar(list, gone, new Set(["work"]))?.calendar.id).toBe("home");
+    expect(firstCalendarFor(list, "event", new Set(["work"]))?.id).toBe("home");
+    expect(firstCalendarFor(list, "event", new Set(["work", "home"]))?.id).toBe("work");
+    // None takes it.
+    expect(newItemCalendar([list[0]!], gone)).toBeNull();
+  });
+
   test("a new item whose calendar went while its dialog was open goes to the first that takes it (foundation D122)", async () => {
     // A first run: the calendar on this device, where the new event's dialog opens.
     const store = await Store.open(nodeDriver());
@@ -488,6 +528,23 @@ describe("saving writes pending changes through the store (D5)", () => {
       { now: NOW, uid: () => "meanwhile" },
     );
     expect(await store.objectAt(work.id, "meanwhile.ics")).toMatchObject({ pending: "create" });
+    // With the first one hidden, the dialog offers the next, and the save goes there too.
+    const events = await store.saveCalendar({
+      accountId: server.id,
+      url: "https://cloud.example.com/remote.php/dav/calendars/astro/events/",
+      name: "Events",
+      color: null,
+      components: ["VEVENT"],
+      rights: ALL_RIGHTS,
+    });
+    const hidden = new Set([events.id]);
+    expect(firstCalendarFor(await store.calendars(), "event", hidden)?.id).toBe(work.id);
+    await saveForm(
+      store,
+      { target: null, initial: null, form, scope: "all", untitled: "Reminder", hidden },
+      { now: NOW, uid: () => "hidden-first" },
+    );
+    expect(await store.objectAt(work.id, "hidden-first.ics")).toBeDefined();
     expect(await store.pending(tasks.id)).toEqual([]);
 
     // Still there but no longer taking it: refused, nothing saved, and the
@@ -509,7 +566,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     ]).toEqual([undefined, undefined]);
     expect(await store.objectAt(work.id, "tasks-only.ics")).toBeUndefined();
 
-    // No calendar left that takes it: gone, as the dialog says.
+    // No calendar left that takes it: nowhere to go, nothing saved.
     await store.removeAccount(server.id);
     await expect(
       saveForm(
@@ -517,7 +574,7 @@ describe("saving writes pending changes through the store (D5)", () => {
         { target: null, initial: null, form, scope: "all", untitled: "Reminder" },
         { now: NOW, uid: () => "nowhere" },
       ),
-    ).rejects.toThrow(GoneError);
+    ).rejects.toThrow(NowhereError);
   });
 
   test("a new item under <uid>.ics in its calendar, pending creation", async () => {
