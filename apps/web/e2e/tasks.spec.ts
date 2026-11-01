@@ -132,7 +132,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Задачи", exact: true }).click();
     const panel = page.getByRole("region", { name: "Задачи" });
-    const strip = panel.getByRole("tablist").locator("..");
+    const strip = panel.locator("[data-tab-strip]");
     const first = panel.getByRole("tab", { name: /^Задачи/ });
     const second = panel.getByRole("tab", { name: /^Личное/ });
     const fadesStart = /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/;
@@ -146,7 +146,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await strip.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
     await expect(strip).toHaveCSS("mask-image", fadesStart);
     const under = await first.evaluate((tab) => {
-      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
       return tab.getBoundingClientRect().left < room.left + 40;
     });
     expect(under).toBe(true);
@@ -157,10 +157,33 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await expect(first).toHaveAttribute("aria-selected", "true");
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
     const clear = await first.evaluate((tab) => {
-      const room = tab.parentElement!.parentElement!.getBoundingClientRect();
+      const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
       const { left, right } = tab.getBoundingClientRect();
       return left >= room.left && right <= room.right - 40;
     });
     expect(clear).toBe(true);
+  });
+
+  test("a tab reached by the keyboard is scrolled clear of the fade", async ({ page }) => {
+    await openDemo(page, "week");
+    // Wider tabs, so the second one sits under the end's fade at the start.
+    await page.addStyleTag({ content: "[data-tab-strip] [role=tab] { padding-inline: 60px; }" });
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const second = panel.getByRole("tab", { name: /^Личное/ });
+    const edges = () =>
+      second.evaluate((tab) => {
+        const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
+        const { left, right } = tab.getBoundingClientRect();
+        return { left: left - room.left, right: room.right - right };
+      });
+    expect((await edges()).right).toBeLessThan(40);
+    // Tab to the open first tab, then the arrow to the second.
+    await panel.getByRole("tab", { name: /^Задачи/ }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(second).toBeFocused();
+    const { left, right } = await edges();
+    expect(right).toBeGreaterThanOrEqual(40);
+    expect(left).toBeGreaterThanOrEqual(40);
   });
 });

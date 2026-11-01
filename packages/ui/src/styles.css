@@ -91,6 +91,15 @@
       animation-iteration-count: 1 !important;
     }
   }
+  /*
+   * A dialog, popover or menu that is closing (Base UI marks it while its
+   * fade runs) lets a press through to what is under it, so a press on the
+   * grid just after closing one starts a drag instead of being swallowed by
+   * a backdrop on its way out (design D136).
+   */
+  [data-ending-style] {
+    pointer-events: none;
+  }
   :root {
     color-scheme: light dark;
     /*

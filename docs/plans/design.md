@@ -650,7 +650,10 @@ are its decisions.
     word are, at 9.43:1 on the fill (dark: 7.77:1), past 1.4.11's 3:1 and
     text's 4.5:1.
   - **"Nothing found" is a status** (`role="status"`), so a screen reader
-    hears that a search found nothing; results are a list it can walk.
+    hears that a search found nothing; results are a list it can walk. The
+    status is there, empty, while search is open, and only "Nothing found"
+    goes in it: the hint before a word is typed is outside it, so opening
+    search says nothing more than the field's name.
 - **D135. A tab strip wider than its room says so.** The tasks screen's
   tabs (one per list, then "+ New list") scroll sideways when they do not
   fit, as Google Tasks' do; in the 360 px panel the Russian strip already
@@ -661,7 +664,20 @@ are its decisions.
   from a search too ([D97](#D97)). No arrows: the strip scrolls by touch,
   wheel and Tab, and the fade is the sign. The chosen tab is scrolled by the
   strip's own `scrollLeft` until it clears the fade, so neither the page
-  nor the panel moves.
+  nor the panel moves. _Since PR (d1):_ a tab reached by the keyboard
+  (Tab, the arrows) is scrolled clear of the fade too, not only one
+  chosen; the open tab is kept clear again when the strip or its tabs
+  change size (a count, a font loading, the lists arriving); and the line
+  under the strip is its wrapper's, so the mask no longer fades it at the
+  ends.
+- **D136. A closing dialog, popover or menu lets a press through.** While
+  one fades out (Base UI marks it `data-ending-style`), it takes no
+  pointer events: one rule in `styles.css`. A backdrop on its way out used
+  to swallow the next press, so a drag begun on the grid just after closing
+  the edit dialog did nothing, and the press went nowhere a user could see
+  (it surfaced as a test that failed one run in seven on a loaded machine,
+  then was found to be a real flaw). Google Calendar's grid takes the press
+  as soon as a dialog starts to close.
 
 ### Decided in the logic QA (after v0.2.0)
 
@@ -820,7 +836,8 @@ PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each
 next to the matching reference, in both themes.
 
 The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`),
-D134 (`feat/ui-consistency`) and D135 (`fix/tasks-tab-strip`);
+D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`) and D136
+(`fix/closing-popups-and-strip`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its

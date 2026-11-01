@@ -130,21 +130,34 @@ export function SearchResults({
 
   const blank = query.trim() === "";
   const none = !blank && results.query === query && results.found.length === 0;
-  // The status stays while search is open and only its words change, so a
-  // screen reader says "Nothing found" when a query comes to find nothing
-  // (design D134); the results are a list of their own, outside it.
+  // The status stays while search is open, empty until a query comes to find
+  // nothing, so a screen reader says "Nothing found" then and nothing on open
+  // (design D134); the hint before a word is typed and the results are
+  // outside it.
   const status = (
     <div role="status">
-      {blank || none ? (
+      {none ? (
         <EmptyState
           icon={<SearchIcon className="size-6" />}
-          title={t(blank ? "search.hint" : "search.none")}
+          title={t("search.none")}
           hint={t("search.scope")}
         />
       ) : null}
     </div>
   );
-  if (blank || none) return status;
+  if (none) return status;
+  if (blank) {
+    return (
+      <>
+        {status}
+        <EmptyState
+          icon={<SearchIcon className="size-6" />}
+          title={t("search.hint")}
+          hint={t("search.scope")}
+        />
+      </>
+    );
+  }
   return (
     <>
       {status}
