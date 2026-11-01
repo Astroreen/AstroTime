@@ -94,7 +94,24 @@ export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
   return e >= `${nextDay(firstMidnight)}T00:00:00`;
 }
 
-/** The first and last day an all-day item covers in the user's zone (its exclusive end at midnight belongs to the day before). */
+/**
+ * The first and last day an occurrence shows on in the user's zone: a task's
+ * chip on the day of its time only, anything else from the day it starts to
+ * the day it ends (an end at midnight belongs to the day before).
+ */
+export function dayRange(
+  occurrence: Occurrence,
+  timeZone: string,
+): { first: string; last: string } {
+  const at = chipTime(occurrence);
+  if (at) {
+    const day = wallClockOf(at, timeZone).slice(0, 10);
+    return { first: day, last: day };
+  }
+  return daysOf(occurrence, timeZone);
+}
+
+/** The first and last day an item covers in the user's zone (its exclusive end at midnight belongs to the day before). */
 function daysOf(occurrence: Occurrence, timeZone: string): { first: string; last: string } {
   const first = wallClockOf(occurrence.start, timeZone).slice(0, 10);
   const end = wallClockOf(occurrence.end, timeZone);
@@ -185,14 +202,36 @@ export function layoutDay(
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
+/**
+ * Sorts by a key worked out once per occurrence, not on every comparison:
+ * a zoned time's wall clock asks `Intl`, which a month of items would ask
+ * tens of thousands of times.
+ */
+function sortByKey<K>(
+  occurrences: readonly Occurrence[],
+  keyOf: (occurrence: Occurrence) => K,
+  order: (a: K, b: K) => number,
+): Occurrence[] {
+  return occurrences
+    .map((occurrence) => ({ occurrence, key: keyOf(occurrence) }))
+    .toSorted((a, b) => order(a.key, b.key))
+    .map(({ occurrence }) => occurrence);
+}
+
 /** Longer spans first, then events before tasks, then by title (Google's order). */
 function sortAllDay(occurrences: Occurrence[], timeZone: string): Occurrence[] {
-  return occurrences.toSorted(
+  return sortByKey(
+    occurrences,
+    (o) => ({
+      length: minutesBetween(o.start, o.end, timeZone),
+      event: o.item.kind === "event",
+      title: o.item.summary ?? "",
+    }),
     (a, b) =>
-      minutesBetween(b.start, b.end, timeZone) - minutesBetween(a.start, a.end, timeZone) ||
-      (a.item.kind === b.item.kind ? 0 : a.item.kind === "event" ? -1 : 1) ||
+      b.length - a.length ||
+      (a.event === b.event ? 0 : a.event ? -1 : 1) ||
       // Code-unit order, the same on every platform (localeCompare is not).
-      compare(a.item.summary ?? "", b.item.summary ?? ""),
+      compare(a.title, b.title),
   );
 }
 
@@ -265,6 +304,19 @@ function placeCluster(
   });
 }
 
+/** Timed items in time order, the longer first when they start together, then by title. */
+function sortTimed(occurrences: Occurrence[], timeZone: string): Occurrence[] {
+  return sortByKey(
+    occurrences,
+    (o) => ({
+      start: wallClockOf(chipTime(o) ?? o.start, timeZone),
+      length: minutesBetween(o.start, o.end, timeZone),
+      title: o.item.summary ?? "",
+    }),
+    (a, b) => compare(a.start, b.start) || b.length - a.length || compare(a.title, b.title),
+  );
+}
+
 /** An all-day span placed in a row of the week's (or a month week's) strip. */
 export interface Span {
   readonly occurrence: Occurrence;
@@ -279,21 +331,30 @@ export interface Span {
 /**
  * The all-day strip across several days (a week, or one week of a month):
  * each span gets the first row free on all its days, longest spans first, so
- * a three-day conference reads as one bar (D14, D42).
+ * a three-day conference reads as one bar (D14, D42). With `timed`, as a
+ * month's week has no time grid, timed items join after the all-day ones in
+ * time order, each over the days it shows on (design D86).
  */
 export function layoutSpans(
   occurrences: readonly Occurrence[],
   days: readonly string[],
   timeZone: string,
+  options: { readonly timed?: boolean } = {},
 ): Span[] {
   const first = days[0];
   const last = days.at(-1);
   if (!first || !last) return [];
   const rows: boolean[][] = [];
   const spans: Span[] = [];
-  const strip = occurrences.filter((occurrence) => isAllDay(occurrence, timeZone));
-  for (const occurrence of sortAllDay(strip, timeZone)) {
-    const { first: startDay, last: endDay } = daysOf(occurrence, timeZone);
+  const strip: Occurrence[] = [];
+  const timed: Occurrence[] = [];
+  for (const occurrence of occurrences) {
+    if (isAllDay(occurrence, timeZone)) strip.push(occurrence);
+    else if (options.timed) timed.push(occurrence);
+  }
+  const ordered = [...sortAllDay(strip, timeZone), ...sortTimed(timed, timeZone)];
+  for (const occurrence of ordered) {
+    const { first: startDay, last: endDay } = dayRange(occurrence, timeZone);
     const firstDay = Math.max(0, daysBetween(first, startDay));
     const lastDay = Math.min(days.length - 1, daysBetween(first, endDay));
     if (lastDay < 0 || firstDay > days.length - 1 || lastDay < firstDay) continue;

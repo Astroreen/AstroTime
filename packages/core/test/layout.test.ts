@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   CalendarObject,
+  dayRange,
   layoutDay,
   layoutSpans,
   occurrencesBetween,
@@ -325,6 +326,51 @@ describe("chips, days and edges", () => {
       timeZone,
     );
     expect(spans.map((s) => s.occurrence.item.uid)).toEqual(["off"]);
+  });
+
+  test("a month's week takes timed items too: after the all-day ones, in time order, over the days they show on (design D86)", () => {
+    const days = ["2026-11-02", "2026-11-03", "2026-11-04"];
+    const spans = layoutSpans(
+      on(
+        "2026-11-02",
+        "2026-11-05",
+        event("late", "20261102T150000Z", "20261102T160000Z"),
+        event("early", "20261102T090000Z", "20261102T100000Z"),
+        event("night", "20261103T220000Z", "20261104T010000Z"),
+        task("report", "DUE:20261104T120000Z\r\n"),
+        allDay("off", "20261103", "20261104"),
+      ),
+      days,
+      timeZone,
+      { timed: true },
+    );
+    expect(spans.map((s) => [s.occurrence.item.uid, s.firstDay, s.lastDay, s.row])).toEqual([
+      ["off", 1, 1, 0],
+      ["early", 0, 0, 0],
+      ["late", 0, 0, 1],
+      ["night", 1, 2, 1],
+      ["report", 2, 2, 0],
+    ]);
+  });
+
+  test("the days an item shows on: a chip's own day; a timed item to the day it ends, not past midnight", () => {
+    const range = (ics: string) => dayRange(on("2026-11-01", "2026-11-06", ics)[0]!, timeZone);
+    expect(range(task("chip", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T120000Z\r\n"))).toEqual({
+      first: "2026-11-04",
+      last: "2026-11-04",
+    });
+    expect(range(event("night", "20261103T220000Z", "20261104T010000Z"))).toEqual({
+      first: "2026-11-03",
+      last: "2026-11-04",
+    });
+    expect(range(event("evening", "20261103T220000Z", "20261104T000000Z"))).toEqual({
+      first: "2026-11-03",
+      last: "2026-11-03",
+    });
+    expect(range(allDay("trip", "20261103", "20261106"))).toEqual({
+      first: "2026-11-03",
+      last: "2026-11-05",
+    });
   });
 });
 

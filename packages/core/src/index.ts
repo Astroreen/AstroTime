@@ -11,6 +11,7 @@ export {
 export { wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
 export { isDone, isUndoneBefore, latestUndoneBefore } from "./undone.ts";
 export {
+  dayRange,
   isAllDay,
   layoutDay,
   layoutSpans,
