@@ -122,6 +122,15 @@
         calc(clamp(0, g, 1) * var(--dim)) calc(clamp(0, b, 1) * var(--dim)) / 1
     );
   }
+  /* Without relative colour syntax (Chromium before 119, Safari before 18,
+   * Firefox before 128) the fill is the colour itself: shown, though not
+   * darkened. Android's WebView floor (123) and Electron have it. */
+  @supports not (color: color(from red srgb-linear calc(r * 0.5) g b)) {
+    .item,
+    .item-color {
+      --item-fill: var(--fill);
+    }
+  }
   .item {
     background: var(--item-fill);
     color: #ffffff;
