@@ -95,3 +95,24 @@ test("Login Flow v2 waits through a rate limit or a busy server while the user a
   expect([await flow.poll(), await flow.poll()]).toEqual([null, null]);
   expect(await flow.poll()).toMatchObject({ username: "astro", password: "app" });
 });
+
+test("Login Flow v2 gives up on a server that keeps failing, and says so", async () => {
+  const http: HttpClient = async (request) => {
+    const start = request.url.endsWith("/index.php/login/v2");
+    const body = start
+      ? {
+          poll: { token: "t", endpoint: "https://cloud.example.com/login/v2/poll" },
+          login: "https://cloud.example.com/login/v2/flow/x",
+        }
+      : {};
+    return {
+      status: start ? 200 : 502,
+      url: request.url,
+      header: () => null,
+      body: JSON.stringify(body),
+    };
+  };
+  const flow = await startLoginFlow(http, "https://cloud.example.com");
+  for (let i = 0; i < 4; i++) expect(await flow.poll()).toBeNull();
+  await expect(flow.poll()).rejects.toThrow(/keeps answering 502/);
+});

@@ -154,12 +154,14 @@ export class SyncScheduler {
     this.#update({ running: true });
     try {
       const report = await this.#sync(fresh);
-      const accounts = new Map(this.#status.accounts);
+      // Every account syncAll knows is in its report: one removed meanwhile drops out.
+      const before = this.#status.accounts;
+      const accounts = new Map<string, AccountStatus>();
       for (const last of report.accounts) {
         const syncedAt =
           last.status === "synced"
             ? report.finishedAt
-            : (accounts.get(last.accountId)?.syncedAt ?? null);
+            : (before.get(last.accountId)?.syncedAt ?? null);
         accounts.set(last.accountId, { last, syncedAt });
       }
       this.#update({ accounts });

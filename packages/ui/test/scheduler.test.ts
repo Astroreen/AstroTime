@@ -159,4 +159,9 @@ test("the status says a sync runs, and each account's last result and time", asy
     last: { accountId: "a", status: "offline", detail: "offline", report: null },
     syncedAt: 10,
   });
+  // An account removed meanwhile is not in the next report, and leaves the status.
+  const third = scheduler.syncNow();
+  finish({ accounts: [], finishedAt: 30 });
+  await third;
+  expect(scheduler.status.accounts.has("a")).toBe(false);
 });
