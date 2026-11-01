@@ -50,6 +50,9 @@ const roundButton =
   "grid size-10 shrink-0 place-items-center rounded-full hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:hover:bg-transparent";
 const iconButton = `${roundButton} text-ink disabled:text-ink-muted`;
 
+/** How far the tab strip fades out on a side that hides tabs, in px (design D135). */
+const FADE = 40;
+
 export function TasksScreen({
   store,
   preferences,
@@ -131,6 +134,48 @@ export function TasksScreen({
     now,
   };
 
+  // The tab strip's hidden sides, so each fades out while it hides tabs, and
+  // the open list's tab is scrolled into view (design D135).
+  const strip = useRef<HTMLDivElement>(null);
+  const [hides, setHides] = useState({ start: false, end: false });
+  const measureStrip = () => {
+    const element = strip.current;
+    if (!element) return;
+    const start = element.scrollLeft > 1;
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
+    setHides((current) =>
+      current.start === start && current.end === end ? current : { start, end },
+    );
+  };
+  const hasLists = lists.length > 0;
+  useEffect(() => {
+    const element = strip.current;
+    if (!element) return;
+    // The strip's width, and its tabs' as their names and counts change.
+    const observer = new ResizeObserver(measureStrip);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, [hasLists]);
+  useEffect(() => {
+    // The strip alone scrolls (not the page or the panel), so the tab clears
+    // the fade on either side, as far as the strip can go.
+    const element = strip.current;
+    const tab = element?.querySelector("[role=tab][aria-selected=true]");
+    if (!element || !tab) return;
+    const room = element.getBoundingClientRect();
+    const { left, right } = tab.getBoundingClientRect();
+    if (left < room.left + FADE) element.scrollLeft -= room.left + FADE - left;
+    else if (right > room.right - FADE) element.scrollLeft += right - (room.right - FADE);
+  }, [selected]);
+  const fade = (side: boolean) => (side ? "transparent" : "black");
+  const stripMask =
+    hides.start || hides.end
+      ? {
+          maskImage: `linear-gradient(to right, ${fade(hides.start)}, black ${FADE}px, black calc(100% - ${FADE}px), ${fade(hides.end)})`,
+        }
+      : undefined;
+
   return (
     <section
       aria-label={t("tasks.title")}
@@ -174,7 +219,13 @@ export function TasksScreen({
           onValueChange={(value) => setChosen(String(value))}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex shrink-0 items-stretch overflow-x-auto border-b border-line [scrollbar-width:none]">
+          {/* Wider than the panel, the strip scrolls; a side with more fades out (design D135). */}
+          <div
+            ref={strip}
+            onScroll={measureStrip}
+            style={stripMask}
+            className="flex shrink-0 items-stretch overflow-x-auto border-b border-line [scrollbar-width:none]"
+          >
             <Tabs.List aria-label={t("tasks.lists")} className="relative flex">
               {lists.map((list) => {
                 const count = byList.get(list.id)?.undoneCount ?? 0;
