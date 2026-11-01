@@ -28,7 +28,7 @@ export function UndoneChip({
   return (
     <Popover.Root>
       <Popover.Trigger
-        className={`flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent ${
+        className={`flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
           dense
             ? "gap-0.5 rounded-[4px] px-1 text-[11px]"
             : "gap-1.5 rounded-[5px] px-1.5 text-[13px]"

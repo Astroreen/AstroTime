@@ -424,12 +424,17 @@ the project.
   CI's `e2e` job. A popup is audited once Base UI's entering marks are gone
   and its transitions have run out, not half faded in. A rule is switched
   off only in the spec's `DISABLED` (everywhere) or `EXEMPT` (on some
-  elements), each with its reason; there is one: **target size** (2.5.8)
-  is not checked on the Month's chips, "+N" and undone chip, one line of
-  16 px every 17 px as dense as the reference ([D86](#D86)). The
-  criterion's _equivalent_ exception is the reason: the day's number, a
-  24 px target, opens the day, where every item is a larger target of its
-  own. The spec also proves what axe cannot see ([D120](#D120)).
+  elements), each with its reason, and an exemption matches nothing
+  taller than it names, so it cannot hide a larger element that comes to
+  fail. There is one, and it is **an accepted gap, not conformance**:
+  **target size** (2.5.8) is not checked on the button of each Month chip,
+  "+N" and undone chip, one line of 16 px every 17 px as dense as the
+  reference ([D86](#D86)); its day's number, the week's pill and the rest
+  of the Month are checked. The criterion's _equivalent_ exception does
+  not cover it: the day's number (24 px) opens the day, where every item
+  is a larger target, but not the item itself. Larger targets there are
+  [deferred](#deferred) ("Larger targets in the Month on a touch screen").
+  The spec also proves what axe cannot see ([D120](#D120)).
 - **D120. What the pass changed, and the rules it leaves:**
   - **an item's text on its colour** is white, as the reference draws it
     (Google Calendar keeps white text and colours dark enough for it), and
@@ -469,12 +474,18 @@ the project.
     3.5:1;
   - **targets** are at least 24 × 24 px (2.5.8): the Month's day numbers,
     the strip's rows (24 px, were 22) and so its chips and "+N"; the
-    Month's own chips are D119's exemption;
+    Month's own chips are D119's accepted gap;
   - **names say what shows** (2.5.3): "Today" names the day its icon shows
     ("Today, Wednesday, November 4"), and a search result's or a task
     list tab's text keeps its words apart as its name says them;
   - **focus**: every focusable element without a ring of its own gets the
-    accent's 2 px outline (the stylesheet's `:focus-visible`), the tasks
+    accent's 2 px outline (the stylesheet's `:focus-visible`). An item's
+    ring, the undone chip's and "+N"'s are drawn inward
+    (`-outline-offset-2`): the grid's scroller, the strip and a Month day's
+    rows clip what goes past them, and in the Month an outer ring covered
+    the next chip. An item's is white, with the text's contrast on its fill
+    (above). The spec tabs through the Week and the Month and checks each
+    stop's whole ring lies inside every box that clips it. The tasks
     screen's tabs and panels, search results and menu items included.
     Base UI's dialogs, popovers and the drawer keep the focus inside while
     open and give it back to what opened them, an item's details too;
@@ -553,8 +564,10 @@ the project.
   repeated hour. A grid of the elapsed hours (23 or 25) comes if the drift
   is reported.
 - **Larger targets in the Month on a touch screen** — its chips are 16 px
-  high and exempt from WCAG 2.5.8 through the day's number ([D119](#D119));
-  Google's Android app opens the day on any tap of a tile instead.
+  high, under WCAG 2.5.8's 24 px, an accepted gap the audit exempts
+  ([D119](#D119)); the day's number opens the day, where each item is a
+  larger target. Google's Android app opens the day on any tap of a tile
+  instead.
 - **Forced colours** (Windows' high contrast) — items keep their own fills
   and the rings their accent; the system's colours are not mapped
   ([D120](#D120)).

@@ -303,7 +303,7 @@ function DayTile({
               type="button"
               aria-label={t("month.more", { count: more, day: name })}
               onClick={() => onOpenDay(day)}
-              className="h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] leading-none font-medium whitespace-nowrap text-ink-muted hover:bg-raised"
+              className="h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] leading-none font-medium whitespace-nowrap text-ink-muted -outline-offset-2 hover:bg-raised"
             >
               {t("grid.more", { count: more })}
             </button>

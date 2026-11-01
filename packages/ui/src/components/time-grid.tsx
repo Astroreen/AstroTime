@@ -378,7 +378,7 @@ function Strip({
             type="button"
             aria-label={t("grid.moreLabel", { count, day: formats.fullDate(day) })}
             onClick={() => onExpandedChange(true)}
-            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-[13px] text-ink-muted hover:bg-raised"
+            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-[13px] text-ink-muted -outline-offset-2 hover:bg-raised"
           >
             {t("grid.more", { count })}
           </button>

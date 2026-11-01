@@ -15,16 +15,20 @@ const DISABLED: Record<string, string> = {};
 
 /**
  * Elements a rule is not run on, each with why (design D119). axe checks
- * every other rule on them, and this rule on everything else.
+ * every other rule on them, and this rule on everything else. Each matches
+ * nothing taller than `tallest`, so it cannot hide a larger element that
+ * comes to fail.
  */
-const EXEMPT: { rule: string; selector: string; reason: string }[] = [
+const EXEMPT: { rule: string; selector: string; tallest: number; reason: string }[] = [
   {
     rule: "target-size",
-    // The Month's items, its "+N" and its undone chip: one-line chips 16 px
-    // high, a row every 17 px, as dense as the reference (design D86).
-    selector: '[data-view="month"] [role="listitem"] button',
+    // The Month's items, its "+N" and its undone chip: the button of each
+    // one-line chip, 16 px high, a row every 17 px, as dense as the
+    // reference (design D86). Its day's number and the week's pill are checked.
+    selector: '[data-view="month"] [role="listitem"] > button',
+    tallest: 16,
     reason:
-      "WCAG 2.5.8's equivalent: the day's number, a 24 px target, opens the day, where each item is its own larger target",
+      "an accepted gap, not conformance (design D119): Google's density; larger targets on a touch screen are deferred",
   },
 ];
 
@@ -44,6 +48,17 @@ async function audit(page: Page, what: string): Promise<void> {
         .map((animation) => animation.finished),
     ),
   );
+  for (const { selector, tallest } of EXEMPT) {
+    const heights = await page
+      .locator(selector)
+      .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
+    expect
+      .soft(
+        heights.filter((height) => height > tallest + 0.5),
+        `${what}: exempt only chips`,
+      )
+      .toEqual([]);
+  }
   const exempted = [...new Set(EXEMPT.map(({ rule }) => rule))];
   const results = await new AxeBuilder({ page })
     .withTags(TAGS)
@@ -283,29 +298,76 @@ test.describe("what axe cannot see (design D120)", () => {
     await expect(menu).toBeFocused();
   });
 
-  test("a focused control shows a ring", async ({ page }) => {
-    await page.setViewportSize(WIDE);
-    await openDemo(page, "week");
-    await expect(today(page).getByRole("listitem").first()).toBeVisible();
-    // The top bar, the drawer's views, calendars and settings, and on into
-    // the week: each stop by keyboard with a visible outline.
-    for (let i = 0; i < 40; i++) {
-      await page.keyboard.press("Tab");
-      const ring = await page.evaluate(() => {
-        const element = document.activeElement;
-        if (!element || element === document.body) return null;
-        const style = getComputedStyle(element);
-        return {
-          name: element.getAttribute("aria-label") ?? element.textContent,
-          style: style.outlineStyle,
-          width: style.outlineWidth,
-        };
-      });
-      expect(ring).not.toBeNull();
-      expect(ring!.style, ring!.name ?? "").not.toBe("none");
-      expect(ring!.width, ring!.name ?? "").not.toBe("0px");
-    }
-  });
+  for (const view of ["week", "month"] as const) {
+    test(`every keyboard stop in the ${view} view shows its whole ring`, async ({ page }) => {
+      await page.setViewportSize(WIDE);
+      await openDemo(page, view);
+      await expect(today(page).getByRole("listitem").first()).toBeVisible();
+      // The top bar, the drawer, then the view's days and items, until Tab
+      // comes round again. Each stop shows an outline, and the whole of it is
+      // inside every box that clips it (a scroller, a day's rows) and on
+      // screen: a ring cut off by the grid's scroller is not seen.
+      let stops = 0;
+      for (let tab = 0; tab < 400; tab++) {
+        await page.keyboard.press("Tab");
+        const ring = await page.evaluate(() => {
+          const element = document.activeElement as HTMLElement | null;
+          // Past the last stop the focus leaves the page.
+          if (!element || element === document.body) return null;
+          const again = element.dataset["ringSeen"] !== undefined;
+          element.dataset["ringSeen"] = "";
+          const style = getComputedStyle(element);
+          const reach = parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+          const box = element.getBoundingClientRect();
+          // The outline's outer edge; one drawn inward stays within the element.
+          const grow = Math.max(reach, 0);
+          const outer = {
+            left: box.left - grow,
+            top: box.top - grow,
+            right: box.right + grow,
+            bottom: box.bottom + grow,
+          };
+          const clips = [{ left: 0, top: 0, right: innerWidth, bottom: innerHeight, by: "screen" }];
+          for (let up = element.parentElement; up; up = up.parentElement) {
+            const { overflowX, overflowY } = getComputedStyle(up);
+            if (overflowX === "visible" && overflowY === "visible") continue;
+            const r = up.getBoundingClientRect();
+            const left = r.left + up.clientLeft;
+            const top = r.top + up.clientTop;
+            clips.push({
+              left,
+              top,
+              right: left + up.clientWidth,
+              bottom: top + up.clientHeight,
+              by: up.getAttribute("aria-label") ?? up.className,
+            });
+          }
+          const cut = clips.find(
+            (clip) =>
+              outer.left < clip.left - 0.5 ||
+              outer.top < clip.top - 0.5 ||
+              outer.right > clip.right + 0.5 ||
+              outer.bottom > clip.bottom + 0.5,
+          );
+          return {
+            again,
+            name: element.getAttribute("aria-label") ?? element.textContent ?? element.tagName,
+            style: style.outlineStyle,
+            width: style.outlineWidth,
+            cut: cut?.by ?? null,
+          };
+        });
+        // Round once: the focus left the page or came back to a stop seen.
+        if (!ring || ring.again) break;
+        stops++;
+        expect(ring.style, ring.name).not.toBe("none");
+        expect(ring.width, ring.name).not.toBe("0px");
+        expect(ring.cut, `${ring.name}: its ring is cut off`).toBeNull();
+      }
+      // The view's items were reached, not only the chrome.
+      expect(stops).toBeGreaterThan(40);
+    });
+  }
 
   test("the page has its landmarks and a heading for the period", async ({ page }) => {
     await page.setViewportSize(WIDE);

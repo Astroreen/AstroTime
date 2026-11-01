@@ -43,7 +43,10 @@ function Opener({
           ),
         )
       }
-      className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+      // Its ring is drawn inward, in white: the grid's scroller, the strip
+      // and a Month day's rows clip what goes past an item, and white on
+      // its fill has the text's contrast (design D120).
+      className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
     />
   );
 }
