@@ -131,6 +131,42 @@ export function TasksScreen({
     now,
   };
 
+  // The tab strip's hidden sides, so each fades out while it hides tabs, and
+  // the open list's tab is scrolled into view (design D135).
+  const strip = useRef<HTMLDivElement>(null);
+  const [hides, setHides] = useState({ start: false, end: false });
+  const measureStrip = () => {
+    const element = strip.current;
+    if (!element) return;
+    const start = element.scrollLeft > 1;
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
+    setHides((current) =>
+      current.start === start && current.end === end ? current : { start, end },
+    );
+  };
+  const hasLists = lists.length > 0;
+  useEffect(() => {
+    const element = strip.current;
+    if (!element) return;
+    // The strip's width, and its tabs' as their names and counts change.
+    const observer = new ResizeObserver(measureStrip);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, [hasLists]);
+  useEffect(() => {
+    strip.current
+      ?.querySelector("[role=tab][aria-selected=true]")
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [selected]);
+  const fade = (side: boolean) => (side ? "transparent" : "black");
+  const stripMask =
+    hides.start || hides.end
+      ? {
+          maskImage: `linear-gradient(to right, ${fade(hides.start)}, black 2.5rem, black calc(100% - 2.5rem), ${fade(hides.end)})`,
+        }
+      : undefined;
+
   return (
     <section
       aria-label={t("tasks.title")}
@@ -174,7 +210,13 @@ export function TasksScreen({
           onValueChange={(value) => setChosen(String(value))}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex shrink-0 items-stretch overflow-x-auto border-b border-line [scrollbar-width:none]">
+          {/* Wider than the panel, the strip scrolls; a side with more fades out (design D135). */}
+          <div
+            ref={strip}
+            onScroll={measureStrip}
+            style={stripMask}
+            className="flex shrink-0 items-stretch overflow-x-auto border-b border-line [scrollbar-width:none]"
+          >
             <Tabs.List aria-label={t("tasks.lists")} className="relative flex">
               {lists.map((list) => {
                 const count = byList.get(list.id)?.undoneCount ?? 0;

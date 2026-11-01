@@ -122,3 +122,30 @@ test.describe("in Russian", () => {
     await expect(panel.getByRole("button", { name: "Пометить: Отправить отчёт" })).toBeVisible();
   });
 });
+
+test.describe("the tab strip wider than the panel (design D135)", () => {
+  test.use({ locale: "ru-RU", viewport: WIDE });
+
+  test("fades out on the side that hides tabs, and the open list's tab is scrolled into view", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Задачи", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Задачи" });
+    const strip = panel.getByRole("tablist").locator("..");
+    // "+ Создать список" goes past the 360 px panel: the end fades, the start does not.
+    await expect(strip).toHaveCSS(
+      "mask-image",
+      /^linear-gradient\(to right, rgb\(0, 0, 0\),.*rgba\(0, 0, 0, 0\)\)$/,
+    );
+    await strip.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+    await expect(strip).toHaveCSS(
+      "mask-image",
+      /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/,
+    );
+    // Back at the start, the open list's tab comes into view when it is chosen.
+    await strip.evaluate((element) => element.scrollTo({ left: 0 }));
+    await panel.getByRole("tab", { name: /^Личное/ }).click();
+    await expect(panel.getByRole("tab", { name: /^Личное/ })).toBeInViewport({ ratio: 1 });
+  });
+});

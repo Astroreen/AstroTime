@@ -125,6 +125,7 @@ export function SearchResults({
       <EmptyState
         icon={<SearchIcon className="size-6" />}
         title={t("search.none")}
+        status
         hint={t("search.scope")}
       />
     );

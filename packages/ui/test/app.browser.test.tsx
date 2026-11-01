@@ -782,7 +782,8 @@ test("the empty screens say what is empty and what to do, in English and Russian
     await expect.element(page.getByText(words.searchHint)).toBeInTheDocument();
     await expect.element(page.getByText(words.scope)).toBeInTheDocument();
     await page.getByRole("searchbox").fill("zzzz");
-    await expect.element(page.getByText(words.none)).toBeInTheDocument();
+    // Said to a screen reader as the search's outcome.
+    await expect.element(page.getByRole("status").getByText(words.none)).toBeInTheDocument();
     await expect.element(page.getByText(words.scope)).toBeInTheDocument();
     for (const cleanup of cleanups.splice(0).toReversed()) await cleanup();
   }

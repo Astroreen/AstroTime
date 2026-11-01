@@ -643,8 +643,23 @@ are its decisions.
     tasks…") in the middle of the free space, instead of one grey line at
     the top.
   - **Create in the light theme** is a deeper tonal blue
-    (`--color-fab`), so the screen's main action stands off the light
-    canvas as it does off the dark one.
+    (`--color-fab` `#c2d6fa`, was `#d2e2fc`), so the screen's main action
+    stands off the light canvas: 1.29:1 against it (was 1.15:1; the dark
+    theme's is 1.72:1), with its shadow as the edge. The fill is a tonal
+    surface, as Material 3's is, not what tells the button: its "+" and its
+    word are, at 9.43:1 on the fill (dark: 7.77:1), past 1.4.11's 3:1 and
+    text's 4.5:1.
+  - **"Nothing found" is a status** (`role="status"`), so a screen reader
+    hears that a search found nothing; results are a list it can walk.
+- **D135. A tab strip wider than its room says so.** The tasks screen's
+  tabs (one per list, then "+ New list") scroll sideways when they do not
+  fit, as Google Tasks' do; in the 360 px panel the Russian strip already
+  did ("+ Создать список" cut at the panel's edge), with nothing to tell
+  that more was there. Now a side that hides tabs fades out over 40 px (a
+  mask on the strip, measured on scroll and on resize of the strip and its
+  tabs), and the open list's tab is scrolled into view when it is chosen,
+  from a search too ([D97](#D97)). No arrows: the strip scrolls by touch,
+  wheel and Tab, and the fade is the sign.
 
 ### Decided in the logic QA (after v0.2.0)
 
@@ -774,8 +789,8 @@ Foundation's PR 6a (the details and edit dialogs) brought D108 and D109;
 PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each view
 next to the matching reference, in both themes.
 
-The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`) and
-D134 (`feat/ui-consistency`);
+The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`),
+D134 (`feat/ui-consistency`) and D135 (`fix/tasks-tab-strip`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its
