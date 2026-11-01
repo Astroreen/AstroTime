@@ -71,6 +71,9 @@ When you add a package, app or module, add its line here in the same PR.
     `findOrAddAccount`, one per home and user),
     calendars (with their rights, migration 7), objects with pending local changes, conflicts; finds objects
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
+    - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
+      calendar on this device (provider `local`), whose changes are final.
+      → `plans/foundation.md#D122`
     - `subscribe` — hears every write, for live queries.
       → `plans/foundation.md#D54`
     - `undoneTasksBefore` — the undone tasks due before today.
@@ -120,6 +123,9 @@ When you add a package, app or module, add its line here in the same PR.
     shell whose HTTP follows none: the desktop's. Android's plugin still
     follows them itself, in Kotlin (its Deferred).
     → `plans/desktop.md#D72`, `plans/android.md#D62`
+  - `presetFrom`, `withPreset` (`preset.ts`) — a single-user deployment's
+    server and user name, from the environment into the page's `<meta>`
+    tags. → `plans/foundation.md#D123`
   - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
@@ -167,8 +173,10 @@ When you add a package, app or module, add its line here in the same PR.
     `plans/design.md#D87`). → `plans/design.md#D46`
     - `accounts.tsx`, `sign-in-dialog.tsx`, `remove-account.tsx` — the
       account button and dialog, each account in the drawer, the sync
-      status, the first-run screen, adding and removing an account.
-      → `plans/foundation.md#D92`
+      status, adding (with a preset, the password alone) and removing an
+      account, the calendar on this device.
+      → `plans/foundation.md#D92`, `plans/foundation.md#D122`,
+      `plans/foundation.md#D123`
     - `tasks-screen.tsx` — the tasks screen, or panel on a wide screen.
       → `plans/design.md#D95`
     - `search.tsx` — the search field and its results.
@@ -255,6 +263,8 @@ When you add a package, app or module, add its line here in the same PR.
     `accounts.spec.ts` signs in to a real Radicale (the one
     `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
     takes the accounts' evidence. → `plans/foundation.md#D92`;
+    `offline-first.spec.ts` makes an event on the calendar on this device
+    with no account and no network. → `plans/foundation.md#D122`;
     `remember.spec.ts` closes and opens a persistent profile on an account,
     and reloads a tab in the middle of a Login Flow. → `plans/foundation.md#D121`;
     `reminders.spec.ts` moves `page.clock` and sees notifications through a
@@ -275,6 +285,8 @@ When you add a package, app or module, add its line here in the same PR.
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
     server listens beyond localhost. → `plans/foundation.md#D20`
+  - `dev-preset.ts` — the single-user preset in the dev server's page.
+    → `plans/foundation.md#D123`
   - `dev-tls.ts` — the dev server's https front for the tailnet with a
     self-signed certificate, when `tailscale serve` may not run.
     → `plans/foundation.md#D20`

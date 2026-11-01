@@ -187,6 +187,72 @@ export class Store {
     return this.db.select().from(schema.accounts).orderBy(schema.accounts.createdAt);
   }
 
+  /**
+   * The calendar on this device (docs/plans/foundation.md#D122), made when
+   * the store has no account at all, so the app always has somewhere to
+   * write: one account of provider `local` with one calendar of events and
+   * tasks, named in the user's language. In one transaction, so two tabs
+   * opening an empty store make it once. `null` when the store has accounts.
+   */
+  addLocalCalendarIfEmpty(names: {
+    readonly account: string;
+    readonly calendar: string;
+    readonly color: string;
+  }): Promise<Account | null> {
+    return this.exclusive(async () => {
+      const [any] = await this.db.select({ id: schema.accounts.id }).from(schema.accounts).limit(1);
+      if (any) return null;
+      const account = {
+        id: crypto.randomUUID(),
+        provider: "local" as const,
+        name: names.account,
+        serverUrl: LOCAL_SERVER,
+        username: null,
+        homeUrl: null,
+        createdAt: Date.now(),
+      };
+      await this.db.insert(schema.accounts).values(account);
+      await this.db.insert(schema.calendars).values({
+        id: crypto.randomUUID(),
+        accountId: account.id,
+        url: `${LOCAL_SERVER}personal/`,
+        name: names.calendar,
+        color: names.color,
+        components: "VEVENT,VTODO",
+        readOnly: false,
+        rights: RIGHTS.join(","),
+      });
+      return account;
+    });
+  }
+
+  /**
+   * Removes the calendar on this device if nothing was ever written in it and
+   * another account has calendars of its own now: it steps aside for the
+   * server the user connected (D122). True when it went.
+   */
+  removeLocalCalendarIfUnused(): Promise<boolean> {
+    return this.exclusive(async () => {
+      const accounts = await this.db.select().from(schema.accounts);
+      const local = accounts.filter((account) => account.provider === "local");
+      if (local.length === 0 || local.length === accounts.length) return false;
+      let removed = false;
+      for (const account of local) {
+        const [used] = await this.db
+          .select({ id: schema.objects.id })
+          .from(schema.objects)
+          .innerJoin(schema.calendars, eq(schema.objects.calendarId, schema.calendars.id))
+          .where(eq(schema.calendars.accountId, account.id))
+          .limit(1);
+        if (used) continue;
+        await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
+        removed = true;
+      }
+      if (removed) this.undoneCache.clear();
+      return removed;
+    });
+  }
+
   /** Changes what an account says of itself (signing in again finds its home anew). */
   updateAccount(
     id: string,
@@ -434,7 +500,12 @@ export class Store {
       throw new Error(`${href} holds ${current.uid}; a change to ${object.uid} cannot replace it.`);
     }
     // An edit of an object deleted here but not yet uploaded revives it (D38).
-    const pending: Pending = !current || current.pending === "create" ? "create" : "update";
+    // On the calendar on this device a change is final: nothing uploads it (D122).
+    const pending: Pending = (await this.onDevice(calendarId))
+      ? "none"
+      : !current || current.pending === "create"
+        ? "create"
+        : "update";
     return this.upsert(
       calendarId,
       href,
@@ -470,7 +541,8 @@ export class Store {
   private async deleteLocalNow(id: string): Promise<void> {
     const object = await this.object(id);
     if (!object) return;
-    if (object.pending === "create") await this.removeObjectNow(id);
+    if (object.pending === "create" || (await this.onDevice(object.calendarId)))
+      await this.removeObjectNow(id);
     else
       await this.db
         .update(schema.objects)
@@ -526,6 +598,17 @@ export class Store {
 
   removeObject(id: string): Promise<void> {
     return this.exclusive(() => this.removeObjectNow(id));
+  }
+
+  /** Whether a calendar is the one on this device, which no sync reaches (D122). */
+  private async onDevice(calendarId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ provider: schema.accounts.provider })
+      .from(schema.calendars)
+      .innerJoin(schema.accounts, eq(schema.calendars.accountId, schema.accounts.id))
+      .where(eq(schema.calendars.id, calendarId))
+      .limit(1);
+    return row?.provider === "local";
   }
 
   // The `…Now` methods run inside `exclusive`; they never call an exclusive method.
@@ -910,6 +993,9 @@ const RIGHTS = ["create", "edit", "delete"] as const;
 const IN_LIMIT = 500;
 /** Rows in one multi-row `INSERT`: 15 columns each, 1 500 bound values. */
 const ROWS_PER_INSERT = 100;
+
+/** The calendar on this device's address: no server's, only unique (D122). */
+const LOCAL_SERVER = "local:";
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they

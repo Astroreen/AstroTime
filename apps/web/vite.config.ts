@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 import { davProxy } from "./dav-proxy.ts";
 import { devClients } from "./dev-clients.ts";
+import { devPreset } from "./dev-preset.ts";
 import { devTls } from "./dev-tls.ts";
 
 // Host names besides localhost and IPs the dev server answers to
@@ -16,7 +17,14 @@ const allowedHosts = process.env["ASTROTIME_WEB_ALLOWED_HOSTS"]
 
 export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
-  plugins: [react({ compiler: true }), tailwindcss(), davProxy(), devClients(), devTls()],
+  plugins: [
+    react({ compiler: true }),
+    tailwindcss(),
+    davProxy(),
+    devClients(),
+    devTls(),
+    devPreset(),
+  ],
   ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
   // The page's tags, and a <meta property="csp-nonce"> the app reads, carry
   // this placeholder; the web image's server fills in a fresh nonce on every

@@ -797,7 +797,8 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   brings their mirror ([D135](#D135)).
 - **Accounts in Settings** — adding, removing and signing in again stay in
   the account dialog (the top bar's account button) while the first run and
-  the accounts are reworked; Settings gets an Accounts group then
+  the accounts are reworked (the first run is the calendar on this device
+  since [foundation D122](foundation.md#D122)); Settings gets an Accounts group then
   ([D131](#D131)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing

@@ -7,7 +7,7 @@
 import { test as base, expect } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { openApp, WIDE } from "./support.ts";
+import { addAccount, openApp, WIDE } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -26,8 +26,7 @@ test("an event created here reaches the server, and again once dragged", async (
 }) => {
   const work = await radicale.mkcalendar("work");
   await openApp(page);
-  await page.getByRole("button", { name: "Another CalDAV server" }).click();
-  const signIn = page.getByRole("dialog", { name: "Add an account" });
+  const signIn = await addAccount(page, "caldav");
   await signIn.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
   await signIn.getByRole("textbox", { name: "User name" }).fill(radicale.username);
   await signIn.getByLabel("Password").fill(radicale.password);

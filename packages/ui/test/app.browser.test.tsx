@@ -562,7 +562,9 @@ test("removing a Login Flow account offline: removed here, and the app password 
   await expect
     .element(told.getByText(/^AstroTime could not revoke its app password/))
     .toBeInTheDocument();
-  expect([await store.accounts(), secrets.values.size]).toEqual([[], 0]);
+  // Gone, with its password; the calendar on this device comes in its place (D122).
+  const servers = (await store.accounts()).filter((account) => account.provider !== "local");
+  expect([servers, secrets.values.size]).toEqual([[], 0]);
   await click(told.getByRole("button", { name: "OK" }));
   await expect.element(told).not.toBeInTheDocument();
 });
@@ -624,19 +626,25 @@ test("a sync that comes to need the user is said once, not again after each sync
   ]);
 });
 
-test("an empty app leads to adding an account, and a wrong password says so in the user's language", async () => {
+test("an empty app opens on the calendar on this device; an account added from the accounts dialog takes its place, a wrong password said in the user's language (D122)", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });
   const secrets = memorySecrets();
   render(Promise.resolve(store), ["ru-RU"], { http: server.http, secrets });
+  // No sign-in in the way: the calendar, with a calendar of its own on this device.
+  await page.getByRole("button", { name: /^Аккаунты/ }).click();
+  const accounts = page.getByRole("dialog", { name: "Аккаунты" });
   await expect
-    .element(page.getByRole("heading", { name: "Ваши календари и задачи с вашего сервера" }))
+    .element(accounts.getByText("Без синхронизации: только на этом устройстве"))
     .toBeInTheDocument();
-  await page.getByRole("button", { name: "Другой сервер CalDAV" }).click();
-  const dialog = page.getByRole("dialog", { name: "Добавить аккаунт" });
   await expect
-    .element(dialog.getByRole("tab", { name: "CalDAV" }))
-    .toHaveAttribute("aria-selected", "true");
+    .element(accounts.getByText("На этом устройстве", { exact: true }))
+    .toBeInTheDocument();
+  expect((await store.accounts()).map((a) => a.provider)).toEqual(["local"]);
+  expect((await store.calendars()).map((c) => c.name)).toEqual(["Личный"]);
+  await accounts.getByRole("button", { name: "Добавить аккаунт" }).click();
+  const dialog = page.getByRole("dialog", { name: "Добавить аккаунт" });
+  await dialog.getByRole("tab", { name: "CalDAV" }).click();
   await dialog.getByRole("textbox", { name: "Адрес сервера" }).fill("cloud.example.com");
   await dialog.getByRole("textbox", { name: "Имя пользователя" }).fill("astro");
   await dialog.getByLabelText("Пароль").fill("wrong");
@@ -644,15 +652,58 @@ test("an empty app leads to adding an account, and a wrong password says so in t
   await expect
     .element(dialog.getByRole("alert"))
     .toHaveTextContent("Неверное имя пользователя или пароль.");
-  expect(await store.accounts()).toEqual([]);
 
   await dialog.getByLabelText("Пароль").fill("right");
   await dialog.getByRole("button", { name: "Войти" }).click();
-  // Signed in: the dialog closes and the calendar, with the account's button, takes its place.
+  // Signed in: the dialog closes, and the unused calendar on this device steps aside.
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  await expect.element(page.getByRole("button", { name: /^Аккаунты/ })).toBeInTheDocument();
+  await page.getByRole("button", { name: /^Аккаунты/ }).click();
+  await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
+  await expect
+    .element(accounts.getByText("На этом устройстве", { exact: true }))
+    .not.toBeInTheDocument();
   expect((await store.accounts()).map((a) => a.name)).toEqual(["astro@cloud.example.com"]);
   expect(secrets.values.size).toBe(1);
+});
+
+test("a deployment's preset asks for the password alone, by itself, and not again once closed (D123)", async () => {
+  const store = await emptyStore();
+  const server = nextcloud({ password: "right" });
+  const preferences = memoryPreferences({ "astrotime.view": "day" });
+  const preset = { server: `${SERVER}/`, username: "astro" };
+  render(Promise.resolve(store), ["en-US"], { http: server.http, preferences, preset });
+  const dialog = page.getByRole("dialog", { name: "Sign in to cloud.example.com" });
+  await expect.element(dialog.getByText("As astro")).toBeInTheDocument();
+  await expect
+    .element(dialog.getByRole("textbox", { name: "Server address" }))
+    .not.toBeInTheDocument();
+  await expect.element(dialog.getByRole("textbox", { name: "User name" })).not.toBeInTheDocument();
+  // Closed unsigned: the calendar on this device, and no dialog the next time.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  expect(preferences.get("astrotime.presetSignIn")).toBe("dismissed");
+  cleanups.pop()?.();
+  render(Promise.resolve(store), ["en-US"], { http: server.http, preferences, preset });
+  await expect.element(page.getByRole("button", { name: /^Accounts/ })).toBeInTheDocument();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+  // From the accounts dialog it asks the same: the password signs in.
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await page.getByRole("button", { name: "Add account" }).click();
+  await dialog.getByLabelText("Password").fill("right");
+  await dialog.getByRole("button", { name: "Sign in" }).click();
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  // The unused calendar on this device steps aside for the server's (D122).
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  const accounts = page.getByRole("dialog", { name: "Accounts" });
+  await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
+  await expect
+    .element(accounts.getByText("On this device", { exact: true }))
+    .not.toBeInTheDocument();
+  expect((await store.accounts()).map((a) => [a.provider, a.username])).toEqual([
+    ["caldav", "astro"],
+  ]);
+  expect(preferences.get("astrotime.presetSignIn")).toBe("");
 });
 
 test("Login Flow v2 in the UI: it waits, opens the page again, cancels, and finishes on return", async () => {
@@ -663,7 +714,8 @@ test("Login Flow v2 in the UI: it waits, opens the page again, cancels, and fini
     http: server.http,
     openExternal: (url) => opened.push(url),
   });
-  await page.getByRole("button", { name: "Sign in to Nextcloud" }).click();
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await page.getByRole("button", { name: "Add account" }).click();
   const dialog = page.getByRole("dialog", { name: "Add an account" });
   await dialog.getByRole("textbox", { name: "Server address" }).fill("cloud.example.com");
   await dialog.getByRole("button", { name: "Continue" }).click();

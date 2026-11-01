@@ -53,6 +53,12 @@ over https, on the same port number, through one of two fronts:
   openssl from the devenv shell) is made once, and again when the names it
   covers change. `dev.sh` prints the command above while it falls back.
 
+**A single-user preset.** `.astrotime-dev/preset.env` (gitignored), with
+`ASTROTIME_SERVER_URL=https://cloud.example.com` and
+`ASTROTIME_USERNAME=astro`, makes the dev server's page name that server and
+user, so signing in asks for the password alone, and puts the server on the
+proxy's list (`docs/plans/foundation.md#D123`). It holds no password.
+
 **One address, one store.** A browser keeps the app's store, accounts and
 passwords per origin, so `http://127.0.0.1:5180`, `https://100.x.y.z:5180`,
 `https://<machine>:5180` and the `tailscale serve` name each start empty,

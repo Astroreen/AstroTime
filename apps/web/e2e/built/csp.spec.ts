@@ -10,7 +10,7 @@ import { test as base, expect } from "@playwright/test";
 
 import { createAppServer } from "../../../proxy/src/server.ts";
 import { startRadicale, type CalDavServer } from "../../../../packages/sync/test/servers.ts";
-import { openApp, WIDE } from "../support.ts";
+import { addAccount, openApp, WIDE } from "../support.ts";
 
 const test = base.extend<{ radicale: CalDavServer; violations: string[] }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -82,9 +82,7 @@ test("the built app opens its store, adds an account through the proxy, and brea
   const policy = (await loaded).headers()["content-security-policy"] ?? "";
   expect(policy).toContain("default-src 'none'");
   // The store opened: SQLite's wasm in its worker, on OPFS.
-  await expect(
-    page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
 
   // The worker's script and SQLite's wasm came with the policy, without a nonce.
   expect(files.some((file) => file.path.endsWith(".wasm"))).toBe(true);
@@ -112,8 +110,7 @@ test("the built app opens its store, adds an account through the proxy, and brea
   expect([nonce.attribute, nonce.applied]).toEqual(["", "7px"]);
 
   // Signing in goes through /dav-proxy/ on the page's own origin.
-  await page.getByRole("button", { name: "Another CalDAV server" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add an account" });
+  const dialog = await addAccount(page, "caldav");
   await dialog.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
   await dialog.getByRole("textbox", { name: "User name" }).fill(radicale.username);
   await dialog.getByLabel("Password").fill(radicale.password);

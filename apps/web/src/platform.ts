@@ -5,7 +5,7 @@
 // tab loaded anew (D121), preferences in localStorage,
 // one sync at a time across the tabs (D91), and reminders as notifications
 // while the app is open (D101).
-import { fetchClient, throughProxy } from "@astrotime/caldav";
+import { fetchClient, throughProxy, type Preset } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
 import { localPreferences, type Platform } from "@astrotime/ui";
 
@@ -22,7 +22,7 @@ const REQUEST_CEILING_MS = 5 * 60_000;
  * `store` is the web store named `name` on OPFS (`webDriver`'s), which every
  * tab of the origin opens (D98).
  */
-export function webPlatform(store: Promise<Store>, name: string): Platform {
+export function webPlatform(store: Promise<Store>, name: string, preset?: Preset): Platform {
   const secrets = indexedDbSecrets();
   return {
     store,
@@ -38,6 +38,8 @@ export function webPlatform(store: Promise<Store>, name: string): Platform {
       ((await navigator.storage.persisted()) || navigator.storage.persist()),
     // Each origin has its own store: the same app at another address starts empty.
     dataHome: location.host,
+    // The server and user the deployment names (D123).
+    ...(preset ? { preset } : {}),
     // A tab of its own, which cannot reach back into this one.
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
     preferences: localPreferences,

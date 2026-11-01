@@ -1,4 +1,4 @@
-import type { HttpClient } from "@astrotime/caldav";
+import type { HttpClient, Preset } from "@astrotime/caldav";
 import type { ReminderScheduler, SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 import type { SyncLock } from "@astrotime/sync";
@@ -71,6 +71,12 @@ export interface Platform {
    * `preferences`), since Firefox asks the user.
    */
   readonly keepData?: () => Promise<boolean>;
+  /**
+   * A single-user deployment's server and user name (foundation D123): the
+   * sign-in asks for the password alone, and opens by itself while there is
+   * no account of a server. The web's, from the page.
+   */
+  readonly preset?: Preset;
   /**
    * Where the store lives, for a platform where the same app at another
    * address has a store of its own: the web's origin (foundation D121).

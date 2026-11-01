@@ -11,6 +11,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
@@ -37,6 +38,9 @@ export interface AccountsValue {
 }
 
 const AccountsContext = createContext<AccountsValue | null>(null);
+
+/** The calendar on this device's colour, the demo's first calendar's blue (design D47). */
+const LOCAL_COLOR = "#4f8fd6";
 
 export function useAccounts(): AccountsValue {
   const value = useContext(AccountsContext);
@@ -90,6 +94,29 @@ export function AccountsProvider({
   const [signingIn, setSigningIn] = useState<SignInRequest | null>(null);
   const [removing, setRemoving] = useState<Account | null>(null);
 
+  // No account at all: the calendar on this device, so the app opens on a
+  // calendar to write in, with no server (D122). Made in the language
+  // spoken now; again after the last account is removed.
+  const { t } = useTranslation();
+  const [localNames] = useState(() => ({
+    account: t("local.account"),
+    calendar: t("local.calendar"),
+  }));
+  useEffect(
+    () =>
+      liveQuery(
+        store,
+        async () => (await store.accounts()).length,
+        (count) => {
+          if (count > 0) return;
+          store
+            .addLocalCalendarIfEmpty({ ...localNames, color: LOCAL_COLOR })
+            .catch((error: unknown) => console.error(error));
+        },
+      ),
+    [store, localNames],
+  );
+
   // A Login Flow the page before this one started, discarded by the browser
   // or ended by the system while the user approved on Nextcloud's page: this
   // page takes it up again (D121).
@@ -130,7 +157,11 @@ export function AccountsProvider({
           pending,
           ...(platform.signingInTo ? { signingInTo: platform.signingInTo } : {}),
         });
-        if ((await signIn.saveHeld()) === "saved") void scheduler.syncNow();
+        if ((await signIn.saveHeld()) === "saved") {
+          void scheduler.syncNow();
+          // An unused calendar on this device steps aside for the server's (D122).
+          await store.removeLocalCalendarIfUnused();
+        }
         const now = await heldApproval(pending);
         if (live) setHeld(now);
       } catch (error) {
@@ -148,11 +179,31 @@ export function AccountsProvider({
     };
   }, [platform, store, scheduler]);
 
+  // A single-user deployment (D123): while no server's account is here, the
+  // sign-in opens by itself on the password, once per page, until the user
+  // closes it unsigned.
+  const { preset, preferences } = platform;
+  // The dialog closes after a sign-in too; that is no dismissal.
+  const signedIn = useRef(false);
+  useEffect(() => {
+    if (!preset || preferences.get(KEYS.presetSignIn) === "dismissed") return;
+    let asked = false;
+    return liveQuery(
+      store,
+      async () => (await store.accounts()).some((account) => account.provider === "caldav"),
+      (hasServer) => {
+        if (hasServer || asked) return;
+        asked = true;
+        setSigningIn((open) => open ?? { kind: "preset" });
+      },
+    );
+  }, [preset, preferences, store]);
+
   // Once the store holds an account, the browser is asked to keep its data
   // rather than evict it under pressure, once on this device: its answer is
   // kept, granted or refused (D121).
   useEffect(() => {
-    const { keepData, preferences } = platform;
+    const { keepData } = platform;
     if (!keepData || preferences.get(KEYS.keepData) !== null) return;
     let asked = false;
     return liveQuery(
@@ -173,7 +224,7 @@ export function AccountsProvider({
         );
       },
     );
-  }, [platform, store]);
+  }, [platform, preferences, store]);
 
   const value: AccountsValue = {
     platform,
@@ -193,11 +244,22 @@ export function AccountsProvider({
       <SignInDialog
         request={signingIn}
         onClose={() => {
+          // Closed unsigned: the preset's sign-in opens by itself no more.
+          if (signingIn?.kind === "preset" && !signedIn.current)
+            preferences.set(KEYS.presetSignIn, "dismissed");
+          signedIn.current = false;
           setSigningIn(null);
           // A sign-in that ended offline after its approval leaves it held.
           retryHeld.current();
         }}
-        onSignedIn={() => void scheduler.syncNow()}
+        onSignedIn={() => {
+          signedIn.current = true;
+          void scheduler.syncNow();
+          // Signed in: removed one day, the preset's sign-in opens by itself again.
+          preferences.set(KEYS.presetSignIn, "");
+          // An unused calendar on this device steps aside for the server's (D122).
+          store.removeLocalCalendarIfUnused().catch((error: unknown) => console.error(error));
+        }}
       />
       <RemoveAccountDialog
         account={removing}

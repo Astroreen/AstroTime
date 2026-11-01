@@ -80,3 +80,29 @@ export async function openApp(page: Page): Promise<void> {
   await page.clock.setFixedTime(NOW);
   await page.goto("/");
 }
+
+/**
+ * Opens the add-account dialog from the accounts dialog, the way in since
+ * the app opens on the calendar on this device (docs/plans/foundation.md#D122);
+ * on CalDAV's tab for `caldav`. `words` are the UI's, in its language.
+ */
+export async function addAccount(
+  page: Page,
+  kind: "nextcloud" | "caldav" = "nextcloud",
+  words = { accounts: /^Accounts/, add: "Add account", dialog: "Add an account" },
+) {
+  await page.getByRole("button", { name: words.accounts }).click();
+  await page.getByRole("dialog").getByRole("button", { name: words.add }).click();
+  const dialog = page.getByRole("dialog", { name: words.dialog });
+  if (kind === "nextcloud") return dialog;
+  // The Nextcloud tab's panel may stay in the tree: CalDAV's own panel holds the form.
+  await dialog.getByRole("tab", { name: "CalDAV" }).click();
+  return dialog.getByRole("tabpanel", { name: "CalDAV" });
+}
+
+/** The Russian words of `addAccount`. */
+export const RU_ADD_ACCOUNT = {
+  accounts: /^Аккаунты/,
+  add: "Добавить аккаунт",
+  dialog: "Добавить аккаунт",
+};

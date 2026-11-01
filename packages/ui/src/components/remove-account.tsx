@@ -8,6 +8,7 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { accountName } from "./accounts.tsx";
 import { textButton } from "./sign-in-dialog.tsx";
 
 export function RemoveAccountDialog({
@@ -21,6 +22,9 @@ export function RemoveAccountDialog({
 }) {
   const { t } = useTranslation();
   const [removing, setRemoving] = useState(false);
+  // The calendar on this device has no server to keep its items (D122).
+  const local = account?.provider === "local";
+  const name = account ? accountName(account, t) : "";
   /** Removed, but its app password is still valid on the server. */
   const [kept, setKept] = useState(false);
   const close = () => {
@@ -35,7 +39,7 @@ export function RemoveAccountDialog({
           {kept ? (
             <>
               <AlertDialog.Title className="text-lg font-medium">
-                {t("accounts.notRevokedTitle", { name: account?.name ?? "" })}
+                {t("accounts.notRevokedTitle", { name })}
               </AlertDialog.Title>
               <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
                 {t("accounts.notRevokedBody")}
@@ -49,10 +53,10 @@ export function RemoveAccountDialog({
           ) : (
             <>
               <AlertDialog.Title className="text-lg font-medium">
-                {t("accounts.removeTitle", { name: account?.name ?? "" })}
+                {local ? t("local.removeTitle") : t("accounts.removeTitle", { name })}
               </AlertDialog.Title>
               <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
-                {t("accounts.removeBody")}
+                {t(local ? "local.removeBody" : "accounts.removeBody")}
               </AlertDialog.Description>
               <div className="mt-5 flex justify-end gap-2">
                 <AlertDialog.Close className={textButton}>
@@ -76,7 +80,7 @@ export function RemoveAccountDialog({
                       .finally(() => setRemoving(false));
                   }}
                 >
-                  {t("accounts.removeConfirm")}
+                  {t(local ? "local.removeConfirm" : "accounts.removeConfirm")}
                 </button>
               </div>
             </>

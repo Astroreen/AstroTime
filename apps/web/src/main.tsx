@@ -1,5 +1,6 @@
 // The web app: its platform (`platform.ts`) and the browser's languages
 // around the shared UI (docs/plans/foundation.md#D22).
+import { PRESET_META, type Preset } from "@astrotime/caldav";
 import { Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { AstroTime } from "@astrotime/ui";
@@ -17,6 +18,13 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // The nonce the server gave this page for the styles Base UI adds
 // (docs/plans/foundation.md#D110); the browser keeps it from the DOM's attribute.
 const nonce = document.querySelector<HTMLMetaElement>("meta[property=csp-nonce]")?.nonce;
+// The server and user name a single-user deployment names (docs/plans/foundation.md#D123).
+const meta = (name: string) =>
+  document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content || null;
+const presetServer = meta(PRESET_META.server);
+const preset: Preset | undefined = presetServer
+  ? { server: presetServer, username: meta(PRESET_META.username) }
+  : undefined;
 
 /** The web store's name on OPFS. */
 const STORE = "astrotime";
@@ -35,7 +43,7 @@ async function openStore(): Promise<Store> {
 createRoot(root).render(
   <StrictMode>
     <AstroTime
-      platform={webPlatform(openStore(), STORE)}
+      platform={webPlatform(openStore(), STORE, preset)}
       languages={languages}
       timeZone={timeZone}
       {...(nonce ? { nonce } : {})}

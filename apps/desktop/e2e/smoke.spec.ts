@@ -40,10 +40,8 @@ test("the app starts sandboxed on app://, keeps its store in a utility process, 
   const userData = profile();
   const { app, page } = await launch(userData);
 
-  // The store opened: the first-run screen shows only then.
-  await expect(
-    page.getByRole("heading", { name: "Your calendars and tasks, from your own server" }),
-  ).toBeVisible();
+  // The store opened: the calendar shows only then, on the calendar on this device (D122).
+  await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
   expect(page.url()).toBe("app://astrotime/");
   // node:sqlite in a utility process of its own, on a file in userData (D73).
   const processes = await app.evaluate(({ app: main }) =>
