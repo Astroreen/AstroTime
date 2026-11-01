@@ -110,6 +110,8 @@ export function AgendaView({
   // list goes there, and reads the days around it if it does not hold them.
   useEffect(() => {
     if (anchor === reported.current) return;
+    // The list is going there: picking the day scrolled to before is a jump again.
+    reported.current = anchor;
     setJump(anchor);
     setRange((current) =>
       anchor < current.from || anchor >= current.to ? around(anchor) : current,
