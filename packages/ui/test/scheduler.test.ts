@@ -390,3 +390,53 @@ test("a hold's end syncs a hidden tab only for a change of its own; a visible ta
   page.elapse(122_000);
   expect(calls).toHaveLength(5);
 });
+
+test("an account signed out does not keep a hidden tab waking at holds' ends for a change already sent", async () => {
+  const page = fakePage();
+  const { calls, sync, report } = recorder();
+  const scheduler = new SyncScheduler(sync, page.env);
+  scheduler.start();
+  await Promise.resolve();
+  page.hide();
+  // The change goes up to "a"; "b" is signed out, its password refused and held.
+  report({
+    accounts: [
+      {
+        accountId: "a",
+        status: "synced",
+        report: {
+          uploaded: 1,
+          downloaded: 0,
+          removed: 0,
+          conflicts: 0,
+          skipped: [],
+          errors: [],
+          dropped: [],
+        },
+      },
+      { accountId: "b", status: "signed-out", detail: "401", report: null },
+    ],
+    finishedAt: 0,
+    retryAt: null,
+    held: ["b"],
+  });
+  scheduler.changed();
+  page.tick(CHANGE_DEBOUNCE_MS);
+  await Promise.resolve();
+  expect(calls).toHaveLength(2);
+  // Later a third account's server is busy, held for two minutes: its end
+  // does not wake this hidden tab, which has nothing of its own to send.
+  report({
+    accounts: [{ accountId: "c", status: "offline", detail: "429", report: null }],
+    finishedAt: 0,
+    retryAt: page.env.now() + 120_000,
+    held: ["c"],
+  });
+  page.pass(REFOCUS_GAP_MS);
+  page.goOffline();
+  page.goOnline();
+  await scheduler.requested();
+  expect(calls).toHaveLength(3);
+  page.elapse(122_000);
+  expect(calls).toHaveLength(3);
+});

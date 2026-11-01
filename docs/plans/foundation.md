@@ -1488,7 +1488,9 @@ too many requests.
   names the soonest end of a hold (`retryAt`), and `SyncScheduler` plans a
   sync a second after it, so the change goes up then with no trigger or
   user needed: in a visible tab, or a hidden one that holds a change of its
-  own ([D129](#D129)); any other hidden tab waits for its next visit. A held
+  own ([D129](#D129)), until every account that can sync took it (one
+  signed out or refused waits for the user, not for a sync); any other
+  hidden tab waits for its next visit. A held
   account's result is not news: its "offline" does not make the next
   trigger due, so triggers during a hold keep the one-minute gap. Each tab
   (each instance of the store) keeps its own holds, in memory
