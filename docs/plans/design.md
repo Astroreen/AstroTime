@@ -665,8 +665,12 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   - **Save with nothing changed asks nothing** of an occurrence of a
     series, as a drop that changes nothing ([D111](#D111)); it writes
     nothing either.
-  - **Event, task, event keeps the event's times** while creating: a task
-    holds one day, so an end at or before the start was the next day's.
+  - **Event, task, event keeps the event's times** while creating: switched
+    to a task, the event's all-day state, its days and its end time are
+    kept with the form, and switched back it has them again, from the day
+    the task is due on (several days, no length, all day). A task made an
+    event otherwise holds its one day: an end before the start is the next
+    day's, one at it an hour.
   - **A dialog keeps its keys**: the view and period keys
     ([D88](#D88)) do nothing behind the scope question or a confirmation
     (`alertdialog`), as behind any other dialog.

@@ -275,6 +275,42 @@ describe("the form's corners", () => {
     expect(withStartTime(late, "09:00")).toMatchObject({ endDate: "2026-11-05", endTime: "10:00" });
   });
 
+  test("an event made a task and back while the dialog is open is the event it was", () => {
+    const options = { calendarId: "c", day: "2026-11-05", minutes: 0, at: 10 * 60, timeZone };
+    const round = (form: Form) => switchKind(switchKind(form, "task"), "event");
+    // Over three days.
+    const long = { ...newForm("event", options), endDate: "2026-11-07", endTime: "12:00" };
+    expect(round(long)).toMatchObject({
+      allDay: false,
+      startDate: "2026-11-05",
+      startTime: "10:00",
+      endDate: "2026-11-07",
+      endTime: "12:00",
+    });
+    // With no length.
+    const none = newForm("event", { ...options, length: 0 });
+    expect(round(none)).toMatchObject({
+      startTime: "10:00",
+      endDate: "2026-11-05",
+      endTime: "10:00",
+    });
+    // All day, over two days.
+    const allDay = { ...newForm("event", options), allDay: true, endDate: "2026-11-06" };
+    expect(round(allDay)).toMatchObject({
+      allDay: true,
+      startDate: "2026-11-05",
+      endDate: "2026-11-06",
+    });
+    // Due on another day meanwhile: as long, from there.
+    const moved = { ...switchKind(long, "task"), endDate: "2026-11-10" };
+    expect(switchKind(moved, "event")).toMatchObject({
+      startDate: "2026-11-10",
+      endDate: "2026-11-12",
+      endTime: "12:00",
+    });
+    expect(switchKind(moved, "event")).not.toHaveProperty("asEvent");
+  });
+
   test("an event over midnight made a task and back keeps its length", () => {
     const form = newForm("event", {
       calendarId: "c",
