@@ -1154,6 +1154,24 @@ Decided while building PR 6a.
   a calendar that lets nothing be edited ([D37](#D37)) only keeping the
   server's is offered. Ours is
   applied as it was refused, with its own `DTSTAMP` and `SEQUENCE`.
+- **D142. A series edited at its corners** ([D105](#D105)), found by the
+  logic QA after v0.2.0:
+  - **"This and following" from the first occurrence that shows** is all of
+    them: one before it that an EXDATE or a cancelled exception removes does
+    not count, so no object is left with no occurrence (an edit's old
+    series, a deletion's whole object goes).
+  - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
+    made all-day or timed, or moves to another zone (`movedRule`): it ends
+    on the same day, a date or the end of that day in UTC.
+  - **Every other week on several days** keeps its weeks when its days
+    shift into different weeks than each other: the rule's week start
+    (`WKST`) shifts by as many days.
+  - **A time naming an occurrence in another zone than the start's** (an
+    EXDATE or RECURRENCE-ID another client wrote) is written, when rewritten,
+    with the start's TZID at the same instant, on its wall clock; it kept its
+    wall clock under the new TZID, and named another instant.
+  - **An `RDATE` of a period** (`VALUE=PERIOD`) stays as written, and goes
+    with the part of a split its start is in.
 
 ### Dragging
 
@@ -1454,6 +1472,8 @@ errors").
 - **An `RDATE` period's own length** — an occurrence from an `RDATE` of a
   period lasts as long as the series, not the period ([D141](#D141)); no
   client AstroTime has seen writes one.
+- **An `RDATE` period moved with its series** — a series moved keeps its
+  `RDATE`s of periods where they were ([D142](#D142)).
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by

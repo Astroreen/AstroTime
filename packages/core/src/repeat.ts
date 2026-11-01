@@ -219,6 +219,21 @@ export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.
       return `${ordinal}${shift(weekday)}`;
     });
     if (byDay) parts["BYDAY"] = unique(byDay);
+    // Every other week (or more) on several days: the days shifted into
+    // different weeks than each other would fall in weeks the rule skips,
+    // unless the week starts as many days later too (RFC 5545 WKST).
+    if (rule.freq === "WEEKLY" && rule.interval > 1 && parts["BYDAY"]) {
+      // ical.js numbers the weekdays from Sunday, 1 to 7.
+      const start = rule.wkst || ICAL.Time.MONDAY;
+      const weeks = new Set(
+        (rule.parts["BYDAY"] ?? []).map((value) => {
+          const weekday = /(MO|TU|WE|TH|FR|SA|SU)$/.exec(String(value))?.[1] as Weekday;
+          const sunday = (WEEKDAYS.indexOf(weekday) + 1) % 7;
+          return Math.floor((((sunday - (start - 1) + 7) % 7) + days) / 7);
+        }),
+      );
+      if (weeks.size > 1) moved.wkst = ((((start - 1 + days) % 7) + 7) % 7) + 1;
+    }
     if (parts["BYMONTHDAY"] && (rule.freq === "MONTHLY" || rule.freq === "YEARLY")) {
       const date = Number(fromDay.slice(8));
       parts["BYMONTHDAY"] = unique(
@@ -245,7 +260,19 @@ export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.
     shifted("BYHOUR", part(to.local, 11) - part(from.local, 11), 24);
     shifted("BYMINUTE", part(to.local, 14) - part(from.local, 14), 60);
   }
+  // UNTIL is of DTSTART's type (RFC 5545 §3.3.10): made all-day or timed, or
+  // in another zone, the series ends on the same day, written in the new type.
+  if (rule.until && !sameKind(from, to)) {
+    const zone = from.type === "zoned" ? from.timeZone : "UTC";
+    moved.until = untilOf(wallClockOf(fromIcalTime(rule.until), zone).slice(0, 10), to);
+  }
   return moved;
+}
+
+/** Whether two times are of one type, and of one zone when zoned. */
+function sameKind(a: ItemTime, b: ItemTime): boolean {
+  if (a.type === "zoned" && b.type === "zoned") return a.timeZone === b.timeZone;
+  return a.type === b.type;
 }
 
 /**

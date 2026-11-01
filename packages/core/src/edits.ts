@@ -12,7 +12,7 @@ import { readItem } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
-import { fromIcalTime, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
 
 /** Which occurrences of a series an edit or a deletion applies to (D11). */
@@ -176,7 +176,7 @@ export function editItem(
     apply(component, copy.root, withoutRepeat(changes), now);
     return { ics: copy.serialize(), split: null };
   }
-  if (scope === "following" && !isFirst(master, recurrenceId)) {
+  if (scope === "following" && !isFirst(copy.root, master, recurrenceId)) {
     if (!options.newUid) throw new Error("A split needs the new series' UID.");
     const rest = splitAt(copy, master, recurrenceId, options.newUid, now);
     editSeries(rest, changes, recurrenceId, shown, now);
@@ -224,7 +224,7 @@ export function deleteItem(
     return exceptions.length > gone.length ? copy.serialize() : null;
   }
   if (scope === "following") {
-    if (isFirst(master, recurrenceId)) return null;
+    if (isFirst(copy.root, master, recurrenceId)) return null;
     endBefore(copy.root, master, recurrenceId, now);
     return copy.serialize();
   }
@@ -236,7 +236,7 @@ export function deleteItem(
   }
   const exdate = new ICAL.Property("exdate");
   master.addProperty(exdate);
-  setTime(exdate, recurrenceId, anchorTzid(master));
+  setTime(exdate, inSeriesZone(recurrenceId, master), anchorTzid(master));
   significant(master, now);
   return copy.serialize();
 }
@@ -551,9 +551,38 @@ function isSeries(component: ICAL.Component): boolean {
   return component.hasProperty("rrule") || component.hasProperty("rdate");
 }
 
-function isFirst(master: ICAL.Component, recurrenceId: ItemTime): boolean {
+/**
+ * Whether no occurrence of the series shows before `recurrenceId`: then
+ * "this and following" is all of them (D105), as when it is the first
+ * occurrence by `DTSTART`, so no series is left without any. One its rule or
+ * RDATEs make shows unless an EXDATE or a cancelled exception removes it; an
+ * exception for one before, moved anywhere, shows. A series too dense to walk
+ * through is taken to show one.
+ */
+function isFirst(root: ICAL.Component, master: ICAL.Component, recurrenceId: ItemTime): boolean {
   const anchor = anchorOf(master);
-  return anchor !== null && orderKey(recurrenceId, anchor) <= orderKey(anchor, anchor);
+  if (anchor === null) return false;
+  const split = orderKey(recurrenceId, anchor);
+  if (split <= orderKey(anchor, anchor)) return true;
+  const removed = datesOf(master, "exdate");
+  for (const exception of exceptionsOf(root, master)) {
+    const id = recurrenceIdOf(exception);
+    if (id === null || orderKey(id, anchor) >= split) continue;
+    const status = String(exception.getFirstPropertyValue("status") ?? "").toUpperCase();
+    if (status !== "CANCELLED") return false;
+    removed.push(id);
+  }
+  const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
+  if (!(start instanceof ICAL.Time)) return false;
+  const nextStart = seriesStarts(master, start, null);
+  for (let step = 0; step < 50_000; step++) {
+    const next = nextStart();
+    if (!next) return true;
+    const time = fromIcalTime(keepTzid(start, next));
+    if (orderKey(time, anchor) >= split) return true;
+    if (!removed.some((gone) => sameOccurrence(gone, time, anchor))) return false;
+  }
+  return false;
 }
 
 function exceptionsOf(root: ICAL.Component, master: ICAL.Component): ICAL.Component[] {
@@ -565,7 +594,10 @@ function recurrenceIdOf(component: ICAL.Component): ItemTime | null {
   return value instanceof ICAL.Time ? fromIcalTime(value) : null;
 }
 
-/** Every value of a component's EXDATEs or RDATEs, one property per value. */
+/**
+ * Every time of a component's EXDATEs or RDATEs. An RDATE of a period is not
+ * one: `setDates` leaves it as it is (`keepPeriods` drops it).
+ */
 function datesOf(component: ICAL.Component, name: "exdate" | "rdate"): ItemTime[] {
   return component
     .getAllProperties(name)
@@ -574,18 +606,48 @@ function datesOf(component: ICAL.Component, name: "exdate" | "rdate"): ItemTime[
     .map(fromIcalTime);
 }
 
+const holdsPeriods = (property: ICAL.Property) =>
+  property.getValues().some((value) => value instanceof ICAL.Period);
+
+/** Writes `times` as the EXDATEs or RDATEs, one property per value; RDATEs of periods stay. */
 function setDates(
   component: ICAL.Component,
   name: "exdate" | "rdate",
   times: readonly ItemTime[],
   tzid: string | null,
 ): void {
-  component.removeAllProperties(name);
+  for (const property of component.getAllProperties(name)) {
+    if (!holdsPeriods(property)) component.removeProperty(property);
+  }
   for (const time of times) {
     const property = new ICAL.Property(name);
     component.addProperty(property);
-    setTime(property, time, tzid);
+    setTime(property, inSeriesZone(time, component), tzid);
   }
+}
+
+/** Drops the RDATEs of periods whose start `keep` refuses. */
+function keepPeriods(component: ICAL.Component, keep: (start: ItemTime) => boolean): void {
+  for (const property of component.getAllProperties("rdate")) {
+    if (!holdsPeriods(property)) continue;
+    const kept = property
+      .getValues()
+      .filter((value) => !(value instanceof ICAL.Period) || keep(fromIcalTime(value.start)));
+    if (kept.length === 0) component.removeProperty(property);
+    else property.setValues(kept);
+  }
+}
+
+/**
+ * A time that names an occurrence (an EXDATE, a RECURRENCE-ID) as the series
+ * writes it, with the TZID of its start: one in another zone than the
+ * start's (another client's), on the start's wall clock at the same instant.
+ */
+function inSeriesZone(time: ItemTime, component: ICAL.Component): ItemTime {
+  const anchor = anchorOf(component);
+  if (time.type !== "zoned" || time.timeZone === "UTC" || anchor?.type !== "zoned") return time;
+  if (anchor.timeZone === "UTC" || anchor.timeZone === time.timeZone) return time;
+  return inFrameOf(time, anchor);
 }
 
 function setRepeat(master: ICAL.Component, repeat: Repeat | null): void {
@@ -721,7 +783,7 @@ function editSeries(
     for (const exception of exceptions) {
       const id = recurrenceIdOf(exception)!;
       const moved = moveNamed(id);
-      setTime(exception.getFirstProperty("recurrence-id")!, moved, tzid);
+      setTime(exception.getFirstProperty("recurrence-id")!, inSeriesZone(moved, master), tzid);
       if (followers.has(exception)) {
         setTimes(exception, root, timesAt!(moved));
         significant(exception, now);
@@ -837,6 +899,7 @@ function endBefore(
     const kept = dates.filter((time) => orderKey(time, anchor) < split);
     if (kept.length !== dates.length) setDates(master, name, kept, anchorTzid(master));
   }
+  keepPeriods(master, (start) => orderKey(start, anchor) < split);
   for (const exception of exceptionsOf(root, master)) {
     if (orderKey(recurrenceIdOf(exception)!, anchor) >= split) root.removeSubcomponent(exception);
   }
@@ -902,6 +965,7 @@ function splitAt(
     const kept = dates.filter((time) => orderKey(time, anchor) >= split);
     if (kept.length !== dates.length) setDates(next, name, kept, anchorTzid(master));
   }
+  keepPeriods(next, (start) => orderKey(start, anchor) >= split);
   next.updatePropertyWithValue("uid", uid);
   next.updatePropertyWithValue("created", now.clone());
   next.updatePropertyWithValue("sequence", 0);
