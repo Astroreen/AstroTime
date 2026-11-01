@@ -445,18 +445,47 @@ function DateTime({
         onChange={(e) => e.target.value && onDate(e.target.value)}
         className={`${field} flex-[3]`}
       />
-      {!form.allDay && (
-        <input
-          type="time"
-          aria-label={timeLabel}
-          value={time}
-          step={60}
-          required
-          onChange={(e) => e.target.value && onTime(e.target.value.slice(0, 5))}
-          className={`${field} flex-[2]`}
-        />
-      )}
+      {!form.allDay && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
     </div>
+  );
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** Every quarter of an hour, as Google's time list offers them. */
+const QUARTERS = Array.from(
+  { length: 96 },
+  (_, i) => `${pad2(Math.floor(i / 4))}:${pad2((i % 4) * 15)}`,
+);
+
+/**
+ * A time from a list in the user's clock (12 or 24 hours, design D96), which
+ * the browser's own time field does not follow; a time between the quarters
+ * the item already has stays in the list.
+ */
+function TimeSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (time: string) => void;
+}) {
+  const { formats } = useCalendar();
+  const times = QUARTERS.includes(value) ? QUARTERS : [...QUARTERS, value].toSorted();
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${field} flex-[2]`}
+    >
+      {times.map((time) => (
+        <option key={time} value={time}>
+          {formats.clock(time)}
+        </option>
+      ))}
+    </select>
   );
 }
 

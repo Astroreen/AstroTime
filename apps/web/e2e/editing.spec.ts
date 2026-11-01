@@ -34,7 +34,7 @@ test('"+" creates an event on the day shown from the next half hour; it shows in
   await expect(dialog.getByLabel("End time")).toHaveValue("12:00");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Haircut");
   // A new start keeps the length; Sunday, which has room in the Month view.
-  await dialog.getByLabel("Start time").fill("17:00");
+  await dialog.getByLabel("Start time").selectOption("17:00");
   await expect(dialog.getByLabel("End time")).toHaveValue("18:00");
   await dialog.getByLabel("Start date").fill("2026-11-01");
   await expect(dialog.getByLabel("End date")).toHaveValue("2026-11-01");
@@ -75,7 +75,7 @@ test("an end before the start is refused, in words; Escape closes without saving
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Backwards");
-  await dialog.getByLabel("End time").fill("10:00");
+  await dialog.getByLabel("End time").selectOption("10:00");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toHaveText("The end must be after the start.");
   await page.keyboard.press("Escape");
@@ -102,7 +102,7 @@ test("the details of an event show where, the description's link, the reminder, 
   await details.getByRole("button", { name: "Edit" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Design review, round 2");
-  await dialog.getByLabel("Start time").fill("16:00");
+  await dialog.getByLabel("Start time").selectOption("16:00");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(details).toHaveCount(0);
@@ -128,7 +128,7 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   test("all occurrences: a new time moves the whole series", async ({ page }) => {
     await openDemo(page, "week");
     const dialog = await editItem(page, "Friday, November 6", /^Stand-up, /, "Stand-up");
-    await dialog.getByLabel("Start time").fill("09:15");
+    await dialog.getByLabel("Start time").selectOption("09:15");
     await dialog.getByRole("button", { name: "Save" }).click();
     const scope = page.getByRole("alertdialog", { name: "Edit recurring event" });
     await scope.getByRole("radio", { name: "All occurrences" }).check();

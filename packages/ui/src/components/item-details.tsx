@@ -361,10 +361,11 @@ function whenText(
   { t, formats, timeZone }: { t: TFunction; formats: Formats; timeZone: string },
 ): string {
   const year = new Date().getFullYear().toString();
+  // A task's dates follow "Due", "Starts": not capitalized.
   const at = (time: ItemTime) =>
     time.type === "date"
-      ? formats.longDate(time.date, year)
-      : `${formats.longDate(dayIn(time, timeZone), year)}, ${formats.time(time, timeZone)}`;
+      ? formats.longDate(time.date, year, false)
+      : `${formats.longDate(dayIn(time, timeZone), year, false)}, ${formats.time(time, timeZone)}`;
   if (task) {
     const parts = [];
     if (times.start) parts.push(t("details.starts", { time: at(times.start) }));
@@ -379,7 +380,9 @@ function whenText(
     return last <= first ? formats.longDate(first, year) : formats.dateRange(first, last);
   }
   if (!end || dayIn(start, timeZone) !== dayIn(end, timeZone)) {
-    return end ? formats.timeRange(start, end, timeZone) : at(start);
+    return end
+      ? formats.timeRange(start, end, timeZone)
+      : `${formats.longDate(dayIn(start, timeZone), year)}, ${formats.time(start, timeZone)}`;
   }
   return `${formats.longDate(dayIn(start, timeZone), year)} · ${formats.timeRange(start, end, timeZone)}`;
 }

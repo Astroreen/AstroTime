@@ -151,10 +151,14 @@ export class Formats {
     return this.#date.format(utcDate(day));
   }
 
-  /** "Wednesday, November 4", with the year when it is not `currentYear`. */
-  longDate(day: string, currentYear: string): string {
+  /**
+   * "Wednesday, November 4", with the year when it is not `currentYear`;
+   * capitalized to start a line, as it is in the middle of one ("среда").
+   */
+  longDate(day: string, currentYear: string, start = true): string {
     const format = day.slice(0, 4) === currentYear ? this.#fullDate : this.#dayDate;
-    return capitalize(format.format(utcDate(day)), this.#locale);
+    const text = format.format(utcDate(day));
+    return start ? capitalize(text, this.#locale) : text;
   }
 
   /** "November 4 – 6", "4–6 ноября": the days of an item over several. */

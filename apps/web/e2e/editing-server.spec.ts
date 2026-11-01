@@ -33,7 +33,7 @@ test("an event created here reaches the server", async ({ page, radicale }) => {
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Made in AstroTime");
-  await dialog.getByLabel("Start time").fill("16:00");
+  await dialog.getByLabel("Start time").selectOption("16:00");
   // The upload is the event to wait for: the sync after a local change (D91).
   const uploaded = page.waitForResponse((response) => response.request().method() === "PUT");
   await dialog.getByRole("button", { name: "Save" }).click();
