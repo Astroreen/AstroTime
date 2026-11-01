@@ -216,9 +216,13 @@ export function remindersOf(object: CalendarObject, objectId: string, range: Ran
       if (fireAt >= toMs) break;
       if (fireAt < fromMs || fireAt <= acknowledged) continue;
       const same = `${key}@${fireAt}`;
-      if (found.has(same)) continue;
+      const id = `${objectId}/${key}/${repeat}/${alarm.uid ?? `#${index}`}`;
+      // Two alarms at one instant are one reminder: the same one whatever
+      // their order, so its id stays when the other is removed or moved.
+      const known = found.get(same);
+      if (known && known.id <= id) continue;
       found.set(same, {
-        id: `${objectId}/${key}/${repeat}/${alarm.uid ?? `#${index}`}`,
+        id,
         objectId,
         uid: object.uid,
         kind: item.kind,

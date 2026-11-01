@@ -225,6 +225,14 @@ describe("which alarms notify (D100)", () => {
       ),
     );
     expect(reminders(object).map((r) => r.id)).toEqual(["obj/-/0/#0"]);
+    // Whatever their order, the same one stands for both.
+    const swapped = parse(
+      vevent(
+        "twice",
+        `DTSTART:20261105T080000Z\r\n${display(":-PT15M", "UID:z-last\r\n")}${display(":-PT15M", "UID:a-first\r\n")}`,
+      ),
+    );
+    expect(reminders(swapped).map((r) => r.id)).toEqual(["obj/-/0/a-first"]);
   });
 
   test("an alarm's UID names it in the id, so reordering the alarms keeps the ids", () => {

@@ -136,6 +136,16 @@ test("a new set replaces the one before: a reminder no longer in it does not sho
   expect(fake.timers).toBe(0);
 });
 
+test("a reminder that showed and is moved later (an edited item) shows again at its new time", () => {
+  const fake = fakePage();
+  const reminders = webReminders(fake.page);
+  reminders.schedule([reminder("a", 10)]);
+  fake.advance(10 * MINUTE);
+  reminders.schedule([reminder("a", 40)]);
+  fake.advance(30 * MINUTE);
+  expect(fake.shown.map((s) => s.tag)).toEqual(["a", "a"]);
+});
+
 test("after a sleep a reminder missed by a few minutes shows on waking; an older one is dropped", () => {
   const fake = fakePage();
   const reminders = webReminders(fake.page);

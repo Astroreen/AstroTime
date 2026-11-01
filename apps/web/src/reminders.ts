@@ -102,6 +102,7 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
   let leading = false;
   let cancel: (() => void) | null = null;
   // Shown or dropped already, so a set handed over again never repeats one.
+  /** Reminders already shown, or dropped as stale, by id and time: one moved later shows again. */
   const done = new Set<string>();
   const listeners = new Set<(reminder: ScheduledReminder) => void>();
 
@@ -132,12 +133,12 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
     if (!leading) return;
     const now = page.now();
     for (const reminder of set) {
-      if (done.has(reminder.id)) continue;
+      if (done.has(shownKey(reminder))) continue;
       if (reminder.fireAt > now) {
         cancel = page.after(reminder.fireAt - now, arm);
         return;
       }
-      done.add(reminder.id);
+      done.add(shownKey(reminder));
       if (now - reminder.fireAt <= LATE_MS) show(reminder);
     }
   };
@@ -151,8 +152,8 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
   return {
     schedule(reminders) {
       set = reminders.toSorted((a, b) => a.fireAt - b.fireAt);
-      const ids = new Set(set.map((reminder) => reminder.id));
-      for (const id of done) if (!ids.has(id)) done.delete(id);
+      const keys = new Set(set.map(shownKey));
+      for (const key of done) if (!keys.has(key)) done.delete(key);
       arm();
     },
     onOpen(listener) {
@@ -165,3 +166,6 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
     whileOpenOnly: true,
   };
 }
+
+const shownKey = (reminder: { readonly id: string; readonly fireAt: number }) =>
+  `${reminder.id}@${reminder.fireAt}`;
