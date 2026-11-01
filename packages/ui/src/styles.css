@@ -81,6 +81,12 @@
   .item-time {
     opacity: 0.85;
   }
+  /* The item a search jumped to (design D53). */
+  [data-found] {
+    box-shadow:
+      0 0 0 2px var(--color-canvas),
+      0 0 0 4px var(--color-accent);
+  }
   /* A mark on a calendar's colour (the drawer's checkbox), dark or light by that colour. */
   .item-on-color {
     color: oklch(from var(--calendar) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);

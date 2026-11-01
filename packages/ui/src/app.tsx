@@ -3,7 +3,7 @@
 // secrets, the system browser, where preferences are kept) and the user's
 // languages, and renders this.
 import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 
 import { localeSettings } from "./calendar/locale.ts";
@@ -11,6 +11,8 @@ import { AccountsProvider } from "./components/accounts-context.tsx";
 import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { createI18n } from "./i18n/index.ts";
 import type { Platform } from "./platform.ts";
+import { KEYS, usePreference } from "./preferences.ts";
+import { readSettings, SettingsContext, withSettings, type Settings } from "./settings.ts";
 
 export interface AstroTimeProps {
   readonly platform: Platform;
@@ -27,14 +29,30 @@ type Opening =
 
 export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
   const { store, preferences } = platform;
-  const [settings] = useState(() => localeSettings(languages));
+  // The drawer's settings (design D53), applied as soon as they change.
+  const [chosen, setChosen] = usePreference(preferences, KEYS.settings, readSettings, (value) =>
+    JSON.stringify(value),
+  );
+  const language = chosen.language === "system" ? undefined : chosen.language;
+  const settings = useMemo(
+    () => withSettings(localeSettings(languages, language), chosen),
+    [languages, language, chosen],
+  );
   const [i18n] = useState(() => createI18n(settings.language));
   const [zone] = useState(() => timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [opening, setOpening] = useState<Opening>({ status: "opening" });
 
   useEffect(() => {
     document.documentElement.lang = settings.language;
-  }, [settings.language]);
+    void i18n.changeLanguage(settings.language);
+  }, [i18n, settings.language]);
+
+  // The theme follows the system unless one is chosen (design D58).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (chosen.theme === "system") delete root.dataset["theme"];
+    else root.dataset["theme"] = chosen.theme;
+  }, [chosen.theme]);
 
   useEffect(() => {
     let live = true;
@@ -52,25 +70,34 @@ export function AstroTime({ platform, languages, timeZone }: AstroTimeProps) {
     };
   }, [store]);
 
+  // From the latest settings, so two changes before a render keep both.
+  const latest = useRef(chosen);
+  latest.current = chosen;
+  const change = (changes: Partial<Settings>) => {
+    latest.current = { ...latest.current, ...changes };
+    setChosen(latest.current);
+  };
   return (
     <I18nextProvider i18n={i18n}>
-      {opening.status === "open" ? (
-        <AccountsProvider
-          platform={platform}
-          store={opening.store}
-          settings={settings}
-          timeZone={zone}
-        >
-          <CalendarScreen
+      <SettingsContext.Provider value={{ settings: chosen, change }}>
+        {opening.status === "open" ? (
+          <AccountsProvider
+            platform={platform}
             store={opening.store}
-            preferences={preferences}
             settings={settings}
             timeZone={zone}
-          />
-        </AccountsProvider>
-      ) : (
-        <StoreMessage opening={opening} />
-      )}
+          >
+            <CalendarScreen
+              store={opening.store}
+              preferences={preferences}
+              settings={settings}
+              timeZone={zone}
+            />
+          </AccountsProvider>
+        ) : (
+          <StoreMessage opening={opening} />
+        )}
+      </SettingsContext.Provider>
     </I18nextProvider>
   );
 }

@@ -379,6 +379,72 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await ask()).toEqual([{ type: "date", date: "2026-11-02" }]);
     });
 
+    test("the tasks of the calendars, dated or not; events and deleted tasks left out (D52)", async () => {
+      const { store, account, calendar } = await setup();
+      const other = await store.saveCalendar({
+        accountId: account.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/other/",
+        name: "Other",
+        color: null,
+        components: ["VTODO"],
+        readOnly: false,
+      });
+      const save = (calendarId: string, uid: string, ics: string) =>
+        store.saveFromServer(calendarId, { href: `${uid}.ics`, etag: '"1"', ics });
+      await save(calendar.id, "dated", task("dated", "DUE;VALUE=DATE:20261104\r\n"));
+      await save(calendar.id, "undated", task("undated"));
+      await save(calendar.id, "event", event("event", "20261102T090000Z", "20261102T100000Z"));
+      await save(other.id, "elsewhere", task("elsewhere"));
+      const gone = await save(calendar.id, "gone", task("gone"));
+      await store.deleteLocal(gone.id);
+      const uids = async (ids: string[]) => (await store.tasks(ids)).map((o) => o.uid).toSorted();
+      expect(await uids([calendar.id])).toEqual(["dated", "undated"]);
+      expect(await uids([calendar.id, other.id])).toEqual(["dated", "elsewhere", "undated"]);
+    });
+
+    test("search finds titles, ignoring case and diacritics, in Russian too (D53)", async () => {
+      const { store, calendar } = await setup();
+      const titled = (uid: string, summary: string, fields = "") =>
+        store.saveFromServer(calendar.id, {
+          href: `${uid}.ics`,
+          etag: '"1"',
+          ics: vcal(
+            `BEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:20261001T000000Z\r\nSUMMARY:${summary}\r\n${fields}END:VTODO\r\n`,
+          ),
+        });
+      await titled("report", "Отправить ОТЧЁТ", "DUE;VALUE=DATE:20261104\r\n");
+      await titled("cafe", "Café with Zoë", "DUE;VALUE=DATE:20261101\r\n");
+      await titled("percent", "100% done_now");
+      await titled("plain", "Water the plants", "DUE;VALUE=DATE:20261110\r\n");
+      const gone = await titled("gone", "отчёт, удалённый здесь");
+      await store.deleteLocal(gone.id);
+      await store.saveFromServer(calendar.id, {
+        href: "series.ics",
+        etag: '"1"',
+        ics: vcal(
+          "BEGIN:VEVENT\r\nUID:series\r\nDTSTAMP:20261001T000000Z\r\nDTSTART:20261102T090000Z\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Stand-up\r\nEND:VEVENT\r\n" +
+            "BEGIN:VEVENT\r\nUID:series\r\nDTSTAMP:20261001T000000Z\r\nRECURRENCE-ID:20261103T090000Z\r\nDTSTART:20261103T100000Z\r\nSUMMARY:Retro\r\nEND:VEVENT\r\n",
+        ),
+      });
+      const find = async (text: string, limit?: number) =>
+        (await store.search([calendar.id], text, limit)).map((o) => o.uid);
+      expect(await find("отчет")).toEqual(["report"]);
+      expect(await find("  ОТЧЁТ ")).toEqual(["report"]);
+      expect(await find("CAFE")).toEqual(["cafe"]);
+      expect(await find("zoe")).toEqual(["cafe"]);
+      // `%` and `_` are only themselves.
+      expect(await find("0%")).toEqual(["percent"]);
+      expect(await find("e_n")).toEqual(["percent"]);
+      expect(await find("%")).toEqual(["percent"]);
+      // An exception's own title finds its series.
+      expect(await find("retro")).toEqual(["series"]);
+      // The latest start first, undated last; at most `limit`.
+      expect(await find("e")).toEqual(["plain", "series", "cafe", "percent"]);
+      expect(await find("e", 2)).toEqual(["plain", "series"]);
+      expect(await find("")).toEqual([]);
+      expect(await store.search([], "отчёт")).toEqual([]);
+    });
+
     test("a listener hears every write until it unsubscribes", async () => {
       const { store, calendar } = await setup();
       let heard = 0;

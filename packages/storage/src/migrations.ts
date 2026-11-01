@@ -71,6 +71,12 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE accounts ADD COLUMN home_url TEXT;
   `,
+  // 6: the titles of an object's components folded for search (design D53),
+  // so a search reads one short column instead of parsing every object.
+  // NULL: written before this migration, parsed to find out.
+  `
+  ALTER TABLE objects ADD COLUMN titles TEXT;
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

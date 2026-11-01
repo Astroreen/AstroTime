@@ -1,13 +1,14 @@
 // The drawer (design D46): the views, then each account with its menu and
 // its calendars, each with its colour and a visibility checkbox
-// (`AccountSection`). A sheet over the view on a phone, a sidebar on a wide
-// screen.
+// (`AccountSection`), then the settings (D53). A sheet over the view on a
+// phone, a sidebar on a wide screen.
 import type { Account, Calendar } from "@astrotime/storage";
 import { useTranslation } from "react-i18next";
 
 import { VIEWS, type GridView, type View } from "../calendar/views.ts";
 import { AccountSection, AddAccountButton } from "./accounts.tsx";
 import { AgendaIcon, MonthIcon, ViewIcon } from "./icons.tsx";
+import { SettingsSection } from "./settings-section.tsx";
 
 const COLUMNS: Record<GridView, number> = { day: 1, "3days": 3, week: 7 };
 
@@ -76,6 +77,8 @@ export function DrawerContent({
         />
       ))}
       <AddAccountButton onLeave={onLeave} />
+      <hr className="mx-4 my-2 border-line" />
+      <SettingsSection />
     </div>
   );
 }

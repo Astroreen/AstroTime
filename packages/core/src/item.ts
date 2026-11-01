@@ -75,6 +75,8 @@ export interface Task extends ItemFields {
   readonly sortOrder: number | null;
   /** `X-OC-HIDESUBTASKS`: Nextcloud Tasks folds the subtasks away. */
   readonly hideSubtasks: boolean;
+  /** `X-ASTROTIME-STARRED:TRUE`: starred on the tasks screen (design D52). */
+  readonly starred: boolean;
 }
 
 export type Item = Event | Task;
@@ -210,5 +212,6 @@ export function readItem(component: ICAL.Component): Item {
     parentUid: parentUid(component),
     sortOrder: integer(component, "x-apple-sort-order"),
     hideSubtasks: text(component, "x-oc-hidesubtasks") === "1",
+    starred: text(component, "x-astrotime-starred")?.toUpperCase() === "TRUE",
   };
 }

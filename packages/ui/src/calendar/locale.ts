@@ -1,5 +1,6 @@
 // The language, week start and clock come from the device's locale
-// (design D45: Russian means Monday and 24 hours); the overrides are PR 5b's.
+// (design D45: Russian means Monday and 24 hours); the drawer's settings
+// override them (`settings.ts`, design D53).
 import { LANGUAGES, type Language } from "../i18n/index.ts";
 
 export interface LocaleSettings {
@@ -31,7 +32,29 @@ function weekStartOf(locale: string): number {
   return SUNDAY_REGIONS.has(intl.maximize().region ?? "") ? 7 : 1;
 }
 
-export function localeSettings(languages: readonly string[]): LocaleSettings {
+/**
+ * Whether the region of `locale` reads a 12-hour clock. `Intl.DateTimeFormat`
+ * falls back to the language's own clock for a pair it has no data for
+ * (`en-RU` would get 12 hours), so the locale's hour cycles come first.
+ */
+function hour12Of(locale: string): boolean {
+  const intl = new Intl.Locale(locale) as Intl.Locale & {
+    getHourCycles?: () => string[];
+    hourCycles?: string[];
+  };
+  const cycle =
+    intl.getHourCycles?.()[0] ??
+    intl.hourCycles?.[0] ??
+    new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
+  return cycle === "h11" || cycle === "h12";
+}
+
+/**
+ * The settings of the user's languages, most preferred first. `chosen` is
+ * the language picked in settings: it speaks that, with the dates of the
+ * same region (ru-RU choosing English gets English, Monday and 24 hours).
+ */
+export function localeSettings(languages: readonly string[], chosen?: Language): LocaleSettings {
   const tags = languages.filter((tag) => {
     try {
       return Intl.getCanonicalLocales(tag).length > 0;
@@ -39,8 +62,10 @@ export function localeSettings(languages: readonly string[]): LocaleSettings {
       return false;
     }
   });
-  const spoken = tags.find((tag) => (LANGUAGES as readonly string[]).includes(baseOf(tag)));
-  const language = (spoken ? baseOf(spoken) : "en") as Language;
+  const spoken = tags.find((tag) =>
+    chosen ? baseOf(tag) === chosen : (LANGUAGES as readonly string[]).includes(baseOf(tag)),
+  );
+  const language = chosen ?? ((spoken ? baseOf(spoken) : "en") as Language);
   // The region of the user's first language decides the week and the clock,
   // even when AstroTime does not speak that language (lt-LT: English, Monday, 24 h).
   const primary = tags[0];
@@ -53,11 +78,5 @@ export function localeSettings(languages: readonly string[]): LocaleSettings {
         : region
           ? `${language}-${region}`
           : language;
-  const cycle = new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
-  return {
-    language,
-    locale,
-    weekStart: weekStartOf(locale),
-    hour12: cycle === "h11" || cycle === "h12",
-  };
+  return { language, locale, weekStart: weekStartOf(locale), hour12: hour12Of(locale) };
 }

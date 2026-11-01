@@ -68,7 +68,7 @@ export function StripChip({
   continuesAfter: boolean;
   dense?: boolean;
 }) {
-  const { colorOf } = useCalendar();
+  const { colorOf, found } = useCalendar();
   const label = useItemLabel();
   const task = entry.occurrence.item.kind === "task";
   return (
@@ -76,6 +76,7 @@ export function StripChip({
       role="listitem"
       aria-label={label(entry, allDay)}
       data-done={entry.done || undefined}
+      data-found={entry.objectId === found || undefined}
       className={[
         "item flex h-full items-center leading-none font-medium",
         dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1 rounded-[5px] px-1.5 text-[13px]",
@@ -143,7 +144,7 @@ export function TimedItem({
   compact: boolean;
 }) {
   const { shape, top, bottom, left, width, layer, continuesBefore, continuesAfter } = placed;
-  const { colorOf, formats, timeZone } = useCalendar();
+  const { colorOf, formats, timeZone, found } = useCalendar();
   const label = useItemLabel();
   const height = ((bottom - top) / 60) * HOUR - 2;
   const task = entry.occurrence.item.kind === "task";
@@ -153,6 +154,7 @@ export function TimedItem({
       role="listitem"
       aria-label={label(entry, false)}
       data-done={entry.done || undefined}
+      data-found={entry.objectId === found || undefined}
       className={[
         "item absolute overflow-hidden rounded-[6px]",
         compact ? "px-[3px] py-px text-[11px]" : "px-1.5 py-0.5 text-[12.5px]",

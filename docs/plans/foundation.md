@@ -190,8 +190,10 @@ logic worth borrowing.
   web's tested driver runs there unchanged and rows stay arrays.
 
 - **D36. The store holds only valid objects.** Every write parses the
-  iCalendar with `@astrotime/core` and indexes it by `boundsOf`; a range
-  query returns candidates for `occurrencesBetween` to place exactly. Local
+  iCalendar with `@astrotime/core` and indexes it by `boundsOf` (and, since
+  migration 6, by its titles folded for search, design
+  [D97](design.md#D97)); a range query returns candidates for
+  `occurrencesBetween` to place exactly. Local
   changes carry `pending` (`create`, `update`, `delete`) for the sync engine;
   credentials are not in the store ([D19](#D19)). An object a server serves
   that does not parse is refused by the store; the sync engine skips it,

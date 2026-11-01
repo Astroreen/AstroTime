@@ -1,4 +1,5 @@
-// This device's own choices (the view, which calendars show). Each app
+// This device's own choices (the view, which calendars show, the drawer's
+// settings, the tasks screen's list and order). Each app
 // brings the storage: `localStorage` on the web, Capacitor's later.
 import { useState } from "react";
 
@@ -34,6 +35,9 @@ export function usePreference<T>(
 export const KEYS = {
   view: "astrotime.view",
   hiddenCalendars: "astrotime.hiddenCalendars",
+  settings: "astrotime.settings",
+  taskList: "astrotime.taskList",
+  taskSort: "astrotime.taskSort",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */

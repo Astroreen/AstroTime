@@ -91,3 +91,42 @@ test("migration 5 keeps existing accounts, with no calendar home until they sync
     },
   ]);
 });
+
+test("migration 6 leaves titles unknown on older rows, and search still finds them", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const { Store } = await import("../src/index.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 5));
+  const ics = (uid: string, summary: string) =>
+    `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:${uid}\r\nSUMMARY:${summary}\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`;
+  await driver.query(
+    "INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', NULL, 0, NULL)",
+    [],
+  );
+  await driver.query(
+    "INSERT INTO calendars (id, account_id, url, name, components) VALUES ('c', 'a', 'https://x/c/', 'C', 'VTODO')",
+    [],
+  );
+  for (const [uid, summary] of [
+    ["old", "Позвонить в банк"],
+    ["other", "Something else"],
+  ] as const) {
+    await driver.query(
+      "INSERT INTO objects (id, calendar_id, href, uid, kind, ics, pending, updated_at) VALUES (?, 'c', ?, ?, 'task', ?, 'none', 0)",
+      [uid, `${uid}.ics`, uid, ics(uid, summary)],
+    );
+  }
+  const store = await Store.open(driver);
+  expect(await driver.query("SELECT id, titles FROM objects ORDER BY id", [])).toEqual([
+    ["old", null],
+    ["other", null],
+  ]);
+  expect((await store.search(["c"], "БАНК")).map((o) => o.uid)).toEqual(["old"]);
+  // The search kept what it read: the older rows have their titles now.
+  expect(await driver.query("SELECT id, titles IS NOT NULL FROM objects ORDER BY id", [])).toEqual([
+    ["old", 1],
+    ["other", 1],
+  ]);
+  await store.saveFromServer("c", { href: "new.ics", etag: null, ics: ics("new", "Банк, снова") });
+  expect((await store.search(["c"], "банк")).map((o) => o.uid)).toEqual(["new", "old"]);
+});

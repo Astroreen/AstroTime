@@ -232,6 +232,13 @@ const CALENDARS: readonly DemoCalendar[] = [
           DUE: date(day(-10)),
           RRULE: "FREQ=WEEKLY",
         }),
+        // Undated tasks live on the tasks screen only (D16): one starred, one a subtask.
+        task("demo-books", t("Return the library books", "Вернуть книги в библиотеку"), {
+          "X-ASTROTIME-STARRED": "TRUE",
+        }),
+        task("demo-figures", t("Collect the figures", "Собрать цифры"), {
+          "RELATED-TO": "demo-proposal",
+        }),
       ];
     },
   },

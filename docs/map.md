@@ -36,6 +36,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `isDone`, `isUndoneBefore`, `latestUndoneBefore` — done tasks, and the
     undone ones that roll over to today. → `plans/design.md#D51`,
     `plans/foundation.md#D55`
+  - `completeTask`, `starTask` — the tasks screen's two edits, a series'
+    occurrence through its exception, nothing else changed.
+    → `plans/design.md#D94`
   - `mergeObjects` — the three-way merge of a refused write.
     → `plans/foundation.md#D6`
   - `Provider` — the interface every provider implements.
@@ -53,6 +56,11 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/foundation.md#D54`
     - `undoneTasksBefore` — the undone tasks due before today.
       → `plans/foundation.md#D55`
+    - `tasks` — every task of some calendars: the tasks screen's lists.
+      → `plans/design.md#D95`
+    - `search` — objects by title, case and diacritics aside, over the
+      folded `titles` column (`search.ts`, migration 6).
+      → `plans/design.md#D97`
   - `StoreInUseError` — another tab holds the web store.
     → `plans/foundation.md#D56`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
@@ -98,13 +106,24 @@ When you add a package, app or module, add its line here in the same PR.
       account button and dialog, each account in the drawer, the sync
       status, the first-run screen, adding and removing an account.
       → `plans/foundation.md#D92`
+    - `tasks-screen.tsx` — the tasks screen, or panel on a wide screen.
+      → `plans/design.md#D95`
+    - `search.tsx` — the search field and its results.
+      → `plans/design.md#D97`
+    - `settings-section.tsx` — the drawer's settings.
+      → `plans/design.md#D96`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
     (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery`.
     → `plans/foundation.md#D54`
+    - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
+      subtasks under parents, a series by its current occurrence.
+      → `plans/design.md#D95`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe`, `useNow`, `useMediaQuery`.
+  - `settings.ts` — the drawer's settings, kept in the preferences and
+    applied over the locale. → `plans/design.md#D96`
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light.

@@ -58,6 +58,8 @@ export const objects = sqliteTable(
     endMs: integer("end_ms"),
     /** The master is a completed or cancelled task (`isDone`); `null` before migration 4. */
     done: integer("done", { mode: "boolean" }),
+    /** Every component's `SUMMARY` folded by `foldForSearch`, one per line; `null` before migration 6. */
+    titles: text("titles"),
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [

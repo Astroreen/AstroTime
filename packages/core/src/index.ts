@@ -9,6 +9,7 @@ export {
   type Range,
 } from "./occurrences.ts";
 export { wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
+export { completeTask, starTask } from "./task-edits.ts";
 export { isDone, isUndoneBefore, latestUndoneBefore } from "./undone.ts";
 export {
   dayRange,

@@ -12,6 +12,7 @@ import {
 import { Formats } from "../src/calendar/format.ts";
 import { localeSettings } from "../src/calendar/locale.ts";
 import { periodOf, stepAnchor, titleRange } from "../src/calendar/views.ts";
+import { DEFAULT_SETTINGS, readSettings, withSettings } from "../src/settings.ts";
 
 describe("days", () => {
   test("arithmetic on calendar days ignores zones and DST", () => {
@@ -157,5 +158,55 @@ describe("formats", () => {
     expect(ru.weekNumber(["2026-11-02"])).toBe(45);
     // …and starts an American one.
     expect(en.weekNumber(["2026-11-01", "2026-11-02"])).toBe(45);
+  });
+});
+
+describe("the drawer's settings override the locale (D53)", () => {
+  test("a language chosen keeps the region's week and clock", () => {
+    expect(localeSettings(["ru-RU"], "en")).toEqual({
+      language: "en",
+      locale: "en-RU",
+      weekStart: 1,
+      hour12: false,
+    });
+    // The region is still the first language's.
+    expect(localeSettings(["en-US", "ru"], "ru")).toMatchObject({
+      language: "ru",
+      locale: "ru-US",
+    });
+    expect(localeSettings(["en-US"], "ru")).toMatchObject({ language: "ru", weekStart: 7 });
+  });
+
+  test("the week start and the clock, when chosen", () => {
+    const us = localeSettings(["en-US"]);
+    expect(withSettings(us, DEFAULT_SETTINGS)).toEqual(us);
+    expect(withSettings(us, { ...DEFAULT_SETTINGS, weekStart: 1, clock: 24 })).toMatchObject({
+      weekStart: 1,
+      hour12: false,
+    });
+    expect(
+      withSettings(localeSettings(["ru-RU"]), { ...DEFAULT_SETTINGS, weekStart: 6, clock: 12 }),
+    ).toMatchObject({ weekStart: 6, hour12: true });
+  });
+
+  test("what was stored is read back; anything unreadable is the default", () => {
+    const chosen = { theme: "light", language: "ru", weekStart: 6, clock: 24, hideCompleted: true };
+    expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
+    expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
+    expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
+    expect(
+      readSettings('{"theme":"pink","weekStart":3,"clock":"24","hideCompleted":"yes"}'),
+    ).toEqual(DEFAULT_SETTINGS);
+  });
+
+  test("days near today by name, others by date, the year when it is not this one", () => {
+    const en = new Formats(localeSettings(["en-US"]));
+    expect(en.day("2026-11-04", "2026-11-04")).toBe("Today");
+    expect(en.day("2026-11-05", "2026-11-04")).toBe("Tomorrow");
+    expect(en.day("2026-11-03", "2026-11-04")).toBe("Yesterday");
+    expect(en.day("2026-11-08", "2026-11-04")).toBe("Sun, Nov 8");
+    expect(en.day("2027-01-08", "2026-11-04")).toBe("Fri, Jan 8, 2027");
+    expect(new Formats(localeSettings(["ru-RU"])).day("2026-11-05", "2026-11-04")).toBe("Завтра");
+    expect(new Formats(localeSettings(["ru-RU"])).weekdayName(1)).toBe("Понедельник");
   });
 });

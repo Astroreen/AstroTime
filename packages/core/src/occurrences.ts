@@ -80,7 +80,7 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
 }
 
 /** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
-function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
+export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
   const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
   return length.isNegative ? new ICAL.Duration({}) : length;

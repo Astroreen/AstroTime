@@ -3,7 +3,8 @@
 Status: **in progress** — PR 5 of
 [`foundation.md`](foundation.md#pr-5--calendar-grid) builds it; PR 5a-1
 built the shell, both themes and the Day, 3-day and Week views; PR 5a-2 the
-Month and Agenda views. This plan
+Month and Agenda views; PR 5b the tasks screen, the drawer's settings and
+search. This plan
 owns how AstroTime looks and is laid out (foundation's
 [D18](foundation.md#D18)); where items go is the layout engine's
 ([D42](foundation.md#D42)).
@@ -96,10 +97,12 @@ the project.
   (D5); editing dialogs and dragging are foundation's PR 6. The star is
   stored as an AstroTime property (`X-ASTROTIME-STARRED:TRUE`),
   so the task's own `PRIORITY` is never touched and other clients keep it
-  (AGENTS.md rule 2).
+  (AGENTS.md rule 2). _Built in PR 5b:_ what completing writes is
+  [D94](#D94), the screen's details [D95](#D95).
 - **D53. Settings in the drawer**: the theme (system, dark, light), the
   week start and the clock (D44, D45), and "hide completed" (D51). Search,
-  in the top bar, finds items by title in the local store.
+  in the top bar, finds items by title in the local store. _Built in
+  PR 5b:_ the settings [D96](#D96), search [D97](#D97).
 
 ### Decided while building PR 5a
 
@@ -128,7 +131,11 @@ the project.
   - on open the grid shows two hours before now on today, else the morning;
   - the UI speaks the first of the user's languages it knows; the week start
     and the clock come from the region of their first language, so
-    Lithuanian (`lt-LT`) gets English, Monday and 24 hours (D45).
+    Lithuanian (`lt-LT`) gets English, Monday and 24 hours (D45);
+  - the time grid is the wall clock: on the day a clock changes for DST the
+    day is still 24 tiles, and the current-time line, like the items, is
+    placed by the minutes the wall clock shows, not by the minutes elapsed
+    since midnight.
 - **D86. The Month view, read from the reference** (and from Google's
   Android app where the reference is silent):
   - six weeks from the week holding the month's first day, as the reference
@@ -181,6 +188,77 @@ the project.
   custom view's key), `w` Week, `m` Month, `a` Agenda, beside D59's `n`/`j`,
   `p`/`k` and `t`.
 
+### Decided while building PR 5b
+
+- **D94. Completing and starring write what Nextcloud Tasks writes, and
+  nothing else** (`completeTask`, `starTask` in `@astrotime/core`).
+  Completing sets `STATUS:COMPLETED`, `COMPLETED` (now, in UTC) and
+  `PERCENT-COMPLETE:100`; un-completing sets `STATUS:NEEDS-ACTION`,
+  removes `COMPLETED` and sets `PERCENT-COMPLETE:0`, as Nextcloud Tasks
+  does (the percentage before completion is not kept there either).
+  Starring adds `X-ASTROTIME-STARRED:TRUE`; unstarring removes it. Each
+  also sets `LAST-MODIFIED` and `DTSTAMP` to now (RFC 5545 §3.8.7.2,
+  §3.8.7.3); `SEQUENCE` and `PRIORITY` are never touched, and every other
+  line is written back byte for byte. One occurrence of a series is
+  completed in its own exception (`RECURRENCE-ID`): a copy of the master
+  without its recurrence, at the occurrence's time, made the first time
+  and changed in place after; the series itself is not changed. D51
+  already reads such an exception as a done occurrence. The edit goes
+  through `Store.saveLocal` as a pending update (foundation
+  [D5](foundation.md#D5)).
+- **D95. The tasks screen, in detail** (D52):
+  - a task list is a calendar whose components include `VTODO`; lists are
+    in their names' order, and the tasks screen shows every list, whatever
+    the drawer hides from the views;
+  - a tab's count of undone tasks shows on the other tabs, not the open one,
+    as in the reference; each tab's accessible name always has it;
+  - the card's sort button offers my order (`X-APPLE-SORT-ORDER`, else the
+    creation time, as Nextcloud Tasks reads a task without one), date (by
+    due, undated last) and starred first; one order for every list, kept on
+    this device;
+  - a subtask sits under its parent (`RELATED-TO`), indented, while both
+    are undone; "Completed (N)" lists completed tasks flat, the most
+    recently completed first, folded until opened;
+  - a task shows its due as "Today", "Tomorrow", "Yesterday" or a date, in
+    the danger colour when overdue, with a mark when it repeats;
+  - a series shows once, by its earliest occurrence that is not done, as
+    Google Tasks shows a repeating task's current instance; completing it
+    (D94) brings the next one, and a series with every occurrence done is
+    completed;
+  - a read-only list's tasks cannot be completed or starred;
+  - "+ New list" and the card's menu are drawn but disabled until lists can
+    be made and changed ([Deferred](#deferred)); the "+" button is the
+    calendar's, disabled until PR 6;
+  - on a phone the screen covers the calendar, with a back arrow; from
+    1024 px it is a 360 px panel right of the view, its toggle pressed.
+- **D96. The settings, in detail** (D53): one value in the app's
+  preferences (`astrotime.settings`), read leniently (anything unknown is
+  the default) and applied at once. The theme sets `data-theme` (D58) or
+  removes it for the system's. A language chosen keeps the region of the
+  user's first language for dates, so `ru-RU` choosing English gets
+  English, Monday and 24 hours; the region's clock comes from
+  `Intl.Locale`'s hour cycles, since `Intl.DateTimeFormat` falls back to
+  the language's own for a pair it has no data for. The week starts on the
+  region's day, Monday, Sunday or Saturday; the clock is the region's,
+  12 or 24 hours. "Hide completed tasks" hides completed tasks' chips on
+  every view, never the undone chip (D51). In the drawer each setting's
+  name sits above its value, as Android's settings list them, so nothing
+  is squeezed in the sidebar.
+- **D97. Search, in detail** (D53): `Store.search` finds the objects whose
+  title holds the text, in the visible calendars, at most 50, the latest
+  start first. Migration 6 adds a `titles` column: every component's
+  `SUMMARY` lower-cased, decomposed (NFKD) and stripped of combining
+  marks, so case and diacritics do not matter in any script (`é` finds
+  `e`, `ё` finds `е`; `й` finds `и` too); the text searched is folded the
+  same way and matched with `LIKE`, its `%` and `_` escaped. Rows written
+  before migration 6 hold `NULL` and are parsed, as foundation
+  [D55](foundation.md#D55)'s `done` is. A result shows by its next
+  occurrence within a year, else its last, in time order, undated tasks
+  last, with its colour and when it is. Choosing one closes the search: a
+  dated item moves the calendar to its day and is outlined in the accent
+  until the view moves on; an undated task opens the tasks screen on its
+  list, outlined.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
@@ -188,6 +266,24 @@ the project.
   ([D52](#D52)); a place that gathers starred tasks comes later.
 - **Search beyond titles** — descriptions, locations, attendees, and the
   server's own search ([D53](#D53)).
+- **A full-text index for search** — `LIKE` over the folded titles reads
+  every row of the visible calendars; SQLite's FTS5 (on both drivers) when
+  a store grows past what that answers at once ([D97](#D97)).
+- **Making, renaming and deleting task lists** — "+ New list" and the
+  card's menu are disabled: a list is a calendar on the server, made with
+  `MKCALENDAR` through the provider and the sync engine ([D95](#D95)).
+- **Advancing a series instead of an exception per occurrence** —
+  completing a repeating task writes one exception per occurrence
+  ([D94](#D94)); Tasks.org moves the series' start instead, which keeps
+  the object small. When real data shows the cost.
+- **Completing from the calendar** — tasks are completed on the tasks
+  screen; a chip on the views opens nothing until PR 6 ([D52](#D52)).
+- **Sorting per list, and "starred recently"** — one order serves every
+  list, and the star keeps no time, so starred tasks come first in my
+  order rather than by when they were starred ([D95](#D95)).
+- **Demo data in the language chosen** — the demo is titled in the
+  browser's language, not the one chosen in settings (development only,
+  foundation [D57](foundation.md#D57)).
 - **A day header opens that day** — as Google does; the headers are not
   buttons yet ([D59](#D59)).
 - **A swipe the page follows** — the swipe moves to the next period once
@@ -207,5 +303,5 @@ Foundation's PR 5 builds this plan in two parts:
   as [foundation's PR plan](foundation.md#pr-5--calendar-grid) lists them
   (D58, D59 came with 5a-1; D86–D88 with 5a-2).
 - **PR 5b** — the tasks screen, the drawer's settings and search (D52,
-  D53). Its evidence is screenshots of each view next to the matching
-  reference, in both themes.
+  D53; D94–D97 came with it). Its evidence is screenshots of each view
+  next to the matching reference, in both themes.
