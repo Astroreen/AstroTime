@@ -18,7 +18,7 @@ export function liveQuery<T>(
       return;
     }
     running = true;
-    do {
+    for (;;) {
       stale = false;
       try {
         const result = await run();
@@ -26,7 +26,9 @@ export function liveQuery<T>(
       } catch (error) {
         if (!stopped) onError(error);
       }
-    } while (stale && !stopped);
+      // A change came during the run (`stale`, set by another `go`): once more.
+      if (!stale || stopped) break;
+    }
     running = false;
   };
   const unsubscribe = store.subscribe(() => void go());

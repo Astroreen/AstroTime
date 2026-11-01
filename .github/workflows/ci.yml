@@ -48,6 +48,25 @@ jobs:
       - run: pipx install radicale==3.8.0
       - run: vp test run
 
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    # Chromium's system packages may come from a slow apt mirror (see unit).
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/chromium
+      # Playwright starts the web app's dev server and loads the demo data (apps/web/e2e).
+      - run: pnpm --filter @astrotime/web e2e
+      - name: Playwright's traces, when a test failed
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-traces
+          path: apps/web/test-results/
+          retention-days: 7
+
   knip:
     name: Unused code
     runs-on: ubuntu-latest
@@ -111,7 +130,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, typecheck, unit, knip, build, image, dev-scripts]
+    needs: [check, typecheck, unit, e2e, knip, build, image, dev-scripts]
     runs-on: ubuntu-latest
     steps:
       - name: All jobs passed

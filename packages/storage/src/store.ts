@@ -51,8 +51,8 @@ export class Store {
   static async open(driver: SqlDriver): Promise<Store> {
     await migrate(driver);
     const db = drizzle(
-      async (sql, params, method) => {
-        const rows = await driver.query(sql, params);
+      async (statement, params, method) => {
+        const rows = await driver.query(statement, params);
         // Drizzle reads `get` as one row, and no row as `undefined`.
         return { rows: method === "get" ? (rows[0] as unknown[]) : rows };
       },

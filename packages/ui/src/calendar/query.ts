@@ -101,14 +101,15 @@ function expand(object: CalendarObject, row: StoredObject, range: Range): Entry[
   }));
 }
 
-/** A span of the all-day strip: an entry, or the "N undone tasks" chip on today. */
-export interface StripSpan extends Omit<Span, "occurrence"> {
+/** A span of the all-day strip: an entry's, or the "N undone tasks" chip's on today (`entry: null`). */
+interface StripSpan {
+  readonly span: Span;
   readonly entry: Entry | null;
 }
 
-export interface DayColumn {
+interface DayColumn {
   readonly day: string;
-  readonly timed: readonly (Omit<Placed, "occurrence"> & { readonly entry: Entry })[];
+  readonly timed: readonly { readonly placed: Placed; readonly entry: Entry }[];
 }
 
 export interface RangeLayout {
@@ -137,16 +138,16 @@ export function layoutRange(
   const occurrences = [...byOccurrence.keys()];
   const chip = undone > 0 && days.includes(today) ? undoneChip(today) : null;
   const strip = layoutSpans(chip ? [...occurrences, chip] : occurrences, days, timeZone).map(
-    ({ occurrence, ...span }) => ({ ...span, entry: byOccurrence.get(occurrence) ?? null }),
+    (span) => ({ span, entry: byOccurrence.get(span.occurrence) ?? null }),
   );
   const columns = days.map((day) => ({
     day,
-    timed: layoutDay(occurrences, day, { timeZone }).timed.map(({ occurrence, ...placed }) => ({
-      ...placed,
-      entry: byOccurrence.get(occurrence)!,
+    timed: layoutDay(occurrences, day, { timeZone }).timed.map((placed) => ({
+      placed,
+      entry: byOccurrence.get(placed.occurrence)!,
     })),
   }));
-  return { strip, rows: Math.max(0, ...strip.map((span) => span.row + 1)), columns };
+  return { strip, rows: Math.max(0, ...strip.map(({ span }) => span.row + 1)), columns };
 }
 
 /** A stand-in task for the "N undone tasks" chip, so the layout engine places it. */

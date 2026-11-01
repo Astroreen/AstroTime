@@ -19,7 +19,7 @@ test.describe("each view draws the demo data", () => {
     await expect(header(page, "Sunday, November 1")).toBeVisible();
     await expect(header(page, "Saturday, November 7")).toBeVisible();
     await expect(header(page, "Wednesday, November 4")).toHaveAttribute("aria-current", "date");
-    await expect(page.getByLabel("Week 45")).toBeVisible();
+    await expect(page.getByText("Week 45")).toBeAttached();
     await expect(
       day(page, "Wednesday, November 4").getByRole("listitem", { name: /^Design review, / }),
     ).toBeVisible();

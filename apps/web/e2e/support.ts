@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /** The demo data's today, as the frozen clock has it: a Wednesday, mid-morning in Vilnius. */
-export const NOW = new Date("2026-11-04T10:40:00+02:00");
+const NOW = new Date("2026-11-04T10:40:00+02:00");
 
 export const PHONE = { width: 412, height: 915 };
 export const WIDE = { width: 1440, height: 900 };

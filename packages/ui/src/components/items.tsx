@@ -1,7 +1,7 @@
 // Items as the views draw them (design D50, D51): blocks and chips filled in
 // their colour, a task with its check-circle, a done task struck through and
 // muted. Each is a list item named by its title and time.
-import { wallClockOf } from "@astrotime/core";
+import { wallClockOf, type Placed } from "@astrotime/core";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +10,7 @@ import { useCalendar } from "./context.ts";
 import { CheckCircleIcon } from "./icons.tsx";
 
 /** The accessible name of an item: what it is, its title and when. */
-export function useItemLabel(): (entry: Entry, allDay: boolean) => string {
+function useItemLabel(): (entry: Entry, allDay: boolean) => string {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   return (entry, allDay) => {
@@ -72,28 +72,15 @@ export const HOUR = 56;
 /** A timed item in a day's column: a block from start to end, or a task's 30-minute chip. */
 export function TimedItem({
   entry,
-  shape,
-  top,
-  bottom,
-  left,
-  width,
-  layer,
-  continuesBefore,
-  continuesAfter,
+  placed,
   compact,
 }: {
   entry: Entry;
-  shape: "block" | "chip";
-  top: number;
-  bottom: number;
-  left: number;
-  width: number;
-  layer: number;
-  continuesBefore: boolean;
-  continuesAfter: boolean;
+  placed: Placed;
   /** A narrow column (a week on a phone): smaller text, no time line. */
   compact: boolean;
 }) {
+  const { shape, top, bottom, left, width, layer, continuesBefore, continuesAfter } = placed;
   const { colorOf, formats, timeZone } = useCalendar();
   const label = useItemLabel();
   const height = ((bottom - top) / 60) * HOUR - 2;

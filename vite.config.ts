@@ -14,7 +14,11 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
-          include: ["packages/**/*.test.ts", "apps/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+          include: [
+            "packages/**/*.test.{ts,tsx}",
+            "apps/**/*.test.{ts,tsx}",
+            "scripts/**/*.test.ts",
+          ],
           exclude: ["**/node_modules/**", "**/dist/**", "**/*.browser.test.{ts,tsx}"],
         },
       },
@@ -23,9 +27,23 @@ export default defineConfig({
         // and runs in headless Chromium (as in Jhin).
         extends: true,
         // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
+        // The rest are pre-bundled up front: one found mid-run reloads the tests.
         optimizeDeps: {
           exclude: ["@sqlite.org/sqlite-wasm"],
-          include: ["drizzle-orm/sqlite-proxy", "drizzle-orm", "ical.js"],
+          include: [
+            "drizzle-orm/sqlite-proxy",
+            "drizzle-orm",
+            "ical.js",
+            "@base-ui/react/checkbox",
+            "@base-ui/react/dialog",
+            "@base-ui/react/popover",
+            "i18next",
+            "react",
+            "react-dom/client",
+            "react-i18next",
+            "react/jsx-dev-runtime",
+            "vite-plus/test/browser/context",
+          ],
         },
         test: {
           name: "browser",
@@ -87,7 +105,7 @@ export default defineConfig({
       },
       {
         // AGENTS.md: tests wait for a concrete event, never for time.
-        files: ["**/*.test.ts", "**/*.test.tsx"],
+        files: ["**/*.test.ts", "**/*.test.tsx", "**/e2e/**/*.ts"],
         rules: {
           "eslint/no-restricted-globals": [
             "error",

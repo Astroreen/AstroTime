@@ -2,6 +2,7 @@
 // D49–D51): day headers with the week number, the all-day strip pinned above
 // the time grid, and the grid of hour tiles with the items and the
 // current-time line.
+import type { Span } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import {
   useLayoutEffect,
@@ -12,7 +13,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { RangeLayout, StripSpan } from "../calendar/query.ts";
+import type { RangeLayout } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { ChevronIcon } from "./icons.tsx";
 import { HOUR, StripChip, TimedItem } from "./items.tsx";
@@ -95,11 +96,11 @@ export function TimeGrid(props: TimeGridProps) {
         ) : (
           <>
             <div className="flex items-end justify-center pb-1.5">
-              <span
-                aria-label={t("grid.week", { number: formats.weekNumber(days) })}
-                className="rounded-full bg-pill px-2 py-1 text-xs font-medium text-ink-muted"
-              >
-                {formats.weekNumber(days)}
+              <span className="rounded-full bg-pill px-2 py-1 text-xs font-medium text-ink-muted">
+                <span aria-hidden="true">{formats.weekNumber(days)}</span>
+                <span className="sr-only">
+                  {t("grid.week", { number: formats.weekNumber(days) })}
+                </span>
               </span>
             </div>
             {days.map((day) => (
@@ -211,14 +212,17 @@ function Strip({
 }: TimeGridProps & { collapsed: boolean }) {
   const { t } = useTranslation();
   const { formats } = useCalendar();
-  const shown = collapsed ? layout.strip.filter((span) => span.row < STRIP_ROWS - 1) : layout.strip;
+  const shown = collapsed
+    ? layout.strip.filter(({ span }) => span.row < STRIP_ROWS - 1)
+    : layout.strip;
   const more = collapsed
     ? days
         .map((day, index) => ({
           day,
           index,
           count: layout.strip.filter(
-            (span) => span.row >= STRIP_ROWS - 1 && span.firstDay <= index && index <= span.lastDay,
+            ({ span }) =>
+              span.row >= STRIP_ROWS - 1 && span.firstDay <= index && index <= span.lastDay,
           ).length,
         }))
         .filter(({ count }) => count > 0)
@@ -235,11 +239,11 @@ function Strip({
         minHeight: rows === 0 ? 4 : undefined,
       }}
     >
-      {shown.map((span) => (
-        <StripCell key={spanKey(span)} span={span}>
-          {span.entry ? (
+      {shown.map(({ span, entry }) => (
+        <StripCell key={entry?.key ?? "undone"} span={span}>
+          {entry ? (
             <StripChip
-              entry={span.entry}
+              entry={entry}
               continuesBefore={span.continuesBefore}
               continuesAfter={span.continuesAfter}
             />
@@ -271,7 +275,7 @@ function Strip({
   );
 }
 
-function StripCell({ span, children }: { span: StripSpan; children: ReactNode }) {
+function StripCell({ span, children }: { span: Span; children: ReactNode }) {
   return (
     <div
       className="min-w-0 px-[1.5px]"
@@ -280,8 +284,4 @@ function StripCell({ span, children }: { span: StripSpan; children: ReactNode })
       {children}
     </div>
   );
-}
-
-function spanKey(span: StripSpan): string {
-  return span.entry?.key ?? "undone";
 }

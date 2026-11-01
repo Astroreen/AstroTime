@@ -3,7 +3,7 @@
 import type { ItemTime } from "@astrotime/core";
 import { wallClockOf } from "@astrotime/core";
 
-import { isoWeek, utcDate, weekdayOf } from "./dates.ts";
+import { addDays, isoWeek, utcDate, weekdayOf } from "./dates.ts";
 import type { LocaleSettings } from "./locale.ts";
 
 const UTC = "UTC";
@@ -104,9 +104,12 @@ export class Formats {
     return this.#time.formatRange(s, e);
   }
 
+  /**
+   * The ISO number of the week the first day belongs to. Where weeks start
+   * on Sunday, a Sunday belongs to the week of the Monday after it.
+   */
   weekNumber(days: readonly string[]): number {
-    // A week that starts on Sunday is numbered by its Monday, as ISO numbers it.
     const first = days[0]!;
-    return isoWeek(days.length > 1 && weekdayOf(first) === 7 ? days[1]! : first);
+    return isoWeek(this.#weekStart === 7 && weekdayOf(first) === 7 ? addDays(first, 1) : first);
   }
 }
