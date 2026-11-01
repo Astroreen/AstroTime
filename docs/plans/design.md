@@ -587,6 +587,11 @@ the project.
   ([D120](#D120)). The same holds for the drawer's calendar checkbox on
   the dark drawer (1.4.11): its label names the calendar. A floor on the
   fill's lightness in the dark theme would close both.
+- **The grid moving when the strip grows** — the week's all-day items and
+  task chips arrive after the grid is drawn, and the rows they add push the
+  time grid down (about 70 px in the demo); a press in that moment lands a
+  slot off. Reserving the strip's height until the items are read would
+  hold it still ([D51](#D51)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).

@@ -107,6 +107,10 @@
    * sRGB too (a `display-p3` or wide `oklch` one). The calendar's own colour
    * is unchanged (D47); only what is drawn is darker.
    * `packages/ui/test/item-colors.test.ts` proves the bound over the colours.
+   * `--luminance` names `r`, `g` and `b` outside a colour function: it works
+   * only substituted as text into `color(from … srgb-linear …)` below, so it
+   * must stay an unregistered property used there. The fill is opaque
+   * (`/ 1`): white text on a translucent one would depend on what is behind.
    */
   .item,
   .item-color {
