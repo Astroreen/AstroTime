@@ -97,6 +97,29 @@
       0 0 0 2px var(--color-canvas),
       0 0 0 4px var(--color-accent);
   }
+  /*
+   * Dragging (design D111): an item that drags selects no text and opens no
+   * menu on a long press; while it is held, it stays dimmed where it was, and
+   * the pointer says what the drag does wherever it goes.
+   */
+  .draggable {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  [data-held] {
+    opacity: 0.45;
+  }
+  :root[data-dragging] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  :root[data-dragging="move"] * {
+    cursor: grabbing;
+  }
+  :root[data-dragging="resize"] * {
+    cursor: ns-resize;
+  }
   /* A mark on a calendar's colour (the drawer's checkbox), dark or light by that colour. */
   .item-on-color {
     color: oklch(from var(--calendar) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);

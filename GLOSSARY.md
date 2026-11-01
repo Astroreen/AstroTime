@@ -58,6 +58,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Span** — a chip drawn as one bar over every day the item covers, in
   the all-day strip of a week and in each week of the Month view (where
   timed items are spans too); a one-day item is a span of one day.
+- **Ghost** — what a drag draws where the item would go, with its new
+  time, while the item stays dimmed where it was until the drop is saved
+  (design D111).
 - **Cluster** — timed items that overlap, directly or through others; they
   share the column's width (D15).
 - **Tasks screen** — the task lists, as in Google Tasks: a screen on a

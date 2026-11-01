@@ -159,9 +159,16 @@ When you add a package, app or module, add its line here in the same PR.
     - `settings-section.tsx` — the drawer's settings.
       → `plans/design.md#D96`
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
-      details or creates one; the details (`item-details.tsx`), the edit
+      details or creates one, or gives an occurrence new times
+      (`reschedule`); the details (`item-details.tsx`), the edit
       dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
       → `plans/design.md#D108`
+    - `drag.tsx` — `useDrag`: a view's drag and resize by pointer, a
+      finger's long press, Escape, the edges that scroll, the keys that
+      move a focused item and what a move announces; the view says what is
+      under a point (`DragSurface`) and draws the ghost (`GhostBlock`,
+      `GhostChip` in `items.tsx`). → `plans/design.md#D111`,
+      `plans/design.md#D112`
     - `conflicts-dialog.tsx` — the Conflicts list, from the accounts
       dialog. → `plans/foundation.md#D107`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
@@ -176,9 +183,13 @@ When you add a package, app or module, add its line here in the same PR.
       one check of whether an item can be created, edited or deleted.
       → `plans/foundation.md#D37`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
-      scopes and calendars offered and the writes to the store; `words.ts` — rules and
-      reminders in words; `conflicts.ts` — the Conflicts list's two ways
-      out. → `plans/foundation.md#D103`, `plans/foundation.md#D107`
+      scopes and calendars offered and the writes to the store
+      (`saveChanges`, a drag's too); `words.ts` — rules and reminders in
+      words; `conflicts.ts` — the Conflicts list's two ways out.
+      → `plans/foundation.md#D103`, `plans/foundation.md#D107`
+    - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
+      `moved`, `keyMove`), the slot and column under a point, the ghost's
+      occurrence, when a press is a drag. → `plans/foundation.md#D113`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe`, `useNow`, `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
@@ -222,11 +233,13 @@ When you add a package, app or module, add its line here in the same PR.
     `reminders.spec.ts` moves `page.clock` and sees notifications through a
     wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`;
     `editing.spec.ts` creates, edits and deletes on the demo data,
-    `editing-server.spec.ts` sees an item made here reach Radicale,
-    `editing-screenshots.spec.ts` takes the editing evidence.
-    → `plans/design.md#D108`;
-    `insets.spec.ts` keeps the shell clear of a phone's system bars.
-    → `plans/android.md#D68`
+    `editing-server.spec.ts` sees an item made here, then dragged, reach
+    Radicale, `editing-screenshots.spec.ts` takes the editing evidence.
+    → `plans/design.md#D108`; `drag.spec.ts` drags, resizes and moves by
+    keys (a finger through Chromium's touch input under `page.clock`),
+    `drag-screenshots.spec.ts` takes the dragging evidence.
+    → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
+    phone's system bars. → `plans/android.md#D68`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,

@@ -107,16 +107,22 @@ function zoneOf(times: ItemTimes, timeZone: string): { zone: string | null; utc:
   return { zone: time.timeZone, utc: false };
 }
 
+/** Times as the form shows them in `zone`: dates and clocks, an all-day event's end its last day. */
+function formTimes(kind: "event" | "task", times: ItemTimes, zone: string | null) {
+  const allDay = (times.start ?? times.end)?.type === "date";
+  const start = times.start ? split(times.start, zone) : { date: "", time: "" };
+  let end = times.end ? split(times.end, zone) : { date: "", time: "" };
+  // An all-day event's DTEND is the day after its last; the form shows the last.
+  if (kind === "event" && allDay && times.end) end = { date: addDays(end.date, -1), time: "" };
+  return { allDay, start, end };
+}
+
 /** The form for an item opened: the occurrence's times, the item's fields. */
 export function formOf(target: Target, timeZone: string): Form {
   const { item, object } = target;
   const times = timesOf(object, target.recurrenceId);
   const { zone, utc } = zoneOf(times, timeZone);
-  const allDay = (times.start ?? times.end)?.type === "date";
-  const start = times.start ? split(times.start, zone) : { date: "", time: "" };
-  let end = times.end ? split(times.end, zone) : { date: "", time: "" };
-  // An all-day event's DTEND is the day after its last; the form shows the last.
-  if (item.kind === "event" && allDay && times.end) end = { date: addDays(end.date, -1), time: "" };
+  const { allDay, start, end } = formTimes(item.kind, times, zone);
   const rule = repeatOf(object);
   const task = item.kind === "task" ? item : null;
   return {
@@ -146,8 +152,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
  * A new item's form, as Google prefills it: an event on `day` from the next
- * half hour after `minutes` (or at `at`, a tapped slot), an hour long; a task
- * due on `day`, all day, or undated without one.
+ * half hour after `minutes` (or at `at`, a tapped slot), an hour long (or
+ * `length` minutes, a press dragged over the grid); a task due on `day`,
+ * all day, or undated without one.
  */
 export function newForm(
   kind: "event" | "task",
@@ -158,13 +165,15 @@ export function newForm(
     readonly minutes: number;
     /** Minutes past midnight of a tapped slot: the event starts there. */
     readonly at?: number;
+    /** Minutes the event lasts; an hour by default. */
+    readonly length?: number;
     readonly timeZone: string;
   },
 ): Form {
   const startMinutes = options.at ?? Math.ceil((options.minutes + 1) / 30) * 30;
   const day = options.day ?? "";
   const startDay = addDays(day || "2000-01-01", Math.floor(startMinutes / 1440));
-  const endMinutes = startMinutes + 60;
+  const endMinutes = startMinutes + (options.length ?? 60);
   const endDay = addDays(day || "2000-01-01", Math.floor(endMinutes / 1440));
   const clock = (m: number) => `${pad(Math.floor((m % 1440) / 60))}:${pad(m % 60)}`;
   const event = kind === "event";
@@ -382,18 +391,42 @@ export function scopesFor(
 ): Scope[] | null {
   if (!target || !initial || !isOccurrence(target)) return [];
   if (initial.calendarId !== form.calendarId) return [];
-  const repeat = ruleChanged(initial, form);
   const day = initial.startDate !== form.startDate || initial.endDate !== form.endDate;
-  const scopes: Scope[] =
-    repeat && day
-      ? ["following"]
-      : repeat
-        ? ["following", "all"]
-        : day
-          ? ["this", "following"]
-          : ["this", "following", "all"];
-  const allowed = scopes.filter((scope) => scope !== "following" || rights.create);
-  return allowed.length > 0 ? allowed : null;
+  return allowed(scopesOf(ruleChanged(initial, form), day), rights);
+}
+
+/**
+ * The scopes an occurrence moved or resized to `times` may take (a drag or
+ * a key, foundation D113), by the dialog's rule: its rule stays, so a new
+ * day is not every occurrence's, and "this occurrence" is always one, so
+ * there is always one to take. Empty: no question to ask.
+ */
+export function scopesForTimes(
+  target: Target,
+  times: ItemTimes,
+  timeZone: string,
+  rights: CalendarRights = ALL_RIGHTS,
+): Scope[] {
+  if (!isOccurrence(target)) return [];
+  const days = (of: ItemTimes) => {
+    const { start, end } = formTimes(target.item.kind, of, zoneOf(of, timeZone).zone);
+    return `${start.date}/${end.date}`;
+  };
+  const day = days(timesOf(target.object, target.recurrenceId)) !== days(times);
+  return allowed(scopesOf(false, day), rights) ?? ["this"];
+}
+
+function scopesOf(repeat: boolean, day: boolean): Scope[] {
+  if (repeat && day) return ["following"];
+  if (repeat) return ["following", "all"];
+  if (day) return ["this", "following"];
+  return ["this", "following", "all"];
+}
+
+/** The scopes a calendar's rights allow: a split is a new item (D105, D37); `null` for none. */
+function allowed(scopes: Scope[], rights: CalendarRights): Scope[] | null {
+  const kept = scopes.filter((scope) => scope !== "following" || rights.create);
+  return kept.length > 0 ? kept : null;
 }
 
 /**
@@ -586,8 +619,35 @@ export async function saveForm(
     });
     return;
   }
-  const changes = changesOf(initial, form, untitled);
-  const moving = form.calendarId !== target.calendarId;
+  await saveChanges(
+    store,
+    {
+      target,
+      changes: changesOf(initial, form, untitled),
+      calendarId: form.calendarId,
+      scope: request.scope,
+    },
+    writes,
+  );
+}
+
+/**
+ * Saves what the user changed of an item, in `scope`, into `calendarId`:
+ * the edit dialog's save, and a drag's or a key's new times (D113).
+ * Nothing changed, nothing is written.
+ */
+export async function saveChanges(
+  store: Store,
+  request: {
+    readonly target: Target;
+    readonly changes: ItemChanges;
+    readonly calendarId: string;
+    readonly scope: Scope;
+  },
+  writes: Writes,
+): Promise<void> {
+  const { target, changes, calendarId } = request;
+  const moving = calendarId !== target.calendarId;
   if (!moving && Object.keys(changes).length === 0) return;
   const newUid = writes.uid();
   await changeLocal(store, async (local) => {
@@ -600,7 +660,7 @@ export async function saveForm(
         scope: "all",
         recurrenceId: target.recurrenceId,
       });
-      await local.save(form.calendarId, ics);
+      await local.save(calendarId, ics);
       await local.delete(stored.id);
       return;
     }

@@ -1,8 +1,9 @@
 // Editing against a real Radicale (docs/plans/foundation.md#pr-6--editing,
 // D91): an event made with "+" is a pending change in the local store that
 // the UI's sync uploads, shortly after the change, to the server, where
-// another client reads it. Radicale is the one the sync package's
-// integration tests start, ready when it says so.
+// another client reads it; dragged to another day and time (design D111),
+// it is uploaded again. Radicale is the one the sync package's integration
+// tests start, ready when it says so.
 import { test as base, expect } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
@@ -19,7 +20,10 @@ const test = base.extend<{ radicale: CalDavServer }>({
 
 test.use({ viewport: WIDE });
 
-test("an event created here reaches the server", async ({ page, radicale }) => {
+test("an event created here reaches the server, and again once dragged", async ({
+  page,
+  radicale,
+}) => {
   const work = await radicale.mkcalendar("work");
   await openApp(page);
   await page.getByRole("button", { name: "Another CalDAV server" }).click();
@@ -56,4 +60,31 @@ test("an event created here reaches the server", async ({ page, radicale }) => {
   expect(ics).toContain("SUMMARY:Made in AstroTime");
   expect(ics).toContain("DTSTART;TZID=Europe/Vilnius:20261104T160000");
   expect(ics).toContain("PRODID:-//AstroTime//AstroTime//EN");
+
+  // Dragged from Wednesday's 4:00 PM to Thursday's 5:00 PM, it is uploaded again.
+  const made = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("listitem", { name: "Made in AstroTime, 4:00 – 5:00 PM" });
+  const from = (await made.boundingBox())!;
+  const thursday = (await page.getByRole("list", { name: "Thursday, November 5" }).boundingBox())!;
+  const moved = page.waitForResponse((answer) => answer.request().method() === "PUT");
+  await page.mouse.move(from.x + from.width / 2, from.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(thursday.x + thursday.width / 2, thursday.y + 17.1 * 56, { steps: 8 });
+  await page.mouse.up();
+  await expect(
+    page
+      .getByRole("list", { name: "Thursday, November 5" })
+      .getByRole("listitem", { name: "Made in AstroTime, 5:00 – 6:00 PM" }),
+  ).toBeVisible();
+  const update = await moved;
+  expect(update.ok()).toBe(true);
+  expect(update.request().headers()["if-match"]).toBeTruthy();
+  const again = await fetch(`${work}${uid}.ics`, {
+    headers: { Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}` },
+  });
+  const changed = await again.text();
+  expect(changed).toContain("DTSTART;TZID=Europe/Vilnius:20261105T170000");
+  expect(changed).toContain("DTEND;TZID=Europe/Vilnius:20261105T180000");
+  expect(changed).toContain("SUMMARY:Made in AstroTime");
 });

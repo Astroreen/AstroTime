@@ -315,7 +315,7 @@ the project.
   - **creating**: the "+" button makes an event on the day shown from the
     next half hour after now, an hour long (Google's prefill); a tap on an
     empty slot of the time grid makes one from that half hour, an hour long
-    (a press to size it comes with dragging, PR 6b); a tap on a Month
+    (a press dragged sizes it, [D111](#D111)); a tap on a Month
     tile's empty space keeps opening the day ([D86](#D86)), where Google's
     Android app creates on a long press ([Deferred](#deferred)). A new item
     goes in the first calendar that takes new items the views show;
@@ -339,11 +339,84 @@ the project.
   of its card, which makes an undated task in that list, as the tasks
   screen's "+" button does on a phone.
 
+### Decided while building PR 6b
+
+- **D111. Dragging and resizing, as Google Calendar's** (foundation
+  [D14](foundation.md#D14), [D16](foundation.md#D16); what a drop writes:
+  foundation [D113](foundation.md#D113)):
+  - **what drags**: every item of a calendar whose rights let it be edited
+    (foundation [D37](foundation.md#D37)), in the time grid (a block, a
+    task's chip), the all-day strip and the Month; a read-only calendar's
+    items, the undone tasks chip and the Agenda's cards do not. A tap still
+    opens the details;
+  - **the press**: a mouse or a pen drags once it moves 4 px, so a click
+    still opens; a finger drags after a long press of 500 ms held still
+    (Google's Android app), and one that moves 8 px first scrolls the view
+    or swipes it to the next period. While a finger drags, the view does not
+    scroll; a long press opens no menu, and nothing selects text;
+  - **where it goes**: on the time grid it moves by the 15-minute slots and
+    the days between where it was picked up and where the pointer is (so a
+    block at 10:05 moves to 10:20, as Nextcloud's calendar snaps; Google
+    snaps to the quarter too); in the strip and the Month by days, keeping
+    its length and time. From the grid into the strip it becomes all day
+    from that day, over as many days as its times covered (one, for most);
+    from the strip onto the grid it starts at the slot, an hour long. Dropped on the days shown only: past them is
+    [deferred](#deferred);
+  - **resizing**: a block's bottom edge moves its end and its top edge its
+    start (8 px each; a block under 28 px has only its bottom edge), on its
+    own day, at least 15 minutes long; D16's start–due task resizes either
+    end. Google's web app resizes the end only, its Android app both;
+    a chip has no length and does not resize;
+  - **the ghost**: while it drags, the item is drawn where it would go, by
+    the layout engine (foundation [D42](foundation.md#D42)), in its colour
+    above the others, with its title and its new time (a short one: the
+    time first); the original stays where it was, dimmed, until the save is
+    written and the item is drawn anew, also while the scope is asked.
+    Near the grid's top or bottom edge, once the drag moves that way, the
+    grid scrolls, faster nearer the edge;
+  - **Escape** cancels a drag; so does Cancel in the scope dialog. A drop
+    that changes nothing writes nothing and asks nothing;
+  - **an occurrence of a series** asks the scope with [D108](#D108)'s
+    dialog and its rule: a new time on the same day offers all three, a
+    new day "This occurrence" and "This and following" ("This and
+    following" only where the calendar takes new items, D37);
+  - **a press dragged over an empty column** sizes a new event from the
+    first slot to the end of the last and opens the edit dialog with it
+    ([D108](#D108)'s creating); one that never leaves its slot is a tap;
+  - a drop that could not be saved (gone meanwhile, in doubt, failed;
+    foundation [D103](foundation.md#D103)) says so in a note at the bottom
+    of the view, with Dismiss; the item is drawn where the store has it.
+- **D112. Keys and what a move says.** A focused item (its button) moves
+  with **Alt and an arrow**: up or down by 15 minutes and left or right by a
+  day on the time grid, left or right by a day in the strip, by a day or a
+  week in the Month; **Alt, Shift and up or down** move a block's end by 15
+  minutes. Alt with an arrow is the browser's back and forward, so on an
+  item the key is taken from the browser. Each item names its keys
+  (`aria-keyshortcuts`) and describes them in words (`aria-describedby`, in
+  the user's language). After a move or a resize, by keys or a drop, a
+  status region says what it is now ("Moved: Lunch with Marta. Thursday,
+  November 5 · 3:00 – 4:00 PM", "Перенесено: Обед с Мартой. Четверг, 5
+  ноября · 15:00–16:00"; "Resized: …"), a cancelled drag says so, and the
+  focus follows the item to its new day. A key's move asks the scope as a
+  drop does.
+
 ## Deferred
 
 - **Year view** ([D48](#D48)).
 - **A long press in the Month view to create** — as Google's Android app
   does; a tap keeps opening the day ([D108](#D108)).
+- **Dragging past the days shown** — Google moves to the next week when a
+  drag rests at the view's side; here a drop lands on the first or last day
+  shown, and the keys move on past them ([D111](#D111)).
+- **Resizing an all-day item** — its edge in the strip or the Month, to
+  more or fewer days; it moves, its length kept ([D111](#D111)).
+- **Handles on a touch screen** — Google's Android app selects an item on
+  a long press and shows round handles on its ends; here a finger resizes
+  by the same 8 px edges as a mouse ([D111](#D111)).
+- **Undo after a drop** — Google shows "Event saved · Undo"; a drop is
+  undone by dragging it back ([D111](#D111)).
+- **Keys between the strip and the grid** — a timed item made all day, or
+  the other way, by a drag only ([D112](#D112)).
 - **Dates in the app's own format** — the edit dialog's date field is the
   browser's, in its language and order; its times are a list in the user's
   clock ([D108](#D108)).
@@ -388,5 +461,6 @@ Foundation's PR 5 builds this plan in two parts:
 - **PR 5b** — the tasks screen, the drawer's settings and search (D52,
   D53; D94–D97 came with it).
 
-Foundation's PR 6a (the details and edit dialogs) brought D108 and D109. Its evidence is screenshots of each view
+Foundation's PR 6a (the details and edit dialogs) brought D108 and D109;
+PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each view
 next to the matching reference, in both themes.

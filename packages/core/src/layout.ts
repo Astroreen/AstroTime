@@ -63,14 +63,17 @@ function daysBetween(a: string, b: string): number {
 /**
  * Where a task's chip sits, or `null` when the task is not a chip (D16,
  * D42): a timed due with no timed start to span from, or a timed start
- * with no due at all.
+ * with no due at all. The occurrence's own time, not the item's: a series'
+ * occurrences share the master's item.
  */
 function chipTime(occurrence: Occurrence): ItemTime | null {
   const { item } = occurrence;
   if (item.kind !== "task") return null;
   const { start, due } = item;
-  if (due && due.type !== "date" && (start === null || start.type === "date")) return due;
-  if (!due && start && start.type !== "date") return start;
+  if (due && due.type !== "date" && (start === null || start.type === "date")) {
+    return occurrence.end;
+  }
+  if (!due && start && start.type !== "date") return occurrence.start;
   return null;
 }
 

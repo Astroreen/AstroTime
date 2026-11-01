@@ -321,6 +321,16 @@ export const en = {
   "scope.all": "All occurrences",
   "scope.ok": "OK",
   "scope.cancel": "Cancel",
+
+  "drag.moved": "Moved: {{title}}. {{when}}",
+  "drag.resized": "Resized: {{title}}. {{when}}",
+  "drag.cancelled": "Move cancelled",
+  "drag.dismiss": "Dismiss",
+  "drag.hint.grid":
+    "Alt with the up or down arrow moves it by 15 minutes, with the left or right arrow by a day; with Shift too, up and down move its end.",
+  "drag.hint.strip": "Alt with the left or right arrow moves it by a day.",
+  "drag.hint.month":
+    "Alt with the left or right arrow moves it by a day, with the up or down arrow by a week.",
   "delete.event": "Delete this event?",
   "delete.task": "Delete this task?",
   "delete.confirm": "Delete",

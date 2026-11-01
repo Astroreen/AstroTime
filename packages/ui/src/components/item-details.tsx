@@ -356,8 +356,11 @@ function zoneNote(time: ItemTime | null, timeZone: string): string | null {
 const dayIn = (time: ItemTime, timeZone: string) =>
   time.type === "date" ? time.date : wallClockOf(time, timeZone).slice(0, 10);
 
-/** "Wednesday, November 4 · 10:00 – 11:30", "November 4 – 6", "Due Thursday, November 5, 15:00". */
-function whenText(
+/**
+ * "Wednesday, November 4 · 10:00 – 11:30", "November 4 – 6", "Due Thursday,
+ * November 5, 15:00": the details' line, and what a move announces (design D112).
+ */
+export function whenText(
   task: Task | null,
   times: { start: ItemTime | null; end: ItemTime | null },
   allDay: boolean,
