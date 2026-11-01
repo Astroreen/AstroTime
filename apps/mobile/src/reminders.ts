@@ -109,12 +109,12 @@ export function androidReminders(options: {
   onResume?: (listener: () => void) => void;
 }): ReminderScheduler {
   const { native, preferences, now = () => Date.now() } = options;
-  const read = readKept(preferences);
-  const kept: Kept = read ?? { next: 1, asked: false, scheduled: {} };
+  const record = readKept(preferences);
+  const kept: Kept = record ?? { next: 1, asked: false, scheduled: {} };
   // Without a record (unreadable, or the preferences cleared) the alarms
   // Android still holds are no one's: their ids would be handed out again
   // while they still fire. The first set cancels them all.
-  let orphans = read === null;
+  let orphans = record === null;
   let permission: ReminderPermission = "default";
   let exact = true;
   // The first set of a run arms every reminder ahead again: alarms do not
