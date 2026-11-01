@@ -66,7 +66,7 @@ export interface EditorState {
 }
 
 const field =
-  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-[15px] text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
+  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 
 export function ItemEditor({
   state,
@@ -105,7 +105,7 @@ export function ItemEditor({
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>
               <CloseIcon className="size-5" />
             </Dialog.Close>
-            <Dialog.Title className="min-w-0 flex-1 truncate text-[18px]">{title}</Dialog.Title>
+            <Dialog.Title className="min-w-0 flex-1 truncate text-title">{title}</Dialog.Title>
             <button
               type="submit"
               form={formId}
@@ -134,7 +134,7 @@ export function ItemEditor({
               {state.problem && (
                 <p
                   role="alert"
-                  className="mt-4 rounded-xl bg-danger-soft p-3 text-[14px] text-danger"
+                  className="mt-4 rounded-xl bg-danger-soft p-3 text-body text-danger"
                 >
                   {t(state.problem === "failed" ? "edit.failed" : `edit.problem.${state.problem}`)}
                 </p>
@@ -173,7 +173,7 @@ function Fields({
               role="radio"
               aria-checked={form.kind === kind}
               onClick={() => onChange(switchKind(form, kind))}
-              className="rounded-full px-4 py-1.5 text-[14px] font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-accent aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
+              className="rounded-full px-4 py-1.5 text-body font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-accent aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t(`edit.kind.${kind}`)}
             </button>
@@ -186,7 +186,7 @@ function Fields({
         value={form.summary}
         autoFocus={!existing}
         onChange={(e) => set({ summary: e.target.value })}
-        className="h-12 w-full border-b border-line bg-transparent px-1 text-[22px] text-ink outline-none placeholder:text-ink-muted focus:border-accent"
+        className="h-12 w-full border-b border-line bg-transparent px-1 text-headline text-ink outline-none placeholder:text-ink-muted focus:border-accent"
       />
 
       <Section icon={<ClockIcon className="size-5" />}>
@@ -253,10 +253,10 @@ function Fields({
           </>
         )}
         {!form.allDay && form.zone === null && (
-          <p className="text-[13px] text-ink-muted">{t("edit.floating")}</p>
+          <p className="text-small text-ink-muted">{t("edit.floating")}</p>
         )}
         {!form.allDay && form.zone !== null && form.zone !== timeZone && (
-          <p className="text-[13px] text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
+          <p className="text-small text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
         )}
       </Section>
 
@@ -275,9 +275,7 @@ function Fields({
           onChange={(calendarId) => set({ calendarId })}
           options={calendars.map((c) => [c.id, c.name])}
         />
-        {calendars.length === 0 && (
-          <p className="text-[13px] text-danger">{t("edit.noCalendar")}</p>
-        )}
+        {calendars.length === 0 && <p className="text-small text-danger">{t("edit.noCalendar")}</p>}
       </Section>
 
       <Section icon={<PaletteIcon className="size-5" />}>
@@ -407,7 +405,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-3 text-[15px]">
+    <label className="flex min-h-10 cursor-pointer items-center gap-3 text-row">
       <span className="min-w-0 flex-1">{label}</span>
       <Switch.Root
         checked={checked}
@@ -495,7 +493,7 @@ function Labelled({ label, children }: { label: string; children: (id: string) =
   const id = useId();
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[13px] text-ink-muted">
+      <label htmlFor={id} className="text-small text-ink-muted">
         {label}
       </label>
       {children(id)}
@@ -724,7 +722,7 @@ function CustomRepeat({
               aria-pressed={days.includes(d)}
               aria-label={formats.weekdayName(WEEKDAYS.indexOf(d) + 1)}
               onClick={() => toggle(d)}
-              className="grid size-9 place-items-center rounded-full text-[13px] ring-1 ring-line aria-pressed:bg-accent aria-pressed:text-on-accent aria-pressed:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
+              className="grid size-9 place-items-center rounded-full text-small ring-1 ring-line aria-pressed:bg-accent aria-pressed:text-on-accent aria-pressed:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
             >
               {/* 2024-01-01 was a Monday. */}
               <span aria-hidden="true">
@@ -756,9 +754,9 @@ function CustomRepeat({
         />
       )}
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1 text-[13px] text-ink-muted">{t("repeat.ends")}</legend>
+        <legend className="mb-1 text-small text-ink-muted">{t("repeat.ends")}</legend>
         {(["never", "until", "count"] as const).map((kind) => (
-          <label key={kind} className="flex min-h-9 items-center gap-2 text-[14.5px]">
+          <label key={kind} className="flex min-h-9 items-center gap-2 text-body">
             <input
               type="radio"
               name="repeat-end"
@@ -852,7 +850,7 @@ function Reminders({
       {form.alarms.length > 0 && (
         <ul aria-label={t("edit.reminders")} className="flex flex-col gap-1">
           {form.alarms.map((choice, index) => (
-            <li key={index} className="flex min-h-9 items-center gap-2 text-[14.5px]">
+            <li key={index} className="flex min-h-9 items-center gap-2 text-body">
               <span className="min-w-0 flex-1">{wordsOf(choice)}</span>
               <button
                 type="button"

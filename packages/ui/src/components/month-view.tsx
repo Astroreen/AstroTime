@@ -106,7 +106,7 @@ export function MonthView(props: MonthViewProps) {
           {weeks[0]?.days.map((day) => (
             <span
               key={day}
-              className={`text-center text-[11.5px] ${
+              className={`text-center text-chip ${
                 todayShown && weekdayOf(day) === weekdayOf(today)
                   ? "font-semibold text-accent"
                   : "text-ink-muted"
@@ -269,7 +269,7 @@ function DayTile({
           aria-current={isToday ? "date" : undefined}
           onClick={() => onOpenDay(day)}
           className={[
-            "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[13px] leading-none tabular-nums focus-visible:outline-2 focus-visible:outline-accent",
+            "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-small leading-none tabular-nums focus-visible:outline-2 focus-visible:outline-accent",
             isToday
               ? "bg-accent font-semibold text-on-accent"
               : outside
@@ -342,4 +342,4 @@ function DayTile({
 }
 
 const moreClass =
-  "h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] font-medium whitespace-nowrap text-ink-muted";
+  "h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-tiny font-medium whitespace-nowrap text-ink-muted";

@@ -29,7 +29,7 @@ export function UndoneChip({
   const { open } = useEditing();
   const first = tasks[0];
   const chip = `flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink ${
-    dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1.5 rounded-[5px] px-1.5 text-[13px]"
+    dense ? "gap-0.5 rounded-[4px] px-1 text-tiny" : "gap-1.5 rounded-[5px] px-1.5 text-small"
   }`;
   const face = (
     <>
@@ -79,7 +79,7 @@ export function UndoneChip({
                       style={{ "--item": colorOf(task) } as CSSProperties}
                     />
                     <span className="flex min-w-0 flex-col">
-                      <span className="text-[13.5px] break-words">
+                      <span className="text-small break-words">
                         {item.summary?.trim() || t("item.untitled")}
                       </span>
                       <span className="text-xs text-ink-muted">

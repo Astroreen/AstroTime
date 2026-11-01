@@ -36,7 +36,7 @@ export function RemindersSwitch() {
         ]
       : [];
   return (
-    <div className="flex flex-col px-4 py-1 text-[14px]">
+    <div className="flex flex-col px-4 py-1 text-body">
       <label className="flex min-h-11 cursor-pointer items-center gap-3 has-disabled:cursor-default">
         <span className="min-w-0 flex-1">{t("reminders.setting")}</span>
         <Switch.Root
@@ -50,7 +50,7 @@ export function RemindersSwitch() {
         </Switch.Root>
       </label>
       {notes.length > 0 && (
-        <div id={hint} className="flex flex-col gap-0.5 pb-1 text-[12.5px] text-ink-muted">
+        <div id={hint} className="flex flex-col gap-0.5 pb-1 text-note text-ink-muted">
           {notes.map((note) => (
             <p key={note}>{note}</p>
           ))}

@@ -138,7 +138,7 @@ export function StripChip({
       {...dragProps(entry, source, held)}
       className={[
         "item relative flex h-full items-center leading-none font-medium",
-        dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1 rounded-[5px] px-1.5 text-[13px]",
+        dense ? "gap-0.5 rounded-[4px] px-1 text-tiny" : "gap-1 rounded-[5px] px-1.5 text-small",
         continuesBefore ? "rounded-l-none" : "",
         continuesAfter ? "rounded-r-none" : "",
         source ? "draggable" : "",
@@ -182,10 +182,10 @@ export function AgendaCard({
     >
       {task && <CheckCircleIcon className="size-4 shrink-0" />}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex text-[14px] leading-tight font-medium">
+        <span className="flex text-body leading-tight font-medium">
           <Title entry={entry} wrap={false} />
         </span>
-        <span className="item-time truncate text-[12px] leading-tight">{time}</span>
+        <span className="item-time truncate text-note leading-tight">{time}</span>
       </span>
       <Opener entry={entry} label={name} />
     </div>
@@ -225,7 +225,7 @@ export function TimedItem({
       {...dragProps(entry, source, held)}
       className={[
         "item absolute overflow-hidden rounded-[6px]",
-        compact ? "px-[3px] py-px text-[11px]" : "px-1.5 py-0.5 text-[12.5px]",
+        compact ? "px-[3px] py-px text-tiny" : "px-1.5 py-0.5 text-note",
         "leading-[1.2] font-medium",
         shape === "chip" ? "flex items-center gap-1" : "",
         // Drawn over another item: a thin outline in the grid's colour (D50).
@@ -245,7 +245,7 @@ export function TimedItem({
       {task && shape === "chip" && <CheckCircleIcon className="size-3 shrink-0" />}
       {shape === "chip" ? <Title entry={entry} wrap={false} /> : <Title entry={entry} wrap />}
       {showTime && (
-        <span className="item-time block text-[11.5px] font-normal">
+        <span className="item-time block text-chip font-normal">
           {formats.timeRange(entry.occurrence.start, entry.occurrence.end, timeZone)}
         </span>
       )}
@@ -307,7 +307,7 @@ export function GhostBlock({
       data-ghost=""
       className={[
         "item pointer-events-none absolute inset-x-[1.5px] z-[55] overflow-hidden rounded-[6px] leading-[1.2] font-medium shadow-lg ring-2 shadow-black/40 ring-canvas",
-        compact ? "px-[3px] py-px text-[11px]" : "px-1.5 py-0.5 text-[12.5px]",
+        compact ? "px-[3px] py-px text-tiny" : "px-1.5 py-0.5 text-note",
       ].join(" ")}
       style={itemStyle(color, { top: (top / 60) * HOUR + 1, height: Math.max(height, 12) })}
     >
@@ -318,7 +318,7 @@ export function GhostBlock({
       ) : (
         <>
           <span className="item-title-wrap">{title}</span>
-          <span className="item-time block text-[11.5px] font-normal">{time}</span>
+          <span className="item-time block text-chip font-normal">{time}</span>
         </>
       )}
     </div>
@@ -341,7 +341,7 @@ export function GhostChip({
       data-ghost=""
       className={[
         "item pointer-events-none flex h-full items-center truncate leading-none font-medium shadow-lg ring-2 shadow-black/40 ring-canvas",
-        dense ? "rounded-[4px] px-1 text-[11px]" : "rounded-[5px] px-1.5 text-[13px]",
+        dense ? "rounded-[4px] px-1 text-tiny" : "rounded-[5px] px-1.5 text-small",
       ].join(" ")}
       style={itemStyle(color)}
     >

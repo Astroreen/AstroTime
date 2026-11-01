@@ -67,7 +67,7 @@ function Choice({ request, onClose }: { request: ScopeRequest; onClose: () => vo
           {request.scopes.map((option) => (
             <label
               key={option}
-              className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px]"
+              className="flex min-h-11 cursor-pointer items-center gap-3 text-row"
             >
               <input
                 type="radio"

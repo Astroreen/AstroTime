@@ -141,6 +141,8 @@ test("the tasks screen, its panel, the settings and search (design D52, D53)", a
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: settingsName })).toBeHidden();
     await page.getByRole("button", { name: language === "en" ? "Search" : "Поиск" }).click();
+    await expect(page.getByRole("searchbox")).toBeFocused();
+    await shot(page, `search-empty-dark-${language}-phone`);
     await page.getByRole("searchbox").fill(language === "en" ? "the" : "на");
     await expect(
       page.getByRole("list", { name: /Search results|Результаты поиска/ }),

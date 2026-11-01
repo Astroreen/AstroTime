@@ -172,6 +172,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D95`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
+    - `empty-state.tsx` — what a screen shows with nothing to list.
+      → `plans/design.md#D134`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
       screen), from the top bar's gear or the drawer's last row.
       → `plans/design.md#D131`, `plans/design.md#D96`
@@ -226,8 +228,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs.
     → `plans/foundation.md#D17`
-  - `styles.css` — the theme's tokens, dark and light.
-    → `plans/design.md#D58`
+  - `styles.css` — the theme's tokens, dark and light, and the type scale.
+    → `plans/design.md#D58`, `plans/design.md#D134`
   - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev
     server, tests and screenshots, with a read-only calendar and a conflict
     to resolve. → `plans/foundation.md#D57`

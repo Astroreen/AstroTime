@@ -69,12 +69,12 @@ export function ConflictsDialog({
             <Dialog.Close className={dialogIcon} aria-label={t("details.close")}>
               <CloseIcon className="size-5" />
             </Dialog.Close>
-            <Dialog.Title className="min-w-0 flex-1 truncate text-[18px]">
+            <Dialog.Title className="min-w-0 flex-1 truncate text-title">
               {t("conflicts.title")}
             </Dialog.Title>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-6">
-            <Dialog.Description className="text-[14px] text-ink-muted">
+            <Dialog.Description className="text-body text-ink-muted">
               {views.length > 0 ? t("conflicts.intro") : t("conflicts.none")}
             </Dialog.Description>
             <ul className="mt-3 flex flex-col gap-3">
@@ -118,14 +118,14 @@ function ConflictCard({
   const shown = named.filter((field) => VALUED.has(field));
   return (
     <li aria-label={title} className="rounded-2xl bg-canvas p-3">
-      <p className="text-[15.5px] font-medium break-words">
+      <p className="text-row font-medium break-words">
         {t("conflicts.item", { title, calendar: view.calendar?.name ?? "" })}
       </p>
-      <p className="mt-0.5 text-[13px] text-ink-muted">
+      <p className="mt-0.5 text-small text-ink-muted">
         {t("conflicts.differs", { fields: words.join(", ") })}
       </p>
       {shown.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-[13.5px]">
+        <div className="mt-2 grid grid-cols-2 gap-2 text-small">
           {(
             [
               ["conflicts.yours", view.ours],
@@ -133,7 +133,7 @@ function ConflictCard({
             ] as const
           ).map(([label, object]) => (
             <section key={label} aria-label={t(label)} className="rounded-xl bg-raised p-2.5">
-              <h3 className="text-[12px] font-medium tracking-wide text-ink-muted uppercase">
+              <h3 className="text-note font-medium tracking-wide text-ink-muted uppercase">
                 {t(label)}
               </h3>
               <dl className="mt-1 flex flex-col gap-1">
@@ -150,7 +150,7 @@ function ConflictCard({
           ))}
         </div>
       )}
-      {readOnly && <p className="mt-2 text-[13px] text-ink-muted">{t("conflicts.readOnly")}</p>}
+      {readOnly && <p className="mt-2 text-small text-ink-muted">{t("conflicts.readOnly")}</p>}
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button type="button" className={textButton} onClick={onKeep}>
           {t("conflicts.keepServer")}

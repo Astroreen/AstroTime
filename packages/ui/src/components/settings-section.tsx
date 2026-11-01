@@ -53,7 +53,7 @@ export function SettingsScreen({
             <Dialog.Close className={dialogIcon} aria-label={t("settings.close")}>
               <CloseIcon className="size-5" />
             </Dialog.Close>
-            <Dialog.Title className="min-w-0 flex-1 truncate text-[18px]">
+            <Dialog.Title className="min-w-0 flex-1 truncate text-title">
               {t("settings.title")}
             </Dialog.Title>
           </div>
@@ -148,7 +148,7 @@ function SettingsGroups({
             {own.map((calendar) => (
               <label
                 key={calendar.id}
-                className="flex min-h-12 cursor-pointer items-center gap-4 px-4 text-[14px]"
+                className="flex min-h-12 cursor-pointer items-center gap-4 px-4 text-body"
               >
                 <Checkbox.Root
                   checked={!hidden.has(calendar.id)}
@@ -188,7 +188,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h2 id={id} className="px-4 text-[13px] font-medium text-accent">
+      <h2 id={id} className="px-4 text-small font-medium text-accent">
         {title}
       </h2>
       <div className="flex flex-col rounded-2xl bg-canvas py-1">{children}</div>
@@ -209,7 +209,7 @@ function Toggle({
 }) {
   const hintId = useId();
   return (
-    <div className="flex flex-col px-4 text-[14px]">
+    <div className="flex flex-col px-4 text-body">
       <label className="flex min-h-12 min-w-0 cursor-pointer items-center gap-3">
         <span className="min-w-0 flex-1">{label}</span>
         <Switch.Root
@@ -222,7 +222,7 @@ function Toggle({
         </Switch.Root>
       </label>
       {hint ? (
-        <p id={hintId} className="pb-2 text-[12.5px] text-ink-muted">
+        <p id={hintId} className="pb-2 text-note text-ink-muted">
           {hint}
         </p>
       ) : null}
@@ -244,7 +244,7 @@ function Choice({
   const id = useId();
   // The name on the left, its value on the right; the value wraps below on a narrow screen.
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-[14px]">
+    <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-body">
       <label htmlFor={id} className="min-w-0 flex-1">
         {label}
       </label>
@@ -252,7 +252,7 @@ function Choice({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 max-w-full min-w-40 rounded-lg bg-raised px-2 text-[14px] text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        className="h-9 max-w-full min-w-40 rounded-lg bg-raised px-2 text-input text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >
         {options.map(([option, name]) => (
           <option key={option} value={option}>

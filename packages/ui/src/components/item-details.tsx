@@ -173,17 +173,17 @@ function Body({
           />
           <div className="min-w-0 flex-1">
             <Dialog.Title
-              className={`text-[22px] leading-tight break-words ${done ? "text-ink-muted line-through" : ""}`}
+              className={`text-headline leading-tight break-words ${done ? "text-ink-muted line-through" : ""}`}
             >
               {title}
             </Dialog.Title>
-            <Dialog.Description className="mt-1 text-[14px] text-ink-muted">
+            <Dialog.Description className="mt-1 text-body text-ink-muted">
               {whenText(task, times, allDay, { t, formats, timeZone })}
             </Dialog.Description>
-            {zone && <p className="text-[13px] text-ink-muted">{t("details.zone", { zone })}</p>}
+            {zone && <p className="text-small text-ink-muted">{t("details.zone", { zone })}</p>}
           </div>
         </div>
-        <dl className="mt-4 flex flex-col gap-3 text-[14.5px]">
+        <dl className="mt-4 flex flex-col gap-3 text-body">
           {rule && (
             <Row icon={<RepeatIcon className="size-5" />}>
               {rule.exact
@@ -256,7 +256,7 @@ function Body({
                     </li>
                   ))}
               </ul>
-              <p className="mt-1 text-[12.5px] text-ink-muted">{t("details.guestsNote")}</p>
+              <p className="mt-1 text-note text-ink-muted">{t("details.guestsNote")}</p>
             </Row>
           )}
           {item.categories.length > 0 && (
@@ -286,7 +286,7 @@ function Body({
           )}
         </dl>
         {!rights.edit && !canDelete && calendar && (
-          <p role="note" className="mt-4 rounded-2xl bg-canvas p-3 text-[13px] text-ink-muted">
+          <p role="note" className="mt-4 rounded-2xl bg-canvas p-3 text-small text-ink-muted">
             {t("details.readOnly", { calendar: calendar.name })}
           </p>
         )}
