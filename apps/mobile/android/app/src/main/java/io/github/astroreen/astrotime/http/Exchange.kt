@@ -58,10 +58,10 @@ private val REDIRECTS = setOf(301, 302, 303, 307, 308)
 private val NO_BODY = setOf("GET", "HEAD")
 private val NEEDS_BODY = setOf("POST", "PUT", "PATCH", "PROPPATCH", "REPORT")
 
-/** What describes a body, dropped with it when a redirect turns the request into a GET (as `fetch`). */
 /** What fetch drops on a redirect to another origin: whatever names a user. */
 private val CREDENTIAL_HEADERS = setOf("authorization", "cookie", "proxy-authorization")
 
+/** What describes a body, dropped with it when a redirect turns the request into a GET (as `fetch`). */
 private val BODY_HEADERS =
     setOf("content-type", "content-length", "content-encoding", "content-language", "content-location")
 

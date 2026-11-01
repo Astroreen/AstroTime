@@ -27,7 +27,13 @@ export function mobilePlatform(store: Promise<Store>): Platform {
     openExternal: (url) => void window.open(url, "_blank"),
     signingInTo: (server) => {
       signingIn.push(server);
-      return () => void signingIn.splice(signingIn.indexOf(server), 1);
+      let done = false;
+      // Once only: a second call must not take another sign-in's entry.
+      return () => {
+        if (done) return;
+        done = true;
+        signingIn.splice(signingIn.indexOf(server), 1);
+      };
     },
     preferences,
     reminders: noReminders,
