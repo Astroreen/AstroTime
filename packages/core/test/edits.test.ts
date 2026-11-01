@@ -1244,6 +1244,28 @@ describe("deleting with a scope (D11)", () => {
     expect(hasOccurrence(CalendarObject.parse(ics), recurrenceId)).toBe(false);
   });
 
+  test("a series in a zone the object does not define, east of UTC, keeps the last day its end names", () => {
+    // 23:00 in Vilnius is 21:00Z; "until 23 November" is 21:59:59Z that day.
+    const google = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T230000",
+      "DTEND;TZID=Europe/Vilnius:20261102T233000",
+      "RRULE:FREQ=WEEKLY",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(google),
+      { repeat: { ...weekly, end: { type: "until", until: "2026-11-23" } } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T23:00:00") },
+    );
+    expect(ics).toContain("UNTIL=20261123T215959Z");
+    expect(ics).not.toContain("BEGIN:VTIMEZONE");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T23:00:00",
+      "2026-11-09T23:00:00",
+      "2026-11-16T23:00:00",
+      "2026-11-23T23:00:00",
+    ]);
+  });
+
   test("a series held without its master: this exception, or each from it on", () => {
     const exception = (day: string) => [
       `RECURRENCE-ID;TZID=Europe/Vilnius:${day}T090000`,

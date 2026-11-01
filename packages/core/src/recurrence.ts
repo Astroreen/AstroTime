@@ -3,7 +3,7 @@
 // whole periods of the rule after DTSTART, instead of at DTSTART.
 import ICAL from "ical.js";
 
-import { fromIcalTime, wallClockIn } from "./time.ts";
+import { wallClockIn, zoneOrigin } from "./time.ts";
 
 /**
  * The parts with which ical.js's iterator settles into the rule's period:
@@ -401,15 +401,11 @@ export function seriesStarts(
   if (rules.length === 0 && !master.hasProperty("recurrence-id")) starts++;
   for (let i = 0; i < starts; i++) dates.push(dtstart.clone());
   dates.sort((a, b) => a.compare(b));
-  // An RDATE at DTSTART is the same occurrence.
-  for (let i = dates.length - 1; i > 0; i--) {
-    if (dates[i]!.compare(dates[i - 1]!) === 0) dates.splice(i, 1);
-  }
   // As RecurExpansion: the RDATEs from DTSTART on, or all of them when the
   // first is before it (Google's birthdays).
   let index = dates[0] && dates[0].compare(dtstart) < 0 ? 0 : firstFrom(dates, dtstart);
 
-  return () => {
+  const step = () => {
     let earliest: ICAL.RecurIterator | null = null;
     for (const iterator of iterators) {
       if (!iterator.completed && (!earliest || earliest.last.compare(iterator.last) > 0)) {
@@ -426,6 +422,20 @@ export function seriesStarts(
     earliest.next();
     return next;
   };
+  // The set is the union of the rules' and the RDATEs' starts (RFC 5545
+  // 3.8.5.3): a start two of them give (an RDATE at DTSTART beside an RRULE,
+  // two rules that meet) is one occurrence. Both come in order, so the same
+  // start comes twice in a row.
+  let last: ICAL.Time | null = null;
+  return () => {
+    for (;;) {
+      const next = step();
+      if (!next || !last || next.compare(last) !== 0) {
+        last = next;
+        return next;
+      }
+    }
+  };
 }
 
 /**
@@ -437,16 +447,14 @@ export function seriesStarts(
  */
 function onWallClock(rule: ICAL.Recur, dtstart: ICAL.Time): ICAL.Recur {
   const { until } = rule;
-  if (!until || until.isDate || dtstart.isDate || until.zone !== ICAL.Timezone.utcTimezone) {
-    return rule;
-  }
-  const zone = dtstart.zone;
-  if (zone && zone !== ICAL.Timezone.localTimezone && zone.tzid !== "floating") return rule;
-  const start = fromIcalTime(dtstart);
-  if (start.type !== "zoned") return rule;
+  if (!until || zoneOrigin(until).kind !== "utc") return rule;
+  const origin = zoneOrigin(dtstart);
+  if (origin.kind !== "undefined") return rule;
   const walked = rule.clone();
+  // In the hour a DST change repeats, the wall clock stands for both of its
+  // instants: an occurrence at it is kept.
   walked.until = ICAL.Time.fromDateTimeString(
-    wallClockIn(until.toUnixTime() * 1000, start.timeZone),
+    wallClockIn(until.toUnixTime() * 1000, origin.timeZone),
   );
   return walked;
 }

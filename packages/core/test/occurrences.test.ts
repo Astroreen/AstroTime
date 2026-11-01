@@ -520,6 +520,86 @@ describe("RFC 5545's corners", () => {
     ]);
   });
 
+  test("a UNTIL in the hour a DST change repeats keeps an occurrence at that wall clock", () => {
+    // Vilnius goes from 04:00 back to 03:00 on 25 October: 03:30 is 00:30Z, then 01:30Z.
+    const daily = (until: string) =>
+      starts(
+        occurrencesBetween(
+          event(
+            "DTSTART;TZID=Europe/Vilnius:20261022T033000",
+            "DTEND;TZID=Europe/Vilnius:20261022T034500",
+            `RRULE:FREQ=DAILY;UNTIL=${until}`,
+          ),
+          vilnius("2026-10-20", "2026-11-01"),
+        ),
+      ).map((start) => start.slice(0, 10));
+    const four = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"];
+    expect(daily("20261025T003000Z")).toEqual(four);
+    expect(daily("20261025T013000Z")).toEqual(four);
+    expect(daily("20261025T002959Z")).toEqual(four.slice(0, 3));
+  });
+
+  test("an UNTIL is left as ical.js reads it for a floating, an all-day or a defined zone's start", () => {
+    // Floating: RFC 5545 asks a floating UNTIL; a UTC one is read on the wall clock, as before.
+    const floating = event(
+      "DTSTART:20261102T090000",
+      "DTEND:20261102T100000",
+      "RRULE:FREQ=WEEKLY;UNTIL=20261123T090000Z",
+    );
+    expect(starts(occurrencesBetween(floating, vilnius("2026-11-01", "2026-12-31")))).toHaveLength(
+      4,
+    );
+    const allDay = event(
+      "DTSTART;VALUE=DATE:20261102",
+      "DTEND;VALUE=DATE:20261103",
+      "RRULE:FREQ=WEEKLY;UNTIL=20261123",
+    );
+    expect(starts(occurrencesBetween(allDay, vilnius("2026-11-01", "2026-12-31")))).toHaveLength(4);
+    // With its VTIMEZONE ical.js places 23:00 in Vilnius at 21:00Z itself: the 23rd stays.
+    const defined = CalendarObject.parse(
+      load("nextcloud-event-recurring.ics")
+        .serialize()
+        .replace(/RRULE:[^\r]*/, "RRULE:FREQ=WEEKLY;UNTIL=20261110T075959Z"),
+    );
+    expect(starts(occurrencesBetween(defined, vilnius("2026-10-01", "2026-12-31")))).not.toContain(
+      "2026-11-10T10:00:00",
+    );
+  });
+
+  test("an RDATE at DTSTART is the one occurrence, with an RRULE or alone", () => {
+    const withRule = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "RRULE:FREQ=WEEKLY;COUNT=2",
+      "RDATE;TZID=Europe/Vilnius:20261102T090000",
+    );
+    expect(starts(occurrencesBetween(withRule, vilnius("2026-11-01", "2026-12-01")))).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T09:00:00",
+    ]);
+    const alone = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "RDATE;TZID=Europe/Vilnius:20261102T090000,20261105T090000",
+    );
+    expect(starts(occurrencesBetween(alone, vilnius("2026-11-01", "2026-12-01")))).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-05T09:00:00",
+    ]);
+  });
+
+  test("an EXDATE removes the DTSTART of a series of RDATEs alone", () => {
+    const object = event(
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "RDATE;TZID=Europe/Vilnius:20261105T090000",
+      "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+    );
+    expect(starts(occurrencesBetween(object, vilnius("2026-11-01", "2026-12-01")))).toEqual([
+      "2026-11-05T09:00:00",
+    ]);
+  });
+
   test("an RDATE of a period adds an occurrence at the period's start", () => {
     const object = event(
       "DTSTART;TZID=Europe/Vilnius:20261102T090000",
@@ -533,6 +613,9 @@ describe("RFC 5545's corners", () => {
       "2026-11-09T09:00:00",
       "2026-11-16T09:00:00",
     ]);
+    // Of the series' length, not the period's (foundation's Deferred).
+    const period = occurrencesBetween(object, vilnius("2026-11-04", "2026-11-05"))[0]!;
+    expect(wallClockOf(period.end, "Europe/Vilnius")).toBe("2026-11-04T15:00:00");
   });
 
   test("a series of RDATEs alone starts with its DTSTART", () => {
