@@ -484,6 +484,18 @@ function touches(occurrence: Occurrence, range: Range): boolean {
 }
 
 describe("a rule ical.js never meets (D118)", () => {
+  test("the ical.js methods the bound wraps are still there: an upgrade that renames one fails here", () => {
+    const iterator = ICAL.Recur.fromString("FREQ=DAILY").iterator(
+      ICAL.Time.fromDateString("2026-01-01"),
+    );
+    for (const name of ["check_contracting_rules", "increment_monthday"] as const) {
+      expect(typeof iterator[name]).toBe("function");
+    }
+    for (const name of ["increment_month", "increment_year"] as const) {
+      expect(typeof ICAL.RecurIterator.prototype[name]).toBe("function");
+    }
+  });
+
   const object = (rule: string, kind = "VEVENT") =>
     CalendarObject.parse(
       [

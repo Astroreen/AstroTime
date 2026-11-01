@@ -58,7 +58,9 @@ export function latestUndoneBefore(
   const dueOf = (occurrence: Occurrence) => wallClockOf(occurrence.end, timeZone);
   const first = firstDay(object);
   // A task that does not recur has one occurrence, and one with no date none.
-  const all = first === null ? "0001-01-01" : shiftDate(first, -3);
+  // Three days early, never before year 1: an ISO string there is "0000-" or
+  // "-00001-", which does not compare as a date.
+  const all = first === null || first < "0001-01-04" ? "0001-01-01" : shiftDate(first, -3);
   for (let days = 32; ; days *= 8) {
     const window = object.master?.recurring ? shiftDate(day, -days) : all;
     const from = window > all ? window : all;

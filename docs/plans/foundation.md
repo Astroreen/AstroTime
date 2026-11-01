@@ -1338,7 +1338,10 @@ Decided while closing the Deferred "Expanding long series from the middle".
   before the range in microseconds each, but past 50 000 steps throws
   `ExpansionLimitError` (a minutely or hourly series from years ago), and
   the series then shows nowhere: the views, the "N undone tasks" chip and
-  the reminders leave it out, silently ([D55](#D55), [D100](#D100)). The
+  the reminders leave it out, silently ([D55](#D55), [D100](#D100)). An
+  hourly or finer rule sparser than its bound (17 years of hours, 101 days
+  of minutes between two occurrences) becomes its `DTSTART` alone, also
+  with no sign. The
   tasks screen (design [D95](design.md#D95)) still places every occurrence
   of a recurring task from the year 1 to find its current one, as the chip
   did; it comes when a measured list is slow. A new range places every
