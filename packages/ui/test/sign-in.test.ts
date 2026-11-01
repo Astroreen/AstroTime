@@ -162,3 +162,22 @@ test("an address that is no Nextcloud, or no web address at all, is told apart",
   // 404 everywhere: an address that answers, but no CalDAV server.
   expect(signIn.state).toMatchObject({ step: "failed", problem: "not-caldav" });
 });
+
+test("cancelled while the account was being saved, the account it added goes again", async () => {
+  const server = nextcloud({ password: "secret" });
+  const { store, secrets, signIn } = await setup(server);
+  const saving = store.addAccount.bind(store);
+  // Cancel the moment the account is written, before the sign-in sees it.
+  let added = "";
+  store.addAccount = async (input) => {
+    const account = await saving(input);
+    added = account.id;
+    signIn.cancel();
+    return account;
+  };
+  await signIn.withPassword({ server: SERVER, username: "astro", password: "secret" });
+  expect(added).not.toBe("");
+  expect(await store.accounts()).toEqual([]);
+  expect(await secrets.get(`account:${added}`)).toBeNull();
+  expect(signIn.state.step).not.toBe("done");
+});

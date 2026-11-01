@@ -143,7 +143,20 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
           status: 502,
         });
       }
-      if (location.origin !== target.origin) {
+      // Only a redirect moves the client; a 201's Location names what it made.
+      // Going from http to https on the same host is no other server.
+      const upgrade =
+        target.protocol === "http:" &&
+        location.protocol === "https:" &&
+        location.hostname === target.hostname &&
+        target.port === "" &&
+        location.port === "";
+      if (
+        answer.status >= 300 &&
+        answer.status < 400 &&
+        location.origin !== target.origin &&
+        !upgrade
+      ) {
         return new Response(
           `${target.origin} redirects to ${location.origin}; sign in with that address.`,
           { status: 502, headers: { [REFUSED]: `other-server ${location.origin}` } },

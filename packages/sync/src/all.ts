@@ -60,7 +60,7 @@ interface Runs {
   current: Promise<SyncAllReport> | null;
   next: Promise<SyncAllReport> | null;
   /** Accounts on their way out: a sync that starts now leaves them alone. */
-  readonly removing: Set<string>;
+  readonly removing: Map<string, number>;
 }
 
 /** The sync running on each store, and the one waiting to start after it. */
@@ -69,7 +69,7 @@ const runs = new WeakMap<Store, Runs>();
 function runsOf(store: Store): Runs {
   let found = runs.get(store);
   if (!found) {
-    found = { current: null, next: null, removing: new Set() };
+    found = { current: null, next: null, removing: new Map() };
     runs.set(store, found);
   }
   return found;
@@ -111,7 +111,7 @@ function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
 
 async function everyAccount(
   context: SyncContext,
-  removing: ReadonlySet<string>,
+  removing: ReadonlyMap<string, number>,
 ): Promise<SyncAllReport> {
   const accounts: AccountSync[] = [];
   for (const account of await context.store.accounts()) {
@@ -230,15 +230,21 @@ export async function saveAccount(
  * leave it alone, and the running one and the one queued after it end
  * first, so nothing of the account is written while it goes.
  */
-export async function removeAccount(context: SyncContext, accountId: string): Promise<void> {
+export async function removeAccount(
+  context: Pick<SyncContext, "store" | "secrets">,
+  accountId: string,
+): Promise<void> {
   const state = runsOf(context.store);
-  state.removing.add(accountId);
+  // Counted, so overlapping removals of one account do not end each other's.
+  state.removing.set(accountId, (state.removing.get(accountId) ?? 0) + 1);
   try {
     // A sync begun before this call may be inside the account; any later one skips it.
     await Promise.all([state.current, state.next].map((run) => run?.catch(ignore)));
     await context.secrets.delete(keyOf(accountId));
     await context.store.removeAccount(accountId);
   } finally {
-    state.removing.delete(accountId);
+    const left = (state.removing.get(accountId) ?? 1) - 1;
+    if (left > 0) state.removing.set(accountId, left);
+    else state.removing.delete(accountId);
   }
 }

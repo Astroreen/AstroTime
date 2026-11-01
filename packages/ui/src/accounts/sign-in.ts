@@ -12,7 +12,7 @@ import {
 } from "@astrotime/caldav";
 import { AuthError, OfflineError, type SecretStore } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
-import { saveAccount } from "@astrotime/sync";
+import { removeAccount, saveAccount } from "@astrotime/sync";
 
 /** Why signing in did not work, as a code the UI words in the user's language. */
 export type SignInProblem =
@@ -207,7 +207,12 @@ export class SignIn {
       { store, secrets },
       { name: accountName(credentials.username, server), serverUrl: server, homeUrl, credentials },
     );
-    if (signal.aborted) return;
+    if (signal.aborted) {
+      // Cancelled while it was saved: an account it added goes again. One it
+      // signed in to again keeps its new password, as the user meant it to.
+      if (added) await removeAccount({ store, secrets }, account.id);
+      return;
+    }
     this.#set({ step: "done", account, added });
   }
 
