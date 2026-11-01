@@ -26,6 +26,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Series** — an item with a recurrence rule (`RRULE`, `RDATE`).
 - **Occurrence** — one instance of a series at one time; an occurrence that
   was changed on its own is an **exception** (`RECURRENCE-ID`).
+- **Scope** — which occurrences of a series an edit or a deletion of one
+  covers: this occurrence, this and following (the series is **split**: it
+  ends before the occurrence and a new series starts there), or all
+  occurrences (foundation D11, D105). `Scope` in code.
 - **Floating time** — a wall-clock time with no zone, shown at the same
   hour everywhere. A **zoned time** names its IANA zone and an instant.
 - **Subtask** — a task whose `RELATED-TO` names a parent task.
@@ -71,6 +75,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
   Month view and the Agenda).
 - **Undone tasks chip** — the one chip on today that stands for every
   undone task due before today, "N undone tasks" (design D51).
+- **Details** — the dialog a tap on an item opens: when it is, how it
+  repeats, where, its reminders and guests, with edit and delete (design
+  D108).
+- **Edit dialog** — where an item is created or changed (design D108).
 - **Agenda** — the view that lists items in time order, day by day,
   instead of a grid ("Расписание" in Russian, as Google's).
 - **Account button** — the avatar at the end of the top bar; it opens the
@@ -112,7 +120,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Pending change** — a local create, update or delete the server has not
   accepted yet.
 - **Conflict** — a change of ours the server refused because the item
-  changed there first, on the same field. Kept in the **Conflicts** list.
+  changed there first, on the same field. Kept in the **Conflicts list**,
+  which shows it beside the server's version: keep the server's, or apply
+  mine again (foundation D107).
 - **Proxy** — the stateless web proxy that lets the web app reach CalDAV
   servers despite CORS: in the dev server now, in the web app's Docker image
   later (`proxyHandler`).
