@@ -59,6 +59,7 @@ runs:
         OnlyLoadAppFromAsar is Enabled
         LoadBrowserProcessSpecificV8Snapshot is Disabled
         GrantFileProtocolExtraPrivileges is Disabled
+        WasmTrapHandlers is Enabled
         EOF
       shell: bash
     # What the checks below need, and libfuse2, which an AppImage needs and
