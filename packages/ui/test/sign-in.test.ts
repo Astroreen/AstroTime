@@ -10,6 +10,8 @@ import { expect, test } from "vite-plus/test";
 import {
   FLOW_LIFETIME_MS,
   hasPendingFlow,
+  heldApproval,
+  HOLD_MS,
   PENDING_FLOW,
   pollInterval,
   serverAddress,
@@ -398,7 +400,7 @@ test("a newer flow started in another page replaces the kept one, and the older 
   expect(first.secrets.values.get(PENDING_FLOW)).toBe(newer);
 });
 
-test("an approval whose account is not saved yet is kept: the next page saves it, without a new flow (D121)", async () => {
+test("an approval held while its server cannot be reached opens no dialog; it is saved in the background once it can be (D121)", async () => {
   const server = nextcloud({ password: "app-pass" });
   // The server cannot be reached for discovery, after the approval.
   let unreachable = true;
@@ -419,13 +421,22 @@ test("an approval whose account is not saved yet is kept: the next page saves it
     username: "astro",
     password: "app-pass",
   });
-  expect(await hasPendingFlow(first.secrets, Number.MAX_SAFE_INTEGER)).toBe(true);
+  // Closed while offline: held, not revoked; no page reopens the dialog for it.
+  await first.signIn.cancel();
+  expect(server.requests.filter((r) => r.method === "DELETE")).toEqual([]);
+  expect(await hasPendingFlow(first.secrets, 0)).toBe(false);
+  expect(await heldApproval(first.secrets, first.page)).toEqual({
+    server: `${SERVER}/`,
+    username: "astro",
+  });
+  // Tried again still offline: held.
+  expect(await first.signIn.saveHeld()).toBe("held");
 
-  // The page goes; the next one, online, saves the account from the approval.
+  // The page goes; the next one, online, saves the account in the background.
   unreachable = false;
   const next = await setup({ ...server, http }, first);
   const polls = server.requests.filter((r) => r.url.endsWith("/login/v2/poll")).length;
-  expect(await next.signIn.resume()).toBe(true);
+  expect(await next.signIn.saveHeld()).toBe("saved");
   expect(next.signIn.state).toMatchObject({ step: "done", added: true });
   expect(server.requests.filter((r) => r.url.endsWith("/login/v2/poll"))).toHaveLength(polls);
   const [account] = await next.store.accounts();
@@ -434,6 +445,87 @@ test("an approval whose account is not saved yet is kept: the next page saves it
     loginFlow: true,
   });
   expect(next.secrets.values.has(PENDING_FLOW)).toBe(false);
+  expect(await heldApproval(next.secrets, next.page)).toBeNull();
+});
+
+test("an approval held past its seven days is revoked at the next chance, then dropped (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  let unreachable = true;
+  const http: HttpClient = (request) => {
+    if (unreachable && !request.url.includes("/login/v2"))
+      return Promise.reject(new OfflineError("offline"));
+    return server.http(request);
+  };
+  const page = await setup({ ...server, http });
+  const signingIn = page.signIn.withNextcloud({ server: SERVER });
+  await page.time.waiting();
+  server.approve();
+  page.time.advance(2_000);
+  await signingIn;
+  expect(JSON.parse(page.secrets.values.get(PENDING_FLOW)!)).toMatchObject({
+    heldUntil: 2_000 + HOLD_MS,
+  });
+  page.time.advance(HOLD_MS);
+  // Past it, still offline: the revocation waits for the next chance.
+  expect(await page.signIn.saveHeld()).toBe("held");
+  expect(page.secrets.values.has(PENDING_FLOW)).toBe(true);
+  // Online: revoked, not saved, and dropped.
+  unreachable = false;
+  expect(await page.signIn.saveHeld()).toBe("none");
+  expect(
+    server.requests.filter((r) => r.method === "DELETE").map((r) => r.headers.Authorization),
+  ).toEqual([`Basic ${btoa("astro:app-pass")}`]);
+  expect(page.secrets.values.has(PENDING_FLOW)).toBe(false);
+  expect(await page.store.accounts()).toEqual([]);
+});
+
+test("an approval held is used again only for the same server: scheme, host, port and path (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  let unreachable = true;
+  const http: HttpClient = (request) => {
+    if (unreachable && !request.url.includes("/login/v2"))
+      return Promise.reject(new OfflineError("offline"));
+    return server.http(request);
+  };
+  const page = await setup({ ...server, http });
+  const signingIn = page.signIn.withNextcloud({ server: SERVER });
+  await page.time.waiting();
+  server.approve();
+  page.time.advance(2_000);
+  await signingIn;
+  const starts = () => server.requests.filter((r) => r.url.endsWith("/index.php/login/v2"));
+  expect(starts()).toHaveLength(1);
+  // Another path on the same host is another server: a flow of its own
+  // (which this fake Nextcloud, at its root only, does not offer there).
+  await page.signIn.withNextcloud({ server: "cloud.example.com/other" });
+  expect(starts().map((r) => r.url)).toEqual([
+    `${SERVER}/index.php/login/v2`,
+    `${SERVER}/other/index.php/login/v2`,
+  ]);
+  expect(page.signIn.state).toMatchObject({ step: "failed", problem: "not-nextcloud" });
+
+  // The same server, spelled as typed: the approval held is saved, with no new flow.
+  const server2 = nextcloud({ password: "app-pass" });
+  const again = await setup({
+    ...server2,
+    http: (request) =>
+      unreachable && !request.url.includes("/login/v2")
+        ? Promise.reject(new OfflineError("offline"))
+        : server2.http(request),
+  });
+  const held = again.signIn.withNextcloud({ server: SERVER });
+  await again.time.waiting();
+  server2.approve();
+  again.time.advance(2_000);
+  await held;
+  expect(again.signIn.state).toMatchObject({ step: "failed", problem: "offline" });
+  unreachable = false;
+  const before = server2.requests.filter((r) => r.url.endsWith("/index.php/login/v2")).length;
+  await again.signIn.withNextcloud({ server: "cloud.example.com/" });
+  expect(again.signIn.state).toMatchObject({ step: "done", added: true });
+  expect(server2.requests.filter((r) => r.url.endsWith("/index.php/login/v2"))).toHaveLength(
+    before,
+  );
 });
 
 test("a new flow that replaces an approval another page left unsaved revokes its app password (D121)", async () => {
@@ -448,6 +540,7 @@ test("a new flow that replaces an approval another page left unsaved revokes its
       token: "old-t0k3n",
       server: `${SERVER}/`,
       owner: "a-page-that-went",
+      heldUntil: HOLD_MS,
       username: "astro",
       password: "app-left",
     }),
@@ -483,11 +576,13 @@ test("an approval is taken up only once the page that holds it is gone, never be
     token: "saving-t0k3n",
     server: `${SERVER}/`,
     owner: "saving",
+    heldUntil: HOLD_MS,
     username: "astro",
     password: "app-pass",
   });
   page.secrets.values.set(PENDING_FLOW, approval);
-  expect(await hasPendingFlow(page.secrets, 0, page.page)).toBe(false);
+  expect(await heldApproval(page.secrets, page.page)).toBeNull();
+  expect(await page.signIn.saveHeld()).toBe("none");
   expect(await page.signIn.resume()).toBe(false);
   // Nor does a new flow here replace it, or revoke its app password.
   void page.signIn.withNextcloud({ server: SERVER });
@@ -500,16 +595,16 @@ test("an approval is taken up only once the page that holds it is gone, never be
   // The page goes before saving it: the next page takes it up, as its own, and saves it.
   leave();
   const next = await setup(server, page);
-  expect(await hasPendingFlow(next.secrets, 0, next.page)).toBe(true);
-  expect(await next.signIn.resume()).toBe(true);
+  expect(await heldApproval(next.secrets, next.page)).not.toBeNull();
+  expect(await next.signIn.saveHeld()).toBe("saved");
   expect(next.signIn.state).toMatchObject({ step: "done", added: true });
   expect(next.secrets.values.has(PENDING_FLOW)).toBe(false);
   expect(server.requests.filter((r) => r.method === "DELETE")).toEqual([]);
 });
 
-test("an approval whose account cannot be saved, or that is cancelled, is revoked and forgotten (D121)", async () => {
+test("an approval whose account cannot be saved is revoked and forgotten (D121)", async () => {
   const server = nextcloud({ password: "app-pass" });
-  let reachable = false;
+  let reachable = true;
   // Discovery finds no calendars: no account to save.
   const http: HttpClient = async (request) => {
     if (request.url.includes("/login/v2") || request.method === "DELETE")
@@ -517,24 +612,9 @@ test("an approval whose account cannot be saved, or that is cancelled, is revoke
     if (!reachable) throw new OfflineError("offline");
     return { status: 404, url: request.url, header: () => null, body: "" };
   };
-  const page = await setup({ ...server, http });
-  const failing = page.signIn.withNextcloud({ server: SERVER });
-  await page.time.waiting();
-  server.approve();
-  page.time.advance(2_000);
-  await failing;
-  // Offline: held. Then closed: revoked and forgotten.
-  expect(page.signIn.state).toMatchObject({ step: "failed", problem: "offline" });
-  await page.signIn.cancel();
-  const revocations = () => server.requests.filter((r) => r.method === "DELETE");
-  expect(revocations().map((r) => r.headers.Authorization)).toEqual([
-    `Basic ${btoa("astro:app-pass")}`,
-  ]);
-  expect(page.secrets.values.has(PENDING_FLOW)).toBe(false);
-
   // Reached, but no CalDAV server there: revoked at once.
   const server2 = nextcloud({ password: "app-pass" });
-  reachable = true;
+  expect(reachable).toBe(true);
   const other = await setup({
     ...server2,
     http: (request) =>
