@@ -681,7 +681,9 @@ are its decisions.
   the edit dialog did nothing, and the press went nowhere a user could see
   (it surfaced as a test that failed one run in seven on a loaded machine,
   then was found to be a real flaw). Google Calendar's grid takes the press
-  as soon as a dialog starts to close.
+  as soon as a dialog starts to close. The rule is every element Base UI
+  marks closing, a collapsing panel too, not only popups and backdrops, on
+  purpose: nothing is meant to be pressed while it goes.
 
 ### Decided in the logic QA (after v0.2.0)
 

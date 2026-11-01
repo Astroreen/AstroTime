@@ -166,7 +166,9 @@ export function TasksScreen({
     }
   };
   // The strip alone scrolls (not the page or the panel), so a tab clears the
-  // fade on either side, as far as the strip can go.
+  // fade on either side, as far as the strip can go. FADE on both sides even
+  // where a side shows none (unlike `slack`): there the strip is at its end,
+  // and the browser clamps the scroll, so it comes to the same.
   const clear = (tab: Element | null | undefined) => {
     const element = strip.current;
     if (!element || !tab) return;
@@ -192,6 +194,8 @@ export function TasksScreen({
         if (start < -1 || end < -1) clear(open);
       }
       measureStrip();
+      // How many resizes were handled: a test sees one was.
+      element.dataset["resized"] = String(Number(element.dataset["resized"] ?? 0) + 1);
     });
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);

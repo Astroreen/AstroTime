@@ -222,32 +222,38 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
         const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
         return room.right - tab.getBoundingClientRect().right;
       });
-    // Laid out and its resize observed: two frames, as ResizeObserver reports before a paint.
-    const frames = () =>
-      page.evaluate(
-        () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
-      );
+    // Each resize the strip handles is counted: a step waits for the next one,
+    // so the observer has run, whatever it then did.
+    const resized = async (change: () => Promise<unknown>) => {
+      const before = (await strip.getAttribute("data-resized")) ?? "";
+      await change();
+      await expect(strip).not.toHaveAttribute("data-resized", before);
+    };
+    const noStartFade = /^linear-gradient\(to right, rgb\(0, 0, 0\),/;
+    // Chosen, the second tab is clear of the end's fade as the strip opens.
     await second.dispatchEvent("click");
     await expect(second).toHaveAttribute("aria-selected", "true");
-    await frames();
     expect(await fromEnd()).toBeGreaterThanOrEqual(40);
 
     // The first tab grows (a count, a font): the open second, clear before, is brought clear again.
-    await page.addStyleTag({
-      content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }",
-    });
-    await frames();
+    await resized(() =>
+      page.addStyleTag({
+        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }",
+      }),
+    );
     expect(await fromEnd()).toBeGreaterThanOrEqual(40);
+    expect(await strip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
 
     // The user scrolls back to the start, the open tab under the end's fade:
     // a resize then leaves the strip where the user put it.
     await strip.evaluate((element) => element.scrollTo({ left: 0 }));
-    await frames();
+    await expect(strip).toHaveCSS("mask-image", noStartFade);
     expect(await fromEnd()).toBeLessThan(40);
-    await page.addStyleTag({
-      content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }",
-    });
-    await frames();
+    await resized(() =>
+      page.addStyleTag({
+        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }",
+      }),
+    );
     expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
   });
 });
