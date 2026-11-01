@@ -21,6 +21,9 @@ export function netClient(session: Session): (request: HttpRequest) => Promise<N
   return followRedirects((request) => hop(session, request));
 }
 
+/** As Android's plugin bounds a call (android D62). */
+const HOP_CEILING_MS = 5 * 60_000;
+
 function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
   return new Promise((resolve, reject) => {
     const exchange = net.request({
@@ -32,18 +35,34 @@ function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
       // Someone's calendar, fetched with their credentials: never kept by a cache.
       cache: "no-store",
     });
-    const offline = (what: string, cause?: unknown) =>
+    const offline = (what: string, cause?: unknown) => {
+      clearTimeout(ceiling);
       reject(new OfflineError(`${request.method} ${request.url} ${what}`, { cause }));
-    for (const [name, value] of Object.entries(request.headers)) exchange.setHeader(name, value);
+    };
+    // A whole hop, however slowly it trickles: a stalled server never holds a sync for ever.
+    const ceiling = setTimeout(() => {
+      exchange.abort();
+      offline("did not answer in time.");
+    }, HOP_CEILING_MS);
+    try {
+      for (const [name, value] of Object.entries(request.headers)) exchange.setHeader(name, value);
+    } catch (error) {
+      clearTimeout(ceiling);
+      exchange.abort();
+      reject(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
     exchange.on("redirect", (status, _method, _location, headers) => {
       // Not followed here: the shared rule decides where it goes, and with what.
+      clearTimeout(ceiling);
       resolve(answer(request.url, status, headers, ""));
       exchange.abort();
     });
     exchange.on("response", (response) => {
       const chunks: Buffer[] = [];
       response.on("data", (chunk) => chunks.push(chunk));
-      response.on("end", () =>
+      response.on("end", () => {
+        clearTimeout(ceiling);
         resolve(
           answer(
             request.url,
@@ -51,8 +70,8 @@ function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
             response.headers,
             new TextDecoder().decode(Buffer.concat(chunks)),
           ),
-        ),
-      );
+        );
+      });
       response.on("error", (error) => offline("the answer broke off.", error));
       response.on("aborted", () => offline("the answer broke off."));
     });

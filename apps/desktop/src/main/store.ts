@@ -5,6 +5,13 @@ import { MessageChannelMain, utilityProcess, type MessagePortMain } from "electr
 
 import type { StoreCommand } from "../store/index.ts";
 
+/** Quick ends in a row before the store is not started again. */
+const RESTARTS = 3;
+/** An end this soon after the start counts as failing to start. */
+const QUICK_END_MS = 10_000;
+/** How long quitting waits for the store to close its database. */
+const CLOSE_CEILING_MS = 5_000;
+
 export interface StoreProcess {
   /** A new port to the store, for a page to send its statements on. */
   connect(): MessagePortMain;
@@ -19,10 +26,22 @@ export interface StoreProcess {
  */
 export function storeProcess(entry: string, database: string, restarted: () => void): StoreProcess {
   let closing = false;
+  let alive = false;
+  // Ends in a row, each soon after its start: a store that cannot open the
+  // database is not started for ever; the page then shows the store failed.
+  let quickEnds = 0;
   const start = () => {
+    const started = Date.now();
     const child = utilityProcess.fork(entry, [database], { serviceName: "AstroTime store" });
+    alive = true;
     child.once("exit", (code) => {
+      alive = false;
       if (closing) return;
+      quickEnds = Date.now() - started < QUICK_END_MS ? quickEnds + 1 : 0;
+      if (quickEnds >= RESTARTS) {
+        console.error(`The store's process ended (${code}) ${RESTARTS} times at start; not again.`);
+        return;
+      }
       console.error(`The store's process ended (${code}); starting it again.`);
       current = start();
       restarted();
@@ -40,7 +59,15 @@ export function storeProcess(entry: string, database: string, restarted: () => v
       if (closing) return Promise.resolve();
       closing = true;
       const child = current;
-      const ended = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+      if (!alive) return Promise.resolve();
+      const ended = new Promise<void>((resolve) => {
+        // A process that does not end when asked is ended: quitting never waits for ever.
+        const kill = setTimeout(() => child.kill(), CLOSE_CEILING_MS);
+        child.once("exit", () => {
+          clearTimeout(kill);
+          resolve();
+        });
+      });
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a utility process's postMessage takes no origin
       child.postMessage({ type: "close" } satisfies StoreCommand);
       return ended;
