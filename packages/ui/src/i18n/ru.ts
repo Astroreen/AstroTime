@@ -274,6 +274,7 @@ export const ru = {
   "edit.reminders": "Напоминания",
   "edit.addReminder": "Добавить напоминание",
   "edit.removeReminder": "Удалить напоминание: {{alarm}}",
+  "edit.untitledReminder": "Напоминание",
   "edit.calendar": "Календарь",
   "edit.list": "Список",
   "edit.color": "Цвет",

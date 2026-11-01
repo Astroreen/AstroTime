@@ -139,16 +139,20 @@ describe("the form", () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
     const initial = formOf(target, timeZone);
-    expect(changesOf(initial, initial)).toEqual({});
-    expect(changesOf(initial, { ...initial, summary: "  Review  " })).toEqual({
+    expect(changesOf(initial, initial, "Reminder")).toEqual({});
+    expect(changesOf(initial, { ...initial, summary: "  Review  " }, "Reminder")).toEqual({
       summary: "Review",
     });
     // The clock of an all-day item is no change.
     const allDay = { ...initial, allDay: true };
-    expect(changesOf(allDay, { ...allDay, startTime: "13:00" })).toEqual({});
-    const removed = changesOf(initial, { ...initial, alarms: [] });
-    expect(removed).toEqual({ alarms: { remove: [0], add: [] } });
-    const moved = changesOf(initial, { ...initial, startTime: "12:00", endTime: "13:00" });
+    expect(changesOf(allDay, { ...allDay, startTime: "13:00" }, "Reminder")).toEqual({});
+    const removed = changesOf(initial, { ...initial, alarms: [] }, "Reminder");
+    expect(removed).toEqual({ alarms: { remove: [0], add: [], untitled: "Reminder" } });
+    const moved = changesOf(
+      initial,
+      { ...initial, startTime: "12:00", endTime: "13:00" },
+      "Reminder",
+    );
     expect(Object.keys(moved)).toEqual(["time"]);
   });
 
@@ -239,7 +243,7 @@ describe("the scopes offered (D11)", () => {
     expect(scopesFor(target, initial, { ...initial, repeat: null })).toEqual(["following", "all"]);
     // The rule moved with the day is no new rule; a new rule on a new day is "following".
     expect(nextDay.repeat).not.toEqual(initial.repeat);
-    expect(changesOf(initial, nextDay)).not.toHaveProperty("repeat");
+    expect(changesOf(initial, nextDay, "Reminder")).not.toHaveProperty("repeat");
     expect(scopesFor(target, initial, { ...nextDay, repeat: null })).toEqual(["following"]);
     const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
     const form = formOf(single, timeZone);
@@ -257,7 +261,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     };
     await saveForm(
       store,
-      { target: null, initial: null, form, scope: "all" },
+      { target: null, initial: null, form, scope: "all", untitled: "Reminder" },
       { now: NOW, uid: () => "new-one" },
     );
     const row = await store.objectAt(personal.id, "new-one.ics");
@@ -272,7 +276,13 @@ describe("saving writes pending changes through the store (D5)", () => {
     const initial = formOf(target, timeZone);
     await saveForm(
       store,
-      { target, initial, form: { ...initial, summary: "Daily sync" }, scope: "following" },
+      {
+        target,
+        initial,
+        form: { ...initial, summary: "Daily sync" },
+        scope: "following",
+        untitled: "Reminder",
+      },
       { now: NOW, uid: () => "sync-series" },
     );
     expect(await rowOf("Work", "demo-standup")).toMatchObject({ pending: "update" });
@@ -286,7 +296,13 @@ describe("saving writes pending changes through the store (D5)", () => {
     const work = byName("Work");
     await saveForm(
       store,
-      { target, initial, form: { ...initial, calendarId: work.id }, scope: "all" },
+      {
+        target,
+        initial,
+        form: { ...initial, calendarId: work.id },
+        scope: "all",
+        untitled: "Reminder",
+      },
       {
         now: NOW,
         uid: uids,
@@ -308,6 +324,7 @@ describe("saving writes pending changes through the store (D5)", () => {
         initial,
         form: { ...initial, calendarId: personal.id, startTime: "09:15", endTime: "09:45" },
         scope: "all",
+        untitled: "Reminder",
       },
       { now: NOW, uid: uids },
     );
@@ -330,7 +347,13 @@ describe("saving writes pending changes through the store (D5)", () => {
     const initial = formOf(second, timeZone);
     await saveForm(
       store,
-      { target: second, initial, form: { ...initial, summary: "Renamed" }, scope: "all" },
+      {
+        target: second,
+        initial,
+        form: { ...initial, summary: "Renamed" },
+        scope: "all",
+        untitled: "Reminder",
+      },
       {
         now: NOW,
         uid: uids,
@@ -368,6 +391,7 @@ describe("saving writes pending changes through the store (D5)", () => {
         initial,
         form: { ...initial, summary: "Design review, v2", alarms: [] },
         scope: "all",
+        untitled: "Reminder",
       },
       { now: NOW, uid: uids },
     );
@@ -389,6 +413,7 @@ describe("saving writes pending changes through the store (D5)", () => {
       initial,
       form: { ...initial, summary: "x" },
       scope: "this",
+      untitled: "Reminder",
     } as const;
     await expect(saveForm(store, request, { now: NOW, uid: uids })).rejects.toThrow(GoneError);
     expect((await rowOf("Work", "demo-standup")).ics).toBe(before);
@@ -407,6 +432,7 @@ describe("saving writes pending changes through the store (D5)", () => {
           initial: reviewForm,
           form: { ...reviewForm, summary: "x" },
           scope: "all",
+          untitled: "Reminder",
         },
         { now: NOW, uid: uids },
       ),
@@ -420,7 +446,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const save = (on: Store, summary: string) =>
       saveForm(
         on,
-        { target, initial, form: { ...initial, summary }, scope: "all" },
+        { target, initial, form: { ...initial, summary }, scope: "all", untitled: "Reminder" },
         { now: NOW, uid: uids },
       );
     /** The store, with `changeLocal` as given. */
@@ -475,7 +501,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const form = followed(initial, withStartDate(initial, "2026-11-06"));
     await saveForm(
       store,
-      { target, initial, form, scope: "following" },
+      { target, initial, form, scope: "following", untitled: "Reminder" },
       { now: NOW, uid: () => "standup-later" },
     );
     const rest = (await store.objectAt(byName("Work").id, "standup-later.ics"))!;

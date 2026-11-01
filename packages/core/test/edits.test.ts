@@ -57,7 +57,11 @@ describe("creating (D9, D10)", () => {
         location: "Room 4",
         description: "The week ahead",
         time: { start: vilnius("2026-11-04T11:00:00"), end: vilnius("2026-11-04T12:00:00") },
-        alarms: { remove: [], add: [{ relatedTo: "start", offsetSeconds: -900 }] },
+        alarms: {
+          remove: [],
+          add: [{ relatedTo: "start", offsetSeconds: -900 }],
+          untitled: "Reminder",
+        },
       },
       { now: NOW, uid: "new-event" },
     );
@@ -112,7 +116,11 @@ describe("creating (D9, D10)", () => {
       {
         summary: "Send the report",
         time: { start: null, end: vilnius("2026-11-20T10:00:00") },
-        alarms: { remove: [], add: [{ relatedTo: "end", offsetSeconds: -3600 }] },
+        alarms: {
+          remove: [],
+          add: [{ relatedTo: "end", offsetSeconds: -3600 }],
+          untitled: "Reminder",
+        },
         priority: 1,
       },
       { now: NOW, uid: "report" },
@@ -351,7 +359,13 @@ describe("editing writes what the user changed, and nothing else (D7)", () => {
     const source = fixture("nextcloud-web-event-reminder.ics");
     const removed = editItem(
       CalendarObject.parse(source),
-      { alarms: { remove: [0], add: [{ relatedTo: "start", offsetSeconds: -86_400 }] } },
+      {
+        alarms: {
+          remove: [0],
+          add: [{ relatedTo: "start", offsetSeconds: -86_400 }],
+          untitled: "Reminder",
+        },
+      },
       { now: NOW },
     ).ics;
     expect(removed).not.toContain("This is an event reminder.");
@@ -360,13 +374,35 @@ describe("editing writes what the user changed, and nothing else (D7)", () => {
     );
     const added = editItem(
       CalendarObject.parse(source),
-      { alarms: { remove: [], add: [{ relatedTo: "start", offsetSeconds: 0 }] } },
+      {
+        alarms: {
+          remove: [],
+          add: [{ relatedTo: "start", offsetSeconds: 0 }],
+          untitled: "Reminder",
+        },
+      },
       { now: NOW },
     ).ics;
     expect(added).toContain(
       "TRIGGER;RELATED=START:-PT15M\r\nSUMMARY:Dentist\r\nDESCRIPTION:This is an event reminder.\r\nEND:VALARM\r\n",
     );
     expect(CalendarObject.parse(added).master!.alarms).toHaveLength(2);
+  });
+
+  test("a reminder added to an item without a title says what the UI passes, in the user's language", () => {
+    const ics = createItem(
+      "task",
+      {
+        time: { start: null, end: vilnius("2026-11-05T18:00:00") },
+        alarms: {
+          remove: [],
+          add: [{ relatedTo: "end", offsetSeconds: 0 }],
+          untitled: "Напоминание",
+        },
+      },
+      { now: NOW, uid: "untitled" },
+    );
+    expect(ics).toContain("BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Напоминание\r\n");
   });
 
   test("a task's status, progress, priority and categories (D10), as Nextcloud Tasks writes them", () => {
@@ -983,6 +1019,114 @@ describe("a series moves as its occurrence moved (D105)", () => {
     expect(ics).toContain("RRULE:FREQ=MONTHLY;BYDAY=2TU\r\n");
     expect(starts(ics, "2026-11-01", "2026-12-01")).toEqual(["2026-11-18T09:00:00"]);
   });
+});
+
+describe("a RECURRENCE-ID of another kind than the series' start (D35)", () => {
+  // Mondays at 9:00 in Vilnius from November 2, four times; the second moved
+  // to 11:00, its RECURRENCE-ID written as a date or a floating time.
+  const kinds = [
+    {
+      kind: "a date",
+      id: "RECURRENCE-ID;VALUE=DATE:20261109",
+      at10: "RECURRENCE-ID;VALUE=DATE:20261109",
+      dayLater: "RECURRENCE-ID;VALUE=DATE:20261110",
+      until: "UNTIL=20261108T215959Z",
+      recurrenceId: { type: "date", date: "2026-11-09" } as ItemTime,
+    },
+    {
+      kind: "a floating time",
+      id: "RECURRENCE-ID:20261109T090000",
+      at10: "RECURRENCE-ID:20261109T100000",
+      dayLater: "RECURRENCE-ID:20261110T090000",
+      until: "UNTIL=20261109T065959Z",
+      recurrenceId: { type: "floating", local: "2026-11-09T09:00:00" } as ItemTime,
+    },
+  ];
+  const source = (id: string) =>
+    calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T100000",
+        "SUMMARY:Lesson",
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+      ],
+      [
+        id,
+        "DTSTART;TZID=Europe/Vilnius:20261109T110000",
+        "DTEND;TZID=Europe/Vilnius:20261109T120000",
+        "SUMMARY:Lesson (late)",
+      ],
+    );
+  const exceptionStarts = (ics: string) =>
+    occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-11-01",
+      to: "2026-12-01",
+      timeZone,
+    })
+      .filter((o) => o.item.summary === "Lesson (late)")
+      .map((o) => (o.start.type === "zoned" ? o.start.local : ""));
+
+  test.each(kinds)("$kind: kept by an hour later for all, and named again", ({ id, at10 }) => {
+    expect(starts(source(id))).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T11:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(source(id)),
+      { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain(`${at10}\r\n`);
+    expect(starts(ics)).toEqual([
+      "2026-11-02T10:00:00",
+      "2026-11-09T11:00:00",
+      "2026-11-16T10:00:00",
+      "2026-11-23T10:00:00",
+    ]);
+  });
+
+  test.each(kinds)("$kind: kept by a new rule that still has it", ({ id }) => {
+    const { ics } = editItem(CalendarObject.parse(source(id)), { repeat: weekly }, { now: NOW });
+    expect(ics).toContain(`${id}\r\n`);
+    expect(exceptionStarts(ics)).toEqual(["2026-11-09T11:00:00"]);
+  });
+
+  test.each(kinds)("$kind: moved a day later with the series, in its kind", ({ id, dayLater }) => {
+    const { ics } = editItem(
+      CalendarObject.parse(source(id)),
+      { time: { start: vilnius("2026-11-03T09:00:00"), end: vilnius("2026-11-03T10:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(ics).toContain(`${dayLater}\r\n`);
+    expect(starts(ics)).toEqual([
+      "2026-11-03T09:00:00",
+      "2026-11-09T11:00:00",
+      "2026-11-17T09:00:00",
+      "2026-11-24T09:00:00",
+    ]);
+  });
+
+  test.each(kinds)(
+    "$kind: this and following ends the zoned series with an UNTIL in UTC (D105)",
+    ({ id, until, recurrenceId }) => {
+      const { ics, split } = editItem(
+        CalendarObject.parse(source(id)),
+        { summary: "Lesson v2" },
+        { now: NOW, scope: "following", recurrenceId, newUid: "lesson-2" },
+      );
+      expect(ics).toContain(`RRULE:FREQ=WEEKLY;${until}\r\n`);
+      expect(starts(ics)).toEqual(["2026-11-02T09:00:00"]);
+      expect(split).toContain("DTSTART;TZID=Europe/Vilnius:20261109T090000\r\n");
+      expect(split).toContain(`${id}\r\n`);
+      expect(starts(split!)).toEqual([
+        "2026-11-09T11:00:00",
+        "2026-11-16T09:00:00",
+        "2026-11-23T09:00:00",
+      ]);
+    },
+  );
 });
 
 describe("a series still has an occurrence", () => {

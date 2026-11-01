@@ -13,6 +13,7 @@ import {
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
 import { createContext, useContext, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   changeLocal,
@@ -112,6 +113,7 @@ export function useEditingState({
   /** A local change was written: the sync scheduler sends it soon (D91). */
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
   const [details, setDetails] = useState<Target | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [asking, setAsking] = useState<ScopeRequest | null>(null);
@@ -146,12 +148,12 @@ export function useEditingState({
         });
         const own = row ? CalendarObject.parse(row.ics).master : null;
         const task = own?.kind === "task" ? own : null;
-        const name = (t: Task) => t.summary?.trim() || "";
+        const name = (title: Task) => title.summary?.trim() || "";
         setRelated({
           parent: task?.parentUid
-            ? (titles.find((t) => t.uid === task.parentUid)?.summary ?? null)
+            ? (titles.find((title) => title.uid === task.parentUid)?.summary ?? null)
             : null,
-          subtasks: task ? titles.filter((t) => t.parentUid === task.uid).map(name) : [],
+          subtasks: task ? titles.filter((title) => title.parentUid === task.uid).map(name) : [],
         });
       },
     );
@@ -215,7 +217,7 @@ export function useEditingState({
       setEditing((current) => current && { ...current, state: { ...current.state, saving: true } });
       saveForm(
         store,
-        { target, initial, form: state.form, scope },
+        { target, initial, form: state.form, scope, untitled: t("edit.untitledReminder") },
         {
           now: Date.now(),
           uid: () => crypto.randomUUID(),

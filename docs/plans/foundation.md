@@ -903,7 +903,9 @@ Decided while building PR 6a.
   `X-ALT-DESC`, which would show the old text in their clients. A colour is
   RFC 7986's `COLOR`, a CSS name, as Nextcloud writes it. A reminder added
   is `ACTION:DISPLAY` with the item's title as its `DESCRIPTION` (RFC 5545
-  §3.6.6 asks for one) and a relative `TRIGGER`, `RELATED=END` before a
+  §3.6.6 asks for one), or for an item without a title the word the UI
+  passes in the user's language ("Reminder", "Напоминание"; the core holds
+  no UI strings, AGENTS.md rule 5), and a relative `TRIGGER`, `RELATED=END` before a
   task's due; one removed goes whole; the others stay byte for byte. A task's
   status writes what Nextcloud Tasks writes beside it (D94): `COMPLETED`
   and `PERCENT-COMPLETE:100` when completed. **A new item** (`createItem`)
@@ -946,7 +948,8 @@ Decided while building PR 6a.
     (`RANGE=THISANDFUTURE` stays unused, [Deferred](#deferred)): the series
     ends with an `UNTIL` one second before the occurrence, in the type RFC
     5545 §3.3.10 asks (a date, the day before, for a series of dates; UTC
-    for a zoned one; a wall clock for a floating one), a `COUNT` becoming
+    for a zoned one, a date or floating `RECURRENCE-ID` read in its zone
+    ([D35](#D35)); a wall clock for a floating one), a `COUNT` becoming
     that `UNTIL`; the rest is a new object under a new UID, the master
     moved to the occurrence with the edit, its own `CREATED` and
     `SEQUENCE:0`, a `COUNT` left as the occurrences remaining, and the
@@ -964,7 +967,9 @@ Decided while building PR 6a.
     the same wall-clock time, across a DST change too. A series at 9:00
     moved to 10:00 is at 10:00, its `RDATE` at 14:00 at 15:00, and its
     `EXDATE`s and `RECURRENCE-ID`s shift alike, so they still name their
-    occurrences; an exception not moved on its own follows with the new
+    occurrences (one of another kind than the start keeps it, [D35](#D35):
+    a date moves by whole days, a floating time on its wall clock, and is
+    matched by day or wall clock when stale ones are dropped); an exception not moved on its own follows with the new
     times, one moved keeps its own. Made all-day, every time moves by whole
     days; made timed, each takes the new time of day.
   - **The rule moves with it** unless the user picked a new one, as

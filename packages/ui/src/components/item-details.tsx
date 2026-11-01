@@ -389,13 +389,30 @@ function whenText(
 
 const LINK = /(https?:\/\/[^\s<>"]+|mailto:[^\s<>"]+)/g;
 
+/**
+ * A link as found in text, without what ends the sentence after it: a full
+ * stop, a comma, or a closing bracket the link did not open
+ * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own).
+ */
+export function linkOf(found: string): string {
+  let url = found;
+  for (;;) {
+    url = url.replace(/[.,;:!?]+$/, "");
+    const last = url.at(-1);
+    const open = last === ")" ? "(" : last === "]" ? "[" : null;
+    if (!last || !open || count(url, open) >= count(url, last)) return url;
+    url = url.slice(0, -1);
+  }
+}
+
+const count = (text: string, char: string) => text.split(char).length - 1;
+
 /** The text with its web and mail links as links that open elsewhere; nothing else is markup. */
 function linkify(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(LINK)) {
-    // A sentence's full stop or a closing bracket after a link is not part of it.
-    const url = match[0].replace(/[.,;:!?)\]]+$/, "");
+    const url = linkOf(match[0]);
     const start = match.index;
     if (start > last) parts.push(text.slice(last, start));
     parts.push(

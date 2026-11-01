@@ -47,7 +47,15 @@ export interface ItemChanges {
   /** `null`: the item no longer repeats. */
   readonly repeat?: Repeat | null;
   /** Reminders removed, by their index among the item's `VALARM`s, and added. */
-  readonly alarms?: { readonly remove: readonly number[]; readonly add: readonly NewAlarm[] };
+  readonly alarms?: {
+    readonly remove: readonly number[];
+    readonly add: readonly NewAlarm[];
+    /**
+     * What a reminder added says when its item has no title (its
+     * `DESCRIPTION`), in the user's language: the core holds no UI strings (D103).
+     */
+    readonly untitled: string;
+  };
   /** RFC 7986 `COLOR`, a CSS colour name; `null` takes the calendar's. */
   readonly color?: string | null;
   readonly status?: TaskStatus;
@@ -313,7 +321,7 @@ function setAlarms(component: ICAL.Component, alarms: NonNullable<ItemChanges["a
     const alarm = new ICAL.Component("valarm");
     alarm.addPropertyWithValue("action", "DISPLAY");
     // RFC 5545 §3.6.6: a display alarm has a DESCRIPTION; the item's title says most.
-    alarm.addPropertyWithValue("description", summary || "Reminder");
+    alarm.addPropertyWithValue("description", summary || alarms.untitled);
     const trigger = new ICAL.Property("trigger");
     if (add.relatedTo === "end") trigger.setParameter("related", "END");
     trigger.setValue(ICAL.Duration.fromSeconds(add.offsetSeconds));
@@ -437,12 +445,12 @@ function withLocal(template: ItemTime, local: string): ItemTime {
     type: "zoned",
     local,
     timeZone: template.timeZone,
-    epochMs:
-      template.timeZone === "UTC"
-        ? Date.parse(`${local}Z`)
-        : zonedToEpoch(local, template.timeZone),
+    epochMs: epochOf(local, template.timeZone),
   };
 }
+
+const epochOf = (local: string, timeZone: string) =>
+  timeZone === "UTC" ? Date.parse(`${local}Z`) : zonedToEpoch(local, timeZone);
 
 /** A time's wall clock as milliseconds, read as if it were UTC; a date at its midnight. */
 const wallMs = (time: ItemTime) =>
@@ -463,6 +471,28 @@ function mover(from: ItemTime, to: ItemTime): (time: ItemTime) => ItemTime {
   }
   const delta = wallMs(to) - wallMs(from);
   return (time) => withLocal(to, new Date(wallMs(time) + delta).toISOString().slice(0, 19));
+}
+
+/**
+ * `move` for a time that names an occurrence (a RECURRENCE-ID, an EXDATE, an
+ * RDATE) written as another kind of time than the series' start `from`
+ * (D35): it keeps its kind, so it still names its occurrence. A date moves
+ * by the whole days its occurrence moved; a floating or zoned time by as
+ * much wall-clock time, on its own clock. Made all-day, each is a date.
+ */
+function inKind(
+  move: (time: ItemTime) => ItemTime,
+  from: ItemTime,
+  to: ItemTime,
+): (time: ItemTime) => ItemTime {
+  return (time) => {
+    if (time.type === from.type || to.type === "date" || from.type === "date") return move(time);
+    if (time.type === "date") {
+      return { type: "date", date: dayOf(move(occurrenceAt(time, from))) };
+    }
+    const moved = move(time);
+    return moved.type === "date" ? moved : withLocal(time, moved.local);
+  };
 }
 
 /** An occurrence's times moved together from where `from` is to where `to` is, on `from`'s clock. */
@@ -491,6 +521,27 @@ function orderKey(time: ItemTime, frame: ItemTime | null): string {
     return wallClockIn(time.epochMs, frame.timeZone);
   }
   return time.local;
+}
+
+/** The occurrence a time names on a timed series: a date, at the start's time of day (D35). */
+function occurrenceAt(time: ItemTime, anchor: ItemTime): ItemTime {
+  if (time.type !== "date" || anchor.type === "date") return time;
+  return withLocal(anchor, `${time.date}T${anchor.local.slice(11)}`);
+}
+
+/** A time names its occurrence by day when it or the series' start is a date (D35). */
+const byDay = (time: ItemTime, anchor: ItemTime) => time.type === "date" || anchor.type === "date";
+
+/** The last moment on the series' wall clock a time may name: a date, its whole day. */
+const reachOf = (time: ItemTime, anchor: ItemTime) =>
+  time.type === "date" ? `${time.date}T23:59:59` : orderKey(time, anchor);
+
+/** Whether two times name the same occurrence of the series: on its wall clock, or by day (D35). */
+function sameOccurrence(a: ItemTime, b: ItemTime, anchor: ItemTime): boolean {
+  if (byDay(a, anchor) || byDay(b, anchor)) {
+    return dayOf(inFrameOf(a, anchor)) === dayOf(inFrameOf(b, anchor));
+  }
+  return orderKey(a, anchor) === orderKey(b, anchor);
 }
 
 // Series
@@ -552,11 +603,15 @@ function dropRecurrence(root: ICAL.Component, master: ICAL.Component): void {
 }
 
 /**
- * The series' occurrences by their RRULE and RDATE, without its EXDATEs, up
- * to `last` on its wall clock, as `orderKey`s; `null` if that is more than a
- * series may be walked through (then nothing is dropped).
+ * Whether a time names one of the series' occurrences by its RRULE and
+ * RDATE, without its EXDATEs, up to `last` on its wall clock: on that wall
+ * clock, or by day when the time or the start is a date (D35). `null` if
+ * that is more than a series may be walked through (then nothing is dropped).
  */
-function occurrenceKeys(master: ICAL.Component, last: string): Set<string> | null {
+function occurrencesUpTo(
+  master: ICAL.Component,
+  last: string,
+): ((time: ItemTime) => boolean) | null {
   const anchor = anchorOf(master);
   if (!anchor) return null;
   const bare = new ICAL.Component(copyOf(master.toJSON()));
@@ -565,12 +620,18 @@ function occurrenceKeys(master: ICAL.Component, last: string): Set<string> | nul
   if (!(start instanceof ICAL.Time)) return null;
   const expansion = new ICAL.RecurExpansion({ component: bare, dtstart: start });
   const keys = new Set<string>();
+  const days = new Set<string>();
+  const named = (time: ItemTime) =>
+    byDay(time, anchor)
+      ? days.has(dayOf(inFrameOf(time, anchor)))
+      : keys.has(orderKey(time, anchor));
   for (let step = 0; step < 50_000; step++) {
     const next = expansion.next();
-    if (!next) return keys;
+    if (!next) return named;
     const key = orderKey(fromIcalTime(next), anchor);
-    if (key > last) return keys;
+    if (key > last) return named;
     keys.add(key);
+    days.add(key.slice(0, 10));
   }
   return null;
 }
@@ -617,6 +678,8 @@ function editSeries(
   // clock; the master and each exception that follows take the new times,
   // placed where each is as the occurrence's are where it is.
   let move: ((time: ItemTime) => ItemTime) | null = null;
+  // A RECURRENCE-ID, EXDATE or RDATE moves in its own kind (D35).
+  let moveNamed: ((time: ItemTime) => ItemTime) | null = null;
   let timesAt: ((at: ItemTime) => ItemTimes) | null = null;
   if (changes.time) {
     const times = changes.time;
@@ -628,6 +691,7 @@ function editSeries(
     const to = inFrameOf(newAnchor, oldAnchor);
     const byOccurrence = mover(inFrameOf(shownAnchor, oldAnchor), to);
     move = (time) => byOccurrence(inFrameOf(time, oldAnchor));
+    moveNamed = inKind(move, oldAnchor, to);
     timesAt = (at) => translated(times, to, at);
     const anchor = move(oldAnchor);
     apply(master, root, { ...changes, time: timesAt(anchor) }, now);
@@ -645,16 +709,16 @@ function editSeries(
   }
 
   const tzid = anchorTzid(master);
-  if (move) {
+  if (moveNamed) {
     const moveDates = (name: "exdate" | "rdate") => {
       const dates = datesOf(master, name);
-      if (dates.length > 0) setDates(master, name, dates.map(move!), tzid);
+      if (dates.length > 0) setDates(master, name, dates.map(moveNamed!), tzid);
     };
     moveDates("exdate");
     moveDates("rdate");
     for (const exception of exceptions) {
       const id = recurrenceIdOf(exception)!;
-      const moved = move(id);
+      const moved = moveNamed(id);
       setTime(exception.getFirstProperty("recurrence-id")!, moved, tzid);
       if (followers.has(exception)) {
         setTimes(exception, root, timesAt!(moved));
@@ -716,10 +780,11 @@ export function hasOccurrence(object: CalendarObject, recurrenceId: ItemTime): b
   if (exceptions.some(named)) return true;
   const anchor = master && isSeries(master) ? anchorOf(master) : null;
   if (!master || !anchor) return false;
-  const key = orderKey(recurrenceId, anchor);
-  if (datesOf(master, "exdate").some((time) => orderKey(time, anchor) === key)) return false;
-  const keys = occurrenceKeys(master, key);
-  return keys === null || keys.has(key);
+  if (datesOf(master, "exdate").some((time) => sameOccurrence(time, recurrenceId, anchor))) {
+    return false;
+  }
+  const has = occurrencesUpTo(master, reachOf(recurrenceId, anchor));
+  return has === null || has(recurrenceId);
 }
 
 /** Exceptions and EXDATEs that name no occurrence of the series any more. */
@@ -731,15 +796,15 @@ function dropStale(root: ICAL.Component, master: ICAL.Component): void {
   const named = [...exceptions.map((c) => recurrenceIdOf(c)!), ...exdates];
   if (named.length === 0) return;
   const last = named
-    .map((time) => orderKey(time, anchor))
+    .map((time) => reachOf(time, anchor))
     .toSorted()
     .at(-1)!;
-  const keys = occurrenceKeys(master, last);
-  if (!keys) return;
+  const has = occurrencesUpTo(master, last);
+  if (!has) return;
   for (const exception of exceptions) {
-    if (!keys.has(orderKey(recurrenceIdOf(exception)!, anchor))) root.removeSubcomponent(exception);
+    if (!has(recurrenceIdOf(exception)!)) root.removeSubcomponent(exception);
   }
-  const kept = exdates.filter((time) => keys.has(orderKey(time, anchor)));
+  const kept = exdates.filter((time) => has(time));
   if (kept.length !== exdates.length) setDates(master, "exdate", kept, anchorTzid(master));
 }
 
@@ -776,20 +841,24 @@ function endBefore(
   significant(master, now);
 }
 
-/** The last moment before an occurrence, in the type `UNTIL` must be written in. */
+/**
+ * The last moment before an occurrence, in the type `UNTIL` must be written
+ * in: a date or a floating time naming an occurrence of a zoned series
+ * (D35) is read in the series' zone, its `UNTIL` in UTC all the same.
+ */
 function untilBefore(recurrenceId: ItemTime, anchor: ItemTime): ICAL.Time {
   const at = inFrameOf(recurrenceId, anchor);
   if (anchor.type === "date") {
     const [year, month, day] = addDays(dayOf(at), -1).split("-").map(Number);
     return ICAL.Time.fromData({ year, month, day, isDate: true });
   }
-  if (anchor.type === "floating" || at.type !== "zoned") {
-    const local = at.type === "date" ? `${at.date}T00:00:00` : at.local;
+  const local = at.type === "date" ? `${at.date}T00:00:00` : at.local;
+  if (anchor.type === "floating") {
     const time = ICAL.Time.fromDateTimeString(local);
     time.adjust(0, 0, 0, -1);
     return time;
   }
-  return utc(at.epochMs - 1000);
+  return utc((at.type === "zoned" ? at.epochMs : epochOf(local, anchor.timeZone)) - 1000);
 }
 
 /**
@@ -811,7 +880,7 @@ function splitAt(
   const rest = new ICAL.Component(copyOf(object.root.toJSON()));
   for (const component of rest.getAllSubcomponents(master.name)) rest.removeSubcomponent(component);
 
-  const next = exceptionOf(master, recurrenceId);
+  const next = exceptionOf(master, occurrenceAt(recurrenceId, anchor));
   next.removeAllProperties("recurrence-id");
   for (const name of ["rrule", "rdate", "exdate"]) {
     for (const property of master.getAllProperties(name)) {

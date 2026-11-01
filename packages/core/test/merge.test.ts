@@ -289,7 +289,11 @@ describe("the fields two versions differ in, for the Conflicts list (D6)", () =>
       {
         summary: "Planning v2",
         time: { start: vilnius("2026-11-16T12:00:00"), end: vilnius("2026-11-16T13:00:00") },
-        alarms: { remove: [], add: [{ relatedTo: "start", offsetSeconds: -600 }] },
+        alarms: {
+          remove: [],
+          add: [{ relatedTo: "start", offsetSeconds: -600 }],
+          untitled: "Reminder",
+        },
       },
       { now },
     ).ics;

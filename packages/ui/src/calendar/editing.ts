@@ -306,8 +306,12 @@ const categoriesOf = (text: string) =>
     .map((category) => category.trim())
     .filter(Boolean);
 
-/** What the user changed from `initial` to `form`; for a new item, everything it holds. */
-export function changesOf(initial: Form | null, form: Form): ItemChanges {
+/**
+ * What the user changed from `initial` to `form`; for a new item, everything
+ * it holds. `untitled` is what a reminder added to an item without a title
+ * says, in the user's language (foundation D103).
+ */
+export function changesOf(initial: Form | null, form: Form, untitled: string): ItemChanges {
   const changes: { -readonly [K in keyof ItemChanges]: ItemChanges[K] } = {};
   const was = initial;
   const differs = <K extends keyof Form>(key: K) => !was || was[key] !== form[key];
@@ -334,7 +338,7 @@ export function changesOf(initial: Form | null, form: Form): ItemChanges {
   const add = form.alarms.flatMap((a) =>
     a.kind === "new" ? [{ relatedTo: a.relatedTo, offsetSeconds: a.offsetSeconds }] : [],
   );
-  if (remove.length > 0 || add.length > 0) changes.alarms = { remove, add };
+  if (remove.length > 0 || add.length > 0) changes.alarms = { remove, add, untitled };
   if (differs("color") && (was || form.color)) changes.color = form.color;
   if (form.kind === "task") {
     if (was ? was.status !== form.status : form.status !== "NEEDS-ACTION")
@@ -506,12 +510,14 @@ export async function saveForm(
     readonly initial: Form | null;
     readonly form: Form;
     readonly scope: Scope;
+    /** What a reminder added to an item without a title says, in the user's language. */
+    readonly untitled: string;
   },
   writes: Writes,
 ): Promise<void> {
-  const { target, initial, form } = request;
+  const { target, initial, form, untitled } = request;
   if (!target || !initial) {
-    const ics = createItem(form.kind, changesOf(null, form), {
+    const ics = createItem(form.kind, changesOf(null, form, untitled), {
       now: writes.now,
       uid: writes.uid(),
     });
@@ -520,7 +526,7 @@ export async function saveForm(
     });
     return;
   }
-  const changes = changesOf(initial, form);
+  const changes = changesOf(initial, form, untitled);
   const moving = form.calendarId !== target.calendarId;
   if (!moving && Object.keys(changes).length === 0) return;
   const newUid = writes.uid();

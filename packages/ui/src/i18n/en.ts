@@ -264,6 +264,7 @@ export const en = {
   "edit.reminders": "Reminders",
   "edit.addReminder": "Add a reminder",
   "edit.removeReminder": "Remove reminder: {{alarm}}",
+  "edit.untitledReminder": "Reminder",
   "edit.calendar": "Calendar",
   "edit.list": "List",
   "edit.color": "Colour",
