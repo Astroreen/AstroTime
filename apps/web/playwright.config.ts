@@ -10,6 +10,11 @@ export default defineConfig({
   testDir: "e2e",
   forbidOnly: ci,
   reporter: ci ? [["github"], ["list"]] : "list",
+  // A ceiling, not a wait (AGENTS.md): a check once gave up at the default
+  // 5 s on CI and passed on rerun; it did not happen locally in 120 runs.
+  // The likely cause, not measured, is CI's two cores with a dev server that
+  // compiles modules on first request. Nothing waits for time to pass.
+  ...(ci ? { expect: { timeout: 15_000 } } : {}),
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     ...devices["Desktop Chrome"],
