@@ -501,6 +501,73 @@ Decided while building PR 7.
   added through the proxy, and not one violation is reported, the worker's
   included.
 
+- **D124. The web app starts with no network.** Offline-first ([D122](#D122))
+  means the web app opens with no network too, not only stays open. The build
+  writes a service worker, `/sw.js` (`apps/web/sw/sw.ts`, built by
+  `apps/web/service-worker.ts`), with the list of every file the build and
+  `public/` wrote (the hashed scripts and styles, the store's worker,
+  SQLite's wasm, both languages in the bundle, the manifest and icons) and a
+  version, a hash of them and of the page (`public/` walked whole). Only the
+  build registers it; the dev server has
+  none.
+  - **What it keeps.** On install it keeps this version's files in a cache
+    of its own (`astrotime-<version>`) and the page as the server sent it
+    then, policy and nonce with it ([D110](#D110)), but without the preset's
+    tags ([D123](#D123)), which only the server says: the block the server
+    marks between `<!-- astrotime-preset -->` comments, and any
+    `<meta name="astrotime-server|username">` however it is written. A page
+    that names a file this version does not list (a rolling deploy, the page
+    newer than the worker) fails the install, so the version that has them
+    keeps it. Its files answer from
+    the cache; the page comes from the network first (a fresh nonce, the
+    preset) and from the cache when there is no network, or when what
+    answers is a server error (a reverse proxy's 502, 503 or 504 while the
+    container is down), or when the network has not answered within three
+    seconds (a connection that stalls, lie-fi, may settle only after tens
+    of seconds). The network's page, when it comes, refreshes the kept one
+    in the background. Only the server's own page is ever kept: an `ok`,
+    `basic`, HTML answer that was not redirected (a sign-on's login page, a
+    slash added); a version whose page is not one fails its install and
+    keeps nothing. It answers only the app's own navigations, under
+    its scope: a route of the single-page app, never `/dav-proxy/`, the
+    health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
+    of the app's origin, never a file it does not list. Activated, it
+    deletes older versions' caches. The proxy's static serving stays as
+    [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
+    manifest, icons) revalidated, so the browser's check of the worker costs
+    a 304.
+  - **Updates.** A newer version installs beside the running one and
+    waits; it does not take over a page by itself (no `skipWaiting`, no
+    `clients.claim`, so a first install reloads nothing). A page the old
+    version runs is told (`Platform.updates`) and shows a quiet line, "A new
+    version of AstroTime is ready", with Reload and Later; Reload lets it
+    take over and reloads that tab. Every other tab, run by the new version
+    from then on, offers the same and reloads only when its user asks, never
+    by itself (an edit dialog open in it keeps its text). Unasked, it runs
+    once every tab has closed. A page in
+    front of the user asks for a newer version at most once an hour.
+  - **The policy** gains `manifest-src 'self'` and `img-src 'self'` for the
+    manifest and icons; `worker-src 'self'` already covers the worker, whose
+    own script carries the files' policy (`connect-src 'self'` for what it
+    fetches). A page kept for offline use reuses its nonce until the next
+    page the network gives: a nonce guards against injected markup, and
+    the kept page holds none.
+  - **Installable.** `manifest.webmanifest` (standalone, AstroTime's dark
+    canvas as its colours) with an SVG icon and 192, 512 and a maskable 512
+    px PNG, drawn from the SVG by `scripts/generate-icons.ts`. The icon is a
+    placeholder until the design gives one ([Deferred](#deferred)).
+  - Android and the desktop ship their files and need none.
+  - Proved by `apps/web/e2e/built/offline.spec.ts` on the image's server:
+    the network gone, a reload shows the calendar with its items, the page
+    from the worker; the cache holds no `/dav-proxy/` answer and no preset;
+    a newer version is offered, and Reload runs it with only its cache
+    left; the manifest and icons answer with their types.
+  - Rejected: Workbox or `vite-plugin-pwa` (a dependency and its own
+    conventions for a worker of sixty lines); keeping the page cache-first
+    (an old nonce and preset on every load, and an update a load late);
+    reloading other tabs, hidden or not, by themselves (an edit dialog open
+    in one would lose its text).
+
 ### Layout
 
 Decided while building the layout engine, ahead of PR 5's screens.
@@ -736,8 +803,11 @@ Decided while building PR 5a-3.
     the token's place until the account and its secret are saved, so a page
     that goes in between (discovery, the first write) loses nothing: the
     next one saves it without a new flow, in the background: an approval
-    held never opens the dialog again. The UI tries it on start and whenever
-    the network comes back (`SignIn.saveHeld`), and while it waits, the
+    held never opens the dialog again. The UI tries it on start, whenever
+    the network comes back, and, for a server down while the browser is
+    online, at the end of a sync's tick once a backoff allows (a minute,
+    doubling to half an hour; only a save, or no approval left, starts it
+    again) (`SignIn.saveHeld`), and while it waits, the
     accounts dialog says calmly that AstroTime signs in as that user once the
     server can be reached. An approval is held for seven days (`heldUntil`);
     past that, its app password is revoked at the next chance and the entry
@@ -768,7 +838,9 @@ Decided while building PR 5a-3.
     Android have a `pendingSignIn` (their secrets); the desktop, whose
     window lives on while the browser is in front, has none.
   - **Eviction.** A browser may evict best-effort storage when the device runs
-    short of space. Once the store holds an account, the UI calls the
+    short of space. Once the store holds something worth keeping (a server's
+    account, or an item on the calendar on this device; never on a first
+    run's load, which makes that calendar empty), the UI calls the
     platform's `keepData`, the web's `navigator.storage.persist()` (unless
     `persisted()` already says so): Chromium grants or refuses it silently
     (by engagement, a bookmark, an installed app), Firefox asks the user. Its
@@ -786,8 +858,9 @@ Decided while building PR 5a-3.
   - A store with no account at all gets **the calendar on this device**: an
     account of provider `local` (`local:` its address, never synced, as the
     demo's is not, [D90](#D90)) with one calendar of events and tasks, named
-    in the language spoken then ("Personal") and shown as "On this device"
-    in the language spoken now. `Store.addLocalCalendarIfEmpty` makes it in
+    in the language spoken then ("Personal"); it and its account are shown
+    in the language spoken now ("Personal", "On this device"), the name
+    given wherever the UI reads its calendars (`shownCalendars`). `Store.addLocalCalendarIfEmpty` makes it in
     one transaction, so two tabs opening an empty store make one; the UI
     calls it whenever the store has no account, after the last one is
     removed too, so the app always has somewhere to write.
@@ -830,7 +903,8 @@ Decided while building PR 5a-3.
   `ASTROTIME_USERNAME` (optional), and the dev server the same, from the
   environment or a gitignored `.astrotime-dev/preset.env`
   (`scripts/t3/dev.sh`). The page carries them as two `<meta>` tags
-  (`astrotime-server`, `astrotime-username`) that the server adds to every
+  (`astrotime-server`, `astrotime-username`), between two marking comments,
+  that the server adds to every
   answer of the page, as it adds the nonce ([D110](#D110)): no request more,
   nothing to fetch offline, and a build that holds none. With a preset the
   add-account dialog asks for the password alone (the user name too when
@@ -1795,10 +1869,16 @@ errors").
   move to a server's calendar one by one, in the edit dialog; offering, when
   an account is added, to upload them all to one of its calendars comes
   when someone asks.
-- **Starting the web app with no network** ([D122](#D122)) — once open, the
-  web app works offline, but a page loaded with no network needs a service
-  worker holding the app's files (the image revalidates `index.html` on
-  every load, [D80](#D80)). Android and the desktop start offline already.
+- **AstroTime's own icon** ([D124](#D124)) — the web app's manifest
+  carries a placeholder (a calendar with a check, on the dark canvas); the
+  design gives the real one, for the web, Android and the desktop alike.
+- **A held approval's retries after a failure that is not offline**
+  ([D121](#D121)) — the tick retry counts only answers that leave it held;
+  one that ends otherwise does not re-arm it until `online` or a reload.
+- **An update offered to a page loaded by a hard reload** ([D124](#D124)) —
+  such a page has no controller, which `serviceWorkerUpdates` reads once at
+  start, so it never offers the waiting version; it gets it on the next
+  normal load.
 - **A preset on Android and the desktop** ([D123](#D123)) — they have no
   page served by an AstroTime server; a build-time or first-start preset
   comes if someone deploys them for one person.

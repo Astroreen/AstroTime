@@ -786,14 +786,14 @@ describe("saving writes pending changes through the store (D5)", () => {
 describe("the Conflicts list (D6)", () => {
   test("the demo's conflict differs in its title and time", async () => {
     const { store } = await demo();
-    const [view] = await conflictViews(store);
+    const [view] = await conflictViews(store, "Personal");
     expect(view!.fields).toEqual(["summary", "time"]);
     expect(view!.calendar?.name).toBe("Personal");
   });
 
   test("keeping the server's drops ours; nothing is written", async () => {
     const { store, rowOf } = await demo();
-    const [view] = await conflictViews(store);
+    const [view] = await conflictViews(store, "Personal");
     await keepServer(store, view!);
     expect(await store.conflicts()).toHaveLength(0);
     expect(await rowOf("Personal", "demo-dentist")).toMatchObject({ pending: "none" });
@@ -801,7 +801,7 @@ describe("the Conflicts list (D6)", () => {
 
   test("applying ours again is a pending update over the server's version", async () => {
     const { store, rowOf } = await demo();
-    const [view] = await conflictViews(store);
+    const [view] = await conflictViews(store, "Personal");
     await applyMine(store, view!);
     expect(await store.conflicts()).toHaveLength(0);
     const row = await rowOf("Personal", "demo-dentist");
@@ -815,7 +815,9 @@ describe("the Conflicts list (D6)", () => {
     const theirs = await rowOf("Personal", "demo-cinema");
     const ours = theirs.ics.replaceAll("demo-cinema", "our-new-item");
     const conflict = await store.addConflict(theirs.id, ours);
-    const view = (await conflictViews(store)).find((v) => v.conflict.id === conflict.id)!;
+    const view = (await conflictViews(store, "Personal")).find(
+      (v) => v.conflict.id === conflict.id,
+    )!;
     await applyMine(store, view, () => "a1");
     expect(await store.objectAt(byName("Personal").id, "our-new-item-a1.ics")).toMatchObject({
       pending: "create",

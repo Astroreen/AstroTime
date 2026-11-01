@@ -6,6 +6,8 @@
 import { CalendarObject, differences } from "@astrotime/core";
 import type { Calendar, Conflict, Store, StoredObject } from "@astrotime/storage";
 
+import { shownCalendars } from "./calendars.ts";
+
 export interface ConflictView {
   readonly conflict: Conflict;
   readonly stored: StoredObject;
@@ -18,9 +20,12 @@ export interface ConflictView {
   readonly fields: readonly string[];
 }
 
-/** The conflicts with what they need to be shown; one whose object cannot be read is left out. */
-export async function conflictViews(store: Store): Promise<ConflictView[]> {
-  const calendars = new Map((await store.calendars()).map((c) => [c.id, c]));
+/**
+ * The conflicts with what they need to be shown; one whose object cannot be
+ * read is left out. `localName`: the calendar on this device's name now.
+ */
+export async function conflictViews(store: Store, localName: string): Promise<ConflictView[]> {
+  const calendars = new Map((await shownCalendars(store, localName)).map((c) => [c.id, c]));
   const views: ConflictView[] = [];
   for (const conflict of await store.conflicts()) {
     const stored = await store.object(conflict.objectId);

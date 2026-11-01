@@ -6,6 +6,7 @@ import { davProxy } from "./dav-proxy.ts";
 import { devClients } from "./dev-clients.ts";
 import { devPreset } from "./dev-preset.ts";
 import { devTls } from "./dev-tls.ts";
+import { serviceWorker } from "./service-worker.ts";
 
 // Host names besides localhost and IPs the dev server answers to
 // (comma-separated, `.example.com` for a domain and its subdomains);
@@ -24,6 +25,7 @@ export default defineConfig({
     devClients(),
     devTls(),
     devPreset(),
+    serviceWorker(),
   ],
   ...(allowedHosts?.length ? { server: { allowedHosts } } : {}),
   // The page's tags, and a <meta property="csp-nonce"> the app reads, carry

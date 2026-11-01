@@ -757,6 +757,131 @@ test("a hidden calendar that stepped aside leaves the view and new items to the 
     .toBeInTheDocument();
 });
 
+test("an approval held while its server is down is saved on a later sync's tick, after the backoff (D121)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  // An account of another server, whose syncs the test holds midway: a tick
+  // is seen to run, and to end.
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@dav.example.org",
+      serverUrl: "https://dav.example.org/",
+      homeUrl: "https://dav.example.org/calendars/astro/",
+      credentials: { username: "astro", password: "pw" },
+    },
+  );
+  // A page went with its approval unsaved; its server is down, the browser online.
+  secrets.values.set(
+    "login-flow",
+    JSON.stringify({
+      step: "approved",
+      token: "t0k3n",
+      server: `${SERVER}/`,
+      owner: "a-page-that-went",
+      heldUntil: NOW.getTime() + 60 * 60_000,
+      username: "astro",
+      password: "app-pass",
+    }),
+  );
+  const server = nextcloud({ password: "app-pass" });
+  let down = true;
+  let midway: Promise<void> | null = null;
+  const tries: string[] = [];
+  const http: HttpClient = async (request) => {
+    if (new URL(request.url).host === "dav.example.org") {
+      await midway;
+      throw new OfflineError("away");
+    }
+    tries.push(request.url);
+    if (down) throw new OfflineError("down");
+    return server.http(request);
+  };
+  let request: (byUser: boolean) => void = () => {};
+  render(Promise.resolve(store), ["en-US"], {
+    http,
+    secrets,
+    pendingSignIn: secrets,
+    onSyncRequest: (listener) => {
+      request = listener;
+      return () => {};
+    },
+  });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  await button.click();
+  const accounts = page.getByRole("dialog", { name: "Accounts" });
+  await expect
+    .element(
+      accounts.getByText("Signing in as astro@cloud.example.com once the server can be reached."),
+    )
+    .toBeInTheDocument();
+  await accounts.getByRole("button", { name: "Close" }).click();
+  await expect.element(accounts).not.toBeInTheDocument();
+  const before = tries.length;
+
+  // The server is back. A sync's tick within the backoff, seen to run and
+  // end, leaves the approval be.
+  down = false;
+  let release = () => {};
+  midway = new Promise((resolve) => (release = resolve));
+  request(true);
+  await expect.element(button).toHaveAccessibleName("Accounts, syncing");
+  release();
+  midway = null;
+  await expect.element(button).not.toHaveAccessibleName("Accounts, syncing");
+  expect(tries).toHaveLength(before);
+  expect((await store.accounts()).filter((a) => a.name === "astro@cloud.example.com")).toEqual([]);
+
+  // One after the backoff saves it.
+  vi.setSystemTime(NOW.getTime() + 2 * 60_000);
+  request(true);
+  await button.click();
+  await expect.element(accounts.getByText("astro@cloud.example.com")).toBeInTheDocument();
+  expect(secrets.values.has("login-flow")).toBe(false);
+});
+
+test("the browser is asked to keep the data once there is something to keep, not on a first run's load (D121)", async () => {
+  const store = await emptyStore();
+  let asks = 0;
+  let asked = () => {};
+  const keeping = new Promise<void>((resolve) => (asked = resolve));
+  const memory = memoryPreferences({ "astrotime.view": "day" });
+  let answered: (value: string) => void = () => {};
+  const answer = new Promise<string>((resolve) => (answered = resolve));
+  const preferences = {
+    get: memory.get,
+    set: (key: string, value: string) => {
+      memory.set(key, value);
+      if (key === "astrotime.keepData") answered(value);
+    },
+  };
+  render(Promise.resolve(store), ["en-US"], {
+    preferences,
+    keepData: async () => {
+      asks++;
+      asked();
+      return false;
+    },
+  });
+  // The first run: the empty calendar on this device, and no question yet.
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await expect
+    .element(page.getByRole("dialog", { name: "Accounts" }).getByText("On this device"))
+    .toBeInTheDocument();
+  expect(asks).toBe(0);
+  // Its first item is worth keeping: asked, once, and the answer kept.
+  const [personal] = await store.calendars();
+  await store.saveLocal(
+    personal!.id,
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\nBEGIN:VTODO\r\nUID:milk\r\nDTSTAMP:20261101T080000Z\r\nSUMMARY:Milk\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+  );
+  await keeping;
+  expect(asks).toBe(1);
+  expect(await answer).toBe("refused");
+});
+
 test("a deployment's preset asks for the password alone, by itself, and not again once closed (D123)", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });

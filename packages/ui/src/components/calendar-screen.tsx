@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { addDays } from "../calendar/dates.ts";
 import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
+import { shownCalendars } from "../calendar/calendars.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import { layoutMonth } from "../calendar/month.ts";
@@ -118,7 +119,12 @@ export function CalendarScreen({
     () =>
       liveQuery(
         store,
-        async () => ({ accounts: await store.accounts(), calendars: await store.calendars() }),
+        async () => {
+          const accounts = await store.accounts();
+          // Named in the language spoken now (foundation D122).
+          const calendars = await shownCalendars(store, t("local.calendar"));
+          return { accounts, calendars };
+        },
         (result) => {
           setLists(result);
           setListsFailed(false);
@@ -128,7 +134,7 @@ export function CalendarScreen({
           setListsFailed(true);
         },
       ),
-    [store],
+    [store, t],
   );
   const ids = lists
     ? lists.calendars.filter((calendar) => !hidden.has(calendar.id)).map((calendar) => calendar.id)

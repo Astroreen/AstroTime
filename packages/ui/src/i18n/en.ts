@@ -20,6 +20,10 @@ export const en = {
   "secrets.unprotected.untilQuit": "Keep until AstroTime quits",
   "secrets.unprotected.save": "Save unprotected",
 
+  "update.ready": "A new version of AstroTime is ready.",
+  "update.reload": "Reload",
+  "update.later": "Later",
+
   "local.account": "On this device",
   "local.calendar": "Personal",
   "local.status": "Not synced: on this device only",

@@ -201,6 +201,9 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+  - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
+    the UI shows them, the calendar on this device named in the language
+    spoken now. → `plans/foundation.md#D122`
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
@@ -280,11 +283,17 @@ When you add a package, app or module, add its line here in the same PR.
     every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
     landmarks, reflow and reduced motion. → `plans/design.md#D119`
   - `e2e/built/` — the production build on the image's server, under its
-    Content Security Policy, with no violation. → `plans/foundation.md#D110`
+    Content Security Policy, with no violation. → `plans/foundation.md#D110`;
+    `offline.spec.ts` reloads it with the network gone, updates it, and
+    reads its manifest. → `plans/foundation.md#D124`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
     server listens beyond localhost. → `plans/foundation.md#D20`
+  - `sw/sw.ts` and `service-worker.ts` — the service worker that keeps the
+    built app's files for starting with no network, and its build;
+    `src/updates.ts`, its registration and a newer version offered;
+    `public/`, the manifest and icons. → `plans/foundation.md#D124`
   - `dev-preset.ts` — the single-user preset in the dev server's page.
     → `plans/foundation.md#D123`
   - `dev-tls.ts` — the dev server's https front for the tailnet with a
@@ -380,6 +389,8 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/bench-big-calendar.ts` — a big calendar read as the views, the
   undone chip and the reminders read it; prints how long each takes, run by
   hand. → `plans/foundation.md#D118`
+- `scripts/generate-icons.ts` — draws the web app's PNG icons from its SVG
+  in Chromium, run by hand. → `plans/foundation.md#D124`
 - `scripts/sweep-recurrence.ts` — the generated series of D118's proof for
   other seeds, ten times as many as CI's, run by hand.
   → `plans/foundation.md#D118`

@@ -60,6 +60,10 @@ password, or opens Nextcloud's own sign-in; either way it first opens on a
 calendar on the device, with no account
 ([D122](docs/plans/foundation.md#D122)).
 
+The app installs as a web app on phones and desktops, and once loaded it
+starts with no network ([D124](docs/plans/foundation.md#D124)); a new
+version is offered with a quiet "Reload" after you update the container.
+
 The container sends the app with a strict Content Security Policy and a
 fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Let the
 reverse proxy pass it on as it is and keep the page out of its cache: a policy

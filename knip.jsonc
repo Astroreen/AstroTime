@@ -40,7 +40,8 @@
       "entry": ["src/main.ts", "vite.config.ts"],
     },
     "apps/web": {
-      "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts"],
+      // The service worker is an entry of the build (service-worker.ts).
+      "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts", "sw/sw.ts"],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.
       "ignoreDependencies": ["oxc-transform-react"],
     },

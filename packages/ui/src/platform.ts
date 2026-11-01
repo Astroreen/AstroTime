@@ -7,6 +7,18 @@ import type { UnprotectedPrompt } from "./accounts/unprotected.ts";
 import type { Preferences } from "./preferences.ts";
 import type { Theme } from "./settings.ts";
 
+/**
+ * A newer version of the app, installed and waiting to run (the web's
+ * service worker, foundation D124): the UI says so quietly and reloads into
+ * it when the user asks.
+ */
+export interface AppUpdates {
+  readonly waiting: boolean;
+  subscribe(listener: () => void): () => void;
+  /** Runs the newer version; the page reloads into it. */
+  apply(): void;
+}
+
 /** What a shell's own chrome shows, from the settings, in the user's language (desktop D75). */
 export interface ShellState {
   /** The theme the window's frame follows. */
@@ -82,6 +94,8 @@ export interface Platform {
    * address has a store of its own: the web's origin (foundation D121).
    */
   readonly dataHome?: string;
+  /** A newer version waiting (the web's, foundation D124); shells that ship their files have none. */
+  readonly updates?: AppUpdates;
   /** Where this device's choices are kept (the view, hidden calendars). */
   readonly preferences: Preferences;
   /**

@@ -12,6 +12,7 @@ import { AccountsProvider } from "./components/accounts-context.tsx";
 import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { RemindersProvider } from "./components/reminders-context.tsx";
 import { UnprotectedDialog } from "./components/unprotected-dialog.tsx";
+import { UpdateNotice } from "./components/update-notice.tsx";
 import { createI18n } from "./i18n/index.ts";
 import type { Platform, ShellState } from "./platform.ts";
 import { KEYS, usePreference } from "./preferences.ts";
@@ -109,6 +110,7 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
           <StoreMessage opening={opening} />
         )}
         {platform.shell ? <ShellChrome apply={platform.shell} settings={chosen} /> : null}
+        {platform.updates ? <UpdateNotice updates={platform.updates} /> : null}
         {platform.unprotectedPrompt ? (
           <UnprotectedDialog prompt={platform.unprotectedPrompt} />
         ) : null}
