@@ -728,16 +728,24 @@ Decided while building PR 5a-3.
     does). Once approved, the entry holds the app password Nextcloud gave in
     the token's place until the account and its secret are saved, so a page
     that goes in between (discovery, the first write) loses nothing: the
-    next one saves it without a new flow. An approval has an owner, the page
+    next one saves it without a new flow, in the background: an approval
+    held never opens the dialog again. The UI tries it on start and whenever
+    the network comes back (`SignIn.saveHeld`), and while it waits, the
+    accounts dialog says calmly that AstroTime signs in as that user once the
+    server can be reached. An approval is held for seven days (`heldUntil`);
+    past that, its app password is revoked at the next chance and the entry
+    dropped. "Continue" in the dialog uses a held approval again only for the
+    same server: scheme, host, port and path, a final slash aside. An approval has an owner, the page
     that holds it; every page holds a Web Lock, `astrotime-page-<id>`, for as
     long as it lives. Another page takes an approval up only when
     `navigator.locks.query()` shows its owner's lock is not held (the page is
     gone), and makes itself the owner under the flow's lock; only the owner
     saves, forgets or revokes it, and a new flow never replaces an approval
     whose owner lives. Saving fails because the server
-    cannot be reached: the approval is held, and the next try saves it.
-    Fails otherwise (no CalDAV server there), or the user cancels before it
-    is saved: the app password is revoked and forgotten. A waiting flow is
+    cannot be reached: the approval is held (closing the dialog then leaves
+    it held), and the next try saves it. Fails otherwise (no CalDAV server
+    there), or the user cancels while it is being saved: the app password
+    is revoked and forgotten. A waiting flow is
     forgotten as it expires, fails or is cancelled; a page's load drops one
     past its token's life, or unreadable, without opening the dialog
     (`hasPendingFlow`). Forgetting compares the kept token and deletes under

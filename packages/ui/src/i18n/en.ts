@@ -82,6 +82,7 @@ export const en = {
     "AstroTime could not revoke its app password on the server. You can revoke it in Nextcloud's settings, under Security.",
   "accounts.notRevokedClose": "OK",
   "accounts.demo": "Demo data, on this device only",
+  "accounts.held": "Signing in as {{name}} once the server can be reached.",
   "accounts.noCalendars": "No calendars on this account",
   "accounts.close": "Close",
 

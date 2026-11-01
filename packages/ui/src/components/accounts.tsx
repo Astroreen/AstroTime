@@ -223,6 +223,13 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
               </li>
             ))}
           </ul>
+          {value.held && (
+            <p role="status" className="mt-3 px-2 text-[13px] text-ink-muted">
+              {t("accounts.held", {
+                name: `${value.held.username}@${new URL(value.held.server).host}`,
+              })}
+            </p>
+          )}
           {value.conflicts > 0 && (
             <div role="note" className="mt-3 rounded-2xl bg-danger-soft p-3 text-[13px]">
               <p className="font-medium text-danger">

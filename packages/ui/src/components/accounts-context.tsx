@@ -3,10 +3,17 @@
 // status, the conflicts count, and the sign-in and removal dialogs.
 import type { Account, Store } from "@astrotime/storage";
 import { connectCalDav, removeAccount, syncAll, type SyncContext } from "@astrotime/sync";
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
-import { hasPendingFlow } from "../accounts/sign-in.ts";
+import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
@@ -23,6 +30,8 @@ export interface AccountsValue {
   readonly status: SyncStatus;
   /** Our changes the server refused, waiting in the Conflicts list (D6). */
   readonly conflicts: number;
+  /** Login Flow's approval held while its server cannot be reached, saved once it can (D121). */
+  readonly held: { readonly server: string; readonly username: string } | null;
   signIn(request: SignInRequest): void;
   remove(account: Account): void;
 }
@@ -92,6 +101,46 @@ export function AccountsProvider({
     };
   }, [platform]);
 
+  // Login Flow's approval held while its server could not be reached (its
+  // page's, or one whose page went): saved in the background, on start and
+  // whenever the network comes back, with no dialog (D121).
+  const [held, setHeld] = useState<AccountsValue["held"]>(null);
+  const retryHeld = useRef<() => void>(() => {});
+  useEffect(() => {
+    const pending = platform.pendingSignIn;
+    if (!pending) return;
+    let live = true;
+    let running = false;
+    const run = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const signIn = new SignIn({
+          store,
+          secrets: platform.secrets,
+          http: platform.http,
+          openExternal: platform.openExternal,
+          pending,
+          ...(platform.signingInTo ? { signingInTo: platform.signingInTo } : {}),
+        });
+        if ((await signIn.saveHeld()) === "saved") void scheduler.syncNow();
+        const now = await heldApproval(pending);
+        if (live) setHeld(now);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        running = false;
+      }
+    };
+    void run();
+    retryHeld.current = () => void run();
+    window.addEventListener("online", run);
+    return () => {
+      live = false;
+      window.removeEventListener("online", run);
+    };
+  }, [platform, store, scheduler]);
+
   // Once the store holds an account, the browser is asked to keep its data
   // rather than evict it under pressure, once on this device: its answer is
   // kept, granted or refused (D121).
@@ -127,6 +176,7 @@ export function AccountsProvider({
     scheduler,
     status,
     conflicts,
+    held,
     signIn: setSigningIn,
     remove: setRemoving,
   };
@@ -135,7 +185,11 @@ export function AccountsProvider({
       {children}
       <SignInDialog
         request={signingIn}
-        onClose={() => setSigningIn(null)}
+        onClose={() => {
+          setSigningIn(null);
+          // A sign-in that ended offline after its approval leaves it held.
+          retryHeld.current();
+        }}
         onSignedIn={() => void scheduler.syncNow()}
       />
       <RemoveAccountDialog
