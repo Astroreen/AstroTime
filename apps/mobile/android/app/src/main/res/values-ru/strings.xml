@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="reminders_channel">Напоминания</string>
+    <string name="reminders_channel_description">Напоминания о событиях и задачах</string>
+</resources>

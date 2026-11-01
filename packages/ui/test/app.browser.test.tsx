@@ -263,6 +263,67 @@ test("Reminders the browser blocks: the switch cannot turn on and says why, in R
     .toBeInTheDocument();
 });
 
+test("Reminders on Android: the platform has the set before it may notify, asks by itself, and the setting hears its answer (android D66)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  const reminders = fakeReminders("default", "granted");
+  const changed = new Set<() => void>();
+  let exact = false;
+  const handed = reminders.next();
+  render(Promise.resolve(store), ["en-US"], {
+    reminders: {
+      ...reminders.scheduler,
+      whileOpenOnly: false,
+      asksWhenNeeded: true,
+      native: true,
+      inexact: () => !exact,
+      onPermissionChange(listener) {
+        changed.add(listener);
+        return () => changed.delete(listener);
+      },
+    },
+  });
+  // Handed over at start, with no tap, so the platform can ask the first time there is one.
+  await handed;
+  expect(reminders.last.map((r) => r.notification.title)).toContain("Call with Anna");
+  expect(reminders.asked).toBe(0);
+  await page.getByRole("button", { name: "Main menu" }).click();
+  const toggle = page.getByRole("switch", { name: "Reminders" });
+  await expect.element(toggle).not.toBeChecked();
+
+  // The platform asked and was allowed: the switch is on, and says reminders may come late.
+  await reminders.scheduler.requestPermission();
+  for (const listener of changed) listener();
+  await expect.element(toggle).toBeChecked();
+  await expect
+    .element(page.getByText(/^Exact alarms are off for AstroTime in the system's settings/))
+    .toBeInTheDocument();
+  expect(page.getByText("Reminders show while AstroTime is open in a tab.").query()).toBeNull();
+  exact = true;
+  for (const listener of changed) listener();
+  await expect.element(page.getByText(/^Exact alarms are off/)).not.toBeInTheDocument();
+});
+
+test("Reminders the system blocks: the setting names the system's settings, not a browser's", async () => {
+  const store = await demoStore(["ru-RU"]);
+  const reminders = fakeReminders("denied");
+  render(Promise.resolve(store), ["ru-RU"], {
+    reminders: { ...reminders.scheduler, native: true, asksWhenNeeded: true },
+  });
+  await page.getByRole("button", { name: "Главное меню" }).click();
+  await expect.element(page.getByRole("switch", { name: "Напоминания" })).toBeDisabled();
+  await expect
+    .element(
+      page.getByText(
+        "Уведомления от AstroTime выключены. Разрешите их в настройках системы для AstroTime.",
+      ),
+    )
+    .toBeInTheDocument();
+  // Blocked, the platform is handed nothing.
+  expect(reminders.last).toEqual([]);
+});
+
 test("a page that is not a secure context: a message in the user's language", async () => {
   render(failing(new InsecureContextError("http")), ["ru-RU"]);
   await expect

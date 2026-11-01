@@ -4,4 +4,7 @@
     <string name="title_activity_main">AstroTime</string>
     <string name="package_name">io.github.astroreen.astrotime</string>
     <string name="custom_url_scheme">io.github.astroreen.astrotime</string>
+    <!-- The reminders' notification channel, in Android's settings (docs/plans/android.md#D66). -->
+    <string name="reminders_channel">Reminders</string>
+    <string name="reminders_channel_description">Reminders of events and tasks</string>
 </resources>

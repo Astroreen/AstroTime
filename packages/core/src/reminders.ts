@@ -70,6 +70,22 @@ export interface ReminderScheduler {
   requestPermission(): Promise<ReminderPermission>;
   /** Reminders fire only while the app is open (the web, foundation D101): the setting says so. */
   readonly whileOpenOnly: boolean;
+  /**
+   * The platform asks the permission itself, the first time there is a
+   * reminder to schedule (Android, docs/plans/android.md#D66): the UI hands it
+   * the set while the permission is still `default`, not only once granted.
+   */
+  readonly asksWhenNeeded?: boolean;
+  /** An app of the system's, not a page: the setting's words name the app's settings, not a browser. */
+  readonly native?: boolean;
+  /** Reminders may come late: the system lets the app fire them only inexactly (Android D66). */
+  inexact?(): boolean;
+  /**
+   * Calls `listener` when `permission()` or `inexact()` may answer otherwise,
+   * changed without the UI asking (the platform asked, or its settings
+   * changed); returns the function that stops it.
+   */
+  onPermissionChange?(listener: () => void): () => void;
 }
 
 /** Alarms that notify: `DISPLAY` and `AUDIO`. `EMAIL` is a server's, `NONE` (RFC 9074) is none. */

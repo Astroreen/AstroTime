@@ -278,6 +278,10 @@ When you add a package, app or module, add its line here in the same PR.
     TypeScript side, with the back button. → `plans/android.md#D68`
   - `src/webview.ts` — the WebView's Chromium version, checked before the
     store opens. → `plans/android.md#D61`
+  - `src/reminders.ts` — `androidReminders`: reminders as local
+    notifications (`@capacitor/local-notifications`), diffed per set, under
+    integer ids kept in the preferences; the channel is made in
+    `MainActivity`. → `plans/android.md#D66`
 
 - `apps/desktop` (`@astrotime/desktop`) — the Linux desktop app on
   Electron: `pnpm --filter @astrotime/desktop build`, then `start` (the dev
