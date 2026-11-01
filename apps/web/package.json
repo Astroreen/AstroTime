@@ -7,7 +7,7 @@
   "scripts": {
     "build": "vp build",
     "dev": "vp dev",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p sw",
     "e2e": "playwright test"
   },
   "dependencies": {

@@ -34,8 +34,12 @@ export function contentSecurityPolicy(nonce?: string): string {
     nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
     // SQLite's wasm, and every CalDAV request through /dav-proxy/ (D39).
     "connect-src 'self'",
-    // The store's worker (packages/storage/src/web).
+    // The store's worker (packages/storage/src/web), and the service worker
+    // that keeps the app's files for starting offline (D124).
     "worker-src 'self'",
+    // The web app manifest and its icons, the page's icon among them (D124).
+    "manifest-src 'self'",
+    "img-src 'self'",
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",

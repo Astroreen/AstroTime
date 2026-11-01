@@ -501,6 +501,56 @@ Decided while building PR 7.
   added through the proxy, and not one violation is reported, the worker's
   included.
 
+- **D124. The web app starts with no network.** Offline-first ([D122](#D122))
+  means the web app opens with no network too, not only stays open. The build
+  writes a service worker, `/sw.js` (`apps/web/sw/sw.ts`, built by
+  `apps/web/service-worker.ts`), with the list of every file the build and
+  `public/` wrote (the hashed scripts and styles, the store's worker,
+  SQLite's wasm, both languages in the bundle, the manifest and icons) and a
+  version, a hash of them. Only the build registers it; the dev server has
+  none.
+  - **What it keeps.** On install it keeps this version's files in a cache
+    of its own (`astrotime-<version>`) and the page as the server sent it
+    then, policy and nonce with it ([D110](#D110)), but without the preset's
+    tags ([D123](#D123)), which only the server says. Its files answer from
+    the cache; the page comes from the network first (a fresh nonce, the
+    preset) and from the cache only when there is no network. It touches
+    nothing else: never `/dav-proxy/`, never a request that is not a `GET`
+    of the app's origin, never a file it does not list. Activated, it
+    deletes older versions' caches. The proxy's static serving stays as
+    [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
+    manifest, icons) revalidated, so the browser's check of the worker costs
+    a 304.
+  - **Updates.** A newer version installs beside the running one and
+    waits; it does not take over a page by itself (no `skipWaiting`, no
+    `clients.claim`, so a first install reloads nothing). A page the old
+    version runs is told (`Platform.updates`) and shows a quiet line, "A new
+    version of AstroTime is ready", with Reload and Later; Reload lets it
+    take over, and every tab of the origin reloads into it, since the older
+    files are gone. Unasked, it runs once every tab has closed. A page in
+    front of the user asks for a newer version at most once an hour.
+  - **The policy** gains `manifest-src 'self'` and `img-src 'self'` for the
+    manifest and icons; `worker-src 'self'` already covers the worker, whose
+    own script carries the files' policy (`connect-src 'self'` for what it
+    fetches). A page kept for offline use reuses its nonce until the next
+    page the network gives: a nonce guards against injected markup, and
+    the kept page holds none.
+  - **Installable.** `manifest.webmanifest` (standalone, AstroTime's dark
+    canvas as its colours) with an SVG icon and 192, 512 and a maskable 512
+    px PNG, drawn from the SVG by `scripts/generate-icons.ts`. The icon is a
+    placeholder until the design gives one ([Deferred](#deferred)).
+  - Android and the desktop ship their files and need none.
+  - Proved by `apps/web/e2e/built/offline.spec.ts` on the image's server:
+    the network gone, a reload shows the calendar with its items, the page
+    from the worker; the cache holds no `/dav-proxy/` answer and no preset;
+    a newer version is offered, and Reload runs it with only its cache
+    left; the manifest and icons answer with their types.
+  - Rejected: Workbox or `vite-plugin-pwa` (a dependency and its own
+    conventions for a worker of sixty lines); keeping the page cache-first
+    (an old nonce and preset on every load, and an update a load late);
+    reloading a hidden tab by itself (an edit dialog open in it would lose
+    its text).
+
 ### Layout
 
 Decided while building the layout engine, ahead of PR 5's screens.
@@ -1795,10 +1845,9 @@ errors").
   move to a server's calendar one by one, in the edit dialog; offering, when
   an account is added, to upload them all to one of its calendars comes
   when someone asks.
-- **Starting the web app with no network** ([D122](#D122)) — once open, the
-  web app works offline, but a page loaded with no network needs a service
-  worker holding the app's files (the image revalidates `index.html` on
-  every load, [D80](#D80)). Android and the desktop start offline already.
+- **AstroTime's own icon** ([D124](#D124)) — the web app's manifest
+  carries a placeholder (a calendar with a check, on the dark canvas); the
+  design gives the real one, for the web, Android and the desktop alike.
 - **A preset on Android and the desktop** ([D123](#D123)) — they have no
   page served by an AstroTime server; a build-time or first-start preset
   comes if someone deploys them for one person.

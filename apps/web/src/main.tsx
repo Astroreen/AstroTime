@@ -8,6 +8,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { webPlatform } from "./platform.ts";
+import { serviceWorkerUpdates } from "./updates.ts";
 import "./index.css";
 
 const root = document.querySelector("#root");
@@ -40,10 +41,18 @@ async function openStore(): Promise<Store> {
   return store;
 }
 
+// The built app keeps its files for starting with no network, and hears of a
+// newer version (docs/plans/foundation.md#D124); the dev server has neither.
+const updates =
+  import.meta.env.PROD && "serviceWorker" in navigator
+    ? serviceWorkerUpdates(navigator.serviceWorker, { reload: () => location.reload() })
+    : undefined;
+void updates?.register();
+
 createRoot(root).render(
   <StrictMode>
     <AstroTime
-      platform={webPlatform(openStore(), STORE, preset)}
+      platform={{ ...webPlatform(openStore(), STORE, preset), ...(updates ? { updates } : {}) }}
       languages={languages}
       timeZone={timeZone}
       {...(nonce ? { nonce } : {})}

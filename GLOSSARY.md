@@ -153,6 +153,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   once in android plan D60. A shell's implementation of one is an
   **adapter**; all of them together are the shell's **Platform** (the
   `Platform` object it hands the UI's root).
+- **Service worker** — the web app's script that keeps the built app's
+  files, so it starts with no network, and offers a newer version once one
+  is installed (foundation D124).
 - **Secret store** — where a platform keeps an account's credentials
   (`SecretStore`): IndexedDB on the web (foundation D89), the Keystore on
   Android, the keyring on the desktop. Never the local store.

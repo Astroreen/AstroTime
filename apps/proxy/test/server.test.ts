@@ -518,13 +518,15 @@ describe("the Content Security Policy (D110)", () => {
     expect(new Set(nonces).size).toBe(nonces.length);
   });
 
-  test("the policy loads only the app's own scripts, styles, workers and connections", () => {
+  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons", () => {
     expect(contentSecurityPolicy("n0nce").split("; ")).toEqual([
       "default-src 'none'",
       "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'nonce-n0nce'",
       "connect-src 'self'",
       "worker-src 'self'",
+      "manifest-src 'self'",
+      "img-src 'self'",
       "base-uri 'none'",
       "form-action 'none'",
       "frame-ancestors 'none'",

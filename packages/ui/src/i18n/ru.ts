@@ -21,6 +21,10 @@ export const ru = {
   "secrets.unprotected.untilQuit": "Хранить до выхода из AstroTime",
   "secrets.unprotected.save": "Сохранить без защиты",
 
+  "update.ready": "Готова новая версия AstroTime.",
+  "update.reload": "Обновить",
+  "update.later": "Позже",
+
   "local.account": "На этом устройстве",
   "local.calendar": "Личный",
   "local.status": "Без синхронизации: только на этом устройстве",
