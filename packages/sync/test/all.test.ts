@@ -388,6 +388,11 @@ test("signing in again revokes the app password Login Flow gave the one replaced
   expect(await (await signIn("app-3", true, nextcloud(false).http)).replaced).toBe("kept");
   expect(await (await signIn("app-4", true, null)).replaced).toBe("kept");
   expect(server.revoked).toHaveLength(1);
+  // A typed password over Login Flow's: Login Flow's is revoked all the same.
+  expect(await (await signIn("typed-again", false)).replaced).toBe("revoked");
+  expect(server.revoked.at(-1)).toBe(
+    `DELETE https://a.example/ocs/v2.php/core/apppassword Basic ${btoa("astro:app-4")}`,
+  );
 });
 
 test("signing in again repairs credentials the secret store cannot read: the new ones are saved", async () => {

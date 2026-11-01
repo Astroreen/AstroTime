@@ -1238,7 +1238,11 @@ Decided while building PR 6b.
   revokes the app password it replaces ([D90](#D90)), unwaited; when that
   fails (offline, a server that would not), the old password stays in
   Nextcloud's list of devices and the sign-in dialog says nothing. A word
-  there, as the remove dialog has, comes if it is seen.
+  there, as the remove dialog has, comes if it is seen. Two sign-ins again
+  at once (two tabs) both read the same old secret outside the account's
+  transaction, so both revoke it and the first one's new password stays
+  unrevoked; reading the old secret and writing the new under one lock
+  would close that.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store

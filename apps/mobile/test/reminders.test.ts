@@ -432,6 +432,21 @@ test("without the permission, what left the set is still cancelled: allowed agai
   expect(phone.calls).toHaveLength(2);
 });
 
+test("without the permission, a cancel that fails says so and is tried again with the next set, as with it", async () => {
+  const phone = device();
+  const { reminders } = scheduler(phone);
+  const call = reminder("call", NOW + 30 * MINUTE);
+  await reminders.schedule([call, reminder("lunch", NOW + 3 * 60 * MINUTE)]);
+  const lunchId = idOf(phone, "lunch")!;
+  phone.display = "denied";
+  const cancel = phone.native.cancel;
+  phone.native.cancel = () => Promise.reject(new Error("Plugin failed."));
+  await expect(reminders.schedule([call])).rejects.toThrow("Plugin failed.");
+  phone.native.cancel = cancel;
+  await reminders.schedule([call]);
+  expect(phone.last()).toEqual({ scheduled: [], cancelled: [lunchId] });
+});
+
 test("the switch asks too; refused for good, the setting says so", async () => {
   const phone = device({ display: "prompt", answer: "denied" });
   const { reminders } = scheduler(phone);
