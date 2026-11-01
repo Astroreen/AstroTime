@@ -8,9 +8,19 @@ export {
   type Occurrence,
   type Range,
 } from "./occurrences.ts";
-export { wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
+export { wallClockIn, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
 export { completeTask, starTask } from "./task-edits.ts";
 export { isDone, isUndoneBefore, latestUndoneBefore } from "./undone.ts";
+export {
+  MAX_REMINDERS,
+  REMINDER_HORIZON_MS,
+  remindersOf,
+  soonestReminders,
+  type Reminder,
+  type ReminderPermission,
+  type ReminderScheduler,
+  type ScheduledReminder,
+} from "./reminders.ts";
 export {
   dayRange,
   isAllDay,

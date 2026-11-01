@@ -445,6 +445,117 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.search([], "отчёт")).toEqual([]);
     });
 
+    test("reminders: every calendar's items whose alarms fire in the range, soonest first (D100)", async () => {
+      const { store, account, calendar } = await setup();
+      const other = await store.saveCalendar({
+        accountId: account.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/work/",
+        name: "Work",
+        color: null,
+        components: ["VEVENT"],
+        readOnly: true,
+      });
+      const alarm = (trigger: string) =>
+        `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER${trigger}\r\nEND:VALARM\r\n`;
+      const save = (calendarId: string, uid: string, ics: string) =>
+        store.saveFromServer(calendarId, { href: `${uid}.ics`, etag: '"1"', ics });
+      await save(
+        calendar.id,
+        "meeting",
+        event("meeting", "20261105T080000Z", "20261105T090000Z", alarm(":-PT15M")),
+      );
+      await save(
+        other.id,
+        "work",
+        event("work", "20261104T120000Z", "20261104T130000Z", alarm(":-PT10M")),
+      );
+      // Weeks after the range, an alarm a month before it.
+      await save(
+        calendar.id,
+        "far",
+        event("far", "20261206T080000Z", "20261206T090000Z", alarm(":-P30D")),
+      );
+      // A series from long ago reminds of its occurrences in the range.
+      await save(
+        calendar.id,
+        "daily",
+        event(
+          "daily",
+          "20250101T070000Z",
+          "20250101T073000Z",
+          `RRULE:FREQ=DAILY\r\n${alarm(":-PT5M")}`,
+        ),
+      );
+      // An overdue and an undated task with an alarm at a time of its own.
+      await save(
+        calendar.id,
+        "overdue",
+        task("overdue", `DUE:20261001T100000Z\r\n${alarm(";VALUE=DATE-TIME:20261106T060000Z")}`),
+      );
+      await save(
+        calendar.id,
+        "undated",
+        task("undated", alarm(";VALUE=DATE-TIME:20261106T070000Z")),
+      );
+      // None of these.
+      await save(calendar.id, "plain", event("plain", "20261105T080000Z", "20261105T090000Z"));
+      await save(
+        calendar.id,
+        "done",
+        task("done", `DUE:20261105T100000Z\r\nSTATUS:COMPLETED\r\n${alarm(":-PT15M")}`),
+      );
+      await save(
+        calendar.id,
+        "past",
+        event("past", "20261001T080000Z", "20261001T090000Z", alarm(";RELATED=END:PT1H")),
+      );
+      await save(
+        calendar.id,
+        "dense",
+        event(
+          "dense",
+          "19900101T000000Z",
+          "19900101T000100Z",
+          `RRULE:FREQ=MINUTELY\r\n${alarm(":-PT1M")}`,
+        ),
+      );
+      const deleted = await save(
+        calendar.id,
+        "deleted",
+        event("deleted", "20261105T080000Z", "20261105T090000Z", alarm(":-PT15M")),
+      );
+      await store.deleteLocal(deleted.id);
+
+      const range = { from: "2026-11-04", to: "2026-11-07", timeZone: "Europe/Vilnius" };
+      const fired = async () =>
+        (await store.reminders(range)).map((r) => [r.uid, new Date(r.fireAt).toISOString()]);
+      expect(await fired()).toEqual([
+        ["daily", "2026-11-04T06:55:00.000Z"],
+        ["work", "2026-11-04T11:50:00.000Z"],
+        ["daily", "2026-11-05T06:55:00.000Z"],
+        ["meeting", "2026-11-05T07:45:00.000Z"],
+        ["overdue", "2026-11-06T06:00:00.000Z"],
+        ["daily", "2026-11-06T06:55:00.000Z"],
+        ["undated", "2026-11-06T07:00:00.000Z"],
+        ["far", "2026-11-06T08:00:00.000Z"],
+      ]);
+      const [first] = await store.reminders(range);
+      const daily = await store.objectAt(calendar.id, "daily.ics");
+      expect(first).toMatchObject({ objectId: daily!.id, kind: "event", title: "daily" });
+
+      // A change shows at once, however often the set is asked.
+      await save(
+        calendar.id,
+        "meeting",
+        event("meeting", "20261105T080000Z", "20261105T090000Z", alarm(":-PT30M")),
+      );
+      expect((await fired()).filter(([uid]) => uid === "meeting")).toEqual([
+        ["meeting", "2026-11-05T07:30:00.000Z"],
+      ]);
+      await store.removeCalendar(other.id);
+      expect((await fired()).filter(([uid]) => uid === "work")).toEqual([]);
+    });
+
     test("a listener hears every write until it unsubscribes", async () => {
       const { store, calendar } = await setup();
       let heard = 0;
