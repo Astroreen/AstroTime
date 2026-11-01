@@ -1732,6 +1732,49 @@ errors").
     does not define is put on that start's wall clock first, since ical.js
     compares that wall clock as if it were UTC.
 
+### What a visit loads
+
+Measured in the performance QA after v0.2.0 (the owner's feedback: "the
+optimization is lacking").
+
+- **D145. The web app loads in chunks, against a budget.** The build was one
+  1 MB chunk (329 KiB gzipped), so any change to AstroTime's own code made
+  every returning browser fetch all of it, React and the libraries too.
+  - **Libraries in chunks of their own** (`apps/web/vite.config.ts`,
+    Rolldown's `codeSplitting` groups): React, Base UI, ical.js, Drizzle,
+    i18next and the rest each in one, cached across updates; an update of
+    AstroTime's own code is one chunk.
+  - **Dialogs with their first opening**: the edit dialog, Settings and the
+    Conflicts list (`components/lazy.tsx`), each a stand-in with its props
+    that draws nothing until first open and fetches its code once the page
+    is idle. Signing in and the sync stack stay in the first load
+    ([Deferred](#deferred)).
+  - **A budget CI holds**: `scripts/bundle-budget.ts`, after the web build,
+    fails when what a visit loads at once passes 340 KiB gzipped (318 at
+    D145) or AstroTime's own code in it 130 KiB (120); a PR that needs more raises it, saying
+    why.
+  - **Measured by hand** with `scripts/bench-cold-start.ts`: the built app
+    on the image's server, its store filled with `big-calendar.ts`'s 12 230
+    objects (D118's), the median of five new tabs; it prints when the first
+    paint came, when the week's first event was drawn, the main thread's
+    blocked time until then and the bytes fetched. On an i7-14700KF, and
+    with Chrome's "Fast 4G" and a CPU four times slower (`ASTROTIME_BENCH_SLOW`):
+
+    | cold start, week drawn        |  before |   after |
+    | ----------------------------- | ------: | ------: |
+    | desktop, empty HTTP cache     |  483 ms |  460 ms |
+    | desktop, cached               |  457 ms |  445 ms |
+    | phone-class, empty HTTP cache | 2248 ms | 2334 ms |
+    | phone-class, cached           | 1397 ms | 1417 ms |
+
+    The first load is as it was, within the runs' spread: the same bytes
+    in more files. What changed is an update's: a release of AstroTime's own
+    code fetches its own chunks, about 120 KiB, not the whole 318. Where the
+    first draw's time goes, measured with Chrome's profiler: opening the
+    store in its worker (sqlite-wasm, OPFS, the migrations check), the
+    view's and the undone chip's reads, then placing their objects and
+    drawing.
+
 ## Deferred
 
 - **An `RDATE` period's own length** — an occurrence from an `RDATE` of a
@@ -1740,6 +1783,10 @@ errors").
 - **An `RDATE` period moved with its series** — a series moved keeps its
   `RDATE`s of periods where they were, and one made all-day keeps them
   timed ([D142](#D142)).
+- **The sync stack and signing in with their first use** — CalDAV, the
+  XML parser and the sign-in dialog (some 30 KiB gzipped) still load at
+  once ([D145](#D145)); they belong to the accounts' code, which was being
+  rewritten when D145 was measured.
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by

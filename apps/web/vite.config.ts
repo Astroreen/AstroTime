@@ -38,5 +38,21 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        // Libraries in chunks of their own (docs/plans/foundation.md#D145): an
+        // update of AstroTime's own code leaves them in the browser's cache.
+        codeSplitting: {
+          groups: [
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: "base-ui", test: /node_modules[\\/]@(base-ui|floating-ui)[\\/]/ },
+            { name: "ical", test: /node_modules[\\/]ical\.js[\\/]/ },
+            { name: "drizzle", test: /node_modules[\\/]drizzle-orm[\\/]/ },
+            { name: "i18n", test: /node_modules[\\/](i18next|react-i18next)[\\/]/ },
+            { name: "vendor", test: /node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
   },
 });

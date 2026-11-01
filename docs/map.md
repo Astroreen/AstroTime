@@ -191,6 +191,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
       screen), from the top bar's gear or the drawer's last row.
       → `plans/design.md#D131`, `plans/design.md#D96`
+    - `lazy.tsx` — dialogs that load with their first opening: the edit
+      dialog, Settings, the Conflicts list. → `plans/foundation.md#D145`
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
       (`reschedule`); the details (`item-details.tsx`), the edit
@@ -391,6 +393,14 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
   `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
   → `plans/foundation.md#D32`
+- `scripts/big-calendar.ts` — D118's big calendar, generated the same on
+  every run, for both benchmarks. → `plans/foundation.md#D118`
+- `scripts/bench-cold-start.ts` — the built web app opened on that calendar
+  in Chromium: first paint, the week drawn, blocked time, bytes; run by
+  hand (`scripts/bench-seed/` fills the store on the app's origin).
+  → `plans/foundation.md#D145`
+- `scripts/bundle-budget.ts` — what a first visit loads, against its
+  budget; CI runs it after the web build. → `plans/foundation.md#D145`
 - `scripts/bench-big-calendar.ts` — a big calendar read as the views, the
   undone chip and the reminders read it; prints how long each takes, run by
   hand. → `plans/foundation.md#D118`

@@ -2,7 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts", "vite.config.ts"],
+      // The page `bench-cold-start.ts` fills the web store from is built from scripts/bench-seed.
+      "entry": ["scripts/*.ts", "scripts/bench-seed/seed.ts", "vite.config.ts"],
     },
     "packages/*": {
       "entry": ["src/index.ts"],
