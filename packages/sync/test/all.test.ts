@@ -1,10 +1,16 @@
 // `syncAll`, the one sync entry every shell calls (docs/plans/android.md#D60,
 // docs/plans/foundation.md#D90), and the accounts it syncs.
 import type { HttpClient } from "@astrotime/caldav";
-import { AuthError, OfflineError, type Provider, type SecretStore } from "@astrotime/core";
+import {
+  AuthError,
+  OfflineError,
+  ServerBusyError,
+  type Provider,
+  type SecretStore,
+} from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
-import { expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
@@ -433,4 +439,172 @@ test("signing in as another user of the same calendar home adds that user, never
   expect(other.added).toBe(true);
   expect((await store.accounts()).map((a) => a.username)).toEqual(["astro", "other"]);
   expect(JSON.parse(secrets.values.get(`account:${astro.account.id}`)!).username).toBe("astro");
+});
+
+describe("an account a server turned away is left alone for a while (D128)", () => {
+  /** One account on a server that answers as `answer` says, its tries counted. */
+  async function turnedAway() {
+    const store = await Store.open(nodeDriver());
+    const secrets = memorySecrets();
+    const server = memoryServer("https://a.example/cal/");
+    let answer: () => Promise<void> = async () => {};
+    let tries = 0;
+    let time = 1_000_000;
+    const connect: Connect = async () => ({
+      ...server,
+      calendars: async () => {
+        tries++;
+        await answer();
+        return server.calendars();
+      },
+    });
+    const context = { store, secrets, connect, now: () => time };
+    const { account } = await saveAccount(context, {
+      name: "astro@a.example",
+      serverUrl: "https://a.example/",
+      homeUrl: "https://a.example/",
+      credentials: { username: "astro", password: "old" },
+    });
+    return {
+      context,
+      account,
+      tries: () => tries,
+      answer: (next: () => Promise<void>) => (answer = next),
+      pass: (ms: number) => (time += ms),
+    };
+  }
+
+  test("refused credentials are not tried again until they change, or the user asks", async () => {
+    const { context, account, tries, answer } = await turnedAway();
+    answer(async () => {
+      throw new AuthError("refused");
+    });
+    const first = await syncAll(context);
+    expect(first.accounts[0]).toMatchObject({ status: "signed-out" });
+    // Every trigger meanwhile hears the same, without a request.
+    expect((await syncAll(context, { fresh: true })).accounts).toEqual(first.accounts);
+    expect(tries()).toBe(1);
+    // "Sync now" is the user's: it tries.
+    await syncAll(context, { retry: true });
+    expect(tries()).toBe(2);
+    // Signed in again: new credentials are tried at once.
+    answer(async () => {});
+    await saveAccount(context, {
+      name: account.name,
+      serverUrl: account.serverUrl,
+      homeUrl: account.homeUrl!,
+      credentials: { username: "astro", password: "new" },
+    });
+    expect((await syncAll(context)).accounts[0]).toMatchObject({ status: "synced" });
+    expect(tries()).toBe(3);
+  });
+
+  test("a 429 or 503 holds the server for its Retry-After, when longer than the backoff's step", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("429", 120_000);
+    });
+    expect((await syncAll(context)).accounts[0]).toMatchObject({ status: "offline" });
+    pass(119_000);
+    await syncAll(context, { fresh: true });
+    expect(tries()).toBe(1);
+    answer(async () => {});
+    pass(1_000);
+    expect((await syncAll(context)).accounts[0]).toMatchObject({ status: "synced" });
+    expect(tries()).toBe(2);
+  });
+
+  test("without Retry-After, a busy or failing server waits a minute, then twice as long each time, up to half an hour", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    await syncAll(context);
+    const waits: number[] = [];
+    for (let strike = 1; strike <= 7; strike++) {
+      // Each wait is its step, give or take a fifth: tried only once it has passed.
+      let waited = 0;
+      while (tries() === strike) {
+        pass(1_000);
+        waited += 1_000;
+        await syncAll(context);
+      }
+      waits.push(waited);
+    }
+    const steps = [1, 2, 4, 8, 16, 30, 30].map((minutes) => minutes * 60_000);
+    waits.forEach((waited, i) => {
+      expect(waited).toBeGreaterThanOrEqual(steps[i]! * 0.8);
+      expect(waited).toBeLessThanOrEqual(steps[i]! * 1.2 + 1_000);
+    });
+    // A server back on its feet clears the count.
+    answer(async () => {});
+    pass(60 * 60_000);
+    expect((await syncAll(context)).accounts[0]).toMatchObject({ status: "synced" });
+  });
+
+  test("a Retry-After of 0, or a date gone by, never holds less than the backoff's step", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("429", 0);
+    });
+    await syncAll(context);
+    const waits: number[] = [];
+    for (let strike = 1; strike <= 3; strike++) {
+      let waited = 0;
+      while (tries() === strike) {
+        pass(1_000);
+        waited += 1_000;
+        await syncAll(context);
+      }
+      waits.push(waited);
+    }
+    [1, 2, 4].forEach((minutes, i) => {
+      expect(waits[i]).toBeGreaterThanOrEqual(minutes * 60_000 * 0.8);
+      expect(waits[i]).toBeLessThanOrEqual(minutes * 60_000 * 1.2 + 1_000);
+    });
+  });
+
+  test("only a sync that goes through clears the count: a timeout between two 503s does not", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    const busy = async () => {
+      throw new ServerBusyError("503", null);
+    };
+    const timeout = async () => {
+      throw new OfflineError("no answer in time");
+    };
+    /** Syncs every second until the server is tried again; how long that took. */
+    const waitOut = async () => {
+      const before = tries();
+      let waited = 0;
+      while (tries() === before) {
+        pass(1_000);
+        waited += 1_000;
+        await syncAll(context);
+      }
+      return waited;
+    };
+    answer(busy);
+    await syncAll(context); // strike 1: about a minute
+    answer(timeout);
+    await waitOut(); // tried after the minute: it times out
+    answer(busy);
+    await syncAll(context); // strike 2, not 1 again: about two minutes
+    answer(async () => {});
+    expect(await waitOut()).toBeGreaterThanOrEqual(2 * 60_000 * 0.8);
+    // Through: the count is cleared, and the next 503 waits a minute again.
+    answer(busy);
+    await syncAll(context);
+    answer(async () => {});
+    expect(await waitOut()).toBeLessThanOrEqual(60_000 * 1.2 + 1_000);
+  });
+
+  test("offline holds nothing: no request reached the server", async () => {
+    const { context, tries, answer } = await turnedAway();
+    answer(async () => {
+      throw new OfflineError("offline");
+    });
+    await syncAll(context);
+    await syncAll(context);
+    expect(tries()).toBe(2);
+  });
 });

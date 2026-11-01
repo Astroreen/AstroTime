@@ -94,6 +94,9 @@ export interface Bridge {
     onOpen(listener: (reminder: ScheduledReminder) => void): () => void;
   };
   shell(state: ShellState): void;
-  /** Hears the main process ask for a sync; returns the function that stops it. */
-  onSyncRequest(listener: () => void): () => void;
+  /**
+   * Hears the main process ask for a sync, `byUser` for the tray's "Sync
+   * now"; returns the function that stops it.
+   */
+  onSyncRequest(listener: (byUser: boolean) => void): () => void;
 }

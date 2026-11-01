@@ -63,6 +63,8 @@ export {
   AuthError,
   NO_RIGHTS,
   OfflineError,
+  retryAfter,
+  ServerBusyError,
   type CalendarRights,
   type Changes,
   type Provider,

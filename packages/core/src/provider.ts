@@ -90,6 +90,32 @@ export class OfflineError extends Error {
   override name = "OfflineError";
 }
 
+/**
+ * The server asks to be left alone for a while: `429 Too Many Requests` or
+ * `503 Service Unavailable` (docs/plans/foundation.md#D128). A sync stops on
+ * it as when offline; `retryAfterMs` is its `Retry-After`, if it said one.
+ */
+export class ServerBusyError extends OfflineError {
+  override name = "ServerBusyError";
+  readonly retryAfterMs: number | null;
+  constructor(message: string, retryAfterMs: number | null) {
+    super(message);
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/**
+ * A `Retry-After` header (RFC 9110 §10.2.3) as milliseconds from `now`:
+ * seconds, or an HTTP date; `null` when absent or unreadable.
+ */
+export function retryAfter(header: string | null, now = Date.now()): number | null {
+  if (header === null) return null;
+  const value = header.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? null : Math.max(0, date - now);
+}
+
 /** The server refused the credentials; no sync can go on until they change. */
 export class AuthError extends Error {
   override name = "AuthError";

@@ -14,7 +14,7 @@ import {
   type LoginFlow,
   type LoginFlowState,
 } from "@astrotime/caldav";
-import { AuthError, OfflineError, type SecretStore } from "@astrotime/core";
+import { AuthError, OfflineError, ServerBusyError, type SecretStore } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
 import { removeAccount, saveAccount } from "@astrotime/sync";
 
@@ -75,8 +75,7 @@ const realClock: Clock = {
     }),
 };
 
-/** How often Login Flow v2 is polled, and how long its token lives (android D65). */
-const POLL_EVERY_MS = 2_000;
+/** How long Login Flow v2's token lives (android D65). */
 export const FLOW_LIFETIME_MS = 20 * 60_000;
 
 /** Where a Login Flow under way is kept, in the platform's `pendingSignIn` (D121). */
@@ -236,6 +235,18 @@ export async function hasPendingFlow(
 }
 
 /**
+ * How long to wait before the next poll of Login Flow v2, `elapsed` after it
+ * began (foundation D130): every 2 seconds for the first minute, while the
+ * user is likely approving, every 5 seconds until five minutes have passed,
+ * then every 15. Coming back to AstroTime polls at once anyway.
+ */
+export function pollInterval(elapsed: number): number {
+  if (elapsed < 60_000) return 2_000;
+  if (elapsed < 5 * 60_000) return 5_000;
+  return 15_000;
+}
+
+/**
  * A web address from what the user typed: `cloud.example.com` is
  * `https://cloud.example.com/`; a path (a Nextcloud in a folder) is kept.
  */
@@ -271,6 +282,11 @@ export interface SignInOptions {
   /** This page's id, whose Web Lock it holds while it lives; its own by default (D121). */
   readonly page?: string;
   readonly clock?: Clock;
+  /**
+   * Whether the user can see AstroTime; while not, Login Flow v2 is not
+   * polled until `pollNow` (foundation D130). The page's visibility by default.
+   */
+  readonly visible?: () => boolean;
 }
 
 /** One attempt at adding an account, from the form to the saved account. */
@@ -294,7 +310,12 @@ export class SignIn {
     this.#options = options;
     this.#clock = options.clock ?? realClock;
     this.#page = options.page ?? currentPage();
+    this.#visible =
+      options.visible ??
+      (() => typeof document === "undefined" || document.visibilityState !== "hidden");
   }
+
+  readonly #visible: () => boolean;
 
   get state(): SignInState {
     return this.#state;
@@ -424,6 +445,8 @@ export class SignIn {
   /** Polls until the user approves, the token expires, or another page ends the flow. */
   async #await(signal: AbortSignal, flow: LoginFlow, server: string, deadline: number) {
     const token = flow.state.token;
+    // Polled less often as it waits (D130), from when the flow began.
+    const began = deadline - FLOW_LIFETIME_MS;
     try {
       for (;;) {
         // Another page took it up too, and ended it (approved there, or cancelled).
@@ -434,11 +457,14 @@ export class SignIn {
         }
         if (signal.aborted) return;
         let approved: Awaited<ReturnType<LoginFlow["poll"]>> = null;
+        /** At least this long before the next poll: a busy server's Retry-After. */
+        let asked = 0;
         try {
           approved = await flow.poll();
         } catch (error) {
           // A moment without a network: the page waits, and so do we.
           if (!(error instanceof OfflineError)) throw error;
+          if (error instanceof ServerBusyError) asked = error.retryAfterMs ?? 0;
         }
         if (signal.aborted) return;
         if (approved) {
@@ -465,7 +491,13 @@ export class SignIn {
           await this.#forget(token);
           return this.#fail(signal, "expired");
         }
-        await this.#nap(signal);
+        // A server that asks to wait past the token's life: the flow cannot
+        // finish, so it ends now and the user tries again later.
+        if (this.#clock.now() + asked >= deadline) {
+          await this.#forget(token);
+          return this.#fail(signal, "expired");
+        }
+        await this.#nap(signal, Math.max(asked, pollInterval(this.#clock.now() - began)));
         if (signal.aborted) return;
       }
     } catch (error) {
@@ -637,13 +669,18 @@ export class SignIn {
     this.#set({ step: "done", account, added });
   }
 
-  async #nap(signal: AbortSignal): Promise<void> {
+  /** Waits `ms`, then on while AstroTime is out of sight; `pollNow` or cancelling ends it. */
+  async #nap(signal: AbortSignal, ms: number): Promise<void> {
     const woken = new AbortController();
     const stop = () => woken.abort();
     signal.addEventListener("abort", stop);
     this.#wake = stop;
     try {
-      await this.#clock.wait(POLL_EVERY_MS, woken.signal);
+      await this.#clock.wait(ms, woken.signal);
+      // Out of sight, nobody is approving here: the user's return polls (D130).
+      if (!woken.signal.aborted && !this.#visible()) {
+        await new Promise((resolve) => woken.signal.addEventListener("abort", resolve));
+      }
     } finally {
       signal.removeEventListener("abort", stop);
       this.#wake = null;

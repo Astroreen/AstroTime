@@ -32,7 +32,8 @@ const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 /** Response headers the client reads. */
 // Not WWW-Authenticate: on the app's own origin it would make the browser
 // show its own sign-in dialog; the app reads the 401 and asks itself.
-const RETURNED = ["content-type", "etag", "dav", "location"];
+// Retry-After: how long a busy server asks to be left alone (foundation D128).
+const RETURNED = ["content-type", "etag", "dav", "location", "retry-after"];
 
 export interface ProxyOptions {
   /** Where proxied URLs start on the app's origin, `/dav-proxy/`. */

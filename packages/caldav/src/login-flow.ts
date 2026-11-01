@@ -1,7 +1,9 @@
+import { retryAfter, ServerBusyError } from "@astrotime/core";
+
 import type { HttpClient } from "./http.ts";
 import { basic, type Credentials } from "./provider.ts";
 
-/** Server errors in a row after which a poll gives up (at a poll every 2 s, about 10 s). */
+/** Server errors in a row after which a poll gives up. */
 const SERVER_ERRORS = 5;
 
 /**
@@ -24,7 +26,11 @@ export interface LoginFlow {
   readonly loginUrl: string;
   /** What `resumeLoginFlow` takes up again. */
   readonly state: LoginFlowState;
-  /** Asks once whether the user approved: their credentials, or `null` while they have not. */
+  /**
+   * Asks once whether the user approved: their credentials, or `null` while
+   * they have not. A rate limit (429) or a server down for a while (503)
+   * throws `ServerBusyError`, with its `Retry-After` (foundation D130).
+   */
   poll(): Promise<(Credentials & { readonly server: string }) | null>;
 }
 
@@ -71,11 +77,18 @@ export function resumeLoginFlow(http: HttpClient, state: LoginFlowState): LoginF
       // 404 until the user approves. Rate limited (429, as a proxy in front
       // of Nextcloud may answer) or a passing server error: not yet, asked
       // again later; the same error several times in a row is the server's.
-      failing = response.status >= 500 ? failing + 1 : 0;
+      // A server that says how long to wait is busy, not failing: it is
+      // waited out, never counted toward giving up (foundation D130).
+      const wait = retryAfter(response.header("retry-after"));
+      const busy = response.status === 429 || response.status === 503;
+      failing = response.status >= 500 && !(busy && wait !== null) ? failing + 1 : 0;
       if (failing >= SERVER_ERRORS) {
         throw new Error(`The login flow failed: the server keeps answering ${response.status}.`);
       }
-      if (response.status === 404 || response.status === 429 || response.status >= 500) return null;
+      if (busy) {
+        throw new ServerBusyError(`The login flow's poll answered ${response.status}.`, wait);
+      }
+      if (response.status === 404 || response.status >= 500) return null;
       if (response.status !== 200) throw new Error(`The login flow failed (${response.status}).`);
       const result = json(response.body) as {
         server?: unknown;

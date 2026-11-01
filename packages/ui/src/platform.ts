@@ -94,8 +94,10 @@ export interface Platform {
   readonly shell?: (state: ShellState) => void;
   /**
    * A shell's own sync triggers (the desktop's timer, resume and tray, desktop
-   * D75): the UI runs each as a sync of its own, so two never run at once.
-   * Returns the function that stops listening.
+   * D75): the UI runs each as a sync of its own, so two never run at once;
+   * `byUser` (the tray's "Sync now") is the user's own, which tries accounts
+   * a server turned away too (foundation D128). Returns the function that
+   * stops listening.
    */
-  readonly onSyncRequest?: (listener: () => void) => () => void;
+  readonly onSyncRequest?: (listener: (byUser: boolean) => void) => () => void;
 }

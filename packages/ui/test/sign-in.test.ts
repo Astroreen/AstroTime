@@ -11,6 +11,7 @@ import {
   FLOW_LIFETIME_MS,
   hasPendingFlow,
   PENDING_FLOW,
+  pollInterval,
   serverAddress,
   SignIn,
   type Clock,
@@ -23,10 +24,13 @@ function manualClock() {
   let now = 0;
   const waits = new Set<() => void>();
   const watchers: (() => void)[] = [];
+  /** How long each wait was asked to be. */
+  const asked: number[] = [];
   const clock: Clock = {
     now: () => now,
-    wait: (_ms, signal) =>
+    wait: (ms, signal) =>
       new Promise<void>((resolve) => {
+        asked.push(ms);
         const done = () => {
           waits.delete(done);
           resolve();
@@ -38,6 +42,7 @@ function manualClock() {
   };
   return {
     clock,
+    asked,
     /** Resolves once the sign-in waits between two polls. */
     waiting: () =>
       new Promise<void>((resolve) => (waits.size > 0 ? resolve() : watchers.push(resolve))),
@@ -52,6 +57,7 @@ async function setup(
   server: ReturnType<typeof nextcloud>,
   shared?: { store: Store; secrets: ReturnType<typeof memorySecrets> },
   pending?: SecretStore,
+  visible?: () => boolean,
 ) {
   const store = shared?.store ?? (await Store.open(nodeDriver()));
   const secrets = shared?.secrets ?? memorySecrets();
@@ -67,6 +73,7 @@ async function setup(
     // A page of its own, whose lock nobody holds unless the test does: gone.
     page,
     clock: time.clock,
+    ...(visible ? { visible } : {}),
   });
   /** Resolves once the state is `step` (or right away if it is). */
   const reaches = (step: SignInState["step"]) =>
@@ -169,6 +176,72 @@ test("Login Flow v2: opens Nextcloud's page, waits for the approval, then signs 
   });
   const polls = server.requests.filter((r) => r.url.endsWith("/login/v2/poll"));
   expect(polls).toHaveLength(4);
+});
+
+test("Login Flow v2 polls every 2 s at first, then less often, and not while AstroTime is out of sight (foundation D130)", async () => {
+  expect([0, 59_999, 60_000, 299_999, 300_000].map(pollInterval)).toEqual([
+    2_000, 2_000, 5_000, 5_000, 15_000,
+  ]);
+  const server = nextcloud({ password: "app-pass" });
+  let visible = true;
+  const { time, signIn } = await setup(server, undefined, undefined, () => visible);
+  const signingIn = signIn.withNextcloud({ server: SERVER });
+  const polls = () => server.requests.filter((r) => r.url.endsWith("/login/v2/poll")).length;
+  await time.waiting();
+  time.advance(61_000);
+  await time.waiting();
+  expect(time.asked).toEqual([2_000, 5_000]);
+  // In Nextcloud's tab: the wait ends, and no poll follows while out of sight.
+  visible = false;
+  time.advance(5_000);
+  await Promise.resolve();
+  time.advance(FLOW_LIFETIME_MS / 2);
+  expect(polls()).toBe(2);
+  // Back: it asks at once.
+  visible = true;
+  server.approve();
+  signIn.pollNow();
+  await signingIn;
+  expect(signIn.state).toMatchObject({ step: "done" });
+  expect(polls()).toBe(3);
+});
+
+test("a rate-limited poll waits for the server's Retry-After (foundation D130)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  let limited = true;
+  const http: HttpClient = async (request) =>
+    limited && request.url.endsWith("/login/v2/poll")
+      ? ((limited = false),
+        {
+          status: 429,
+          url: request.url,
+          header: (name) => (name === "retry-after" ? "30" : null),
+          body: "",
+        })
+      : server.http(request);
+  const { time, signIn } = await setup({ ...server, http });
+  const signingIn = signIn.withNextcloud({ server: SERVER });
+  await time.waiting();
+  expect(time.asked).toEqual([30_000]);
+  signIn.cancel();
+  await signingIn;
+});
+
+test("a poll told to wait past the token's life ends the flow as expired, at once (foundation D130)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  const http: HttpClient = async (request) =>
+    request.url.endsWith("/login/v2/poll")
+      ? {
+          status: 429,
+          url: request.url,
+          header: (name) => (name === "retry-after" ? "86400" : null),
+          body: "",
+        }
+      : server.http(request);
+  const { time, signIn } = await setup({ ...server, http });
+  await signIn.withNextcloud({ server: SERVER });
+  expect(signIn.state).toEqual({ step: "failed", problem: "expired", location: null });
+  expect(time.asked).toEqual([]);
 });
 
 test("Login Flow v2 gives up when Nextcloud's token expires, and a cancelled one changes nothing", async () => {

@@ -191,3 +191,18 @@ test("a first sync a server will not answer by sync-collection lists the calenda
     "PROPFIND",
   ]);
 });
+
+test("a first sync refused with a 403 that is no expired token fails at once, without a listing", async () => {
+  const requests: string[] = [];
+  const http: HttpClient = async (request) => {
+    requests.push(request.method);
+    const body = `<?xml version="1.0"?><d:error xmlns:d="DAV:"><d:need-privileges/></d:error>`;
+    return { status: 403, url: request.url, header: () => null, body };
+  };
+  const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
+  const listed = { syncToken: "t1", ctag: null };
+  await expect(
+    provider.changes(home, { syncToken: null, ctag: null }, new Map(), listed),
+  ).rejects.toThrow(/403/);
+  expect(requests).toEqual(["REPORT"]);
+});
