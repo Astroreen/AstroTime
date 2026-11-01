@@ -327,7 +327,10 @@ were checked on 2026-11-01.
     Android is called, so an id is never handed out twice; a set Android
     refuses is scheduled again with the next, under the same ids. One that
     fired and then moved ahead (the item edited to later) gets a new id, so
-    the notification already shown is not taken off the screen.
+    the notification already shown is not taken off the screen. Without a
+    map that reads (the preferences cleared, or written wrong), the first
+    set cancels every alarm the plugin still holds (`getPending`) before
+    ids are handed out from 1 again, so no old alarm shares one.
   - **Past reminders.** The set reaches an hour back
     ([foundation D100](foundation.md#D100)). One handed over before has
     fired from its alarm, and is never shown again. One that reaches
@@ -343,11 +346,14 @@ were checked on 2026-11-01.
     while the phone was off, 15 seconds after boot, however old: that is
     the plugin's, not the adapter's.
   - **The permission** is asked by the adapter once, the first time a set
-    holds a reminder ahead (so the user sees why), and remembered: after a
+    holds a reminder ahead (so the user sees why), and remembered once the
+    user answered (a prompt the app ended in is asked again): after a
     refusal the "Reminders" switch asks again, as on the web; refused twice,
     Android stops asking and the setting says to allow notifications in the
     system's settings. Nothing is scheduled without it (the plugin would ask
-    on every set). Back in front the adapter reads both permissions again
+    on every set), but what leaves the set is still cancelled, which needs
+    no permission: its alarm would show once notifications are allowed
+    again. Back in front the adapter reads both permissions again
     and the setting follows.
   - **Exact alarms.** `USE_EXACT_ALARM`, and `SCHEDULE_EXACT_ALARM` with
     `maxSdkVersion` 32 (the plugin declares it for every version; the
