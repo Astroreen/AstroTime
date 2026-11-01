@@ -165,6 +165,9 @@ function absolute(calendar: Calendar, href: string): string {
   return new URL(href, calendar.url).href;
 }
 
+/** The server's objects stored in one transaction of the store (D99). */
+const DOWNLOAD_BATCH = 500;
+
 /** Whether the calendar's rights let a pending change of this kind go up (D37). */
 function allowed(calendar: Calendar, pending: StoredObject["pending"]): boolean {
   const { rights } = calendar;
@@ -387,6 +390,8 @@ async function download(
 
   const changes = await provider.changes(calendar.url, calendar, known, listed);
   let keepToken = false;
+  /** The server's versions of objects with no change of ours: stored in batches. */
+  const plain: RemoteObject[] = [];
   for (const object of changes.changed) {
     const mine = local.get(object.href);
     if (mine && mine.pending !== "none") {
@@ -412,24 +417,27 @@ async function download(
       }
       continue;
     }
-    try {
-      await store.saveFromServer(calendar.id, object);
-      report.downloaded++;
-    } catch (error) {
-      if (!(error instanceof CalendarObjectError)) throw error;
-      if (!report.skipped.includes(object.href)) report.skipped.push(object.href);
-    }
+    plain.push(object);
   }
-  for (const href of changes.removed) {
+  // A transaction and a notification per batch, not per object: a big
+  // calendar's first sync is thousands (D99).
+  for (let i = 0; i < plain.length; i += DOWNLOAD_BATCH) {
+    const batch = plain.slice(i, i + DOWNLOAD_BATCH);
+    const { invalid } = await store.saveManyFromServer(calendar.id, batch);
+    report.downloaded += batch.length - invalid.length;
+    for (const href of invalid) if (!report.skipped.includes(href)) report.skipped.push(href);
+  }
+  // Edited here since the sync began: that edit is newer than this listing,
+  // and the next sync decides it (an upload, then D38); the store removes an
+  // object only if its pending change is still the one seen here.
+  const gone = changes.removed.flatMap((href) => {
     const mine = local.get(href);
-    if (!mine) continue;
-    // Edited here since the sync began: that edit is newer than this listing,
-    // and the next sync decides it (an upload, then D38).
-    const now = await store.object(mine.id);
-    if (now && now.pending !== mine.pending) continue;
-    await store.removeObject(mine.id);
+    return mine ? [{ href, ...mine }] : [];
+  });
+  const removed = new Set(gone.length > 0 ? await store.removeManyFromServer(gone) : []);
+  for (const mine of gone.filter((object) => removed.has(object.id))) {
     report.removed++;
-    if (mine.pending !== "none") report.dropped.push(href);
+    if (mine.pending !== "none") report.dropped.push(mine.href);
   }
   if (!keepToken)
     await store.setSyncState(calendar.id, { syncToken: changes.syncToken, ctag: changes.ctag });

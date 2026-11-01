@@ -608,3 +608,30 @@ describe("a calendar the listing says is unchanged is not asked (D127)", () => {
     expect(heard).toEqual([{ syncToken: "t:", ctag: null }]);
   });
 });
+
+test("a big download is stored in batches: a transaction and a notification per 500 objects (D99)", async () => {
+  const server = memoryServer(calendarUrl);
+  for (let i = 0; i < 1_200; i++)
+    server.objects.set(`${calendarUrl}t${i}.ics`, { etag: `"${i}"`, ics: task(`t${i}`) });
+  server.objects.set(`${calendarUrl}broken.ics`, { etag: '"b"', ics: "not a calendar" });
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "Memory",
+    serverUrl: calendarUrl,
+    username: null,
+  });
+  let writes = 0;
+  store.subscribe(() => writes++);
+  const report = await syncAccount(store, server, account.id);
+  expect([report.downloaded, report.skipped]).toEqual([1_200, [`${calendarUrl}broken.ics`]]);
+  // The calendar, three batches, the sync state.
+  expect(writes).toBe(5);
+
+  // Removed on the server: one transaction for all of them.
+  for (let i = 0; i < 1_000; i++) server.objects.delete(`${calendarUrl}t${i}.ics`);
+  writes = 0;
+  expect(await syncAccount(store, server, account.id)).toMatchObject({ removed: 1_000 });
+  // The calendar, the unreadable object offered again, the removals, the sync state.
+  expect(writes).toBe(4);
+});

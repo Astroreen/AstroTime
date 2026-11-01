@@ -870,6 +870,22 @@ Decided while closing the Deferred "One store across tabs".
     `welcome` makes it run again ([D98](#D98)). Before this, a statement
     inside an edit's transaction lost to a hand-over was not tried again,
     and every hand-over logged a "Failed query" in the console.
+  - **A download is stored in batches.** _Added after v0.2.0:_ a sync no
+    longer stores the server's objects one transaction each: the web
+    store's every statement crosses to the leader's worker, and every
+    notification re-runs the open views' live queries, so a big calendar's
+    first sync took over a minute. `saveManyFromServer` stores up to 500
+    objects (`DOWNLOAD_BATCH`) in one transaction with one notification: one
+    query finds which of them hold a pending change here (kept, as
+    `saveFromServer` keeps it, AGENTS.md rule 2), each is parsed, and the
+    rows go in 100 to a statement; one that is not iCalendar is left out
+    and named (D36). `removeManyFromServer` removes what the server deleted
+    in one transaction, each object only if its pending change is still the
+    one the sync saw ([D38](#D38)). An object with a pending change of ours
+    still goes through `saveFromServer` on its own, as before. Writing
+    12 230 objects (the calendar of [D118](#D118)'s benchmark, events
+    alike) through the web store in headless Chromium took 86.9 s with
+    12 230 notifications, and takes 2.3 s with 25.
 
 ### Reminders
 
