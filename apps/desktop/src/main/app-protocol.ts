@@ -5,7 +5,7 @@
 // so it is tested in Node.
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { extname, isAbsolute, join, relative } from "node:path";
+import { extname, isAbsolute, join, relative, sep } from "node:path";
 
 import { APP_HOST } from "../bridge.ts";
 
@@ -56,7 +56,7 @@ export function appFiles(root: string): (request: Request) => Promise<Response> 
       return notFound();
     }
     const inside = relative(root, file);
-    if (inside.startsWith("..") || isAbsolute(inside)) return notFound();
+    if (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) return notFound();
     let body: Buffer;
     try {
       body = await readFile(file);

@@ -5,6 +5,22 @@ import type { HttpRequest } from "@astrotime/caldav";
 
 import { APP_HOST, APP_SCHEME } from "../bridge.ts";
 
+/** Headers a page may not set (as fetch's forbidden request headers). */
+const FORBIDDEN = new Set([
+  "host",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+  "upgrade",
+  "te",
+  "trailer",
+  "cookie",
+  "cookie2",
+  "expect",
+  "proxy-authorization",
+]);
+
 /** An HTTP token (RFC 9110): a method, or a header's name. */
 const TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 /** A header's value: no line break or NUL, which would split the request. */
@@ -33,6 +49,9 @@ export function checkRequest(value: unknown): HttpRequest {
     if (!TOKEN.test(name) || typeof header !== "string" || !VALUE.test(header)) {
       throw new TypeError(`Not an HTTP header: ${name}.`);
     }
+    // What the network stack sets itself, or what would carry a cookie past
+    // `credentials: "omit"`: refused, as fetch refuses them.
+    if (FORBIDDEN.has(name.toLowerCase())) throw new TypeError(`Not a header to set: ${name}.`);
     checked[name] = header;
   }
   if (body !== undefined && typeof body !== "string") {

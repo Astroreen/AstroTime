@@ -52,6 +52,12 @@ export function storeProcess(entry: string, database: string, restarted: () => v
   return {
     connect() {
       const { port1, port2 } = new MessageChannelMain();
+      // A store that is not started again: the page's port closes at once,
+      // so it shows the store failed instead of waiting.
+      if (!alive) {
+        port1.close();
+        return port2;
+      }
       current.postMessage({ type: "connect" } satisfies StoreCommand, [port1]);
       return port2;
     },

@@ -27,6 +27,9 @@ test("anything that is not one http(s) request is refused", () => {
     { ...request, headers: { Depth: 0 } },
     { ...request, headers: { "Bad Name": "x" } },
     { ...request, headers: { Depth: "0\r\nX-Injected: 1" } },
+    { ...request, headers: { Host: "elsewhere.example" } },
+    { ...request, headers: { Cookie: "session=1" } },
+    { ...request, headers: { "Content-Length": "999" } },
     { ...request, body: { xml: "<x/>" } },
   ];
   for (const value of refused) expect(() => checkRequest(value)).toThrow(TypeError);
