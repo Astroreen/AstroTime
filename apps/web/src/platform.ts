@@ -1,7 +1,8 @@
 // The web app's platform (docs/plans/android.md#D60): the web store, HTTP
 // through the CORS proxy on the app's own origin (docs/plans/foundation.md#D39:
 // `/dav-proxy/` in the dev server and in the image alike), credentials in
-// IndexedDB (D89), Login Flow's page in a new tab, preferences in localStorage,
+// IndexedDB (D89), Login Flow's page in a new tab and taken up again by a
+// tab loaded anew (D121), preferences in localStorage,
 // one sync at a time across the tabs (D91), and reminders as notifications
 // while the app is open (D101).
 import { fetchClient, throughProxy } from "@astrotime/caldav";
@@ -22,10 +23,19 @@ const REQUEST_CEILING_MS = 5 * 60_000;
  * tab of the origin opens (D98).
  */
 export function webPlatform(store: Promise<Store>, name: string): Platform {
+  const secrets = indexedDbSecrets();
   return {
     store,
     http: fetchClient({ via: throughProxy(DAV_PROXY_PREFIX), timeoutMs: REQUEST_CEILING_MS }),
-    secrets: indexedDbSecrets(),
+    secrets,
+    // A tab the browser discarded while Nextcloud's page was in front (a
+    // phone's, mostly) takes its Login Flow up again (D121).
+    pendingSignIn: secrets,
+    // Best-effort storage may be evicted under pressure; asked once there is
+    // an account. Chromium grants or refuses silently, Firefox asks the user.
+    keepData: () => void navigator.storage?.persist?.().catch(() => {}),
+    // Each origin has its own store: the same app at another address starts empty.
+    dataHome: location.host,
     // A tab of its own, which cannot reach back into this one.
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
     preferences: localPreferences,

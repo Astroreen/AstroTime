@@ -4,7 +4,14 @@
 import type { Account } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
-import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { SignIn } from "../accounts/sign-in.ts";
@@ -16,6 +23,8 @@ export interface SignInRequest {
   readonly kind: SignInKind;
   /** Signing in again: the account whose address and user name are filled in. */
   readonly account?: Account;
+  /** Takes up the Login Flow a page before this one started (D121). */
+  readonly resume?: boolean;
 }
 
 export const primaryButton =
@@ -78,6 +87,7 @@ function SignInForm({
         http: platform.http,
         openExternal: platform.openExternal,
         ...(platform.signingInTo ? { signingInTo: platform.signingInTo } : {}),
+        ...(platform.pendingSignIn ? { pending: platform.pendingSignIn } : {}),
       }),
   );
   const state = useSyncExternalStore(
@@ -92,15 +102,29 @@ function SignInForm({
   const [password, setPassword] = useState("");
 
   // Closing the dialog stops whatever the attempt was doing.
-  useEffect(() => () => signIn.cancel(), [signIn]);
-  // Once, as the attempt ends: the state changes to `done` once.
+  useEffect(() => () => void signIn.cancel(), [signIn]);
+  // Once, as the attempt ends: the state changes to `done` once. A flow
+  // taken up again that another page ended closes the dialog: the account,
+  // if it was approved, comes through the store.
+  const ended = useEffectEvent(() => onCancel());
   useEffect(
     () =>
       signIn.subscribe(() => {
         if (signIn.state.step === "done") onDone();
+        if (signIn.state.step === "elsewhere") ended();
       }),
     [signIn, onDone],
   );
+  // A Login Flow a page before this one started (D121); none after all, nothing to show.
+  const resume = Boolean(request.resume);
+  useEffect(() => {
+    if (!resume) return;
+    let live = true;
+    void signIn.resume().then((resumed) => live && !resumed && ended());
+    return () => {
+      live = false;
+    };
+  }, [signIn, resume]);
   // Back from Nextcloud's page: ask at once whether it was approved (android
   // D65). A tab comes back visible; a desktop window beside the browser was
   // visible all along and comes back focused (desktop D77).
@@ -116,9 +140,9 @@ function SignInForm({
     };
   }, [signIn]);
 
-  if (state.step === "checking" || state.step === "done") {
+  if (state.step === "checking" || state.step === "done" || state.step === "elsewhere") {
     return (
-      <Busy onCancel={() => signIn.cancel()}>
+      <Busy onCancel={() => void signIn.cancel()}>
         <p>{t("signIn.checking")}</p>
       </Busy>
     );
@@ -126,7 +150,7 @@ function SignInForm({
   if (state.step === "waiting") {
     return (
       <Busy
-        onCancel={() => signIn.cancel()}
+        onCancel={() => void signIn.cancel()}
         action={
           <button type="button" className={textButton} onClick={() => signIn.reopen()}>
             {t("signIn.waiting.reopen")}

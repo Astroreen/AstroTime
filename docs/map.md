@@ -108,6 +108,8 @@ When you add a package, app or module, add its line here in the same PR.
     `sync-collection` with a full listing as fallback, multiget, writes with
     ETags. → `plans/foundation.md#D2`
   - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
+    `resumeLoginFlow`, one a page before this one started, from its
+    `LoginFlowState` → `plans/foundation.md#D121`;
     `revokeAppPassword`, the app password it gave revoked when its account
     goes. → `plans/foundation.md#D90`
   - `fetchClient`, `HttpClient` — how it reaches servers on each platform;
@@ -146,9 +148,10 @@ When you add a package, app or module, add its line here in the same PR.
     `signingInTo` and `onBack`, on the desktop `shell` and `onSyncRequest`),
     the user's languages and zone. When the store does not open it says why
     (`InsecureContextError`, `OutdatedWebViewError`). → `plans/android.md#D60`
-  - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
-    the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
-    `plans/foundation.md#D92`
+  - `accounts/` — signing in (`SignIn`: password, Login Flow v2, a flow
+    taken up again by the next page with `resume`) and when the UI syncs
+    (`SyncScheduler`). → `plans/foundation.md#D91`,
+    `plans/foundation.md#D92`, `plans/foundation.md#D121`
     - `unprotected.ts` — `UnprotectedPrompt`, the question a shell asks
       before saving a password no keyring protects; its dialog is
       `components/unprotected-dialog.tsx`. → `plans/desktop.md#D74`
@@ -244,6 +247,8 @@ When you add a package, app or module, add its line here in the same PR.
     `accounts.spec.ts` signs in to a real Radicale (the one
     `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
     takes the accounts' evidence. → `plans/foundation.md#D92`;
+    `remember.spec.ts` closes and opens a persistent profile on an account,
+    and reloads a tab in the middle of a Login Flow. → `plans/foundation.md#D121`;
     `reminders.spec.ts` moves `page.clock` and sees notifications through a
     wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`;
     `editing.spec.ts` creates, edits and deletes on the demo data,

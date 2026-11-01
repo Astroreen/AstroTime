@@ -6,6 +6,7 @@ import { connectCalDav, removeAccount, syncAll, type SyncContext } from "@astrot
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
+import { hasPendingFlow } from "../accounts/sign-in.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
@@ -71,6 +72,41 @@ export function AccountsProvider({
 
   const [signingIn, setSigningIn] = useState<SignInRequest | null>(null);
   const [removing, setRemoving] = useState<Account | null>(null);
+
+  // A Login Flow the page before this one started, discarded by the browser
+  // or ended by the system while the user approved on Nextcloud's page: this
+  // page takes it up again (D121).
+  useEffect(() => {
+    const pending = platform.pendingSignIn;
+    if (!pending) return;
+    let live = true;
+    hasPendingFlow(pending).then(
+      (found) => {
+        if (live && found) setSigningIn((open) => open ?? { kind: "nextcloud", resume: true });
+      },
+      (error: unknown) => console.error(error),
+    );
+    return () => {
+      live = false;
+    };
+  }, [platform]);
+
+  // Once the store holds an account, the browser is asked to keep its data
+  // rather than evict it under pressure (D121).
+  useEffect(() => {
+    const keep = platform.keepData;
+    if (!keep) return;
+    let asked = false;
+    return liveQuery(
+      store,
+      async () => (await store.accounts()).some((account) => account.provider !== "demo"),
+      (some) => {
+        if (!some || asked) return;
+        asked = true;
+        keep();
+      },
+    );
+  }, [platform, store]);
 
   const value: AccountsValue = {
     platform,

@@ -4,10 +4,26 @@ import { basic, type Credentials } from "./provider.ts";
 /** Server errors in a row after which a poll gives up (at a poll every 2 s, about 10 s). */
 const SERVER_ERRORS = 5;
 
+/**
+ * What a Login Flow v2 under way needs to be polled again, by a page loaded
+ * anew after the browser discarded the one that started it
+ * (docs/plans/foundation.md#D121). The token gets the app password once the
+ * user approves: keep it as a secret.
+ */
+export interface LoginFlowState {
+  /** The server the user named. */
+  readonly server: string;
+  readonly loginUrl: string;
+  readonly endpoint: string;
+  readonly token: string;
+}
+
 /** A Nextcloud Login Flow v2 in progress (docs/plans/foundation.md#D19). */
 export interface LoginFlow {
   /** The page where the user approves access; open it in a browser. */
   readonly loginUrl: string;
+  /** What `resumeLoginFlow` takes up again. */
+  readonly state: LoginFlowState;
   /** Asks once whether the user approved: their credentials, or `null` while they have not. */
   poll(): Promise<(Credentials & { readonly server: string }) | null>;
 }
@@ -26,19 +42,31 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
   if (start.status !== 200)
     throw new Error(`${serverUrl} does not offer Nextcloud's Login Flow v2 (${start.status}).`);
   const { login, poll } = parseStart(start.body, serverUrl);
+  return resumeLoginFlow(http, {
+    server: serverUrl,
+    loginUrl: login,
+    endpoint: poll.endpoint,
+    token: poll.token,
+  });
+}
+
+/** A Login Flow v2 started before, polled again from its `state`. */
+export function resumeLoginFlow(http: HttpClient, state: LoginFlowState): LoginFlow {
+  const serverUrl = state.server;
   // Server errors in a row; a server that keeps failing is said to, not waited on.
   let failing = 0;
   return {
-    loginUrl: login,
+    loginUrl: state.loginUrl,
+    state,
     async poll() {
       const response = await http({
         method: "POST",
-        url: poll.endpoint,
+        url: state.endpoint,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json",
         },
-        body: `token=${encodeURIComponent(poll.token)}`,
+        body: `token=${encodeURIComponent(state.token)}`,
       });
       // 404 until the user approves. Rate limited (429, as a proxy in front
       // of Nextcloud may answer) or a passing server error: not yet, asked

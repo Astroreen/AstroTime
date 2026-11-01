@@ -8,6 +8,8 @@ import { expect, test } from "vite-plus/test";
 
 import {
   FLOW_LIFETIME_MS,
+  hasPendingFlow,
+  PENDING_FLOW,
   serverAddress,
   SignIn,
   type Clock,
@@ -45,9 +47,12 @@ function manualClock() {
   };
 }
 
-async function setup(server: ReturnType<typeof nextcloud>) {
-  const store = await Store.open(nodeDriver());
-  const secrets = memorySecrets();
+async function setup(
+  server: ReturnType<typeof nextcloud>,
+  shared?: { store: Store; secrets: ReturnType<typeof memorySecrets> },
+) {
+  const store = shared?.store ?? (await Store.open(nodeDriver()));
+  const secrets = shared?.secrets ?? memorySecrets();
   const opened: string[] = [];
   const time = manualClock();
   const signIn = new SignIn({
@@ -55,6 +60,7 @@ async function setup(server: ReturnType<typeof nextcloud>) {
     secrets,
     http: server.http,
     openExternal: (url) => opened.push(url),
+    pending: secrets,
     clock: time.clock,
   });
   /** Resolves once the state is `step` (or right away if it is). */
@@ -174,6 +180,57 @@ test("Login Flow v2 gives up when Nextcloud's token expires, and a cancelled one
   await cancelled;
   expect(signIn.state).toEqual({ step: "idle" });
   expect(await store.accounts()).toEqual([]);
+});
+
+test("a Login Flow outlives the page that started it: the next page takes it up and signs in (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  const first = await setup(server);
+  void first.signIn.withNextcloud({ server: "cloud.example.com" });
+  await first.reaches("waiting");
+  expect(await hasPendingFlow(first.secrets)).toBe(true);
+  // The browser discards the page while the user approves on Nextcloud's;
+  // the page loaded anew takes the flow up, without opening Nextcloud's again.
+  const next = await setup(server, first);
+  const resuming = next.signIn.resume();
+  expect(await next.reaches("waiting")).toEqual({
+    step: "waiting",
+    loginUrl: `${SERVER}/login/v2/flow/abc`,
+  });
+  expect(next.opened).toEqual([]);
+  next.signIn.reopen();
+  expect(next.opened).toEqual([`${SERVER}/login/v2/flow/abc`]);
+  // Not approved yet at its first poll; then the user approves.
+  await next.time.waiting();
+  server.approve();
+  next.time.advance(2_000);
+  expect(await resuming).toBe(true);
+  expect(next.signIn.state).toMatchObject({ step: "done", added: true });
+  expect((await next.store.accounts()).map((a) => a.username)).toEqual(["astro"]);
+  // The token is spent: nothing is left to take up.
+  expect(first.secrets.values.has(PENDING_FLOW)).toBe(false);
+  // The discarded page, had it come back, would see another page ended it.
+  first.time.advance(2_000);
+  expect(await first.reaches("elsewhere")).toEqual({ step: "elsewhere" });
+});
+
+test("no flow, or one past its token's life, is nothing to take up; a cancelled one is forgotten (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  const first = await setup(server);
+  expect(await first.signIn.resume()).toBe(false);
+  expect(first.signIn.state).toEqual({ step: "idle" });
+
+  void first.signIn.withNextcloud({ server: SERVER });
+  await first.reaches("waiting");
+  await first.signIn.cancel();
+  expect(first.secrets.values.has(PENDING_FLOW)).toBe(false);
+
+  void first.signIn.withNextcloud({ server: SERVER });
+  await first.reaches("waiting");
+  const next = await setup(server, first);
+  next.time.advance(FLOW_LIFETIME_MS);
+  expect(await next.signIn.resume()).toBe(false);
+  expect(next.signIn.state).toEqual({ step: "idle" });
+  expect(first.secrets.values.has(PENDING_FLOW)).toBe(false);
 });
 
 test("an address that is no Nextcloud, or no web address at all, is told apart", async () => {

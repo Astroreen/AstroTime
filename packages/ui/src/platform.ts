@@ -55,6 +55,25 @@ export interface Platform {
    * function that stops it. A platform with no back button leaves it out.
    */
   readonly onBack?: (close: () => boolean) => () => void;
+  /**
+   * Where a Login Flow under way is kept (its token gets an app password, so
+   * a secret store), so a page the browser discarded, or an app the system
+   * ended, while the user approved on Nextcloud's page takes it up again on
+   * its next start (foundation D121). The web and Android, whose page may go
+   * while Nextcloud's is in front, have one; the desktop's window lives on.
+   */
+  readonly pendingSignIn?: SecretStore;
+  /**
+   * Asks that the store's data be kept, not evicted when the device runs
+   * short of space: the web's `navigator.storage.persist()` (foundation
+   * D121). Called once the store holds an account.
+   */
+  readonly keepData?: () => void;
+  /**
+   * Where the store lives, for a platform where the same app at another
+   * address has a store of its own: the web's origin (foundation D121).
+   */
+  readonly dataHome?: string;
   /** Where this device's choices are kept (the view, hidden calendars). */
   readonly preferences: Preferences;
   /**

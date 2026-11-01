@@ -23,6 +23,8 @@ export const en = {
   "firstRun.title": "Your calendars and tasks, from your own server",
   "firstRun.body":
     "Sign in to Nextcloud or any CalDAV server. Your data stays there and on this device; AstroTime has no server of its own.",
+  "firstRun.dataHome":
+    "AstroTime keeps your accounts and data in this browser, for {{home}} only. Opened at another address or in another browser, it starts empty.",
   "firstRun.nextcloud": "Sign in to Nextcloud",
   "firstRun.caldav": "Another CalDAV server",
 

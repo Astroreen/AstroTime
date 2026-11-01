@@ -6,10 +6,12 @@ import {
   CertificateError,
   NoCalendarHomeError,
   ProxyRefusedError,
+  resumeLoginFlow,
   startLoginFlow,
   type Credentials,
   type HttpClient,
   type LoginFlow,
+  type LoginFlowState,
 } from "@astrotime/caldav";
 import { AuthError, OfflineError, type SecretStore } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
@@ -50,7 +52,9 @@ export type SignInState =
       readonly location: string | null;
     }
   /** `added`: a new account; otherwise one already here signed in again. */
-  | { readonly step: "done"; readonly account: Account; readonly added: boolean };
+  | { readonly step: "done"; readonly account: Account; readonly added: boolean }
+  /** The Login Flow this page took up again ended in another (D121). */
+  | { readonly step: "elsewhere" };
 
 /** Waits `ms`, or less when `signal` aborts; injected so tests decide when time passes. */
 export interface Clock {
@@ -73,6 +77,38 @@ const realClock: Clock = {
 /** How often Login Flow v2 is polled, and how long its token lives (android D65). */
 const POLL_EVERY_MS = 2_000;
 export const FLOW_LIFETIME_MS = 20 * 60_000;
+
+/** Where a Login Flow under way is kept, in the platform's `pendingSignIn` (D121). */
+export const PENDING_FLOW = "login-flow";
+
+/** A Login Flow under way, as kept: its state and when its token expires. */
+interface PendingFlow extends LoginFlowState {
+  readonly deadline: number;
+}
+
+function readPending(json: string | null): PendingFlow | null {
+  if (json === null) return null;
+  try {
+    const value = JSON.parse(json) as Partial<PendingFlow> | null;
+    const { server, loginUrl, endpoint, token, deadline } = value ?? {};
+    if (
+      typeof server !== "string" ||
+      typeof loginUrl !== "string" ||
+      typeof endpoint !== "string" ||
+      typeof token !== "string" ||
+      typeof deadline !== "number"
+    )
+      return null;
+    return { server, loginUrl, endpoint, token, deadline };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a Login Flow is under way in `pending`, for a page that just started to take up again. */
+export async function hasPendingFlow(pending: SecretStore): Promise<boolean> {
+  return readPending(await pending.get(PENDING_FLOW)) !== null;
+}
 
 /**
  * A web address from what the user typed: `cloud.example.com` is
@@ -101,6 +137,12 @@ export interface SignInOptions {
   readonly openExternal: (url: string) => void;
   /** The platform's `signingInTo`: the server is being signed in to, until the returned function. */
   readonly signingInTo?: (server: string) => () => void;
+  /**
+   * The platform's `pendingSignIn`: where a Login Flow under way is kept, so
+   * a page the browser discarded while the user approved takes it up again
+   * (`resume`, D121).
+   */
+  readonly pending?: SecretStore;
   readonly clock?: Clock;
 }
 
@@ -113,6 +155,8 @@ export class SignIn {
   #attempt: AbortController | null = null;
   /** Ends the wait between two polls at once. */
   #wake: (() => void) | null = null;
+  /** The token of the Login Flow this attempt keeps in `pending`. */
+  #kept: string | null = null;
 
   constructor(options: SignInOptions) {
     this.#options = options;
@@ -162,11 +206,66 @@ export class SignIn {
       return this.#fail(signal, problemOf(error, "not-nextcloud"), error);
     }
     if (signal.aborted) return;
-    this.#set({ step: "waiting", loginUrl: flow.loginUrl });
-    this.#options.openExternal(flow.loginUrl);
     const deadline = this.#clock.now() + FLOW_LIFETIME_MS;
     try {
+      await this.#keep(signal, { ...flow.state, deadline });
+    } catch (error) {
+      // Kept or not, the flow goes on in this page.
+      console.error(error);
+    }
+    if (signal.aborted) return;
+    this.#set({ step: "waiting", loginUrl: flow.loginUrl });
+    this.#options.openExternal(flow.loginUrl);
+    await this.#await(signal, flow, server, deadline);
+  }
+
+  /**
+   * Takes up a Login Flow a page before this one started (D121): the browser
+   * discarded it, or the system ended the app, while the user approved on
+   * Nextcloud's page. Nextcloud's page is not opened again, but `reopen`
+   * opens it. False when none is under way.
+   */
+  async resume(): Promise<boolean> {
+    const { pending } = this.#options;
+    if (!pending) return false;
+    const signal = this.#begin();
+    let kept: PendingFlow | null;
+    try {
+      kept = readPending(await pending.get(PENDING_FLOW));
+    } catch (error) {
+      console.error(error);
+      kept = null;
+    }
+    if (signal.aborted) return false;
+    if (!kept || this.#clock.now() >= kept.deadline) {
+      if (kept) await this.#forget(kept.token);
+      this.#set({ step: "idle" });
+      return false;
+    }
+    const { deadline, ...state } = kept;
+    this.#kept = state.token;
+    this.#set({ step: "waiting", loginUrl: state.loginUrl });
+    const end = this.#options.signingInTo?.(state.server);
+    try {
+      await this.#await(signal, resumeLoginFlow(this.#options.http, state), state.server, deadline);
+    } finally {
+      end?.();
+    }
+    return true;
+  }
+
+  /** Polls until the user approves, the token expires, or another page ends the flow. */
+  async #await(signal: AbortSignal, flow: LoginFlow, server: string, deadline: number) {
+    const token = flow.state.token;
+    try {
       for (;;) {
+        // Another page took it up too, and ended it (approved there, or cancelled).
+        if (this.#kept === token && !(await this.#stillKept(token))) {
+          if (signal.aborted) return;
+          this.#kept = null;
+          return this.#set({ step: "elsewhere" });
+        }
+        if (signal.aborted) return;
         let approved: Awaited<ReturnType<LoginFlow["poll"]>> = null;
         try {
           approved = await flow.poll();
@@ -176,18 +275,56 @@ export class SignIn {
         }
         if (signal.aborted) return;
         if (approved) {
+          // The token is spent: a page loaded from here on has nothing to take up.
+          await this.#forget(token);
           this.#set({ step: "checking" });
           const { server: approvedServer, ...credentials } = approved;
           return await this.#finish(signal, serverAddress(approvedServer) ?? server, credentials, {
             loginFlow: true,
           });
         }
-        if (this.#clock.now() >= deadline) return this.#fail(signal, "expired");
+        if (this.#clock.now() >= deadline) {
+          await this.#forget(token);
+          return this.#fail(signal, "expired");
+        }
         await this.#nap(signal);
         if (signal.aborted) return;
       }
     } catch (error) {
+      await this.#forget(token);
       this.#fail(signal, problemOf(error, "failed"), error);
+    }
+  }
+
+  /** Keeps the flow in `pending`, for a page loaded after this one (D121). */
+  async #keep(signal: AbortSignal, flow: PendingFlow): Promise<void> {
+    const { pending } = this.#options;
+    if (!pending) return;
+    await pending.set(PENDING_FLOW, JSON.stringify(flow));
+    if (signal.aborted) return this.#forget(flow.token);
+    this.#kept = flow.token;
+  }
+
+  async #stillKept(token: string): Promise<boolean> {
+    const { pending } = this.#options;
+    if (!pending) return true;
+    try {
+      return readPending(await pending.get(PENDING_FLOW))?.token === token;
+    } catch {
+      return true;
+    }
+  }
+
+  /** Forgets the kept flow, if it is still the one with `token`: a later one, another page's, stays. */
+  async #forget(token: string): Promise<void> {
+    const { pending } = this.#options;
+    if (this.#kept === token) this.#kept = null;
+    if (!pending) return;
+    try {
+      if (readPending(await pending.get(PENDING_FLOW))?.token === token)
+        await pending.delete(PENDING_FLOW);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -201,11 +338,16 @@ export class SignIn {
     this.#wake?.();
   }
 
-  /** Stops the attempt; nothing it was doing changes the state any more. */
-  cancel(): void {
+  /**
+   * Stops the attempt; nothing it was doing changes the state any more.
+   * Resolves once a Login Flow it kept is forgotten (D121).
+   */
+  cancel(): Promise<void> {
     this.#attempt?.abort();
     this.#attempt = null;
     this.#set({ step: "idle" });
+    // A flow it kept is over for every page; one it was still reading stays.
+    return this.#kept === null ? Promise.resolve() : this.#forget(this.#kept);
   }
 
   #begin(): AbortSignal {

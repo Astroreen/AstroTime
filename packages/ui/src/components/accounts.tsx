@@ -364,6 +364,12 @@ export function FirstRun() {
         <p className="text-[15px] font-medium tracking-tight text-accent">{t("app.name")}</p>
         <h1 className="text-[26px] leading-tight">{t("firstRun.title")}</h1>
         <p className="text-[15px] text-ink-muted">{t("firstRun.body")}</p>
+        {/* The web keeps a store per origin: another address starts empty (D121). */}
+        {value.platform.dataHome ? (
+          <p className="text-[13px] text-ink-muted">
+            {t("firstRun.dataHome", { home: value.platform.dataHome })}
+          </p>
+        ) : null}
         <div className="mt-2 flex flex-col items-center gap-2">
           <button
             type="button"

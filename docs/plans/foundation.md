@@ -698,6 +698,46 @@ Decided while building PR 5a-3.
   in again" opens the dialog with the account's address and user name, on
   Nextcloud's tab for a Nextcloud account.
 
+- **D121. The app remembers the user.** Found while chasing the owner's
+  "opening AstroTime again asks me to connect Nextcloud again" (v0.2.0). On
+  one address the store and the credentials outlive a reload, the browser
+  closed and opened again, and the dev server restarted (`remember.spec.ts`,
+  a persistent Chromium profile); nothing there was lost. What loses them:
+  - **Another address.** A browser keeps OPFS, IndexedDB and localStorage per
+    origin, so `http://127.0.0.1:5180`, the self-signed
+    `https://<tailnet IP>:5180`, `https://<machine>:5180` and the
+    `tailscale serve` name are four stores, each empty at first, and an app
+    cannot see another origin's. The owner's dev server moved from the
+    self-signed front to `tailscale serve`, and T3's preview from
+    `127.0.0.1` to the tailnet name, on the day of the report. So the first
+    run says, on the web (`Platform.dataHome`, the origin's host), that
+    AstroTime keeps its data in this browser for this address only, and
+    another address or browser starts empty; `scripts/t3/README.md` says to
+    keep to one address.
+  - **A Login Flow whose page went.** Nextcloud's page opens in another tab
+    (a Custom Tab on Android), and a phone's browser discards a tab in the
+    background, as Android may end the app while the Custom Tab is in front
+    ([android D65](android.md#D65)). The flow lived in the page's memory
+    only, so the page loaded anew showed the first run, however the user had
+    approved. Now `SignIn` keeps the flow (`LoginFlowState`: the server, its
+    page, the poll endpoint and token, and when the token expires) in the
+    platform's `pendingSignIn`, a `SecretStore` under `login-flow`, since the
+    token gets the app password; the next page finds it and opens the dialog
+    on its waiting step, polling again (`SignIn.resume`, `resumeLoginFlow`),
+    without opening Nextcloud's page again ("Open the sign-in page again"
+    does). It is forgotten as the token is spent (approved), expires, fails,
+    or the user cancels; a page that took up a flow another page ended
+    closes its dialog (`elsewhere`), the account coming through the store.
+    The web and Android have a `pendingSignIn` (their secrets); the desktop,
+    whose window lives on while the browser is in front, has none.
+  - **Eviction.** A browser may evict best-effort storage when the device runs
+    short of space. Once the store holds an account, the UI calls the
+    platform's `keepData` once, the web's `navigator.storage.persist()`:
+    Chromium grants or refuses it silently (by engagement, a bookmark, an
+    installed app), Firefox asks the user. A refusal changes nothing else.
+  - An insecure context (plain http beyond localhost) never opens the store
+    and says so ([D20](#D20)), so it cannot lose anything.
+
 ### The store across tabs
 
 Decided while closing the Deferred "One store across tabs".
@@ -1434,6 +1474,13 @@ Decided while closing the Deferred "Expanding long series from the middle".
   transaction, so both revoke it and the first one's new password stays
   unrevoked; reading the old secret and writing the new under one lock
   would close that.
+- **A sign-in that ends with its page** ([D121](#D121)) — a page that goes
+  between Login Flow's approval and the account saved (discovery, the first
+  write) loses the app password Nextcloud made: the token is spent, so the
+  next page has nothing to take up, and the user signs in again, leaving an
+  app password nobody uses until revoked in Nextcloud's security settings.
+  Keeping the approved credentials in `pendingSignIn` until the account is
+  saved would close it.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store
