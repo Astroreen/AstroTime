@@ -19,7 +19,22 @@ export interface SyncContext {
   readonly store: Store;
   readonly secrets: SecretStore;
   readonly connect: Connect;
+  /**
+   * Keeps the syncs of one store apart where several instances of it share
+   * one database (the web's tabs, docs/plans/foundation.md#D91); without it,
+   * this instance is the store's only one.
+   */
+  readonly lock?: SyncLock;
 }
+
+/**
+ * Runs `work` once no other instance of the store is syncing, waiting for
+ * the one that is, and holds the others off until `work` ends.
+ */
+export type SyncLock = <T>(work: () => Promise<T>) => Promise<T>;
+
+const alone = <T>(context: Pick<SyncContext, "lock">, work: () => Promise<T>): Promise<T> =>
+  context.lock ? context.lock(work) : work();
 
 /** Opens the provider of an account with its credentials. */
 export type Connect = (account: Account, credentials: Credentials) => Promise<Provider>;
@@ -83,7 +98,8 @@ const ignore = () => {};
  * sync runs joins it instead of starting a second. With `fresh`, the caller
  * needs a sync that starts after the call (a local change, an account just
  * added): it gets the running one's successor, which every such call during
- * the run shares.
+ * the run shares. With the context's `lock`, a sync waits for another
+ * instance's sync of the store to end (D91).
  */
 export function syncAll(
   context: SyncContext,
@@ -100,7 +116,8 @@ export function syncAll(
 }
 
 function begin(context: SyncContext, state: Runs): Promise<SyncAllReport> {
-  const run = everyAccount(context, state.removing);
+  // After another instance's sync, not beside it: one pending change goes up once.
+  const run = alone(context, () => everyAccount(context, state.removing));
   state.current = run;
   const done = () => {
     if (state.current === run) state.current = null;
@@ -228,10 +245,11 @@ export async function saveAccount(
  * left behind asks to sign in again; a password left behind would be
  * invisible), then its calendars and items. Syncs that start from now on
  * leave it alone, and the running one and the one queued after it end
- * first, so nothing of the account is written while it goes.
+ * first, as does another instance's (the context's `lock`), so nothing of the
+ * account is written while it goes.
  */
 export async function removeAccount(
-  context: Pick<SyncContext, "store" | "secrets">,
+  context: Pick<SyncContext, "store" | "secrets" | "lock">,
   accountId: string,
 ): Promise<void> {
   const state = runsOf(context.store);
@@ -240,8 +258,11 @@ export async function removeAccount(
   try {
     // A sync begun before this call may be inside the account; any later one skips it.
     await Promise.all([state.current, state.next].map((run) => run?.catch(ignore)));
-    await context.secrets.delete(keyOf(accountId));
-    await context.store.removeAccount(accountId);
+    // Another instance's sync may be inside it too; the next one finds it gone.
+    await alone(context, async () => {
+      await context.secrets.delete(keyOf(accountId));
+      await context.store.removeAccount(accountId);
+    });
   } finally {
     const left = (state.removing.get(accountId) ?? 1) - 1;
     if (left > 0) state.removing.set(accountId, left);

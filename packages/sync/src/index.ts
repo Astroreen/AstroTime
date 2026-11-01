@@ -7,5 +7,6 @@ export {
   type Connect,
   type SyncAllReport,
   type SyncContext,
+  type SyncLock,
 } from "./all.ts";
 export { syncAccount, type Problem, type SyncReport } from "./sync.ts";

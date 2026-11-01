@@ -5,7 +5,7 @@ import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { expect, test } from "vite-plus/test";
 
-import { removeAccount, saveAccount, syncAll, type Connect } from "../src/index.ts";
+import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
 
 const task = (uid: string) =>
@@ -65,7 +65,8 @@ function servers(byHome: Record<string, MemoryServer>) {
 }
 
 async function setup() {
-  const store = await Store.open(nodeDriver());
+  const driver = nodeDriver();
+  const store = await Store.open(driver);
   const secrets = memorySecrets();
   const a = memoryServer("https://a.example/cal/");
   const b = memoryServer("https://b.example/cal/");
@@ -80,7 +81,17 @@ async function setup() {
       homeUrl: `https://${host}/`,
       credentials: { username: "astro", password },
     });
-  return { store, secrets, a, b, net, context, add };
+  return { driver, store, secrets, a, b, net, context, add };
+}
+
+/** A lock the instances of one store share, as the web's tabs share a Web Lock (D91). */
+function sharedLock(): SyncLock {
+  let last: Promise<unknown> = Promise.resolve();
+  return (work) => {
+    const run = last.then(work);
+    last = run.catch(() => {});
+    return run;
+  };
 }
 
 test("every account syncs and reports how it went; the demo's never does", async () => {
@@ -217,6 +228,59 @@ test("a sync queued behind the running one leaves an account being removed alone
   expect((await queued).accounts).toEqual([]);
   // Only the sync begun before the removal reached the server.
   expect(net.connections).toHaveLength(1);
+  expect([await store.accounts(), await store.calendars(), secrets.values.size]).toEqual([
+    [],
+    [],
+    0,
+  ]);
+});
+
+test("with the platform's lock, another instance's sync waits for the running one, so a change goes up once", async () => {
+  const { driver, store, secrets, a, net, add } = await setup();
+  const { account } = await add("a.example");
+  // Two instances of the store on one database, as the web's tabs (D98).
+  const other = await Store.open(driver);
+  const lock = sharedLock();
+  await syncAll({ store, secrets, connect: net.connect, lock });
+  const [calendar] = await store.calendars(account.id);
+  await store.saveLocal(calendar!.id, task("new"));
+  const writes: string[] = [];
+  a.beforeWrite = (method, href) => void writes.push(`${method} ${href}`);
+
+  const held = gate();
+  net.holdAt(held.opened);
+  const inside = net.reached();
+  const first = syncAll({ store, secrets, connect: net.connect, lock });
+  await inside;
+  // The other instance's change: a sync that starts after this call.
+  const second = syncAll({ store: other, secrets, connect: net.connect, lock }, { fresh: true });
+  net.holdAt(null);
+  held.open();
+  const reports = await Promise.all([first, second]);
+  expect(reports.map((report) => report.accounts.map((r) => r.status))).toEqual([
+    ["synced"],
+    ["synced"],
+  ]);
+  expect(writes).toEqual([`create https://a.example/cal/new.ics`]);
+});
+
+test("with the platform's lock, removing an account waits for another instance's sync inside it", async () => {
+  const { driver, store, secrets, net, add } = await setup();
+  const { account } = await add("a.example");
+  const other = await Store.open(driver);
+  const lock = sharedLock();
+  const held = gate();
+  net.holdAt(held.opened);
+  const inside = net.reached();
+  const running = syncAll({ store, secrets, connect: net.connect, lock });
+  await inside;
+  const removing = removeAccount({ store: other, secrets, lock }, account.id);
+  held.open();
+  const [report] = await Promise.all([running, removing]);
+  // The sync ended whole, its account still there; then it went.
+  expect(report.accounts).toEqual([
+    expect.objectContaining({ status: "synced", report: expect.objectContaining({ errors: [] }) }),
+  ]);
   expect([await store.accounts(), await store.calendars(), secrets.values.size]).toEqual([
     [],
     [],

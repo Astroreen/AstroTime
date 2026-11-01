@@ -87,6 +87,50 @@ test("an account added by password syncs its calendars into the Week view, and S
   ).toBeVisible();
 });
 
+test("two tabs sync one at a time: a tab's sync waits for the other's to end (D91)", async ({
+  context,
+  radicale,
+}) => {
+  const work = await radicale.mkcalendar("work");
+  const first = await context.newPage();
+  await openApp(first);
+  await signInByPassword(first, radicale);
+  await expect(first.getByRole("button", { name: "Accounts", exact: true })).toBeVisible();
+  // A sync of the first tab that has not ended: it holds the store's sync lock.
+  await first.evaluate(
+    () =>
+      new Promise<void>((held) => {
+        void navigator.locks.request("astrotime-sync:astrotime", () => {
+          held();
+          return new Promise<void>((end) => {
+            (globalThis as typeof globalThis & { endSync?: () => void }).endSync = end;
+          });
+        });
+      }),
+  );
+  await radicale.put(work, "review", "Review from the phone", "20261104T160000", "20261104T170000");
+
+  // The second tab's sync on start waits for it, so it brings nothing yet.
+  const second = await context.newPage();
+  await openApp(second);
+  await expect(second.getByRole("button", { name: "Accounts, syncing" })).toBeVisible();
+  const waiting = await second.evaluate(async () =>
+    ((await navigator.locks.query()).pending ?? []).map((lock) => lock.name),
+  );
+  expect(waiting).toContain("astrotime-sync:astrotime");
+  const review = (page: Page) =>
+    wednesday(page).getByRole("listitem", { name: /^Review from the phone, / });
+  await expect(review(second)).toHaveCount(0);
+
+  // The first tab's sync ends: the second's runs, and both tabs show what it brought.
+  await first.evaluate(() =>
+    (globalThis as typeof globalThis & { endSync?: () => void }).endSync?.(),
+  );
+  await expect(review(second)).toBeVisible();
+  await expect(review(first)).toBeVisible();
+  await expect(second.getByRole("button", { name: "Accounts", exact: true })).toBeVisible();
+});
+
 test.describe("in Russian", () => {
   test.use({ locale: "ru-RU" });
 

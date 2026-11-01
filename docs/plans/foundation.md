@@ -178,6 +178,7 @@ logic worth borrowing.
   layer (Drizzle's `sqlite-proxy`) over a small `SqlDriver` per platform:
   - web: the official `@sqlite.org/sqlite-wasm` in a worker, on OPFS through
     the `opfs-sahpool` VFS, which needs no cross-origin isolation headers;
+    one tab's worker opens the database, for every tab ([D98](#D98));
   - Electron and tests: `node:sqlite`, built into Node 24, so no native
     module to rebuild;
   - Android: the web's driver, in the WebView.
@@ -499,7 +500,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
 Decided while building PR 5a.
 
 - **D54. The views read the store through live queries.** `Store.subscribe`
-  calls its listeners after every write; a view's query runs again when the
+  calls its listeners after every write, another tab's too ([D98](#D98)); a
+  view's query runs again when the
   store changes, and a burst of writes during a run costs one more run, not
   one per write (`liveQuery`), so a sync writing while the app is open shows
   at once ([D5](#D5)). Each object is parsed once while its iCalendar is
@@ -516,11 +518,11 @@ Decided while building PR 5a.
   cancelled (`isDone`). Migration 4 adds a `done` column for the master, so
   the query skips done tasks without parsing them; rows written before it
   hold `NULL` and are parsed.
-- **D56. One tab holds the web store, and says so.** The web driver holds a
-  Web Lock named after its database while it is open; a second tab gets
-  `StoreInUseError` at once, and the UI tells the user, in their language,
-  to close the other tab. Sharing the store between tabs stays
-  [deferred](#deferred).
+- **D56. One tab holds the web store, and says so.** _Replaced by
+  [D98](#D98):_ every tab works on the store; `StoreInUseError` and its
+  message are gone. It was: the web driver held a Web Lock named after its
+  database while it was open; a second tab got `StoreInUseError` at once,
+  and the UI told the user, in their language, to close the other tab.
 - **D57. Demo data and end-to-end tests.** `@astrotime/ui/demo` holds
   invented calendars around today, titled in English or Russian; the web dev
   server loads them with `?demo`, and the production build leaves them out
@@ -590,10 +592,23 @@ Decided while building PR 5a-3.
   - 2 seconds after the last of a burst of local changes (`changed()`, for
     the editing of PR 5b and PR 6), and on "Sync now", both `fresh`.
 
-  Android adds background sync ([android D67](android.md#D67)) and the
-  desktop its main-process timer and resume ([desktop D75](desktop.md#D75)),
-  both through `syncAll`. The status shows without getting in the way: the
-  account button in the top bar turns a ring while a sync runs and shows a
+  Every open tab runs these triggers on the one store ([D98](#D98)), so a
+  sync waits for another tab's to end: two at once would each upload the
+  same pending change. The web platform's `syncLock` takes a Web Lock per
+  store (`astrotime-sync:<store>`) around each run of `syncAll`
+  (`SyncContext.lock`), and removing an account takes it too, so no tab's
+  sync is inside an account another tab removes. A tab that closes lets it
+  go. It waits rather than skips: a skipped run has no report, so that
+  tab would show nothing of its accounts, and a `fresh` request must lead
+  to a sync that starts after it; a sync that finds nothing new costs one
+  `PROPFIND` and one `sync-collection` per calendar. A shell with one
+  instance of its store needs no lock.
+
+  Android adds background sync ([android D67](android.md#D67)), which
+  takes the same lock, and the desktop its main-process timer and resume
+  ([desktop D75](desktop.md#D75)), both through `syncAll`. The status
+  shows without getting in the way: the account button in the top bar
+  turns a ring while a sync runs and shows a
   dot when something needs the user (signed out, refused, failed, items the
   sync could not handle, conflicts). Each account says, in the drawer and
   in the accounts dialog, that it syncs, when it last synced, that it is
@@ -628,6 +643,108 @@ Decided while building PR 5a-3.
   "Sync now" syncs every account ([D90](#D90)). Removing asks first. "Sign
   in again" opens the dialog with the account's address and user name, on
   Nextcloud's tab for a Nextcloud account.
+
+### The store across tabs
+
+Decided while closing the Deferred "One store across tabs".
+
+- **D98. Every tab works on the one web store; a leader tab runs it.**
+  `opfs-sahpool` holds the database's files exclusively, through
+  `createSyncAccessHandle`, which only a dedicated worker has, so one worker
+  at a time can open the database. Each tab's driver starts a worker that
+  asks for the store's Web Lock without `ifAvailable`, so the tabs queue;
+  the worker holding it opens the database and runs the statements of every
+  tab, its own included: the **leader tab**. A driver says `hello` on the
+  store's `BroadcastChannel` and is answered on a channel of its own, which
+  only it and the leader hear, so a result is cloned once, for the tab that
+  asked; a follower's statement costs one message there and back. The lock
+  lives and dies with the worker that holds the files: when the leader's
+  tab closes or is discarded, or its worker fails, both go, the next tab in
+  the queue opens the database and says so (`leader`), and the others send
+  there.
+  - **A tab put away** (`pagehide` into the back/forward cache, `freeze`)
+    lets go of everything it holds, so no tab waits on it: its worker, with
+    the store's lock and files if it led; its own Web Lock, so the leader
+    rolls back a transaction it left open and serves the others, as for a
+    closed tab; and its channel. What it had on its way fails with
+    `HandOverError`, and its open transaction is over. Back (`pageshow` from
+    the cache, `resume`), it joins again under a new name, so nothing said
+    to the old one reaches it, queues to lead again, and its views read
+    again. Whether a browser caches or freezes a page holding Web Locks at
+    all varies (Chromium does neither); the tests dispatch the events to an
+    iframe.
+  - **Nothing lost, nothing run twice.** A statement on its way when the
+    leader goes fails with `HandOverError`: it may or may not have run, and
+    nothing proves which, so it is never sent again. A leader that closes
+    the database says `bye` after its last result, so a statement without
+    one did not run and goes to the next leader, as do statements sent while
+    no leader was known. A transaction open at a leader that goes is over:
+    rolled back there (from its journal at the next open, if the tab died),
+    and its tab's statements fail with `HandOverError` until its `ROLLBACK`,
+    never running outside it.
+  - **Every tab hears every write.** The leader says `changed` after each
+    write transaction that commits, whatever it wrote: rows, the schema, a
+    pragma such as `user_version` (SQLite's commit hook, not a count of
+    changed rows, which leaves the schema out; a `BEGIN IMMEDIATE` that
+    wrote nothing counts too, and the others only read again). A rolled
+    back one changed nothing for the others. The driver's `SqlDriver.subscribe` (optional;
+    the web driver has it) reaches `Store.subscribe`, so a write in one tab
+    re-renders the others ([D54](#D54)). A tab hears one after a hand-over
+    too, so a read that failed on its way runs again.
+  - **One tab's transaction at a time** ([D99](#D99)): while a tab's
+    transaction is open, the leader holds the other tabs' statements back.
+    Each tab holds a Web Lock of its own while its store is open; when the
+    leader is granted it, the tab is gone, and its open transaction is
+    rolled back. A tab that is gone never holds the others: if that
+    `ROLLBACK` fails and leaves the connection in its transaction, no other
+    statement runs inside it; the leader stops (its worker ends, with the
+    files and the lock), and the next leader opens the database afresh,
+    which rolls the journal back. A migration step outlasts five hand-overs
+    in a row, then the opening fails.
+  - Every leader sets its connection up alike (foreign keys on), since the
+    tabs move between connections without knowing. The pool opens with
+    `preserveOnInitFailure`: by default a failed open deletes the pool's
+    files, the database with them. A new leader that finds a file still
+    held (a closed tab's worker lets its lock and its files go in no set
+    order) tries again, for a few seconds.
+  - Every tab's worker loads sqlite-wasm's script (220 kB, cached); only the
+    leader compiles the wasm and opens the database.
+  - Rejected: a `SharedWorker` owning the database (it has no
+    `createSyncAccessHandle`, and Android's WebView has no `SharedWorker`,
+    [android D67](android.md#D67)); a connection per tab on the `opfs` VFS
+    (it needs cross-origin isolation, which D25 avoided, and the tabs would
+    wait on each other's file locks); pausing and unpausing the pool around
+    each operation (`pauseVfs`: every file handle taken again, by every tab,
+    per statement); `MessagePort`s handed out by the leader (a
+    `BroadcastChannel` cannot carry one, and the only brokers are a
+    `SharedWorker` or a service worker AstroTime does not have); one channel
+    for every result (every tab would clone every other tab's rows).
+
+  Replaces [D56](#D56); [android D67](android.md#D67) shares the store
+  between the app and its background job the same way.
+
+- **D99. A store operation is a transaction.** Each read-then-write
+  operation of the store (`exclusive`) runs in `BEGIN IMMEDIATE … COMMIT`
+  and rolls back when it fails, so a failed one leaves nothing of itself;
+  each migration step reads the schema's version inside its own
+  transaction. The store's queue keeps one tab's operations in order; the
+  transaction keeps them whole across tabs ([D98](#D98)): two tabs opening
+  an old database at once migrate it once, and a sync in one tab never
+  marks synced an edit another tab made meanwhile ([D38](#D38)).
+  - **A COMMIT in doubt.** A store operation that fails with
+    `HandOverError` did nothing: its transaction went with the leader, so
+    trying it again is safe. One whose `COMMIT` was on its way when the
+    leader went fails with `CommitInDoubtError` (a `HandOverError`): it may
+    have committed, and nothing tells. The store's callers never assume
+    either; they read again. A migration step reads the version again and
+    goes on from there, so it never runs twice. The sync engine reports the
+    object (or, outside one, the account's run) as failed and goes on
+    through the next leader; its next run starts from what the store and
+    the server hold, where an upload whose marking was lost is recognised as
+    our own ([D37](#D37)): a creation finds its href holding our version, an
+    update is refused and merged with a server copy that is ours already. A
+    view reads again at the hand-over ([D98](#D98)), so the user sees
+    whether an edit is there.
 
 ## Deferred
 
@@ -695,9 +812,15 @@ Decided while building PR 5a-3.
 - **`RANGE=THISANDFUTURE`** on a `RECURRENCE-ID` is read as replacing one
   occurrence only. Nextcloud, Apple and Google split the series instead, so
   it is rare; it comes when a fixture from a real client needs it.
-- **One store across tabs** — the web store opens its database in one tab;
-  a second tab is told so ([D56](#D56)) until a `SharedWorker` or a lock
-  hands the store over ([D25](#D25)).
+- **Tabs of two builds** — after an update, a tab of the new build may
+  follow a leader tab of the old one until the old tabs reload: its
+  migrations run on the old tab's connection while the old tab's store
+  keeps writing the old way, and a later change to the tabs' messages would
+  need a version in `hello` ([D98](#D98)). Nothing checks it until a build
+  changes the schema or the messages in a way an old tab cannot follow; that
+  build tells old tabs to reload. A tab of a build before D98 holds the lock
+  without serving: a new tab says it is opening until that tab is closed or
+  reloaded.
 
 ## PR plan
 

@@ -84,7 +84,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Sync engine** — `syncAccount` in `@astrotime/sync`, which reconciles
   the local store with a provider (D37).
 - **`syncAll`** — the one sync entry every shell calls: every account in
-  turn, joining a sync already running (D90). The UI calls it on its
+  turn, joining a sync already running (D90), after another tab's has ended
+  (the **sync lock**, D91). The UI calls it on its
   **sync triggers** (start, back in front, a timer, the network back, a
   local change: D91).
 - **Sync status** — how an account's last sync went, as the UI shows it:
@@ -92,6 +93,12 @@ One word per concept. Use these terms in code, docs, commits and UI.
   the items it could not handle.
 - **Signed out** — an account whose server refused its credentials (or
   that has none saved); it syncs again once the user signs in again.
+- **Leader tab** — the tab whose worker has the web store's database open
+  and runs the statements of every tab; the others follow it. When it goes,
+  the next tab leads: a **hand-over** (foundation D98).
+- **In doubt** — a COMMIT whose answer went with the leader tab: the
+  transaction may or may not have committed (`CommitInDoubtError`,
+  foundation D99).
 - **Live query** — a query of the local store that runs again whenever the
   store changes, so a view shows what a sync wrote (`liveQuery`, D54).
 - **Sync token** — the server's marker of the last state we saw

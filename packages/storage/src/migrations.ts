@@ -1,4 +1,7 @@
-import type { SqlDriver } from "./driver.ts";
+import { HandOverError, transaction, type SqlDriver } from "./driver.ts";
+
+/** Hand-overs in a row a migration step outlasts (docs/plans/foundation.md#D99). */
+const HAND_OVERS = 5;
 
 /**
  * The store's schema, one script per version (`PRAGMA user_version`).
@@ -89,22 +92,34 @@ export async function migrate(
   migrations: readonly string[] = MIGRATIONS,
 ): Promise<void> {
   await driver.script("PRAGMA foreign_keys = ON;");
-  const [[version] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
-  if (Number(version) > migrations.length) {
-    throw new NewerSchemaError(
-      `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
-    );
-  }
-  for (let next = Number(version); next < migrations.length; next++) {
+  // Each step reads the version in its own transaction: two tabs opening an
+  // old database at once migrate it once (docs/plans/foundation.md#D99).
+  // A failed step leaves nothing of itself; the steps before it stay.
+  // Hand-overs in a row before the opening gives up: the store keeps changing hands.
+  let handOvers = 0;
+  for (;;) {
+    let done: boolean;
     try {
-      await driver.script(
-        `BEGIN;\n${migrations[next]}\nPRAGMA user_version = ${next + 1};\nCOMMIT;`,
-      );
+      done = await transaction(driver, async () => {
+        const [[read] = [0]] = (await driver.query("PRAGMA user_version", [])) as number[][];
+        const version = Number(read);
+        if (version > migrations.length) {
+          throw new NewerSchemaError(
+            `The local store is at schema ${version}; this build knows ${migrations.length}. Update AstroTime.`,
+          );
+        }
+        if (version === migrations.length) return true;
+        await driver.script(`${migrations[version]}\nPRAGMA user_version = ${version + 1};`);
+        return false;
+      });
     } catch (error) {
-      // A failed script leaves its transaction open; nothing of it may stay.
-      await driver.script("ROLLBACK;").catch(() => {});
+      // The leader tab went (D98): the step was rolled back, or its COMMIT is
+      // in doubt. Reading the version again tells which; never run it twice.
+      if (error instanceof HandOverError && ++handOvers < HAND_OVERS) continue;
       throw error;
     }
+    handOvers = 0;
+    if (done) return;
   }
 }
 

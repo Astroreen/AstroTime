@@ -2,7 +2,7 @@
 // app brings its platform (docs/plans/android.md#D60: the store, HTTP,
 // secrets, the system browser, where preferences are kept) and the user's
 // languages, and renders this.
-import { InsecureContextError, StoreInUseError, type Store } from "@astrotime/storage";
+import { InsecureContextError, type Store } from "@astrotime/storage";
 import { CSPProvider } from "@base-ui/react/csp-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
@@ -62,9 +62,7 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
     store.then(
       (opened) => live && setOpening({ status: "open", store: opened }),
       (error: unknown) => {
-        if (!(error instanceof StoreInUseError || error instanceof InsecureContextError)) {
-          console.error(error);
-        }
+        if (!(error instanceof InsecureContextError)) console.error(error);
         if (live) setOpening({ status: "failed", error });
       },
     );
@@ -116,12 +114,7 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
       </main>
     );
   }
-  const reason =
-    opening.error instanceof StoreInUseError
-      ? "inUse"
-      : opening.error instanceof InsecureContextError
-        ? "insecure"
-        : "failed";
+  const reason = opening.error instanceof InsecureContextError ? "insecure" : "failed";
   return (
     <main className="grid h-dvh place-items-center bg-canvas p-6 text-ink">
       <div
