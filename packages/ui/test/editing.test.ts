@@ -256,6 +256,55 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(await rowOf("Personal", "demo-lunch")).toMatchObject({ pending: "delete" });
   });
 
+  test("a series moved to another calendar with a new time moves as the occurrence did", async () => {
+    const { store, byName, rowOf } = await demo();
+    const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const initial = formOf(target, timeZone);
+    const personal = byName("Personal");
+    await saveForm(
+      store,
+      {
+        target,
+        initial,
+        form: { ...initial, calendarId: personal.id, startTime: "09:15", endTime: "09:45" },
+        scope: "all",
+      },
+      { now: NOW, uid: uids },
+    );
+    const moved = (await store.objectAt(personal.id, "demo-standup.ics"))!;
+    // The series still starts two weeks before, now at 9:15.
+    expect(moved.ics).toContain("DTSTART;TZID=Europe/Vilnius:20261021T091500");
+  });
+
+  test("a series held without its master: one exception edited and deleted on its own", async () => {
+    const { store, byName } = await demo();
+    const work = byName("Work");
+    const exception = (day: string, summary: string) =>
+      `BEGIN:VEVENT\r\nUID:orphans\r\nDTSTAMP:20261101T000000Z\r\nRECURRENCE-ID;TZID=Europe/Vilnius:${day}T090000\r\nDTSTART;TZID=Europe/Vilnius:${day}T090000\r\nDTEND;TZID=Europe/Vilnius:${day}T100000\r\nSUMMARY:${summary}\r\nEND:VEVENT\r\n`;
+    const row = await store.saveFromServer(work.id, {
+      href: "orphans.ics",
+      etag: '"1"',
+      ics: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\n${exception("20261105", "First")}${exception("20261106", "Second")}END:VCALENDAR\r\n`,
+    });
+    const second = await targetOn(store, row, "2026-11-06");
+    const initial = formOf(second, timeZone);
+    await saveForm(
+      store,
+      { target: second, initial, form: { ...initial, summary: "Renamed" }, scope: "all" },
+      {
+        now: NOW,
+        uid: uids,
+      },
+    );
+    const edited = (await store.object(row.id))!;
+    expect(edited.ics).toContain("SUMMARY:First");
+    expect(edited.ics).toContain("SUMMARY:Renamed");
+    await deleteTarget(store, await targetOn(store, edited, "2026-11-05"), "all", NOW);
+    const left = (await store.object(row.id))!;
+    expect(left.ics).not.toContain("SUMMARY:First");
+    expect(left.ics).toContain("SUMMARY:Renamed");
+  });
+
   test("deleting one occurrence is an update; deleting all a pending deletion", async () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");

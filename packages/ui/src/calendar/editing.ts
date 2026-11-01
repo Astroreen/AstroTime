@@ -386,16 +386,22 @@ export async function saveForm(
   const stored = await store.object(target.objectId);
   if (!stored) throw new Error("The item is no longer on this device.");
   if (form.calendarId !== target.calendarId) {
-    const { ics } = editItem(target.object, changes, { now: writes.now });
+    // The whole series moves; a new time moves it as the occurrence moved (D105).
+    const { ics } = editItem(target.object, changes, {
+      now: writes.now,
+      scope: "all",
+      recurrenceId: target.recurrenceId,
+    });
     await store.saveLocal(form.calendarId, ics);
     await store.deleteLocal(stored.id);
     return;
   }
   if (Object.keys(changes).length === 0) return;
+  // A series held without its master has each exception edited on its own.
   const { ics, split: rest } = editItem(target.object, changes, {
     now: writes.now,
     scope: request.scope,
-    recurrenceId: isOccurrence(target) ? target.recurrenceId : null,
+    recurrenceId: target.recurrenceId,
     newUid: writes.uid(),
   });
   await store.saveLocal(stored.calendarId, ics, stored.href);
@@ -411,10 +417,11 @@ export async function deleteTarget(
 ): Promise<void> {
   const stored = await store.object(target.objectId);
   if (!stored) return;
+  // A series held without its master loses only the exception asked for.
   const ics = deleteItem(target.object, {
     now,
-    scope,
-    recurrenceId: isOccurrence(target) ? target.recurrenceId : null,
+    scope: target.object.master ? scope : "this",
+    recurrenceId: target.recurrenceId,
   });
   if (ics === null) await store.deleteLocal(stored.id);
   else await store.saveLocal(stored.calendarId, ics, stored.href);
