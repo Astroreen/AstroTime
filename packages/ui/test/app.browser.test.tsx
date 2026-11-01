@@ -713,6 +713,11 @@ test("a new event's dialog open as the calendar on this device steps aside saves
 });
 
 test("a hidden calendar that stepped aside leaves the view and new items to the server's (D122)", async () => {
+  // The clock pinned mid-morning, as the views' other tests have it: with the
+  // real one, from 23:00 in the test's zone a new event starts tomorrow, off
+  // the day the view shows.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   const store = await emptyStore();
   const local = await store.addLocalCalendarIfEmpty({
     account: "On this device",
