@@ -275,6 +275,7 @@ function Busy({
   return (
     <div className="flex flex-col gap-3 text-sm text-ink-muted" aria-busy="true">
       <div
+        data-spinner
         className="size-6 animate-spin rounded-full border-[3px] border-accent-soft border-t-accent"
         aria-hidden="true"
       />

@@ -3,6 +3,7 @@
 import { CalendarObject, wallClockOf } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { Popover } from "@base-ui/react/popover";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -35,8 +36,8 @@ export function UndoneChip({
       >
         <span
           aria-hidden="true"
-          className={`grid shrink-0 place-items-center rounded-full text-raised ${dense ? "size-3" : "size-3.5"}`}
-          style={{ background: first ? colorOf(first) : undefined }}
+          className={`item-color grid shrink-0 place-items-center rounded-full bg-[var(--item-fill)] text-white ${dense ? "size-3" : "size-3.5"}`}
+          style={first ? ({ "--item": colorOf(first) } as CSSProperties) : undefined}
         >
           <CheckCircleIcon className={dense ? "size-3" : "size-3.5"} strokeWidth={2.5} />
         </span>
@@ -66,8 +67,8 @@ export function UndoneChip({
                     className="relative flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-raised-hover"
                   >
                     <CheckCircleIcon
-                      className="mt-px size-4 shrink-0"
-                      style={{ color: colorOf(task) }}
+                      className="item-color mt-px size-4 shrink-0 text-[var(--item-fill)]"
+                      style={{ "--item": colorOf(task) } as CSSProperties}
                     />
                     <span className="flex min-w-0 flex-col">
                       <span className="text-[13.5px] break-words">

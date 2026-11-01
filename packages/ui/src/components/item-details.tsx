@@ -16,7 +16,7 @@ import {
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import type { TFunction } from "i18next";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -168,8 +168,8 @@ function Body({
         <div className="flex items-start gap-4">
           <span
             aria-hidden="true"
-            className="mt-1.5 size-4 shrink-0 rounded-[5px]"
-            style={{ background: color }}
+            className="item-color mt-1.5 size-4 shrink-0 rounded-[5px] bg-[var(--item-fill)]"
+            style={{ "--item": color } as CSSProperties}
           />
           <div className="min-w-0 flex-1">
             <Dialog.Title

@@ -167,6 +167,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         {value.status.running && (
           <span
             aria-hidden="true"
+            data-spinner
             className="absolute inset-0.5 animate-spin rounded-full border-2 border-transparent border-t-accent"
           />
         )}
@@ -177,9 +178,13 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
           />
         )}
       </Dialog.Trigger>
-      {/* A sync that comes to need the user is said, not only shown as the dot. */}
+      {/*
+        A sync that comes to need the user is said, not only shown as the dot:
+        once, as it starts to. The text stays while the need does, through the
+        syncs that run meanwhile, so it is not said again after each.
+      */}
       <span role="status" className="sr-only">
-        {attention && !value.status.running ? t("accounts.buttonAttention") : ""}
+        {attention ? t("accounts.buttonAttention") : ""}
       </span>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
@@ -307,10 +312,10 @@ export function AccountSection({
           <Checkbox.Root
             checked={!hidden.has(calendar.id)}
             onCheckedChange={(checked) => onToggle(calendar.id, checked)}
-            className="grid size-[18px] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--calendar)] data-checked:bg-[var(--calendar)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            style={{ "--calendar": colorOf(calendar) } as CSSProperties}
+            className="item-color grid size-[18px] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--item-fill)] data-checked:bg-[var(--item-fill)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            style={{ "--item": colorOf(calendar) } as CSSProperties}
           >
-            <Checkbox.Indicator className="item-on-color flex data-unchecked:hidden">
+            <Checkbox.Indicator className="flex text-white data-unchecked:hidden">
               <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden="true">
                 <path
                   d="M3.5 8.5l3 3 6-7"

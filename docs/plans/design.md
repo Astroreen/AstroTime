@@ -47,6 +47,8 @@ the project.
 - **D47. An item's colour is its calendar's**, as the server gives it
   (Apple's `calendar-color` property, which `CalDavProvider` reads into
   `RemoteCalendar.color`), unless the item has its own RFC 7986 `COLOR`.
+  It is drawn darkened where white text needs it ([D120](#D120)); the
+  colour itself, stored and written back, stays the server's.
 
 ### Read from the reference
 
@@ -111,10 +113,11 @@ the project.
   Colours are CSS custom properties written with `light-dark()`; the root's
   `color-scheme` follows the system, and `data-theme="light"` or `"dark"` on
   the root element overrides it, so D53's setting only sets that attribute.
-  An item's text is black or white by its fill's luminance (CSS relative
-  colours), so any calendar colour reads (D47; the rule is [D120](#D120)'s,
-  which replaced OKLCH lightness); a done task's fill is its colour mixed
-  45% into the grid's. Fonts are the system's and the
+  An item's text is white, as the reference's, on its colour darkened as
+  far as white needs (CSS relative colours), so any calendar colour reads
+  (D47; the rule is [D120](#D120)'s, which replaced black or white text by
+  OKLCH lightness); a done task's fill is its colour mixed 45% into the
+  grid's, darkened the same way. Fonts are the system's and the
   icons AstroTime's own SVG, so nothing loads from another origin (D43). An
   hour is 56 px tall; from 1024 px wide the drawer is a sidebar (D46).
 - **D59. Details read from the reference for the time grid:**
@@ -428,17 +431,39 @@ the project.
   24 px target, opens the day, where every item is a larger target of its
   own. The spec also proves what axe cannot see ([D120](#D120)).
 - **D120. What the pass changed, and the rules it leaves:**
-  - **an item's text on its colour** is black or white, whichever has more
-    contrast by WCAG's relative luminance, computed in CSS from the fill's
-    linear-light channels (`color(from … srgb-linear …)` in `styles.css`).
-    The two contrasts are equal at a luminance of 0.1791, where each is
-    4.58:1, so every calendar colour gets 4.5:1, small text's contrast,
-    with no exception for large text needed. OKLCH lightness (D58) gave
-    Nextcloud's own blue `#0082c9` white text at 4.2:1, and the demo's green
-    3.3:1. A done task keeps its muted fill (45% into the grid's) and its
-    strike-through but no longer fades its text, and an item's time is set
-    apart by its weight, not by opacity: faded, both fell below 4.5:1. The
-    drawer's checkbox mark on a calendar's colour follows the same rule;
+  - **an item's text on its colour** is white, as the reference draws it
+    (Google Calendar keeps white text and colours dark enough for it), and
+    the fill is the colour darkened as far as white needs, no further. In
+    `styles.css` (`--item-fill`, CSS relative colours) the colour's
+    linear-light sRGB channels are clipped to 0–1, then scaled down
+    together until its WCAG relative luminance is at most **0.18**; white
+    on 0.18 is 1.05 / 0.23 = **4.57:1**, over the 4.5:1 small text needs,
+    with no exception for large text. Scaling the three channels together
+    keeps the colour's hue (in OKLCH it scales lightness and chroma
+    alike), a colour already that dark is drawn as it is, and clipping
+    first holds the bound for a colour outside sRGB (`display-p3`, a wide
+    `oklch`). `packages/ui/test/item-colors.test.ts` proves it over every
+    OKLCH hue, chroma to 0.5 and lightness, and over the `#rrggbb` cube,
+    each rounded up to 8 bits; `a11y.spec.ts` checks Chromium draws it so
+    in both themes. A cap on OKLCH lightness alone (`min(l, …)`) was
+    weighed and dropped: lightness is not luminance, so one cap must be
+    about 0.52 to hold for a vivid green, and so darkens a grey that 0.568
+    would serve; and a dark, vivid colour leaves sRGB and comes back
+    brighter when clipped. The first version of this pass made the text black or
+    white instead, which put black text on the demo's green and blue,
+    unlike the reference. A done task's fill is its colour mixed 45% into
+    the grid's and then darkened the same way (in the light theme it is
+    greyer, not lighter); it keeps its strike-through and its text is not
+    faded, as done items are not disabled: they reach 4.5:1 too. An item's
+    time is set apart by its weight, not by opacity. The colour is drawn
+    the same way wherever it shows (`.item-color`): the undone chip's mark,
+    a search result's dot, the details' swatch, the editor's colour
+    choices, and the drawer's calendar checkbox, which is the calendar's
+    swatch: drawn in the fill its items have, so the colour there is the
+    one on the grid, with a white mark. As a control it needs 3:1 against
+    the drawer (1.4.11): on the light drawer the fill reaches 4.57:1
+    against white, on the dark one a pale colour, darkened to 0.18, still
+    has 3.1:1, and a darker one is drawn as the server has it;
   - **muted text** is `ink-muted` at full strength: the faded variants
     (a day outside the month, the drawer's sync line, placeholders) were
     3.5:1;
@@ -463,10 +488,13 @@ the project.
   - **live regions**: a drag's or a key's move is said ([D112](#D112)); in
     the accounts dialog each account's sync line is a status, so Sync now
     is heard to run and end, and a sync that comes to need the user is
-    said once, as the account button's dot shows it;
+    said once, as the account button's dot shows it: the status keeps its
+    text while the need lasts, through the syncs that run meanwhile, so it
+    is not said again after each;
   - **less motion**: with `prefers-reduced-motion: reduce` nothing slides,
-    fades or scales (transitions take no time); the sync spinner turns on,
-    as it says that sync runs;
+    fades or scales (transitions take no time) and a CSS animation runs
+    once, at once; a spinner (`data-spinner`: the account button's while a
+    sync runs, the sign-in's) turns on, as it says something is running;
   - **reflow**: at 320 px wide (1280 px at 400% zoom) every view needs no
     sideways scroll and the top bar's buttons and "+" stay on screen;
   - **language**: the document's `lang` is the UI's language (D53), so a
@@ -533,9 +561,10 @@ the project.
 - **A screen reader's tour of the grid by arrow keys** — each day is a
   list and items are buttons reached by Tab; a grid with arrow keys between
   days and slots (ARIA's `grid`) is not built ([D120](#D120)).
-- **Contrast of a calendar's colour against the grid** — an item's text
-  reaches 4.5:1 on its fill, but a pale fill on the light grid's white
-  tiles can fall below 3:1 as a shape; its title says what it is
+- **Contrast of a calendar's colour against the dark grid** — an item's
+  text reaches 4.5:1 on its fill, and on the light grid's white tiles the
+  darkened fill reaches 4.57:1 as a shape, but a calendar colour as dark as
+  the dark grid stays below 3:1 there; its title says what it is
   ([D120](#D120)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing

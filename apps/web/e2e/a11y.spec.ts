@@ -335,6 +335,82 @@ test.describe("what axe cannot see (design D120)", () => {
     });
   }
 
+  for (const colorScheme of ["dark", "light"] as const) {
+    test(`every colour an item can have is drawn dark enough for its white text, ${colorScheme}`, async ({
+      page,
+    }) => {
+      // The fill as Chromium resolves styles.css (packages/ui/test/item-colors.test.ts
+      // proves the rule itself): a grid over sRGB, colours outside it, a
+      // translucent one, the editor's names, each also done (muted).
+      await page.emulateMedia({ colorScheme });
+      await openDemo(page, "day");
+      await expect(today(page).getByRole("listitem").first()).toBeVisible();
+      const worst = await page.evaluate(() => {
+        const colors: string[] = [];
+        for (let r = 0; r < 256; r += 51) {
+          for (let g = 0; g < 256; g += 51) {
+            for (let b = 0; b < 256; b += 51) colors.push(`rgb(${r} ${g} ${b})`);
+          }
+        }
+        colors.push(
+          "color(display-p3 0 1 0)",
+          "color(rec2020 0 1 1)",
+          "oklch(0.95 0.4 200)",
+          "oklch(0.6 0.5 140)",
+          "#ffff0080",
+          "#0082c9",
+          "tomato",
+          "orange",
+          "gold",
+          "mediumseagreen",
+          "lightseagreen",
+          "steelblue",
+          "slateblue",
+          "palevioletred",
+          "slategray",
+          "white",
+        );
+        const box = document.createElement("div");
+        document.body.append(box);
+        const toLinear = (x: number) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+        // Chromium gives a resolved colour in its own space; a canvas draws it in sRGB, 8 bits.
+        const canvas = document.createElement("canvas").getContext("2d", {
+          willReadFrequently: true,
+        })!;
+        const drawn = (color: string) => {
+          canvas.clearRect(0, 0, 1, 1);
+          canvas.fillStyle = color;
+          canvas.fillRect(0, 0, 1, 1);
+          const [r, g, b, a] = canvas.getImageData(0, 0, 1, 1).data;
+          return { linear: [r!, g!, b!].map((x) => toLinear(x / 255)), alpha: a };
+        };
+        let found = { contrast: Infinity, color: "", done: false, fill: "", text: "" };
+        for (const color of colors) {
+          for (const done of [false, true]) {
+            const item = document.createElement("div");
+            item.className = "item";
+            item.style.setProperty("--item", color);
+            if (done) item.dataset["done"] = "";
+            box.append(item);
+            const style = getComputedStyle(item);
+            const fill = drawn(style.backgroundColor);
+            const text = drawn(style.color);
+            if (fill.alpha !== 255) throw new Error(`a translucent fill for ${color}`);
+            const y = ([r, g, b]: number[]) => 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+            const [hi, lo] = [y(text.linear), y(fill.linear)].toSorted((p, q) => q - p);
+            const contrast = (hi! + 0.05) / (lo! + 0.05);
+            if (contrast < found.contrast) {
+              found = { contrast, color, done, fill: style.backgroundColor, text: style.color };
+            }
+          }
+        }
+        box.remove();
+        return found;
+      });
+      expect(worst.contrast, JSON.stringify(worst)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
   test("asked for less motion, the drawer slides in no more", async ({ browser }) => {
     const context = await browser.newContext({
       reducedMotion: "reduce",

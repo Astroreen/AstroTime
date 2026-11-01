@@ -482,6 +482,63 @@ test("removing a Login Flow account offline: removed here, and the app password 
   await expect.element(told).not.toBeInTheDocument();
 });
 
+test("a sync that comes to need the user is said once, not again after each sync while it does (design D120)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@cloud.example.com",
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "revoked" },
+    },
+  );
+  // The server refuses the saved password, so every sync needs the user. A
+  // sync's requests wait while `held` is set, to look at the page mid-sync.
+  const server = nextcloud({ password: "right" });
+  let held: Promise<void> | null = null;
+  let release = () => {};
+  const http: HttpClient = async (request) => {
+    await held;
+    return server.http(request);
+  };
+  let requestSync = () => {};
+  render(Promise.resolve(store), ["en-US"], {
+    http,
+    secrets,
+    onSyncRequest: (listener) => {
+      requestSync = listener;
+      return () => {};
+    },
+  });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  const said = page.getByRole("status").filter({ hasText: "something needs your attention" });
+  await expect.element(said).toHaveTextContent("Accounts, something needs your attention");
+  await expect.element(button).toHaveAccessibleName("Accounts, something needs your attention");
+
+  // A live region is read again when its content changes: record any change.
+  const changes: string[] = [];
+  const region = said.element();
+  new MutationObserver(() => changes.push(region.textContent ?? "")).observe(region, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+  held = new Promise((resolve) => (release = resolve));
+  requestSync();
+  await expect.element(button).toHaveAccessibleName("Accounts, syncing");
+  expect(region.textContent).toBe("Accounts, something needs your attention");
+  held = null;
+  release();
+  await expect.element(button).toHaveAccessibleName("Accounts, something needs your attention");
+  expect([region.isConnected, region.textContent, changes]).toEqual([
+    true,
+    "Accounts, something needs your attention",
+    [],
+  ]);
+});
+
 test("an empty app leads to adding an account, and a wrong password says so in the user's language", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });

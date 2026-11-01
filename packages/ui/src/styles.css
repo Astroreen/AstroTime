@@ -45,8 +45,9 @@
     outline-offset: 2px;
   }
   /*
-   * Asked for less motion (WCAG 2.3.3): no slides, fades or scales; things
-   * appear at once. The sync spinner keeps turning: it says sync runs.
+   * Asked for less motion (WCAG 2.3.3): no slides, fades or scales, and no
+   * animation; things appear at once. A spinner (`data-spinner`) keeps
+   * turning: it is how a sync or a sign-in says it is still running.
    */
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -54,6 +55,12 @@
     ::after {
       transition-duration: 0s !important;
       scroll-behavior: auto !important;
+    }
+    :not([data-spinner]),
+    :not([data-spinner])::before,
+    :not([data-spinner])::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
     }
   }
   :root {
@@ -87,13 +94,33 @@
 
 @layer components {
   /*
-   * An item filled in its colour (`--item`, design D47, D50), its text dark
-   * or light by the fill's lightness. A done task is muted and struck
-   * through (design D51).
+   * An item filled in its colour (`--item`, design D47, D50), with white
+   * text, as the reference draws it. A done task is muted and struck through
+   * (design D51).
+   *
+   * The fill is the colour darkened as much as white text needs (design
+   * D120): in linear light, its channels clipped to sRGB, then scaled down
+   * together until its WCAG relative luminance is at most 0.18. White on a
+   * luminance of 0.18 is 1.05 / 0.23 = 4.57:1, over the 4.5:1 small text
+   * needs. Scaling all three channels keeps the hue; a colour already that
+   * dark is drawn as it is. Clipping first holds it for a colour outside
+   * sRGB too (a `display-p3` or wide `oklch` one). The calendar's own colour
+   * is unchanged (D47); only what is drawn is darker.
+   * `packages/ui/test/item-colors.test.ts` proves the bound over the colours.
    */
-  .item {
+  .item,
+  .item-color {
     --fill: var(--item);
-    background: var(--fill);
+    --luminance: calc(0.2126 * clamp(0, r, 1) + 0.7152 * clamp(0, g, 1) + 0.0722 * clamp(0, b, 1));
+    --dim: min(1, 0.18 / max(var(--luminance), 0.0001));
+    --item-fill: color(
+      from var(--fill) srgb-linear calc(clamp(0, r, 1) * var(--dim))
+        calc(clamp(0, g, 1) * var(--dim)) calc(clamp(0, b, 1) * var(--dim)) / 1
+    );
+  }
+  .item {
+    background: var(--item-fill);
+    color: #ffffff;
   }
   .item[data-done] {
     --fill: color-mix(in oklab, var(--item) 45%, var(--color-tile));
@@ -138,25 +165,5 @@
   }
   :root[data-dragging="resize"] * {
     cursor: ns-resize;
-  }
-  /* A mark on a calendar's colour (the drawer's checkbox), black or white by that colour. */
-  .item-on-color {
-    --fill: var(--calendar);
-  }
-  /*
-   * The text on a calendar's colour (`--fill`, design D120): black or white,
-   * whichever contrasts more by WCAG's relative luminance, computed from the
-   * fill's linear-light channels. Their contrasts are equal at a luminance of
-   * 0.1791, where each is 4.58:1, so any fill gets at least 4.5:1, the
-   * contrast small text needs.
-   */
-  .item,
-  .item-on-color {
-    color: color(
-      from var(--fill) srgb-linear
-        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
-        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
-        clamp(0, (0.1791 - (0.2126 * r + 0.7152 * g + 0.0722 * b)) * 100000, 1)
-    );
   }
 }

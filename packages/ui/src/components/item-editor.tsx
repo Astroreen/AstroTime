@@ -17,7 +17,7 @@ import {
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -556,8 +556,8 @@ function Colors({
           aria-label={color ? t(`color.${color}`) : t("edit.colorDefault")}
           title={color ? t(`color.${color}`) : t("edit.colorDefault")}
           onClick={() => onChange(color)}
-          className="grid size-8 place-items-center rounded-full ring-1 ring-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-2 aria-checked:ring-offset-raised focus-visible:outline-2 focus-visible:outline-accent"
-          style={{ background: color ?? calendarColor ?? undefined }}
+          className="item-color grid size-8 place-items-center rounded-full bg-[var(--item-fill)] ring-1 ring-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-2 aria-checked:ring-offset-raised focus-visible:outline-2 focus-visible:outline-accent"
+          style={{ "--item": color ?? calendarColor ?? undefined } as CSSProperties}
         ></button>
       ))}
     </div>
