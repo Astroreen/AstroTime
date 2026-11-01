@@ -242,6 +242,9 @@ test("in the Month an item drags to another day, keeping its time", async ({ pag
 
 test("a press dragged over an empty slot sizes a new event", async ({ page }) => {
   await openDemo(page, "week");
+  // The empty column is there before the week's items, and the strip's rows
+  // they bring push the grid down: measure once they are drawn.
+  await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
   await drag(
     page,
     await pointOn(page, "Saturday, November 7", 14.1),

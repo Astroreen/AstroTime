@@ -36,6 +36,33 @@
 }
 
 @layer base {
+  /*
+   * A focus ring wherever an element has none of its own (WCAG 2.4.7);
+   * the UI's own rings use the same accent.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  /*
+   * Asked for less motion (WCAG 2.3.3): no slides, fades or scales, and no
+   * animation; things appear at once. A spinner (`data-spinner`) keeps
+   * turning: it is how a sync or a sign-in says it is still running.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition-duration: 0s !important;
+      scroll-behavior: auto !important;
+    }
+    :not([data-spinner]),
+    :not([data-spinner])::before,
+    :not([data-spinner])::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
   :root {
     color-scheme: light dark;
     /*
@@ -67,18 +94,51 @@
 
 @layer components {
   /*
-   * An item filled in its colour (`--item`, design D47, D50), its text dark
-   * or light by the fill's lightness. A done task is muted and struck
-   * through (design D51).
+   * An item filled in its colour (`--item`, design D47, D50), with white
+   * text, as the reference draws it. A done task is muted and struck through
+   * (design D51).
+   *
+   * The fill is the colour darkened as much as white text needs (design
+   * D120): in linear light, its channels clipped to sRGB, then scaled down
+   * together until its WCAG relative luminance is at most 0.18. White on a
+   * luminance of 0.18 is 1.05 / 0.23 = 4.57:1, over the 4.5:1 small text
+   * needs. Scaling all three channels keeps the hue; a colour already that
+   * dark is drawn as it is. Clipping first holds it for a colour outside
+   * sRGB too (a `display-p3` or wide `oklch` one). The calendar's own colour
+   * is unchanged (D47); only what is drawn is darker.
+   * `packages/ui/test/item-colors.test.ts` proves the bound over the colours.
+   * `--luminance` names `r`, `g` and `b` outside a colour function: it works
+   * only substituted as text into `color(from … srgb-linear …)` below, so it
+   * must stay an unregistered property used there. The fill is opaque
+   * (`/ 1`): white text on a translucent one would depend on what is behind.
    */
-  .item {
+  .item,
+  .item-color {
     --fill: var(--item);
-    background: var(--fill);
-    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
+    --luminance: calc(0.2126 * clamp(0, r, 1) + 0.7152 * clamp(0, g, 1) + 0.0722 * clamp(0, b, 1));
+    --dim: min(1, 0.18 / max(var(--luminance), 0.0001));
+    --item-fill: color(
+      from var(--fill) srgb-linear calc(clamp(0, r, 1) * var(--dim))
+        calc(clamp(0, g, 1) * var(--dim)) calc(clamp(0, b, 1) * var(--dim)) / 1
+    );
+  }
+  /* Without relative colour syntax (Chromium before 119, Safari before 18,
+   * Firefox before 128; Android's WebView floor, 123, and Electron have it)
+   * every colour is darkened alike: each sRGB channel scaled to 45% keeps
+   * the luminance under that of grey 45%, 0.171, so white text still
+   * reaches 4.75:1, though dark colours get darker than they need. */
+  @supports not (color: color(from red srgb-linear calc(r * 0.5) g b)) {
+    .item,
+    .item-color {
+      --item-fill: color-mix(in srgb, var(--fill) 45%, black);
+    }
+  }
+  .item {
+    background: var(--item-fill);
+    color: #ffffff;
   }
   .item[data-done] {
     --fill: color-mix(in oklab, var(--item) 45%, var(--color-tile));
-    color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0 / 0.7);
   }
   .item[data-done] .item-title-wrap,
   .item[data-done] .item-title {
@@ -88,8 +148,9 @@
     display: block;
     overflow-wrap: anywhere;
   }
+  /* Set apart by its weight, not by fading: faded, it would lose its contrast. */
   .item-time {
-    opacity: 0.85;
+    font-weight: 400;
   }
   /* The item a search jumped to (design D53). */
   [data-found] {
@@ -119,9 +180,5 @@
   }
   :root[data-dragging="resize"] * {
     cursor: ns-resize;
-  }
-  /* A mark on a calendar's colour (the drawer's checkbox), dark or light by that colour. */
-  .item-on-color {
-    color: oklch(from var(--calendar) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0);
   }
 }

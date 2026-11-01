@@ -357,7 +357,8 @@ export function CalendarScreen({
               <button
                 type="button"
                 className={iconButton}
-                aria-label={t("topBar.today")}
+                // Its name says the day its icon shows (WCAG 2.5.3).
+                aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
                 title={t("topBar.today")}
                 onClick={() => setAnchor(today)}
               >
@@ -382,6 +383,8 @@ export function CalendarScreen({
                 </nav>
               )}
               <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
+                {/* The period shown, the page's heading; the top bar shows it as the month picker's button. */}
+                <h1 className="sr-only">{title}</h1>
                 {view === "agenda" ? (
                   <AgendaView
                     store={store}

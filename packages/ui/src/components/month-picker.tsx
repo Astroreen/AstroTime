@@ -97,7 +97,7 @@ export function MonthPicker({
                         : selected
                           ? "bg-accent-soft font-medium"
                           : "hover:bg-raised-hover",
-                      outside && !isToday ? "text-ink-muted/70" : "",
+                      outside && !isToday ? "text-ink-muted" : "",
                     ].join(" ")}
                   >
                     {formats.dayNumber(day)}

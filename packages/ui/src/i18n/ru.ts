@@ -116,6 +116,7 @@ export const ru = {
 
   "topBar.menu": "Главное меню",
   "topBar.today": "Сегодня",
+  "topBar.todayLabel": "Сегодня, {{date}}",
   "topBar.period": "{{period}}, выбрать дату",
   "topBar.search": "Поиск",
   "topBar.tasks": "Задачи",

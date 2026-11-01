@@ -247,7 +247,9 @@ When you add a package, app or module, add its line here in the same PR.
     keys (a finger through Chromium's touch input under `page.clock`),
     `drag-screenshots.spec.ts` takes the dragging evidence.
     → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
-    phone's system bars. → `plans/android.md#D68`
+    phone's system bars. → `plans/android.md#D68`; `a11y.spec.ts` audits
+    every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
+    landmarks, reflow and reduced motion. → `plans/design.md#D119`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,

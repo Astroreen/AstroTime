@@ -336,7 +336,7 @@ function Strip({
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] overflow-y-auto"}`}
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${rows}, 22px)`,
+        gridTemplateRows: `repeat(${rows}, 24px)`,
         minHeight: rows === 0 ? 4 : undefined,
       }}
     >
@@ -378,7 +378,7 @@ function Strip({
             type="button"
             aria-label={t("grid.moreLabel", { count, day: formats.fullDate(day) })}
             onClick={() => onExpandedChange(true)}
-            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-[13px] text-ink-muted hover:bg-raised"
+            className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-[13px] text-ink-muted -outline-offset-2 hover:bg-raised"
           >
             {t("grid.more", { count })}
           </button>
