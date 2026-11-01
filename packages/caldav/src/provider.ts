@@ -52,7 +52,8 @@ const MULTIGET_BATCH = 100;
 /** Truncated sync-collection answers followed before falling back to a full listing. */
 const MAX_SYNC_PAGES = 50;
 
-function basic({ username, password }: Credentials): string {
+/** The `Authorization` header of HTTP Basic for these credentials. */
+export function basic({ username, password }: Credentials): string {
   const bytes = new TextEncoder().encode(`${username}:${password}`);
   return `Basic ${btoa(Array.from(bytes, (byte) => String.fromCodePoint(byte)).join(""))}`;
 }

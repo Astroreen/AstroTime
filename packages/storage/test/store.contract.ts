@@ -82,6 +82,27 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.accounts()).toEqual([{ ...account, homeUrl: home, username: "astro2" }]);
     });
 
+    test("an account is found by its calendar home and user, else added, in one transaction (D90)", async () => {
+      const { store, account } = await setup();
+      const home = "https://cloud.example.com/remote.php/dav/calendars/astro/";
+      const input = { name: "astro@cloud", serverUrl: account.serverUrl, homeUrl: home };
+      // One without a home (before migration 5) is not matched: discovery found none for it.
+      const added = await store.findOrAddAccount({ ...input, username: "astro" });
+      expect(added.added).toBe(true);
+      expect(added.account).toMatchObject({ provider: "caldav", homeUrl: home, username: "astro" });
+      const twice = await Promise.all([
+        store.findOrAddAccount({ ...input, username: "astro" }),
+        store.findOrAddAccount({ ...input, username: "astro" }),
+      ]);
+      expect(twice.map((found) => [found.added, found.account.id])).toEqual([
+        [false, added.account.id],
+        [false, added.account.id],
+      ]);
+      // Another user of the same home is another account.
+      expect((await store.findOrAddAccount({ ...input, username: "anna" })).added).toBe(true);
+      expect(await store.accounts()).toHaveLength(3);
+    });
+
     test("objects are found by date range, widened only as far as zones reach", async () => {
       const { store, calendar } = await setup();
       await store.saveFromServer(calendar.id, {

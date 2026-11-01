@@ -72,9 +72,13 @@ export const en = {
   "accounts.remove": "Remove from this device",
   "accounts.removeTitle": "Remove {{name}}?",
   "accounts.removeBody":
-    "Its calendars and items are deleted from this device, and its password is forgotten. Nothing changes on the server.",
+    "Its calendars and items are deleted from this device, and its password is forgotten; an app password AstroTime got from Nextcloud is revoked. Your calendars on the server stay as they are.",
   "accounts.removeConfirm": "Remove",
   "accounts.removeCancel": "Cancel",
+  "accounts.notRevokedTitle": "{{name}} was removed",
+  "accounts.notRevokedBody":
+    "AstroTime could not revoke its app password on the server. You can revoke it in Nextcloud's settings, under Security.",
+  "accounts.notRevokedClose": "OK",
   "accounts.demo": "Demo data, on this device only",
   "accounts.noCalendars": "No calendars on this account",
   "accounts.close": "Close",
@@ -301,6 +305,10 @@ export const en = {
     "This is no longer on your calendar: it was deleted or moved elsewhere. Nothing was saved.",
   "edit.problem.inDoubt":
     "It is not clear whether the change was saved. Check the item, and save again if it is not there.",
+  "notice.deleteInDoubt":
+    "It is not clear whether it was deleted. Check your calendar, and delete it again if it is still there.",
+  "notice.deleteFailed": "It could not be deleted. Try again.",
+  "notice.close": "Dismiss",
 
   "color.tomato": "Red",
   "color.orange": "Orange",

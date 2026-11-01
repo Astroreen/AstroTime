@@ -1,6 +1,6 @@
 // The views' query path on the demo data: the store → parsed objects (kept
 // while unchanged) → occurrences → the layout, with today's undone tasks.
-import { Store, type StoredObject } from "@astrotime/storage";
+import { HandOverError, Store, type SqlDriver, type StoredObject } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -192,5 +192,47 @@ describe("live queries", () => {
     stop();
     await store.saveLocal(ids[0]!, event("after"));
     expect(runs).toBe(2);
+  });
+
+  test("a read the leader tab took with it is not reported: it runs again once the next leader serves (D98)", async () => {
+    // The web driver as a hand-over leaves it: one statement unanswered, then
+    // every subscriber told that the store is served again.
+    const inner = nodeDriver();
+    let fail = false;
+    let failed!: () => void;
+    const tookIt = new Promise<void>((resolve) => (failed = resolve));
+    let served = () => {};
+    const driver: SqlDriver = {
+      query: async (sql, params) => {
+        if (fail && sql.includes('from "accounts"')) {
+          fail = false;
+          failed();
+          throw new HandOverError("The leader went.");
+        }
+        return inner.query(sql, params);
+      },
+      script: (sql) => inner.script(sql),
+      close: () => inner.close(),
+      subscribe(listener) {
+        served = listener;
+        return () => {};
+      },
+    };
+    const store = await Store.open(driver);
+    fail = true;
+    const errors: unknown[] = [];
+    const counted = new Promise<number>((resolve) =>
+      liveQuery(
+        store,
+        async () => (await store.accounts()).length,
+        resolve,
+        (error) => errors.push(error),
+      ),
+    );
+    // The first run fails with the hand-over (wrapped by Drizzle); then the next leader serves.
+    await tookIt;
+    served();
+    expect(await counted).toBe(0);
+    expect(errors).toEqual([]);
   });
 });

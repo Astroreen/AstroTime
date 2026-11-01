@@ -1,6 +1,13 @@
 import { expect, test } from "vite-plus/test";
 
-import { startLoginFlow, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { OfflineError } from "@astrotime/core";
+
+import {
+  revokeAppPassword,
+  startLoginFlow,
+  type HttpClient,
+  type HttpRequest,
+} from "../src/index.ts";
 
 /** Nextcloud's Login Flow v2 as its documentation shows it, the user approving after the first poll. */
 function nextcloud(): { http: HttpClient; requests: HttpRequest[] } {
@@ -142,4 +149,39 @@ test("the approved server is used on the user's scheme too", async () => {
   };
   const flow = await startLoginFlow(http, "https://cloud.example.com");
   expect((await flow.poll())?.server).toBe("https://cloud.example.com");
+});
+
+test("an app password is revoked with itself, as Nextcloud's OCS API asks; one refused already is gone (D90)", async () => {
+  const requests: HttpRequest[] = [];
+  const answering =
+    (status: number): HttpClient =>
+    async (request) => {
+      requests.push(request);
+      return { status, url: request.url, header: () => null, body: "{}" };
+    };
+  const credentials = { username: "astro", password: "app-pass" };
+  await revokeAppPassword(answering(200), "https://cloud.example.com/nextcloud/", credentials);
+  expect(requests.map((r) => [r.method, r.url, r.headers])).toEqual([
+    [
+      "DELETE",
+      "https://cloud.example.com/nextcloud/ocs/v2.php/core/apppassword",
+      {
+        "OCS-APIRequest": "true",
+        Accept: "application/json",
+        Authorization: `Basic ${btoa("astro:app-pass")}`,
+      },
+    ],
+  ]);
+  // Revoked in Nextcloud's settings already: nothing left to do.
+  await revokeAppPassword(answering(401), "https://cloud.example.com", credentials);
+  // Not an app password (403), or a server that fails: it is still valid there.
+  await expect(
+    revokeAppPassword(answering(403), "https://cloud.example.com", credentials),
+  ).rejects.toThrow("would not revoke");
+  const offline: HttpClient = async (request) => {
+    throw new OfflineError(`${request.url} could not be reached.`);
+  };
+  await expect(
+    revokeAppPassword(offline, "https://cloud.example.com", credentials),
+  ).rejects.toThrow(OfflineError);
 });

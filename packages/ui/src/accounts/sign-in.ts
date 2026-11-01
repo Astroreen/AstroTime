@@ -178,7 +178,9 @@ export class SignIn {
         if (approved) {
           this.#set({ step: "checking" });
           const { server: approvedServer, ...credentials } = approved;
-          return await this.#finish(signal, serverAddress(approvedServer) ?? server, credentials);
+          return await this.#finish(signal, serverAddress(approvedServer) ?? server, credentials, {
+            loginFlow: true,
+          });
         }
         if (this.#clock.now() >= deadline) return this.#fail(signal, "expired");
         await this.#nap(signal);
@@ -213,7 +215,12 @@ export class SignIn {
     return this.#attempt.signal;
   }
 
-  async #finish(signal: AbortSignal, server: string, credentials: Credentials) {
+  async #finish(
+    signal: AbortSignal,
+    server: string,
+    credentials: Credentials,
+    { loginFlow = false } = {},
+  ) {
     const { http, store, secrets, signingInTo } = this.#options;
     // Once saved, the account is one of the platform's own.
     const end = signingInTo?.(server);
@@ -228,6 +235,7 @@ export class SignIn {
           serverUrl: server,
           homeUrl,
           credentials,
+          loginFlow,
         },
       );
     } finally {
@@ -237,7 +245,8 @@ export class SignIn {
     if (signal.aborted) {
       // Cancelled while it was saved: an account it added goes again. One it
       // signed in to again keeps its new password, as the user meant it to.
-      if (added) await removeAccount({ store, secrets }, account.id);
+      // Login Flow's app password, made for nothing, is revoked.
+      if (added) await removeAccount({ store, secrets, http }, account.id);
       return;
     }
     this.#set({ step: "done", account, added });

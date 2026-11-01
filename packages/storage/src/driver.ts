@@ -58,6 +58,19 @@ export class CommitInDoubtError extends HandOverError {
 }
 
 /**
+ * The hand-over a store operation failed with, if it did: Drizzle wraps a
+ * failed statement (`DrizzleQueryError`, the driver's error its `cause`), so
+ * a read can fail with a hand-over inside. The store's writes throw it bare
+ * (docs/plans/foundation.md#D99).
+ */
+export function handOverIn(error: unknown): HandOverError | null {
+  for (let at = error, depth = 0; at instanceof Error && depth < 8; at = at.cause, depth++) {
+    if (at instanceof HandOverError) return at;
+  }
+  return null;
+}
+
+/**
  * The page is not a secure context (plain `http` beyond localhost), where
  * browsers offer neither OPFS nor Web Locks, so the web store cannot open.
  */

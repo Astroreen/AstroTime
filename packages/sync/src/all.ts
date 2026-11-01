@@ -1,6 +1,7 @@
 import {
   CalDavProvider,
   ProxyRefusedError,
+  revokeAppPassword,
   type Credentials,
   type HttpClient,
 } from "@astrotime/caldav";
@@ -182,12 +183,28 @@ async function readCredentials(
   secrets: SecretStore,
   accountId: string,
 ): Promise<Credentials | null> {
+  return (await readSecret(secrets, accountId))?.credentials ?? null;
+}
+
+/** The credentials kept for an account, and whether Login Flow v2 gave its password. */
+async function readSecret(
+  secrets: SecretStore,
+  accountId: string,
+): Promise<{ readonly credentials: Credentials; readonly loginFlow: boolean } | null> {
   const value = await secrets.get(keyOf(accountId));
   if (value === null) return null;
   try {
-    const parsed = JSON.parse(value) as { username?: unknown; password?: unknown };
-    if (typeof parsed.username === "string" && typeof parsed.password === "string")
-      return { username: parsed.username, password: parsed.password };
+    const parsed = JSON.parse(value) as {
+      username?: unknown;
+      password?: unknown;
+      loginFlow?: unknown;
+    };
+    if (typeof parsed.username === "string" && typeof parsed.password === "string") {
+      return {
+        credentials: { username: parsed.username, password: parsed.password },
+        loginFlow: parsed.loginFlow === true,
+      };
+    }
   } catch {
     // Unreadable: as if none were saved, so the user signs in again.
   }
@@ -196,9 +213,11 @@ async function readCredentials(
 
 /**
  * Keeps an account the user signed in to: the account in the store, its
- * credentials in the platform's secret store. Signing in to an account that
- * is here already (the same calendar home and user) replaces its password
- * instead, as "sign in again" does.
+ * credentials in the platform's secret store, with whether Login Flow v2
+ * gave the password (an app password, revoked when the account goes).
+ * Signing in to an account that is here already (the same calendar home and
+ * user) replaces its password instead, as "sign in again" does; the store
+ * looks and adds in one transaction, so two sign-ins at once add one.
  */
 export async function saveAccount(
   context: Pick<SyncContext, "store" | "secrets">,
@@ -207,25 +226,17 @@ export async function saveAccount(
     readonly serverUrl: string;
     readonly homeUrl: string;
     readonly credentials: Credentials;
+    /** The password is an app password from Nextcloud's Login Flow v2. */
+    readonly loginFlow?: boolean;
   },
 ): Promise<{ readonly account: Account; readonly added: boolean }> {
   const { store, secrets } = context;
   const secret = JSON.stringify({
     username: input.credentials.username,
     password: input.credentials.password,
+    ...(input.loginFlow ? { loginFlow: true } : {}),
   });
-  const existing = (await store.accounts()).find(
-    (account) =>
-      account.provider === "caldav" &&
-      account.homeUrl === input.homeUrl &&
-      account.username === input.credentials.username,
-  );
-  if (existing) {
-    await secrets.set(keyOf(existing.id), secret);
-    return { account: existing, added: false };
-  }
-  const account = await store.addAccount({
-    provider: "caldav",
+  const { account, added } = await store.findOrAddAccount({
     name: input.name,
     serverUrl: input.serverUrl,
     username: input.credentials.username,
@@ -234,11 +245,19 @@ export async function saveAccount(
   try {
     await secrets.set(keyOf(account.id), secret);
   } catch (error) {
-    await store.removeAccount(account.id);
+    if (added) await store.removeAccount(account.id);
     throw error;
   }
-  return { account, added: true };
+  return { account, added };
 }
+
+/**
+ * What became of an account's app password when it was removed: `revoked`
+ * on the server, `kept` there (the server could not be reached, or would
+ * not; the user can revoke it in Nextcloud's security settings), or `none`:
+ * its password was no app password of Login Flow v2.
+ */
+export type AppPasswordRevocation = "revoked" | "kept" | "none";
 
 /**
  * Removes an account from this device: its credentials first (an account
@@ -246,26 +265,41 @@ export async function saveAccount(
  * invisible), then its calendars and items. Syncs that start from now on
  * leave it alone, and the running one and the one queued after it end
  * first, as does another instance's (the context's `lock`), so nothing of the
- * account is written while it goes.
+ * account is written while it goes. Then, with `http`, an app password Login
+ * Flow v2 gave it is revoked on the server, as far as that can be done.
  */
 export async function removeAccount(
-  context: Pick<SyncContext, "store" | "secrets" | "lock">,
+  context: Pick<SyncContext, "store" | "secrets" | "lock"> & { readonly http?: HttpClient },
   accountId: string,
-): Promise<void> {
+): Promise<AppPasswordRevocation> {
   const state = runsOf(context.store);
   // Counted, so overlapping removals of one account do not end each other's.
   state.removing.set(accountId, (state.removing.get(accountId) ?? 0) + 1);
+  let removed: { account: Account | undefined; secret: Awaited<ReturnType<typeof readSecret>> };
   try {
     // A sync begun before this call may be inside the account; any later one skips it.
     await Promise.all([state.current, state.next].map((run) => run?.catch(ignore)));
     // Another instance's sync may be inside it too; the next one finds it gone.
-    await alone(context, async () => {
+    removed = await alone(context, async () => {
+      const account = (await context.store.accounts()).find((a) => a.id === accountId);
+      const secret = await readSecret(context.secrets, accountId);
       await context.secrets.delete(keyOf(accountId));
       await context.store.removeAccount(accountId);
+      return { account, secret };
     });
   } finally {
     const left = (state.removing.get(accountId) ?? 1) - 1;
     if (left > 0) state.removing.set(accountId, left);
     else state.removing.delete(accountId);
+  }
+  // After the account is gone from here: the server is not waited on for that.
+  const { account, secret } = removed;
+  if (!secret?.loginFlow || !account) return "none";
+  if (!context.http) return "kept";
+  try {
+    await revokeAppPassword(context.http, account.serverUrl, secret.credentials);
+    return "revoked";
+  } catch {
+    return "kept";
   }
 }

@@ -1,5 +1,5 @@
 import type { HttpClient } from "./http.ts";
-import type { Credentials } from "./provider.ts";
+import { basic, type Credentials } from "./provider.ts";
 
 /** Server errors in a row after which a poll gives up (at a poll every 2 s, about 10 s). */
 const SERVER_ERRORS = 5;
@@ -72,6 +72,36 @@ export async function startLoginFlow(http: HttpClient, serverUrl: string): Promi
       return { server, username: result.loginName, password: result.appPassword };
     },
   };
+}
+
+/**
+ * Revokes an app password Login Flow v2 gave (Nextcloud's
+ * `DELETE ocs/v2.php/core/apppassword`, signed in with that password), so a
+ * device that no longer uses it leaves no way in behind
+ * (docs/plans/foundation.md#D90). A password the server refuses already
+ * (401: revoked in Nextcloud's settings) has nothing left to revoke. Throws
+ * `OfflineError` when the server cannot be reached, and an `Error` when it
+ * would not revoke it.
+ */
+export async function revokeAppPassword(
+  http: HttpClient,
+  serverUrl: string,
+  credentials: Credentials,
+): Promise<void> {
+  const response = await http({
+    method: "DELETE",
+    url: new URL(
+      "ocs/v2.php/core/apppassword",
+      serverUrl.endsWith("/") ? serverUrl : `${serverUrl}/`,
+    ).href,
+    headers: {
+      "OCS-APIRequest": "true",
+      Accept: "application/json",
+      Authorization: basic(credentials),
+    },
+  });
+  if (response.status === 200 || response.status === 401) return;
+  throw new Error(`${serverUrl} would not revoke the app password (${response.status}).`);
 }
 
 /**
