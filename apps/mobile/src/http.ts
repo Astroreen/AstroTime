@@ -59,9 +59,12 @@ export function nativeClient(
       // a redirect elsewhere, so sign-in names the address to sign in with.
       if (codeOf(error) === "cleartext") {
         const origin = (error as { data?: { origin?: unknown } }).data?.origin;
+        // The address itself, never typed: not allowed. A hop elsewhere: name it.
         throw new ProxyRefusedError(
           request,
-          `other-server ${typeof origin === "string" ? origin : ""}`,
+          typeof origin === "string" && origin !== new URL(request.url).origin
+            ? `other-server ${origin}`
+            : "not-allowed",
         );
       }
       throw error;

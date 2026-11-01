@@ -95,6 +95,21 @@ test("the plugin's offline is OfflineError; a hop to plain http names its addres
     reason: "other-server",
     location: "http://b.example:8080",
   });
+  // Refused on the address itself (not typed, not saved): not allowed, no other server named.
+  const itself = nativeClient(
+    {
+      request: async () => {
+        throw Object.assign(new Error("refused"), {
+          code: "cleartext",
+          data: { origin: "http://a.example" },
+        });
+      },
+    },
+    async () => [],
+  );
+  await expect(
+    itself({ method: "PROPFIND", url: "http://a.example/dav/", headers: {} }),
+  ).rejects.toMatchObject({ name: "ProxyRefusedError", reason: "not-allowed", location: null });
   const refused = nativeClient(plugin({ code: "redirects" }).http, async () => []);
   const error = await refused({ method: "GET", url: "http://a.example/", headers: {} }).catch(
     (caught: unknown) => caught,

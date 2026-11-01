@@ -94,6 +94,8 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
             // A REPORT of a large calendar may take a while to start answering.
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            // A whole hop, however slowly it trickles: a stalled server never holds a sync for ever.
+            .callTimeout(5, TimeUnit.MINUTES)
             .build()
 
     fun run(request: HttpRequest): HttpResponse {
