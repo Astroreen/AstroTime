@@ -163,10 +163,16 @@ export function androidReminders(options: {
    * asked once answered: a prompt the app ended in is asked again.
    */
   let asking: Promise<ReminderPermission> | null = null;
+  // A prompt that failed is not asked again by itself until the next run:
+  // every store write makes a set.
+  let failed = false;
   const request = (): Promise<ReminderPermission> =>
     (asking ??= (async () => {
       try {
-        const { display } = await native.requestPermissions();
+        const { display } = await native.requestPermissions().catch((error: unknown) => {
+          failed = true;
+          throw error;
+        });
         kept.asked = true;
         save();
         reads++;
@@ -208,7 +214,8 @@ export function androidReminders(options: {
     const at = now();
     // Android asks once by itself, the first time there is a reminder to
     // schedule (D66); after that it is the setting's switch that asks.
-    if (permission === "default" && !kept.asked && set.some((r) => r.fireAt >= at)) await request();
+    if (permission === "default" && !kept.asked && !failed && set.some((r) => r.fireAt >= at))
+      await request();
 
     const ids = new Set(set.map((reminder) => reminder.id));
     const gone: number[] = [];

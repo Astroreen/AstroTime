@@ -405,6 +405,9 @@ test("a request that fails is not kept as asked, though the set is saved after i
   await expect(reminders.schedule([reminder("call", NOW + MINUTE)])).rejects.toThrow(
     "No activity.",
   );
+  // Not asked again by itself in this run: every store write makes a set.
+  await reminders.schedule([reminder("call", NOW + MINUTE)]);
+  expect(phone.asked()).toBe(0);
   // Allowed in the system's settings meanwhile: the set is saved, "asked" not with it.
   phone.display = "granted";
   await reminders.schedule([reminder("call", NOW + MINUTE)]);

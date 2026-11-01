@@ -1,7 +1,7 @@
 // Adding an account, step by step (docs/plans/foundation.md#D92): a fake
 // Nextcloud answers Login Flow v2 and CalDAV discovery; the test decides when
 // time passes, so nothing here waits for a clock.
-import { CertificateError, type HttpClient } from "@astrotime/caldav";
+import { CertificateError, type HttpClient, type HttpRequest } from "@astrotime/caldav";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { expect, test } from "vite-plus/test";
@@ -93,6 +93,30 @@ test("a password sign-in finds the calendars and keeps the account, its password
     username: "astro",
     password: "pw",
   });
+});
+
+test("signing in again revokes the app password Login Flow gave the one replaced (foundation D90)", async () => {
+  const server = nextcloud({ password: "pw" });
+  let revoked: (request: HttpRequest) => void = () => {};
+  const revoking = new Promise<HttpRequest>((resolve) => (revoked = resolve));
+  const http: HttpClient = (request) => {
+    if (request.method === "DELETE") revoked(request);
+    return server.http(request);
+  };
+  const { store, secrets, signIn } = await setup({ ...server, http });
+  await signIn.withPassword({ server: "cloud.example.com", username: "astro", password: "pw" });
+  const [account] = await store.accounts();
+  // As if Login Flow had given the password kept.
+  secrets.values.set(
+    `account:${account!.id}`,
+    JSON.stringify({ username: "astro", password: "app-old", loginFlow: true }),
+  );
+  await signIn.withPassword({ server: "cloud.example.com", username: "astro", password: "pw" });
+  const request = await revoking;
+  expect([request.url, request.headers.Authorization]).toEqual([
+    "https://cloud.example.com/ocs/v2.php/core/apppassword",
+    `Basic ${btoa("astro:app-old")}`,
+  ]);
 });
 
 test("a wrong password says so, and keeps nothing", async () => {
