@@ -191,6 +191,13 @@ export async function webDriver(name = "astrotime"): Promise<SqlDriver> {
         // the worker goes with them, so the next tab can open the database.
         thread.terminate();
         gone();
+      } else if (event.data.type === "lost") {
+        // Not this tab's fault: its worker stops leading, with the files and
+        // the lock, and queues again; the tab goes on with the next leader.
+        console.error(event.data.error);
+        thread.terminate();
+        gone();
+        if (worker?.thread === thread && present && !broken) start();
       } else gone();
     });
     // A worker that fails to load or crashes answers nothing again.

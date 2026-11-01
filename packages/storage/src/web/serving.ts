@@ -87,7 +87,6 @@ export function serving(connection: Connection, out: Out): Serving {
     }
   };
 
-  /** Ends the owner's transaction, whatever ROLLBACK says: nobody else may wait on it. */
   /** Ends a gone tab's transaction; false when the connection is stuck in it. */
   const rollBack = (): boolean => {
     if (owner === undefined) return true;

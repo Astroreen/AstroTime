@@ -8,7 +8,10 @@ export type Command = { readonly type: "lead"; readonly name: string } | { reado
 /** A worker to its tab's driver. */
 export type Report =
   /** It held the lock but could not open the database; it let the lock go. */
-  { readonly type: "failed"; readonly error: string } | { readonly type: "closed" };
+  | { readonly type: "failed"; readonly error: string }
+  /** It led, and stopped: its connection was stuck in a gone tab's transaction. */
+  | { readonly type: "lost"; readonly error: string }
+  | { readonly type: "closed" };
 
 /** On the store's channel, which every driver and the leader hear. */
 export type Announcement =
