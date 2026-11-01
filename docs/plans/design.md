@@ -615,16 +615,22 @@ are its decisions.
 - **D134. One scale for type, one rule for corners, and empty screens that
   say what to do.**
   - **Type**: eight sizes, each a role, as tokens in `styles.css`
-    (`text-tiny` 11 px: hour labels, weekday names, week numbers;
+    (`text-tiny` 11 px: hour labels, the month picker's weekdays, chips and
+    "+N" where columns are narrow, a phone's Week and the Month;
     `text-chip` 11.5 px: an item's title on the grid, the strip and the
     Month; `text-note` 12.5 px: hints and second lines; `text-small` 13 px:
     group headings and secondary text; `text-body` 14 px; `text-row` 15 px:
-    a list's main line, a tab, the search field; `text-title` 19 px: a
-    dialog's or a day's title; `text-headline` 22 px: a screen's title, the
-    period). The UI had grown sixteen sizes in half-pixel steps (11 to 26
-    px), so two lists side by side rarely matched; each was mapped to the
-    nearest role, none moved by more than a pixel. The accounts' and
-    sign-in's screens keep theirs until they are reworked (Deferred).
+    a list's main line, a tab; `text-title` 19 px: a dialog's or a day's
+    title; `text-headline` 22 px: a screen's title, an item's in its details
+    and editor, the period), and one for fields: `text-input` 16 px, every
+    field that takes text or a choice (search, the edit dialog's fields,
+    sign-in's, Settings' choices), since iOS Safari zooms the page into a
+    field under 16 px when it gets the focus. The UI had grown sixteen sizes
+    in half-pixel steps (11 to 26 px), so two lists side by side rarely
+    matched; each was mapped to the nearest role, no text moved by more
+    than a pixel, and the fields grew to 16 px (the edit dialog's and
+    sign-in's from 15, Settings' choices from 14). The accounts' and
+    sign-in's screens keep their other sizes until they are reworked (Deferred).
   - **Corners**: an item 4–8 px, as dense as the reference (D43); a menu
     and a popover 12 px; a card in a screen (a task list's, a Settings
     group) and the Create button 16 px; a dialog 24 px; buttons and fields

@@ -161,7 +161,8 @@ export function TasksScreen({
           </button>
         )}
       </header>
-      {lists.length === 0 || selected === null ? (
+      {/* No list at all: with any, the first is open when none was chosen. */}
+      {selected === null ? (
         <EmptyState
           icon={<CheckCircleIcon className="size-6" />}
           title={t("tasks.noLists")}

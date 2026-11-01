@@ -59,7 +59,7 @@ export function SearchBar({
         }}
         aria-label={t("search.label")}
         placeholder={t("search.label")}
-        className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-row text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-accent"
+        className="h-10 min-w-0 flex-1 rounded-full bg-raised px-4 text-input text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-accent"
       />
     </div>
   );

@@ -37,11 +37,12 @@
   --color-danger-soft: light-dark(#fbe9e7, #3b2424);
 
   /*
-   * The type scale (design D134): eight sizes, each a role, instead of the
-   * sixteen the UI had grown. Dense as Google Calendar (D43): an item's
-   * title on the grid is 11.5 px, a dialog's title 22 px.
+   * The type scale (design D134): eight sizes, each a role, and the fields',
+   * instead of the sixteen the UI had grown. Dense as Google Calendar (D43):
+   * an item's title on the grid is 11.5 px, a dialog's title 19 px.
    */
-  /* Hour labels, weekday names, week numbers, counts. */
+  /* The smallest: hour labels, the month picker's weekdays, chips and "+N"
+   * where columns are narrow (a phone's Week, the Month). */
   --text-tiny: 11px;
   /* An item's title on the grid, the strip and the Month. */
   --text-chip: 11.5px;
@@ -55,8 +56,11 @@
   --text-row: 15px;
   /* A dialog's or a day's title, the drawer's wordmark. */
   --text-title: 19px;
-  /* A screen's title, an item's in its details, the period. */
+  /* A screen's title, an item's in its details and editor, the period. */
   --text-headline: 22px;
+  /* Every field that takes text or a choice: a browser zooms the page into
+   * one under 16 px when it gets the focus (iOS Safari), so none is smaller. */
+  --text-input: 16px;
 }
 
 @layer base {

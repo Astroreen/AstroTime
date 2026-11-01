@@ -66,7 +66,7 @@ export interface EditorState {
 }
 
 const field =
-  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-row text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
+  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 
 export function ItemEditor({
   state,

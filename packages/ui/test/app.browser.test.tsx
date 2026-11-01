@@ -734,3 +734,56 @@ test("the back button closes what is open, the topmost first, then lets the shel
   // Nothing open: the shell leaves the app.
   expect(press()).toBe(false);
 });
+
+test("the empty screens say what is empty and what to do, in English and Russian (design D134)", async () => {
+  for (const [language, words] of [
+    [
+      "en-US",
+      {
+        tasks: "Tasks",
+        noLists: "No task lists yet",
+        listHint: /^A task list is a calendar that holds tasks\./,
+        back: "Back to the calendar",
+        search: "Search",
+        searchHint: "Find events and tasks by their title",
+        none: "Nothing found",
+        scope: "Only the calendars shown are searched.",
+      },
+    ],
+    [
+      "ru-RU",
+      {
+        tasks: "Задачи",
+        noLists: "Списков задач пока нет",
+        listHint: /^Список задач — это календарь с задачами\./,
+        back: "Назад к календарю",
+        search: "Поиск",
+        searchHint: "Найдите мероприятие или задачу по названию",
+        none: "Ничего не найдено",
+        scope: "Поиск идёт только по показанным календарям.",
+      },
+    ],
+  ] as const) {
+    const store = await demoStore([language]);
+    // No calendar holds tasks: the tasks screen has no list to show.
+    for (const calendar of await store.calendars()) {
+      if (calendar.components.includes("VTODO")) await store.removeCalendar(calendar.id);
+    }
+    render(Promise.resolve(store), [language]);
+    await page.getByRole("button", { name: words.tasks, exact: true }).click();
+    const tasks = page.getByRole("region", { name: words.tasks });
+    await expect.element(tasks.getByText(words.noLists)).toBeInTheDocument();
+    await expect.element(tasks.getByText(words.listHint)).toBeInTheDocument();
+    expect(tasks.getByRole("tablist").elements()).toEqual([]);
+    await tasks.getByRole("button", { name: words.back }).click();
+
+    // Search before a word is typed, and when nothing is found.
+    await page.getByRole("button", { name: words.search, exact: true }).click();
+    await expect.element(page.getByText(words.searchHint)).toBeInTheDocument();
+    await expect.element(page.getByText(words.scope)).toBeInTheDocument();
+    await page.getByRole("searchbox").fill("zzzz");
+    await expect.element(page.getByText(words.none)).toBeInTheDocument();
+    await expect.element(page.getByText(words.scope)).toBeInTheDocument();
+    for (const cleanup of cleanups.splice(0).toReversed()) await cleanup();
+  }
+});

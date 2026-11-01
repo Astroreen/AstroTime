@@ -252,7 +252,7 @@ function Choice({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 max-w-full min-w-40 rounded-lg bg-raised px-2 text-body text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        className="h-9 max-w-full min-w-40 rounded-lg bg-raised px-2 text-input text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >
         {options.map(([option, name]) => (
           <option key={option} value={option}>
