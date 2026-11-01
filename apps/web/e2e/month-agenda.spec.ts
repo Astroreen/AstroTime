@@ -194,6 +194,11 @@ test("the drawer and the keys switch to every view (D88)", async ({ page }) => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ь", code: "KeyM" })),
   );
   await expect(dayButton(page, "Wednesday, November 4")).toBeVisible();
+  // On Dvorak the key in QWERTY's d place types e: the letter wins, not the place.
+  await page.evaluate(() =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", code: "KeyE" })),
+  );
+  await expect(header(page, "Thursday, November 5")).toHaveCount(0);
 });
 
 test.describe("in Russian", () => {

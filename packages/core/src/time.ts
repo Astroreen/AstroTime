@@ -123,7 +123,7 @@ const formatters = new Map<string, Intl.DateTimeFormat>();
 /**
  * Wall clocks already asked of `Intl`, by zone and instant: the views ask
  * for the same ones on every layout, and a series' expansion again for each
- * range. Cleared when full, so it stays small.
+ * range. Bounded: past the limit its oldest entry goes.
  */
 const wallClocks = new Map<string, string>();
 const WALL_CLOCKS = 20_000;

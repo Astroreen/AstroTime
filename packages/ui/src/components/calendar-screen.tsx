@@ -128,10 +128,13 @@ export function CalendarScreen({
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
-      // By the key's place, not its letter, so a Russian layout's ь is m.
-      const key = event.code.startsWith("Key")
-        ? event.code.slice(3).toLowerCase()
-        : event.key.toLowerCase();
+      // The letter typed on a Latin layout (Dvorak's t is t); on another
+      // script the key's place, so a Russian layout's ь is m.
+      const typed = event.key.toLowerCase();
+      const key =
+        /^[a-z]$/.test(typed) || !event.code.startsWith("Key")
+          ? typed
+          : event.code.slice(3).toLowerCase();
       if (key === "n" || key === "j") setAnchor((current) => stepAnchor(view, current, 1));
       else if (key === "p" || key === "k") setAnchor((current) => stepAnchor(view, current, -1));
       else if (key === "t") setAnchor(today);
