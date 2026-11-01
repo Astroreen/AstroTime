@@ -257,7 +257,7 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
     await page.goto(`http://127.0.0.1:${port}/`);
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
     await activated(page);
-    const [name] = (await page.evaluate(() => caches.keys())).filter(
+    const name = (await page.evaluate(() => caches.keys())).find(
       (cache) => cache !== "astrotime-versions",
     );
     const version = name!.slice("astrotime-".length);
