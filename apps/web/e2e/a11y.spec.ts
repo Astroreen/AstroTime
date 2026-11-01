@@ -14,21 +14,30 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"]
 const DISABLED: Record<string, string> = {};
 
 /**
- * Elements a rule is not run on, each with why (design D119). axe checks
- * every other rule on them, and this rule on everything else. Each matches
- * nothing taller than `tallest`, so it cannot hide a larger element that
- * comes to fail.
+ * Elements a rule is not run on, each with why (design D119), where the
+ * page matches `media`. axe checks every other rule on them, and this rule
+ * on everything else. Each matches nothing taller than `tallest`, so it
+ * cannot hide a larger element that comes to fail.
  */
-const EXEMPT: { rule: string; selector: string; tallest: number; reason: string }[] = [
+const EXEMPT: {
+  rule: string;
+  selector: string;
+  media: string;
+  tallest: number;
+  reason: string;
+}[] = [
   {
     rule: "target-size",
     // The Month's items, its "+N" and its undone chip: the button of each
     // one-line chip, 16 px high, a row every 17 px, as dense as the
-    // reference (design D86). Its day's number and the week's pill are checked.
+    // reference (design D86). Its day's number and the week's pill are
+    // checked. With no mouse or pen the chips are no buttons: a tap opens
+    // the day, the target (design D86), and nothing is exempt.
     selector: '[data-view="month"] [role="listitem"] > button',
+    media: "(any-pointer: fine)",
     tallest: 16,
     reason:
-      "an accepted gap, not conformance (design D119): Google's density; larger targets on a touch screen are deferred",
+      "an accepted gap, not conformance (design D119): Google's density, for a mouse; on a touch screen the day is the target",
   },
 ];
 
@@ -49,7 +58,13 @@ async function audit(page: Page, what: string): Promise<void> {
         .map((animation) => animation.finished.catch(() => undefined)),
     ),
   );
-  for (const { selector, tallest } of EXEMPT) {
+  const exempt = [];
+  for (const exemption of EXEMPT) {
+    if (await page.evaluate((media) => matchMedia(media).matches, exemption.media)) {
+      exempt.push(exemption);
+    }
+  }
+  for (const { selector, tallest } of exempt) {
     const heights = await page
       .locator(selector)
       .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
@@ -60,7 +75,7 @@ async function audit(page: Page, what: string): Promise<void> {
       )
       .toEqual([]);
   }
-  const exempted = [...new Set(EXEMPT.map(({ rule }) => rule))];
+  const exempted = [...new Set(exempt.map(({ rule }) => rule))];
   const results = await new AxeBuilder({ page })
     .withTags(TAGS)
     .disableRules([...Object.keys(DISABLED), ...exempted])
@@ -68,7 +83,7 @@ async function audit(page: Page, what: string): Promise<void> {
   const found = [...results.violations];
   for (const rule of exempted) {
     let builder = new AxeBuilder({ page }).withRules([rule]);
-    for (const { selector } of EXEMPT.filter((exempt) => exempt.rule === rule)) {
+    for (const { selector } of exempt.filter((exemption) => exemption.rule === rule)) {
       builder = builder.exclude(selector);
     }
     found.push(...(await builder.analyze()).violations);
@@ -91,19 +106,22 @@ async function show(page: Page, view: "day" | "3days" | "week" | "month" | "agen
 }
 
 for (const colorScheme of ["dark", "light"] as const) {
-  for (const [size, viewport] of [
-    ["phone", PHONE],
-    ["wide", WIDE],
+  // A phone is a touch screen with no mouse or pen; a wide screen has a mouse.
+  for (const [size, viewport, hasTouch] of [
+    ["phone", PHONE, true],
+    ["wide", WIDE, false],
   ] as const) {
     test(`every view, ${colorScheme}, ${size}`, async ({ browser }) => {
       const context = await browser.newContext({
         colorScheme,
         viewport,
+        hasTouch,
         locale: "en-US",
         timezoneId: "Europe/Vilnius",
       });
       const page = await context.newPage();
       await openDemo(page, "day");
+      expect(await page.evaluate(() => matchMedia("(any-pointer: fine)").matches)).toBe(!hasTouch);
       await expect(today(page).getByRole("listitem").first()).toBeVisible();
       for (const view of ["day", "3days", "week", "month", "agenda"] as const) {
         await show(page, view);

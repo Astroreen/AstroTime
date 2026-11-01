@@ -54,7 +54,8 @@ export interface Entries {
  * The visible calendars' occurrences from `from` to `to` (exclusive) and
  * the undone tasks before today, read again whenever the store changes
  * (docs/plans/foundation.md#D54). Nothing is read while `ids` (the calendars
- * are not read yet) or `from` is null; the last result stays meanwhile.
+ * are not read yet) or `from` is null; the last result stays meanwhile. A
+ * range whose read fails comes back empty.
  */
 export function useEntries(
   store: Store,
@@ -86,6 +87,17 @@ export function useEntries(
         return { from, to, entries: cache.entries(rows, range), undone };
       },
       setData,
+      (error) => {
+        console.error(error);
+        // A range that could not be read is had as empty, and one read
+        // before as it was, anew: either way a view that waits for this
+        // read draws it (design D59).
+        setData((last) =>
+          last?.from === from && last.to === to
+            ? { ...last }
+            : { from, to, entries: [], undone: last?.undone ?? [] },
+        );
+      },
     );
   }, [store, cache, idsKey, from, to, timeZone, today]);
   return data;

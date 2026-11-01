@@ -166,10 +166,14 @@ export const ru = {
   "grid.expand": "Показать все записи на весь день",
   "grid.collapse": "Свернуть записи на весь день",
 
-  "month.more_one": "Ещё {{count}} запись, {{day}}",
-  "month.more_few": "Ещё {{count}} записи, {{day}}",
-  "month.more_many": "Ещё {{count}} записей, {{day}}",
-  "month.more_other": "Ещё {{count}} записи, {{day}}",
+  "month.more_one": "+{{count}} запись, {{day}}",
+  "month.more_few": "+{{count}} записи, {{day}}",
+  "month.more_many": "+{{count}} записей, {{day}}",
+  "month.more_other": "+{{count}} записи, {{day}}",
+  "month.day_one": "{{day}}, {{count}} запись",
+  "month.day_few": "{{day}}, {{count}} записи",
+  "month.day_many": "{{day}}, {{count}} записей",
+  "month.day_other": "{{day}}, {{count}} записи",
 
   "agenda.dayOf": "День {{index}} из {{total}}",
   "agenda.nothingToday": "На сегодня ничего не запланировано",

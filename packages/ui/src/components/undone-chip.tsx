@@ -15,37 +15,45 @@ export function UndoneChip({
   tasks,
   colorOf,
   dense = false,
+  opens = true,
 }: {
   tasks: readonly UndoneTask[];
   colorOf: (task: UndoneTask) => string;
   /** The month's smaller chip (design D86). */
   dense?: boolean;
+  /** Without it the chip is no button: a tap goes to the Month's day under it (design D86). */
+  opens?: boolean;
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   const { open } = useEditing();
   const first = tasks[0];
+  const chip = `flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink ${
+    dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1.5 rounded-[5px] px-1.5 text-[13px]"
+  }`;
+  const face = (
+    <>
+      <span
+        aria-hidden="true"
+        className={`item-color grid shrink-0 place-items-center rounded-full bg-[var(--item-fill)] text-white ${dense ? "size-3" : "size-3.5"}`}
+        style={first ? ({ "--item": colorOf(first) } as CSSProperties) : undefined}
+      >
+        <CheckCircleIcon className={dense ? "size-3" : "size-3.5"} strokeWidth={2.5} />
+      </span>
+      <span
+        className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${dense ? "" : "text-ellipsis"}`}
+      >
+        {t("undone", { count: tasks.length })}
+      </span>
+    </>
+  );
+  if (!opens) return <div className={chip}>{face}</div>;
   return (
     <Popover.Root>
       <Popover.Trigger
-        className={`flex h-full w-full min-w-0 items-center bg-raised text-left leading-none font-medium text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-          dense
-            ? "gap-0.5 rounded-[4px] px-1 text-[11px]"
-            : "gap-1.5 rounded-[5px] px-1.5 text-[13px]"
-        }`}
+        className={`${chip} hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
       >
-        <span
-          aria-hidden="true"
-          className={`item-color grid shrink-0 place-items-center rounded-full bg-[var(--item-fill)] text-white ${dense ? "size-3" : "size-3.5"}`}
-          style={first ? ({ "--item": colorOf(first) } as CSSProperties) : undefined}
-        >
-          <CheckCircleIcon className={dense ? "size-3" : "size-3.5"} strokeWidth={2.5} />
-        </span>
-        <span
-          className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${dense ? "" : "text-ellipsis"}`}
-        >
-          {t("undone", { count: tasks.length })}
-        </span>
+        {face}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start" className="z-50">

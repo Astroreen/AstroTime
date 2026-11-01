@@ -2,7 +2,10 @@
 // day a tile with its number and its items as one-line chips, a span over
 // the week's days for an item over several; as many rows as the tiles fit,
 // then "+N". A day, or its "+N", opens in the Day view; an item, its details.
-// An item drags to another day, keeping its time (design D111).
+// With no mouse or pen, a tap anywhere on a day opens it, its items too, as
+// Google's Android app does: the day is the target, not a 16 px chip
+// (design D86, D119). An item drags to another day, keeping its time
+// (design D111).
 import { dayRange, isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -11,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { weekdayOf } from "../calendar/dates.ts";
 import { foldWeek, type MonthWeek } from "../calendar/month.ts";
 import type { StripSpan } from "../calendar/query.ts";
-import { useSwipe } from "../hooks.ts";
+import { useMediaQuery, useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
 import { GhostChip, StripChip } from "./items.tsx";
@@ -172,6 +175,13 @@ function Week({
           {...props}
           day={day}
           spans={shown.filter(({ span }) => span.firstDay === index)}
+          count={week.spans.reduce(
+            (sum, { span, entry }) =>
+              span.firstDay <= index && index <= span.lastDay
+                ? sum + (entry ? 1 : props.undone.length)
+                : sum,
+            0,
+          )}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
           column={index + 2}
@@ -202,6 +212,7 @@ function Week({
 function DayTile({
   day,
   spans,
+  count,
   more,
   moreRow,
   month,
@@ -218,18 +229,23 @@ function DayTile({
   day: string;
   /** The spans that start on this day (or, continued, at the week's start). */
   spans: readonly StripSpan[];
+  /** How many items the day has, the undone tasks on today among them. */
+  count: number;
   /** How many items "+N" stands for; 0 for none. */
   more: number;
   moreRow: number;
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
+  // With no mouse or pen a tap on a chip opens the day under it: the chips
+  // are no buttons. A device with one keeps them, a touch laptop too.
+  const touch = !useMediaQuery("(any-pointer: fine)");
   const outside = day.slice(0, 7) !== month.slice(0, 7);
   const isToday = day === today;
   const name = formats.fullDate(day);
 
   // A tap on the tile opens its day. Buttons act on their own: the number,
-  // "+N", the undone chip, and every item, which opens its details (PR 6).
+  // and with a mouse "+N", the undone chip and every item, which opens its details.
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target || !event.currentTarget.contains(target) || target.closest("button")) return;
@@ -247,7 +263,9 @@ function DayTile({
       <div className="flex justify-center pt-px">
         <button
           type="button"
-          aria-label={name}
+          // The day and how many items it has: a screen reader's way to them
+          // on a touch screen, where the chips are no buttons (design D86).
+          aria-label={count > 0 ? t("month.day", { day: name, count }) : name}
           aria-current={isToday ? "date" : undefined}
           onClick={() => onOpenDay(day)}
           className={[
@@ -284,10 +302,11 @@ function DayTile({
                   continuesBefore={span.continuesBefore}
                   continuesAfter={span.continuesAfter}
                   dense
+                  opens={!touch}
                 />
               ) : (
                 <div role="listitem" className="h-full">
-                  <UndoneChip tasks={undone} colorOf={undoneColor} dense />
+                  <UndoneChip tasks={undone} colorOf={undoneColor} dense opens={!touch} />
                 </div>
               )}
             </div>
@@ -296,20 +315,31 @@ function DayTile({
         {more > 0 && (
           <div
             role="listitem"
+            aria-label={touch ? t("month.more", { count: more, day: name }) : undefined}
             className="absolute inset-x-0 z-[1] px-[1.5px]"
             style={{ top: moreRow * ROW, height: ROW - 1 }}
           >
-            <button
-              type="button"
-              aria-label={t("month.more", { count: more, day: name })}
-              onClick={() => onOpenDay(day)}
-              className="h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] leading-none font-medium whitespace-nowrap text-ink-muted -outline-offset-2 hover:bg-raised"
-            >
-              {t("grid.more", { count: more })}
-            </button>
+            {touch ? (
+              // Drawn where the button is: its text centred, on the line's baseline.
+              <span className={`inline-flex items-center leading-none ${moreClass}`}>
+                {t("grid.more", { count: more })}
+              </span>
+            ) : (
+              <button
+                type="button"
+                aria-label={t("month.more", { count: more, day: name })}
+                onClick={() => onOpenDay(day)}
+                className={`leading-none ${moreClass} -outline-offset-2 hover:bg-raised`}
+              >
+                {t("grid.more", { count: more })}
+              </button>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+
+const moreClass =
+  "h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] font-medium whitespace-nowrap text-ink-muted";

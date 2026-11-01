@@ -109,6 +109,73 @@ test("a swipe on a touch screen moves to the next period", async ({ page }) => {
   await expect(header(page, "Saturday, November 7")).toBeVisible();
 });
 
+test("the time grid is drawn where it stays: the strip's items do not push it down as they arrive", async ({
+  page,
+}) => {
+  // Every state of the page that can be painted, as the time grid is in it:
+  // a mutation observer runs after each change, before the paint. Each
+  // state says the grid's top and its first day, or that there is no grid.
+  await page.addInitScript(() => {
+    const states: { top: number; first: string }[] = [];
+    Object.assign(window, { gridStates: states });
+    new MutationObserver(() => {
+      const column = document.querySelector('main [role="list"]:not([aria-label="All day"])');
+      let element = column;
+      while (element && getComputedStyle(element).overflowY !== "auto") {
+        element = element.parentElement;
+      }
+      states.push(
+        element
+          ? { top: element.getBoundingClientRect().top, first: column!.getAttribute("aria-label")! }
+          : { top: NaN, first: "" },
+      );
+    }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  let seen = 0;
+  /** The grid's states since the last look. */
+  const states = async () => {
+    const all = await page.evaluate(
+      () => (window as unknown as { gridStates: { top: number; first: string }[] }).gridStates,
+    );
+    const since = all.slice(seen);
+    seen = all.length;
+    return since;
+  };
+
+  // On open: no grid until the week is read, then the grid where it stays.
+  await openDemo(page, "week");
+  await expect(
+    strip(page).getByRole("listitem", { name: "Developer conference, All day" }),
+  ).toBeVisible();
+  await expect(
+    day(page, "Wednesday, November 4").getByRole("listitem", { name: /^Design review, / }),
+  ).toBeVisible();
+  const opened = (await states()).filter(({ first }) => first !== "");
+  const top = opened.at(-1)!.top;
+  expect(opened.length).toBeGreaterThan(0);
+  expect(opened.filter((state) => state.top !== top)).toEqual([]);
+
+  // To the next week and back: the week drawn stays where it was until the
+  // next one is read, and the next one is drawn where it stays from its
+  // first state, never with the old week's items on its days.
+  await page.locator("body").press("n");
+  await expect(day(page, "Wednesday, November 11").getByRole("listitem").first()).toBeVisible();
+  const next = await states();
+  const nextTop = next.at(-1)!.top;
+  /** The states that show a week somewhere else than where it stays. */
+  const astray = (list: typeof next) =>
+    list.filter(
+      (state) =>
+        state.first === "" || state.top !== (state.first === "Sunday, November 8" ? nextTop : top),
+    );
+  expect(astray(next)).toEqual([]);
+  await page.locator("body").press("p");
+  await expect(
+    strip(page).getByRole("listitem", { name: "Developer conference, All day" }),
+  ).toBeVisible();
+  expect(astray(await states())).toEqual([]);
+});
+
 test("the month picker jumps to the day picked", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await openDemo(page, "day");

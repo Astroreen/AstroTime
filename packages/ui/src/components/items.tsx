@@ -105,6 +105,9 @@ function dragProps(entry: Entry, source: DragSource | null, held: boolean) {
 /**
  * A chip of the all-day strip, one line high; in the month (`dense`) any
  * item is one, smaller, its title cut short as the reference's (design D86).
+ * Without `opens` it has no button of its own: a tap goes to what is under
+ * it, the Month's day on a touch screen (design D86), and a long press still
+ * drags it.
  */
 export function StripChip({
   entry,
@@ -112,12 +115,14 @@ export function StripChip({
   continuesBefore,
   continuesAfter,
   dense = false,
+  opens = true,
 }: {
   entry: Entry;
   allDay?: boolean;
   continuesBefore: boolean;
   continuesAfter: boolean;
   dense?: boolean;
+  opens?: boolean;
 }) {
   const { colorOf, found } = useCalendar();
   const label = useItemLabel();
@@ -142,7 +147,7 @@ export function StripChip({
     >
       {task && <CheckCircleIcon className={`${dense ? "size-3" : "size-3.5"} shrink-0`} />}
       <Title entry={entry} wrap={false} clip={dense} />
-      <Opener entry={entry} label={name} keys={source?.keys} />
+      {opens && <Opener entry={entry} label={name} keys={source?.keys} />}
     </div>
   );
 }

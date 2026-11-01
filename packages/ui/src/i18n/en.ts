@@ -160,8 +160,10 @@ export const en = {
   "grid.expand": "Show all all-day items",
   "grid.collapse": "Show fewer all-day items",
 
-  "month.more_one": "{{count}} more item on {{day}}",
-  "month.more_other": "{{count}} more items on {{day}}",
+  "month.more_one": "+{{count}} more item on {{day}}",
+  "month.more_other": "+{{count}} more items on {{day}}",
+  "month.day_one": "{{day}}, {{count}} item",
+  "month.day_other": "{{day}}, {{count}} items",
 
   "agenda.dayOf": "Day {{index}} of {{total}}",
   "agenda.nothingToday": "Nothing planned today",
