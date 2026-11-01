@@ -53,6 +53,12 @@ One word per concept. Use these terms in code, docs, commits and UI.
   share the column's width (D15).
 - **Tasks screen** — the task lists, as in Google Tasks: a screen on a
   phone, a panel beside the calendar on a wide screen (design D52).
+- **Task list** — a calendar that holds tasks (its components include
+  `VTODO`), a tab of the tasks screen. Never "todo list".
+- **Star** — a task marked as important on the tasks screen,
+  `X-ASTROTIME-STARRED:TRUE` (design D52); it is not `PRIORITY`.
+- **Settings** — the drawer's choices for this device: theme, language,
+  week start, clock, "hide completed" (design D96).
 - **Top bar**, **drawer**, **floating button** — the app shell: the bar
   with the month, search, "today" and the tasks toggle; the side menu with
   views, calendars and settings (a sidebar on a wide screen); the "+" button
