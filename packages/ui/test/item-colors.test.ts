@@ -2,7 +2,9 @@
 // for white text to reach 4.5:1. The rule is CSS (`--item-fill` in
 // styles.css); this models it and proves the bound over every hue, chroma
 // and lightness, inside sRGB and outside it, as the drawn 8-bit colour.
-// e2e/a11y.spec.ts checks that Chromium resolves the rule the same way.
+// Only the cap is read from the CSS: the rest of the formula (the luminance
+// weights, the clip) is modelled here, so e2e/a11y.spec.ts, which checks
+// that Chromium resolves the real rule, is the only guard for a change there.
 import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vite-plus/test";

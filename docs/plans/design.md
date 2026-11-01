@@ -472,7 +472,9 @@ the project.
     one on the grid, with a white mark. As a control it needs 3:1 against
     the drawer (1.4.11): on the light drawer the fill reaches 4.57:1
     against white, on the dark one a pale colour, darkened to 0.18, still
-    has 3.1:1, and a darker one is drawn as the server has it;
+    has 3.1:1, and a darker one is drawn as the server has it, so a
+    colour near the dark drawer's own falls below 3:1 there (Deferred:
+    contrast against the dark grid);
   - **muted text** is `ink-muted` at full strength: the faded variants
     (a day outside the month, the drawer's sync line, placeholders) were
     3.5:1;
@@ -582,7 +584,9 @@ the project.
   text reaches 4.5:1 on its fill, and on the light grid's white tiles the
   darkened fill reaches 4.57:1 as a shape, but a calendar colour as dark as
   the dark grid stays below 3:1 there; its title says what it is
-  ([D120](#D120)).
+  ([D120](#D120)). The same holds for the drawer's calendar checkbox on
+  the dark drawer (1.4.11): its label names the calendar. A floor on the
+  fill's lightness in the dark theme would close both.
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).

@@ -45,7 +45,8 @@ async function audit(page: Page, what: string): Promise<void> {
       document
         .getAnimations()
         .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
-        .map((animation) => animation.finished),
+        // One cancelled meanwhile (a popup unmounted) rejects: it is over all the same.
+        .map((animation) => animation.finished.catch(() => undefined)),
     ),
   );
   for (const { selector, tallest } of EXEMPT) {
