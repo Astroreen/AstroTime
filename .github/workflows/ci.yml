@@ -123,6 +123,19 @@ jobs:
           test "$status" = 304
           curl -fsS -o /dev/null -D page.headers http://127.0.0.1:8080/week/2026-11-02
           grep -qi '^cache-control: no-cache' page.headers
+      - name: The image sends its page under a Content Security Policy, with a fresh nonce each time (D110)
+        run: |
+          nonce() { tr -d '\r' < "$1" | grep -i '^content-security-policy:' | grep -o "'nonce-[^']*'" | tr -d "'" | cut -c7-; }
+          curl -fsS -D first.headers -o first.html http://127.0.0.1:8080/day/2026-11-04
+          curl -fsS -D second.headers -o second.html http://127.0.0.1:8080/day/2026-11-04
+          cat first.headers
+          first=$(nonce first.headers)
+          test -n "$first"
+          test "$first" != "$(nonce second.headers)"
+          grep -qF "nonce=\"${first}\"" first.html
+          if grep -q astrotime-csp-nonce first.html; then echo "the placeholder was left in the page" >&2; exit 1; fi
+          grep -qi "^content-security-policy: default-src 'none'" first.headers
+          grep -qi '^referrer-policy: same-origin' first.headers
       - name: With ASTROTIME_PUBLIC_HOST, the image refuses other hosts but answers its health check (D81)
         run: |
           docker run -d --name listed --network host -e PORT=8081 -e ASTROTIME_PROXY_ALLOW=https://cloud.example.com -e ASTROTIME_PUBLIC_HOST=calendar.example.com astrotime:ci

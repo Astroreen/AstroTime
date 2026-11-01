@@ -146,6 +146,8 @@ When you add a package, app or module, add its line here in the same PR.
     `accounts.spec.ts` signs in to a real Radicale (the one
     `packages/sync/test/servers.ts` starts), `accounts-screenshots.spec.ts`
     takes the accounts' evidence. → `plans/foundation.md#D92`
+  - `e2e/built/` — the production build on the image's server, under its
+    Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
@@ -155,8 +157,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D20`
 
 - `apps/proxy` (`@astrotime/proxy`) — the web app's server in production:
-  static files, `/healthz`, the CalDAV proxy, the Host allowlist; bundled
-  into the Docker image (`Dockerfile`). → `plans/foundation.md#D40`, `#D81`
+  static files, `/healthz`, the CalDAV proxy, the Host allowlist, the
+  Content Security Policy with a nonce per answer; bundled into the Docker
+  image (`Dockerfile`). → `plans/foundation.md#D40`, `#D81`, `#D110`
   - `compress.ts` — precompresses the built app (brotli, gzip) when the image
     is built. → `plans/foundation.md#D80`
 

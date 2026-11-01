@@ -1,8 +1,8 @@
 // The web app's server (docs/plans/foundation.md#D20, D39): the built app's
 // static files, and the CalDAV proxy at /dav-proxy/. It keeps no state.
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { Stats } from "node:fs";
-import { open, stat, type FileHandle } from "node:fs/promises";
+import { open, readFile, stat, type FileHandle } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -12,6 +12,49 @@ import { extname, join, resolve, sep } from "node:path";
 import { proxyHandler } from "@astrotime/caldav";
 
 export const DAV_PROXY_PREFIX = "/dav-proxy/";
+
+/**
+ * What Vite's build writes where the page's nonce goes (`html.cspNonce` in
+ * apps/web/vite.config.ts); each answer puts a fresh nonce there (D110).
+ */
+export const NONCE_PLACEHOLDER = "astrotime-csp-nonce";
+
+/**
+ * The app's Content Security Policy, from what the app needs and nothing more
+ * (D110). The page's carries its nonce; every file's carries it too without
+ * one, since a worker answers to the policy its own script came with.
+ */
+export function contentSecurityPolicy(nonce?: string): string {
+  return [
+    // Nothing the app does not ask for below: no frames, objects, fonts or media.
+    "default-src 'none'",
+    // The app's own scripts; SQLite's WebAssembly compiles in the store's worker.
+    "script-src 'self' 'wasm-unsafe-eval'",
+    // The built stylesheet, and the <style> elements Base UI adds, which carry the nonce.
+    nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
+    // SQLite's wasm, and every CalDAV request through /dav-proxy/ (D39).
+    "connect-src 'self'",
+    // The store's worker (packages/storage/src/web).
+    "worker-src 'self'",
+    "base-uri 'none'",
+    // Forms are handled by the app; none is ever submitted to a URL.
+    "form-action 'none'",
+    // No other site may frame the app (clickjacking).
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+/** The app page's other security headers (D110). */
+const PAGE_HEADERS = {
+  // Pages the app opens (Nextcloud's sign-in) get no handle back to it, and none to them.
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), display-capture=()",
+  // Not "no-referrer": that would send `Origin: null` with the app's own
+  // PROPFINDs, and the proxy refuses those (D39).
+  "Referrer-Policy": "same-origin",
+  "X-Content-Type-Options": "nosniff",
+};
 
 /** The largest request passed on: a calendar object or a report is a few kilobytes. */
 const MAX_REQUEST_BYTES = 10 * 1024 * 1024;
@@ -269,6 +312,10 @@ function staticFiles(root: string) {
       return;
     }
     const target = found ? file : join(root, "index.html");
+    if (extname(target).toLowerCase() === ".html") {
+      await page(target, req, res);
+      return;
+    }
     const variants = await Promise.all(
       ENCODINGS.map(async ([coding, suffix]) => ({
         coding,
@@ -299,6 +346,7 @@ function staticFiles(root: string) {
         ETag: etag,
         Vary: "Accept-Encoding",
         "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": contentSecurityPolicy(),
       };
       if (matches(req.headers["if-none-match"], etag)) {
         res.writeHead(304, headers).end();
@@ -317,6 +365,25 @@ function staticFiles(root: string) {
       });
     }
   };
+}
+
+/**
+ * The app's page, with a fresh nonce in its policy and its tags on every
+ * answer (D110). It is read whole (under a kilobyte) and sent as it is: not
+ * compressed, and with no ETag, so no 304 can pair a stored page with
+ * another answer's nonce.
+ */
+async function page(file: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const nonce = randomBytes(16).toString("base64");
+  const body = Buffer.from((await readFile(file, "utf8")).replaceAll(NONCE_PLACEHOLDER, nonce));
+  res.writeHead(200, {
+    ...PAGE_HEADERS,
+    "Content-Security-Policy": contentSecurityPolicy(nonce),
+    "Cache-Control": "no-cache",
+    "Content-Type": TYPES[".html"],
+    "Content-Length": body.length,
+  });
+  res.end(req.method === "HEAD" ? undefined : body);
 }
 
 /** The file's bytes up to the size it had when it was opened, never more than its Content-Length. */
@@ -387,8 +454,10 @@ function createAppHandler(options: ServerOptions, root: string): Server {
           response.headers.forEach((value, name) => res.setHeader(name, value));
           // Someone's calendar, fetched with their credentials: never kept by a cache.
           res.setHeader("Cache-Control", "no-store");
-          // Served on the app's own origin: never sniffed into something runnable.
+          // Served on the app's own origin: never sniffed into something runnable,
+          // and a page among them, opened by URL, runs nothing (D110).
           res.setHeader("X-Content-Type-Options", "nosniff");
+          res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
           if (!response.body) return void res.end();
           // Broken midway, the answer is cut off, not ended: a client must not
           // take a truncated multistatus for a whole one.

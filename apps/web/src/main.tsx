@@ -14,6 +14,9 @@ if (!root) throw new Error("#root is missing from index.html");
 
 const languages = navigator.languages.length > 0 ? navigator.languages : [navigator.language];
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+// The nonce the server gave this page for the styles Base UI adds
+// (docs/plans/foundation.md#D110); the browser keeps it from the DOM's attribute.
+const nonce = document.querySelector<HTMLMetaElement>("meta[property=csp-nonce]")?.nonce;
 
 async function openStore(): Promise<Store> {
   const store = await Store.open(await webDriver());
@@ -28,6 +31,11 @@ async function openStore(): Promise<Store> {
 
 createRoot(root).render(
   <StrictMode>
-    <AstroTime platform={webPlatform(openStore())} languages={languages} timeZone={timeZone} />
+    <AstroTime
+      platform={webPlatform(openStore())}
+      languages={languages}
+      timeZone={timeZone}
+      {...(nonce ? { nonce } : {})}
+    />
   </StrictMode>,
 );

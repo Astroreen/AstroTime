@@ -35,6 +35,7 @@ export default defineConfig({
             "drizzle-orm",
             "ical.js",
             "@base-ui/react/checkbox",
+            "@base-ui/react/csp-provider",
             "@base-ui/react/dialog",
             "@base-ui/react/menu",
             "@base-ui/react/popover",
