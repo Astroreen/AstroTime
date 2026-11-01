@@ -358,9 +358,9 @@ the project.
     the days between where it was picked up and where the pointer is (so a
     block at 10:05 moves to 10:20, as Nextcloud's calendar snaps; Google
     snaps to the quarter too); in the strip and the Month by days, keeping
-    its length and time. From the grid into the strip it becomes all day on
-    that day; from the strip onto the grid it starts at the slot, an hour
-    long. Dropped on the days shown only: past them is
+    its length and time. From the grid into the strip it becomes all day
+    from that day, over as many days as its times covered (one, for most);
+    from the strip onto the grid it starts at the slot, an hour long. Dropped on the days shown only: past them is
     [deferred](#deferred);
   - **resizing**: a block's bottom edge moves its end and its top edge its
     start (8 px each; a block under 28 px has only its bottom edge), on its

@@ -243,19 +243,32 @@ export function dropped(
     return moved(held, grip, days + to.minutes - from.minutes, timeZone);
   }
   if (from.minutes === null && to.minutes === null) return moved(held, grip, days, timeZone);
-  if (to.minutes === null) return allDayOn(held, to.day);
+  if (to.minutes === null) return allDayOn(held, to.day, timeZone);
   return timedAt(held, `${to.day}T00:00:00`, to.minutes, timeZone);
 }
 
 /** An item made all day on `day` (foundation D105: made all-day, its times move by whole days). */
-function allDayOn(held: Held, day: string): ItemTimes | null {
+function allDayOn(held: Held, day: string, timeZone: string): ItemTimes | null {
   const date = (d: string): ItemTime => ({ type: "date", date: d });
   const { start, end } = held.times;
   const next =
     held.kind === "event"
-      ? { start: date(day), end: date(addDays(day, 1)) }
+      ? { start: date(day), end: date(addDays(day, daysCovered(start, end, timeZone))) }
       : { start: start && date(day), end: end && date(day) };
   return sameTimes(next, held.times) ? null : next;
+}
+
+/**
+ * The days of the user's wall clock a timed event covers, at least one: an
+ * event over several days stays as long when it is made all day.
+ */
+function daysCovered(start: ItemTime | null, end: ItemTime | null, timeZone: string): number {
+  if (!start || !end || start.type === "date" || end.type === "date") return 1;
+  const first = wallClockOf(start, timeZone).slice(0, 10);
+  const until = wallClockOf(end, timeZone);
+  // An end at midnight closes the day before it.
+  const last = until.endsWith("T00:00:00") ? addDays(until.slice(0, 10), -1) : until.slice(0, 10);
+  return Math.max(1, daysBetween(first, last) + 1);
 }
 
 /** An item from the strip put on the time grid at `minutes` past `midnight` of the user's day. */

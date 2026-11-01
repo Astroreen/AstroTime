@@ -215,6 +215,15 @@ describe("what a drop gives an event", () => {
       timeZone,
     );
     expect(allDay).toEqual({ start: date("2026-11-06"), end: date("2026-11-07") });
+    // A timed event over three days (Mon 22:00 – Wed 09:00) stays three days long.
+    const night = dropped(
+      event(zoned("2026-11-02T22:00:00"), zoned("2026-11-04T09:00:00")),
+      "move",
+      { day: "2026-11-02", minutes: 22 * 60 },
+      { day: "2026-11-05", minutes: null },
+      timeZone,
+    );
+    expect(night).toEqual({ start: date("2026-11-05"), end: date("2026-11-08") });
     const timed = dropped(
       event(date("2026-11-04"), date("2026-11-07")),
       "move",
