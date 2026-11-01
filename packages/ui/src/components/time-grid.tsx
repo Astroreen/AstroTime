@@ -4,16 +4,11 @@
 // current-time line.
 import type { Span } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
-import {
-  useLayoutEffect,
-  useRef,
-  type CSSProperties,
-  type PointerEvent,
-  type ReactNode,
-} from "react";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { RangeLayout } from "../calendar/query.ts";
+import { useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { ChevronIcon } from "./icons.tsx";
 import { HOUR, StripChip, TimedItem } from "./items.tsx";
@@ -69,18 +64,7 @@ export function TimeGrid(props: TimeGridProps) {
     // Only on open; afterwards the user's scroll stays.
   }, []);
 
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-  const onPointerDown = (event: PointerEvent) => {
-    swipe.current = event.pointerType === "touch" ? { x: event.clientX, y: event.clientY } : null;
-  };
-  const onPointerUp = (event: PointerEvent) => {
-    const start = swipe.current;
-    swipe.current = null;
-    if (!start) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.abs(dx) > 56 && Math.abs(dx) > 2 * Math.abs(dy)) onSwipe(dx < 0 ? 1 : -1);
-  };
+  const swipe = useSwipe(onSwipe);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -116,9 +100,7 @@ export function TimeGrid(props: TimeGridProps) {
       <div
         ref={scroller}
         className="relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => (swipe.current = null)}
+        {...swipe}
       >
         <div className="grid" style={{ ...columns, height: 24 * HOUR }}>
           <div aria-hidden="true" className="relative">
@@ -159,7 +141,16 @@ export function TimeGrid(props: TimeGridProps) {
   );
 }
 
-function DayHeader({ day, today }: { day: string; today: string }) {
+/** A day's weekday and number, today's in the accent (design D49); the Agenda's days too. */
+export function DayHeader({
+  day,
+  today,
+  level = 2,
+}: {
+  day: string;
+  today: string;
+  level?: number;
+}) {
   const { formats } = useCalendar();
   const isToday = day === today;
   return (
@@ -168,7 +159,7 @@ function DayHeader({ day, today }: { day: string; today: string }) {
       aria-current={isToday ? "date" : undefined}
       aria-label={formats.fullDate(day)}
       role="heading"
-      aria-level={2}
+      aria-level={level}
     >
       <span
         aria-hidden="true"

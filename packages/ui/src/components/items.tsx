@@ -9,41 +9,64 @@ import type { Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { CheckCircleIcon } from "./icons.tsx";
 
-/** The accessible name of an item: what it is, its title and when. */
-function useItemLabel(): (entry: Entry, allDay: boolean) => string {
+/** When an item is: "All day", its time, or its start and end. */
+function useItemTime(): (entry: Entry, allDay: boolean) => string {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   return (entry, allDay) => {
-    const { item, start, end } = entry.occurrence;
+    const { start, end } = entry.occurrence;
+    if (allDay) return t("grid.allDay");
+    return wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
+      ? formats.time(start, timeZone)
+      : formats.timeRange(start, end, timeZone);
+  };
+}
+
+/** The accessible name of an item: what it is, its title and when. */
+function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => string {
+  const { t } = useTranslation();
+  const timeOf = useItemTime();
+  return (entry, allDay, time = timeOf(entry, allDay)) => {
+    const { item } = entry.occurrence;
     const title = item.summary?.trim() || t("item.untitled");
-    const time = allDay
-      ? t("grid.allDay")
-      : wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
-        ? formats.time(start, timeZone)
-        : formats.timeRange(start, end, timeZone);
     if (item.kind === "event") return t("item.event", { title, time });
     return t(entry.done ? "item.taskDone" : "item.task", { title, time });
   };
 }
 
-function Title({ entry, wrap }: { entry: Entry; wrap: boolean }) {
+/** The title on one line, cut with an ellipsis, or (`clip`) cut short as the month's chips are. */
+function Title({ entry, wrap, clip }: { entry: Entry; wrap: boolean; clip?: boolean }) {
   const { t } = useTranslation();
   const title = entry.occurrence.item.summary?.trim() || t("item.untitled");
-  return <span className={wrap ? "item-title-wrap" : "min-w-0 flex-1 truncate"}>{title}</span>;
+  if (wrap) return <span className="item-title-wrap">{title}</span>;
+  return (
+    <span
+      className={`item-title min-w-0 flex-1 overflow-hidden whitespace-nowrap ${clip ? "" : "text-ellipsis"}`}
+    >
+      {title}
+    </span>
+  );
 }
 
 const itemStyle = (color: string, style: CSSProperties = {}) =>
   ({ "--item": color, ...style }) as CSSProperties;
 
-/** A chip of the all-day strip, one line high. */
+/**
+ * A chip of the all-day strip, one line high; in the month (`dense`) any
+ * item is one, smaller, its title cut short as the reference's (design D86).
+ */
 export function StripChip({
   entry,
+  allDay = true,
   continuesBefore,
   continuesAfter,
+  dense = false,
 }: {
   entry: Entry;
+  allDay?: boolean;
   continuesBefore: boolean;
   continuesAfter: boolean;
+  dense?: boolean;
 }) {
   const { colorOf } = useCalendar();
   const label = useItemLabel();
@@ -51,17 +74,56 @@ export function StripChip({
   return (
     <div
       role="listitem"
-      aria-label={label(entry, true)}
+      aria-label={label(entry, allDay)}
       data-done={entry.done || undefined}
       className={[
-        "item flex h-full items-center gap-1 rounded-[5px] px-1.5 text-[13px] leading-none font-medium",
+        "item flex h-full items-center leading-none font-medium",
+        dense ? "gap-0.5 rounded-[4px] px-1 text-[11px]" : "gap-1 rounded-[5px] px-1.5 text-[13px]",
         continuesBefore ? "rounded-l-none" : "",
         continuesAfter ? "rounded-r-none" : "",
       ].join(" ")}
       style={itemStyle(colorOf(entry))}
     >
-      {task && <CheckCircleIcon className="size-3.5 shrink-0" />}
-      <Title entry={entry} wrap={false} />
+      {task && <CheckCircleIcon className={`${dense ? "size-3" : "size-3.5"} shrink-0`} />}
+      <Title entry={entry} wrap={false} clip={dense} />
+    </div>
+  );
+}
+
+/**
+ * An item of the Agenda (design D87): filled in its colour like every item,
+ * its title over when it is ("All day", "Day 2 of 3", its time).
+ */
+export function AgendaCard({
+  entry,
+  allDay,
+  part,
+}: {
+  entry: Entry;
+  allDay: boolean;
+  part: { index: number; total: number } | null;
+}) {
+  const { t } = useTranslation();
+  const { colorOf } = useCalendar();
+  const timeOf = useItemTime();
+  const label = useItemLabel();
+  const time = part ? t("agenda.dayOf", part) : timeOf(entry, allDay);
+  const task = entry.occurrence.item.kind === "task";
+  return (
+    <div
+      role="listitem"
+      aria-label={label(entry, allDay, time)}
+      data-done={entry.done || undefined}
+      className="item flex min-h-11 items-center gap-2 rounded-[8px] px-2.5 py-1.5"
+      style={itemStyle(colorOf(entry))}
+    >
+      {task && <CheckCircleIcon className="size-4 shrink-0" />}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex text-[14px] leading-tight font-medium">
+          <Title entry={entry} wrap={false} />
+        </span>
+        <span className="item-time truncate text-[12px] leading-tight">{time}</span>
+      </span>
     </div>
   );
 }

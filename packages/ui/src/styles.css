@@ -67,7 +67,7 @@
     color: oklch(from var(--fill) clamp(0.2, (0.72 - l) * 1000, 0.985) 0 0 / 0.7);
   }
   .item[data-done] .item-title-wrap,
-  .item[data-done] .truncate {
+  .item[data-done] .item-title {
     text-decoration: line-through;
   }
   .item-title-wrap {

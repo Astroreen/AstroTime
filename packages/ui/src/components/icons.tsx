@@ -96,3 +96,19 @@ export const ViewIcon = ({ columns, ...props }: Props & { columns: number }) => 
     {columns === 7 && <path d="M7.75 9v10.5M12 9v10.5M16.25 9v10.5" strokeWidth="1.5" />}
   </Icon>
 );
+
+/** The Month view's icon: a calendar page of weeks. */
+export const MonthIcon = (props: Props) => (
+  <Icon {...props}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M3.5 9h17M3.5 14.25h17M9.2 9v10.5M14.8 9v10.5" strokeWidth="1.5" />
+  </Icon>
+);
+
+/** The Agenda's icon: lines of a list. */
+export const AgendaIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M8.5 6.5h12M8.5 12h12M8.5 17.5h12" />
+    <path d="M4 6.5h.01M4 12h.01M4 17.5h.01" strokeWidth="2.6" />
+  </Icon>
+);

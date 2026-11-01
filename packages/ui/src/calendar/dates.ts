@@ -12,6 +12,11 @@ export function addDays(day: string, days: number): string {
   return dayOf(msOf(day) + days * DAY_MS);
 }
 
+/** Calendar days from `a` to `b`. */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((msOf(b) - msOf(a)) / DAY_MS);
+}
+
 /** `count` days from `first`. */
 export function daysFrom(first: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => addDays(first, i));
@@ -25,6 +30,26 @@ export function weekdayOf(day: string): number {
 /** The first day of the week holding `day`, for a week starting on `weekStart` (1–7). */
 export function startOfWeek(day: string, weekStart: number): string {
   return addDays(day, -((weekdayOf(day) - weekStart + 7) % 7));
+}
+
+/** The first day of the month holding `day`. */
+export function firstOfMonth(day: string): string {
+  return `${day.slice(0, 7)}-01`;
+}
+
+/** The first day of the month `months` after (or before) the one holding `day`. */
+export function addMonths(day: string, months: number): string {
+  const index = Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7)) - 1 + months;
+  const year = String(Math.floor(index / 12)).padStart(4, "0");
+  return `${year}-${String((index % 12) + 1).padStart(2, "0")}-01`;
+}
+
+/**
+ * The six weeks a month is shown in, from the week holding its first day,
+ * as the reference's month view and the month picker show them (design D86).
+ */
+export function monthDays(day: string, weekStart: number): string[] {
+  return daysFrom(startOfWeek(firstOfMonth(day), weekStart), 42);
 }
 
 /** The ISO 8601 week number (weeks start on Monday; week 1 holds January 4). */

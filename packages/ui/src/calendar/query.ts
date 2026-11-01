@@ -102,7 +102,7 @@ function expand(object: CalendarObject, row: StoredObject, range: Range): Entry[
 }
 
 /** A span of the all-day strip: an entry's, or the "N undone tasks" chip's on today (`entry: null`). */
-interface StripSpan {
+export interface StripSpan {
   readonly span: Span;
   readonly entry: Entry | null;
 }
@@ -118,6 +118,31 @@ export interface RangeLayout {
   readonly columns: readonly DayColumn[];
 }
 
+/** What every view's layout needs besides the entries. */
+export interface LayoutContext {
+  readonly today: string;
+  readonly timeZone: string;
+  /** How many undone tasks the chip on today stands for (design D51). */
+  readonly undone: number;
+}
+
+/**
+ * The entries the views draw, by occurrence: undone tasks due before today
+ * leave their days for the chip on today (design D51).
+ */
+export function shownOn(
+  entries: readonly Entry[],
+  today: string,
+  timeZone: string,
+): Map<Occurrence, Entry> {
+  const byOccurrence = new Map<Occurrence, Entry>();
+  for (const entry of entries) {
+    if (isUndoneBefore(entry.object, entry.occurrence, today, timeZone)) continue;
+    byOccurrence.set(entry.occurrence, entry);
+  }
+  return byOccurrence;
+}
+
 /**
  * Lays out the visible days. Undone tasks due before today leave their days
  * (design D51); when there are any, today's strip gets the chip that stands
@@ -127,14 +152,10 @@ export interface RangeLayout {
 export function layoutRange(
   entries: readonly Entry[],
   days: readonly string[],
-  options: { readonly today: string; readonly timeZone: string; readonly undone: number },
+  options: LayoutContext,
 ): RangeLayout {
   const { today, timeZone, undone } = options;
-  const byOccurrence = new Map<Occurrence, Entry>();
-  for (const entry of entries) {
-    if (isUndoneBefore(entry.object, entry.occurrence, today, timeZone)) continue;
-    byOccurrence.set(entry.occurrence, entry);
-  }
+  const byOccurrence = shownOn(entries, today, timeZone);
   const occurrences = [...byOccurrence.keys()];
   const chip = undone > 0 && days.includes(today) ? undoneChip(today) : null;
   const strip = layoutSpans(chip ? [...occurrences, chip] : occurrences, days, timeZone).map(
@@ -151,7 +172,7 @@ export function layoutRange(
 }
 
 /** A stand-in task for the "N undone tasks" chip, so the layout engine places it. */
-function undoneChip(today: string): Occurrence {
+export function undoneChip(today: string): Occurrence {
   const item: Task = {
     kind: "task",
     uid: "",

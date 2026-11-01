@@ -4,16 +4,9 @@ import { Popover } from "@base-ui/react/popover";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { daysFrom, startOfWeek } from "../calendar/dates.ts";
+import { addMonths, firstOfMonth, monthDays } from "../calendar/dates.ts";
 import { useCalendar } from "./context.ts";
 import { CaretIcon, ChevronIcon } from "./icons.tsx";
-
-const firstOfMonth = (day: string) => `${day.slice(0, 7)}-01`;
-const shiftMonth = (first: string, months: number) => {
-  const [year, month] = first.split("-").map(Number) as [number, number];
-  const index = year * 12 + month - 1 + months;
-  return `${String(Math.floor(index / 12)).padStart(4, "0")}-${String((index % 12) + 1).padStart(2, "0")}-01`;
-};
 
 export function MonthPicker({
   title,
@@ -32,7 +25,7 @@ export function MonthPicker({
   const { formats } = useCalendar();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => firstOfMonth(anchor));
-  const days = daysFrom(startOfWeek(month, weekStart), 42);
+  const days = monthDays(month, weekStart);
   return (
     <Popover.Root
       open={open}
@@ -55,7 +48,7 @@ export function MonthPicker({
               <button
                 type="button"
                 aria-label={t("picker.previousMonth")}
-                onClick={() => setMonth(shiftMonth(month, -1))}
+                onClick={() => setMonth(addMonths(month, -1))}
                 className="grid size-8 place-items-center rounded-full hover:bg-raised-hover"
               >
                 <ChevronIcon direction="left" className="size-5" />
@@ -66,7 +59,7 @@ export function MonthPicker({
               <button
                 type="button"
                 aria-label={t("picker.nextMonth")}
-                onClick={() => setMonth(shiftMonth(month, 1))}
+                onClick={() => setMonth(addMonths(month, 1))}
                 className="grid size-8 place-items-center rounded-full hover:bg-raised-hover"
               >
                 <ChevronIcon direction="right" className="size-5" />

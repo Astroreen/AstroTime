@@ -10,14 +10,24 @@ import { addDays } from "../calendar/dates.ts";
 import { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
+import { layoutMonth } from "../calendar/month.ts";
 import { layoutRange, ObjectCache, type Entry } from "../calendar/query.ts";
-import { isView, periodOf, stepAnchor, type View } from "../calendar/views.ts";
-import { useMediaQuery, useNow } from "../hooks.ts";
+import {
+  isView,
+  periodOf,
+  stepAnchor,
+  titleRange,
+  VIEW_KEYS,
+  type View,
+} from "../calendar/views.ts";
+import { useEntries, useMediaQuery, useNow } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
+import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
 import { ChevronIcon, MenuIcon, PlusIcon, TodayIcon } from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
+import { MonthView } from "./month-view.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 
 /** A calendar without a colour of its own (design D47). */
@@ -73,33 +83,21 @@ export function CalendarScreen({
       ),
     [store],
   );
-  const visible = (lists?.calendars ?? []).filter((calendar) => !hidden.has(calendar.id));
-  const visibleKey = visible.map((calendar) => calendar.id).join(",");
+  const ids = lists
+    ? lists.calendars.filter((calendar) => !hidden.has(calendar.id)).map((calendar) => calendar.id)
+    : null;
 
+  // One cache for every view, so a switch of views parses nothing again. The
+  // Agenda reads its own days as it scrolls; the other views read their period.
   const [cache] = useState(() => new ObjectCache());
-  const [data, setData] = useState<{ entries: Entry[]; undone: UndoneTask[] }>({
-    entries: [],
-    undone: [],
-  });
-  // Whether the lists arrived, not the lists themselves: they are new on every
-  // store write, and the query below already reruns on every write.
-  const loaded = lists !== null;
-  useEffect(() => {
-    if (!loaded) return;
-    const ids = visibleKey === "" ? [] : visibleKey.split(",");
-    const range = { from, to, timeZone };
-    return liveQuery(
-      store,
-      async () => {
-        const [rows, undone] = await Promise.all([
-          store.objectsBetween(ids, range),
-          store.undoneTasksBefore(ids, today, timeZone),
-        ]);
-        return { entries: cache.entries(rows, range), undone };
-      },
-      setData,
-    );
-  }, [store, cache, loaded, visibleKey, from, to, timeZone, today]);
+  const agenda = view === "agenda";
+  const data = useEntries(store, cache, {
+    ids,
+    from: agenda ? null : from,
+    to: agenda ? null : to,
+    today,
+    timeZone,
+  }) ?? { entries: [], undone: [] };
 
   const calendarColor = new Map(
     (lists?.calendars ?? []).map((calendar) => [
@@ -110,15 +108,21 @@ export function CalendarScreen({
   const colorOfCalendar = (id: string) => calendarColor.get(id) ?? DEFAULT_COLOR;
   const colorOf = (entry: Entry) =>
     validColor(entry.occurrence.item.color) ?? colorOfCalendar(entry.calendarId);
-  const layout = layoutRange(data.entries, days, { today, timeZone, undone: data.undone.length });
+  const layoutContext = { today, timeZone, undone: data.undone.length };
+  const undoneColor = (task: UndoneTask) => colorOfCalendar(task.object.calendarId);
 
   const go = (direction: 1 | -1) => setAnchor((current) => stepAnchor(view, current, direction));
   const pickView = (next: View) => {
     setView(next);
     setDrawerOpen(false);
   };
+  const openDay = (day: string) => {
+    setView("day");
+    setAnchor(day);
+  };
 
-  // Keys on a desktop: n or j for the next period, p or k for the previous, t for today.
+  // Keys on a desktop: n or j for the next period, p or k for the previous,
+  // t for today; d, x, w, m and a for the views, as Google Calendar's (design D88).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -128,12 +132,13 @@ export function CalendarScreen({
       if (key === "n" || key === "j") setAnchor((current) => stepAnchor(view, current, 1));
       else if (key === "p" || key === "k") setAnchor((current) => stepAnchor(view, current, -1));
       else if (key === "t") setAnchor(today);
+      else if (VIEW_KEYS.has(key)) setView(VIEW_KEYS.get(key)!);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, today]);
+  }, [view, today, setView]);
 
-  const title = formats.period(from, days.at(-1)!, today.slice(0, 4));
+  const title = formats.period(...titleRange(view, days, anchor), today.slice(0, 4));
   const drawer = (
     <DrawerContent
       view={view}
@@ -216,17 +221,39 @@ export function CalendarScreen({
               </nav>
             )}
             <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
-              <TimeGrid
-                days={days}
-                layout={layout}
-                today={today}
-                minutes={minutes}
-                undone={data.undone}
-                undoneColor={(task) => colorOfCalendar(task.object.calendarId)}
-                expanded={expanded}
-                onExpandedChange={setExpanded}
-                onSwipe={go}
-              />
+              {view === "agenda" ? (
+                <AgendaView
+                  store={store}
+                  cache={cache}
+                  ids={ids}
+                  anchor={anchor}
+                  today={today}
+                  undoneColor={undoneColor}
+                  onVisibleDay={setAnchor}
+                />
+              ) : view === "month" ? (
+                <MonthView
+                  month={titleRange(view, days, anchor)[0]}
+                  weeks={layoutMonth(data.entries, days, layoutContext)}
+                  today={today}
+                  undone={data.undone}
+                  undoneColor={undoneColor}
+                  onOpenDay={openDay}
+                  onSwipe={go}
+                />
+              ) : (
+                <TimeGrid
+                  days={days}
+                  layout={layoutRange(data.entries, days, layoutContext)}
+                  today={today}
+                  minutes={minutes}
+                  undone={data.undone}
+                  undoneColor={undoneColor}
+                  expanded={expanded}
+                  onExpandedChange={setExpanded}
+                  onSwipe={go}
+                />
+              )}
               {/* Creating items is PR 6 (docs/plans/foundation.md#pr-6--editing). */}
               <button
                 type="button"
