@@ -1,0 +1,179 @@
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 6.77ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 5.57ms
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (verified 15m ago)
+
+../.. prepare$ vp config --no-agent
+../.. prepare: Done
+Done in 543ms using pnpm v11.25.0
+$ playwright test
+
+Running 128 tests using 14 workers
+
+  -    1 [dev] › e2e/accounts-screenshots.spec.ts:126:3 › the first run and the add-account dialog, en
+  -    2 [dev] › e2e/accounts-screenshots.spec.ts:144:3 › Login Flow's waiting step and an error, en
+  -    3 [dev] › e2e/accounts-screenshots.spec.ts:186:3 › an account synced from Radicale, en
+  -    4 [dev] › e2e/accounts-screenshots.spec.ts:126:3 › the first run and the add-account dialog, ru
+  -    5 [dev] › e2e/accounts-screenshots.spec.ts:144:3 › Login Flow's waiting step and an error, ru
+  -    6 [dev] › e2e/accounts-screenshots.spec.ts:186:3 › an account synced from Radicale, ru
+  -    7 [dev] › e2e/drag-screenshots.spec.ts:84:5 › dragging, en, dark
+  -    8 [dev] › e2e/drag-screenshots.spec.ts:84:5 › dragging, en, light
+  -    9 [dev] › e2e/drag-screenshots.spec.ts:84:5 › dragging, ru, dark
+  -   10 [dev] › e2e/drag-screenshots.spec.ts:84:5 › dragging, ru, light
+  -   11 [dev] › e2e/editing-screenshots.spec.ts:88:5 › editing, en, dark
+  -   12 [dev] › e2e/editing-screenshots.spec.ts:88:5 › editing, en, light
+  -   13 [dev] › e2e/editing-screenshots.spec.ts:88:5 › editing, ru, dark
+  -   14 [dev] › e2e/editing-screenshots.spec.ts:88:5 › editing, ru, light
+  -   15 [dev] › e2e/screenshots.spec.ts:46:5 › views, en, dark
+  -   16 [dev] › e2e/screenshots.spec.ts:46:5 › views, en, light
+  -   17 [dev] › e2e/screenshots.spec.ts:46:5 › views, ru, dark
+  -   18 [dev] › e2e/screenshots.spec.ts:46:5 › views, ru, light
+  -   19 [dev] › e2e/screenshots.spec.ts:61:5 › Month and Agenda, en, dark
+  -   20 [dev] › e2e/screenshots.spec.ts:61:5 › Month and Agenda, en, light
+  -   21 [dev] › e2e/screenshots.spec.ts:61:5 › Month and Agenda, ru, dark
+  -   22 [dev] › e2e/screenshots.spec.ts:61:5 › Month and Agenda, ru, light
+  -   23 [dev] › e2e/screenshots.spec.ts:74:1 › the strip expanded, the undone tasks, the drawer and the month picker
+  -   24 [dev] › e2e/screenshots.spec.ts:96:1 › the tasks screen, its panel, the settings and search (design D52, D53)
+  -   25 [dev] › e2e/screenshots.spec.ts:149:1 › reminders: the setting, and a notification as the page draws it (foundation D101)
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+transforming...
+✓ 656 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       0.51 kB │ gzip:   0.29 kB
+dist/assets/sqlite3-opfs-async-proxy-DeAec6oc.js     32.46 kB
+dist/assets/sqlite3-worker1-GjKHjwg_.js             215.93 kB
+dist/assets/worker-BmcShC9h.js                      220.88 kB
+dist/assets/sqlite3-k2cTanUO.wasm                   879.08 kB │ gzip: 411.62 kB
+dist/assets/index-CkWyQ0LR.css                       36.40 kB │ gzip:   7.74 kB
+dist/assets/index-C96uMKsx.js                     1,021.73 kB │ gzip: 325.32 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.03s
+  ✓   35 [build] › e2e/built/build.setup.ts:7:1 › build the app (1.4s)
+  ✓   26 [dev] › e2e/calendar.spec.ts:14:3 › each view draws the demo data › Week: the locale's week, its all-day spans, timed items and task chips (3.9s)
+  ✓   29 [dev] › e2e/month-agenda.spec.ts:14:3 › Month › six weeks of tiles: chips in their colours, spans over days, today marked, +N on a full day (D86) (4.2s)
+  ✓   30 [dev] › e2e/search.spec.ts:10:1 › a title found jumps the calendar to its day and marks the item (4.4s)
+  ✓   33 [dev] › e2e/drag.spec.ts:49:1 › an event dragged to another time and day shows there in Week and the Agenda (5.1s)
+  ✓   37 [dev] › e2e/editing.spec.ts:25:1 › "+" creates an event on the day shown from the next half hour; it shows in Week, Month and Agenda (5.1s)
+  ✓   39 [dev] › e2e/accounts.spec.ts:51:1 › an account added by password syncs its calendars into the Week view, and Sync now brings a change from the server (5.2s)
+  ✓   36 [dev] › e2e/insets.spec.ts:29:1 › the top bar, the drawer, the tasks screen and the floating buttons clear the system bars (5.4s)
+  ✓   28 [dev] › e2e/reminders.spec.ts:46:1 › a reminder shows at its time, with what it is about and how soon (5.6s)
+  ✓   38 [dev] › e2e/tabs.spec.ts:23:1 › a second tab works on the same store, and shows at once what the other writes (5.9s)
+  ✓   40 [dev] › e2e/calendar.spec.ts:49:3 › each view draws the demo data › 3 days: today and the two after it, a start–due task as a block (2.5s)
+  ✓   27 [dev] › e2e/tasks.spec.ts:9:1 › the tasks panel beside the calendar: lists, counts, completing and starring (6.6s)
+  ✓   32 [dev] › e2e/settings.spec.ts:9:1 › theme, week start, clock, hide completed and language apply at once and are kept (6.6s)
+  ✓   41 [dev] › e2e/month-agenda.spec.ts:47:3 › Month › a tap on a day opens it in the Day view; a tap on an item its details (2.8s)
+  ✓   46 [dev] › e2e/insets.spec.ts:57:1 › without insets (a browser, a desktop) nothing moves (1.6s)
+  ✓   42 [dev] › e2e/search.spec.ts:32:1 › an undated task found opens on the tasks screen (2.7s)
+  ✓   43 [dev] › e2e/drag.spec.ts:73:1 › locator.dragTo moves an event onto another day's slot (2.2s)
+  ✓   44 [dev] › e2e/editing.spec.ts:52:1 › Enter in the title saves; a tap on an empty slot of the grid creates there (2.3s)
+  ✓   47 [dev] › e2e/reminders.spec.ts:62:1 › after the laptop slept past them, only a reminder still due shows; a tap opens its day and its details (2.5s)
+  ✓   49 [dev] › e2e/calendar.spec.ts:64:3 › each view draws the demo data › Day: overlapping items cascade, and the current time is marked (1.9s)
+  ✓   50 [dev] › e2e/tasks.spec.ts:75:1 › a series is completed one occurrence at a time, the earliest first (2.3s)
+  ✓   45 [dev] › e2e/accounts.spec.ts:90:1 › two tabs sync one at a time: a tab's sync waits for the other's to end (D91) (3.7s)
+  ✓   52 [dev] › e2e/search.spec.ts:55:3 › in Russian › finds a Russian title whatever its case and its ё (2.1s)
+  ✓   51 [dev] › e2e/month-agenda.spec.ts:69:3 › Month › previous, next, today and the month picker move by month (2.6s)
+  ✓   53 [dev] › e2e/drag.spec.ts:83:1 › a block's bottom edge resizes its end; its top edge its start (2.5s)
+  ✓   34 [dev] › e2e/editing-server.spec.ts:23:1 › an event created here reaches the server, and again once dragged (9.9s)
+  ✓   54 [dev] › e2e/editing.spec.ts:71:1 › an end before the start is refused, in words; Escape closes without saving (2.4s)
+  ✓   56 [dev] › e2e/calendar.spec.ts:77:1 › previous, next and today move by the view's period, by button and by key (2.6s)
+  ✓   57 [dev] › e2e/tasks.spec.ts:94:1 › on a phone the tasks are a screen of their own; back returns to the calendar (2.1s)
+  ✓   48 [dev] › e2e/tabs.spec.ts:39:1 › closing the leading tab hands the store to the other, which keeps working (5.0s)
+  ✓   59 [dev] › e2e/search.spec.ts:71:3 › in Russian › nothing found says so (1.6s)
+  ✓   55 [dev] › e2e/reminders.spec.ts:85:1 › where the browser already lets the site notify, reminders are on; turned off, they stop (3.0s)
+  ✓   60 [dev] › e2e/month-agenda.spec.ts:95:3 › Agenda › opens at today, headed by the undone tasks chip; items in time order, empty days left out (D87) (2.1s)
+  ✓   63 [dev] › e2e/calendar.spec.ts:102:1 › a swipe on a touch screen moves to the next period (1.4s)
+  ✓   61 [dev] › e2e/drag.spec.ts:107:1 › a task's chip drags its due (2.5s)
+  ✓   64 [dev] › e2e/tasks.spec.ts:111:3 › in Russian › the lists and their counts speak Russian (1.5s)
+  ✓   62 [dev] › e2e/editing.spec.ts:86:1 › the details of an event show where, the description's link, the reminder, the guests and the calendar; edit changes title and time (2.6s)
+  ✓   65 [dev] › e2e/tabs.spec.ts:64:1 › a write on its way when the leading tab closes fails, and runs once when sent again (1.7s)
+  ✓   58 [dev] › e2e/accounts.spec.ts:137:3 › in Russian › a wrong password says so, and nothing is kept (3.8s)
+  ✓   66 [dev] › e2e/month-agenda.spec.ts:127:3 › Agenda › scrolling reads further days both ways and keeps the list still; the top bar follows (2.0s)
+  ✓   67 [dev] › e2e/calendar.spec.ts:112:1 › the month picker jumps to the day picked (1.6s)
+  ✓   31 [dev] › e2e/a11y.spec.ts:82:5 › every view, dark, phone (13.9s)
+  ✓   68 [dev] › e2e/drag.spec.ts:120:1 › an occurrence of a series asks the scope; this occurrence moves it alone (1.9s)
+  ✓   69 [dev] › e2e/editing.spec.ts:115:3 › an occurrence of a series asks the scope (D11) › this occurrence: only Thursday's stand-up changes (2.4s)
+  ✓   71 [dev] › e2e/month-agenda.spec.ts:154:3 › Agenda › next and previous go to a month's first days; the button at the top reads earlier (1.8s)
+  ✓   72 [dev] › e2e/calendar.spec.ts:122:1 › the all-day strip folds past three rows to two and +N, and expands in place (D51) (1.9s)
+  ✓   70 [dev] › e2e/accounts.spec.ts:153:1 › removing an account, once confirmed, deletes its calendars from this device (2.9s)
+  ✓   74 [dev] › e2e/drag.spec.ts:139:1 › a drop on another day offers no all occurrences; cancelling leaves the series as it was (1.9s)
+  ✓   77 [dev] › e2e/calendar.spec.ts:140:1 › undone tasks due before today leave their days for one chip on today (D51) (1.5s)
+  ✓   76 [dev] › e2e/month-agenda.spec.ts:174:1 › the drawer and the keys switch to every view (D88) (1.7s)
+  ✓   78 [dev] › e2e/accounts.spec.ts:182:1 › a server this AstroTime does not carry is named as the administrator's choice (D20) (1.7s)
+  ✓   79 [dev] › e2e/drag.spec.ts:154:1 › Escape cancels a drag: the item stays, nothing opens (1.5s)
+  ✓   80 [dev] › e2e/calendar.spec.ts:165:1 › the theme follows the system; data-theme overrides it (D44) (494ms)
+  ✓   75 [dev] › e2e/editing.spec.ts:128:3 › an occurrence of a series asks the scope (D11) › all occurrences: a new time moves the whole series (2.9s)
+  ✓   81 [dev] › e2e/month-agenda.spec.ts:207:3 › in Russian › the month from Monday, its +N in Russian plurals; the Agenda's days (D17, D45) (1.8s)
+  ✓   83 [dev] › e2e/calendar.spec.ts:178:3 › in Russian › the UI speaks Russian, the week starts on Monday, the clock has 24 hours (D17, D45) (1.4s)
+  ✓   82 [dev] › e2e/drag.spec.ts:170:1 › a read-only calendar's item does not drag, by pointer or keys (1.6s)
+  ✓   84 [dev] › e2e/editing.spec.ts:141:3 › an occurrence of a series asks the scope (D11) › this and following: the series is split at Thursday (2.4s)
+  ✓   85 [dev] › e2e/calendar.spec.ts:205:1 › hiding a calendar in the drawer hides its items (1.4s)
+  ✓   86 [dev] › e2e/drag.spec.ts:189:1 › an all-day item drags to another day in the strip, keeping its length (1.5s)
+  ✓   88 [dev] › e2e/drag.spec.ts:204:1 › from the grid into the strip an event is all day; from the strip onto the grid an hour (1.7s)
+  ✓   87 [dev] › e2e/editing.spec.ts:156:3 › an occurrence of a series asks the scope (D11) › a new day offers only this occurrence or this and following (2.1s)
+  ✓   73 [dev] › e2e/a11y.spec.ts:82:5 › every view, dark, wide (9.5s)
+  ✓   89 [dev] › e2e/drag.spec.ts:225:1 › in the Month an item drags to another day, keeping its time (1.5s)
+  ✓   90 [dev] › e2e/editing.spec.ts:169:3 › an occurrence of a series asks the scope (D11) › deleting asks too: this occurrence leaves the others (1.8s)
+  ✓   92 [dev] › e2e/drag.spec.ts:243:1 › a press dragged over an empty slot sizes a new event (1.6s)
+  ✓   93 [dev] › e2e/editing.spec.ts:182:3 › an occurrence of a series asks the scope (D11) › deleting this and following ends the series (1.9s)
+  ✓   94 [dev] › e2e/drag.spec.ts:273:1 › keys move a focused item and say where it went; Shift moves its end (1.4s)
+  ✓   95 [dev] › e2e/editing.spec.ts:198:1 › an event that does not repeat is deleted once confirmed (1.8s)
+  ✓   96 [dev] › e2e/drag.spec.ts:329:3 › on a touch screen › a long press drags an item; let go, it is where the finger went (1.7s)
+  ✓   97 [dev] › e2e/editing.spec.ts:210:1 › a read-only calendar's item opens without edit or delete (1.4s)
+  ✓   98 [dev] › e2e/drag.spec.ts:343:3 › on a touch screen › a finger that moves before the long press scrolls; the item stays (1.4s)
+  ✓   99 [dev] › e2e/editing.spec.ts:225:1 › the tasks screen adds a task to its list, undated, and completes it (2.0s)
+  ✓   91 [dev] › e2e/a11y.spec.ts:82:5 › every view, light, phone (8.2s)
+  ✓  100 [dev] › e2e/editing.spec.ts:252:1 › a task's details complete it and star it (1.7s)
+  ✓  102 [dev] › e2e/editing.spec.ts:280:3 › the Conflicts list (D6) › applying mine again saves it over the server's version (1.9s)
+  ✓  103 [dev] › e2e/editing.spec.ts:300:3 › the Conflicts list (D6) › keeping the server's drops mine (1.9s)
+  ✓  104 [dev] › e2e/editing.spec.ts:320:3 › on a phone, in Russian › the edit dialog covers the screen and speaks Russian; a weekly rule reads in words (1.8s)
+  ✓  101 [dev] › e2e/a11y.spec.ts:82:5 › every view, light, wide (8.4s)
+  ✓  105 [dev] › e2e/a11y.spec.ts:106:7 › the screens and dialogs › dark › the drawer, the month picker, the strip expanded, the undone tasks on a phone (5.6s)
+  ✓  106 [dev] › e2e/a11y.spec.ts:134:7 › the screens and dialogs › dark › the tasks screen on a phone, its panel and the settings on a wide screen (3.5s)
+  ✓  107 [dev] › e2e/a11y.spec.ts:155:7 › the screens and dialogs › dark › search with results (2.2s)
+  ✓  108 [dev] › e2e/a11y.spec.ts:166:7 › the screens and dialogs › dark › the details, the edit dialog and the scope dialog (4.5s)
+  ✓  109 [dev] › e2e/a11y.spec.ts:186:7 › the screens and dialogs › dark › a task's details and its edit dialog (3.1s)
+  ✓  110 [dev] › e2e/a11y.spec.ts:200:7 › the screens and dialogs › dark › the accounts dialog, the conflicts list and adding an account (5.1s)
+  ✓  111 [dev] › e2e/a11y.spec.ts:106:7 › the screens and dialogs › light › the drawer, the month picker, the strip expanded, the undone tasks on a phone (5.8s)
+  ✓  112 [dev] › e2e/a11y.spec.ts:134:7 › the screens and dialogs › light › the tasks screen on a phone, its panel and the settings on a wide screen (3.5s)
+  ✓  113 [dev] › e2e/a11y.spec.ts:155:7 › the screens and dialogs › light › search with results (2.2s)
+  ✓  114 [dev] › e2e/a11y.spec.ts:166:7 › the screens and dialogs › light › the details, the edit dialog and the scope dialog (4.1s)
+  ✓  115 [dev] › e2e/a11y.spec.ts:186:7 › the screens and dialogs › light › a task's details and its edit dialog (3.0s)
+  ✓  116 [dev] › e2e/a11y.spec.ts:200:7 › the screens and dialogs › light › the accounts dialog, the conflicts list and adding an account (4.9s)
+  ✓  117 [dev] › e2e/a11y.spec.ts:228:1 › Russian: the document's language follows the UI's (2.7s)
+  ✓  118 [dev] › e2e/a11y.spec.ts:249:3 › what axe cannot see (design D120) › a dialog keeps the focus inside and gives it back to what opened it (1.6s)
+  ✓  119 [dev] › e2e/a11y.spec.ts:270:3 › what axe cannot see (design D120) › the drawer on a phone traps the focus and gives it back to the menu button (1.5s)
+  ✓  120 [dev] › e2e/a11y.spec.ts:286:3 › what axe cannot see (design D120) › a focused control shows a ring (1.5s)
+  ✓  121 [dev] › e2e/a11y.spec.ts:310:3 › what axe cannot see (design D120) › the page has its landmarks and a heading for the period (1.2s)
+  ✓  122 [dev] › e2e/a11y.spec.ts:323:5 › what axe cannot see (design D120) › at 320 px wide (400% zoom of 1280) the day view needs no sideways scroll (1.3s)
+  ✓  123 [dev] › e2e/a11y.spec.ts:323:5 › what axe cannot see (design D120) › at 320 px wide (400% zoom of 1280) the 3days view needs no sideways scroll (1.3s)
+  ✓  124 [dev] › e2e/a11y.spec.ts:323:5 › what axe cannot see (design D120) › at 320 px wide (400% zoom of 1280) the week view needs no sideways scroll (1.3s)
+  ✓  125 [dev] › e2e/a11y.spec.ts:323:5 › what axe cannot see (design D120) › at 320 px wide (400% zoom of 1280) the month view needs no sideways scroll (1.3s)
+  ✓  126 [dev] › e2e/a11y.spec.ts:323:5 › what axe cannot see (design D120) › at 320 px wide (400% zoom of 1280) the agenda view needs no sideways scroll (1.3s)
+  ✓  127 [dev] › e2e/a11y.spec.ts:338:3 › what axe cannot see (design D120) › asked for less motion, the drawer slides in no more (1.3s)
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+  ✓  128 [built] › e2e/built/csp.spec.ts:55:1 › the built app opens its store, adds an account through the proxy, and breaks no rule of its policy (1.6s)
+::notice title=🎭 Playwright Run Summary::  25 skipped%0A  103 passed (1.8m)
+
+  25 skipped
+  103 passed (1.8m)
+exit 0
