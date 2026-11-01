@@ -17,11 +17,25 @@ export interface MemoryServer extends Provider {
   offline: boolean;
   /** Off: writes answer without an ETag, as some servers do when they change what they store. */
   etagsOnWrite: boolean;
+  /**
+   * What the listing names of each calendar's state (D127): nothing (as by
+   * default), its sync token, its ctag alone, or a token spelled unlike the
+   * one its downloads give.
+   */
+  listing: "none" | "token" | "ctag" | "unlike";
+  /** On: a download leaves something out, and gives no token (D37). */
+  incomplete: boolean;
 }
 
 export function memoryServer(calendarUrl = "https://dav.example/cal/"): MemoryServer {
   let version = 0;
   const etag = () => `"${++version}"`;
+  /** The server's objects and their ETags: a token that changes whenever they do. */
+  const contents = () =>
+    [...server.objects]
+      .map(([href, object]) => `${href}=${object.etag}`)
+      .toSorted()
+      .join(",");
   const server: MemoryServer = {
     objects: new Map(),
     calendarList: [
@@ -36,9 +50,17 @@ export function memoryServer(calendarUrl = "https://dav.example/cal/"): MemorySe
     beforeWrite: () => {},
     offline: false,
     etagsOnWrite: true,
+    listing: "none",
+    incomplete: false,
     async calendars() {
       if (server.offline) throw new OfflineError("offline");
-      return server.calendarList;
+      if (server.listing === "none") return server.calendarList;
+      const state = {
+        token: { syncToken: `t:${contents()}`, ctag: null },
+        ctag: { syncToken: null, ctag: `c:${contents()}` },
+        unlike: { syncToken: `listed:${contents()}`, ctag: null },
+      }[server.listing];
+      return server.calendarList.map((calendar) => ({ ...calendar, state }));
     },
     async changes(_url, _state, known) {
       if (server.offline) throw new OfflineError("offline");
@@ -47,7 +69,12 @@ export function memoryServer(calendarUrl = "https://dav.example/cal/"): MemorySe
         if (known.get(href) !== object.etag) changed.push({ href, ...object });
       }
       const removed = [...known.keys()].filter((href) => !server.objects.has(href));
-      return { changed, removed, syncToken: `t${version}`, ctag: null };
+      if (server.incomplete) return { changed, removed, syncToken: null, ctag: null };
+      if (server.listing === "none")
+        return { changed, removed, syncToken: `t${version}`, ctag: null };
+      if (server.listing === "ctag")
+        return { changed, removed, syncToken: null, ctag: `c:${contents()}` };
+      return { changed, removed, syncToken: `t:${contents()}`, ctag: null };
     },
     async fetch(href) {
       if (server.offline) throw new OfflineError("offline");

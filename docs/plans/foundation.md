@@ -634,8 +634,7 @@ Decided while building PR 5a-3.
   - every 5 minutes while the page is visible and the browser online. A
     visible app is one the user is looking at, so a change made on another
     device should show within minutes, and a sync that finds nothing new is
-    one `PROPFIND` of the calendar home and one `sync-collection` per
-    calendar. A hidden tab's timers are throttled anyway; its next visit
+    one `PROPFIND` of the calendar home ([D127](#D127)). A hidden tab's timers are throttled anyway; its next visit
     syncs;
   - when the network comes back (`online`);
   - 2 seconds after the last of a burst of local changes (`changed()`, for
@@ -650,7 +649,7 @@ Decided while building PR 5a-3.
   go. It waits rather than skips: a skipped run has no report, so that
   tab would show nothing of its accounts, and a `fresh` request must lead
   to a sync that starts after it; a sync that finds nothing new costs one
-  `PROPFIND` and one `sync-collection` per calendar. A shell with one
+  `PROPFIND` ([D127](#D127)). A shell with one
   instance of its store needs no lock. A sync never holds the lock for
   ever: every request of every shell has a ceiling of 5 minutes with its
   answer, after which the server is offline (the web's `fetchClient({
@@ -1306,6 +1305,55 @@ Decided while closing the Deferred "Expanding long series from the middle".
     over placing each of its objects again (ical.js's time arithmetic), the
     layout and the query, none of them a fifth of a month's 100 ms
     ([Deferred](#deferred)).
+
+### Requests to servers
+
+Decided after v0.2.0, when the owner found AstroTime sent their Nextcloud
+too many requests.
+
+- **D126. What an action costs a server is measured and held to a budget.**
+  `packages/sync/test/recorder.ts` wraps any `HttpClient` and records each
+  request's method, path and status; `budget.test.ts` signs a device in to
+  Radicale (every run) and Nextcloud (the nightly job) and holds each action
+  to the exact requests it may send, so a change that sends more fails there
+  instead of on someone's server. With N calendars, measured on Radicale
+  3.8 and Nextcloud 31 (the same counts):
+
+  | action                                     | before                 | after     |
+  | ------------------------------------------ | ---------------------- | --------- |
+  | a sync that finds nothing new              | 1 + N                  | 1         |
+  | a sync after a change on another device    | 2 + N                  | 2         |
+  | an edit, a creation or a deletion here     | 2 + N                  | 3         |
+  | signing in: discovery, then the first sync | 2 + 1 + N + multigets¹ | 2 + 1 + N |
+
+  ¹ one `calendar-multiget` per 100 objects of each calendar. Every trigger
+  of [D91](#D91) costs one sync of each account, so the first row is what
+  start, coming back to the app, the 5-minute timer, the desktop's
+  15-minute timer ([desktop D75](desktop.md#D75)) and Android's hourly job
+  ([android D67](android.md#D67)) each cost.
+
+- **D127. One listing says which calendars changed.** The `PROPFIND` of the
+  calendar home that every sync starts with ([D37](#D37)) also reads each
+  calendar's `sync-token` (RFC 6578) and `getctag` (CalendarServer's), as
+  `RemoteCalendar.state`. A calendar with no pending change whose token, or
+  without one its ctag, is the one kept at its last download is not asked
+  anything more: nothing in it changed. The listing's state is never kept
+  itself, only a download's, so a download that left something out
+  ([D37](#D37)) or kept its old token is asked again. A `sync-collection`
+  asks for each changed object's `calendar-data` with its ETag, so a change
+  comes down in that one report; a multiget asks only for what a server
+  sent without data. The engine hands the provider the listing's state of
+  the calendar it asks about (`changes`' `listed`); a provider keeps none of
+  its own between calls. A calendar's first sync, on a server whose listing
+  names a sync token, is a `sync-collection` from the empty token (RFC 6578
+  §3.4): everything in one report, instead of a listing and a multiget per
+  100 objects; a server that refuses it, or answers no `sync-collection` at
+  all (501), gets the listing, which keeps the token the next sync compares.
+  An expired token
+  still falls back to the listing, which fetches only what changed. Nextcloud
+  and Radicale both name the same token in the listing as in the report, and
+  both send data in a `sync-collection`. A server that names neither token
+  nor ctag is downloaded every sync, as before.
 
 ## Deferred
 

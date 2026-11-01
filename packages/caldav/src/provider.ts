@@ -180,6 +180,9 @@ export class CalDavProvider implements Provider {
         "c:supported-calendar-component-set",
         "d:current-user-privilege-set",
         "nc:deleted-at",
+        // Whether anything in each calendar changed, for every calendar at once (D127).
+        "d:sync-token",
+        "cs:getctag",
       ]),
     });
     return (
@@ -197,66 +200,17 @@ export class CalDavProvider implements Provider {
     calendarUrl: string,
     state: SyncState,
     known: ReadonlyMap<string, string | null>,
+    listed?: SyncState,
   ): Promise<Changes> {
     const url = collection(calendarUrl);
-    if (state.syncToken) {
-      const removed = new Set<string>();
-      const changed = new Set<string>();
-      let token = state.syncToken;
-      // A server may truncate its answer (RFC 6578 §3.6: 507 on the
-      // collection itself) and give a token to continue from; we ask again
-      // until it is complete.
-      for (let page = 0; page < MAX_SYNC_PAGES; page++) {
-        const response = await this.request(
-          {
-            method: "REPORT",
-            url,
-            headers: { Depth: "1", "Content-Type": "application/xml; charset=utf-8" },
-            body: syncCollection(token, ["d:getetag"]),
-          },
-          // An expired or unknown token (RFC 6578 §3.2) falls back to a full listing.
-          [403, 409, 410],
-        );
-        if (response.status >= 300) {
-          // 403 and 409 mean an expired token only with RFC 6578's precondition;
-          // otherwise they are what they say (a revoked share, say).
-          if (
-            (response.status === 403 || response.status === 409) &&
-            !response.body.includes("valid-sync-token")
-          ) {
-            throw new HttpError({ method: "REPORT", url, headers: {} }, response);
-          }
-          break;
-        }
-        const status = parseMultistatus(response.body);
-        let truncated = false;
-        for (const r of status.responses) {
-          const href = this.own(r.href, response.url);
-          if (href === null) continue;
-          if (collection(href) === url) {
-            truncated ||= r.status === 507;
-            continue;
-          }
-          if (r.status === 404) {
-            removed.add(href);
-            changed.delete(href);
-          } else if (changedSince(known, href, text(r.props["getetag"]))) {
-            changed.add(href);
-            removed.delete(href);
-          }
-        }
-        if (!status.syncToken) break;
-        token = status.syncToken;
-        if (!truncated) {
-          const got = await this.multiget(url, [...changed]);
-          return {
-            changed: got.objects,
-            removed: [...removed, ...got.removed],
-            syncToken: got.incomplete ? null : token,
-            ctag: null,
-          };
-        }
-      }
+    // A first sync of a calendar whose listing names a sync token asks for
+    // everything since none (RFC 6578 §3.4): its objects and their data in
+    // one report, instead of a listing and its multigets (D127).
+    const initial = state.syncToken === null && known.size === 0 && !!listed?.syncToken;
+    const token = state.syncToken ?? (initial ? "" : null);
+    if (token !== null) {
+      const changes = await this.syncCollection(url, token, known);
+      if (changes) return changes;
     }
 
     // A full listing: every href with its ETag, compared with what the device has.
@@ -267,7 +221,7 @@ export class CalDavProvider implements Provider {
       body: propfind(["d:getetag", "d:resourcetype", "d:sync-token", "cs:getctag"]),
     });
     const status = parseMultistatus(response.body);
-    const listed = new Map<string, string | null>();
+    const members = new Map<string, string | null>();
     let syncToken: string | null = null;
     let ctag: string | null = null;
     for (const r of status.responses) {
@@ -279,12 +233,12 @@ export class CalDavProvider implements Provider {
         continue;
       }
       if (children(r.props["resourcetype"]).includes("collection")) continue;
-      listed.set(href, text(r.props["getetag"]));
+      members.set(href, text(r.props["getetag"]));
     }
-    const changed = [...listed]
+    const changed = [...members]
       .filter(([href, etag]) => changedSince(known, href, etag))
       .map(([href]) => href);
-    const removed = [...known.keys()].filter((href) => !listed.has(href));
+    const removed = [...known.keys()].filter((href) => !members.has(href));
     const got = await this.multiget(url, changed);
     return {
       changed: got.objects,
@@ -292,6 +246,86 @@ export class CalDavProvider implements Provider {
       syncToken: got.incomplete ? null : syncToken,
       ctag: got.incomplete ? null : ctag,
     };
+  }
+
+  /**
+   * What changed since `token` by `sync-collection` (RFC 6578), each changed
+   * object with its data, so a change costs one report (D127); `null` when
+   * the token is no longer good and a full listing has to say.
+   */
+  private async syncCollection(
+    url: string,
+    from: string,
+    known: ReadonlyMap<string, string | null>,
+  ): Promise<Changes | null> {
+    const removed = new Set<string>();
+    /** Changed objects, with their data where the report carried it. */
+    const changed = new Map<string, RemoteObject | null>();
+    let token = from;
+    // A server may truncate its answer (RFC 6578 §3.6: 507 on the
+    // collection itself) and give a token to continue from; we ask again
+    // until it is complete.
+    for (let page = 0; page < MAX_SYNC_PAGES; page++) {
+      const response = await this.request(
+        {
+          method: "REPORT",
+          url,
+          headers: { Depth: "1", "Content-Type": "application/xml; charset=utf-8" },
+          body: syncCollection(token, ["d:getetag", "c:calendar-data"]),
+        },
+        // An expired or unknown token (RFC 6578 §3.2) falls back to a full
+        // listing, as does a server that does not answer sync-collection
+        // (501), or a first sync from no token (400).
+        from === "" ? [400, 403, 409, 410, 501] : [403, 409, 410, 501],
+      );
+      if (response.status >= 300) {
+        // 403 and 409 mean an expired token only with RFC 6578's precondition;
+        // otherwise they are what they say (a revoked share, say).
+        if (
+          from !== "" &&
+          (response.status === 403 || response.status === 409) &&
+          !response.body.includes("valid-sync-token")
+        ) {
+          throw new HttpError({ method: "REPORT", url, headers: {} }, response);
+        }
+        return null;
+      }
+      const status = parseMultistatus(response.body);
+      let truncated = false;
+      for (const r of status.responses) {
+        const href = this.own(r.href, response.url);
+        if (href === null) continue;
+        if (collection(href) === url) {
+          truncated ||= r.status === 507;
+          continue;
+        }
+        const etag = text(r.props["getetag"]);
+        if (r.status === 404) {
+          removed.add(href);
+          changed.delete(href);
+        } else if (changedSince(known, href, etag)) {
+          const ics = text(r.props["calendar-data"]);
+          changed.set(href, ics ? { href, etag, ics } : null);
+          removed.delete(href);
+        }
+      }
+      if (!status.syncToken) return null;
+      token = status.syncToken;
+      if (truncated) continue;
+      // A server that sent no data for some (or none at all) is asked for them by multiget.
+      const missing = [...changed].filter(([, object]) => object === null).map(([href]) => href);
+      const got = await this.multiget(url, missing);
+      return {
+        changed: [
+          ...[...changed.values()].filter((object): object is RemoteObject => object !== null),
+          ...got.objects,
+        ],
+        removed: [...removed, ...got.removed],
+        syncToken: got.incomplete ? null : token,
+        ctag: null,
+      };
+    }
+    return null;
   }
 
   async fetch(href: string): Promise<RemoteObject | null> {
@@ -463,6 +497,10 @@ function toCalendar(response: DavResponse, base: string): RemoteCalendar {
     color: color(text(response.props["calendar-color"])),
     components,
     rights: rightsOf(response.props["current-user-privilege-set"]),
+    state: {
+      syncToken: text(response.props["sync-token"]),
+      ctag: text(response.props["getctag"]),
+    },
   };
 }
 
