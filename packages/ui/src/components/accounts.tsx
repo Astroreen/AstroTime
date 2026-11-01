@@ -152,23 +152,56 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
 }
 
 /**
- * An account's head: its avatar, its name, how it syncs and its menu; in the
- * accounts dialog and in Settings (design D137).
+ * An account: its avatar, its name, how it syncs and its menu, then "Sign in
+ * again" when it is signed out and what its last sync could not do; the same
+ * in the accounts dialog, Settings and, compact, the drawer (design D137).
+ * Compact, it is the drawer's head: no avatar, its name a heading, and the
+ * sync's problems left to the accounts dialog, where the account button's
+ * dot leads. Its status is text: the account button's one live region says
+ * what changes (D120).
  */
-export function AccountRow({ account, onLeave }: { account: Account; onLeave: () => void }) {
+export function AccountRow({
+  account,
+  onLeave,
+  compact = false,
+}: {
+  account: Account;
+  onLeave: () => void;
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const value = useAccounts();
+  const last = value.status.accounts.get(account.id)?.last;
+  const Name = compact ? "h3" : "p";
   return (
-    <div className="flex items-center gap-3">
-      <Avatar account={account} size="size-9" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body font-medium">{accountName(account, t)}</p>
-        {/* Said as it changes, so Sync now is heard to run and end. */}
-        <p role="status" className="truncate text-note text-ink-muted">
-          <StatusLine account={account} value={value} />
-        </p>
+    <div className="flex flex-col gap-1">
+      <div className={`flex items-center ${compact ? "gap-1" : "gap-3"}`}>
+        {!compact && <Avatar account={account} size="size-9" />}
+        <div className="min-w-0 flex-1">
+          <Name
+            className={`truncate ${compact ? "text-note text-ink-muted" : "text-body font-medium"}`}
+          >
+            {accountName(account, t)}
+          </Name>
+          <p className={`truncate text-ink-muted ${compact ? "text-tiny" : "text-note"}`}>
+            <StatusLine account={account} value={value} />
+          </p>
+        </div>
+        <AccountMenu account={account} onLeave={onLeave} />
       </div>
-      <AccountMenu account={account} onLeave={onLeave} />
+      {last?.status === "signed-out" && (
+        <button
+          type="button"
+          className={`${textButton} self-end`}
+          onClick={() => {
+            onLeave();
+            value.signIn(againRequest(account));
+          }}
+        >
+          {t("accounts.signInAgain")}
+        </button>
+      )}
+      {!compact && <Problems last={last} />}
     </div>
   );
 }
@@ -179,6 +212,13 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   const value = useAccounts();
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // A sync ran while the dialog was open: its end is said.
+  const [syncedWhileOpen, setSyncedWhileOpen] = useState(false);
+  const [wasRunning, setWasRunning] = useState(value.status.running);
+  if (wasRunning !== value.status.running) {
+    setWasRunning(value.status.running);
+    if (!value.status.running && open) setSyncedWhileOpen(true);
+  }
   const attention =
     value.conflicts > 0 ||
     accounts.some((account) => needsAttention(value.status.accounts.get(account.id)?.last));
@@ -188,7 +228,13 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
       ? t("accounts.buttonAttention")
       : t("accounts.button");
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        setSyncedWhileOpen(false);
+      }}
+    >
       <Dialog.Trigger
         aria-label={label}
         title={label}
@@ -210,9 +256,12 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         )}
       </Dialog.Trigger>
       {/*
-        A sync that comes to need the user is said, not only shown as the dot:
-        once, as it starts to. The text stays while the need does, through the
-        syncs that run meanwhile, so it is not said again after each.
+        The accounts' one live region while the dialog is closed (design D120,
+        D137). A sync that comes to need the user is said, not only shown as
+        the dot: once, as it starts to. The text stays while the need does,
+        through the syncs that run meanwhile, so it is not said again after
+        each. While the dialog is open the page around it is hidden from a
+        screen reader, so the dialog has its own, below.
       */}
       <span role="status" className="sr-only">
         {attention ? t("accounts.buttonAttention") : ""}
@@ -227,23 +276,24 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
             </Dialog.Close>
             <Dialog.Title className="text-title font-medium">{t("accounts.title")}</Dialog.Title>
           </div>
+          {/*
+            The accounts' one live region while the dialog is open: a sync is
+            said to run and to end (Sync now) once for every account, and how
+            it ended. The rows' status lines are text.
+          */}
+          <p role="status" className="sr-only">
+            {value.status.running
+              ? t("accounts.buttonSyncing")
+              : syncedWhileOpen
+                ? attention
+                  ? t("accounts.buttonAttention")
+                  : t("accounts.synced")
+                : ""}
+          </p>
           <ul className="flex flex-col gap-1">
             {accounts.map((account) => (
               <li key={account.id} className="flex flex-col gap-1 rounded-2xl bg-canvas p-3">
                 <AccountRow account={account} onLeave={() => setOpen(false)} />
-                {value.status.accounts.get(account.id)?.last.status === "signed-out" && (
-                  <button
-                    type="button"
-                    className={`${textButton} self-end`}
-                    onClick={() => {
-                      setOpen(false);
-                      value.signIn(againRequest(account));
-                    }}
-                  >
-                    {t("accounts.signInAgain")}
-                  </button>
-                )}
-                <Problems last={value.status.accounts.get(account.id)?.last} />
                 {/* The web keeps a store per origin: another address starts empty (D121). */}
                 {account.provider === "local" && value.platform.dataHome ? (
                   <p className="text-note text-ink-muted">
@@ -329,17 +379,10 @@ export function AccountSection({
   onLeave: () => void;
 }) {
   const { t } = useTranslation();
-  const value = useAccounts();
   return (
     <section aria-label={accountName(account, t)} className="flex flex-col">
-      <div className="flex items-center gap-1 pt-2 pr-1 pl-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-note text-ink-muted">{accountName(account, t)}</h3>
-          <p className="truncate text-tiny text-ink-muted">
-            <StatusLine account={account} value={value} />
-          </p>
-        </div>
-        <AccountMenu account={account} onLeave={onLeave} />
+      <div className="pt-2 pr-1 pl-4">
+        <AccountRow account={account} onLeave={onLeave} compact />
       </div>
       {calendars.length === 0 && (
         <p className="px-4 py-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>

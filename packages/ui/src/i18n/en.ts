@@ -76,6 +76,7 @@ export const en = {
 
   "accounts.button": "Accounts",
   "accounts.buttonSyncing": "Accounts, syncing",
+  "accounts.synced": "Accounts, synced",
   "accounts.buttonAttention": "Accounts, something needs your attention",
   "accounts.title": "Accounts",
   "accounts.add": "Add account",

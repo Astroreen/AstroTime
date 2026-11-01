@@ -136,7 +136,9 @@ test("Settings lists the accounts, each with how it syncs, its menu and its cale
   const settings = page.getByRole("dialog", { name: "Settings" });
   const accounts = settings.getByRole("region", { name: "Accounts" });
   const demo = accounts.getByRole("region", { name: "Demo" });
-  await expect(demo.getByRole("status")).toHaveText("Demo data, on this device only");
+  // Its sync line is text: the accounts' live region is one at a time, not one per row.
+  await expect(demo.getByText("Demo data, on this device only")).toBeVisible();
+  await expect(demo.getByRole("status")).toHaveCount(0);
   await expect(demo.getByRole("button", { name: "Options for Demo" })).toBeVisible();
   // The drawer's calendar row, the same checkbox in the same place.
   for (const name of ["Holidays", "Personal", "Tasks", "Work"]) {

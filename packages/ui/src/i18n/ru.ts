@@ -75,6 +75,7 @@ export const ru = {
 
   "accounts.button": "Аккаунты",
   "accounts.buttonSyncing": "Аккаунты, идёт синхронизация",
+  "accounts.synced": "Аккаунты синхронизированы",
   "accounts.buttonAttention": "Аккаунты, нужно ваше внимание",
   "accounts.title": "Аккаунты",
   "accounts.add": "Добавить аккаунт",

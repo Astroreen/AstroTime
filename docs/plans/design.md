@@ -548,8 +548,9 @@ the project.
     title and its time (D50); the hour tiles and labels are hidden from
     screen readers;
   - **live regions**: a drag's or a key's move is said ([D112](#D112)); in
-    the accounts dialog each account's sync line is a status, so Sync now
-    is heard to run and end, and a sync that comes to need the user is
+    the accounts dialog Sync now is heard to run and end (_since
+    [D137](#D137)_ in the dialog's one live region, not one per account's
+    sync line), and a sync that comes to need the user is
     said once, as the account button's dot shows it: the status keeps its
     text while the need lasts, through the syncs that run meanwhile, so it
     is not said again after each;
@@ -695,14 +696,26 @@ are its decisions.
   - Settings' calendar groups become one **Accounts** group: each account
     with its avatar, name, how it syncs (said as it changes) and its menu
     (sync now, sign in again, remove), then its calendars, then "Add
-    account". The same account row is the accounts dialog's
-    (`AccountRow`), and the same calendar row the drawer's (`CalendarRow`,
-    `calendar-row.tsx`): one component each, so the two places cannot drift.
+    account". The same account row (`AccountRow`) is the accounts
+    dialog's, Settings' and, compact, the drawer's head, and the same
+    calendar row the drawer's (`CalendarRow`, `calendar-row.tsx`): one
+    component each, so the places cannot drift. The row carries what tells
+    the user what to do: "Sign in again" for a signed-out account (in all
+    three) and what the last sync could not do, its errors and dropped
+    changes (in the dialog and Settings; compact, the drawer leaves them to
+    the dialog, where the account button's dot leads, and has no avatar,
+    its name a heading). Its sync line is text, not a live region: one per
+    row said a sync once for every account. The accounts' state has one
+    live region at a time: the account button's while the dialog is closed
+    (a need, said once, [D120](#D120)), and the dialog's own while it is
+    open, since a modal dialog hides the page from a screen reader (a sync
+    running, then ended: "synced", or still needing the user). `text-tiny`
+    in the drawer's compact head is [D134](#D134)'s smallest role.
     The calendar on this device is named as everywhere else ("On this
-    device"), not by its stored name. An account's menu or "Add account"
-    closes Settings before its dialog opens, as the drawer does. Its
-    conflicts and the sync's problems stay in the accounts dialog, where the
-    account button's dot leads.
+    device"), not by its stored name. An account's menu, "Sign in again" or
+    "Add account" closes Settings before its dialog opens, as the drawer
+    does. The conflicts stay in the accounts dialog, where the account
+    button's dot leads.
   - The accounts dialog is closed by ✕ before its title, as every other
     dialog, not by a word at its other end.
   - [D134](#D134)'s scale now holds everywhere: the accounts dialog,
