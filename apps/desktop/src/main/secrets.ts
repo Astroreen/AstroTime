@@ -94,7 +94,13 @@ export function secretsFile(options: {
     } catch {
       // Below: a file that is not ours reads as no secrets.
     }
-    console.error(`${path} is not a secrets file; its accounts sign in again.`);
+    // Kept aside, never overwritten: a newer build's file or a damaged one
+    // may still hold passwords someone wants back.
+    const aside = `${path}.unreadable-${Date.now()}`;
+    await rename(path, aside);
+    console.error(
+      `${path} is not a secrets file this build reads; moved to ${aside}; its accounts sign in again.`,
+    );
     return {};
   }
 
@@ -115,6 +121,16 @@ export function secretsFile(options: {
     await write(secrets);
   }
 
+  /** Writes a value again under the keyring, if there is one; a failure is logged, not thrown. */
+  async function upgrade(key: string, value: string): Promise<void> {
+    try {
+      const encrypted = await encrypt(value);
+      if (encrypted) await update(key, { saved: "keyring", value: encrypted });
+    } catch (error) {
+      console.warn(`The secret ${key} could not be written again; it stays as it was.`, error);
+    }
+  }
+
   return {
     get: (key) =>
       serial(async () => {
@@ -123,9 +139,10 @@ export function secretsFile(options: {
         const entry = (await read())[key];
         if (!entry || typeof entry.value !== "string") return null;
         if (entry.saved === "unprotected") {
-          // Saved unprotected for want of a keyring: into the keyring once one is here.
-          const encrypted = await encrypt(entry.value);
-          if (encrypted) await update(key, { saved: "keyring", value: encrypted });
+          // Saved unprotected for want of a keyring: into the keyring once one
+          // is here. Reading never fails for it: a write that fails is tried
+          // again at the next read.
+          await upgrade(key, entry.value);
           return entry.value;
         }
         if (entry.saved !== "keyring") return null;
@@ -139,10 +156,7 @@ export function secretsFile(options: {
           console.warn(`The secret ${key} does not decrypt; its account signs in again.`);
           return null;
         }
-        if (decrypted.shouldReEncrypt) {
-          const encrypted = await encrypt(decrypted.result);
-          if (encrypted) await update(key, { saved: "keyring", value: encrypted });
-        }
+        if (decrypted.shouldReEncrypt) await upgrade(key, decrypted.result);
         return decrypted.result;
       }),
 

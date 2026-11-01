@@ -1,9 +1,16 @@
 // Credentials on the desktop (docs/plans/desktop.md#D74): the file's format,
 // what is written where no keyring protects it, and entries that no longer
 // decrypt; on a fake safeStorage, which marks its ciphertext as Chromium does.
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
@@ -160,6 +167,12 @@ test("keeping a secret until the app quits drops the one saved before; a file no
 
   writeFileSync(path, "not json");
   expect(await open(path).get(KEY)).toBeNull();
-  writeFileSync(path, JSON.stringify({ version: 2, secrets: {} }));
-  expect(await open(path).get(KEY)).toBeNull();
+  // A newer build's file is kept aside, not overwritten by the next write.
+  const newer = JSON.stringify({ version: 2, secrets: { other: "kept" } });
+  writeFileSync(path, newer);
+  const reopened = open(path, { backend: "basic_text", prefix: "v10" });
+  expect(await reopened.get(KEY)).toBeNull();
+  await reopened.set(KEY, PASSWORD, "unprotected");
+  const aside = readdirSync(dirname(path)).filter((name) => name.includes(".unreadable-"));
+  expect(aside.map((name) => readFileSync(join(dirname(path), name), "utf8"))).toContain(newer);
 });
