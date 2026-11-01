@@ -515,6 +515,50 @@ test("an approval kept by an earlier build, with no deadline, gets one on take-u
   expect(page.secrets.values.has(PENDING_FLOW)).toBe(false);
 });
 
+test("one saver per approval: the background's, in the same page as the dialog saving it, does nothing (D121)", async () => {
+  const server = nextcloud({ password: "app-pass" });
+  // Discovery waits until the test lets it go, so the dialog's save is caught midway.
+  let discovering = () => {};
+  const midway = new Promise<void>((resolve) => (discovering = resolve));
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const http: HttpClient = async (request) => {
+    if (!request.url.includes("/login/v2") && request.method !== "DELETE") {
+      discovering();
+      await gate;
+    }
+    return server.http(request);
+  };
+  const dialog = await setup({ ...server, http });
+  const signingIn = dialog.signIn.withNextcloud({ server: SERVER });
+  await dialog.time.waiting();
+  server.approve();
+  dialog.time.advance(2_000);
+  await midway;
+  const discoveries = server.requests.length;
+
+  // The same page's background save: its approval, by the page's own id.
+  const background = new SignIn({
+    store: dialog.store,
+    secrets: dialog.secrets,
+    http,
+    openExternal: () => {},
+    pending: dialog.secrets,
+    page: dialog.page,
+  });
+  expect(await background.saveHeld()).toBe("none");
+  expect(server.requests).toHaveLength(discoveries);
+
+  release();
+  await signingIn;
+  expect(dialog.signIn.state).toMatchObject({ step: "done", added: true });
+  expect((await dialog.store.accounts()).filter((a) => a.provider === "caldav")).toHaveLength(1);
+  expect(server.requests.filter((r) => r.method === "DELETE")).toEqual([]);
+  expect(dialog.secrets.values.has(PENDING_FLOW)).toBe(false);
+  // Once it is saved, nothing is left for the background either.
+  expect(await background.saveHeld()).toBe("none");
+});
+
 test("an approval held is used again only for the same server: scheme, host, port and path (D121)", async () => {
   const server = nextcloud({ password: "app-pass" });
   let unreachable = true;

@@ -236,6 +236,23 @@ function takeUpApproval(
   });
 }
 
+/**
+ * Runs `work` as the one saver of the approval of `token`, in this page or
+ * any other (D121): `wait` queues behind a saver that runs; otherwise, while
+ * one runs, nothing is done and `busy` is true.
+ */
+async function asSaver<T>(
+  token: string,
+  wait: boolean,
+  work: () => Promise<T>,
+): Promise<{ busy: false; value: T } | { busy: true }> {
+  const locks = globalThis.navigator?.locks;
+  if (!locks) return { busy: false, value: await work() };
+  return locks.request(`astrotime-flow-${token}`, { ifAvailable: !wait }, async (lock) =>
+    lock ? { busy: false as const, value: await work() } : { busy: true as const },
+  );
+}
+
 /** Whether `page` may still revoke its approval of `token`: no other page took it up. */
 function stillOwns(pending: SecretStore, token: string, page: string): Promise<boolean> {
   return underLock(async () => {
@@ -505,25 +522,36 @@ export class SignIn {
       return "none";
     }
     const { token, server, username, password, heldUntil } = approval;
-    if (this.#clock.now() >= heldUntil) {
-      try {
-        await revokeAppPassword(http, server, { username, password });
-      } catch (error) {
-        if (error instanceof OfflineError) return "held";
-        console.error(error);
+    // One saver per approval: a save under way (this page's dialog's, or
+    // another page's) is left to finish, and this does nothing.
+    const run = await asSaver(token, false, async (): Promise<"saved" | "held" | "none"> => {
+      // Saved or revoked by another saver since it was taken up: nothing left.
+      if (readPending(await pending.get(PENDING_FLOW))?.token !== token) return "none";
+      if (this.#clock.now() >= heldUntil) {
+        try {
+          await revokeAppPassword(http, server, { username, password });
+        } catch (error) {
+          if (error instanceof OfflineError) return "held";
+          console.error(error);
+        }
+        await this.#forget(token);
+        return "none";
       }
-      await this.#forget(token);
+      await this.#saveApproved(signal, token, server, { username, password }, false);
+      const state = this.#state;
+      if (state.step === "done") return "saved";
+      if (state.step === "failed" && state.problem === "offline") {
+        // Held for the next try, by this page or another.
+        this.#approved = null;
+        return "held";
+      }
+      return "none";
+    });
+    if (run.busy) {
+      this.#set({ step: "idle" });
       return "none";
     }
-    await this.#saveApproved(signal, token, server, { username, password });
-    const state = this.#state;
-    if (state.step === "done") return "saved";
-    if (state.step === "failed" && state.problem === "offline") {
-      // Held for the next try, by this page or another.
-      this.#approved = null;
-      return "held";
-    }
-    return "none";
+    return run.value;
   }
 
   /** Polls until the user approves, the token expires, or another page ends the flow. */
@@ -609,7 +637,22 @@ export class SignIn {
     token: string,
     server: string,
     credentials: Credentials,
+    locked = true,
   ): Promise<void> {
+    if (locked) {
+      // One saver per approval (D121): behind a background save of it in
+      // this page, or a page that took it up, and nothing to do once that
+      // one saved or revoked it.
+      await asSaver(token, true, async () => {
+        if (this.#kept === token && !(await this.#stillKept(token))) {
+          if (signal.aborted) return;
+          this.#kept = null;
+          return this.#set({ step: "elsewhere" });
+        }
+        await this.#saveApproved(signal, token, server, credentials, false);
+      });
+      return;
+    }
     this.#approved = { token, server, credentials };
     this.#set({ step: "checking" });
     this.#finishing = true;

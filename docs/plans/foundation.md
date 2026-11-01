@@ -749,7 +749,10 @@ Decided while building PR 5a-3.
     `navigator.locks.query()` shows its owner's lock is not held (the page is
     gone), and makes itself the owner under the flow's lock; only the owner
     saves, forgets or revokes it, and a new flow never replaces an approval
-    whose owner lives. Saving fails because the server
+    whose owner lives. One saver at a time, in a page or across pages: every
+    save of an approval holds a Web Lock of its own, `astrotime-flow-<token>`;
+    the dialog's waits for a background save and then finds nothing left to
+    do, and the background's does nothing while another runs. Saving fails because the server
     cannot be reached: the approval is held (closing the dialog then leaves
     it held), and the next try saves it. Fails otherwise (no CalDAV server
     there), or the user cancels while it is being saved: the app password

@@ -712,6 +712,46 @@ test("a new event's dialog open as the calendar on this device steps aside saves
   expect(saved?.ics).toContain("SUMMARY:Made meanwhile");
 });
 
+test("a hidden calendar that stepped aside leaves the view and new items to the server's (D122)", async () => {
+  const store = await emptyStore();
+  const local = await store.addLocalCalendarIfEmpty({
+    account: "On this device",
+    calendar: "Personal",
+    color: "#4f8fd6",
+  });
+  const [personal] = await store.calendars(local!.id);
+  // The user hid the calendar on this device; then it steps aside for a server's.
+  const preferences = memoryPreferences({
+    "astrotime.view": "day",
+    "astrotime.hiddenCalendars": JSON.stringify([personal!.id]),
+  });
+  const server = await store.addAccount({
+    provider: "caldav",
+    name: "astro@cloud.example.com",
+    serverUrl: `${SERVER}/`,
+    username: "astro",
+  });
+  const work = await store.saveCalendar({
+    accountId: server.id,
+    url: `${SERVER}/remote.php/dav/calendars/astro/work/`,
+    name: "Work",
+    color: null,
+    components: ["VEVENT", "VTODO"],
+    rights: ALL_RIGHTS,
+  });
+  expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+  render(Promise.resolve(store), ["en-US"], { preferences });
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect.element(dialog.getByRole("combobox", { name: "Calendar" })).toHaveValue(work.id);
+  await dialog.getByRole("textbox", { name: "Title" }).fill("After the step aside");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect.element(dialog).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("listitem", { name: /^After the step aside, / }))
+    .toBeInTheDocument();
+});
+
 test("a deployment's preset asks for the password alone, by itself, and not again once closed (D123)", async () => {
   const store = await emptyStore();
   const server = nextcloud({ password: "right" });
