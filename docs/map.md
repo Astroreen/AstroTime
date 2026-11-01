@@ -82,7 +82,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D97`
     - every operation that writes is a transaction; `changeLocal`, a
       change made here that reads and writes in one (the edit dialog's
-      save). → `plans/foundation.md#D99`, `plans/foundation.md#D103`
+      save); `saveManyFromServer` and `removeManyFromServer`, a sync's
+      download in batches. → `plans/foundation.md#D99`, `plans/foundation.md#D103`
     - `reminders` — every calendar's reminders in a range of days.
       → `plans/foundation.md#D100`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),

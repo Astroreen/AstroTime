@@ -688,5 +688,87 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.conflicts()).toEqual([]);
       expect(await store.calendars()).toEqual([]);
     });
+
+    test("a sync's download is stored in one transaction with one notification, a pending change kept (D99)", async () => {
+      // The driver's transactions counted: each begins with BEGIN.
+      const inner = await driver();
+      let begins = 0;
+      const counted: SqlDriver = {
+        query: (statement, params) => inner.query(statement, params),
+        script: (statement) => {
+          if (statement.startsWith("BEGIN")) begins++;
+          return inner.script(statement);
+        },
+        close: () => inner.close(),
+        ...(inner.subscribe ? { subscribe: (listener) => inner.subscribe!(listener) } : {}),
+      };
+      const store = await Store.open(counted);
+      const account = await store.addAccount({
+        provider: "caldav",
+        name: "Nextcloud",
+        serverUrl: "https://cloud.example.com/",
+        username: "astro",
+      });
+      const calendar = await store.saveCalendar({
+        accountId: account.id,
+        url: "https://cloud.example.com/cal/",
+        name: "Cal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      await store.saveFromServer(calendar.id, { href: "mine.ics", etag: '"0"', ics: task("mine") });
+      const mine = await store.saveLocal(calendar.id, task("mine", "STATUS:COMPLETED\r\n"));
+      const listener = vi.fn();
+      store.subscribe(listener);
+      begins = 0;
+
+      const resources = Array.from({ length: 250 }, (_, i) => ({
+        href: `t${i}.ics`,
+        etag: `"${i}"`,
+        ics: task(`t${i}`),
+      }));
+      const result = await store.saveManyFromServer(calendar.id, [
+        ...resources,
+        { href: "broken.ics", etag: '"b"', ics: "not iCalendar" },
+        { href: "mine.ics", etag: '"1"', ics: task("mine", "SUMMARY:theirs\r\n") },
+        // An href given twice is one row, the later version.
+        { href: "t3.ics", etag: '"3b"', ics: task("t3", "SUMMARY:again\r\n") },
+      ]);
+      expect([begins, listener.mock.calls.length]).toEqual([1, 1]);
+      expect(result).toEqual({ saved: 250, invalid: ["broken.ics"] });
+      expect(await store.objectAt(calendar.id, "t3.ics")).toMatchObject({ etag: '"3b"' });
+      const stored = await store.hrefs(calendar.id);
+      expect(stored).toHaveLength(251);
+      // Ours stays pending, untouched; the others are the server's.
+      expect(await store.object(mine.id)).toMatchObject({ pending: "update", ics: mine.ics });
+      expect(await store.objectAt(calendar.id, "t7.ics")).toMatchObject({
+        etag: '"7"',
+        pending: "none",
+        baseIcs: task("t7"),
+      });
+
+      // Again, changed: rows are updated in place, under their ids.
+      const before = await store.objectAt(calendar.id, "t0.ics");
+      await store.saveManyFromServer(calendar.id, [
+        { href: "t0.ics", etag: '"x"', ics: task("t0", "STATUS:COMPLETED\r\n") },
+      ]);
+      expect(await store.objectAt(calendar.id, "t0.ics")).toMatchObject({
+        id: before!.id,
+        etag: '"x"',
+        done: true,
+      });
+
+      // Removed by the server: in one transaction, ours only if still as seen.
+      listener.mockClear();
+      begins = 0;
+      const gone = stored
+        .filter((o) => o.href.startsWith("t"))
+        .map(({ id }) => ({ id, pending: "none" as const }));
+      const removed = await store.removeManyFromServer([...gone, { id: mine.id, pending: "none" }]);
+      expect([begins, listener.mock.calls.length, removed.length]).toEqual([1, 1, 250]);
+      expect((await store.hrefs(calendar.id)).map((o) => o.href)).toEqual(["mine.ics"]);
+      await store.close();
+    });
   });
 }

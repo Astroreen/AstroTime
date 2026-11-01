@@ -296,6 +296,118 @@ export class Store {
   }
 
   /**
+   * Stores many of the server's resources at once, as `saveFromServer` does
+   * each (a pending local change is kept), in one transaction with one
+   * notification: a sync's download (docs/plans/foundation.md#D99). One
+   * that is not iCalendar is left out and named in `invalid` (D36); one
+   * whose row holds a pending change here is left as it is; `saved` counts
+   * the rows written, an href given twice once.
+   */
+  saveManyFromServer(
+    calendarId: string,
+    resources: readonly { href: string; etag: string | null; ics: string }[],
+  ): Promise<{ readonly saved: number; readonly invalid: readonly string[] }> {
+    return this.exclusive(async () => {
+      const invalid: string[] = [];
+      const pending = new Set<string>();
+      for (let i = 0; i < resources.length; i += IN_LIMIT) {
+        const hrefs = resources.slice(i, i + IN_LIMIT).map((r) => r.href);
+        const rows = await this.db
+          .select({ href: schema.objects.href })
+          .from(schema.objects)
+          .where(
+            and(
+              eq(schema.objects.calendarId, calendarId),
+              inArray(schema.objects.href, hrefs),
+              ne(schema.objects.pending, "none"),
+            ),
+          );
+        for (const row of rows) pending.add(row.href);
+      }
+      const now = Date.now();
+      const values: (typeof schema.objects.$inferInsert)[] = [];
+      // One row per href, the last one given: a statement cannot write a row twice.
+      const unique = new Map(resources.map((resource) => [resource.href, resource]));
+      for (const resource of unique.values()) {
+        // A local change still pending is never overwritten (AGENTS.md rule 2).
+        if (pending.has(resource.href)) continue;
+        let object: CalendarObject;
+        try {
+          object = CalendarObject.parse(resource.ics);
+        } catch (error) {
+          if (!(error instanceof CalendarObjectError)) throw error;
+          invalid.push(resource.href);
+          continue;
+        }
+        values.push({
+          id: crypto.randomUUID(),
+          calendarId,
+          href: resource.href,
+          etag: resource.etag,
+          ...indexOf(object),
+          ics: resource.ics,
+          pending: "none",
+          baseIcs: resource.ics,
+          updatedAt: now,
+        });
+      }
+      // Several rows a statement, within SQLite's limit on bound values.
+      for (let i = 0; i < values.length; i += ROWS_PER_INSERT) {
+        await this.db
+          .insert(schema.objects)
+          .values(values.slice(i, i + ROWS_PER_INSERT))
+          .onConflictDoUpdate({
+            target: [schema.objects.calendarId, schema.objects.href],
+            set: {
+              etag: sql`excluded.etag`,
+              uid: sql`excluded.uid`,
+              kind: sql`excluded.kind`,
+              ics: sql`excluded.ics`,
+              pending: sql`excluded.pending`,
+              baseIcs: sql`excluded.base_ics`,
+              startMs: sql`excluded.start_ms`,
+              endMs: sql`excluded.end_ms`,
+              done: sql`excluded.done`,
+              titles: sql`excluded.titles`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+      }
+      return { saved: values.length, invalid };
+    });
+  }
+
+  /**
+   * Removes objects the server deleted, in one transaction with one
+   * notification: each only if its pending change is still the one the sync
+   * saw, so an edit made here meanwhile stays for the next sync (D38).
+   * Returns the ids removed.
+   */
+  removeManyFromServer(
+    seen: readonly { id: string; pending: StoredObject["pending"] }[],
+  ): Promise<readonly string[]> {
+    return this.exclusive(async () => {
+      const removed: string[] = [];
+      for (const pending of ["none", "create", "update", "delete"] as const) {
+        const ids = seen.filter((object) => object.pending === pending).map((o) => o.id);
+        for (let i = 0; i < ids.length; i += IN_LIMIT) {
+          const rows = await this.db
+            .delete(schema.objects)
+            .where(
+              and(
+                inArray(schema.objects.id, ids.slice(i, i + IN_LIMIT)),
+                eq(schema.objects.pending, pending),
+              ),
+            )
+            .returning({ id: schema.objects.id });
+          for (const row of rows) removed.push(row.id);
+        }
+      }
+      return removed;
+    });
+  }
+
+  /**
    * Stores a change made on this device, for the sync engine to upload. A new
    * object gets the href the sync engine will create it under.
    */
@@ -793,6 +905,11 @@ function indexOf(object: CalendarObject) {
 }
 
 const RIGHTS = ["create", "edit", "delete"] as const;
+
+/** Values in one `IN (…)` list, well within SQLite's limit on bound values. */
+const IN_LIMIT = 500;
+/** Rows in one multi-row `INSERT`: 15 columns each, 1 500 bound values. */
+const ROWS_PER_INSERT = 100;
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they

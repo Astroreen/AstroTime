@@ -66,6 +66,10 @@ export function browserEnvironment(): SyncEnvironment {
 
 const AUTOMATIC: SyncRequest = { fresh: false, retry: false };
 
+/** An account no sync can help until the user acts: signed out, or refused by the proxy. */
+const waitsForUser = (account: AccountSync) =>
+  account.status === "signed-out" || account.status === "refused";
+
 /** One account's latest sync, for the UI. */
 export interface AccountStatus {
   readonly last: AccountSync;
@@ -229,8 +233,12 @@ export class SyncScheduler {
       this.#lastOffline = report.accounts.some(
         (account) => account.status === "offline" && !held.has(account.accountId),
       );
-      // A change made here is sent once every account took a sync.
-      if (report.accounts.every((account) => account.status === "synced")) this.#unsent = false;
+      // A change made here is sent once every account that can sync took
+      // one. One signed out (none saved, or its password refused and held)
+      // or refused by the proxy waits for the user, not for a sync: a
+      // hold's end would only wake a hidden tab for nothing.
+      if (report.accounts.every((account) => account.status === "synced" || waitsForUser(account)))
+        this.#unsent = false;
       this.#retryAt(report.retryAt);
       // Every account syncAll knows is in its report: one removed meanwhile drops out.
       const before = this.#status.accounts;

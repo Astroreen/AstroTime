@@ -43,7 +43,8 @@ jobs:
       # The Login Flow v2 test approves access on Nextcloud's own pages in Chromium.
       - uses: ./.github/actions/chromium
       - run: pipx install radicale==3.8.0
-      - run: vp test run --project unit packages/sync
+      # One file at a time: the SQLite-backed Nextcloud answers 500 to writers at once.
+      - run: vp test run --project unit --no-file-parallelism packages/sync
 
   desktop-login-flow:
     name: Desktop Login Flow v2 against Nextcloud
