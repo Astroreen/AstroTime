@@ -33,6 +33,27 @@ describe("series", () => {
     expect(occurrences[0]?.recurrenceId).toMatchObject({ local: "2026-10-20T10:00:00" });
   });
 
+  test("Nextcloud's web Calendar: weekly six times, the second moved, the third deleted", () => {
+    const occurrences = occurrencesBetween(
+      load("nextcloud-web-event-recurring.ics"),
+      vilnius("2026-11-01", "2027-02-01"),
+    );
+    expect(starts(occurrences)).toEqual([
+      "2026-11-23T09:00:00",
+      "2026-11-30T11:00:00",
+      "2026-12-14T09:00:00",
+      "2026-12-21T09:00:00",
+      "2026-12-28T09:00:00",
+    ]);
+    expect(occurrences.map((o) => o.item.summary)).toEqual([
+      "Standup",
+      "Standup (moved)",
+      "Standup",
+      "Standup",
+      "Standup",
+    ]);
+  });
+
   test("wall-clock length and time are kept across the DST change", () => {
     // Vilnius leaves summer time on 25 Oct: 10:00 is 07:00Z before, 08:00Z after.
     const occurrences = occurrencesBetween(
@@ -164,6 +185,28 @@ describe("placement", () => {
       start: { local: "2026-11-02T09:00:00" },
       end: { local: "2026-11-06T18:00:00" },
     });
+  });
+
+  test("Nextcloud's web apps: a multi-day event, and tasks with UTC times seen in Vilnius", () => {
+    const [conference] = occurrencesBetween(
+      load("nextcloud-web-event-multiday.ics"),
+      vilnius("2026-11-19", "2026-11-20"),
+    );
+    expect(conference).toMatchObject({
+      start: { type: "date", date: "2026-11-18" },
+      end: { type: "date", date: "2026-11-21" },
+    });
+    const [slides] = occurrencesBetween(
+      load("nextcloud-web-task-start-due.ics"),
+      vilnius("2026-11-17", "2026-11-18"),
+    );
+    expect(starts([slides!])).toEqual(["2026-11-16T10:00:00"]);
+    expect(wallClockOf(slides!.end, "Europe/Vilnius")).toBe("2026-11-18T11:00:00");
+    const [report] = occurrencesBetween(
+      load("nextcloud-web-task-due.ics"),
+      vilnius("2026-11-20", "2026-11-21"),
+    );
+    expect(starts([report!])).toEqual(["2026-11-20T10:00:00"]);
   });
 
   test("a task with neither DTSTART nor DUE has no occurrence; it lives in the tasks screen", () => {

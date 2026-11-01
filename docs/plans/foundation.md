@@ -469,18 +469,14 @@ Decided while building PR 5a.
   localhost; elsewhere the app says so instead of failing
   (`InsecureContextError`). Self-hosting needs TLS in front (D40 already
   asks for it); the dev server over the tailnet needs `https` too.
-- **Fixtures from Nextcloud's web calendar** — PR 4's "Done when" first
-  asked for objects written by Nextcloud's web calendar; the recordings are
-  of objects as Nextcloud serves them back. Recording what its web calendar
-  writes needs a browser driving it; Playwright e2e exists since PR 5a
-  ([D57](#D57)).
 - **Finer write rights** — a calendar is read-only unless its privilege
   set grants `write`, `write-content` or `all`; a share that lets one edit
   but not create (`bind`) or delete (`unbind`) is taken as fully writable,
   and its refused creations show as errors ([D37](#D37)).
-- **Login Flow v2 end to end** — the flow is tested against Nextcloud up to
-  the approval page; approving it needs a browser driving Nextcloud's login,
-  which Playwright can do since PR 5a ([D19](#D19), [D57](#D57)).
+- **Recording Nextcloud's web apps in CI** — `scripts/record-nextcloud-fixtures.ts`
+  runs by hand; a change in the apps' pages breaks it unseen until the next
+  recording. A nightly run that records and compares everything but UIDs and
+  timestamps comes if the apps' output changes often enough to matter.
 - **Scheduling syncs** — `syncAccount` runs when called; when and how often
   the apps call it (on start, on focus, on a timer, Android background sync)
   is decided with each app: the web (the UI's own triggers, which every
@@ -548,7 +544,11 @@ recorded as fixtures and pass PR 2's round-trip tests.
 _Changed in PR 4:_ "objects written by Nextcloud's web calendar" became
 "objects as Nextcloud serves them back": the web calendar is a browser app
 no test drives yet. The recordings are `radicale-*.ics` and
-`nextcloud-served-*.ics` in `packages/core/test/fixtures/`.
+`nextcloud-served-*.ics` in `packages/core/test/fixtures/`. _Since then:_
+`scripts/record-nextcloud-fixtures.ts` drives Nextcloud's web Calendar and
+Tasks apps in a browser and records what they write as `nextcloud-web-*.ics`;
+their provenance is in the fixtures' `README.md`. The nightly Nextcloud job
+approves a Login Flow v2 in a browser and signs in with its app password.
 
 ### PR 5 — Calendar grid
 
