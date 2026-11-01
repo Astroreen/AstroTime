@@ -179,10 +179,14 @@ class ExchangeTest {
         val server = server()
         server.enqueue(redirect(301, server.at("b.test", "/next").toString()))
         server.enqueue(answer(207))
-        val response = run("PROPFIND", server.at("a.test"), authorization)
+        val credentials = authorization + mapOf("Cookie" to "s=1", "Proxy-Authorization" to "Basic eDp5")
+        val response = run("PROPFIND", server.at("a.test"), credentials)
         assertEquals(server.at("b.test", "/next").toString(), response.url)
         assertEquals("Basic YXN0cm86cHc=", server.takeRequest().headers["Authorization"])
-        assertNull(server.takeRequest().headers["Authorization"])
+        val next = server.takeRequest().headers
+        assertNull(next["Authorization"])
+        assertNull(next["Cookie"])
+        assertNull(next["Proxy-Authorization"])
     }
 
     @Test

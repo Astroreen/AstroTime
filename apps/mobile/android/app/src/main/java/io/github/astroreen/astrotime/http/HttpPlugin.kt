@@ -31,8 +31,10 @@ class HttpPlugin : Plugin() {
                 call.resolve(write(exchange.run(request)))
             } catch (error: ExchangeException) {
                 call.reject(error.message, error.code, error)
-            } catch (error: RuntimeException) {
-                call.reject(error.message, "failed", error)
+            } catch (error: Throwable) {
+                // Anything at all (an OutOfMemoryError on a huge answer too):
+                // the call is answered, never left waiting.
+                call.reject(error.message ?: error.toString(), "failed", Exception(error))
             }
         }
     }

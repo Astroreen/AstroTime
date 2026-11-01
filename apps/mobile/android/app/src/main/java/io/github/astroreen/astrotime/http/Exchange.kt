@@ -59,6 +59,9 @@ private val NO_BODY = setOf("GET", "HEAD")
 private val NEEDS_BODY = setOf("POST", "PUT", "PATCH", "PROPPATCH", "REPORT")
 
 /** What describes a body, dropped with it when a redirect turns the request into a GET (as `fetch`). */
+/** What fetch drops on a redirect to another origin: whatever names a user. */
+private val CREDENTIAL_HEADERS = setOf("authorization", "cookie", "proxy-authorization")
+
 private val BODY_HEADERS =
     setOf("content-type", "content-length", "content-encoding", "content-language", "content-location")
 
@@ -123,9 +126,9 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
                     body = null
                     headers = headers.filterKeys { name -> name.lowercase() !in BODY_HEADERS }
                 }
-                // The credentials stay with the origin they were meant for.
+                // The credentials stay with the origin they were meant for, as fetch keeps them.
                 if (origin(next) != origin(url)) {
-                    headers = headers.filterKeys { name -> !name.equals("Authorization", ignoreCase = true) }
+                    headers = headers.filterKeys { name -> name.lowercase() !in CREDENTIAL_HEADERS }
                 }
                 url = next
             }
