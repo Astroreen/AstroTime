@@ -93,12 +93,17 @@ function amount(seconds: number, t: TFunction): string {
 const clockOf = (seconds: number) =>
   `${String(Math.floor(seconds / HOUR)).padStart(2, "0")}:${String(Math.floor((seconds % HOUR) / MINUTE)).padStart(2, "0")}`;
 
+/** What a reminder's words read of its trigger: a new one has no `offsetDays` of its own yet. */
+type Trigger =
+  | Omit<Extract<Alarm["trigger"], { type: "relative" }>, "offsetDays">
+  | Extract<Alarm["trigger"], { type: "absolute" }>;
+
 /**
  * A reminder in words. For an all-day item one before its day reads as the
  * day and the time it rings, as Google words it: "1 day before at 9:00".
  */
 export function alarmWords(
-  alarm: Pick<Alarm, "trigger">,
+  alarm: { readonly trigger: Trigger },
   options: { readonly allDay: boolean; readonly task: boolean },
   t: TFunction,
   formats: Formats,

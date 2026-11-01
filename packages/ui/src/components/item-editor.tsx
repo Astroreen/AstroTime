@@ -5,6 +5,7 @@
 // reminders; the calendar; colour; location; description; a task's status,
 // priority, progress and tags. Enter in a field saves, Escape closes.
 import {
+  nthWeekdayOf,
   WEEKDAYS,
   weekdayOf,
   type ItemTime,
@@ -59,7 +60,8 @@ export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
   readonly existing: boolean;
   readonly form: Form;
-  readonly problem: Problem | "failed" | null;
+  /** Why the form cannot be saved, or why saving it did not work. */
+  readonly problem: Problem | "failed" | "gone" | "inDoubt" | null;
   readonly saving: boolean;
 }
 
@@ -576,15 +578,6 @@ const PRESETS: readonly Preset[] = [
 ];
 const NEVER: RepeatEnd = { type: "never" };
 
-/** The nth weekday of its month a day is: 1–4, or −1 for one in the last week. */
-function nthOf(day: string): number {
-  const date = Number(day.slice(8, 10));
-  const length = new Date(
-    Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0),
-  ).getUTCDate();
-  return date + 7 > length ? -1 : Math.ceil(date / 7);
-}
-
 function presetRepeat(preset: Preset, day: string): Repeat | null {
   const base: Repeat = {
     frequency: "DAILY",
@@ -606,7 +599,7 @@ function presetRepeat(preset: Preset, day: string): Repeat | null {
     case "monthly":
       return { ...base, frequency: "MONTHLY" };
     case "monthlyWeekday":
-      return { ...base, frequency: "MONTHLY", monthlyWeekday: { nth: nthOf(day), weekday } };
+      return { ...base, frequency: "MONTHLY", monthlyWeekday: { nth: nthWeekdayOf(day), weekday } };
     case "yearly":
       return { ...base, frequency: "YEARLY" };
   }
@@ -746,14 +739,16 @@ function CustomRepeat({
           label={t("repeat.monthlyOn")}
           value={repeat.monthlyWeekday ? "weekday" : "day"}
           onChange={(value) =>
-            set({ monthlyWeekday: value === "weekday" ? { nth: nthOf(day), weekday } : null })
+            set({
+              monthlyWeekday: value === "weekday" ? { nth: nthWeekdayOf(day), weekday } : null,
+            })
           }
           options={[
             ["day", t("repeat.onDay", { day: Number(day.slice(8, 10)) })],
             [
               "weekday",
               t("repeat.onWeekday", {
-                nth: t(`nth.${nthOf(day)}.${t(`weekday.gender.${weekday}`)}` as "nth.1.m"),
+                nth: t(`nth.${nthWeekdayOf(day)}.${t(`weekday.gender.${weekday}`)}` as "nth.1.m"),
                 weekday: t(`weekday.on.${weekday}`),
               }),
             ],

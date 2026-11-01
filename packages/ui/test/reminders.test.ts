@@ -89,12 +89,14 @@ const summary = (
   ]);
 
 describe("the set the platform is handed (D101)", () => {
-  test("the demo's reminders from now on, the soonest first, with their words", async () => {
+  test("the demo's reminders from an hour ago on, the soonest first, with their words", async () => {
     const { platform, start } = await setup();
     const handed = platform.next();
     start();
     await handed;
     expect(summary(platform.last)).toEqual([
+      // 50 minutes ago: within the hour a set reaches back (foundation D100).
+      ["2026-11-04T07:50:00.000Z", "Design review", "10:00 – 11:30 AM · in 10 minutes"],
       ["2026-11-04T09:00:00.000Z", "Call with Anna", "11:15 – 11:45 AM · in 15 minutes"],
 
       ["2026-11-05T09:00:00.000Z", "Write the proposal", "Due 12:00 PM · in 1 hour"],

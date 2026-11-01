@@ -15,9 +15,14 @@ import type { Calendar, Store, StoredObject } from "@astrotime/storage";
 import { createContext, useContext, useEffect, useState } from "react";
 
 import {
+  changeLocal,
   deleteTarget,
+  followed,
   formOf,
+  GoneError,
+  InDoubtError,
   isOccurrence,
+  itemOf,
   newForm,
   problemOf,
   saveForm,
@@ -77,13 +82,7 @@ function refreshed(row: StoredObject, target: Target): Target | null {
   } catch {
     return null;
   }
-  const id = target.recurrenceId;
-  const exception =
-    id &&
-    object.exceptions.find(
-      (e) => e.recurrenceId && JSON.stringify(e.recurrenceId) === JSON.stringify(id),
-    );
-  const item = exception || object.master || object.exceptions[0];
+  const item = itemOf(object, target.recurrenceId);
   if (!item) return null;
   return { ...target, calendarId: row.calendarId, object, item };
 }
@@ -199,7 +198,9 @@ export function useEditingState({
       // A kind its calendar cannot hold moves to the first calendar that can.
       const fits = writable(form.kind).some((c) => c.id === form.calendarId);
       const next = fits ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
-      return { ...current, state: { ...current.state, form: next, problem: null } };
+      // A rule moves with the item's day (D105).
+      const moved = followed(current.state.form, next);
+      return { ...current, state: { ...current.state, form: moved, problem: null } };
     });
 
   const save = () => {
@@ -226,12 +227,19 @@ export function useEditingState({
           onChanged();
         },
         (error: unknown) => {
-          console.error(error);
+          // Gone meanwhile, or unclear whether it was saved: the user is told so (D99).
+          const failure =
+            error instanceof GoneError
+              ? "gone"
+              : error instanceof InDoubtError
+                ? "inDoubt"
+                : "failed";
+          if (failure === "failed") console.error(error);
           setEditing(
             (current) =>
               current && {
                 ...current,
-                state: { ...current.state, saving: false, problem: "failed" },
+                state: { ...current.state, saving: false, problem: failure },
               },
           );
         },
@@ -266,11 +274,12 @@ export function useEditingState({
     });
   };
 
-  const rewrite = async (target: Target, ics: (object: CalendarObject) => string) => {
-    const row = await store.object(target.objectId);
-    if (!row) return;
-    await store.saveLocal(row.calendarId, ics(CalendarObject.parse(row.ics)), row.href);
-  };
+  const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
+    changeLocal(store, async (local) => {
+      const row = await local.object(target.objectId);
+      if (!row) return;
+      await local.save(row.calendarId, ics(CalendarObject.parse(row.ics)), row.href);
+    });
 
   const complete = () => {
     if (!details || details.item.kind !== "task") return;

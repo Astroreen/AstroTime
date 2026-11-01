@@ -3,7 +3,7 @@
 // changed), the scopes offered, the writes to the local store, the words of
 // rules and reminders, and the Conflicts list's two ways out.
 import { CalendarObject, occurrencesBetween, type Event } from "@astrotime/core";
-import { Store } from "@astrotime/storage";
+import { CommitInDoubtError, HandOverError, Store, type LocalChange } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -11,13 +11,17 @@ import { applyMine, conflictViews, keepServer } from "../src/calendar/conflicts.
 import {
   changesOf,
   deleteTarget,
+  followed,
   formOf,
+  GoneError,
+  InDoubtError,
   newForm,
   problemOf,
   saveForm,
   scopesFor,
   timesOfForm,
   withStartDate,
+  type Form,
   type Target,
 } from "../src/calendar/editing.ts";
 import { Formats } from "../src/calendar/format.ts";
@@ -148,21 +152,50 @@ describe("the form", () => {
     expect(Object.keys(moved)).toEqual(["time"]);
   });
 
-  test("a new start date carries the end and a weekly rule on the old weekday", () => {
-    const form = {
+  test("a new start date carries the end, and the rule moves with the day (D105)", () => {
+    const repeat = {
+      frequency: "WEEKLY" as const,
+      interval: 1,
+      weekdays: ["WE" as const],
+      monthlyWeekday: null,
+      end: { type: "never" as const },
+    };
+    const form: Form = {
       ...newForm("event", { calendarId: "c", day: "2026-11-04", minutes: 600, timeZone }),
       endDate: "2026-11-05",
-      repeat: {
-        frequency: "WEEKLY" as const,
-        interval: 1,
-        weekdays: ["WE" as const],
-        monthlyWeekday: null,
-        end: { type: "never" as const },
-      },
+      repeat,
     };
-    const moved = withStartDate(form, "2026-11-06");
+    const moved = followed(form, withStartDate(form, "2026-11-06"));
     expect(moved).toMatchObject({ startDate: "2026-11-06", endDate: "2026-11-07" });
     expect(moved.repeat).toMatchObject({ weekdays: ["FR"] });
+    // Several weekdays shift together; the nth weekday of a month names the new day's.
+    const several = { ...form, repeat: { ...repeat, weekdays: ["MO" as const, "WE" as const] } };
+    expect(followed(several, withStartDate(several, "2026-11-05")).repeat).toMatchObject({
+      weekdays: ["TU", "TH"],
+    });
+    const monthly: Form = {
+      ...form,
+      startDate: "2026-11-10",
+      endDate: "2026-11-10",
+      repeat: {
+        ...repeat,
+        frequency: "MONTHLY",
+        weekdays: [],
+        monthlyWeekday: { nth: 2, weekday: "TU" },
+      },
+    };
+    expect(followed(monthly, withStartDate(monthly, "2026-11-18")).repeat).toMatchObject({
+      monthlyWeekday: { nth: 3, weekday: "WE" },
+    });
+    // A task without a start moves with its due; a rule the user picks stays theirs.
+    const task: Form = { ...form, kind: "task", startDate: "", endDate: "2026-11-04" };
+    expect(followed(task, { ...task, endDate: "2026-11-05" }).repeat).toMatchObject({
+      weekdays: ["TH"],
+    });
+    const picked = { ...repeat, weekdays: ["SA" as const] };
+    expect(followed(form, { ...withStartDate(form, "2026-11-06"), repeat: picked }).repeat).toBe(
+      picked,
+    );
   });
 
   test("problems: an end before the start, a due before the start, an end of the rule before it", () => {
@@ -197,10 +230,17 @@ describe("the scopes offered (D11)", () => {
       "following",
       "all",
     ]);
-    expect(
-      scopesFor(target, initial, { ...initial, startDate: "2026-11-06", endDate: "2026-11-06" }),
-    ).toEqual(["this", "following"]);
+    const nextDay = followed(initial, {
+      ...initial,
+      startDate: "2026-11-06",
+      endDate: "2026-11-06",
+    });
+    expect(scopesFor(target, initial, nextDay)).toEqual(["this", "following"]);
     expect(scopesFor(target, initial, { ...initial, repeat: null })).toEqual(["following", "all"]);
+    // The rule moved with the day is no new rule; a new rule on a new day is "following".
+    expect(nextDay.repeat).not.toEqual(initial.repeat);
+    expect(changesOf(initial, nextDay)).not.toHaveProperty("repeat");
+    expect(scopesFor(target, initial, { ...nextDay, repeat: null })).toEqual(["following"]);
     const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
     const form = formOf(single, timeZone);
     expect(scopesFor(single, form, { ...form, summary: "x" })).toEqual([]);
@@ -303,6 +343,146 @@ describe("saving writes pending changes through the store (D5)", () => {
     const left = (await store.object(row.id))!;
     expect(left.ics).not.toContain("SUMMARY:First");
     expect(left.ics).toContain("SUMMARY:Renamed");
+  });
+
+  test("an edit applies to the object as the store holds it at saving: a change made meanwhile stays", async () => {
+    const { store, byName, rowOf } = await demo();
+    const row = await rowOf("Work", "demo-review");
+    const target = await targetOn(store, row, "2026-11-04");
+    const initial = formOf(target, timeZone);
+    // The dialog is open; a sync brings the server's newer version: a new
+    // place, another client's property, a reminder before the one there was.
+    const theirs = row.ics
+      .replace("LOCATION:Room 4\\, second floor", "LOCATION:Room 7")
+      .replace(
+        "BEGIN:VALARM",
+        "X-OTHER-CLIENT:kept\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Theirs\r\nTRIGGER:-PT1H\r\nEND:VALARM\r\nBEGIN:VALARM",
+      );
+    expect(theirs).not.toBe(row.ics);
+    await store.saveFromServer(byName("Work").id, { href: row.href, etag: '"2"', ics: theirs });
+    // The user renamed it and took the 10-minute reminder away.
+    await saveForm(
+      store,
+      {
+        target,
+        initial,
+        form: { ...initial, summary: "Design review, v2", alarms: [] },
+        scope: "all",
+      },
+      { now: NOW, uid: uids },
+    );
+    const saved = CalendarObject.parse((await rowOf("Work", "demo-review")).ics);
+    expect(saved.master).toMatchObject({ summary: "Design review, v2", location: "Room 7" });
+    expect(saved.master!.alarms.map((alarm) => alarm.description)).toEqual(["Theirs"]);
+    expect(saved.serialize()).toContain("X-OTHER-CLIENT:kept\r\n");
+  });
+
+  test("an item or an occurrence gone meanwhile: nothing is saved, and the user is told", async () => {
+    const { store, rowOf } = await demo();
+    const standup = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const initial = formOf(standup, timeZone);
+    // Another tab deleted this occurrence while the dialog was open.
+    await deleteTarget(store, standup, "this", NOW);
+    const before = (await rowOf("Work", "demo-standup")).ics;
+    const request = {
+      target: standup,
+      initial,
+      form: { ...initial, summary: "x" },
+      scope: "this",
+    } as const;
+    await expect(saveForm(store, request, { now: NOW, uid: uids })).rejects.toThrow(GoneError);
+    expect((await rowOf("Work", "demo-standup")).ics).toBe(before);
+    // And deleting it again changes nothing.
+    await deleteTarget(store, standup, "this", NOW + 1000);
+    expect((await rowOf("Work", "demo-standup")).ics).toBe(before);
+
+    const review = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
+    const reviewForm = formOf(review, timeZone);
+    await store.deleteLocal(review.objectId);
+    await expect(
+      saveForm(
+        store,
+        {
+          target: review,
+          initial: reviewForm,
+          form: { ...reviewForm, summary: "x" },
+          scope: "all",
+        },
+        { now: NOW, uid: uids },
+      ),
+    ).rejects.toThrow(GoneError);
+  });
+
+  test("the store's leader gone: tried once more; a commit in doubt read again (D99)", async () => {
+    const { store, rowOf } = await demo();
+    const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
+    const initial = formOf(target, timeZone);
+    const save = (on: Store, summary: string) =>
+      saveForm(
+        on,
+        { target, initial, form: { ...initial, summary }, scope: "all" },
+        { now: NOW, uid: uids },
+      );
+    /** The store, with `changeLocal` as given. */
+    const withChange = (
+      changeLocal: (change: (local: LocalChange) => Promise<void>) => Promise<void>,
+    ) => Object.assign(Object.create(store) as Store, { changeLocal });
+    const summary = async () =>
+      CalendarObject.parse((await rowOf("Work", "demo-review")).ics).master!.summary;
+
+    // A statement that went with the leader ran nothing: the change runs again.
+    let calls = 0;
+    await save(
+      withChange(async (change) => {
+        if (calls++ === 0) throw new HandOverError("The leader went.");
+        await store.changeLocal(change);
+      }),
+      "Handed over",
+    );
+    expect(calls).toBe(2);
+    expect(await summary()).toBe("Handed over");
+
+    // A COMMIT whose answer went with the leader: the store is read again.
+    await save(
+      withChange(async (change) => {
+        await store.changeLocal(change);
+        throw new CommitInDoubtError("The answer went with the leader.");
+      }),
+      "Committed",
+    );
+    expect(await summary()).toBe("Committed");
+    await expect(
+      save(
+        withChange(async (change) => {
+          await store
+            .changeLocal(async (local) => {
+              await change(local);
+              throw new Error("Rolled back with the leader.");
+            })
+            .catch(() => {});
+          throw new CommitInDoubtError("The answer went with the leader.");
+        }),
+        "Lost",
+      ),
+    ).rejects.toThrow(InDoubtError);
+    expect(await summary()).toBe("Committed");
+  });
+
+  test("this and following on another day: the new series' rule names the new days", async () => {
+    const { store, byName, rowOf } = await demo();
+    const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
+    const initial = formOf(target, timeZone);
+    const form = followed(initial, withStartDate(initial, "2026-11-06"));
+    await saveForm(
+      store,
+      { target, initial, form, scope: "following" },
+      { now: NOW, uid: () => "standup-later" },
+    );
+    const rest = (await store.objectAt(byName("Work").id, "standup-later.ics"))!;
+    expect(rest.ics).toContain("RRULE:FREQ=WEEKLY;BYDAY=TU,WE,TH,FR,SA\r\n");
+    expect(CalendarObject.parse(rest.ics).master).toMatchObject({
+      start: { local: "2026-11-06T09:00:00" },
+    });
   });
 
   test("deleting one occurrence is an update; deleting all a pending deletion", async () => {

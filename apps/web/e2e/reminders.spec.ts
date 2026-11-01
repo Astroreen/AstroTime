@@ -59,7 +59,7 @@ test("a reminder shows at its time, with what it is about and how soon", async (
   ).toBeVisible();
 });
 
-test("after the laptop slept past them, only a reminder still due shows; a tap opens its day", async ({
+test("after the laptop slept past them, only a reminder still due shows; a tap opens its day and its details", async ({
   page,
 }) => {
   await openDemo(page);
@@ -75,6 +75,7 @@ test("after the laptop slept past them, only a reminder still due shows; a tap o
   await dentist.click();
   await expect(dentist).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Thursday, November 5" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Dentist" })).toBeVisible();
 });
 
 test("where the browser already lets the site notify, reminders are on; turned off, they stop", async ({

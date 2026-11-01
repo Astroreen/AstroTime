@@ -142,7 +142,7 @@ test("completing and starring on the tasks screen write the task to the store, t
   expect(proposal?.ics).toContain("X-ASTROTIME-STARRED:TRUE\r\n");
 });
 
-test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day (D101)", async () => {
+test("Reminders: the switch asks the permission from the tap, the set reaches the platform, a tapped one opens its day and its details (D101)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   const store = await demoStore(["en-US"]);
@@ -166,6 +166,7 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
     .element(page.getByText("Reminders show while AstroTime is open in a tab."))
     .toBeInTheDocument();
   expect(reminders.last.map((r) => r.notification.title)).toEqual([
+    "Design review",
     "Call with Anna",
     "Write the proposal",
     "Dentist",
@@ -177,6 +178,11 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
   await expect
     .element(page.getByRole("list", { name: "Thursday, November 5" }))
     .toBeInTheDocument();
+  // Its details open over the day.
+  const details = page.getByRole("dialog", { name: "Dentist" });
+  await expect.element(details).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(details).not.toBeInTheDocument();
 
   // Turned off: the platform is handed an empty set.
   await page.getByRole("button", { name: "Main menu" }).click();

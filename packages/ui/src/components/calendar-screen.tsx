@@ -3,13 +3,14 @@
 // "+" button; search and the tasks screen open from the top bar (D52, D53);
 // the first-run screen while there is no account. The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
-import { CalendarObject, wallClockOf, type ItemTime } from "@astrotime/core";
+import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
+import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
@@ -209,24 +210,23 @@ export function CalendarScreen({
     setAnchor(day);
   };
 
-  // A tapped reminder opens its occurrence's day in the Day view (foundation
-  // D101): an event's start, a task's due or start; one with no time only
-  // brings the app forward.
+  // A tapped reminder opens its occurrence's day in the Day view, and its
+  // details over it (foundation D101): an event's start, a task's due or
+  // start; one with no time opens only the details.
   const { onOpen } = useReminders();
-  const openReminder = useEffectEvent((time: ItemTime | null) => {
-    if (!time) return;
+  const openReminder = useEffectEvent(async (reminder: ScheduledReminder) => {
+    const time = reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start;
     setSearching(false);
     setDrawerOpen(false);
     if (!wide) setTasksOpen(false);
-    openDay(wallClockOf(time, timeZone).slice(0, 10));
+    if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
+    const stored = await store.object(reminder.objectId);
+    if (!stored || stored.pending === "delete") return;
+    const object = CalendarObject.parse(stored.ics);
+    const item = itemOf(object, reminder.recurrenceId);
+    if (item) editing.value.open(targetOf(stored, object, reminder.recurrenceId, item));
   });
-  useEffect(
-    () =>
-      onOpen((reminder) =>
-        openReminder(reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start),
-      ),
-    [onOpen],
-  );
+  useEffect(() => onOpen((reminder) => void openReminder(reminder)), [onOpen]);
 
   // Keys on a desktop: n or j for the next period, p or k for the previous,
   // t for today; d, x, w, m and a for the views, as Google Calendar's (design D88).

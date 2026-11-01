@@ -292,6 +292,10 @@ export const ru = {
   "edit.problem.dueBeforeStart": "Срок не может быть раньше начала.",
   "edit.problem.untilBeforeStart": "Повтор не может закончиться раньше начала.",
   "edit.problem.noDate": "Выберите дату.",
+  "edit.problem.gone":
+    "Этого больше нет в календаре: его удалили или перенесли. Ничего не сохранено.",
+  "edit.problem.inDoubt":
+    "Неясно, сохранилось ли изменение. Проверьте запись и сохраните ещё раз, если изменения нет.",
 
   "color.tomato": "Красный",
   "color.orange": "Оранжевый",

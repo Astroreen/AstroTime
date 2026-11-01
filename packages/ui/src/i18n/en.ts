@@ -282,6 +282,10 @@ export const en = {
   "edit.problem.dueBeforeStart": "The due date cannot be before the start.",
   "edit.problem.untilBeforeStart": "The repeat cannot end before the item starts.",
   "edit.problem.noDate": "Pick a date.",
+  "edit.problem.gone":
+    "This is no longer on your calendar: it was deleted or moved elsewhere. Nothing was saved.",
+  "edit.problem.inDoubt":
+    "It is not clear whether the change was saved. Check the item, and save again if it is not there.",
 
   "color.tomato": "Red",
   "color.orange": "Orange",
