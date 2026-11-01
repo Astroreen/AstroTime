@@ -56,6 +56,8 @@ export function AccountsProvider({
     () => new SyncScheduler((fresh) => syncAll(context, { fresh }), browserEnvironment()),
   );
   useEffect(() => scheduler.start(), [scheduler]);
+  // The shell's own triggers (desktop D75), each a sync that starts after it.
+  useEffect(() => platform.onSyncRequest?.(() => void scheduler.syncNow()), [platform, scheduler]);
   const status = useSyncExternalStore(
     (onChange) => scheduler.subscribe(onChange),
     () => scheduler.status,

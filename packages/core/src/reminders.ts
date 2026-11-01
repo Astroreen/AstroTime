@@ -42,7 +42,15 @@ export interface Reminder {
 
 /** A reminder with the words a platform shows, in the user's language. */
 export interface ScheduledReminder extends Reminder {
-  readonly notification: { readonly title: string; readonly body: string };
+  readonly notification: {
+    readonly title: string;
+    readonly body: string;
+    /**
+     * The body of one shown late, missed in a sleep: when the item is, and
+     * when the reminder was due (the desktop, docs/plans/desktop.md#D76).
+     */
+    readonly late?: string;
+  };
 }
 
 /** Whether the platform may notify: the web asks once, from a tap (foundation D101). */

@@ -133,10 +133,10 @@ When you add a package, app or module, add its line here in the same PR.
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
-    HTTP, secrets, `openExternal`, `Preferences`, reminders, and on Android
-    `signingInTo` and `onBack`), the user's languages and zone. When the
-    store does not open it says why (`InsecureContextError`,
-    `OutdatedWebViewError`). → `plans/android.md#D60`
+    HTTP, secrets, `openExternal`, `Preferences`, reminders, on Android
+    `signingInTo` and `onBack`, on the desktop `shell` and `onSyncRequest`),
+    the user's languages and zone. When the store does not open it says why
+    (`InsecureContextError`, `OutdatedWebViewError`). → `plans/android.md#D60`
   - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
     the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
     `plans/foundation.md#D92`
@@ -267,7 +267,10 @@ When you add a package, app or module, add its line here in the same PR.
     handlers' checks (`checks.ts`), HTTP on `net.request` (`http.ts`), the
     store's process (`store.ts`), credentials in `secrets.json` through
     `safeStorage` (`secrets.ts`). → `plans/desktop.md#D71`,
-    `plans/desktop.md#D72`, `plans/desktop.md#D74`
+    `plans/desktop.md#D72`, `plans/desktop.md#D74`; one instance whose
+    window closes to the tray, the frame's theme (`index.ts`), the sync
+    timer and resume (`background.ts`), the reminders' notifications
+    (`reminders.ts`). → `plans/desktop.md#D75`, `plans/desktop.md#D76`
   - `src/store/` — the store's utility process, `node:sqlite` on
     `astrotime.sqlite3` in userData. → `plans/desktop.md#D73`
   - `src/preload/` and `src/bridge.ts` — the one object the page gets
@@ -276,7 +279,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `src/renderer/` — its `Platform` around `@astrotime/ui`, as the web's.
   - `e2e/` — Playwright's Electron support under `xvfb-run`: the smoke test
     (Radicale), HTTP's redirects, a private CA, credentials with a keyring
-    of the test's own and without one (`keyringSession`), Login Flow v2
+    of the test's own and without one (`keyringSession`), living in the
+    background (`background.spec.ts`: one instance, the close, resume's
+    sync and reminder, the theme), Login Flow v2
     against a Nextcloud (`ASTROTIME_NEXTCLOUD_*`), and the screenshots
     (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
   - `electron-builder.yml` — packaging; CI builds the unpacked app.

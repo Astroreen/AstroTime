@@ -628,7 +628,8 @@ Decided while building PR 5a-3.
 
   Android adds background sync ([android D67](android.md#D67)), which
   takes the same lock, and the desktop its main-process timer and resume
-  ([desktop D75](desktop.md#D75)), both through `syncAll`. The status
+  ([desktop D75](desktop.md#D75)), both through `syncAll`; the desktop's
+  reach the UI as the `Platform`'s `onSyncRequest`, each a "Sync now". The status
   shows without getting in the way: the account button in the top bar
   turns a ring while a sync runs and shows a
   dot when something needs the user (signed out, refused, failed, items the
@@ -896,6 +897,11 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   minutes", "· in 1 hour", "· now"): minutes up to an hour, and up to three
   hours unless whole, then whole hours. A day or more ahead, the day says
   it; a time already passed says nothing more.
+  _Added in desktop PR D3:_ each reminder also brings the body of one shown
+  late (`notification.late`, [desktop D76](desktop.md#D76)): when the item
+  is, without how soon, and when the reminder was due ("10:00 – 11:30 AM ·
+  reminder due at 9:50 AM"; "Reminder due at 9:50 AM" for an item with no
+  time to say). A platform that never shows one late ignores it.
 
 ### Editing
 

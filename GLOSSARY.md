@@ -67,7 +67,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Star** — a task marked as important on the tasks screen,
   `X-ASTROTIME-STARRED:TRUE` (design D52); it is not `PRIORITY`.
 - **Settings** — the drawer's choices for this device: theme, language,
-  week start, clock, "hide completed" (design D96).
+  week start, clock, "hide completed", reminders, and on the desktop "keep
+  running" (design D96).
 - **Top bar**, **drawer**, **floating button** — the app shell: the bar
   with the month, search, "today" and the tasks toggle; the side menu with
   views, calendars and settings (a sidebar on a wide screen); the "+" button
@@ -151,6 +152,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   port (desktop plan D73).
 - **Background sync** — a sync the operating system starts while the app is
   not open (Android's WorkManager, android plan D67).
+- **Keep running** — the desktop app living on with its window closed: the
+  window hides, the tray stays, syncs and reminders go on; off, closing the
+  window quits (desktop plan D75).
 
 ## Development
 

@@ -1,8 +1,8 @@
 # Desktop plan
 
-Status: **in progress** — PR D1 (the shell, the store and HTTP) and PR D2
-(credentials and Login Flow v2) are built; PR D3–D4 are decided, not yet
-built. It follows the Android app
+Status: **in progress** — PR D1 (the shell, the store and HTTP), PR D2
+(credentials and Login Flow v2) and PR D3 (living in the background) are
+built; PR D4 is decided, not yet built. It follows the Android app
 ([`android.md`](android.md)), as foundation's [D12](foundation.md#D12)
 orders the platforms. This plan owns the Linux desktop app, `apps/desktop`
 (foundation's [D22](foundation.md#D22), [D23](foundation.md#D23)). The
@@ -69,7 +69,10 @@ were checked on 2026-11-01.
   so a port never comes before the page can take it, and a reloaded page
   gets a new one. PR D1 exposes `http`, `openExternal` and `connectStore`;
   the rest join with the PRs that use them (PR D2: `secrets`, with `get`,
-  `set` and `delete`, each checked as `http` is).
+  `set` and `delete`, each checked as `http` is; PR D3: `reminders`, with
+  `schedule`, `onOpen` and `supported`, `shell` and `onSyncRequest`, [D75](#D75),
+  [D76](#D76); the main process checks the set and the shell's state as it
+  checks a request, `checkReminders` and `checkShellState`).
   The page then holds a port that runs SQL, as the web app holds its
   worker: the utility process answers only the store protocol's messages,
   and nothing but the app's own page, under the CSP, runs there.
@@ -209,6 +212,40 @@ were checked on 2026-11-01.
   dark setting through the portal on GNOME and KDE is checked in PR D3.
   Electron runs natively on Wayland by default since 38.
 
+  _Landed in PR D3:_ closing the window **hides** it, and the page goes on
+  running in it, so the shared UI's sync and reminders run as they do with
+  the window open: the main process's timer (`setInterval`, 15 minutes)
+  and `powerMonitor`'s `resume` send the page a sync request
+  (`onSyncRequest` on the `Platform`, run as "Sync now" through the UI's
+  `SyncScheduler`, so it joins or follows a running sync), and the
+  sync's writes reach the reminder planner as any write does. A hidden
+  window's page is `hidden` to the UI, so its own 5-minute timer stops
+  ([foundation D91](foundation.md#D91)) and only the main process's runs;
+  Chromium throttles the hidden page's timers, which nothing here relies on
+  (the planner's midnight look moves by a minute at most). Rejected: syncing
+  in the main process itself (the engine is isomorphic and the store's
+  process speaks the store's protocol, but a second `Store` there would
+  need the page's `liveQuery` told of its writes, which the port's
+  one-page design does not do, [D73](#D73)), and a hidden window of its own
+  (one page is enough). The cost is the renderer's memory while the window
+  is closed. The page hands its settings over through the `Platform`'s
+  `shell` (`ShellState`: the theme, whether to keep running, the tray's and
+  menu's words in the user's language): `nativeTheme.themeSource` follows
+  the theme, and closing the window quits when "Keep running when the
+  window is closed" is off; until the page has said, the window hides. The
+  tray (`Tray`, the app's icon, which is Android's launcher icon for now)
+  and the application menu (AstroTime: Sync now, Close window `Ctrl+W`,
+  Quit AstroTime `Ctrl+Q`; Electron's default menu, in English and with
+  reload and devtools, is gone) are built from those words. A second launch
+  (`second-instance`) restores and focuses the window; on Wayland the
+  compositor may only mark it as asking for attention. Quitting from the
+  tray or the menu sets the app quitting before the window closes, so it
+  closes for good. _Not checked:_ whether `prefers-color-scheme` follows
+  the desktop's dark setting through the portal on GNOME and KDE: the
+  machine PR D3 was built on had no desktop session and no portal
+  ([Deferred](#deferred)); the window's frame follows `themeSource`, which
+  the e2e reads back.
+
 - **D76. Reminders from the main process.** Electron has no scheduled
   notifications, so the main process keeps the set of reminders the shared
   code hands over (`ReminderScheduler.schedule`, [D60](android.md#D60)),
@@ -219,8 +256,24 @@ were checked on 2026-11-01.
   hour, saying when it was due; an older one is dropped. Reminders do not
   fire while the app is not running, as in a browser; closing the window
   does not stop them ([D75](#D75)).
-  _Until PR D3_ the desktop hands the UI a scheduler whose notifications
-  are unsupported, so the setting stays off and says why.
+  _Landed in PR D3:_ `desktopReminders` (the page) sends each set to the
+  main process (`mainReminders`, `src/main/reminders.ts`), which keeps it,
+  arms one timer for the next reminder and shows each as an Electron
+  `Notification` with the app's icon. A notification is kept until it is
+  clicked or closed, so its click is heard; a click shows the window and
+  sends the reminder back to the page, whose `onOpen` opens its
+  occurrence's day and details ([foundation D101](foundation.md#D101)). On
+  `resume` and `unlock-screen` the set is checked again (Node's timers on
+  Linux stand still in a suspend): a reminder up to an hour late
+  (`REMINDER_GRACE_MS`) shows with the body that says when it was due
+  (`notification.late`, [foundation D102](foundation.md#D102)), from a
+  minute late on; an older one is dropped, and shown or dropped, a reminder
+  never shows again for the same set. The page learns at start whether the
+  system shows notifications (`Notification.isSupported()`, passed to the
+  preload as an argument): if not, the setting says notifications are
+  unsupported. What was shown is kept in memory only: quitting and starting
+  the app again within the hour shows the past hour's reminders again, late
+  ([Deferred](#deferred)).
 
 - **D77. Login Flow v2 in the system browser.** The login page opens with
   `shell.openExternal`, where the user's password manager and second factor
@@ -299,6 +352,20 @@ were checked on 2026-11-01.
   `dbus` and `gnome-keyring` too. The nightly runs the Login Flow e2e
   against its Nextcloud (`Desktop Login Flow v2 against Nextcloud`).
 
+  _Since PR D3:_ `background.spec.ts` runs in the same job: a second
+  launch (spawned as a user would) hands over to the first and shows its
+  window; closing the window hides it, and with the setting off quits the
+  app; the theme setting sets `nativeTheme.themeSource`; and with the window
+  closed, `powerMonitor`'s `resume`, emitted in the main process, syncs an
+  event from Radicale whose missed reminder then shows late (Electron's
+  `Notification.prototype.show`, replaced in the main process, says what
+  would show) and whose click opens the details. Each waits for an event
+  (the window's `hide` and `show`, the IPC message, the notification), never
+  for time. The 15-minute timer and the late reminders run on a fake clock
+  and a fake `powerMonitor` in `src/main/reminders.test.ts`. Under `xvfb-run`
+  there is no StatusNotifierItem host and no notification daemon, so
+  neither the tray's menu nor a notification is seen on screen.
+
 ## Deferred
 
 - **Auto-update** — electron-updater can update an AppImage (and a deb
@@ -317,6 +384,18 @@ were checked on 2026-11-01.
 - **Notification actions** — snooze and "mark as done" on a reminder
   ([D76](#D76)).
 - **Moving to Electron 45 and later** — waits for nixpkgs ([D70](#D70)).
+- **The dark setting through the portal** — whether `prefers-color-scheme`
+  (with the theme on "System default") follows GNOME's and KDE's dark
+  setting through xdg-desktop-portal is still to check on a real session
+  ([D75](#D75)).
+- **Reminders shown, across a restart** — what was shown is kept in
+  memory, so a restart within the hour shows the past hour's reminders
+  again, late; keeping the shown ids in `userData` would stop it
+  ([D76](#D76)).
+- **An icon of the desktop's own** — the tray and the notifications use
+  Android's launcher icon; a symbolic tray icon that follows the panel's
+  colours, and the package's icons, come with PR D4 or later ([D75](#D75),
+  [D78](#D78)).
 - **Remembering how to keep passwords without a keyring** — the app asks at
   every save; a setting that remembers the answer, and one to move a kept
   password into the profile later, come if asking proves tiresome
@@ -366,7 +445,7 @@ Playwright's Chromium standing in for the system browser).
 
 Single instance, closing to the background with the tray and its setting,
 the sync timer and resume, the theme, reminders from the main process.
-Decisions: D75, D76.
+Decisions: D75, D76. _Built:_ see D75's and D76's "Landed in PR D3".
 
 Done when: a second launch focuses the first; with the window closed a
 change made on the server arrives within one timer period and a reminder

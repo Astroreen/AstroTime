@@ -28,16 +28,29 @@ function capitalize(text: string, locale: string): string {
   return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
 }
 
-/** The notification of a reminder: its title and body. */
+/**
+ * The notification of a reminder: its title and body, and the body of one
+ * shown late (the desktop, after a sleep), which says when it was due
+ * instead of how soon the item is.
+ */
 export function reminderNotification(
   reminder: Reminder,
   words: ReminderWords,
-): { title: string; body: string } {
-  const { t } = words;
-  return { title: reminder.title ?? t("item.untitled"), body: bodyOf(reminder, words) };
+): { title: string; body: string; late: string } {
+  const { t, formats, timeZone } = words;
+  const when = bodyOf(reminder, words, false);
+  const time = formats.time(
+    { type: "floating", local: wallClockIn(reminder.fireAt, timeZone) },
+    timeZone,
+  );
+  return {
+    title: reminder.title ?? t("item.untitled"),
+    body: bodyOf(reminder, words, true),
+    late: when ? t("reminder.late", { when, time }) : t("reminder.lateOnly", { time }),
+  };
 }
 
-function bodyOf(reminder: Reminder, words: ReminderWords): string {
+function bodyOf(reminder: Reminder, words: ReminderWords, howSoon: boolean): string {
   const { t, formats, locale, timeZone } = words;
   const fireDay = wallClockIn(reminder.fireAt, timeZone).slice(0, 10);
   const dayOf = (time: ItemTime) => wallClockOf(time, timeZone).slice(0, 10);
@@ -55,7 +68,7 @@ function bodyOf(reminder: Reminder, words: ReminderWords): string {
   // or more is said by its day).
   const withRelative = (when: string, time: ItemTime) => {
     const ahead = instantOf(time, timeZone) - reminder.fireAt;
-    if (ahead < 0 || ahead >= DAY_MS) return when;
+    if (!howSoon || ahead < 0 || ahead >= DAY_MS) return when;
     return t("reminder.body", { when, relative: relative(ahead, locale) });
   };
 

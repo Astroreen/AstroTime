@@ -2,7 +2,15 @@
 // request it can send as it is, nothing that would go elsewhere or split it.
 import { expect, test } from "vite-plus/test";
 
-import { checkRequest, checkSecret, checkSecretKey, isAppUrl, isWebUrl } from "./checks.ts";
+import {
+  checkReminders,
+  checkRequest,
+  checkSecret,
+  checkSecretKey,
+  checkShellState,
+  isAppUrl,
+  isWebUrl,
+} from "./checks.ts";
 
 const request = { method: "PROPFIND", url: "https://dav.example/", headers: { Depth: "0" } };
 
@@ -60,4 +68,47 @@ test("a secret's key, value and saving are checked; nothing else passes (D74)", 
   expect(() => checkSecret("x".repeat(65_537), "keyring")).toThrow(TypeError);
   expect(() => checkSecret("x", "plain")).toThrow(TypeError);
   expect(() => checkSecret("x", undefined)).toThrow(TypeError);
+});
+
+const reminder = {
+  id: "obj/-/0/1",
+  objectId: "obj",
+  fireAt: 1_700_000_000_000,
+  notification: { title: "Call", body: "11:15 – 11:45 · in 15 minutes", late: "…" },
+};
+
+test("the page's reminders pass as they came, each with an id, a time and its words", () => {
+  expect(checkReminders([reminder])).toEqual([reminder]);
+  expect(checkReminders([])).toEqual([]);
+  const refused: unknown[] = [
+    null,
+    reminder,
+    Array.from({ length: 101 }, () => reminder),
+    [null],
+    [{ ...reminder, id: 7 }],
+    [{ ...reminder, fireAt: "soon" }],
+    [{ ...reminder, fireAt: Number.NaN }],
+    [{ ...reminder, notification: null }],
+    [{ ...reminder, notification: { title: "Call" } }],
+    [{ ...reminder, notification: { ...reminder.notification, late: 1 } }],
+  ];
+  for (const value of refused) expect(() => checkReminders(value)).toThrow(TypeError);
+});
+
+test("the shell's state is a theme, whether to keep running, and its words", () => {
+  const state = {
+    theme: "dark",
+    keepRunning: false,
+    words: { open: "Open", syncNow: "Sync now", closeWindow: "Close window", quit: "Quit" },
+  };
+  expect(checkShellState({ ...state, extra: 1 })).toEqual(state);
+  const refused: unknown[] = [
+    null,
+    { ...state, theme: "sepia" },
+    { ...state, keepRunning: "yes" },
+    { ...state, words: null },
+    { ...state, words: { ...state.words, quit: 1 } },
+    { ...state, words: { ...state.words, open: "x".repeat(257) } },
+  ];
+  for (const value of refused) expect(() => checkShellState(value)).toThrow(TypeError);
 });

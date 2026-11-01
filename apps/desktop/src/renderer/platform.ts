@@ -1,15 +1,16 @@
 // The desktop's platform (docs/plans/android.md#D60), the page's half: the
 // store on a port to its process (docs/plans/desktop.md#D73), HTTP through the
 // main process (D72), credentials in the keyring's care (D74), the system browser,
-// preferences in localStorage, no reminders until PR D3. One window, one
-// store: no sync lock (foundation D91).
+// preferences in localStorage, reminders shown by the main process (D76), and
+// the shell that lives on with its window closed: its theme, its close, its
+// sync triggers (D75). One window, one store: no sync lock (foundation D91).
 import type { HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 import { localPreferences, UnprotectedPrompt, type Platform } from "@astrotime/ui";
 
 import { STORE_PORT, type Bridge } from "../bridge.ts";
-import { noReminders } from "./reminders.ts";
+import { desktopReminders } from "./reminders.ts";
 import { desktopSecrets } from "./secrets.ts";
 
 export function desktopPlatform(bridge: Bridge, store: Promise<Store>): Platform {
@@ -21,7 +22,9 @@ export function desktopPlatform(bridge: Bridge, store: Promise<Store>): Platform
     unprotectedPrompt,
     openExternal: (url) => bridge.openExternal(url),
     preferences: localPreferences,
-    reminders: noReminders,
+    reminders: desktopReminders(bridge.reminders),
+    shell: (state) => bridge.shell(state),
+    onSyncRequest: (listener) => bridge.onSyncRequest(listener),
   };
 }
 

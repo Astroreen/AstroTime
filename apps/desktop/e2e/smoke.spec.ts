@@ -69,7 +69,15 @@ test("the app starts sandboxed on app://, keeps its store in a utility process, 
   });
   expect(inside).toEqual({
     node: ["undefined", "undefined"],
-    bridge: ["connectStore", "http", "openExternal", "secrets"],
+    bridge: [
+      "connectStore",
+      "http",
+      "onSyncRequest",
+      "openExternal",
+      "reminders",
+      "secrets",
+      "shell",
+    ],
     injected: false,
     outlineOffset: "0px",
   });

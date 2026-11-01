@@ -243,6 +243,25 @@ describe("what a notification says (D102)", () => {
     expect(both({ ...task })).toEqual(["Task", "Задача"]);
   });
 
+  test("one shown late says when it was due instead of how soon (desktop D76)", () => {
+    const late = (reminder: Partial<Reminder>) =>
+      [wordsIn(["en-US"]), wordsIn(["ru-RU"])].map((words) =>
+        plain(reminderNotification({ ...base, ...reminder }, words).late),
+      );
+    expect(late({})).toEqual([
+      "11:00 AM – 12:00 PM · reminder due at 10:45 AM",
+      "11:00–12:00 · напоминание на 10:45",
+    ]);
+    expect(late({ kind: "task", start: null, end: null })).toEqual([
+      "Task · reminder due at 10:45 AM",
+      "Задача · напоминание на 10:45",
+    ]);
+    expect(late({ start: null, end: null })).toEqual([
+      "Reminder due at 10:45 AM",
+      "Напоминание на 10:45",
+    ]);
+  });
+
   test("an item without a title says so", () => {
     expect(reminderNotification({ ...base, title: null }, wordsIn(["ru-RU"])).title).toBe(
       "(Без названия)",

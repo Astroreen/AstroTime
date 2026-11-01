@@ -13,7 +13,7 @@ import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { RemindersProvider } from "./components/reminders-context.tsx";
 import { UnprotectedDialog } from "./components/unprotected-dialog.tsx";
 import { createI18n } from "./i18n/index.ts";
-import type { Platform } from "./platform.ts";
+import type { Platform, ShellState } from "./platform.ts";
 import { KEYS, usePreference } from "./preferences.ts";
 import { readSettings, SettingsContext, withSettings, type Settings } from "./settings.ts";
 
@@ -108,6 +108,7 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
         ) : (
           <StoreMessage opening={opening} />
         )}
+        {platform.shell ? <ShellChrome apply={platform.shell} settings={chosen} /> : null}
         {platform.unprotectedPrompt ? (
           <UnprotectedDialog prompt={platform.unprotectedPrompt} />
         ) : null}
@@ -115,6 +116,33 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
     </I18nextProvider>
   );
   return <CSPProvider nonce={nonce}>{app}</CSPProvider>;
+}
+
+/**
+ * Hands a shell's own chrome its state (desktop D75): the window frame's
+ * theme, whether closing the window quits, and its tray's words in the
+ * user's language; on start and at every change.
+ */
+function ShellChrome({
+  apply,
+  settings,
+}: {
+  apply: (state: ShellState) => void;
+  settings: Settings;
+}) {
+  const { t } = useTranslation();
+  const { theme, keepRunning } = settings;
+  const [open, syncNow, closeWindow, quit] = [
+    t("shell.open"),
+    t("accounts.syncNow"),
+    t("shell.closeWindow"),
+    t("shell.quit"),
+  ];
+  useEffect(
+    () => apply({ theme, keepRunning, words: { open, syncNow, closeWindow, quit } }),
+    [apply, theme, keepRunning, open, syncNow, closeWindow, quit],
+  );
+  return null;
 }
 
 /** While the store opens, or why it did not. */
