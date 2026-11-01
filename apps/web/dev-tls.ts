@@ -5,12 +5,25 @@
 // a TLS listener on ASTROTIME_WEB_HTTPS_HOST:ASTROTIME_WEB_HTTPS_PORT forwards
 // each connection to the dev server, which stays plain http on localhost.
 import { readFileSync } from "node:fs";
-import { connect, type AddressInfo } from "node:net";
+import { connect, type AddressInfo, type Socket } from "node:net";
 import { createServer } from "node:tls";
 
 import type { Plugin } from "vite";
 
 import { isTailnetOrLocal } from "./dev-clients.ts";
+
+/**
+ * Lets in this machine and the tailnet only, even if the front's address is
+ * reachable from a LAN (Linux answers for any of its addresses on any
+ * interface): any other connection is destroyed before its handshake.
+ */
+export function guard(front: {
+  on(event: "connection", listener: (socket: Socket) => void): unknown;
+}): void {
+  front.on("connection", (socket) => {
+    if (!isTailnetOrLocal(socket.remoteAddress ?? "")) socket.destroy();
+  });
+}
 
 export function devTls(env = process.env): Plugin {
   return {
@@ -39,11 +52,7 @@ export function devTls(env = process.env): Plugin {
         socket.on("error", () => upstream.destroy());
         upstream.on("error", () => socket.destroy());
       });
-      // This machine and the tailnet only, even if the address is reachable
-      // from a LAN (Linux answers for any of its addresses on any interface).
-      front.on("connection", (socket) => {
-        if (!isTailnetOrLocal(socket.remoteAddress ?? "")) socket.destroy();
-      });
+      guard(front);
       front.on("error", (error) => {
         server.config.logger.error(`astrotime: the https front failed: ${error.message}`);
         process.exit(1);

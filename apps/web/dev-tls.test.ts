@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import type { ViteDevServer } from "vite";
 import { describe, expect, test } from "vite-plus/test";
 
-import { devTls } from "./dev-tls.ts";
+import { devTls, guard } from "./dev-tls.ts";
 
 // The forwarding itself is proven end to end by scripts/t3/smoke.sh, with a
 // certificate dev.sh makes; here, when the plugin starts and when it refuses.
@@ -43,5 +43,27 @@ describe("devTls", () => {
         null,
       ),
     ).toThrow(/own HTTP server/);
+  });
+});
+
+describe("guard", () => {
+  test("destroys a connection from beyond this machine and the tailnet, keeps the rest", () => {
+    const front = new EventEmitter();
+    guard(front as never);
+    const outcome = (remoteAddress: string) => {
+      let destroyed = false;
+      front.emit("connection", { remoteAddress, destroy: () => (destroyed = true) });
+      return [remoteAddress, destroyed];
+    };
+    expect(
+      ["192.168.1.20", "10.0.0.5", "203.0.113.7", "100.64.0.1", "127.0.0.1", "::1"].map(outcome),
+    ).toEqual([
+      ["192.168.1.20", true],
+      ["10.0.0.5", true],
+      ["203.0.113.7", true],
+      ["100.64.0.1", false],
+      ["127.0.0.1", false],
+      ["::1", false],
+    ]);
   });
 });

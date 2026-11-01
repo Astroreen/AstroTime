@@ -32,8 +32,8 @@ async function send(res: ServerResponse, response: Response): Promise<void> {
   res.end(Buffer.from(await response.arrayBuffer()));
 }
 
-export function davProxy(): Plugin {
-  const allow = process.env["ASTROTIME_PROXY_ALLOW"]
+export function davProxy(env = process.env): Plugin {
+  const allow = env["ASTROTIME_PROXY_ALLOW"]
     ?.split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -48,7 +48,7 @@ export function davProxy(): Plugin {
       const host = server.config.server.host;
       const local =
         (host === undefined || host === "localhost" || host === "127.0.0.1" || host === "::1") &&
-        !process.env["ASTROTIME_WEB_CLIENTS"];
+        !env["ASTROTIME_WEB_CLIENTS"];
       server.middlewares.use(DAV_PROXY_PREFIX, (req, res) => {
         if (!allow?.length && !local) {
           res.statusCode = 403;

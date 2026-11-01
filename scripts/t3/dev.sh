@@ -84,6 +84,9 @@ if [ -z "${ASTROTIME_WEB_TLS:-}" ]; then
   fi
 fi
 export ASTROTIME_WEB_HTTPS_PORT="${ASTROTIME_WEB_HTTPS_PORT:-$ASTROTIME_WEB_PORT}"
+# Only the self-signed mode starts the front (apps/web/dev-tls.ts); a
+# certificate inherited from the caller's shell must not start one otherwise.
+[ "$ASTROTIME_WEB_TLS" = self-signed ] || unset ASTROTIME_WEB_TLS_CERT ASTROTIME_WEB_TLS_KEY
 case "$ASTROTIME_WEB_TLS" in
   off) ;;
   serve)
