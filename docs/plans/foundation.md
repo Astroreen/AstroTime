@@ -513,12 +513,18 @@ Decided while building PR 7.
   - **What it keeps.** On install it keeps this version's files in a cache
     of its own (`astrotime-<version>`) and the page as the server sent it
     then, policy and nonce with it ([D110](#D110)), but without the preset's
-    tags ([D123](#D123)), which only the server says. Its files answer from
+    tags ([D123](#D123)), which only the server says: the block the server
+    marks between `<!-- astrotime-preset -->` comments, and any
+    `<meta name="astrotime-server|username">` however it is written. A page
+    that names a file this version does not list (a rolling deploy, the page
+    newer than the worker) fails the install, so the version that has them
+    keeps it. Its files answer from
     the cache; the page comes from the network first (a fresh nonce, the
     preset) and from the cache when there is no network, or when what
     answers is a server error (a reverse proxy's 502, 503 or 504 while the
-    container is down). It touches
-    nothing else: never `/dav-proxy/`, never a request that is not a `GET`
+    container is down). It answers only the app's own navigations, under
+    its scope: a route of the single-page app, never `/dav-proxy/`, the
+    health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
     of the app's origin, never a file it does not list. Activated, it
     deletes older versions' caches. The proxy's static serving stays as
     [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
@@ -794,7 +800,8 @@ Decided while building PR 5a-3.
     held never opens the dialog again. The UI tries it on start, whenever
     the network comes back, and, for a server down while the browser is
     online, at the end of a sync's tick once a backoff allows (a minute,
-    doubling to half an hour) (`SignIn.saveHeld`), and while it waits, the
+    doubling to half an hour; only a save, or no approval left, starts it
+    again) (`SignIn.saveHeld`), and while it waits, the
     accounts dialog says calmly that AstroTime signs in as that user once the
     server can be reached. An approval is held for seven days (`heldUntil`);
     past that, its app password is revoked at the next chance and the entry
@@ -890,7 +897,8 @@ Decided while building PR 5a-3.
   `ASTROTIME_USERNAME` (optional), and the dev server the same, from the
   environment or a gitignored `.astrotime-dev/preset.env`
   (`scripts/t3/dev.sh`). The page carries them as two `<meta>` tags
-  (`astrotime-server`, `astrotime-username`) that the server adds to every
+  (`astrotime-server`, `astrotime-username`), between two marking comments,
+  that the server adds to every
   answer of the page, as it adds the nonce ([D110](#D110)): no request more,
   nothing to fetch offline, and a build that holds none. With a preset the
   add-account dialog asks for the password alone (the user name too when

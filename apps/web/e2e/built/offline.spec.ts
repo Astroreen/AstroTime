@@ -121,6 +121,16 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV a
     expect(kept.paths.filter((path) => path.startsWith("/dav-proxy/"))).toEqual([]);
     expect(kept.preset).toBe(false);
 
+    // A navigation to CalDAV's proxy is not the app's: the worker leaves it
+    // to the network, which answers it; with none, it fails, never the app.
+    const dav = `http://127.0.0.1:${port}/dav-proxy/${encodeURIComponent(new URL(radicale.url).origin)}/astro/`;
+    expect((await page.goto(dav))?.fromServiceWorker()).toBe(false);
+    await context.setOffline(true);
+    await expect(page.goto(dav)).rejects.toThrow(/ERR_INTERNET_DISCONNECTED/);
+    await context.setOffline(false);
+    await page.goto(`http://127.0.0.1:${port}/`);
+    await expect(planning(page)).toBeVisible();
+
     // No network: the page, its scripts, the store's worker and SQLite's wasm
     // come from the worker, the items from the store on the device.
     await context.setOffline(true);

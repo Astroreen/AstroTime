@@ -43,6 +43,12 @@ export function serviceWorker(): Plugin {
     generateBundle(_options, bundle) {
       const worker = bundle[SW];
       if (!worker || worker.type !== "chunk") throw new Error(`The build wrote no ${SW}.`);
+      // A classic script: a module it shares with the app would be a chunk
+      // it imports, which a classic worker cannot.
+      if (worker.imports.length > 0 || worker.dynamicImports.length > 0)
+        throw new Error(
+          `${SW} imports ${worker.imports.join(", ")}: it must share no module with the app.`,
+        );
       const hash = createHash("sha256");
       const built = Object.keys(bundle).filter(
         (file) => file !== SW && file !== "index.html" && !file.endsWith(".map"),

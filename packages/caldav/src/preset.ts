@@ -10,6 +10,15 @@ export interface Preset {
   readonly username: string | null;
 }
 
+/**
+ * The comments the preset's tags sit between, so whatever keeps the page
+ * (the web app's service worker, D124) can leave them out whole.
+ */
+export const PRESET_MARK = {
+  start: "<!-- astrotime-preset -->",
+  end: "<!-- /astrotime-preset -->",
+} as const;
+
 /** The <meta> names the page carries the preset under. */
 export const PRESET_META = {
   server: "astrotime-server",
@@ -57,8 +66,10 @@ const escape = (text: string) =>
 export function presetTags(preset: Preset): string {
   const tag = (name: string, value: string) => `<meta name="${name}" content="${escape(value)}" />`;
   return [
+    PRESET_MARK.start,
     tag(PRESET_META.server, preset.server),
     ...(preset.username === null ? [] : [tag(PRESET_META.username, preset.username)]),
+    PRESET_MARK.end,
   ].join("");
 }
 

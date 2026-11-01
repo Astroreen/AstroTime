@@ -243,7 +243,7 @@ test("the page names the preset's server and user, escaped, on every route (D123
     // Escaped, with `$` patterns as written, and the nonce's placeholder in
     // the preset left alone: only the page's own tag carries the nonce.
     expect(html).toContain(
-      `<meta name="astrotime-server" content="https://cloud.example.com/$'" /><meta name="astrotime-username" content="a&quot;&lt;b&gt;&amp;$$$&amp;${NONCE_PLACEHOLDER}" /></head>`,
+      `<!-- astrotime-preset --><meta name="astrotime-server" content="https://cloud.example.com/$'" /><meta name="astrotime-username" content="a&quot;&lt;b&gt;&amp;$$$&amp;${NONCE_PLACEHOLDER}" /><!-- /astrotime-preset --></head>`,
     );
     const nonce = /nonce="([^"]+)"/.exec(html)?.[1];
     expect(nonce).not.toBe(NONCE_PLACEHOLDER);

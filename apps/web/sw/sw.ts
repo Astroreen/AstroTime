@@ -1,11 +1,10 @@
 // The web app's service worker (docs/plans/foundation.md#D124): the app's
 // files of this version, kept so the app starts with no network, and its
-// page, from the network first, from the cache when there is none. A classic
-// script with no import, built to /sw.js; the build fills in the two
-// constants below (apps/web/service-worker.ts). CalDAV through /dav-proxy/
-// and anything else not listed is never touched.
-
-// A module to TypeScript, so `self` may be declared; the build emits no export.
+// page, from the network first, from the cache when there is none. Built to
+// /sw.js as one classic script (its import is bundled in); the build fills in
+// the two constants below (apps/web/service-worker.ts). CalDAV through
+// /dav-proxy/ and anything else that is not the app's is never touched.
+import { isAppPage, namedFiles, withoutPreset } from "./page.ts";
 
 declare const self: ServiceWorkerGlobalScope;
 /** Every file of this version, by path; `/` is the page. */
@@ -23,10 +22,13 @@ const FILES = new Set(ASTROTIME_PRECACHE);
  * Its policy, nonce and all, stays with it, as one answer (D110).
  */
 async function keptPage(response: Response): Promise<Response> {
-  const html = (await response.text()).replace(
-    /<meta name="astrotime-(?:server|username)" content="[^"]*" \/>/g,
-    "",
-  );
+  const html = withoutPreset(await response.text());
+  // A page newer than this version's list (a rolling deploy) names files it
+  // does not have: kept, it could not start offline. The install fails, and
+  // the next one, of the version that has them, keeps it.
+  const missing = namedFiles(html).filter((path) => !FILES.has(path));
+  if (missing.length > 0)
+    throw new Error(`The page names files this version does not have: ${missing.join(", ")}`);
   const headers = new Headers(response.headers);
   headers.delete("Content-Length");
   return new Response(html, { status: response.status, statusText: response.statusText, headers });
@@ -66,6 +68,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
+    // Only the app's own pages; CalDAV's proxy and anything else go to the network untouched.
+    if (!isAppPage(url.pathname, new URL(self.registration.scope).pathname)) return;
     // The server's page while it answers (a fresh nonce and the preset); this
     // version's when there is no network, or when what answers is a server
     // error (a reverse proxy's 502, 503 or 504 while the container is down).

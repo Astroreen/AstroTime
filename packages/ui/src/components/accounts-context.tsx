@@ -164,11 +164,14 @@ export function AccountsProvider({
         });
         const result = await signIn.saveHeld();
         if (result === "saved") void scheduler.syncNow();
-        // Still unreachable: tried again on a sync's tick, a minute later,
-        // then two, doubling up to half an hour (D121).
-        tries = result === "held" ? tries + 1 : 0;
-        notBefore = Date.now() + Math.min(HELD_RETRY_MAX_MS, 60_000 * 2 ** Math.max(0, tries - 1));
         const now = await heldApproval(pending);
+        // Still unreachable: tried again on a sync's tick, a minute later,
+        // then two, doubling up to half an hour (D121). Only a save, or no
+        // approval left, starts the count again; a try that did nothing (another
+        // saver ran) or failed keeps it.
+        if (result === "saved" || now === null) tries = 0;
+        else if (result === "held") tries++;
+        notBefore = Date.now() + Math.min(HELD_RETRY_MAX_MS, 60_000 * 2 ** Math.max(0, tries - 1));
         if (live) setHeld(now);
       } catch (error) {
         console.error(error);
