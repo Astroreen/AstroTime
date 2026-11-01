@@ -23,12 +23,16 @@ const http = registerPlugin<NativeHttp>("AstroTimeHttp");
 
 export function mobilePlatform(store: Promise<Store>): Platform {
   const signingIn = new SigningIn();
+  const secrets = keystoreSecrets(SecureStorage);
   return {
     store,
     http: nativeClient(http, async () =>
       cleartextOrigins(await (await store).accounts(), signingIn.servers),
     ),
-    secrets: keystoreSecrets(SecureStorage),
+    secrets,
+    // The system may end the app while the Custom Tab is in front; its next
+    // start takes the Login Flow up again (foundation D121).
+    pendingSignIn: secrets,
     // A Custom Tab, where the user's browser keeps their passwords and second
     // factor. The app is frozen while the tab is in front (Android 14 and
     // later), so the user comes back, and the poll on return ends the sign-in.

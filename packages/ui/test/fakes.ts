@@ -21,6 +21,7 @@ export function nextcloud(options: { password: string; approveAfter?: number }) 
   let polls = 0;
   let offlinePolls = 0;
   let approveAfter = options.approveAfter ?? Infinity;
+  let spent = false;
   const reply = (request: HttpRequest, status: number, body: string): HttpResponse => ({
     status,
     url: request.url,
@@ -45,13 +46,14 @@ export function nextcloud(options: { password: string; approveAfter?: number }) 
         offlinePolls--;
         throw new OfflineError("offline");
       }
-      return polls++ < approveAfter
-        ? reply(request, 404, "[]")
-        : reply(
-            request,
-            200,
-            JSON.stringify({ server: SERVER, loginName: "astro", appPassword: "app-pass" }),
-          );
+      // As Nextcloud: the app password is given once, then the token is gone.
+      if (polls++ < approveAfter || spent) return reply(request, 404, "[]");
+      spent = true;
+      return reply(
+        request,
+        200,
+        JSON.stringify({ server: SERVER, loginName: "astro", appPassword: "app-pass" }),
+      );
     }
     const expected = `Basic ${btoa(`astro:${options.password}`)}`;
     if (request.headers["Authorization"] !== expected) return reply(request, 401, "");

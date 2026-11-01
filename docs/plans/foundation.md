@@ -697,6 +697,68 @@ Decided while building PR 5a-3.
   in again" opens the dialog with the account's address and user name, on
   Nextcloud's tab for a Nextcloud account.
 
+- **D121. The app remembers the user.** Found while chasing the owner's
+  "opening AstroTime again asks me to connect Nextcloud again" (v0.2.0). On
+  one address the store and the credentials outlive a reload, the browser
+  closed and opened again, and the dev server restarted (`remember.spec.ts`,
+  a persistent Chromium profile); nothing there was lost. What loses them:
+  - **Another address.** A browser keeps OPFS, IndexedDB and localStorage per
+    origin, so `http://127.0.0.1:5180`, the self-signed
+    `https://<tailnet IP>:5180`, `https://<machine>:5180` and the
+    `tailscale serve` name are four stores, each empty at first, and an app
+    cannot see another origin's. The owner's dev server moved from the
+    self-signed front to `tailscale serve`, and T3's preview from
+    `127.0.0.1` to the tailnet name, on the day of the report. So the first
+    run says, on the web (`Platform.dataHome`, the origin's host), that
+    AstroTime keeps its data in this browser for this address only, and
+    another address or browser starts empty; `scripts/t3/README.md` says to
+    keep to one address.
+  - **A Login Flow whose page went.** Nextcloud's page opens in another tab
+    (a Custom Tab on Android), and a phone's browser discards a tab in the
+    background, as Android may end the app while the Custom Tab is in front
+    ([android D65](android.md#D65)). The flow lived in the page's memory
+    only, so the page loaded anew showed the first run, however the user had
+    approved. Now `SignIn` keeps the flow (`LoginFlowState`: the server, its
+    page, the poll endpoint and token, and when the token expires) in the
+    platform's `pendingSignIn`, a `SecretStore` under `login-flow`, since the
+    token gets the app password; the next page finds it and opens the dialog
+    on its waiting step, polling again (`SignIn.resume`, `resumeLoginFlow`),
+    without opening Nextcloud's page again ("Open the sign-in page again"
+    does). Once approved, the entry holds the app password Nextcloud gave in
+    the token's place until the account and its secret are saved, so a page
+    that goes in between (discovery, the first write) loses nothing: the
+    next one saves it without a new flow. An approval has an owner, the page
+    that holds it; every page holds a Web Lock, `astrotime-page-<id>`, for as
+    long as it lives. Another page takes an approval up only when
+    `navigator.locks.query()` shows its owner's lock is not held (the page is
+    gone), and makes itself the owner under the flow's lock; only the owner
+    saves, forgets or revokes it, and a new flow never replaces an approval
+    whose owner lives. Saving fails because the server
+    cannot be reached: the approval is held, and the next try saves it.
+    Fails otherwise (no CalDAV server there), or the user cancels before it
+    is saved: the app password is revoked and forgotten. A waiting flow is
+    forgotten as it expires, fails or is cancelled; a page's load drops one
+    past its token's life, or unreadable, without opening the dialog
+    (`hasPendingFlow`). Forgetting compares the kept token and deletes under
+    a Web Lock (`astrotime-login-flow`), so a newer flow another page
+    started is never forgotten for an older one; the latest flow started is
+    the one kept, and an unsaved approval it replaces (a page left it, and
+    this one started anew) has its app password revoked, never lost. A page that took up a flow another page ended closes its
+    dialog (`elsewhere`), the account coming through the store. The web and
+    Android have a `pendingSignIn` (their secrets); the desktop, whose
+    window lives on while the browser is in front, has none.
+  - **Eviction.** A browser may evict best-effort storage when the device runs
+    short of space. Once the store holds an account, the UI calls the
+    platform's `keepData`, the web's `navigator.storage.persist()` (unless
+    `persisted()` already says so): Chromium grants or refuses it silently
+    (by engagement, a bookmark, an installed app), Firefox asks the user. Its
+    answer is kept in the preferences (`astrotime.keepData`), and the UI
+    never asks again once answered, so a user who refused is not asked at
+    every visit; tabs ask one at a time, under the `astrotime-keep-data` Web
+    Lock, each reading the answer again inside it. A refusal changes nothing else.
+  - An insecure context (plain http beyond localhost) never opens the store
+    and says so ([D20](#D20)), so it cannot lose anything.
+
 ### The store across tabs
 
 Decided while closing the Deferred "One store across tabs".
@@ -1517,6 +1579,14 @@ errors").
   transaction, so both revoke it and the first one's new password stays
   unrevoked; reading the old secret and writing the new under one lock
   would close that.
+- **Login Flow across tabs, the rest** ([D121](#D121)) — what ownership
+  does not cover: a page frozen in the back/forward cache while it holds its
+  lock looks alive, so its approval waits for it to come back (Chromium
+  caches no page that holds a Web Lock, so not there); a browser without Web
+  Locks treats every owner as gone (the web store needs them anyway); two
+  pages that took up one waiting flow both poll it, and only one gets the
+  approval, the other closing as `elsewhere`; a new flow started while
+  another page saves its approval is not kept, so it lives in its page alone.
 - **Tabs of two builds** — after an update, a tab of the new build may
   follow a leader tab of the old one until the old tabs reload: its
   migrations run on the old tab's connection while the old tab's store

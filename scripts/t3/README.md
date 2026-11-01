@@ -53,6 +53,12 @@ over https, on the same port number, through one of two fronts:
   openssl from the devenv shell) is made once, and again when the names it
   covers change. `dev.sh` prints the command above while it falls back.
 
+**One address, one store.** A browser keeps the app's store, accounts and
+passwords per origin, so `http://127.0.0.1:5180`, `https://100.x.y.z:5180`,
+`https://<machine>:5180` and the `tailscale serve` name each start empty,
+and none sees another's (`docs/plans/foundation.md#D121`). Keep to one: the
+`tailscale serve` name when it runs, for this machine too.
+
 Either way only this machine and tailnet devices (100.64.0.0/10,
 fd7a:115c:a1e0::/48; `apps/web/dev-clients.ts`) get in, not the rest of a LAN
 or a café's Wi-Fi, and the dev proxy reaches only the servers in

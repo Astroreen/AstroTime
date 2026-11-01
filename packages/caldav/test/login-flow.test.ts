@@ -3,6 +3,7 @@ import { expect, test } from "vite-plus/test";
 import { OfflineError } from "@astrotime/core";
 
 import {
+  resumeLoginFlow,
   revokeAppPassword,
   startLoginFlow,
   type HttpClient,
@@ -56,6 +57,23 @@ test("Login Flow v2: the user approves on their server and AstroTime gets an app
     ["POST", "https://cloud.example.com/login/v2/poll", "token=t0k3n"],
     ["POST", "https://cloud.example.com/login/v2/poll", "token=t0k3n"],
   ]);
+});
+
+test("a flow kept by a page the browser discarded is polled again from its state (D121)", async () => {
+  const { http, requests } = nextcloud();
+  const { state } = await startLoginFlow(http, "https://cloud.example.com/");
+  expect(state).toEqual({
+    server: "https://cloud.example.com/",
+    loginUrl: "https://cloud.example.com/login/v2/flow/abc",
+    endpoint: "https://cloud.example.com/login/v2/poll",
+    token: "t0k3n",
+  });
+  // A new page: the state went through JSON, as a shell keeps it.
+  const resumed = resumeLoginFlow(http, JSON.parse(JSON.stringify(state)));
+  expect(resumed.loginUrl).toBe(state.loginUrl);
+  expect(await resumed.poll()).toBeNull();
+  expect(await resumed.poll()).toMatchObject({ username: "astro", password: "app-pass" });
+  expect(requests.slice(1).map((r) => r.body)).toEqual(["token=t0k3n", "token=t0k3n"]);
 });
 
 test("a server without Login Flow v2 says so", async () => {

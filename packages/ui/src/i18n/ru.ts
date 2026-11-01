@@ -24,6 +24,8 @@ export const ru = {
   "firstRun.title": "Ваши календари и задачи с вашего сервера",
   "firstRun.body":
     "Войдите в Nextcloud или любой сервер CalDAV. Данные остаются там и на этом устройстве; своего сервера у AstroTime нет.",
+  "firstRun.dataHome":
+    "AstroTime хранит аккаунты и данные в этом браузере, только для {{home}}. По другому адресу или в другом браузере он открывается пустым.",
   "firstRun.nextcloud": "Войти в Nextcloud",
   "firstRun.caldav": "Другой сервер CalDAV",
 

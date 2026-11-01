@@ -6,10 +6,13 @@ import {
   CertificateError,
   NoCalendarHomeError,
   ProxyRefusedError,
+  resumeLoginFlow,
+  revokeAppPassword,
   startLoginFlow,
   type Credentials,
   type HttpClient,
   type LoginFlow,
+  type LoginFlowState,
 } from "@astrotime/caldav";
 import { AuthError, OfflineError, type SecretStore } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
@@ -50,7 +53,9 @@ export type SignInState =
       readonly location: string | null;
     }
   /** `added`: a new account; otherwise one already here signed in again. */
-  | { readonly step: "done"; readonly account: Account; readonly added: boolean };
+  | { readonly step: "done"; readonly account: Account; readonly added: boolean }
+  /** The Login Flow this page took up again ended in another (D121). */
+  | { readonly step: "elsewhere" };
 
 /** Waits `ms`, or less when `signal` aborts; injected so tests decide when time passes. */
 export interface Clock {
@@ -73,6 +78,162 @@ const realClock: Clock = {
 /** How often Login Flow v2 is polled, and how long its token lives (android D65). */
 const POLL_EVERY_MS = 2_000;
 export const FLOW_LIFETIME_MS = 20 * 60_000;
+
+/** Where a Login Flow under way is kept, in the platform's `pendingSignIn` (D121). */
+export const PENDING_FLOW = "login-flow";
+
+/**
+ * A Login Flow kept in `pendingSignIn`, under its token: waiting for the
+ * user's approval until `deadline`, or approved, with the app password
+ * Nextcloud gave, until the account and its secret are saved by `owner`,
+ * the page that holds it.
+ */
+type PendingFlow =
+  | (LoginFlowState & { readonly step: "waiting"; readonly deadline: number })
+  | ({
+      readonly step: "approved";
+      readonly token: string;
+      readonly server: string;
+      readonly owner: string;
+    } & Credentials);
+
+/** The Web Lock a page holds for as long as it lives, so other pages can tell it is there. */
+const pageLock = (page: string) => `astrotime-page-${page}`;
+
+let thisPage: string | null = null;
+
+/** This page's id; its lock, taken on first use, is held until the page goes (D121). */
+function currentPage(): string {
+  if (thisPage !== null) return thisPage;
+  const page = crypto.randomUUID();
+  thisPage = page;
+  void globalThis.navigator?.locks?.request(pageLock(page), () => new Promise<void>(() => {}));
+  return page;
+}
+
+/** Whether page `page` is still there: its lock is held. */
+async function pageLives(page: string): Promise<boolean> {
+  const locks = globalThis.navigator?.locks;
+  if (!locks) return false;
+  const { held = [] } = await locks.query();
+  return held.some((lock) => lock.name === pageLock(page));
+}
+
+/** An approval another page holds, and is there to save. */
+async function heldElsewhere(flow: PendingFlow | null, page: string): Promise<boolean> {
+  return flow?.step === "approved" && flow.owner !== page && (await pageLives(flow.owner));
+}
+
+function readPending(json: string | null): PendingFlow | null {
+  if (json === null) return null;
+  try {
+    const value = JSON.parse(json) as Record<string, unknown> | null;
+    const text = (key: string) => (typeof value?.[key] === "string" ? value[key] : null);
+    const [token, server] = [text("token"), text("server")];
+    if (token === null || server === null) return null;
+    if (value?.["step"] === "approved") {
+      const [username, password, owner] = [text("username"), text("password"), text("owner")];
+      if (username === null || password === null || owner === null) return null;
+      return { step: "approved", token, server, owner, username, password };
+    }
+    const [loginUrl, endpoint, deadline] = [
+      text("loginUrl"),
+      text("endpoint"),
+      value?.["deadline"],
+    ];
+    if (value?.["step"] !== "waiting" || loginUrl === null || endpoint === null) return null;
+    if (typeof deadline !== "number") return null;
+    return { step: "waiting", token, server, loginUrl, endpoint, deadline };
+  } catch {
+    return null;
+  }
+}
+
+/** Runs `work` alone among the pages of this origin: the kept flow is read and changed whole. */
+function underLock<T>(work: () => Promise<T>): Promise<T> {
+  const locks = globalThis.navigator?.locks;
+  return locks ? locks.request("astrotime-login-flow", work) : work();
+}
+
+type ApprovedFlow = Extract<PendingFlow, { step: "approved" }>;
+
+/**
+ * Keeps `flow` for `page`, replacing what was kept: the latest flow started
+ * is the one taken up. An approval of another flow that a page left behind
+ * unsaved is handed back, so its app password is revoked rather than lost;
+ * one whose page is still there, saving it, is left alone, and `flow` is
+ * not kept (`kept` false).
+ */
+function keepFlow(
+  pending: SecretStore,
+  flow: PendingFlow,
+  page: string,
+): Promise<{ kept: boolean; displaced: ApprovedFlow | null }> {
+  return underLock(async () => {
+    const before = readPending(await pending.get(PENDING_FLOW));
+    const other = before?.step === "approved" && before.token !== flow.token ? before : null;
+    if (other && (await heldElsewhere(other, page))) return { kept: false, displaced: null };
+    await pending.set(PENDING_FLOW, JSON.stringify(flow));
+    return { kept: true, displaced: other };
+  });
+}
+
+/**
+ * Forgets the kept flow if it is still the one with `token`, and, approved,
+ * still `page`'s: read and deleted under one Web Lock, so another page's
+ * newer flow, or an approval another page took up, stays.
+ */
+function forgetFlow(pending: SecretStore, token: string, page: string): Promise<void> {
+  return underLock(async () => {
+    const kept = readPending(await pending.get(PENDING_FLOW));
+    if (kept?.token !== token || (kept.step === "approved" && kept.owner !== page)) return;
+    await pending.delete(PENDING_FLOW);
+  });
+}
+
+/**
+ * Makes `page` the owner of the kept approval, if its owner is gone (D121):
+ * the approval to save, or null when another page that is still there holds
+ * it, or none is kept.
+ */
+function takeUpApproval(pending: SecretStore, page: string): Promise<ApprovedFlow | null> {
+  return underLock(async () => {
+    const kept = readPending(await pending.get(PENDING_FLOW));
+    if (kept?.step !== "approved" || (await heldElsewhere(kept, page))) return null;
+    const mine = { ...kept, owner: page };
+    await pending.set(PENDING_FLOW, JSON.stringify(mine));
+    return mine;
+  });
+}
+
+/** Whether `page` may still revoke its approval of `token`: no other page took it up. */
+function stillOwns(pending: SecretStore, token: string, page: string): Promise<boolean> {
+  return underLock(async () => {
+    const kept = readPending(await pending.get(PENDING_FLOW));
+    return !(kept?.token === token && kept.step === "approved" && kept.owner !== page);
+  });
+}
+
+/**
+ * Whether a page that just started has a Login Flow to take up: one waiting
+ * within its token's life, or one approved and not yet saved whose page is
+ * gone. What is kept but past its life, or unreadable, is forgotten here.
+ */
+export async function hasPendingFlow(
+  pending: SecretStore,
+  now = Date.now(),
+  page = currentPage(),
+): Promise<boolean> {
+  return underLock(async () => {
+    const raw = await pending.get(PENDING_FLOW);
+    if (raw === null) return false;
+    const flow = readPending(raw);
+    if (flow?.step === "approved") return !(await heldElsewhere(flow, page));
+    if (flow && now < flow.deadline) return true;
+    await pending.delete(PENDING_FLOW);
+    return false;
+  });
+}
 
 /**
  * A web address from what the user typed: `cloud.example.com` is
@@ -101,6 +262,14 @@ export interface SignInOptions {
   readonly openExternal: (url: string) => void;
   /** The platform's `signingInTo`: the server is being signed in to, until the returned function. */
   readonly signingInTo?: (server: string) => () => void;
+  /**
+   * The platform's `pendingSignIn`: where a Login Flow under way is kept, so
+   * a page the browser discarded while the user approved takes it up again
+   * (`resume`, D121).
+   */
+  readonly pending?: SecretStore;
+  /** This page's id, whose Web Lock it holds while it lives; its own by default (D121). */
+  readonly page?: string;
   readonly clock?: Clock;
 }
 
@@ -113,10 +282,18 @@ export class SignIn {
   #attempt: AbortController | null = null;
   /** Ends the wait between two polls at once. */
   #wake: (() => void) | null = null;
+  /** The token of the Login Flow this attempt keeps in `pending`. */
+  #kept: string | null = null;
+  /** Login Flow's approval, kept until its account is saved (D121). */
+  #approved: { token: string; server: string; credentials: Credentials } | null = null;
+  /** Saving `#approved`'s account: a cancel leaves it to the save. */
+  #finishing = false;
+  readonly #page: string;
 
   constructor(options: SignInOptions) {
     this.#options = options;
     this.#clock = options.clock ?? realClock;
+    this.#page = options.page ?? currentPage();
   }
 
   get state(): SignInState {
@@ -141,14 +318,21 @@ export class SignIn {
     }
   }
 
-  /** Nextcloud: the user approves on their server's page and AstroTime gets an app password. */
+  /**
+   * Nextcloud: the user approves on their server's page and AstroTime gets
+   * an app password. An approval this page holds still, whose account could
+   * not be saved (the server unreachable), is saved again instead.
+   */
   async withNextcloud(input: { server: string }) {
     const signal = this.#begin();
     const server = serverAddress(input.server);
     if (!server) return this.#fail(signal, "address");
     const end = this.#options.signingInTo?.(server);
     try {
-      await this.#loginFlow(signal, server);
+      const held = this.#approved;
+      if (held && new URL(held.server).host === new URL(server).host)
+        await this.#saveApproved(signal, held.token, held.server, held.credentials);
+      else await this.#loginFlow(signal, server);
     } finally {
       end?.();
     }
@@ -162,11 +346,93 @@ export class SignIn {
       return this.#fail(signal, problemOf(error, "not-nextcloud"), error);
     }
     if (signal.aborted) return;
+    const deadline = this.#clock.now() + FLOW_LIFETIME_MS;
+    // An approval held from before goes, revoked: this is a new flow.
+    await this.#abandon();
+    try {
+      await this.#keep(signal, { step: "waiting", ...flow.state, deadline });
+    } catch (error) {
+      // Kept or not, the flow goes on in this page.
+      console.error(error);
+    }
+    if (signal.aborted) return;
     this.#set({ step: "waiting", loginUrl: flow.loginUrl });
     this.#options.openExternal(flow.loginUrl);
-    const deadline = this.#clock.now() + FLOW_LIFETIME_MS;
+    await this.#await(signal, flow, server, deadline);
+  }
+
+  /**
+   * Takes up a Login Flow a page before this one started (D121): the browser
+   * discarded it, or the system ended the app, while the user approved on
+   * Nextcloud's page. Nextcloud's page is not opened again, but `reopen`
+   * opens it. False when none is under way.
+   */
+  async resume(): Promise<boolean> {
+    const { pending } = this.#options;
+    if (!pending) return false;
+    const signal = this.#begin();
+    let kept: PendingFlow | null;
+    try {
+      kept = readPending(await pending.get(PENDING_FLOW));
+    } catch (error) {
+      console.error(error);
+      kept = null;
+    }
+    if (signal.aborted) return false;
+    if (kept?.step === "approved") {
+      // Only once its page is gone; one that is there saves it itself.
+      try {
+        kept = await takeUpApproval(pending, this.#page);
+      } catch (error) {
+        console.error(error);
+        kept = null;
+      }
+      if (signal.aborted) return false;
+    }
+    if (!kept || (kept.step === "waiting" && this.#clock.now() >= kept.deadline)) {
+      if (kept)
+        await forgetFlow(pending, kept.token, this.#page).catch((error: unknown) =>
+          console.error(error),
+        );
+      this.#set({ step: "idle" });
+      return false;
+    }
+    this.#kept = kept.token;
+    const end = this.#options.signingInTo?.(kept.server);
+    try {
+      if (kept.step === "approved") {
+        // Approved, but its page went before the account was saved: saved now.
+        const { token, server, username, password } = kept;
+        await this.#saveApproved(signal, token, server, { username, password });
+      } else {
+        const { deadline, server, loginUrl, endpoint, token } = kept;
+        const state = { server, loginUrl, endpoint, token };
+        this.#set({ step: "waiting", loginUrl: state.loginUrl });
+        await this.#await(
+          signal,
+          resumeLoginFlow(this.#options.http, state),
+          state.server,
+          deadline,
+        );
+      }
+    } finally {
+      end?.();
+    }
+    return true;
+  }
+
+  /** Polls until the user approves, the token expires, or another page ends the flow. */
+  async #await(signal: AbortSignal, flow: LoginFlow, server: string, deadline: number) {
+    const token = flow.state.token;
     try {
       for (;;) {
+        // Another page took it up too, and ended it (approved there, or cancelled).
+        if (this.#kept === token && !(await this.#stillKept(token))) {
+          if (signal.aborted) return;
+          this.#kept = null;
+          return this.#set({ step: "elsewhere" });
+        }
+        if (signal.aborted) return;
         let approved: Awaited<ReturnType<LoginFlow["poll"]>> = null;
         try {
           approved = await flow.poll();
@@ -176,19 +442,125 @@ export class SignIn {
         }
         if (signal.aborted) return;
         if (approved) {
-          this.#set({ step: "checking" });
           const { server: approvedServer, ...credentials } = approved;
-          return await this.#finish(signal, serverAddress(approvedServer) ?? server, credentials, {
-            loginFlow: true,
-          });
+          const named = serverAddress(approvedServer) ?? server;
+          // The token is spent; the app password is kept in its place until
+          // its account is saved, so a page that goes meanwhile loses nothing.
+          const { pending } = this.#options;
+          if (pending && this.#kept === token) {
+            try {
+              const { displaced } = await keepFlow(
+                pending,
+                { step: "approved", token, server: named, owner: this.#page, ...credentials },
+                this.#page,
+              );
+              if (displaced) await this.#revoke(displaced);
+            } catch (error) {
+              console.error(error);
+            }
+          }
+          return await this.#saveApproved(signal, token, named, credentials);
         }
-        if (this.#clock.now() >= deadline) return this.#fail(signal, "expired");
+        if (this.#clock.now() >= deadline) {
+          await this.#forget(token);
+          return this.#fail(signal, "expired");
+        }
         await this.#nap(signal);
         if (signal.aborted) return;
       }
     } catch (error) {
+      await this.#forget(token);
       this.#fail(signal, problemOf(error, "failed"), error);
     }
+  }
+
+  /**
+   * Saves the account Login Flow's approval signs in to. The approval is
+   * forgotten once the account and its secret are saved; if they cannot be,
+   * the app password is revoked, except when the server could not be
+   * reached: then it is held, and the next try (this page's, or the next
+   * page's) saves it.
+   */
+  async #saveApproved(
+    signal: AbortSignal,
+    token: string,
+    server: string,
+    credentials: Credentials,
+  ): Promise<void> {
+    this.#approved = { token, server, credentials };
+    this.#set({ step: "checking" });
+    this.#finishing = true;
+    try {
+      await this.#finish(signal, server, credentials, {
+        loginFlow: true,
+        saved: () => {
+          this.#approved = null;
+          return this.#forget(token);
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof OfflineError)) await this.#abandon();
+      this.#fail(signal, problemOf(error, "failed"), error);
+    } finally {
+      this.#finishing = false;
+    }
+    // Cancelled before it was saved: the app password, made for nothing, goes.
+    if (signal.aborted && this.#approved?.token === token) await this.#abandon();
+  }
+
+  /**
+   * Revokes an approval held and forgets it (D121), unless another page took
+   * it up meanwhile; the server unreachable, it stays valid there.
+   */
+  async #abandon(): Promise<void> {
+    const held = this.#approved;
+    if (!held) return;
+    this.#approved = null;
+    const { pending } = this.#options;
+    const owned = pending
+      ? await stillOwns(pending, held.token, this.#page).catch(() => true)
+      : true;
+    if (!owned) return;
+    await this.#revoke({ server: held.server, ...held.credentials });
+    await this.#forget(held.token);
+  }
+
+  /** Revokes an app password Login Flow gave; the server unreachable, it stays valid there. */
+  async #revoke(approval: { server: string } & Credentials): Promise<void> {
+    const { server, username, password } = approval;
+    await revokeAppPassword(this.#options.http, server, { username, password }).catch(
+      (error: unknown) => console.error(error),
+    );
+  }
+
+  /** Keeps the flow in `pending`, for a page loaded after this one (D121). */
+  async #keep(signal: AbortSignal, flow: PendingFlow): Promise<void> {
+    const { pending } = this.#options;
+    if (!pending) return;
+    const { kept, displaced } = await keepFlow(pending, flow, this.#page);
+    if (displaced) await this.#revoke(displaced);
+    // Not kept: another page is saving its approval; this flow goes on in this page.
+    if (!kept) return;
+    if (signal.aborted) return forgetFlow(pending, flow.token, this.#page);
+    this.#kept = flow.token;
+  }
+
+  async #stillKept(token: string): Promise<boolean> {
+    const { pending } = this.#options;
+    if (!pending) return true;
+    try {
+      return readPending(await pending.get(PENDING_FLOW))?.token === token;
+    } catch {
+      return true;
+    }
+  }
+
+  /** Forgets the kept flow, if it is still the one with `token`: a later one, another page's, stays. */
+  async #forget(token: string): Promise<void> {
+    const { pending } = this.#options;
+    if (this.#kept === token) this.#kept = null;
+    if (!pending) return;
+    await forgetFlow(pending, token, this.#page).catch((error: unknown) => console.error(error));
   }
 
   /** Opens Nextcloud's page again (the first one was blocked, or closed). */
@@ -201,11 +573,20 @@ export class SignIn {
     this.#wake?.();
   }
 
-  /** Stops the attempt; nothing it was doing changes the state any more. */
-  cancel(): void {
+  /**
+   * Stops the attempt; nothing it was doing changes the state any more.
+   * Resolves once a Login Flow it kept is forgotten (D121).
+   */
+  cancel(): Promise<void> {
     this.#attempt?.abort();
     this.#attempt = null;
     this.#set({ step: "idle" });
+    // Its account being saved: the save, cancelled, sees to the approval.
+    if (this.#finishing) return Promise.resolve();
+    // An approval held revoked; a flow it kept is over for every page; one
+    // it was still reading stays.
+    if (this.#approved) return this.#abandon();
+    return this.#kept === null ? Promise.resolve() : this.#forget(this.#kept);
   }
 
   #begin(): AbortSignal {
@@ -219,7 +600,10 @@ export class SignIn {
     signal: AbortSignal,
     server: string,
     credentials: Credentials,
-    { loginFlow = false } = {},
+    {
+      loginFlow = false,
+      saved: onSaved,
+    }: { loginFlow?: boolean; saved?: () => Promise<void> } = {},
   ) {
     const { http, store, secrets, signingInTo } = this.#options;
     // Once saved, the account is one of the platform's own.
@@ -241,6 +625,7 @@ export class SignIn {
     } finally {
       end?.();
     }
+    await onSaved?.();
     const { account, added } = saved;
     if (signal.aborted) {
       // Cancelled while it was saved: an account it added goes again. One it
