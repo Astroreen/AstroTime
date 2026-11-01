@@ -3,7 +3,7 @@
 // `userData/secrets.json`; or, where no keyring protects them, kept until the
 // app quits or saved unprotected, as the user chose. Apart from Electron, so
 // the decisions are tested in Node with a fake safeStorage.
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { SecretSaving } from "../bridge.ts";
@@ -109,7 +109,11 @@ export function secretsFile(options: {
     const file: SecretsFile = { version: 1, secrets };
     await mkdir(dirname(path), { recursive: true });
     const next = `${path}.next`;
+    // A file a crash left there keeps its own mode: start afresh, and make
+    // sure of the mode whatever the umask.
+    await rm(next, { force: true });
     await writeFile(next, `${JSON.stringify(file, null, 2)}\n`, { mode: 0o600 });
+    await chmod(next, 0o600);
     await rename(next, path);
   }
 
