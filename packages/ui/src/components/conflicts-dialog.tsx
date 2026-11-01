@@ -13,7 +13,7 @@ import { addDays } from "../calendar/dates.ts";
 import type { Formats } from "../calendar/format.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
-import { alarmWords, repeatWords } from "../calendar/words.ts";
+import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
@@ -172,7 +172,8 @@ function itemOf(object: CalendarObject): Item | null {
   return object.master ?? object.exceptions[0] ?? null;
 }
 
-function valueOf(
+/** A field's value as the Conflicts list shows it, in words. */
+export function valueOf(
   object: CalendarObject,
   field: string,
   { t, formats, timeZone }: { t: TFunction; formats: Formats; timeZone: string },
@@ -195,9 +196,7 @@ function valueOf(
     }
     case "alarms":
       return item.alarms
-        .map((alarm) =>
-          alarmWords(alarm, { allDay: false, task: item.kind === "task" }, t, formats, timeZone),
-        )
+        .map((alarm) => alarmWords(alarm, alarmOptions(item, alarm), t, formats, timeZone))
         .join("\n");
     case "time": {
       const { start, end } = timesOf(object, null);

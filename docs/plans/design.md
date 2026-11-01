@@ -677,14 +677,18 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
     due date counts from its day's midnight, as an all-day start does; the
     words read only a start that way, so every preset of a dated task said
     "9 hours after the start" or "39 hours before". After a timed due it
-    says "after the due time", not "after the start".
+    says "after the due time", not "after the start". The details, the
+    edit dialog and the Conflicts list read every reminder by the time it
+    counts from (`alarmOptions`: a date or not, the item a task or not), as
+    core's `remindersOf` picks it.
   - **A reminder at a time of its own** says the day it rings on in the
     user's zone, as its time; the day was its own zone's.
   - **Russian counts 21, 31, 101 in the singular**: "Каждый 21 день",
     "Каждую 31 неделю", "Каждый 21 месяц", "Каждый 101 год"; they read
     "Каждые 21 день".
   - **A task in the search results** reads as its due: the day it is due
-    and the time, where it gave its start's day with its due's time.
+    and the time, or the day alone for a due date, where it gave its
+    start's day with its due's time.
 
 ## Deferred
 

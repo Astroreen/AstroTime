@@ -31,7 +31,8 @@ import {
   type Target,
 } from "../src/calendar/editing.ts";
 import { Formats } from "../src/calendar/format.ts";
-import { alarmWords, repeatWords } from "../src/calendar/words.ts";
+import { alarmOptions, alarmWords, repeatWords } from "../src/calendar/words.ts";
+import { valueOf } from "../src/components/conflicts-dialog.tsx";
 import { loadDemo } from "../src/demo/index.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
@@ -863,6 +864,40 @@ describe("in words", () => {
       "10 minutes after the due time",
     );
     expect(alarmWords(due(-600), timedTask, ru, ruFormats, timeZone)).toBe("За 10 минут");
+  });
+
+  test("a task's reminder from its start date reads as its day too", () => {
+    const fromStart = {
+      trigger: {
+        type: "relative" as const,
+        relatedTo: "start" as const,
+        offsetSeconds: -15 * 3600,
+      },
+    };
+    expect(alarmWords(fromStart, { allDay: true, task: true }, en, formats, timeZone)).toBe(
+      "1 day before at 9:00 AM",
+    );
+  });
+
+  test("every reminder reads by the time its item counts it from (`alarmOptions`)", () => {
+    const task = (lines: string) =>
+      CalendarObject.parse(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20261101T000000Z\r\n${lines}SUMMARY:Report\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT15H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`,
+      );
+    const dated = task("DUE;VALUE=DATE:20261105\r\n");
+    const [alarm] = dated.master!.alarms;
+    expect(alarmOptions(dated.master!, alarm!)).toEqual({ allDay: true, task: true });
+    // Its due is timed though its start is a date: counted from the due.
+    const timed = task(
+      "DTSTART;VALUE=DATE:20261103\r\nDUE;TZID=Europe/Vilnius:20261105T120000\r\n",
+    );
+    expect(alarmOptions(timed.master!, timed.master!.alarms[0]!)).toEqual({
+      allDay: false,
+      task: true,
+    });
+    // The Conflicts list words them as the details do.
+    expect(valueOf(dated, "alarms", { t: en, formats, timeZone })).toBe("1 day before at 9:00 AM");
+    expect(valueOf(timed, "alarms", { t: ru, formats: ruFormats, timeZone })).toBe("За 15 часов");
   });
 
   test("a reminder at a time of its own reads on the user's day", () => {

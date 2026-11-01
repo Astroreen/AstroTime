@@ -5,6 +5,7 @@ import {
   WEEKDAYS,
   wallClockOf,
   type Alarm,
+  type Item,
   type ItemTime,
   type Repeat,
   type Weekday,
@@ -104,6 +105,28 @@ const clockOf = (seconds: number) =>
 type Trigger =
   | Omit<Extract<Alarm["trigger"], { type: "relative" }>, "offsetDays">
   | Extract<Alarm["trigger"], { type: "absolute" }>;
+
+/**
+ * What `alarmWords` reads of an item for one of its reminders: whether the
+ * time it counts from is a date, as core's `remindersOf` picks that time
+ * (an event's start or end; a task's start, or its due without one, and its
+ * due, or its start without one), and whether the item is a task.
+ */
+export function alarmOptions(
+  item: Item,
+  alarm: { readonly trigger: Trigger },
+): { allDay: boolean; task: boolean } {
+  const end = alarm.trigger.type === "relative" && alarm.trigger.relatedTo === "end";
+  const from =
+    item.kind === "event"
+      ? end
+        ? item.end
+        : item.start
+      : end
+        ? (item.due ?? item.start)
+        : (item.start ?? item.due);
+  return { allDay: from?.type === "date", task: item.kind === "task" };
+}
 
 /**
  * A reminder in words. For an all-day item one before its day reads as the

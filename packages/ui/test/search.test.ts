@@ -28,4 +28,12 @@ describe("when a search result is", () => {
     const when = resultWhen(task, { noDate: "No date", formats, timeZone, today: "2026-11-01" });
     expect(when).toBe(`${formats.day("2026-11-05", "2026-11-01")}, 12:00 PM`);
   });
+
+  test("a task due on a date reads as that day, whatever its start", () => {
+    const task = result(
+      "DTSTART;TZID=Europe/Vilnius:20261103T090000\r\nDUE;VALUE=DATE:20261105\r\n",
+    );
+    const when = resultWhen(task, { noDate: "No date", formats, timeZone, today: "2026-11-01" });
+    expect(when).toBe(formats.day("2026-11-05", "2026-11-01"));
+  });
 });

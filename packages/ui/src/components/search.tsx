@@ -39,7 +39,9 @@ export function resultWhen(
   const { noDate, formats, timeZone, today } = context;
   if (!occurrence) return noDate;
   const { start, end } = occurrence;
-  if (item.kind === "task" && end.type !== "date") {
+  if (item.kind === "task" && item.due) {
+    // A due date is the task's last day; its occurrence ends the day after (D42).
+    if (end.type === "date") return formats.day(addDays(end.date, -1), today);
     return `${formats.day(wallClockOf(end, timeZone).slice(0, 10), today)}, ${formats.time(end, timeZone)}`;
   }
   const day = formats.day(wallClockOf(start, timeZone).slice(0, 10), today);
