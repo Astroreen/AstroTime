@@ -431,7 +431,8 @@ async function download(
   // Edited here since the sync began: that edit is newer than this listing,
   // and the next sync decides it (an upload, then D38); the store removes an
   // object only if its pending change is still the one seen here.
-  const gone = changes.removed.flatMap((href) => {
+  // Each object once, however often a server names it.
+  const gone = [...new Set(changes.removed)].flatMap((href) => {
     const mine = local.get(href);
     return mine ? [{ href, ...mine }] : [];
   });

@@ -736,7 +736,7 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         { href: "t3.ics", etag: '"3b"', ics: task("t3", "SUMMARY:again\r\n") },
       ]);
       expect([begins, listener.mock.calls.length]).toEqual([1, 1]);
-      expect(result).toEqual({ saved: 250, invalid: ["broken.ics"], kept: ["mine.ics"] });
+      expect(result).toEqual({ saved: 250, invalid: ["broken.ics"] });
       expect(await store.objectAt(calendar.id, "t3.ics")).toMatchObject({ etag: '"3b"' });
       const stored = await store.hrefs(calendar.id);
       expect(stored).toHaveLength(251);

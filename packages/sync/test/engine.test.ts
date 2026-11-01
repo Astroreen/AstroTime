@@ -661,3 +661,28 @@ test("an edit made here while the sync downloads is kept, never overwritten, and
   expect(await a).toMatchObject({ pending: "update", ics: task("a", "ours") });
   expect(await b).toMatchObject({ pending: "none", ics: task("b", "theirs") });
 });
+
+test("an object a server names twice as removed is removed and reported once", async () => {
+  const server = memoryServer(calendarUrl);
+  server.objects.set(`${calendarUrl}a.ics`, { etag: '"1"', ics: task("a") });
+  server.objects.set(`${calendarUrl}b.ics`, { etag: '"1"', ics: task("b") });
+  const { store, calendar } = await device(server);
+  // "b" has an edit of ours waiting: its removal drops it (D38), said once.
+  await store.saveLocal(calendar.id, task("b", "ours"));
+  server.objects.delete(`${calendarUrl}a.ics`);
+  server.objects.delete(`${calendarUrl}b.ics`);
+  // Its upload fails first, so the removal reaches the download still pending.
+  server.beforeWrite = () => {
+    throw new Error("not now");
+  };
+  const provider: Provider = {
+    ...server,
+    changes: async (...args) => {
+      const changes = await server.changes(...args);
+      return { ...changes, removed: [...changes.removed, ...changes.removed] };
+    },
+  };
+  const report = await syncAccount(store, provider, calendar.accountId);
+  expect(report.removed).toBe(2);
+  expect(report.dropped).toEqual([`${calendarUrl}b.ics`]);
+});
