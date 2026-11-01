@@ -537,10 +537,11 @@ were checked on 2026-11-01.
     (`reminderSet`, which the planner now shares) in the open app's words,
     from the drawer's settings and language; reminders turned off, nothing.
     It closes the store and tells native it is done, with its report or its
-    error; an `error` or `unhandledrejection` anywhere does the same.
+    error. An `error` or `unhandledrejection` outside the run's promise is
+    only logged: ending there would destroy the WebView mid-sync, and the
+    bound below covers a run that never ends.
   - **The end and its bound.** The page's `done` is the event a run waits
-    for; native takes the first and ignores any after it (the page's error
-    handlers may say it again). A main frame that does not load and a
+    for; native takes the first and ignores any after it. A main frame that does not load and a
     renderer that goes end it too, and so does a page that finds no native
     object, which could never say done: it sets its title to
     `astrotime-background:no-port`, which native hears through
@@ -701,6 +702,10 @@ were checked on 2026-11-01.
   background sync's instrumented tests (`SyncWorkerTest`,
   `PluginNotificationsTest`, [D67](#D67)) are ready for it; until then they
   run on a local emulator only.
+- **Saying that background sync stopped** — a run that fails is logged and
+  the job still succeeds ([D67](#D67)), so one that fails every hour (a
+  WebView below the floor, a broken store) shows nowhere but the log. A
+  line in Settings with the last background run's outcome would say it.
 - **Capacitor 9** — when it is stable: minSdk 26, target 37 ([D61](#D61)).
 - **The native SQLite plugin** — only if OPFS in the WebView proves
   evictable or slow ([D63](#D63)).

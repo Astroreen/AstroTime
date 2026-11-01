@@ -25,13 +25,13 @@ if (!port) {
   document.title = NO_PORT;
 } else {
   const native = channel(port);
-  // Anything that escapes the run still ends it, never leaving native waiting.
-  // These may say done more than once (an error after the run's own done):
-  // native takes the first and ignores the rest.
   const fail = (error: unknown) =>
     native.tell("done", { error: error instanceof Error ? error.message : String(error) });
-  globalThis.addEventListener("error", (event) => fail(event.error ?? event.message));
-  globalThis.addEventListener("unhandledrejection", (event) => fail(event.reason));
+  // An error outside the run's own promise (a stray rejection) is only
+  // logged: ending the run there would destroy the WebView mid-sync. The
+  // run's promise ends it, and native's limit covers one that never does.
+  globalThis.addEventListener("error", (event) => console.error(event.error ?? event.message));
+  globalThis.addEventListener("unhandledrejection", (event) => console.error(event.reason));
   const run = async () => {
     // Too old for the store: the open app says so; here nothing is tried.
     const version = chromiumVersion(navigator.userAgent);
