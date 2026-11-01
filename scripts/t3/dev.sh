@@ -30,7 +30,8 @@ fi
 serve_permitted() {
   [ -n "$tailnet_name" ] || return 1
   [ "$(id -u)" = 0 ] && return 0
-  [[ "$(tailscale debug prefs 2>/dev/null)" == *"\"OperatorUser\": \"$(id -un)\""* ]]
+  # The prefs are JSON; read the key rather than match its spelling.
+  [ "$(tailscale debug prefs 2>/dev/null | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).OperatorUser ?? ""' 2>/dev/null)" = "$(id -un)" ]
 }
 
 # Serves the dev server on the tailnet's https port, unless that port serves
