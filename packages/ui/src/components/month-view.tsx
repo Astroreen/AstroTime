@@ -2,7 +2,9 @@
 // day a tile with its number and its items as one-line chips, a span over
 // the week's days for an item over several; as many rows as the tiles fit,
 // then "+N". A day, or its "+N", opens in the Day view; an item, its details.
-// An item drags to another day, keeping its time (design D111).
+// On a touch screen a tap anywhere on a day opens it, its items too, as
+// Google's Android app does: the day is the target, not a 16 px chip
+// (design D86, D119). An item drags to another day, keeping its time (design D111).
 import { dayRange, isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -11,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { weekdayOf } from "../calendar/dates.ts";
 import { foldWeek, type MonthWeek } from "../calendar/month.ts";
 import type { StripSpan } from "../calendar/query.ts";
-import { useSwipe } from "../hooks.ts";
+import { useMediaQuery, useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
 import { GhostChip, StripChip } from "./items.tsx";
@@ -224,12 +226,14 @@ function DayTile({
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
+  // A finger's tap on a chip opens the day under it: the chips are no buttons.
+  const touch = useMediaQuery("(pointer: coarse)");
   const outside = day.slice(0, 7) !== month.slice(0, 7);
   const isToday = day === today;
   const name = formats.fullDate(day);
 
   // A tap on the tile opens its day. Buttons act on their own: the number,
-  // "+N", the undone chip, and every item, which opens its details (PR 6).
+  // and with a mouse "+N", the undone chip and every item, which opens its details.
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target || !event.currentTarget.contains(target) || target.closest("button")) return;
@@ -284,10 +288,11 @@ function DayTile({
                   continuesBefore={span.continuesBefore}
                   continuesAfter={span.continuesAfter}
                   dense
+                  opens={!touch}
                 />
               ) : (
                 <div role="listitem" className="h-full">
-                  <UndoneChip tasks={undone} colorOf={undoneColor} dense />
+                  <UndoneChip tasks={undone} colorOf={undoneColor} dense opens={!touch} />
                 </div>
               )}
             </div>
@@ -296,20 +301,31 @@ function DayTile({
         {more > 0 && (
           <div
             role="listitem"
+            aria-label={touch ? t("month.more", { count: more, day: name }) : undefined}
             className="absolute inset-x-0 z-[1] px-[1.5px]"
             style={{ top: moreRow * ROW, height: ROW - 1 }}
           >
-            <button
-              type="button"
-              aria-label={t("month.more", { count: more, day: name })}
-              onClick={() => onOpenDay(day)}
-              className="h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] leading-none font-medium whitespace-nowrap text-ink-muted -outline-offset-2 hover:bg-raised"
-            >
-              {t("grid.more", { count: more })}
-            </button>
+            {touch ? (
+              // Drawn where the button is: its text centred, on the line's baseline.
+              <span className={`inline-flex items-center leading-none ${moreClass}`}>
+                {t("grid.more", { count: more })}
+              </span>
+            ) : (
+              <button
+                type="button"
+                aria-label={t("month.more", { count: more, day: name })}
+                onClick={() => onOpenDay(day)}
+                className={`leading-none ${moreClass} -outline-offset-2 hover:bg-raised`}
+              >
+                {t("grid.more", { count: more })}
+              </button>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+
+const moreClass =
+  "h-full w-full overflow-hidden rounded-[4px] px-1 text-left text-[11px] font-medium whitespace-nowrap text-ink-muted";

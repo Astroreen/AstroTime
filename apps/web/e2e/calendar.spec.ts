@@ -109,6 +109,55 @@ test("a swipe on a touch screen moves to the next period", async ({ page }) => {
   await expect(header(page, "Saturday, November 7")).toBeVisible();
 });
 
+test("the time grid is drawn where it stays: the strip's items do not push it down as they arrive", async ({
+  page,
+}) => {
+  // Where the time grid's scroller is in every state of the page that can be
+  // painted: a mutation observer runs after each change, before the paint.
+  await page.addInitScript(() => {
+    const tops: number[] = [];
+    Object.assign(window, { gridTops: tops });
+    new MutationObserver(() => {
+      let element = document.querySelector('main [role="list"]:not([aria-label="All day"])');
+      while (element && getComputedStyle(element).overflowY !== "auto") {
+        element = element.parentElement;
+      }
+      if (element) tops.push(element.getBoundingClientRect().top);
+    }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  const tops = () => page.evaluate(() => (window as unknown as { gridTops: number[] }).gridTops);
+  await openDemo(page, "week");
+  // The week's items are read: the strip's span and a timed item are drawn.
+  await expect(
+    strip(page).getByRole("listitem", { name: "Developer conference, All day" }),
+  ).toBeVisible();
+  await expect(
+    day(page, "Wednesday, November 4").getByRole("listitem", { name: /^Design review, / }),
+  ).toBeVisible();
+  // How often the grid moved since the last look.
+  let seen = 0;
+  const moves = async () => {
+    const all = await tops();
+    const states = all.slice(Math.max(seen - 1, 0));
+    seen = all.length;
+    return states.filter((top, i) => i > 0 && top !== states[i - 1]).length;
+  };
+  expect(await tops()).not.toEqual([]);
+  expect(await moves()).toBe(0);
+
+  // To the next week and back: each time the grid moves at most once, from
+  // where it was to where the new week's strip puts it, never through a
+  // strip of the old week's items on the new days.
+  await page.locator("body").press("n");
+  await expect(day(page, "Wednesday, November 11").getByRole("listitem").first()).toBeVisible();
+  expect(await moves()).toBeLessThanOrEqual(1);
+  await page.locator("body").press("p");
+  await expect(
+    strip(page).getByRole("listitem", { name: "Developer conference, All day" }),
+  ).toBeVisible();
+  expect(await moves()).toBeLessThanOrEqual(1);
+});
+
 test("the month picker jumps to the day picked", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await openDemo(page, "day");

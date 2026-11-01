@@ -66,6 +66,34 @@ test.describe("Month", () => {
     await expect(page.getByRole("dialog", { name: "Developer conference" })).toBeVisible();
   });
 
+  test.describe("on a touch screen", () => {
+    test.use({ hasTouch: true });
+
+    test("a tap anywhere on a day opens it, on an item, +N or the undone chip too (D86, D119)", async ({
+      page,
+    }) => {
+      await openDemo(page, "month");
+      const thursday = day(page, "Thursday, November 5");
+      const conference = thursday.getByRole("listitem", { name: "Developer conference, All day" });
+      await expect(conference).toBeVisible();
+      // No chip is a button of its own: the day is the target.
+      await expect(page.locator('[data-view="month"] [role="listitem"] button')).toHaveCount(0);
+      await conference.tap();
+      await expect(header(page, "Thursday, November 5")).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+
+      await page.locator("body").press("m");
+      const today = day(page, "Wednesday, November 4");
+      await today.getByRole("listitem", { name: "6 more items on Wednesday, November 4" }).tap();
+      await expect(header(page, "Wednesday, November 4")).toBeVisible();
+
+      await page.locator("body").press("m");
+      await today.getByText(/undone task/).tap();
+      await expect(header(page, "Wednesday, November 4")).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+  });
+
   test("previous, next, today and the month picker move by month", async ({ page }) => {
     await page.setViewportSize(WIDE);
     await openDemo(page, "month");

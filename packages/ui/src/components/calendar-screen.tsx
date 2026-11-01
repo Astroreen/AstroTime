@@ -24,7 +24,7 @@ import {
   VIEW_KEYS,
   type View,
 } from "../calendar/views.ts";
-import { useEntries, useMediaQuery, useNow } from "../hooks.ts";
+import { useEntries, useMediaQuery, useNow, type Entries } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
 import { useSettings } from "../settings.ts";
 import { AccountButton, FirstRun } from "./accounts.tsx";
@@ -123,13 +123,24 @@ export function CalendarScreen({
   // Agenda reads its own days as it scrolls; the other views read their period.
   const [cache] = useState(() => new ObjectCache());
   const agenda = view === "agenda";
-  const data = useEntries(store, cache, {
+  const read = useEntries(store, cache, {
     ids,
     from: agenda ? null : from,
     to: agenda ? null : to,
     today,
     timeZone,
-  }) ?? { entries: [], undone: [] };
+  });
+  // A period is drawn once its items are read, so none arrive under a press:
+  // the strip's rows would push the time grid down (design D59). Until then
+  // the view keeps the period it draws, or on open (and after the Agenda,
+  // which reads its own) draws none.
+  const fresh = !agenda && read !== null && read.from === from && read.to === to;
+  const [held, setHeld] = useState<Drawn | null>(null);
+  if (fresh && (held?.read !== read || held.view !== view || held.anchor !== anchor)) {
+    setHeld({ view, days, anchor, read });
+  } else if (agenda && held) setHeld(null);
+  const drawn = fresh ? { view, days, anchor, read } : held;
+  const data = drawn?.read ?? { entries: [], undone: [] };
 
   const calendarColor = new Map(
     (lists?.calendars ?? []).map((calendar) => [
@@ -396,10 +407,10 @@ export function CalendarScreen({
                     onVisibleDay={setAnchor}
                     hideCompleted={hideCompleted}
                   />
-                ) : view === "month" ? (
+                ) : !drawn ? null : drawn.view === "month" ? (
                   <MonthView
-                    month={titleRange(view, days, anchor)[0]}
-                    weeks={layoutMonth(entries, days, layoutContext)}
+                    month={titleRange(drawn.view, drawn.days, drawn.anchor)[0]}
+                    weeks={layoutMonth(entries, drawn.days, layoutContext)}
                     today={today}
                     undone={data.undone}
                     undoneColor={undoneColor}
@@ -408,8 +419,8 @@ export function CalendarScreen({
                   />
                 ) : (
                   <TimeGrid
-                    days={days}
-                    layout={layoutRange(entries, days, layoutContext)}
+                    days={drawn.days}
+                    layout={layoutRange(entries, drawn.days, layoutContext)}
                     today={today}
                     minutes={minutes}
                     undone={data.undone}
@@ -487,6 +498,14 @@ export function CalendarScreen({
       </EditingContext.Provider>
     </CalendarContext.Provider>
   );
+}
+
+/** A period of the views but the Agenda, as drawn: its view, its days and what was read of them. */
+interface Drawn {
+  readonly view: View;
+  readonly days: readonly string[];
+  readonly anchor: string;
+  readonly read: Entries;
 }
 
 /** The wall clock at `minutes` past midnight of `today`, `2026-11-04T10:40:00`. */

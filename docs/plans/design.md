@@ -146,6 +146,13 @@ the project.
     since midnight.
   - a tab left open overnight moves an anchor on today to the new today at
     midnight; an anchor the user moved elsewhere stays.
+  - a period is drawn once its items are read (`useEntries`' result names
+    the range it read): on open the view draws nothing until then, and
+    moving to another period or view keeps the one drawn until the next
+    one's items are read, so its all-day items and task chips never
+    arrive under a press and push the time grid down (about 70 px in the
+    demo). The top bar names the new period at once; the Agenda reads its
+    own days ([D87](#D87)), and after it the next view draws once read.
 - **D86. The Month view, read from the reference** (and from Google's
   Android app where the reference is silent):
   - six weeks from the week holding the month's first day, as the reference
@@ -170,7 +177,13 @@ the project.
     does (its web app opens a popover instead); items open with PR 6.
     _Changed in PR 6a:_ a tap on an item, a span over several days too,
     opens its details ([D108](#D108)); the rest of the tile still opens the
-    day;
+    day. _Changed since:_ on a touch screen (`pointer: coarse`) a tap
+    anywhere on a tile opens its day, on an item, "+N" or the undone chip
+    too, as Google's Android app does: there the chips are no buttons, so
+    the tile (on a phone some 50 × 136 px) is the target, not a 16 px
+    chip ([D119](#D119)). A long press still drags an item
+    ([D111](#D111)), and its details open from the day. With a mouse a
+    chip is a button that opens its details, as before;
   - previous and next (buttons, keys, a swipe) go to the first day of the
     month before or after; the top bar names the month (D59).
 - **D87. The Agenda**:
@@ -362,7 +375,7 @@ the project.
     (foundation [D37](foundation.md#D37)), in the time grid (a block, a
     task's chip), the all-day strip and the Month; a read-only calendar's
     items, the undone tasks chip and the Agenda's cards do not. A tap still
-    opens the details;
+    opens the details (in the Month on a touch screen, the day: [D86](#D86));
   - **the press**: a mouse or a pen drags once it moves 4 px, so a click
     still opens; a finger drags after a long press of 500 ms held still
     (Google's Android app), and one that moves 8 px first scrolls the view
@@ -429,15 +442,21 @@ the project.
   off only in the spec's `DISABLED` (everywhere) or `EXEMPT` (on some
   elements), each with its reason, and an exemption matches nothing
   taller than it names, so it cannot hide a larger element that comes to
-  fail. There is one, and it is **an accepted gap, not conformance**:
-  **target size** (2.5.8) is not checked on the button of each Month chip,
-  "+N" and undone chip, one line of 16 px every 17 px as dense as the
-  reference ([D86](#D86)); its day's number, the week's pill and the rest
-  of the Month are checked. The criterion's _equivalent_ exception does
-  not cover it: the day's number (24 px) opens the day, where every item
-  is a larger target, but not the item itself. Larger targets there are
-  [deferred](#deferred) ("Larger targets in the Month on a touch screen").
-  The spec also proves what axe cannot see ([D120](#D120)).
+  fail. There is one, and it is **an accepted gap, not conformance**, with
+  a mouse only: **target size** (2.5.8) is not checked on the button of
+  each Month chip, "+N" and undone chip, one line of 16 px every 17 px as
+  dense as the reference ([D86](#D86)); its day's number, the week's pill
+  and the rest of the Month are checked. The criterion's _equivalent_
+  exception does not cover it: the day's number (24 px) opens the day,
+  where every item is a larger target, but not the item itself. An
+  exemption holds only where the page matches its media query, this one
+  `(pointer: fine)`. **On a touch screen the Month conforms**, with no
+  exemption: a tap on a tile opens its day, the chips are no buttons
+  (D86), and the audit's phone runs with a touch screen, so a coarse
+  pointer. A tablet's keyboard reaches the day's number, not the items.
+  With a mouse the gap stays, for the density the owner chose
+  ([D43](#D43)). The spec also proves what axe cannot see
+  ([D120](#D120)).
 - **D120. What the pass changed, and the rules it leaves:**
   - **an item's text on its colour** is white, as the reference draws it
     (Google Calendar keeps white text and colours dark enough for it), and
@@ -483,8 +502,10 @@ the project.
     (a day outside the month, the drawer's sync line, placeholders) were
     3.5:1;
   - **targets** are at least 24 × 24 px (2.5.8): the Month's day numbers,
-    the strip's rows (24 px, were 22) and so its chips and "+N"; the
-    Month's own chips are D119's accepted gap;
+    the strip's rows (24 px, were 22) and so its chips and "+N"; on a
+    touch screen the Month's tiles, its chips being no buttons there
+    ([D86](#D86)); with a mouse the Month's own chips are D119's accepted
+    gap;
   - **names say what shows** (2.5.3): "Today" names the day its icon shows
     ("Today, Wednesday, November 4"), and a search result's or a task
     list tab's text keeps its words apart as its name says them;
@@ -573,11 +594,6 @@ the project.
   the wall clock, so it jumps an hour on the change, or goes back over the
   repeated hour. A grid of the elapsed hours (23 or 25) comes if the drift
   is reported.
-- **Larger targets in the Month on a touch screen** — its chips are 16 px
-  high, under WCAG 2.5.8's 24 px, an accepted gap the audit exempts
-  ([D119](#D119)); the day's number opens the day, where each item is a
-  larger target. Google's Android app opens the day on any tap of a tile
-  instead.
 - **Forced colours** (Windows' high contrast) — items keep their own fills
   and the rings their accent; the system's colours are not mapped
   ([D120](#D120)).
@@ -591,11 +607,6 @@ the project.
   ([D120](#D120)). The same holds for the drawer's calendar checkbox on
   the dark drawer (1.4.11): its label names the calendar. A floor on the
   fill's lightness in the dark theme would close both.
-- **The grid moving when the strip grows** — the week's all-day items and
-  task chips arrive after the grid is drawn, and the rows they add push the
-  time grid down (about 70 px in the demo); a press in that moment lands a
-  slot off. Reserving the strip's height until the items are read would
-  hold it still ([D51](#D51)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
@@ -617,3 +628,5 @@ next to the matching reference, in both themes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its
 evidence is the audit's run and screenshots of the colours before and after.
+`fix/touch-targets` closed two of its Deferred items: the Month's day as
+the target on a touch screen (D86, D119) and a period drawn once read (D59).
