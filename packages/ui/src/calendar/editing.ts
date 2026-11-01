@@ -404,10 +404,26 @@ export function scopesFor(
  */
 export function deleteScopes(target: Target, rights: CalendarRights): Scope[] {
   if (!isOccurrence(target)) return rights.delete ? ["all"] : [];
+  // From the first occurrence "this and following" deletes the whole series.
+  const following = isFirstOccurrence(target) ? rights.delete : rights.edit;
   return [
-    ...(rights.edit ? (["this", "following"] as const) : []),
+    ...(rights.edit ? (["this"] as const) : []),
+    ...(following ? (["following"] as const) : []),
     ...(rights.delete ? (["all"] as const) : []),
   ];
+}
+
+/** Whether an occurrence is its series' first (its start is the series'). */
+function isFirstOccurrence(target: Target): boolean {
+  const start = target.object.master?.start;
+  const at = target.recurrenceId;
+  if (!start || !at) return false;
+  if (start.type === "date" || at.type === "date") {
+    const day = (time: typeof at) => (time.type === "date" ? time.date : time.local.slice(0, 10));
+    return day(start) === day(at);
+  }
+  if (start.type === "zoned" && at.type === "zoned") return start.epochMs === at.epochMs;
+  return start.local === at.local;
 }
 
 /**

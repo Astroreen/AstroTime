@@ -283,6 +283,10 @@ describe("what a calendar's rights offer (D37)", () => {
     expect(deleteScopes(series, rights(false, false, true))).toEqual(["all"]);
     expect(deleteScopes(single, rights(true, true, false))).toEqual([]);
     expect(deleteScopes(single, rights(false, false, true))).toEqual(["all"]);
+    // From the series' first occurrence "this and following" deletes it all.
+    const first = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-10-21");
+    expect(deleteScopes(first, rights(true, true, false))).toEqual(["this"]);
+    expect(deleteScopes(first, rights(true, true, true))).toEqual(["this", "following", "all"]);
   });
 
   test("a new item goes where new items may; an existing one stays, and moves out only where its calendar lets it go", async () => {
