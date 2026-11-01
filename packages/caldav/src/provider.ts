@@ -13,6 +13,7 @@ import {
 
 import {
   AuthError,
+  CertificateError,
   HttpError,
   ProxyRefusedError,
   type HttpClient,
@@ -150,6 +151,7 @@ export class CalDavProvider implements Provider {
         if (
           error instanceof AuthError ||
           error instanceof OfflineError ||
+          error instanceof CertificateError ||
           (error instanceof ProxyRefusedError && error.reason === "not-allowed")
         )
           throw error;

@@ -1,7 +1,10 @@
 # Android plan
 
 Status: **in progress** — [PR A1](#pr-a1--the-shell-http-and-the-store)
-(the shell, HTTP and the store) is built; A2–A5 are decided, not yet built.
+(the shell, HTTP and the store) and
+[PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners) (credentials,
+Login Flow v2, the shell's manners) are built; A3–A5 are decided, not yet
+built.
 It started once foundation's
 [PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
 plan owns the Android app, `apps/mobile` (foundation's [D12](foundation.md#D12),
@@ -77,6 +80,11 @@ were checked on 2026-11-01.
   Android's plugin lets plain http reach it before it is a saved account
   ([D62](#D62)). The web leaves it out: its proxy keeps its own allowlist.
 
+  _Added in PR A2:_ `onBack(close)`, optional, returns the function that
+  stops it: the UI hands the platform a function that closes what is open
+  and says whether anything was, and a shell with a back button calls it
+  ([D68](#D68)). The web and the desktop leave it out.
+
 ### The shell
 
 - **D61. `apps/mobile`, Capacitor 8.** `@astrotime/mobile` is a Vite app
@@ -90,8 +98,9 @@ were checked on 2026-11-01.
   Capacitor 9 is in beta (minSdk 26, target 37); the app moves when it is
   stable. The app's origin, `https://localhost`, holds the local store
   ([D63](#D63)), so `server.hostname` and `androidScheme` are never changed:
-  a new origin is an empty store. The store needs a System WebView of
-  Chromium 109 or newer; on an older one the app says to update the WebView
+  a new origin is an empty store. The app needs a System WebView of
+  Chromium 123 or newer (the store's OPFS needs 109, the theme's
+  `light-dark()` 123); on an older one it says to update the WebView
   instead of failing. `CapacitorHttp`'s patching of `fetch` stays off.
 
   _Built in PR A1_ with Capacitor 8.6.0 (`capacitor.config.json`, since the
@@ -102,6 +111,19 @@ were checked on 2026-11-01.
   store error of its own that the shared UI words in both languages, beside
   the shell's other manners; until then an older WebView shows the store's
   general failure.
+
+  _Built in PR A2:_ before opening the store, the app reads the WebView's
+  Chromium version from its user agent (`src/webview.ts`); below 123 it
+  throws `OutdatedWebViewError` (`@astrotime/storage`) instead, which the
+  shared UI words in English and Russian, naming both versions, with no
+  Reload button (reloading does not update the WebView). The check runs in
+  the app's bundle, which Vite builds for Chromium 111: a WebView too old to
+  run the bundle at all would show a blank page, and no such WebView was
+  tried (the message was seen on the emulator's WebView 133 with its user
+  agent overridden over CDP). The floor is 123, not the store's 109, since
+  the theme's colours use `light-dark()` (Chromium 123): below it the app
+  would open with no colours (a review of A2). The System WebView updates
+  through the Play Store; 123 shipped in March 2024.
 
 ### Platform adapters
 
@@ -152,6 +174,12 @@ were checked on 2026-11-01.
   `cleartext`, `redirects` (past 10) and `invalid` stay errors of their own.
   Reads and writes may take a minute, for a large calendar's `REPORT`.
 
+  _Since PR A2:_ the `certificate` code becomes `CertificateError`
+  (`@astrotime/caldav`), which discovery passes on at once, as it does
+  offline (both hold for the origin), and the sign-in words in both
+  languages; the sign-in had shown its general failure, and discovery had
+  turned the refusal into "no calendars here".
+
   _Since desktop PR D1:_ the redirect rule has one implementation,
   `followRedirects` in `@astrotime/caldav`, over a client that makes one
   exchange and returns a redirect as it came; the desktop's `net.request`
@@ -198,6 +226,20 @@ were checked on 2026-11-01.
   for sponsors), Ionic's secure storage (an enterprise product), and
   `capacitor-secure-storage-plugin` (0.x, less maintained).
 
+  _Built in PR A2_ with 8.0.1 (`src/secrets.ts`), as decided: each secret
+  has a Keystore key of its own (alias `capacitor-storage_account:<id>`), and
+  its ciphertext and IV sit in the shared preferences
+  `WSSecureStorageSharedPreferences`. Ciphertext that no longer decrypts
+  (malformed, or sealed under another key) reads as none, so its account
+  asks to sign in again, as on the web ([foundation D89](foundation.md#D89));
+  any other failure is said. Checked on the emulator: the account still syncs
+  after the app is killed and started again, and none of the app's files
+  (74 in that run: its WebView's store, preferences and caches included)
+  holds the app password in plain text. The library lists `@capacitor/ios` and
+  `@capacitor/keyboard` among its dependencies, so pnpm installs their
+  JavaScript; `cap sync` adds only the app's own dependencies to the Gradle
+  project, so neither reaches the APK.
+
 - **D65. Login Flow v2 in a Custom Tab.** The `openExternal` adapter opens
   the login page with `@capacitor/browser` (8.0.5, Chrome Custom Tabs), so
   the user signs in where their browser's passwords and second factor are.
@@ -211,6 +253,22 @@ were checked on 2026-11-01.
   activity forward (`FLAG_ACTIVITY_CLEAR_TOP`, which ends the Custom Tab in
   the app's task); if that fails on a device, the user returns with back,
   and the poll on return finishes the sign-in.
+
+  _Changed in PR A2:_ the app does not come back by itself. With the Custom
+  Tab in front, the app's process holds no visible activity, so Android (14
+  and later) caches and freezes it, its WebView with it: the poll stops
+  within seconds, and nothing in the app runs to bring it forward, neither
+  the app's own plugin nor `@capacitor/browser` 8.0.5's `close()` (which, no
+  longer a no-op, finishes the tab from the plugin's controller activity).
+  Seen on the emulator: no poll from the
+  Custom Tab opening until the return, and `dumpsys activity processes`
+  reported the app `isFrozen=true`. So the fallback is the way: Nextcloud's
+  page says "You can close this window"; the user closes the tab (or goes
+  back to the app), the WebView is visible again, and the sign-in polls at
+  once (`visibilitychange`, which `browserFinished` would only repeat) and
+  finishes. Approved through the Custom Tab, the poll answered 200 on the
+  return and discovery followed. Keeping the app awake while the tab is open
+  is [deferred](#deferred).
 
 ### Behaviour
 
@@ -299,6 +357,36 @@ were checked on 2026-11-01.
   floating button by them. No deep links: Login Flow v2 needs none
   ([D65](#D65)). The splash screen hides when the first screen has drawn.
 
+  _Built in PR A2:_
+  - **Back:** the shell listens to `@capacitor/app`'s `backButton` from the
+    start and calls the UI's `onBack` function ([D60](#D60)); when that
+    closed nothing, or the UI has none (the store did not open),
+    `App.minimizeApp()`. The UI closes the topmost of: a Base UI popup (a
+    dialog, the drawer, a menu, a popover), as Escape does, since Base UI
+    marks the key used; search; the tasks screen. The UI keeps no history of
+    its own (views and days are not pages), so after that back leaves the
+    app.
+  - **Theme:** the application's theme is `DayNight` too. The bars follow
+    the theme the page shows, the setting's (`data-theme`) or else the
+    system's, through AstroTime's own plugin (`AstroTimeShell.setBars`: the
+    icons, and the window's background in the page's canvas colour), not
+    `SystemBars.setStyle`: SystemBars styles the bars by the system's theme
+    and resets the window's background to the Android theme's on every
+    configuration change, so `MainActivity` puts the app's style back after
+    it. A system theme change reaches the running page (`uiMode` stays a
+    configuration change the activity handles).
+  - **Edge to edge:** `SystemBars` stays in its `css` mode (with
+    `initialViewportFitValueHint: "cover"`). On a WebView before 140 (the
+    emulator's 133) Capacitor keeps the WebView clear of the bars itself and
+    injects zero insets, and the bars show the window's background; from 140
+    the page draws under the bars and the UI pads its shell, drawer, search
+    and tasks screen by `--inset-*` (`styles.css`: the injected
+    `--safe-area-inset-*`, else `env()`), which `apps/web/e2e/insets.spec.ts`
+    checks.
+  - **Splash screen:** not built; it stays with the app's icon in
+    [Deferred](#deferred) (the launch theme's placeholder shows until the
+    WebView draws).
+
 ### Build and release
 
 - **D69. Build, CI, release and the dev shell.**
@@ -362,6 +450,11 @@ were checked on 2026-11-01.
   evictable or slow ([D63](#D63)).
 - **Untrusted certificates** — a dialog to trust a server's own certificate
   for its account, as DAVx5 has, instead of installing its CA ([D62](#D62)).
+- **Back from Login Flow by itself** — Android freezes the app while the
+  Custom Tab is in front, so the user comes back ([D65](#D65)). Keeping it
+  awake meanwhile needs a foreground service for up to Nextcloud's 20
+  minutes, or Chrome bound to the app (a Custom Tabs `postMessage` channel);
+  neither is worth a tap.
 - **A sync interval setting** — the hour of [D67](#D67) is fixed until
   someone needs another.
 - **Widgets, quick settings tile, share target** — none in the first
@@ -411,7 +504,15 @@ Done when: credentials survive a restart and are unreadable in the app's
 data without the Keystore; a Nextcloud account is added through Login
 Flow v2 on a phone; back closes the drawer, then leaves the app; the top
 bar and the floating button clear the status and navigation bars in both
-themes (screenshots); a WebView older than Chromium 109 says to update it.
+themes (screenshots); a WebView older than Chromium 123 says to update it.
+
+_As built:_ the platform gained `onBack` ([D60](#D60)); the app's own
+`AstroTimeShell` plugin styles the bars ([D68](#D68)); Login Flow v2 ends
+when the user comes back, since Android freezes the app behind the Custom
+Tab ([D65](#D65)). Also from A1's review: a refused certificate is worded
+at sign-in ([D62](#D62)), and `signingInTo`'s bookkeeping (`SigningIn`) is
+unit-tested. Checked on an Android 16 emulator with a disposable Nextcloud
+31, the WebView driven over CDP by role.
 
 ### PR A3 — Reminders
 

@@ -3,8 +3,9 @@
 // android/app/src/main/java/io/github/astroreen/astrotime/http/), which takes
 // any method, follows redirects itself and sends plain http only to the
 // origins it is given with the request. This side shapes what crosses the
-// bridge, and turns the plugin's "offline" into `OfflineError`.
-import { ProxyRefusedError, type HttpClient } from "@astrotime/caldav";
+// bridge, and turns the plugin's "offline" into `OfflineError` and its
+// "certificate" into `CertificateError`.
+import { CertificateError, ProxyRefusedError, type HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 
 /** One exchange, as the plugin takes it. */
@@ -55,6 +56,16 @@ export function nativeClient(
           cause: error,
         });
       }
+      // Refused, not unreachable: the sign-in says why (an untrusted, expired
+      // or misnamed certificate).
+      if (codeOf(error) === "certificate") {
+        throw new CertificateError(
+          `${request.method} ${request.url}: the certificate was refused.`,
+          {
+            cause: error,
+          },
+        );
+      }
       // A hop to plain http the user did not type: as the web's proxy says of
       // a redirect elsewhere, so sign-in names the address to sign in with.
       if (codeOf(error) === "cleartext") {
@@ -96,6 +107,31 @@ export function cleartextOrigins(
   ];
   const origins = urls.map((url) => new URL(url)).filter((url) => url.protocol === "http:");
   return [...new Set(origins.map((url) => url.origin))];
+}
+
+/**
+ * The servers being signed in to (`Platform.signingInTo`), once per sign-in
+ * under way: two sign-ins of one server each hold it, and either one ending
+ * leaves the other's.
+ */
+export class SigningIn {
+  readonly #servers: string[] = [];
+
+  /** The servers, as many times as sign-ins of each are under way. */
+  get servers(): readonly string[] {
+    return this.#servers;
+  }
+
+  /** `server` is being signed in to, until the returned function, which counts once. */
+  begin(server: string): () => void {
+    this.#servers.push(server);
+    let ended = false;
+    return () => {
+      if (ended) return;
+      ended = true;
+      this.#servers.splice(this.#servers.indexOf(server), 1);
+    };
+  }
 }
 
 /** A rejection's code: Capacitor puts the plugin's on the error it throws. */

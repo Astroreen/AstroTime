@@ -10,8 +10,11 @@ allowBuilds:
   electron-winstaller: false
 
 catalog:
+  "@aparajita/capacitor-secure-storage": 8.0.1
   "@base-ui/react": 1.9.0
   "@capacitor/android": 8.6.0
+  "@capacitor/app": 8.1.2
+  "@capacitor/browser": 8.0.5
   "@capacitor/cli": 8.6.0
   "@capacitor/core": 8.6.0
   "@playwright/test": 1.61.1

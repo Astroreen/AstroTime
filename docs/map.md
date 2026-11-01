@@ -111,6 +111,8 @@ When you add a package, app or module, add its line here in the same PR.
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
+  - `CertificateError` — a server certificate the platform refused (Android's
+    plugin tells it apart). → `plans/android.md#D62`
   - `test/fixtures/` — calendar homes' `PROPFIND` answers from Nextcloud
     (owned, shared read-only and read-write) and Radicale, for the rights
     read from `current-user-privilege-set`; where each comes from:
@@ -132,7 +134,9 @@ When you add a package, app or module, add its line here in the same PR.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
     HTTP, secrets, `openExternal`, `Preferences`, reminders, and on Android
-    `signingInTo`), the user's languages and zone. → `plans/android.md#D60`
+    `signingInTo` and `onBack`), the user's languages and zone. When the
+    store does not open it says why (`InsecureContextError`,
+    `OutdatedWebViewError`). → `plans/android.md#D60`
   - `accounts/` — signing in (`SignIn`: password, Login Flow v2) and when
     the UI syncs (`SyncScheduler`). → `plans/foundation.md#D91`,
     `plans/foundation.md#D92`
@@ -220,7 +224,9 @@ When you add a package, app or module, add its line here in the same PR.
     `editing.spec.ts` creates, edits and deletes on the demo data,
     `editing-server.spec.ts` sees an item made here reach Radicale,
     `editing-screenshots.spec.ts` takes the editing evidence.
-    → `plans/design.md#D108`
+    → `plans/design.md#D108`;
+    `insets.spec.ts` keeps the shell clear of a phone's system bars.
+    → `plans/android.md#D68`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
@@ -233,8 +239,8 @@ When you add a package, app or module, add its line here in the same PR.
 
 - `apps/mobile` (`@astrotime/mobile`) — the Android app: Capacitor around
   `@astrotime/ui`, with its `Platform` (`src/platform.ts`: the web store in
-  the WebView, HTTP through the plugin below, credentials in memory until
-  PR A2) and the committed Gradle project (`android/`). Build the APK with
+  the WebView, HTTP through the plugin below, Login Flow's page in a Custom
+  Tab) and the committed Gradle project (`android/`). Build the APK with
   `vp run --filter @astrotime/mobile build`, `pnpm --filter
   @astrotime/mobile sync`, then `./gradlew assembleDebug test` in
   `android/`. → `plans/android.md#D61`
@@ -244,6 +250,14 @@ When you add a package, app or module, add its line here in the same PR.
     plain http only to an address the user typed; tested by Gradle on
     `MockWebServer` (`app/src/test/`). `src/http.ts` is its TypeScript side.
     → `plans/android.md#D62`
+  - `src/secrets.ts` — credentials under a Keystore key
+    (`@aparajita/capacitor-secure-storage`). → `plans/android.md#D64`
+  - `AstroTimeShell` — the shell's own plugin
+    (`android/app/src/main/java/io/github/astroreen/astrotime/shell/`): the
+    system bars follow the theme the page shows; `src/shell.ts` is its
+    TypeScript side, with the back button. → `plans/android.md#D68`
+  - `src/webview.ts` — the WebView's Chromium version, checked before the
+    store opens. → `plans/android.md#D61`
 
 - `apps/desktop` (`@astrotime/desktop`) — the Linux desktop app on
   Electron: `pnpm --filter @astrotime/desktop build`, then `start` (the dev

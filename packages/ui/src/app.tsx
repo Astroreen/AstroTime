@@ -2,7 +2,7 @@
 // app brings its platform (docs/plans/android.md#D60: the store, HTTP,
 // secrets, the system browser, where preferences are kept, reminders) and the user's
 // languages, and renders this.
-import { InsecureContextError, type Store } from "@astrotime/storage";
+import { InsecureContextError, OutdatedWebViewError, type Store } from "@astrotime/storage";
 import { CSPProvider } from "@base-ui/react/csp-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
@@ -64,7 +64,8 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
     store.then(
       (opened) => live && setOpening({ status: "open", store: opened }),
       (error: unknown) => {
-        if (!(error instanceof InsecureContextError)) console.error(error);
+        if (!(error instanceof InsecureContextError || error instanceof OutdatedWebViewError))
+          console.error(error);
         if (live) setOpening({ status: "failed", error });
       },
     );
@@ -126,7 +127,13 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
       </main>
     );
   }
-  const reason = opening.error instanceof InsecureContextError ? "insecure" : "failed";
+  const { error } = opening;
+  const reason =
+    error instanceof InsecureContextError
+      ? "insecure"
+      : error instanceof OutdatedWebViewError
+        ? "outdated"
+        : "failed";
   return (
     <main className="grid h-dvh place-items-center bg-canvas p-6 text-ink">
       <div
@@ -134,14 +141,21 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
         className="flex max-w-sm flex-col items-start gap-3 rounded-2xl bg-raised p-6"
       >
         <h1 className="text-lg font-medium">{t(`store.${reason}.title`)}</h1>
-        <p className="text-sm text-ink-muted">{t(`store.${reason}.body`)}</p>
-        <button
-          type="button"
-          onClick={() => location.reload()}
-          className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent"
-        >
-          {t("store.reload")}
-        </button>
+        <p className="text-sm text-ink-muted">
+          {error instanceof OutdatedWebViewError
+            ? t("store.outdated.body", { version: error.version, minimum: error.minimum })
+            : t(`store.${reason}.body`)}
+        </p>
+        {/* An outdated WebView stays so until it is updated, which restarts the app. */}
+        {reason !== "outdated" && (
+          <button
+            type="button"
+            onClick={() => location.reload()}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent"
+          >
+            {t("store.reload")}
+          </button>
+        )}
       </div>
     </main>
   );

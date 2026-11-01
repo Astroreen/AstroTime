@@ -1,12 +1,14 @@
 // The TypeScript side of the HTTP plugin (docs/plans/android.md#D69, tests):
 // the plugin is replaced, so this runs in Node; the plugin itself is tested
 // by Gradle (android/app/src/test/).
+import { CertificateError } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
 import {
   cleartextOrigins,
   nativeClient,
+  SigningIn,
   type NativeHttp,
   type NativeRequest,
   type NativeResponse,
@@ -71,7 +73,7 @@ test("a request without a body sends none", async () => {
   expect(requests[0]).not.toHaveProperty("body");
 });
 
-test("the plugin's offline is OfflineError; a hop to plain http names its address; any other refusal stays", async () => {
+test("the plugin's offline is OfflineError, its certificate CertificateError; a hop to plain http names its address; any other refusal stays", async () => {
   const offline = nativeClient(plugin({ code: "offline" }).http, async () => []);
   await expect(offline({ method: "GET", url: "https://a.example/", headers: {} })).rejects.toThrow(
     OfflineError,
@@ -110,6 +112,11 @@ test("the plugin's offline is OfflineError; a hop to plain http names its addres
   await expect(
     itself({ method: "PROPFIND", url: "http://a.example/dav/", headers: {} }),
   ).rejects.toMatchObject({ name: "ProxyRefusedError", reason: "not-allowed", location: null });
+  // A refused certificate is no moment offline: the sign-in says why.
+  const certificate = nativeClient(plugin({ code: "certificate" }).http, async () => []);
+  await expect(
+    certificate({ method: "PROPFIND", url: "https://a.example/", headers: {} }),
+  ).rejects.toThrow(CertificateError);
   const refused = nativeClient(plugin({ code: "redirects" }).http, async () => []);
   const error = await refused({ method: "GET", url: "http://a.example/", headers: {} }).catch(
     (caught: unknown) => caught,
@@ -128,4 +135,29 @@ test("plain http may reach the accounts' servers and calendar homes and the one 
     cleartextOrigins(accounts, ["http://192.168.1.5:8080/", "https://other.example/"]),
   ).toEqual(["http://10.0.2.2:5232", "http://nas.local", "http://192.168.1.5:8080"]);
   expect(cleartextOrigins([], [])).toEqual([]);
+});
+
+test("signing in to a server: each sign-in holds it until it ends, once, whatever the others do", () => {
+  const signingIn = new SigningIn();
+  const first = signingIn.begin("http://10.0.2.2:18110/");
+  // The same server twice at once (the dialog opened again, or Nextcloud
+  // naming the server typed): both hold it.
+  const second = signingIn.begin("http://10.0.2.2:18110/");
+  const other = signingIn.begin("http://192.168.1.5:8080/");
+  expect(cleartextOrigins([], signingIn.servers)).toEqual([
+    "http://10.0.2.2:18110",
+    "http://192.168.1.5:8080",
+  ]);
+  first();
+  expect(cleartextOrigins([], signingIn.servers)).toEqual([
+    "http://10.0.2.2:18110",
+    "http://192.168.1.5:8080",
+  ]);
+  // Ended twice: the second time takes nothing, not the other sign-in's entry.
+  first();
+  expect(signingIn.servers).toEqual(["http://10.0.2.2:18110/", "http://192.168.1.5:8080/"]);
+  second();
+  other();
+  other();
+  expect(signingIn.servers).toEqual([]);
 });

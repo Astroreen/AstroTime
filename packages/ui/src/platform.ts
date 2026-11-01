@@ -32,6 +32,13 @@ export interface Platform {
    * only to saved accounts lets it reach this server meanwhile (android D62).
    */
   readonly signingInTo?: (server: string) => () => void;
+  /**
+   * The system's back button (Android's, android D68): the UI hands it a
+   * function that closes what is open, the topmost first, and says whether
+   * anything was; when nothing was, the shell leaves the app. Returns the
+   * function that stops it. A platform with no back button leaves it out.
+   */
+  readonly onBack?: (close: () => boolean) => () => void;
   /** Where this device's choices are kept (the view, hidden calendars). */
   readonly preferences: Preferences;
   /**

@@ -1,40 +1,37 @@
 // The Android app's platform (docs/plans/android.md#D60): the web store in
 // the WebView (D63), HTTP through AstroTime's OkHttp plugin (D62), credentials
-// in memory until PR A2 (D64), Login Flow's page in the system browser and
-// preferences in the WebView's localStorage.
+// under a Keystore key (D64), Login Flow's page in a Custom Tab (D65), the
+// back button (D68) and preferences in the WebView's localStorage.
+import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import type { Store } from "@astrotime/storage";
 import type { Platform } from "@astrotime/ui";
+import { App } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { registerPlugin } from "@capacitor/core";
 
-import { cleartextOrigins, nativeClient, type NativeHttp } from "./http.ts";
+import { cleartextOrigins, nativeClient, SigningIn, type NativeHttp } from "./http.ts";
 import { preferences } from "./preferences.ts";
 import { noReminders } from "./reminders.ts";
-import { memorySecrets } from "./secrets.ts";
+import { keystoreSecrets } from "./secrets.ts";
+import { backButton } from "./shell.ts";
 
-const plugin = registerPlugin<NativeHttp>("AstroTimeHttp");
+const http = registerPlugin<NativeHttp>("AstroTimeHttp");
 
 export function mobilePlatform(store: Promise<Store>): Platform {
-  // The servers being signed in to, once each per sign-in under way.
-  const signingIn: string[] = [];
+  const signingIn = new SigningIn();
   return {
     store,
-    http: nativeClient(plugin, async () =>
-      cleartextOrigins(await (await store).accounts(), signingIn),
+    http: nativeClient(http, async () =>
+      cleartextOrigins(await (await store).accounts(), signingIn.servers),
     ),
-    secrets: memorySecrets(),
-    // A page outside the app's origin leaves the WebView for the system
-    // browser (Capacitor's navigation rule); PR A2 opens a Custom Tab (D65).
-    openExternal: (url) => void window.open(url, "_blank"),
-    signingInTo: (server) => {
-      signingIn.push(server);
-      let done = false;
-      // Once only: a second call must not take another sign-in's entry.
-      return () => {
-        if (done) return;
-        done = true;
-        signingIn.splice(signingIn.indexOf(server), 1);
-      };
-    },
+    secrets: keystoreSecrets(SecureStorage),
+    // A Custom Tab, where the user's browser keeps their passwords and second
+    // factor. The app is frozen while the tab is in front (Android 14 and
+    // later), so the user comes back, and the poll on return ends the sign-in.
+    // No Custom Tab or browser to open it: the system's own handling of the link.
+    openExternal: (url) => void Browser.open({ url }).catch(() => window.open(url, "_blank")),
+    signingInTo: (server) => signingIn.begin(server),
+    onBack: backButton(App),
     preferences,
     reminders: noReminders,
   };

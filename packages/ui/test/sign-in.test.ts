@@ -1,7 +1,7 @@
 // Adding an account, step by step (docs/plans/foundation.md#D92): a fake
 // Nextcloud answers Login Flow v2 and CalDAV discovery; the test decides when
 // time passes, so nothing here waits for a clock.
-import type { HttpClient } from "@astrotime/caldav";
+import { CertificateError, type HttpClient } from "@astrotime/caldav";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { expect, test } from "vite-plus/test";
@@ -161,6 +161,18 @@ test("an address that is no Nextcloud, or no web address at all, is told apart",
   await signIn.withPassword({ server: "example.com", username: "a", password: "b" });
   // 404 everywhere: an address that answers, but no CalDAV server.
   expect(signIn.state).toMatchObject({ step: "failed", problem: "not-caldav" });
+});
+
+test("a certificate the device refuses is said as such, by password and through Login Flow (android D62)", async () => {
+  const refused: HttpClient = async () => {
+    throw new CertificateError("refused");
+  };
+  const { store, signIn } = await setup({ ...nextcloud({ password: "x" }), http: refused });
+  await signIn.withPassword({ server: "cloud.example.com", username: "a", password: "b" });
+  expect(signIn.state).toEqual({ step: "failed", problem: "certificate", location: null });
+  await signIn.withNextcloud({ server: "cloud.example.com" });
+  expect(signIn.state).toEqual({ step: "failed", problem: "certificate", location: null });
+  expect(await store.accounts()).toEqual([]);
 });
 
 test("cancelled while the account was being saved, the account it added goes again", async () => {

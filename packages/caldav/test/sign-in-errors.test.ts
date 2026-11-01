@@ -7,6 +7,7 @@ import { expect, test } from "vite-plus/test";
 
 import {
   CalDavProvider,
+  CertificateError,
   fetchClient,
   NoCalendarHomeError,
   proxyHandler,
@@ -64,6 +65,18 @@ test("a server that cannot be reached is offline, and discovery stops at once", 
   await expect(
     CalDavProvider.discover(http, "https://cloud.example.com/", credentials),
   ).rejects.toThrow(OfflineError);
+  expect(requests).toHaveLength(1);
+});
+
+test("a refused certificate is said as such, and discovery stops at once (android D62)", async () => {
+  const requests: string[] = [];
+  const http: HttpClient = async (request) => {
+    requests.push(request.url);
+    throw new CertificateError("refused");
+  };
+  await expect(
+    CalDavProvider.discover(http, "https://cloud.example.com/", credentials),
+  ).rejects.toThrow(CertificateError);
   expect(requests).toHaveLength(1);
 });
 
