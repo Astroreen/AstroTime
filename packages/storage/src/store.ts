@@ -367,8 +367,12 @@ export class Store {
         undone.push({ object, occurrence, key });
       }
     }
-    // Objects no longer candidates (done, deleted) leave the cache.
-    for (const id of this.undoneCache.keys()) if (!seen.has(id)) this.undoneCache.delete(id);
+    // Objects of these calendars no longer candidates (done, deleted) leave
+    // the cache; a calendar not asked about (hidden for now) keeps its own.
+    const asked = new Set(calendarIds);
+    for (const [id, entry] of this.undoneCache) {
+      if (asked.has(entry.calendarId) && !seen.has(id)) this.undoneCache.delete(id);
+    }
     return undone
       .toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
       .map(({ object, occurrence }) => ({ object, occurrence }));
@@ -393,13 +397,25 @@ export class Store {
       if (!(error instanceof ExpansionLimitError)) throw error;
       occurrence = null;
     }
-    this.undoneCache.set(object.id, { ics: object.ics, day, timeZone, occurrence });
+    this.undoneCache.set(object.id, {
+      calendarId: object.calendarId,
+      ics: object.ics,
+      day,
+      timeZone,
+      occurrence,
+    });
     return occurrence;
   }
 
   private readonly undoneCache = new Map<
     string,
-    { ics: string; day: string; timeZone: string; occurrence: Occurrence | null }
+    {
+      calendarId: string;
+      ics: string;
+      day: string;
+      timeZone: string;
+      occurrence: Occurrence | null;
+    }
   >();
 
   /** The objects with no date at all: the tasks screen's undated tasks (docs/plans/foundation.md#D16). */
