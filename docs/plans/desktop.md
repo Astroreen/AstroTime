@@ -212,7 +212,11 @@ were checked on 2026-11-01.
   dark setting through the portal on GNOME and KDE is checked in PR D3.
   Electron runs natively on Wayland by default since 38.
 
-  _Landed in PR D3:_ closing the window **hides** it, and the page goes on
+  _Landed in PR D3:_ on GNOME (`XDG_CURRENT_DESKTOP`), which shows no tray
+  without an extension, closing the window minimizes it instead of hiding
+  it, so it stays in the dock and the overview; `ASTROTIME_TRAY=1` says an
+  extension shows the tray (hide as elsewhere), `=0` that none does.
+  Elsewhere closing the window **hides** it, and the page goes on
   running in it, so the shared UI's sync and reminders run as they do with
   the window open: the main process's timer (`setInterval`, 15 minutes)
   and `powerMonitor`'s `resume` send the page a sync request

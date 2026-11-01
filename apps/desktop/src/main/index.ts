@@ -82,6 +82,16 @@ const shown = new Set<Notification>();
 /** The longest `setTimeout` Node keeps (about 24.8 days); a longer wait is armed again. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
+/**
+ * Whether this desktop shows no tray icons: GNOME's shell has none without an
+ * extension. `ASTROTIME_TRAY=1` says there is one (an extension), `=0` none.
+ */
+function trayless(): boolean {
+  const said = process.env["ASTROTIME_TRAY"];
+  if (said !== undefined) return said === "0";
+  return /gnome/i.test(process.env["XDG_CURRENT_DESKTOP"] ?? "");
+}
+
 /** Brings the window to the front, from the tray, a second launch or a notification. */
 function showWindow() {
   if (!window) return;
@@ -285,7 +295,10 @@ async function start() {
   window.on("close", (event) => {
     if (quitting || state?.keepRunning === false) return;
     event.preventDefault();
-    window?.hide();
+    // Where the desktop shows no tray (GNOME without an extension), a hidden
+    // window could not be found again: it is minimized there instead.
+    if (trayless()) window?.minimize();
+    else window?.hide();
   });
   window.on("closed", () => (window = undefined));
   await window.loadURL(APP_URL);
