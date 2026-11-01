@@ -43,6 +43,7 @@ import {
 } from "./icons.tsx";
 import { dialogIcon, priorityOf, sheet } from "./item-details.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** RFC 7986 `COLOR`s to pick from: CSS names, as Nextcloud writes them. */
 const COLORS = [
@@ -100,8 +101,8 @@ export function ItemEditor({
   return (
     <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}>
+        <DialogBackdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPopup className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}>
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>
               <CloseIcon className="size-5" />
@@ -142,7 +143,7 @@ export function ItemEditor({
               )}
             </form>
           )}
-        </Dialog.Popup>
+        </DialogPopup>
       </Dialog.Portal>
     </Dialog.Root>
   );

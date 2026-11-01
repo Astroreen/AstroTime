@@ -4,18 +4,21 @@
 // status. The calendar on this device (D122) is an account here too.
 import type { Account, Calendar } from "@astrotime/storage";
 import type { AccountSync } from "@astrotime/sync";
-import { Checkbox } from "@base-ui/react/checkbox";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import type { TFunction } from "i18next";
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AccountStatus } from "../accounts/scheduler.ts";
 import { AddPersonIcon, MoreIcon, SyncIcon } from "./account-icons.tsx";
 import { useAccounts, type AccountsValue } from "./accounts-context.tsx";
+import { CalendarRow } from "./calendar-row.tsx";
 import { ConflictsDialog } from "./conflicts-dialog.tsx";
+import { CloseIcon } from "./icons.tsx";
+import { dialogIcon } from "./item-details.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
 
@@ -39,7 +42,7 @@ function Avatar({ account, size = "size-8" }: { account: Account | undefined; si
   return (
     <span
       aria-hidden="true"
-      className={`grid ${size} shrink-0 place-items-center rounded-full bg-accent text-sm font-medium text-on-accent`}
+      className={`grid ${size} shrink-0 place-items-center rounded-full bg-accent text-body font-medium text-on-accent`}
     >
       {initial(account && accountName(account, t))}
     </span>
@@ -74,7 +77,7 @@ function Problems({ last }: { last: AccountSync | undefined }) {
   const dropped = last?.report?.dropped.length ?? 0;
   if (errors.length === 0 && dropped === 0) return null;
   return (
-    <div className="flex flex-col gap-1 text-[12.5px] text-danger">
+    <div className="flex flex-col gap-1 text-note text-danger">
       {errors.length > 0 && (
         <details>
           <summary className="cursor-pointer">
@@ -105,7 +108,7 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
   const { t } = useTranslation();
   const value = useAccounts();
   const item =
-    "flex h-10 cursor-default items-center rounded-lg px-3 text-sm -outline-offset-2 data-highlighted:bg-raised-hover";
+    "flex h-10 cursor-default items-center rounded-lg px-3 text-body -outline-offset-2 data-highlighted:bg-raised-hover";
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -149,12 +152,79 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
   );
 }
 
+/**
+ * An account: its avatar, its name, how it syncs and its menu, then "Sign in
+ * again" when it is signed out and what its last sync could not do; the same
+ * in the accounts dialog, Settings and, compact, the drawer (design D137).
+ * Compact, it is the drawer's head: no avatar, its name a heading, and the
+ * sync's problems left to the accounts dialog, where the account button's
+ * dot leads. Its status is text: the account button's one live region says
+ * what changes (D120).
+ */
+export function AccountRow({
+  account,
+  onLeave,
+  compact = false,
+}: {
+  account: Account;
+  onLeave: () => void;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation();
+  const value = useAccounts();
+  const last = value.status.accounts.get(account.id)?.last;
+  const Name = compact ? "h3" : "p";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className={`flex items-center ${compact ? "gap-1" : "gap-3"}`}>
+        {!compact && <Avatar account={account} size="size-9" />}
+        <div className="min-w-0 flex-1">
+          <Name
+            className={`truncate ${compact ? "text-note text-ink-muted" : "text-body font-medium"}`}
+          >
+            {accountName(account, t)}
+          </Name>
+          <p className={`truncate text-ink-muted ${compact ? "text-tiny" : "text-note"}`}>
+            <StatusLine account={account} value={value} />
+          </p>
+        </div>
+        <AccountMenu account={account} onLeave={onLeave} />
+      </div>
+      {last?.status === "signed-out" && (
+        <button
+          type="button"
+          className={`${textButton} self-end`}
+          onClick={() => {
+            onLeave();
+            value.signIn(againRequest(account));
+          }}
+        >
+          {t("accounts.signInAgain")}
+        </button>
+      )}
+      {!compact && <Problems last={last} />}
+    </div>
+  );
+}
+
 /** The account button at the end of the top bar (design D46): the accounts dialog. */
 export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   const { t } = useTranslation();
   const value = useAccounts();
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // A sync that ended unable to reach a server: said in the calm words the
+  // rows use, never as synced (D122).
+  const offline =
+    value.status.offline ||
+    accounts.some((account) => value.status.accounts.get(account.id)?.last.status === "offline");
+  // A sync ran while the dialog was open: its end is said.
+  const [syncedWhileOpen, setSyncedWhileOpen] = useState(false);
+  const [wasRunning, setWasRunning] = useState(value.status.running);
+  if (wasRunning !== value.status.running) {
+    setWasRunning(value.status.running);
+    if (!value.status.running && open) setSyncedWhileOpen(true);
+  }
   const attention =
     value.conflicts > 0 ||
     accounts.some((account) => needsAttention(value.status.accounts.get(account.id)?.last));
@@ -164,7 +234,13 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
       ? t("accounts.buttonAttention")
       : t("accounts.button");
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        setSyncedWhileOpen(false);
+      }}
+    >
       <Dialog.Trigger
         aria-label={label}
         title={label}
@@ -186,50 +262,50 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         )}
       </Dialog.Trigger>
       {/*
-        A sync that comes to need the user is said, not only shown as the dot:
-        once, as it starts to. The text stays while the need does, through the
-        syncs that run meanwhile, so it is not said again after each.
+        The accounts' one live region while the dialog is closed (design D120,
+        D137). A sync that comes to need the user is said, not only shown as
+        the dot: once, as it starts to. The text stays while the need does,
+        through the syncs that run meanwhile, so it is not said again after
+        each. While the dialog is open the page around it is hidden from a
+        screen reader, so the dialog has its own, below.
       */}
       <span role="status" className="sr-only">
         {attention ? t("accounts.buttonAttention") : ""}
       </span>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
-          <div className="mb-2 flex items-center justify-between pl-2">
-            <Dialog.Title className="text-lg font-medium">{t("accounts.title")}</Dialog.Title>
-            <Dialog.Close className={textButton}>{t("accounts.close")}</Dialog.Close>
+        <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPopup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
+          {/* Closed by ✕ before its title, as every other dialog (design D137). */}
+          <div className="mb-2 flex items-center gap-2">
+            <Dialog.Close className={dialogIcon} aria-label={t("accounts.close")}>
+              <CloseIcon className="size-5" />
+            </Dialog.Close>
+            <Dialog.Title className="text-title font-medium">{t("accounts.title")}</Dialog.Title>
           </div>
+          {/*
+            The accounts' one live region while the dialog is open: a sync is
+            said to run and to end (Sync now) once for every account, and how
+            it ended: synced, offline, or needing the user. The rows' status
+            lines are text.
+          */}
+          <p role="status" className="sr-only">
+            {value.status.running
+              ? t("accounts.buttonSyncing")
+              : !syncedWhileOpen
+                ? ""
+                : attention
+                  ? t("accounts.buttonAttention")
+                  : offline
+                    ? t("sync.offline")
+                    : t("accounts.synced")}
+          </p>
           <ul className="flex flex-col gap-1">
             {accounts.map((account) => (
               <li key={account.id} className="flex flex-col gap-1 rounded-2xl bg-canvas p-3">
-                <div className="flex items-center gap-3">
-                  <Avatar account={account} size="size-9" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14.5px] font-medium">{accountName(account, t)}</p>
-                    {/* Said as it changes, so Sync now is heard to run and end. */}
-                    <p role="status" className="truncate text-[12.5px] text-ink-muted">
-                      <StatusLine account={account} value={value} />
-                    </p>
-                  </div>
-                  <AccountMenu account={account} onLeave={() => setOpen(false)} />
-                </div>
-                {value.status.accounts.get(account.id)?.last.status === "signed-out" && (
-                  <button
-                    type="button"
-                    className={`${textButton} self-end`}
-                    onClick={() => {
-                      setOpen(false);
-                      value.signIn(againRequest(account));
-                    }}
-                  >
-                    {t("accounts.signInAgain")}
-                  </button>
-                )}
-                <Problems last={value.status.accounts.get(account.id)?.last} />
+                <AccountRow account={account} onLeave={() => setOpen(false)} />
                 {/* The web keeps a store per origin: another address starts empty (D121). */}
                 {account.provider === "local" && value.platform.dataHome ? (
-                  <p className="text-[12.5px] text-ink-muted">
+                  <p className="text-note text-ink-muted">
                     {t("local.dataHome", { home: value.platform.dataHome })}
                   </p>
                 ) : null}
@@ -237,17 +313,17 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
             ))}
           </ul>
           {value.held && (
-            <p role="status" className="mt-3 px-2 text-[13px] text-ink-muted">
+            <p role="status" className="mt-3 px-2 text-small text-ink-muted">
               {t("accounts.held", {
                 name: `${value.held.username}@${new URL(value.held.server).host}`,
               })}
             </p>
           )}
           {!accounts.some(syncs) && (
-            <p className="mt-3 px-2 text-[13px] text-ink-muted">{t("local.hint")}</p>
+            <p className="mt-3 px-2 text-small text-ink-muted">{t("local.hint")}</p>
           )}
           {value.conflicts > 0 && (
-            <div role="note" className="mt-3 rounded-2xl bg-danger-soft p-3 text-[13px]">
+            <div role="note" className="mt-3 rounded-2xl bg-danger-soft p-3 text-small">
               <p className="font-medium text-danger">
                 {t("conflicts", { count: value.conflicts })}
               </p>
@@ -283,7 +359,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
               {t("accounts.add")}
             </button>
           </div>
-        </Dialog.Popup>
+        </DialogPopup>
       </Dialog.Portal>
       <ConflictsDialog
         store={value.store}
@@ -312,47 +388,23 @@ export function AccountSection({
   onLeave: () => void;
 }) {
   const { t } = useTranslation();
-  const value = useAccounts();
   return (
     <section aria-label={accountName(account, t)} className="flex flex-col">
-      <div className="flex items-center gap-1 pt-2 pr-1 pl-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-xs text-ink-muted">{accountName(account, t)}</h3>
-          <p className="truncate text-[11px] text-ink-muted">
-            <StatusLine account={account} value={value} />
-          </p>
-        </div>
-        <AccountMenu account={account} onLeave={onLeave} />
+      <div className="pt-2 pr-1 pl-4">
+        <AccountRow account={account} onLeave={onLeave} compact />
       </div>
       {calendars.length === 0 && (
-        <p className="px-4 py-2 text-[13px] text-ink-muted">{t("accounts.noCalendars")}</p>
+        <p className="px-4 py-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>
       )}
       {calendars.map((calendar) => (
-        <label
+        <CalendarRow
           key={calendar.id}
-          className="flex h-10 cursor-pointer items-center gap-4 rounded-full px-4 text-[14px] hover:bg-raised-hover"
-        >
-          <Checkbox.Root
-            checked={!hidden.has(calendar.id)}
-            onCheckedChange={(checked) => onToggle(calendar.id, checked)}
-            className="item-color grid size-[18px] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--item-fill)] data-checked:bg-[var(--item-fill)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            style={{ "--item": colorOf(calendar) } as CSSProperties}
-          >
-            <Checkbox.Indicator className="flex text-white data-unchecked:hidden">
-              <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden="true">
-                <path
-                  d="M3.5 8.5l3 3 6-7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Checkbox.Indicator>
-          </Checkbox.Root>
-          <span className="min-w-0 flex-1 truncate">{calendar.name}</span>
-        </label>
+          calendar={calendar}
+          color={colorOf(calendar)}
+          shown={!hidden.has(calendar.id)}
+          onToggle={onToggle}
+          className="h-10 rounded-full hover:bg-raised-hover"
+        />
       ))}
     </section>
   );
@@ -369,7 +421,7 @@ export function AddAccountButton({ onLeave }: { onLeave: () => void }) {
         onLeave();
         value.signIn({ kind: value.platform.preset ? "preset" : "nextcloud" });
       }}
-      className="mt-1 flex h-10 items-center gap-4 rounded-full px-4 text-left text-[14px] hover:bg-raised-hover"
+      className="mt-1 flex h-10 items-center gap-4 rounded-full px-4 text-left text-body hover:bg-raised-hover"
     >
       <AddPersonIcon className="size-5 text-ink-muted" />
       {t("accounts.add")}

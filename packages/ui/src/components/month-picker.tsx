@@ -53,7 +53,7 @@ export function MonthPicker({
               >
                 <ChevronIcon direction="left" className="size-5" />
               </button>
-              <Popover.Title className="text-sm font-semibold" aria-live="polite">
+              <Popover.Title className="text-body font-semibold" aria-live="polite">
                 {formats.monthYear(month)}
               </Popover.Title>
               <button

@@ -82,10 +82,13 @@ test("the strip expanded, the undone tasks, the drawer and the month picker", as
     await expect(page.getByRole("dialog")).toBeVisible();
     await shot(page, `undone-open-dark-${language}-phone`);
     await page.keyboard.press("Escape");
+    // Closed before the next opens, so one dialog is in the shot.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("button", { name: /Main menu|Главное меню/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await shot(page, `drawer-dark-${language}-phone`);
     await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("button", { name: /^(November|Ноябрь), / }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await shot(page, `month-picker-dark-${language}-phone`);

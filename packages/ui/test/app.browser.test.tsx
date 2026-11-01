@@ -1063,3 +1063,156 @@ test("the empty screens say what is empty and what to do, in English and Russian
     for (const cleanup of cleanups.splice(0).toReversed()) await cleanup();
   }
 });
+
+test("a signed-out account offers to sign in again wherever it is shown, and its rows say nothing on their own (design D137)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@cloud.example.com",
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "revoked" },
+    },
+  );
+  // The server refuses the saved password: the account is signed out. A
+  // sync's requests wait while `held` is set, to hear it run.
+  const server = nextcloud({ password: "right" });
+  let held: Promise<void> | null = null;
+  let release = () => {};
+  const http: HttpClient = async (request) => {
+    await held;
+    return server.http(request);
+  };
+  let requestSync: (byUser: boolean) => void = () => {};
+  render(Promise.resolve(store), ["en-US"], {
+    http,
+    secrets,
+    onSyncRequest: (listener) => {
+      requestSync = listener;
+      return () => {};
+    },
+  });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  await expect.element(button).toHaveAccessibleName("Accounts, something needs your attention");
+
+  // The accounts dialog: its row says it, and "Sign in again" is there; no
+  // live region of its own.
+  await button.click();
+  const dialog = page.getByRole("dialog", { name: "Accounts" });
+  await expect.element(dialog.getByText("Signed out: sign in again to sync")).toBeInTheDocument();
+  await expect.element(dialog.getByRole("button", { name: "Sign in again" })).toBeInTheDocument();
+  // The dialog's one live region, silent while nothing changes; the row's line is text.
+  expect(dialog.getByRole("status").elements()).toHaveLength(1);
+  expect(dialog.getByRole("status").element().textContent).toBe("");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(dialog).not.toBeInTheDocument();
+
+  // The drawer's head, compact, offers it too.
+  await page.getByRole("button", { name: "Main menu" }).click();
+  const drawer = page.getByRole("dialog", { name: "Main menu" });
+  await expect.element(drawer.getByRole("button", { name: "Sign in again" })).toBeInTheDocument();
+  expect(drawer.getByRole("status").elements()).toEqual([]);
+
+  // Settings, the same row.
+  await drawer.getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const row = settings.getByRole("region", { name: "astro@cloud.example.com" });
+  await expect.element(row.getByText("Signed out: sign in again to sync")).toBeInTheDocument();
+  await expect.element(row.getByRole("button", { name: "Sign in again" })).toBeInTheDocument();
+  expect(settings.getByRole("status").elements()).toEqual([]);
+  // It closes Settings and opens signing in again.
+  await row.getByRole("button", { name: "Sign in again" }).click();
+  await expect.element(settings).not.toBeInTheDocument();
+  await expect.element(page.getByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+
+  // The one live region keeps saying the need through a sync, once.
+  const said = page.getByRole("status").filter({ hasText: "something needs your attention" });
+  held = new Promise((resolve) => (release = resolve));
+  requestSync(true);
+  await expect.element(button).toHaveAccessibleName("Accounts, syncing");
+  expect(said.element().textContent).toBe("Accounts, something needs your attention");
+  held = null;
+  release();
+  await expect.element(button).toHaveAccessibleName("Accounts, something needs your attention");
+});
+
+test("with the accounts dialog open, a sync is said to run and to end, once, in the dialog's one live region (design D120, D137)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@cloud.example.com",
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "revoked" },
+    },
+  );
+  const server = nextcloud({ password: "right" });
+  let held: Promise<void> | null = null;
+  let release = () => {};
+  const http: HttpClient = async (request) => {
+    await held;
+    return server.http(request);
+  };
+  render(Promise.resolve(store), ["en-US"], { http, secrets });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  await expect.element(button).toHaveAccessibleName("Accounts, something needs your attention");
+  await button.click();
+  const dialog = page.getByRole("dialog", { name: "Accounts" });
+  // One live region in the dialog, silent while nothing changes.
+  const region = dialog.getByRole("status");
+  await expect.element(region).toBeInTheDocument();
+  expect(region.element().textContent).toBe("");
+  held = new Promise((resolve) => (release = resolve));
+  await dialog.getByRole("button", { name: "Sync now" }).click();
+  await expect.element(region).toHaveTextContent("Accounts, syncing");
+  held = null;
+  release();
+  // It ended still needing the user, and says so, once for the account.
+  await expect.element(region).toHaveTextContent("Accounts, something needs your attention");
+  expect(dialog.getByRole("status").elements()).toHaveLength(1);
+});
+
+test("a sync that ends with no server reachable is said in the calm offline words, never as synced (design D137)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@cloud.example.com",
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "right" },
+    },
+  );
+  // No network: every request fails as the platform's offline does. A sync's
+  // requests wait while `held` is set, to hear it run.
+  let held: Promise<void> | null = null;
+  let release = () => {};
+  const http: HttpClient = async () => {
+    await held;
+    throw new OfflineError("no network");
+  };
+  render(Promise.resolve(store), ["en-US"], { http, secrets });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  // Offline is calm: no need, no dot.
+  await expect.element(button).toHaveAccessibleName("Accounts");
+  await button.click();
+  const dialog = page.getByRole("dialog", { name: "Accounts" });
+  const region = dialog.getByRole("status");
+  await expect.element(region).toBeInTheDocument();
+  expect(region.element().textContent).toBe("");
+  held = new Promise((resolve) => (release = resolve));
+  await dialog.getByRole("button", { name: "Sync now" }).click();
+  await expect.element(region).toHaveTextContent("Accounts, syncing");
+  held = null;
+  release();
+  await expect
+    .element(region)
+    .toHaveTextContent("Offline: changes wait until the server can be reached");
+  expect(region.element().textContent).not.toContain("synced");
+});

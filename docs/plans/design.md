@@ -548,8 +548,9 @@ the project.
     title and its time (D50); the hour tiles and labels are hidden from
     screen readers;
   - **live regions**: a drag's or a key's move is said ([D112](#D112)); in
-    the accounts dialog each account's sync line is a status, so Sync now
-    is heard to run and end, and a sync that comes to need the user is
+    the accounts dialog Sync now is heard to run and end (_since
+    [D137](#D137)_ in the dialog's one live region, not one per account's
+    sync line), and a sync that comes to need the user is
     said once, as the account button's dot shows it: the status keeps its
     text while the need lasts, through the syncs that run meanwhile, so it
     is not said again after each;
@@ -674,16 +675,62 @@ are its decisions.
   scrolled stays where they put it. And the line
   under the strip is its wrapper's, so the mask no longer fades it at the
   ends.
-- **D136. A closing dialog, popover or menu lets a press through.** While
-  one fades out (Base UI marks it `data-ending-style`), it takes no
-  pointer events: one rule in `styles.css`. A backdrop on its way out used
+- **D136. A closing dialog lets a press through.** While a dialog's
+  backdrop and popup fade out (Base UI marks them `data-ending-style`), they
+  take no pointer events (`data-ending-style:pointer-events-none`, which
+  `dialog-parts.tsx`'s `DialogBackdrop`, `DialogPopup`, `AlertDialogBackdrop`
+  and `AlertDialogPopup` add; every dialog uses them, and
+  `test/dialog-parts.test.ts` fails on a dialog that takes Base UI's parts
+  directly, so a new dialog cannot forget it). A backdrop on its way out used
   to swallow the next press, so a drag begun on the grid just after closing
   the edit dialog did nothing, and the press went nowhere a user could see
   (it surfaced as a test that failed one run in seven on a loaded machine,
   then was found to be a real flaw). Google Calendar's grid takes the press
-  as soon as a dialog starts to close. The rule is every element Base UI
-  marks closing, a collapsing panel too, not only popups and backdrops, on
-  purpose: nothing is meant to be pressed while it goes.
+  as soon as a dialog starts to close. _Narrowed in PR (d2):_ to dialogs only (the
+  first version took every element Base UI marks closing, a collapsing
+  panel too). Menus and popovers are Base UI's: it makes a closing one
+  inert, so a press passes it whatever this rule says, and a modal menu's
+  own backdrop catches what falls outside it. A double click on the month
+  picker's day is tested to act once: it picks the day, and its second
+  click, passing the closing picker to the grid, makes no event there.
+- **D137. The accounts in Settings, one row for a calendar, and the scale
+  everywhere** (the two Deferred items D131 and D134 left, once the first
+  run became the calendar on this device, [foundation D122](foundation.md#D122)):
+  - Settings' calendar groups become one **Accounts** group: each account
+    with its avatar, name, how it syncs (said as it changes) and its menu
+    (sync now, sign in again, remove), then its calendars, then "Add
+    account". The same account row (`AccountRow`) is the accounts
+    dialog's, Settings' and, compact, the drawer's head, and the same
+    calendar row the drawer's (`CalendarRow`, `calendar-row.tsx`): one
+    component each, so the places cannot drift. The row carries what tells
+    the user what to do: "Sign in again" for a signed-out account (in all
+    three) and what the last sync could not do, its errors and dropped
+    changes (in the dialog and Settings; compact, the drawer leaves them to
+    the dialog, where the account button's dot leads, and has no avatar,
+    its name a heading). Its sync line is text, not a live region: one per
+    row said a sync once for every account. The accounts' state has one
+    live region at a time: the account button's while the dialog is closed
+    (a need, said once, [D120](#D120)), and the dialog's own while it is
+    open, since a modal dialog hides the page from a screen reader (a sync
+    running, then how it ended: "synced", offline in the rows' calm words
+    ("Offline: changes wait…", never "synced"), or still needing the
+    user). `text-tiny`
+    in the drawer's compact head is [D134](#D134)'s smallest role.
+    The calendar on this device is named as everywhere else ("On this
+    device"), not by its stored name. An account's menu, "Sign in again" or
+    "Add account" closes Settings before its dialog opens, as the drawer
+    does. The conflicts stay in the accounts dialog, where the account
+    button's dot leads.
+  - The accounts dialog is closed by ✕ before its title, as every other
+    dialog, not by a word at its other end.
+  - [D134](#D134)'s scale now holds everywhere: the accounts dialog,
+    sign-in, removing an account, the keyring question and the store's
+    error screen took its roles, and Tailwind's own sizes left in the UI
+    (`text-xs`, `text-sm`, `text-lg`) became `text-note`, `text-body` and
+    `text-title`, so a size is chosen by its role only; the update notice
+    ([foundation D124](foundation.md#D124)) too, which now also sits above
+    the system bar, and on a phone above the "+" button it covered
+    ([D132](#D132)).
 
 ### Decided in the logic QA (after v0.2.0)
 
@@ -810,18 +857,10 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   through the provider and the sync engine, or a colour kept on this device
   only. Google offers both per calendar. A menu on each calendar's row in
   the drawer comes with it.
-- **The type scale in the accounts' screens** — the account dialog, the
-  first run and sign-in keep their own sizes while they are reworked; they
-  take [D134](#D134)'s roles after.
 - **The tab strip right to left** — the fade and the chosen tab's scroll
   are worked out left to right; AstroTime speaks English and Russian
   (foundation [D17](foundation.md#D17)), so a right-to-left language
   brings their mirror ([D135](#D135)).
-- **Accounts in Settings** — adding, removing and signing in again stay in
-  the account dialog (the top bar's account button) while the first run and
-  the accounts are reworked (the first run is the calendar on this device
-  since [foundation D122](foundation.md#D122)); Settings gets an Accounts group then
-  ([D131](#D131)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).
@@ -842,8 +881,8 @@ PR 6b (dragging and resizing) D111 and D112. Its evidence is screenshots of each
 next to the matching reference, in both themes.
 
 The UI review after v0.2.0 brought D131–D133 (`feat/settings-screen`),
-D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`) and D136
-(`fix/closing-popups-and-strip`);
+D134 (`feat/ui-consistency`), D135 (`fix/tasks-tab-strip`), D136
+(`fix/closing-popups-and-strip`) and D137 (`feat/settings-accounts`);
 its evidence is screenshots before and after at the same sizes.
 
 The accessibility pass (`fix/accessibility`) brought D119 and D120; its

@@ -53,6 +53,7 @@ import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
 import { SettingsScreen } from "./settings-section.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** A calendar without a colour of its own (design D47). */
 const DEFAULT_COLOR = "#7c8db5";
@@ -561,11 +562,11 @@ export function CalendarScreen({
             )}
           </div>
           <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-            <Dialog.Popup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised pt-(--inset-top) pb-(--inset-bottom) pl-(--inset-left) text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
+            <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+            <DialogPopup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised pt-(--inset-top) pb-(--inset-bottom) pl-(--inset-left) text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
               <Dialog.Title className="sr-only">{t("topBar.menu")}</Dialog.Title>
               <nav aria-label={t("topBar.menu")}>{drawer}</nav>
-            </Dialog.Popup>
+            </DialogPopup>
           </Dialog.Portal>
         </Dialog.Root>
         <SettingsScreen

@@ -161,9 +161,12 @@ for (const language of ["en", "ru"] as const) {
         });
       return route.fulfill({ status: 404, json: [] });
     });
-    await addAccount(page, "nextcloud", text.add);
-    await page.getByRole("textbox", { name: text.server }).fill("cloud.example.com");
-    await page.getByRole("button", { name: text.continue }).click();
+    // Each tab keeps its panel, each with a server field: Nextcloud's is the one.
+    const nextcloud = (await addAccount(page, "nextcloud", text.add)).getByRole("tabpanel", {
+      name: "Nextcloud",
+    });
+    await nextcloud.getByRole("textbox", { name: text.server }).fill("cloud.example.com");
+    await nextcloud.getByRole("button", { name: text.continue }).click();
     await expect(page.getByRole("dialog").getByRole("status")).toBeVisible();
     await page.bringToFront();
     await shot(page, `login-flow-waiting-dark-${language}-phone`);
@@ -172,11 +175,11 @@ for (const language of ["en", "ru"] as const) {
     // A wrong password, from a real Radicale.
     const server = await startRadicale();
     const wrong = await open(browser, { language, theme: "dark", size: PHONE });
-    await addAccount(wrong, "caldav", text.add);
-    await wrong.getByRole("textbox", { name: text.server }).fill(server.url);
-    await wrong.getByRole("textbox", { name: text.user }).fill(server.username);
-    await wrong.getByLabel(text.password).fill("wrong");
-    await wrong.getByRole("button", { name: text.signIn }).click();
+    const caldav = await addAccount(wrong, "caldav", text.add);
+    await caldav.getByRole("textbox", { name: text.server }).fill(server.url);
+    await caldav.getByRole("textbox", { name: text.user }).fill(server.username);
+    await caldav.getByLabel(text.password).fill("wrong");
+    await caldav.getByRole("button", { name: text.signIn }).click();
     await expect(wrong.getByRole("alert")).toBeVisible();
     await shot(wrong, `error-wrong-password-dark-${language}-phone`);
     await wrong.context().close();

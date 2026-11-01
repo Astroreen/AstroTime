@@ -170,8 +170,8 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
         role="alert"
         className="flex max-w-sm flex-col items-start gap-3 rounded-2xl bg-raised p-6"
       >
-        <h1 className="text-lg font-medium">{t(`store.${reason}.title`)}</h1>
-        <p className="text-sm text-ink-muted">
+        <h1 className="text-title font-medium">{t(`store.${reason}.title`)}</h1>
+        <p className="text-body text-ink-muted">
           {error instanceof OutdatedWebViewError
             ? t("store.outdated.body", { version: error.version, minimum: error.minimum })
             : t(`store.${reason}.body`)}
@@ -181,7 +181,7 @@ function StoreMessage({ opening }: { opening: Exclude<Opening, { status: "open" 
           <button
             type="button"
             onClick={() => location.reload()}
-            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent"
+            className="rounded-full bg-accent px-4 py-2 text-body font-medium text-on-accent"
           >
             {t("store.reload")}
           </button>

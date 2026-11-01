@@ -71,7 +71,10 @@ test("an account added beside the calendar on this device keeps it once it holds
     const accounts = page.getByRole("dialog", { name: "Accounts" });
     await accounts.getByRole("button", { name: "Sync now" }).click();
     await expect(
-      accounts.getByText("Offline: changes wait until the server can be reached"),
+      // The account's row (the dialog's live region may say it too, D137).
+      accounts
+        .getByRole("listitem")
+        .getByText("Offline: changes wait until the server can be reached"),
     ).toBeVisible();
     await accounts.getByRole("button", { name: "Close" }).click();
     const button = page.getByRole("button", { name: /^Accounts/ });

@@ -75,6 +75,7 @@ export const ru = {
 
   "accounts.button": "Аккаунты",
   "accounts.buttonSyncing": "Аккаунты, идёт синхронизация",
+  "accounts.synced": "Аккаунты синхронизированы",
   "accounts.buttonAttention": "Аккаунты, нужно ваше внимание",
   "accounts.title": "Аккаунты",
   "accounts.add": "Добавить аккаунт",
@@ -248,7 +249,6 @@ export const ru = {
   "settings.close": "Закрыть настройки",
   "settings.general": "Общие",
   "settings.views": "Вид",
-  "settings.calendarsOf": "Календари: {{account}}",
   "settings.notifications": "Уведомления",
   "settings.desktop": "Приложение для компьютера",
   "settings.theme": "Тема",

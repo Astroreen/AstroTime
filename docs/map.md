@@ -172,17 +172,22 @@ When you add a package, app or module, add its line here in the same PR.
     `plans/design.md#D86`) and the Agenda (`agenda-view.tsx`,
     `plans/design.md#D87`). → `plans/design.md#D46`
     - `accounts.tsx`, `sign-in-dialog.tsx`, `remove-account.tsx` — the
-      account button and dialog, each account in the drawer, the sync
-      status, adding (with a preset, the password alone) and removing an
-      account, the calendar on this device.
+      account button and dialog, each account in the drawer, an account's
+      row (`AccountRow`, the dialog's and Settings'), the sync status,
+      adding (with a preset, the password alone) and removing an account,
+      the calendar on this device.
       → `plans/foundation.md#D92`, `plans/foundation.md#D122`,
-      `plans/foundation.md#D123`
+      `plans/foundation.md#D123`, `plans/design.md#D137`
     - `tasks-screen.tsx` — the tasks screen, or panel on a wide screen.
       → `plans/design.md#D95`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
     - `empty-state.tsx` — what a screen shows with nothing to list.
       → `plans/design.md#D134`
+    - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
+      press through while they close. → `plans/design.md#D136`
+    - `calendar-row.tsx` — a calendar's row with its checkbox, the drawer's
+      and Settings'. → `plans/design.md#D137`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
       screen), from the top bar's gear or the drawer's last row.
       → `plans/design.md#D131`, `plans/design.md#D96`

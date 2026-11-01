@@ -41,6 +41,7 @@ import {
   TrashIcon,
 } from "./icons.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 export const dialogIcon =
   "grid size-10 shrink-0 place-items-center rounded-full text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
@@ -75,8 +76,8 @@ export function ItemDetails({
   return (
     <Dialog.Root open={target !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className={`${sheet} z-[110] sm:w-[min(28rem,calc(100vw-2rem))]`}>
+        <DialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPopup className={`${sheet} z-[110] sm:w-[min(28rem,calc(100vw-2rem))]`}>
           {target && (
             <Body
               target={target}
@@ -95,7 +96,7 @@ export function ItemDetails({
           >
             <CloseIcon className="size-5" />
           </Dialog.Close>
-        </Dialog.Popup>
+        </DialogPopup>
       </Dialog.Portal>
     </Dialog.Root>
   );
@@ -303,7 +304,7 @@ function Body({
             <button
               type="button"
               aria-pressed={starred}
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
+              className="flex items-center gap-2 rounded-full px-4 py-2 text-body font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
               onClick={onStar}
             >
               <StarIcon filled={starred} className="size-4" />

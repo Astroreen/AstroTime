@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export interface ScopeRequest {
   readonly action: "edit" | "delete";
@@ -36,10 +37,10 @@ export function ScopeDialog({
       }}
     >
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <AlertDialog.Popup className="fixed top-1/2 left-1/2 z-[150] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <AlertDialogBackdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <AlertDialogPopup className="fixed top-1/2 left-1/2 z-[150] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           {request && <Choice key={request.scopes.join()} request={request} onClose={onClose} />}
-        </AlertDialog.Popup>
+        </AlertDialogPopup>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );
@@ -60,7 +61,7 @@ function Choice({ request, onClose }: { request: ScopeRequest; onClose: () => vo
         request.run(scope);
       }}
     >
-      <AlertDialog.Title className="text-lg font-medium">{title}</AlertDialog.Title>
+      <AlertDialog.Title className="text-title font-medium">{title}</AlertDialog.Title>
       {!confirm && (
         <fieldset className="mt-4 flex flex-col gap-1">
           <legend className="sr-only">{title}</legend>
@@ -89,7 +90,7 @@ function Choice({ request, onClose }: { request: ScopeRequest; onClose: () => vo
           autoFocus
           className={
             request.action === "delete"
-              ? "rounded-full bg-danger px-5 py-2 text-sm font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+              ? "rounded-full bg-danger px-5 py-2 text-body font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
               : primaryButton
           }
         >

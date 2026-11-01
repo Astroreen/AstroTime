@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 
 import { accountName } from "./accounts.tsx";
 import { textButton } from "./sign-in-dialog.tsx";
+import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export function RemoveAccountDialog({
   account,
@@ -34,14 +35,14 @@ export function RemoveAccountDialog({
   return (
     <AlertDialog.Root open={account !== null} onOpenChange={(open) => !open && close()}>
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <AlertDialog.Popup className="fixed top-1/2 left-1/2 z-[110] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <AlertDialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <AlertDialogPopup className="fixed top-1/2 left-1/2 z-[110] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           {kept ? (
             <>
-              <AlertDialog.Title className="text-lg font-medium">
+              <AlertDialog.Title className="text-title font-medium">
                 {t("accounts.notRevokedTitle", { name })}
               </AlertDialog.Title>
-              <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
+              <AlertDialog.Description className="mt-2 text-body text-ink-muted">
                 {t("accounts.notRevokedBody")}
               </AlertDialog.Description>
               <div className="mt-5 flex justify-end gap-2">
@@ -52,10 +53,10 @@ export function RemoveAccountDialog({
             </>
           ) : (
             <>
-              <AlertDialog.Title className="text-lg font-medium">
+              <AlertDialog.Title className="text-title font-medium">
                 {local ? t("local.removeTitle") : t("accounts.removeTitle", { name })}
               </AlertDialog.Title>
-              <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
+              <AlertDialog.Description className="mt-2 text-body text-ink-muted">
                 {t(local ? "local.removeBody" : "accounts.removeBody")}
               </AlertDialog.Description>
               <div className="mt-5 flex justify-end gap-2">
@@ -65,7 +66,7 @@ export function RemoveAccountDialog({
                 <button
                   type="button"
                   disabled={removing}
-                  className="rounded-full bg-danger px-5 py-2 text-sm font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:opacity-50"
+                  className="rounded-full bg-danger px-5 py-2 text-body font-medium text-on-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:opacity-50"
                   onClick={() => {
                     if (!account) return;
                     setRemoving(true);
@@ -85,7 +86,7 @@ export function RemoveAccountDialog({
               </div>
             </>
           )}
-        </AlertDialog.Popup>
+        </AlertDialogPopup>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );

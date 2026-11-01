@@ -1,6 +1,6 @@
 // The tasks screen on the demo data (design D52): its lists, completing and
 // starring through the local store, the calendar following along.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { openDemo, PHONE, WIDE } from "./support.ts";
 
@@ -126,6 +126,12 @@ test.describe("in Russian", () => {
 test.describe("the tab strip wider than the panel (design D135)", () => {
   test.use({ locale: "ru-RU", viewport: WIDE });
 
+  /** A real click on a tab's part that shows, `x` px in from its right edge: it scrolls nothing itself. */
+  const clickShown = async (page: Page, tab: Locator, x = 12) => {
+    const box = (await tab.boundingBox())!;
+    await page.mouse.click(box.x + box.width - x, box.y + box.height / 2);
+  };
+
   test("fades out on the side that hides tabs, and a tab chosen there is scrolled past the fade", async ({
     page,
   }) => {
@@ -141,7 +147,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
 
     // Scrolled to the end, the open first tab is under the start's fade.
-    await second.dispatchEvent("click");
+    await second.click();
     await expect(second).toHaveAttribute("aria-selected", "true");
     await strip.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
     await expect(strip).toHaveCSS("mask-image", fadesStart);
@@ -151,9 +157,9 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     });
     expect(under).toBe(true);
 
-    // Chosen there (a click that scrolls nothing itself), it is scrolled back
-    // past the fade: the strip at its start, which then fades no more.
-    await first.dispatchEvent("click");
+    // Clicked there on its part that shows, it is scrolled back past the
+    // fade: the strip at its start, which then fades no more.
+    await clickShown(page, first);
     await expect(first).toHaveAttribute("aria-selected", "true");
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
     const clear = await first.evaluate((tab) => {
@@ -222,25 +228,40 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
         const room = tab.closest("[data-tab-strip]")!.getBoundingClientRect();
         return room.right - tab.getBoundingClientRect().right;
       });
-    // Each resize the strip handles is counted: a step waits for the next one,
-    // so the observer has run, whatever it then did.
-    const resized = async (change: () => Promise<unknown>) => {
-      const before = (await strip.getAttribute("data-resized")) ?? "";
-      await change();
-      await expect(strip).not.toHaveAttribute("data-resized", before);
-    };
+    // A style that resizes the tabs, applied once an observer of the test's
+    // own has seen the tabs as they were; it resolves when that observer sees
+    // them resized. The app's observer was made first, so it has run by then.
+    const resized = (css: string) =>
+      strip.evaluate(
+        (element, rule) =>
+          new Promise<void>((done) => {
+            let seen = false;
+            const observer = new ResizeObserver(() => {
+              if (seen) {
+                observer.disconnect();
+                done();
+                return;
+              }
+              seen = true;
+              // Out of the observer's own loop, so the change is a new notification.
+              requestAnimationFrame(() => {
+                const style = document.createElement("style");
+                style.textContent = rule;
+                document.head.append(style);
+              });
+            });
+            observer.observe(element.firstElementChild!);
+          }),
+        css,
+      );
     const noStartFade = /^linear-gradient\(to right, rgb\(0, 0, 0\),/;
     // Chosen, the second tab is clear of the end's fade as the strip opens.
-    await second.dispatchEvent("click");
+    await second.click();
     await expect(second).toHaveAttribute("aria-selected", "true");
     expect(await fromEnd()).toBeGreaterThanOrEqual(40);
 
     // The first tab grows (a count, a font): the open second, clear before, is brought clear again.
-    await resized(() =>
-      page.addStyleTag({
-        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }",
-      }),
-    );
+    await resized("[data-tab-strip] [role=tab]:first-child { padding-inline: 90px; }");
     expect(await fromEnd()).toBeGreaterThanOrEqual(40);
     expect(await strip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
 
@@ -249,11 +270,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     await strip.evaluate((element) => element.scrollTo({ left: 0 }));
     await expect(strip).toHaveCSS("mask-image", noStartFade);
     expect(await fromEnd()).toBeLessThan(40);
-    await resized(() =>
-      page.addStyleTag({
-        content: "[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }",
-      }),
-    );
+    await resized("[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }");
     expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
   });
 });

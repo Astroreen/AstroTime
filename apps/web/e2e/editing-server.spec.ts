@@ -92,3 +92,75 @@ test("an event created here reaches the server, and again once dragged", async (
   expect(changed).toContain("DTEND;TZID=Europe/Vilnius:20261105T180000");
   expect(changed).toContain("SUMMARY:Made in AstroTime");
 });
+
+test("a change the server dropped is told in the accounts dialog and in Settings alike (design D137)", async ({
+  page,
+  radicale,
+}) => {
+  const work = await radicale.mkcalendar("work");
+  await openApp(page);
+  const signIn = await addAccount(page, "caldav");
+  await signIn.getByRole("textbox", { name: "Server address" }).fill(radicale.url);
+  await signIn.getByRole("textbox", { name: "User name" }).fill(radicale.username);
+  await signIn.getByLabel("Password").fill(radicale.password);
+  await signIn.getByRole("button", { name: "Sign in" }).click();
+  await expect(signIn).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
+  // The first sync has ended, its calendars written: an item made before it
+  // could name a calendar the sync was replacing (seen on CI).
+  await expect(
+    page.getByRole("navigation", { name: "Main menu" }).getByText(/^Synced at /),
+  ).toBeVisible();
+
+  // Made here and uploaded.
+  await page.getByRole("button", { name: "Create" }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Gone elsewhere");
+  await dialog.getByLabel("Start time").selectOption("16:00");
+  const uploaded = page.waitForResponse((response) => response.request().method() === "PUT");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  const response = await uploaded;
+  expect(response.status()).toBe(201);
+  const uid = /\r\nUID:([^\r]+)\r\n/.exec(response.request().postData() ?? "")?.[1];
+
+  // Changed here while the server cannot be reached (its uploads refused),
+  // and meanwhile deleted by another client: the next sync drops the change.
+  await page.route("**/dav-proxy/**", (route) =>
+    route.request().method() === "PUT" ? route.abort() : route.continue(),
+  );
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: "Gone elsewhere, 4:00 – 5:00 PM" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Gone elsewhere" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  await edit.getByRole("textbox", { name: "Title" }).fill("Renamed here");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(edit).toHaveCount(0);
+  const deleted = await fetch(`${work}${uid}.ics`, {
+    method: "DELETE",
+    headers: { Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}` },
+  });
+  expect(deleted.status).toBeLessThan(300);
+  await page.unroute("**/dav-proxy/**");
+
+  // The accounts dialog tells it on the account's row…
+  const dropped = "1 change was dropped: the server deleted its item";
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  const accounts = page.getByRole("dialog", { name: "Accounts" });
+  await accounts.getByRole("button", { name: "Sync now" }).click();
+  await expect(accounts.getByText(dropped)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(accounts).toHaveCount(0);
+  // …and Settings, on the same row.
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Settings" })
+      .getByRole("region", { name: "Accounts" })
+      .getByText(dropped),
+  ).toBeVisible();
+});

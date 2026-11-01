@@ -194,8 +194,6 @@ export function TasksScreen({
         if (start < -1 || end < -1) clear(open);
       }
       measureStrip();
-      // How many resizes were handled: a test sees one was.
-      element.dataset["resized"] = String(Number(element.dataset["resized"] ?? 0) + 1);
     });
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
