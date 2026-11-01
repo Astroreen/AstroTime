@@ -9,8 +9,12 @@
     pnpm.enable = true;
   };
 
-  # A real CalDAV server for the integration tests (AGENTS.md).
-  packages = [ pkgs.radicale ];
+  # A real CalDAV server for the integration tests (AGENTS.md), and openssl
+  # for the dev server's self-signed certificate (scripts/t3/dev.sh).
+  packages = [
+    pkgs.radicale
+    pkgs.openssl
+  ];
 
   # Playwright cannot run its downloaded browsers on NixOS; use the nixpkgs
   # build instead. `playwright` in pnpm-workspace.yaml is pinned to the same

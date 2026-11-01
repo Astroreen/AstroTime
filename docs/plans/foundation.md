@@ -139,7 +139,12 @@ logic worth borrowing.
     from beyond localhost (the owner's devices on their tailnet,
     `scripts/t3/README.md`), it lets in loopback and tailnet clients only
     and proxies only to `ASTROTIME_PROXY_ALLOW`'s servers, since the local
-    Radicale's password is published;
+    Radicale's password is published. The tailnet reaches it over **https**,
+    since the web store needs a secure context (OPFS, Web Locks) and plain
+    http is one only on localhost: the dev server stays plain http on
+    127.0.0.1, and `tailscale serve` (the tailnet's own certificate, once the
+    owner lets it run as them) or, without that permission, the dev server's
+    own TLS listener with a self-signed certificate is the https front;
   - in production, the web app ships as **one Docker image** that serves the
     static app and proxies `/dav/*` to the user's server. The proxy keeps no
     state: credentials come from the client and are passed through. An
@@ -504,7 +509,9 @@ Decided while building PR 5a.
   to secure contexts, so the web store opens only over `https` or on
   localhost; elsewhere the app says so instead of failing
   (`InsecureContextError`). Self-hosting needs TLS in front (D40 already
-  asks for it); the dev server over the tailnet needs `https` too.
+  asks for it). The dev server over the tailnet has it: `tailscale serve`,
+  or a self-signed front until the owner allows that ([D20](#D20),
+  `scripts/t3/README.md`).
 - **Finer write rights** — a calendar is read-only unless its privilege
   set grants `write`, `write-content` or `all`; a share that lets one edit
   but not create (`bind`) or delete (`unbind`) is taken as fully writable,

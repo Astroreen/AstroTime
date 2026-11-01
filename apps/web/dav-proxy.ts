@@ -2,7 +2,8 @@
 // reaches CalDAV servers through /dav-proxy/ on its own origin. While the dev
 // server listens on localhost only, any server may be reached unless
 // ASTROTIME_PROXY_ALLOW lists the allowed origins (comma-separated); beyond
-// localhost the list is required.
+// localhost (tailnet devices through an https front included) the list is
+// required.
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { proxyHandler } from "@astrotime/caldav";
@@ -31,8 +32,8 @@ async function send(res: ServerResponse, response: Response): Promise<void> {
   res.end(Buffer.from(await response.arrayBuffer()));
 }
 
-export function davProxy(): Plugin {
-  const allow = process.env["ASTROTIME_PROXY_ALLOW"]
+export function davProxy(env = process.env): Plugin {
+  const allow = env["ASTROTIME_PROXY_ALLOW"]
     ?.split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -42,9 +43,12 @@ export function davProxy(): Plugin {
     configureServer(server) {
       // Open to any server only while the dev server is reachable from this
       // machine alone; with --host, a client elsewhere could use it as a relay.
+      // Tailnet clients (ASTROTIME_WEB_CLIENTS) reach it beyond localhost even
+      // on 127.0.0.1, through an https front (scripts/t3/dev.sh).
       const host = server.config.server.host;
       const local =
-        host === undefined || host === "localhost" || host === "127.0.0.1" || host === "::1";
+        (host === undefined || host === "localhost" || host === "127.0.0.1" || host === "::1") &&
+        !env["ASTROTIME_WEB_CLIENTS"];
       server.middlewares.use(DAV_PROXY_PREFIX, (req, res) => {
         if (!allow?.length && !local) {
           res.statusCode = 403;
