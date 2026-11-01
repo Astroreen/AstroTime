@@ -677,8 +677,11 @@ are its decisions.
   ends.
 - **D136. A closing dialog lets a press through.** While a dialog's
   backdrop and popup fade out (Base UI marks them `data-ending-style`), they
-  take no pointer events (`data-ending-style:pointer-events-none` on every
-  Dialog and AlertDialog backdrop and popup, the sheet's too). A backdrop on its way out used
+  take no pointer events (`data-ending-style:pointer-events-none`, which
+  `dialog-parts.tsx`'s `DialogBackdrop`, `DialogPopup`, `AlertDialogBackdrop`
+  and `AlertDialogPopup` add; every dialog uses them, and
+  `test/dialog-parts.test.ts` fails on a dialog that takes Base UI's parts
+  directly, so a new dialog cannot forget it). A backdrop on its way out used
   to swallow the next press, so a drag begun on the grid just after closing
   the edit dialog did nothing, and the press went nowhere a user could see
   (it surfaced as a test that failed one run in seven on a loaded machine,
@@ -709,7 +712,9 @@ are its decisions.
     live region at a time: the account button's while the dialog is closed
     (a need, said once, [D120](#D120)), and the dialog's own while it is
     open, since a modal dialog hides the page from a screen reader (a sync
-    running, then ended: "synced", or still needing the user). `text-tiny`
+    running, then how it ended: "synced", offline in the rows' calm words
+    ("Offline: changes wait…", never "synced"), or still needing the
+    user). `text-tiny`
     in the drawer's compact head is [D134](#D134)'s smallest role.
     The calendar on this device is named as everywhere else ("On this
     device"), not by its stored name. An account's menu, "Sign in again" or

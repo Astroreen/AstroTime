@@ -18,6 +18,7 @@ import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** A language's name in itself: "English", "Русский". */
 const nativeName = (language: string) => {
@@ -46,8 +47,8 @@ export function SettingsScreen({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
-        <Dialog.Popup
+        <DialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPopup
           className={`${sheet} z-[110] pt-(--inset-top) pb-(--inset-bottom) sm:w-[min(40rem,calc(100vw-2rem))] sm:pt-0 sm:pb-0`}
         >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
@@ -68,7 +69,7 @@ export function SettingsScreen({
               onLeave={onClose}
             />
           </div>
-        </Dialog.Popup>
+        </DialogPopup>
       </Dialog.Portal>
     </Dialog.Root>
   );

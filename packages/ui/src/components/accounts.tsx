@@ -18,6 +18,7 @@ import { ConflictsDialog } from "./conflicts-dialog.tsx";
 import { CloseIcon } from "./icons.tsx";
 import { dialogIcon } from "./item-details.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
 
@@ -212,6 +213,11 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   const value = useAccounts();
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // A sync that ended unable to reach a server: said in the calm words the
+  // rows use, never as synced (D122).
+  const offline =
+    value.status.offline ||
+    accounts.some((account) => value.status.accounts.get(account.id)?.last.status === "offline");
   // A sync ran while the dialog was open: its end is said.
   const [syncedWhileOpen, setSyncedWhileOpen] = useState(false);
   const [wasRunning, setWasRunning] = useState(value.status.running);
@@ -267,8 +273,8 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         {attention ? t("accounts.buttonAttention") : ""}
       </span>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
-        <Dialog.Popup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0 data-ending-style:pointer-events-none">
+        <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPopup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
           {/* Closed by ✕ before its title, as every other dialog (design D137). */}
           <div className="mb-2 flex items-center gap-2">
             <Dialog.Close className={dialogIcon} aria-label={t("accounts.close")}>
@@ -279,16 +285,19 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
           {/*
             The accounts' one live region while the dialog is open: a sync is
             said to run and to end (Sync now) once for every account, and how
-            it ended. The rows' status lines are text.
+            it ended: synced, offline, or needing the user. The rows' status
+            lines are text.
           */}
           <p role="status" className="sr-only">
             {value.status.running
               ? t("accounts.buttonSyncing")
-              : syncedWhileOpen
-                ? attention
+              : !syncedWhileOpen
+                ? ""
+                : attention
                   ? t("accounts.buttonAttention")
-                  : t("accounts.synced")
-                : ""}
+                  : offline
+                    ? t("sync.offline")
+                    : t("accounts.synced")}
           </p>
           <ul className="flex flex-col gap-1">
             {accounts.map((account) => (
@@ -350,7 +359,7 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
               {t("accounts.add")}
             </button>
           </div>
-        </Dialog.Popup>
+        </DialogPopup>
       </Dialog.Portal>
       <ConflictsDialog
         store={value.store}

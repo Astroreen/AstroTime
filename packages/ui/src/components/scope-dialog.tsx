@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export interface ScopeRequest {
   readonly action: "edit" | "delete";
@@ -36,10 +37,10 @@ export function ScopeDialog({
       }}
     >
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:pointer-events-none" />
-        <AlertDialog.Popup className="fixed top-1/2 left-1/2 z-[150] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:pointer-events-none">
+        <AlertDialogBackdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <AlertDialogPopup className="fixed top-1/2 left-1/2 z-[150] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           {request && <Choice key={request.scopes.join()} request={request} onClose={onClose} />}
-        </AlertDialog.Popup>
+        </AlertDialogPopup>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );

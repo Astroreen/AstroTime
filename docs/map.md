@@ -184,6 +184,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D97`
     - `empty-state.tsx` — what a screen shows with nothing to list.
       → `plans/design.md#D134`
+    - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
+      press through while they close. → `plans/design.md#D136`
     - `calendar-row.tsx` — a calendar's row with its checkbox, the drawer's
       and Settings'. → `plans/design.md#D137`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide

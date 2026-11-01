@@ -1176,3 +1176,43 @@ test("with the accounts dialog open, a sync is said to run and to end, once, in 
   await expect.element(region).toHaveTextContent("Accounts, something needs your attention");
   expect(dialog.getByRole("status").elements()).toHaveLength(1);
 });
+
+test("a sync that ends with no server reachable is said in the calm offline words, never as synced (design D137)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  await saveAccount(
+    { store, secrets },
+    {
+      name: "astro@cloud.example.com",
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "right" },
+    },
+  );
+  // No network: every request fails as the platform's offline does. A sync's
+  // requests wait while `held` is set, to hear it run.
+  let held: Promise<void> | null = null;
+  let release = () => {};
+  const http: HttpClient = async () => {
+    await held;
+    throw new OfflineError("no network");
+  };
+  render(Promise.resolve(store), ["en-US"], { http, secrets });
+  const button = page.getByRole("button", { name: /^Accounts/ });
+  // Offline is calm: no need, no dot.
+  await expect.element(button).toHaveAccessibleName("Accounts");
+  await button.click();
+  const dialog = page.getByRole("dialog", { name: "Accounts" });
+  const region = dialog.getByRole("status");
+  await expect.element(region).toBeInTheDocument();
+  expect(region.element().textContent).toBe("");
+  held = new Promise((resolve) => (release = resolve));
+  await dialog.getByRole("button", { name: "Sync now" }).click();
+  await expect.element(region).toHaveTextContent("Accounts, syncing");
+  held = null;
+  release();
+  await expect
+    .element(region)
+    .toHaveTextContent("Offline: changes wait until the server can be reached");
+  expect(region.element().textContent).not.toContain("synced");
+});
