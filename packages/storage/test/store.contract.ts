@@ -728,13 +728,16 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         etag: `"${i}"`,
         ics: task(`t${i}`),
       }));
-      const { invalid } = await store.saveManyFromServer(calendar.id, [
+      const result = await store.saveManyFromServer(calendar.id, [
         ...resources,
         { href: "broken.ics", etag: '"b"', ics: "not iCalendar" },
         { href: "mine.ics", etag: '"1"', ics: task("mine", "SUMMARY:theirs\r\n") },
+        // An href given twice is one row, the later version.
+        { href: "t3.ics", etag: '"3b"', ics: task("t3", "SUMMARY:again\r\n") },
       ]);
       expect([begins, listener.mock.calls.length]).toEqual([1, 1]);
-      expect(invalid).toEqual(["broken.ics"]);
+      expect(result).toEqual({ saved: 250, invalid: ["broken.ics"], kept: ["mine.ics"] });
+      expect(await store.objectAt(calendar.id, "t3.ics")).toMatchObject({ etag: '"3b"' });
       const stored = await store.hrefs(calendar.id);
       expect(stored).toHaveLength(251);
       // Ours stays pending, untouched; the others are the server's.

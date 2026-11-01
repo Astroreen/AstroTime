@@ -221,7 +221,10 @@ logic worth borrowing.
 - **D27. CI on GitHub-hosted runners**, as in Jhin: format and lint,
   typecheck, unit tests, knip, and one aggregate `CI` status for branch
   protection. Integration tests against Radicale run on every PR from PR 4;
-  a nightly job runs them against a real Nextcloud. Claude reviews every PR
+  a nightly job runs them against a real Nextcloud, one test file at a time
+  (`--no-file-parallelism`): its SQLite-backed Nextcloud answers `500` to
+  two files writing at once, which the request budgets of [D126](#D126)
+  made happen. Claude reviews every PR
   and answers `@claude`. Dependabot updates the actions, which are pinned to
   commit SHAs, and the image's base images, pinned by digest ([D41](#D41)).
 - **D28. Releases on a `v*` tag:** the web Docker image to GHCR, and to

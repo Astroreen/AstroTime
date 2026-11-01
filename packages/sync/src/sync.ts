@@ -423,8 +423,9 @@ async function download(
   // calendar's first sync is thousands (D99).
   for (let i = 0; i < plain.length; i += DOWNLOAD_BATCH) {
     const batch = plain.slice(i, i + DOWNLOAD_BATCH);
-    const { invalid } = await store.saveManyFromServer(calendar.id, batch);
-    report.downloaded += batch.length - invalid.length;
+    // One edited here since the listing is kept, for the next sync to merge.
+    const { saved, invalid } = await store.saveManyFromServer(calendar.id, batch);
+    report.downloaded += saved;
     for (const href of invalid) if (!report.skipped.includes(href)) report.skipped.push(href);
   }
   // Edited here since the sync began: that edit is newer than this listing,

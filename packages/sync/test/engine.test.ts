@@ -635,3 +635,29 @@ test("a big download is stored in batches: a transaction and a notification per 
   // The calendar, the unreadable object offered again, the removals, the sync state.
   expect(writes).toBe(4);
 });
+
+test("an edit made here while the sync downloads is kept, never overwritten, and not counted (D99, AGENTS.md rule 2)", async () => {
+  const server = memoryServer(calendarUrl);
+  server.objects.set(`${calendarUrl}a.ics`, { etag: '"1"', ics: task("a") });
+  server.objects.set(`${calendarUrl}b.ics`, { etag: '"1"', ics: task("b") });
+  const { store, calendar } = await device(server);
+  // Both change on the server; "a" is edited here after the sync read the
+  // device's objects, before the server's batch is stored.
+  server.objects.set(`${calendarUrl}a.ics`, { etag: '"2"', ics: task("a", "theirs") });
+  server.objects.set(`${calendarUrl}b.ics`, { etag: '"2"', ics: task("b", "theirs") });
+  const provider: Provider = {
+    ...server,
+    changes: async (...args) => {
+      const changes = await server.changes(...args);
+      await store.saveLocal(calendar.id, task("a", "ours"));
+      return changes;
+    },
+  };
+  const report = await syncAccount(store, provider, calendar.accountId);
+  expect(report.downloaded).toBe(1);
+  const [a, b] = ["a.ics", "b.ics"].map((name) =>
+    store.objectAt(calendar.id, `${calendarUrl}${name}`),
+  );
+  expect(await a).toMatchObject({ pending: "update", ics: task("a", "ours") });
+  expect(await b).toMatchObject({ pending: "none", ics: task("b", "theirs") });
+});

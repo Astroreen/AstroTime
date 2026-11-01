@@ -299,15 +299,21 @@ export class Store {
    * Stores many of the server's resources at once, as `saveFromServer` does
    * each (a pending local change is kept), in one transaction with one
    * notification: a sync's download (docs/plans/foundation.md#D99). One
-   * that is not iCalendar is left out and named in `invalid` (D36); the rest
-   * are stored all the same.
+   * that is not iCalendar is left out and named in `invalid` (D36); one
+   * whose row holds a pending change here is left as it is and named in
+   * `kept`; `saved` counts the rows written, an href given twice once.
    */
   saveManyFromServer(
     calendarId: string,
     resources: readonly { href: string; etag: string | null; ics: string }[],
-  ): Promise<{ readonly invalid: readonly string[] }> {
+  ): Promise<{
+    readonly saved: number;
+    readonly invalid: readonly string[];
+    readonly kept: readonly string[];
+  }> {
     return this.exclusive(async () => {
       const invalid: string[] = [];
+      const kept: string[] = [];
       const pending = new Set<string>();
       for (let i = 0; i < resources.length; i += IN_LIMIT) {
         const hrefs = resources.slice(i, i + IN_LIMIT).map((r) => r.href);
@@ -329,7 +335,10 @@ export class Store {
       const unique = new Map(resources.map((resource) => [resource.href, resource]));
       for (const resource of unique.values()) {
         // A local change still pending is never overwritten (AGENTS.md rule 2).
-        if (pending.has(resource.href)) continue;
+        if (pending.has(resource.href)) {
+          kept.push(resource.href);
+          continue;
+        }
         let object: CalendarObject;
         try {
           object = CalendarObject.parse(resource.ics);
@@ -372,7 +381,7 @@ export class Store {
             },
           });
       }
-      return { invalid };
+      return { saved: values.length, invalid, kept };
     });
   }
 
