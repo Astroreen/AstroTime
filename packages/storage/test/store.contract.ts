@@ -86,9 +86,11 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       const { store, account } = await setup();
       const home = "https://cloud.example.com/remote.php/dav/calendars/astro/";
       const input = { name: "astro@cloud", serverUrl: account.serverUrl, homeUrl: home };
-      // One without a home (before migration 5) is not matched: discovery found none for it.
+      // setup()'s account has the same user and no home (as before migration 5):
+      // it is not matched, since discovery found no home for it.
       const added = await store.findOrAddAccount({ ...input, username: "astro" });
       expect(added.added).toBe(true);
+      expect(added.account.id).not.toBe(account.id);
       expect(added.account).toMatchObject({ provider: "caldav", homeUrl: home, username: "astro" });
       const twice = await Promise.all([
         store.findOrAddAccount({ ...input, username: "astro" }),

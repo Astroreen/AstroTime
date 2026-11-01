@@ -269,7 +269,11 @@ export type AppPasswordRevocation = "revoked" | "kept" | "none";
  * Flow v2 gave it is revoked on the server, as far as that can be done.
  */
 export async function removeAccount(
-  context: Pick<SyncContext, "store" | "secrets" | "lock"> & { readonly http?: HttpClient },
+  context: Pick<SyncContext, "store" | "secrets" | "lock"> & {
+    readonly http?: HttpClient;
+    /** How long to wait for the server's revocation (tests set 0). */
+    readonly revokeWaitMs?: number;
+  },
   accountId: string,
 ): Promise<AppPasswordRevocation> {
   const state = runsOf(context.store);
@@ -292,14 +296,26 @@ export async function removeAccount(
     if (left > 0) state.removing.set(accountId, left);
     else state.removing.delete(accountId);
   }
-  // After the account is gone from here: the server is not waited on for that.
+  // After the account is gone from here: the server is waited on only a
+  // little; past that the revocation goes on, and the user hears it is not
+  // known to be revoked.
   const { account, secret } = removed;
   if (!secret?.loginFlow || !account) return "none";
   if (!context.http) return "kept";
+  const revoking = revokeAppPassword(context.http, account.serverUrl, secret.credentials).then(
+    () => "revoked" as const,
+    () => "kept" as const,
+  );
+  let stop: ReturnType<typeof setTimeout> | undefined;
+  const waited = new Promise<"kept">((resolve) => {
+    stop = setTimeout(() => resolve("kept"), context.revokeWaitMs ?? REVOKE_WAIT_MS);
+  });
   try {
-    await revokeAppPassword(context.http, account.serverUrl, secret.credentials);
-    return "revoked";
-  } catch {
-    return "kept";
+    return await Promise.race([revoking, waited]);
+  } finally {
+    clearTimeout(stop);
   }
 }
+
+/** How long removing an account waits for the server to revoke its app password. */
+const REVOKE_WAIT_MS = 15_000;

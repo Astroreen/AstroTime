@@ -250,6 +250,14 @@ test("removing an account Login Flow added revokes its app password on the serve
   const other = (await viaFlow("b.example")).account;
   expect(await removeAccount({ ...context, http: nextcloud(false).http }, other.id)).toBe("kept");
   expect([await store.accounts(), secrets.values.size]).toEqual([[], 0]);
+
+  // A server that never answers holds nothing: the removal is done, the password said kept.
+  const third = (await viaFlow("c.example")).account;
+  const stalled: HttpClient = () => new Promise(() => {});
+  expect(await removeAccount({ ...context, http: stalled, revokeWaitMs: 0 }, third.id)).toBe(
+    "kept",
+  );
+  expect(await store.accounts()).toEqual([]);
 });
 
 test("a password the user typed is not revoked: removing asks nothing of the server", async () => {
