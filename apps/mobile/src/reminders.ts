@@ -220,22 +220,25 @@ export function androidReminders(options: {
     armed = true;
     // Kept before Android has them: an id once handed out is never handed out again.
     save();
+    // What is to come first, then what is gone: a cancel that fails leaves
+    // the gone ones tracked, to be cancelled with the next set.
+    if (notifications.length > 0) {
+      try {
+        await native.schedule({ notifications });
+      } catch (error) {
+        for (const { extra } of notifications) {
+          const entry = kept.scheduled[extra.reminder.id];
+          if (entry) entry.fireAt = null;
+        }
+        save();
+        throw error;
+      }
+    }
     // A delivered notification stays on the screen: cancelling only stops what is still to come.
     if (gone.length > 0) {
       await native.cancel({ notifications: gone.map((id) => ({ id })) });
       for (const id of forget) delete kept.scheduled[id];
       save();
-    }
-    if (notifications.length === 0) return;
-    try {
-      await native.schedule({ notifications });
-    } catch (error) {
-      for (const { extra } of notifications) {
-        const entry = kept.scheduled[extra.reminder.id];
-        if (entry) entry.fireAt = null;
-      }
-      save();
-      throw error;
     }
   };
 

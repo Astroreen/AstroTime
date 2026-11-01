@@ -153,8 +153,8 @@ test("each set is diffed against the last: the gone cancelled, the new and moved
       cancelled,
     })),
   ).toEqual([
-    { scheduled: [], cancelled: [ids.lunch] },
     { scheduled: ["gym", "dentist"], cancelled: [] },
+    { scheduled: [], cancelled: [ids.lunch] },
   ]);
   // A moved reminder keeps its id, so Android replaces its alarm.
   expect(idOf(phone, "gym")).toBe(ids.gym);
@@ -179,10 +179,13 @@ test("a cancel that fails is tried again with the next set: no alarm is left beh
   phone.native.cancel = async () => {
     throw new Error("cancel failed");
   };
-  await expect(reminders.schedule([call])).rejects.toThrow("cancel failed");
+  // The call moved meanwhile: its new time is scheduled though the cancel fails.
+  const moved = reminder("call", NOW + 45 * MINUTE);
+  await expect(reminders.schedule([moved])).rejects.toThrow("cancel failed");
   expect(phone.pending.has(lunchId)).toBe(true);
+  expect(phone.last().scheduled).toEqual(["call"]);
   phone.native.cancel = cancel;
-  await reminders.schedule([call]);
+  await reminders.schedule([moved]);
   expect(phone.pending.has(lunchId)).toBe(false);
 });
 
