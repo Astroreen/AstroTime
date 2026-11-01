@@ -81,8 +81,11 @@ export function CalendarScreen({
     entries: [],
     undone: [],
   });
+  // Whether the lists arrived, not the lists themselves: they are new on every
+  // store write, and the query below already reruns on every write.
+  const loaded = lists !== null;
   useEffect(() => {
-    if (!lists) return;
+    if (!loaded) return;
     const ids = visibleKey === "" ? [] : visibleKey.split(",");
     const range = { from, to, timeZone };
     return liveQuery(
@@ -96,7 +99,7 @@ export function CalendarScreen({
       },
       setData,
     );
-  }, [store, cache, lists, visibleKey, from, to, timeZone, today]);
+  }, [store, cache, loaded, visibleKey, from, to, timeZone, today]);
 
   const calendarColor = new Map(
     (lists?.calendars ?? []).map((calendar) => [
