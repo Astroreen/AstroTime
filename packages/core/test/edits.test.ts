@@ -1940,6 +1940,18 @@ describe("a copy of an item (design D164)", () => {
     expect(made).toContain("X-OTHER:kept\r\n");
   });
 
+  test("of a subtask keeps its own RELATED-TO, while a snooze alarm's goes with the snooze", () => {
+    const sub = object(
+      "BEGIN:VTODO\r\nUID:draft\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Draft\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nRELATED-TO:report\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Draft\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nBEGIN:VALARM\r\nUID:snooze-1\r\nRELATED-TO;RELTYPE=SNOOZE:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Draft\r\nTRIGGER;VALUE=DATE-TIME:20261105T085000Z\r\nEND:VALARM\r\nEND:VTODO\r\n",
+    );
+    const copy = copyItem(sub, null, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({ parentUid: "report" });
+    expect(CalendarObject.parse(copy).master?.alarms).toHaveLength(1);
+    const lines = contentLines(copy);
+    expect(lines).toContain("RELATED-TO:report");
+    expect(lines.filter((line) => line.startsWith("RELATED-TO"))).toEqual(["RELATED-TO:report"]);
+  });
+
   test("of a completed task is a task to do, its start, due, star and parent kept", () => {
     const task = object(
       "BEGIN:VTODO\r\nUID:report\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Report\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSTATUS:COMPLETED\r\nCOMPLETED:20261105T120000Z\r\nPERCENT-COMPLETE:100\r\nRELATED-TO:parent\r\nX-ASTROTIME-STARRED:TRUE\r\nEND:VTODO\r\n",
