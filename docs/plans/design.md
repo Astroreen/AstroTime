@@ -831,8 +831,8 @@ I make it"; "sometimes an item's text is covered by another event".
   tap; the two `pan-y` views were the only ones it took.
 - **D153. No item covers another's title** (the owner's feedback 6 on
   v0.3.0: "Sometimes an item's text is covered by another event. Text is
-  what matters most. Maybe push the event further aside, or give it an
-  extra column?"). On their screen, the demo's Wednesday ("Обзор дизайна"
+  what matters most. Maybe push the event further aside, or give it an extra
+  column?"). On their screen, the demo's Wednesday ("Обзор дизайна"
   10:00–11:30, "Планирование бюджета" 11:00–12:30, "Созвон с Анной"
   11:15–11:45), the call was drawn over the budget's title: D15's cascade
   drew any later item over an earlier one, 15% further in, whenever they
@@ -840,22 +840,27 @@ I make it"; "sometimes an item's text is covered by another event".
   item. As Google's rule, `layoutDay` now places a cluster's items in time
   order (the longer first when they start together), each on top of those
   before it, in the first of: a column where nothing overlaps it; a column
-  where it starts at least the **title room** (45 minutes: two lines and
-  the time line, 42 px) after every item it overlaps there, with fewer than
-  three stacked, drawn over them 15% of the column further in per item
-  under it, so their titles show above it; a column of its own, beside the
-  others. The columns share the day's width, and an item widens over the
-  columns to its right while nothing in them overlaps it, as Google's do
-  (10:00–11:30 under 11:00–12:30, with 11:30–12:00 beside the latter, takes
-  the whole width). Each placed item says how much of its top nothing
-  covers (`room`); its title keeps to that, in whole lines cut with an
-  ellipsis, and its time line shows only if it fits there too, so no text
-  runs under another item. This works for any item's height (a task's
-  chip, 30 minutes, is never drawn over). Tested as a pure function: the
-  owner's day, the old cases, and 300 generated days on which an item
-  drawn over another always starts at least the title room after it,
-  further in (`packages/core/test/layout.test.ts`). D15, D42's cascade and
-  D50 point here.
+  where it starts at least the **title room** (45 minutes, 40 px: two lines
+  of a title) after every item it overlaps there, with fewer than three
+  stacked, drawn over them 15% of the column further in per item under it,
+  so their titles show above it; a column of its own, beside the others. The
+  columns share the day's width, and an item widens over the columns to its
+  right while nothing in them overlaps it, as Google's do (10:00–11:30 under
+  11:00–12:30, with 11:30–12:00 beside the latter, takes the whole width).
+  Each placed item says how much of its top nothing covers (`room`); its
+  title keeps to that, in whole lines cut with an ellipsis, and its time
+  line, one line cut short, shows under it only where two lines of the title
+  fit above it too: the title wins over the time (`textFit`), so no text
+  runs under another item. This works for any item's height (a task's chip,
+  30 minutes, is never drawn over). Tested as a pure function: the owner's
+  day, the old cases, and 300 generated days on which an item drawn over
+  another always starts at least the title room after it, further in
+  (`packages/core/test/layout.test.ts`); `textFit` at the title room and
+  around it (`packages/ui/test/text-fit.test.ts`); and in the browser, the
+  demo's Wednesday on a phone's 3 days and week and a wide week and day,
+  where no line of a title or time is under an item drawn over its own
+  (`apps/web/e2e/calendar.spec.ts`; on the phone's views it failed before).
+  D15, D42's cascade and D50 point here.
 
 ## Deferred
 

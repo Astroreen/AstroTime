@@ -14,14 +14,14 @@ export interface LayoutOptions {
   readonly chipMinutes?: number;
   /** The shortest a block is drawn, so a 5-minute event can still be hit. */
   readonly minBlockMinutes?: number;
-  /** How far each cascaded item is shifted right, as a fraction of the column (D15). */
+  /** How far an item drawn over others is shifted in per item under it, as a fraction of its column (D15, design D153). */
   readonly cascadeStep?: number;
-  /** Past this many items stacked at once, an item takes a column of its own (D15). */
+  /** How many items may be stacked over one another at once; one more takes a column of its own (design D153). */
   readonly maxCascade?: number;
   /**
-   * The minutes an item's title and time take at its top: an item drawn over
-   * another starts at least this late after it, or takes a column beside it
-   * (D15, design D153).
+   * The minutes at an item's top its title needs (two lines): an item drawn
+   * over another starts at least this late after it, or takes a column
+   * beside it (D15, design D153).
    */
   readonly titleMinutes?: number;
 }

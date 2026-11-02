@@ -220,8 +220,31 @@ export function AgendaCard({
 
 /** HOUR pixels per hour in the time grid. */
 export const HOUR = 56;
-/** Pixels a line of an item's title takes: `text-tiny` or `text-note` at 1.2. */
+/** Pixels a line of an item's title takes: `text-tiny` or `text-note` at `leading-[1.2]`. */
 const LINE = { compact: 13.2, wide: 15 } as const;
+/** Pixels of a block's padding, top and bottom: `py-px` or `py-0.5`. */
+const PADDING = { compact: 2, wide: 4 } as const;
+/** Pixels the time line takes: `text-chip` at 1.2. */
+const TIME_LINE = 14;
+
+/**
+ * What of a timed block's text fits in `visible` pixels at its top (design
+ * D153): the time line under the title where it has room (never in a
+ * narrow column); and, `covered` by an item drawn over it, as many whole
+ * lines of its title as fit above that item, two of them before the time
+ * line, since the title matters most.
+ */
+export function textFit(
+  visible: number,
+  { compact, covered }: { compact: boolean; covered: boolean },
+): { showTime: boolean; lines: number | undefined } {
+  const size = compact ? "compact" : "wide";
+  const timeFits = !compact && visible >= 38;
+  if (!covered) return { showTime: timeFits, lines: undefined };
+  const showTime = timeFits && visible - PADDING[size] - TIME_LINE >= 2 * LINE[size];
+  const lines = Math.floor((visible - PADDING[size] - (showTime ? TIME_LINE : 0)) / LINE[size]);
+  return { showTime, lines: Math.max(1, lines) };
+}
 
 /** A timed item in a day's column: a block from start to end, or a task's 30-minute chip. */
 export function TimedItem({
@@ -243,16 +266,9 @@ export function TimedItem({
   // Another item drawn over this one from `room` on: its text keeps above
   // that, as many whole lines as fit (design D153).
   const covered = room < bottom - top;
-  const visible = covered ? (room / 60) * HOUR - 2 : height;
-  const showTime = shape === "block" && !compact && visible >= 38;
-  const lines = covered
-    ? Math.max(
-        1,
-        Math.floor(
-          (visible - (compact ? 2 : 4) - (showTime ? 14 : 0)) / LINE[compact ? "compact" : "wide"],
-        ),
-      )
-    : undefined;
+  const fit = textFit(covered ? (room / 60) * HOUR - 2 : height, { compact, covered });
+  const showTime = shape === "block" && fit.showTime;
+  const lines = fit.lines;
   const name = label(entry, false);
   // A block's edges resize it where its ends are drawn; a short one keeps its top for moving.
   const edges = shape === "block";
@@ -289,7 +305,7 @@ export function TimedItem({
         <Title entry={entry} wrap lines={lines} />
       )}
       {showTime && (
-        <span className="item-time block text-chip font-normal">
+        <span className="item-time block truncate text-chip font-normal">
           {formats.timeRange(entry.occurrence.start, entry.occurrence.end, timeZone)}
         </span>
       )}
@@ -362,7 +378,7 @@ export function GhostBlock({
       ) : (
         <>
           <span className="item-title-wrap">{title}</span>
-          <span className="item-time block text-chip font-normal">{time}</span>
+          <span className="item-time block truncate text-chip font-normal">{time}</span>
         </>
       )}
     </div>
