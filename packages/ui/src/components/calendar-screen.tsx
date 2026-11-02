@@ -10,7 +10,15 @@
 import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -103,7 +111,10 @@ export function CalendarScreen({
   );
   const mainRef = useRef<HTMLElement>(null);
   const hourNow = useRef(hour);
-  hourNow.current = hour;
+  // Not during render: the React Compiler keeps no memos where it is.
+  useLayoutEffect(() => {
+    hourNow.current = hour;
+  });
   // Pinching, its own chunk once the view is drawn (foundation D145).
   useEffect(() => {
     const main = mainRef.current;

@@ -138,3 +138,108 @@ test.describe("on a phone", () => {
     expect(Math.round(day.height)).toBe(24 * 24);
   });
 });
+
+test.describe("what is no zoom, and what ends one (design D192)", () => {
+  test.use({ viewport: WIDE });
+
+  test("keys a dialog has, and Ctrl and +, zoom nothing; wheels one after another compound", async ({
+    page,
+  }) => {
+    await openDemo(page, "3days");
+    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("textbox", { name: "Title" }).press("+");
+    await dialog.getByRole("radio", { name: "Task" }).press("-");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // Ctrl and + is the browser's page zoom (WCAG 1.4.4), not the grid's.
+    await page.keyboard.press("Control+=");
+    await expect(main(page)).toHaveCSS("--hour", "56px");
+    // Three turns of a wheel with Ctrl: e^0.2 each, kept to a tenth each time.
+    const box = (await grid(page).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.keyboard.down("Control");
+    for (let turn = 0; turn < 3; turn++) await page.mouse.wheel(0, -40);
+    await page.keyboard.up("Control");
+    await expect(main(page)).toHaveCSS("--hour", "102px");
+  });
+});
+
+/** Two or more fingers on the grid as `TouchEvent`s, cancelable or not, as the browser sends them. */
+async function fingers(
+  page: Page,
+  type: "touchstart" | "touchmove" | "touchend" | "touchcancel",
+  points: readonly { x: number; y: number }[],
+  cancelable = true,
+) {
+  await grid(page).evaluate(
+    (element, sent) => {
+      const touches = sent.points.map(
+        ({ x, y }, identifier) =>
+          new Touch({ identifier, target: element, clientX: x, clientY: y }),
+      );
+      element.dispatchEvent(
+        new TouchEvent(sent.type, {
+          touches,
+          targetTouches: touches,
+          bubbles: true,
+          cancelable: sent.cancelable,
+        }),
+      );
+    },
+    { type, points, cancelable },
+  );
+}
+
+test.describe("fingers on a phone (design D192)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  async function setUp(page: Page) {
+    await openDemo(page, "3days");
+    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    const box = (await grid(page).boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    return (spread: number, third = false) => [
+      { x, y: y - spread / 2 },
+      { x, y: y + spread / 2 },
+      ...(third ? [{ x: x + 60, y }] : []),
+    ];
+  }
+
+  test("a second finger on a grid the browser is already scrolling is no pinch", async ({
+    page,
+  }) => {
+    const apart = await setUp(page);
+    await fingers(page, "touchstart", apart(100));
+    // The browser has made the touch its scroll: its moves cannot be cancelled.
+    await fingers(page, "touchmove", apart(200), false);
+    await fingers(page, "touchend", []);
+    await expect(main(page)).toHaveCSS("--hour", "56px");
+  });
+
+  test("a pinch the browser cancels keeps the height it reached", async ({ page }) => {
+    const apart = await setUp(page);
+    await fingers(page, "touchstart", apart(100));
+    await fingers(page, "touchmove", apart(200));
+    await fingers(page, "touchcancel", []);
+    await expect(main(page)).toHaveCSS("--hour", "112px");
+    await page.reload();
+    await expect(main(page)).toHaveCSS("--hour", "112px");
+  });
+
+  test("a third finger ends the pinch; the two left begin anew from there", async ({ page }) => {
+    const apart = await setUp(page);
+    await fingers(page, "touchstart", apart(100));
+    await fingers(page, "touchmove", apart(150));
+    // 84 px, then a third finger: the pinch ends at 84.
+    await fingers(page, "touchstart", apart(150, true));
+    await expect(main(page)).toHaveCSS("--hour", "84px");
+    // It lifts; the two left, now 300 apart, are the new start: twice that is twice 84.
+    await fingers(page, "touchend", apart(300));
+    await fingers(page, "touchmove", apart(600));
+    await fingers(page, "touchend", []);
+    await expect(main(page)).toHaveCSS("--hour", "168px");
+  });
+});

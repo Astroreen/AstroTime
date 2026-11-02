@@ -1618,8 +1618,11 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     already scrolling with one is no pinch: the browser has made that
     touch its scroll and no longer lets the page cancel its moves, so the
     zoom stops there rather than set the scroll against the browser's. A
-    second finger is no swipe either ([D152](#D152)): the swipe lets go of
-    the first;
+    swipe follows the first finger alone ([D152](#D152)), and a
+    real two-finger pinch did not swipe (below); a third finger ends the
+    pinch where it is, and when one of three lifts, the two left begin
+    anew from there, so the zoom never measures one pair of fingers
+    against another;
   - **a trackpad's pinch, or Ctrl and a wheel** (a trackpad's pinch comes
     to the page as a wheel with Ctrl) over the grid does the same about
     the pointer, in place of the page's zoom there; elsewhere the page
@@ -1642,7 +1645,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   with it: what a block's text fits ([D153](#D153)), where a drag lands and
   where a tap creates follow it. The handling is a chunk of its own
   (`pinch.ts`), loaded once the view is drawn ([foundation
-  D145](foundation.md#D145)); until then the page zooms as before.
+  D145](foundation.md#D145)); until then the page zooms as before. A
+  wheel's zoom still settling when the view goes is kept, not lost.
   Safari's own pinch gestures (`gesturestart`) are not handled
   ([Deferred](#deferred)). Tested: `apps/web/e2e/zoom.spec.ts` (Ctrl and a
   wheel over 1:00 PM in 3 days: 92.3 px, 1:00 PM still under the pointer,
@@ -1650,8 +1654,12 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   a reload; the keys up to 240 px, "0" to 56, down to 24; two fingers side
   by side on a phone, spread to twice apart: 112 px, the time between them
   kept, the days not swiped; two fingers closing in the Day view, held at
-  24 px, the day 576 px tall). Tried by hand on Android 16's Chrome in an
-  emulator, a real two-finger pinch to twice the size: the hours twice as
+  24 px, the day 576 px tall; keys in a dialog and Ctrl and "+" zooming
+  nothing; three wheels compounding to 102 px; a second finger on a grid
+  the browser already scrolls, no zoom; a pinch the browser cancels, kept
+  at 112 px through a reload; a third finger ending a pinch at 84 px and
+  the two left beginning anew, to 168 px rather than 240). Tried by hand
+  on Android 16's Chrome in an emulator, a real two-finger pinch to twice the size: the hours twice as
   tall about the pinch, the page not zoomed, no swipe;
   `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
   time under the fingers kept through steps and after).
