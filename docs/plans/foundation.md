@@ -1910,9 +1910,27 @@ The owner's feedback after v0.3.0, tried on a phone and a computer.
     ([D128](#D128): a hold is tried too).
   - A tab of a build before migration 8 knows no switch and still syncs
     it, until it updates ([D124](#D124)).
+- **D174. An item's exact colour beside its `COLOR`.** RFC 7986's `COLOR`
+  takes a CSS3 colour name, not a hex, and Nextcloud Calendar writes the
+  nearest CSS3 name for a colour of its picker (by its source; no fixture
+  recorded yet, see Deferred). A colour of AstroTime's own (the user's
+  colours, design's round 3) is a hex, so `editItem` writes it as
+  `COLOR:<nearest name>` (by distance in RGB, over CSS3's 138 names, `gray`
+  and `aqua` for their twins) and the hex in `X-ASTROTIME-COLOR`; a name of
+  the palette, or none, drops the hex. Reading, `Item.color` is the hex
+  while `COLOR` (in any case) is still its nearest name, else `COLOR`:
+  another client that changed the colour wins, and the hex it left behind
+  stays in the file unread, as every property does ([D7](#D7)). Other
+  clients show the nearest name; nothing else is lost. The names live in
+  `packages/core/src/colors.ts`, some 1.5 KiB of the first visit
+  ([D145](#D145)).
 
 ## Deferred
 
+- **A fixture of Nextcloud's custom colour** — what Nextcloud Calendar
+  writes for a colour of its picker ([D174](#D174) reads its source:
+  the nearest CSS3 name); `scripts/record-nextcloud-fixtures.ts` can record
+  one on its disposable Nextcloud.
 - **An `RDATE` period's own length** — an occurrence from an `RDATE` of a
   period lasts as long as the series, not the period ([D141](#D141)); no
   client AstroTime has seen writes one.

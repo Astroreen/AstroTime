@@ -30,6 +30,9 @@ When you add a package, app or module, add its line here in the same PR.
       periods of its rule after `DTSTART`, near the range) and its starts
       (`seriesStarts`). → `plans/foundation.md#D118`
   - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `colors.ts` — CSS3's colour names and the nearest of a hex: an item's
+    exact colour is written as `COLOR` with `X-ASTROTIME-COLOR` beside it.
+    → `plans/foundation.md#D174`
   - `windows-zones.ts` — Windows zone name → IANA, generated from Unicode
     CLDR by `scripts/generate-windows-zones.ts`; do not edit by hand.
     → `plans/foundation.md#D32`
