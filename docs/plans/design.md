@@ -1518,7 +1518,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   day with "All day" on, as a tap on an empty slot of the grid opens it
   at the slot's time ([D108](#D108)): an event first, "Task" one tap away,
   keeping the day and "All day" ([D159](#D159)). A press that began on
-  an item, moved, or is a double click's second click creates nothing,
+  an item, moved, left the strip, was taken for a scroll
+  (`pointercancel`), or is a double click's second click creates nothing,
   so an item held and let go beside it (a read-only one, which does not
   drag) opens nothing new. An empty strip keeps one row's height (24 px,
   it was 4 px), so the tap has somewhere to land, as Google Calendar's web
@@ -1528,8 +1529,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   one column, and the strip's would be a gesture of its own. Tested:
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
   task made from it, an item tapped opens its details; a press from an
-  item to an empty spot, a press moved 12 px, and a double click opening
-  one item, the first two failing without the check; a phone's Day view
+  item to an empty spot, a press moved 12 px, a press that leaves the
+  strip and comes back, and a double click opening one item, the first
+  three failing without the check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
@@ -1570,6 +1572,40 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   closing it; a double tap by touch on a wide screen; a dialog opened by a
   single click closing on a backdrop click counted as a second elsewhere,
   which `detail` alone kept open; each failing before its change).
+- **D191. Scrollbars are thin, rounded and in the theme** (the owner's
+  feedback 14b: "redo the design of the overflow scrollbars"). Every
+  scroller had the platform's classic scrollbar, a 15 px grey bar on
+  Linux and Windows, the same in light and dark. Now, in `styles.css`:
+  Chromium (and so Electron and Android's WebView) and WebKit draw
+  `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
+  ink colour at 52% on a clear track, 3:1 or more against every surface a
+  scroller sits on in light and dark (WCAG 1.4.11, as [D120](#D120) holds
+  the items to AA; it was 22%, 1.6:1), 66% while the pointer is anywhere
+  over what scrolls (`:hover` on the scroller, so a scroller holding
+  another lights too while the pointer is over the inner one; on purpose:
+  both scroll under it), 6 px wide under the pointer and 80% while
+  dragged; Firefox has
+  only the standard properties, `scrollbar-width: thin` in the same
+  colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
+  the standard ones win over it). Light and dark come with the ink
+  colour. Nothing about scrolling changes: the wheel, the keys, a finger
+  and dragging the thumb work as they did; `scrollbar-gutter: stable`
+  still keeps the day headers over their columns, now 10 px wide on both;
+  a phone's scrollbars are the system's overlay ones, drawn only while
+  scrolling, and Firefox on Linux draws its own overlay ones too. The
+  thumb shows at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller. Checked in Chromium and Firefox (headed,
+  light and dark); WebKit does not start on the development machine, and
+  draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
+  `packages/ui/test/scrollbar-colors.test.ts` (the thumb's contrast at
+  rest, under the pointer and dragged, over the canvas, a tile, a raised
+  surface and its hover, light and dark, read from `styles.css`; failing
+  at 22%), `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
+  Saturday's header ends where its column does; failing before at 15 px:
+  Playwright's headless Chromium hides scrollbars from the screen but
+  keeps their width in the layout, which is what this measures). The
+  thumb's colours under the pointer and while dragged, Firefox's
+  `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
 
 ### Decided in round 4: the editor
 
@@ -1803,8 +1839,8 @@ bar, the sidebar and the accounts panel.
   with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
   a web link (typed with `http://` or `https://`, or with neither, which
   is `https://`; its host has a dot, is `localhost`, or is a name with its
-  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, or a bare
-  word is none, and "Add" waits until it is one; another scheme,
+  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, a bare
+  word, a file's name, `report.pdf`, or a mail address, `a@b.com`, is none, and "Add" waits until it is one; another scheme,
   `javascript:` or `mailto:`, never is), added with Enter or "Add", Escape leaving
   it; Enter there adds the link and does not save the dialog. The form
   keeps them as reminders are kept (`AttachmentChoice`: one the item has,
@@ -1833,7 +1869,9 @@ bar, the sidebar and the accounts panel.
   too). Asking whether an account has files makes no request (its
   calendar home says); the picker's code, the files' with it, loads with
   its first opening.
-  Uploading a file from the device is [Deferred](foundation.md#deferred).
+  _Since [foundation D232](foundation.md#D232):_ "From this device", a third
+  action beside them, uploads a file from the device to the account's
+  files and attaches it.
 
 ### Decided in round 4: pictures
 
@@ -1944,6 +1982,13 @@ own (below).
   web shows every list side by side, each a column with its own "Add a
   task", and tasks dragged from one to another. AstroTime shows one list at
   a time under its tabs; columns come with dragging tasks between lists.
+- **The scrollbars' untested parts** ([D191](#D191)): the thumb's
+  colours as an engine draws them (the shares are proven, not the
+  pixels), Firefox's `scrollbar-width`
+  branch, and a WebKit run (Playwright's WebKit does not start on the
+  development machine) were looked at by eye or not at all; a check per
+  engine needs headed runs in CI. A thumb hidden until the user scrolls,
+  as macOS and Android draw theirs, needs a script on every scroller.
 - **More illustrated subjects** ([D215](#D215)): meetings and calls,
   haircut, code, cleaning, the car, a wedding, the beach and holidays,
   Halloween; and words in languages other than English and Russian. Each

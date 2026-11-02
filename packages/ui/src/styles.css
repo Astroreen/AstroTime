@@ -118,6 +118,58 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
   }
+  /*
+   * Scrollbars (design D191): thin, rounded, in the theme's ink, quiet at
+   * rest and stronger with the pointer over what scrolls. Chromium (and so
+   * Android's WebView and Electron) and WebKit draw `::-webkit-scrollbar`:
+   * a 10 px gutter (what `scrollbar-gutter: stable` keeps) with a 4 px
+   * thumb in it, 6 px under the pointer. Firefox has only the standard
+   * properties: `thin`, in the same colours. Chromium gives the standard
+   * ones precedence over `::-webkit-scrollbar`, so they are set only where
+   * `::-webkit-scrollbar` is not known. A phone's scrollbars are the
+   * system's overlay ones, drawn only while scrolling, whatever this says.
+   */
+  :root {
+    /* 3:1 or more against what is under it, light and dark (WCAG 1.4.11;
+     * test/scrollbar-colors.test.ts proves it over the theme's surfaces). */
+    --scrollbar: color-mix(in srgb, var(--color-ink) 52%, transparent);
+    --scrollbar-hover: color-mix(in srgb, var(--color-ink) 66%, transparent);
+    --scrollbar-active: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar) transparent;
+    }
+    :hover,
+    :focus-visible {
+      scrollbar-color: var(--scrollbar-hover) transparent;
+    }
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--scrollbar) padding-box;
+  }
+  :hover::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-hover);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    border-width: 2px;
+  }
+  ::-webkit-scrollbar-thumb:active {
+    border-width: 2px;
+    background-color: var(--scrollbar-active);
+  }
   html,
   body {
     height: 100%;

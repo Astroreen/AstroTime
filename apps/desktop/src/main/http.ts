@@ -93,7 +93,9 @@ function hop(session: Session, request: HttpRequest): Promise<NetResponse> {
       response.on("aborted", () => offline("the answer broke off."));
     });
     exchange.on("error", (error) => offline("could not reach the server.", error));
-    exchange.end(request.body);
+    exchange.end(
+      typeof request.body === "string" ? request.body : request.body && Buffer.from(request.body),
+    );
   });
 }
 

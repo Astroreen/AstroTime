@@ -58,6 +58,23 @@ test("a request crosses the bridge with the origins plain http may reach, and it
   expect(response.header("ETag")).toBeNull();
 });
 
+test("a file's bytes cross the bridge in base64, as bodyBase64 (foundation D232)", async () => {
+  const { http, requests } = plugin({
+    status: 201,
+    url: "https://a.example/f",
+    headers: {},
+    body: "",
+  });
+  await nativeClient(http, async () => [])({
+    method: "PUT",
+    url: "https://a.example/f",
+    headers: {},
+    body: new Uint8Array([0, 255, 10]),
+  });
+  expect(requests[0]).toMatchObject({ bodyBase64: "AP8K" });
+  expect(requests[0]).not.toHaveProperty("body");
+});
+
 test("a request without a body sends none", async () => {
   const { http, requests } = plugin({
     status: 200,

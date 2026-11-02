@@ -3,6 +3,7 @@
 // (`background/Handlers`, D67). `org.json` only, so the JVM tests read it too.
 package io.github.astroreen.astrotime.http
 
+import okio.ByteString.Companion.decodeBase64
 import org.json.JSONObject
 
 /** The request `apps/mobile/src/http.ts` sends (`NativeRequest`). */
@@ -15,7 +16,11 @@ fun requestOf(json: JSONObject): HttpRequest {
         method = method,
         url = url,
         headers = headers.keys().asSequence().associateWith { headers.optString(it, "") },
-        body = json.stringOrNull("body"),
+        // A file's bytes come in base64 (`bodyBase64`), text as it is.
+        body =
+            json.stringOrNull("bodyBase64")?.let {
+                it.decodeBase64()?.toByteArray() ?: throw InvalidRequest("The body is no base64.")
+            } ?: json.stringOrNull("body")?.toByteArray(Charsets.UTF_8),
         cleartext =
             (0 until (cleartext?.length() ?: 0))
                 .map { cleartext!!.get(it) as? String ?: throw InvalidRequest("The cleartext origins are not a list of strings.") }

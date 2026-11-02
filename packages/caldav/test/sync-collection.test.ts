@@ -2,6 +2,10 @@ import { expect, test } from "vite-plus/test";
 
 import { CalDavProvider, type HttpClient } from "../src/index.ts";
 
+/** A request's body as text: the provider sends text to CalDAV. */
+const bodyText = (request: { readonly body?: string | Uint8Array }) =>
+  typeof request.body === "string" ? request.body : "";
+
 const home = "https://dav.example/cal/";
 const multistatus = (body: string, token: string) =>
   `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">${body}<d:sync-token>${token}</d:sync-token></d:multistatus>`;
@@ -13,10 +17,10 @@ const ics = (uid: string) =>
 test("a truncated sync-collection answer (507) is followed to the end with its new token (RFC 6578 §3.6)", async () => {
   const bodies: string[] = [];
   const http: HttpClient = async (request) => {
-    bodies.push(request.body ?? "");
+    bodies.push(bodyText(request));
     const reply = (body: string) => ({ status: 207, url: request.url, header: () => null, body });
-    if (request.body?.includes("calendar-multiget")) {
-      const hrefs = [...request.body.matchAll(/<d:href>([^<]+)<\/d:href>/g)].map((m) => m[1]!);
+    if (bodyText(request).includes("calendar-multiget")) {
+      const hrefs = [...bodyText(request).matchAll(/<d:href>([^<]+)<\/d:href>/g)].map((m) => m[1]!);
       return reply(
         `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">${hrefs
           .map(
@@ -26,7 +30,7 @@ test("a truncated sync-collection answer (507) is followed to the end with its n
           .join("")}</d:multistatus>`,
       );
     }
-    if (request.body?.includes("<d:sync-token>t1</d:sync-token>")) {
+    if (bodyText(request).includes("<d:sync-token>t1</d:sync-token>")) {
       return reply(
         multistatus(
           `${changed("a.ics")}<d:response><d:href>/cal/</d:href><d:status>HTTP/1.1 507 Insufficient Storage</d:status></d:response>`,
@@ -62,7 +66,7 @@ test("an object the multiget leaves out is fetched on its own; one that cannot b
       const body = served.get(new URL(request.url).pathname);
       return body ? reply(200, body) : reply(404, "");
     }
-    if (request.body?.includes("calendar-multiget"))
+    if (bodyText(request).includes("calendar-multiget"))
       return reply(207, `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>`);
     return reply(207, multistatus(changed("a.ics") + changed("gone.ics"), "t9"));
   };
@@ -83,7 +87,7 @@ test("going offline while fetching what the multiget left out stops the sync", a
   const http: HttpClient = async (request) => {
     if (request.method === "GET") throw new OfflineError("offline");
     const reply = (body: string) => ({ status: 207, url: request.url, header: () => null, body });
-    if (request.body?.includes("calendar-multiget"))
+    if (bodyText(request).includes("calendar-multiget"))
       return reply(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>`);
     return reply(multistatus(changed("a.ics"), "t2"));
   };
@@ -96,7 +100,7 @@ test("going offline while fetching what the multiget left out stops the sync", a
 test("a 403 to sync-collection is an expired token only with RFC 6578's precondition", async () => {
   const answer = { body: "" };
   const http: HttpClient = async (request) => {
-    if (request.method === "REPORT" && request.body?.includes("sync-collection"))
+    if (request.method === "REPORT" && bodyText(request).includes("sync-collection"))
       return { status: 403, url: request.url, header: () => null, body: answer.body };
     return { status: 207, url: request.url, header: () => null, body: multistatus("", "t5") };
   };
@@ -119,10 +123,10 @@ const home207 = (token: string) =>
 test("the listing reads every calendar's sync token and ctag; a report's data needs no multiget (D127)", async () => {
   const requests: string[] = [];
   const http: HttpClient = async (request) => {
-    const kind = request.body?.includes("calendar-multiget")
+    const kind = bodyText(request).includes("calendar-multiget")
       ? "multiget"
-      : request.body?.includes("sync-collection")
-        ? `sync-collection from "${/<d:sync-token>([^<]*)</.exec(request.body)?.[1]}"`
+      : bodyText(request).includes("sync-collection")
+        ? `sync-collection from "${/<d:sync-token>([^<]*)</.exec(bodyText(request))?.[1]}"`
         : `${request.method} Depth ${request.headers["Depth"]}`;
     requests.push(kind);
     const reply = (body: string) => ({ status: 207, url: request.url, header: () => null, body });
@@ -157,14 +161,16 @@ test("the listing reads every calendar's sync token and ctag; a report's data ne
 test("a first sync a server will not answer by sync-collection lists the calendar instead", async () => {
   const requests: string[] = [];
   const http: HttpClient = async (request) => {
-    requests.push(request.body?.includes("sync-collection") ? "sync-collection" : request.method);
+    requests.push(
+      bodyText(request).includes("sync-collection") ? "sync-collection" : request.method,
+    );
     const reply = (status: number, body: string) => ({
       status,
       url: request.url,
       header: () => null,
       body,
     });
-    if (request.body?.includes("sync-collection")) return reply(501, "");
+    if (bodyText(request).includes("sync-collection")) return reply(501, "");
     return reply(207, home207("t1"));
   };
   const provider = new CalDavProvider(

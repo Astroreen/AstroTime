@@ -19,7 +19,8 @@ data class HttpRequest(
     val method: String,
     val url: String,
     val headers: Map<String, String>,
-    val body: String?,
+    /** Text, sent as UTF-8; or bytes (a file uploaded, design D232), which crossed the bridge in base64. */
+    val body: ByteArray?,
     /** The origins plain http may reach on any hop, as `http://host:port`. */
     val cleartext: Set<String>,
 )
@@ -148,12 +149,12 @@ class Exchange(client: OkHttpClient = OkHttpClient()) {
         }
     }
 
-    private fun build(method: String, url: HttpUrl, headers: Map<String, String>, body: String?): Request {
+    private fun build(method: String, url: HttpUrl, headers: Map<String, String>, body: ByteArray?): Request {
         try {
             val content =
                 when {
                     method in NO_BODY -> null
-                    body != null -> body.toByteArray(Charsets.UTF_8).toRequestBody(null)
+                    body != null -> body.toRequestBody(null)
                     method in NEEDS_BODY -> ByteArray(0).toRequestBody(null)
                     else -> null
                 }
