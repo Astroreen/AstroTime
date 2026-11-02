@@ -10,7 +10,7 @@ kept byte for byte (`*.ics -text` in `.gitattributes`).
 | `radicale-*.ics`         | objects as Radicale serves them back (PR 4)                                                                                                                                                        |
 | `nextcloud-served-*.ics` | objects as Nextcloud serves them back after another client wrote them (PR 4)                                                                                                                       |
 | `nextcloud-web-*.ics`    | written by Nextcloud's own web Calendar and Tasks apps, driven in a browser, then fetched over CalDAV ([`scripts/record-nextcloud-fixtures.ts`](../../../../scripts/record-nextcloud-fixtures.ts)) |
-| the others               | written by hand in the shape each client writes (PR 2, `docs/plans/foundation.md#pr-2--icalendar-core`)                                                                                            |
+| the others               | written by hand in the shape each client writes (PR 2, `docs/plans/foundation.md#pr-2--icalendar-core`); the attachments' (`*-attachment*.ics`) by foundation D229                                 |
 
 ## `nextcloud-web-*.ics`
 

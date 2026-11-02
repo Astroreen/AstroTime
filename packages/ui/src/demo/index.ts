@@ -224,6 +224,8 @@ const CALENDARS: readonly DemoCalendar[] = [
           ].join("\r\n"),
         ),
         // A description in Markdown: the details draw it (design D207).
+        // With attachments (design D230): a file of the account's by its link,
+        // as Nextcloud Calendar writes one, a web link, and a file inline.
         event(
           "demo-budget",
           t("Budget planning", "Планирование бюджета"),
@@ -235,6 +237,14 @@ const CALENDARS: readonly DemoCalendar[] = [
               "## Повестка\\n- [x] **Итоги** прошлого квартала\\n- [ ] *Черновик* на следующий год\\n- Поездки\\, см. `travel.ods`\\n\\n> Принесите цифры\\, а не слайды.\\n\\n[Таблица](https://example.com/budget)",
             ),
           },
+          [],
+          [
+            `ATTACH;FMTTYPE=application/pdf;FILENAME=/Calendar/${t("Budget 2027", "Бюджет 2027")}.pdf;SIZE=482133;X-NC-FILE-ID=241;X-NC-HAS-PREVIEW=false:https://example.com/index.php/f/241`,
+            "ATTACH:https://example.com/budget/sheet",
+            // "Q1: 12 000\nQ2: 14 500\n", inline.
+            "ATTACH;ENCODING=BASE64;VALUE=BINARY;FMTTYPE=text/plain;FILENAME=figures.txt:UTE6IDEyIDAwMApRMjogMTQgNTAwCg==",
+            "",
+          ].join("\r\n"),
         ),
         event(
           "demo-conference",

@@ -124,3 +124,17 @@ test("a dated search result closes the tasks and forgets the task a search asked
   await expect(books).toBeVisible();
   await expect(books).not.toHaveAttribute("data-found");
 });
+
+test("while the tasks show, no view is current and Create makes a task", async ({ page }) => {
+  await openDemo(page, "week");
+  const sidebar = page.getByRole("navigation", { name: "Main menu" });
+  await expect(sidebar.getByRole("button", { name: "Week" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(tasks(page)).toBeVisible();
+  await expect(sidebar.locator("[aria-current]")).toHaveCount(0);
+  await sidebar.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("dialog", { name: "New task" })).toBeVisible();
+});

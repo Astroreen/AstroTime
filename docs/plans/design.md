@@ -1549,8 +1549,8 @@ bar, the sidebar and the accounts panel.
   bar's right, 8 px in, growing from its top right corner as Google's
   account popover does; on a phone centred as before, from its top. A line
   of `line` around it sets it apart from the page, which is not dimmed:
-  nested in the drawer's dialog root, Base UI draws no backdrop for it, as
-  before. Its title is first and ✕ at the right of its header, on every
+  it has no backdrop (nested in the drawer's dialog root, Base UI never drew
+  the one it had). Its title is first and ✕ at the right of its header, on every
   screen: the owner's word over [D137](#D137)'s "✕ before its title, as
   every other dialog", for this panel only; the other dialogs keep ✕
   first.
@@ -1573,7 +1573,13 @@ bar, the sidebar and the accounts panel.
   Calendar web's full tasks view; one line, `max-w-[40rem]`, that a wider
   layout of lists side by side can widen), fading up into place; the
   sidebar stays, and a view picked there, or a view's key, brings the
-  calendar back, as do a search's result with a date and a tapped reminder.
+  calendar back, as do a search's result with a date and a tapped reminder
+  (each forgetting the task a search asked the tasks screen for). While
+  the tasks show, no view in the sidebar is the current one, and its
+  Create makes a task, for today in the first list, as the screen's own
+  "Add a task" would. The calendar's view stays drawn under them, hidden,
+  on purpose: back on the calendar, its period and the grid's scroll are
+  where the user left them, with nothing to read again.
   Today, the arrows and the period hide while the tasks are shown, and the
   keys that step a period or go to today do nothing: they would move a
   calendar nobody sees. The 360 px panel right of the calendar ([D95](#D95))
@@ -1594,6 +1600,40 @@ bar, the sidebar and the accounts panel.
   the tasks screen fades up 8 px as it takes the view's place. Only
   `transform` and `opacity` move; asked for less motion, all of it is at
   once ([D119](#D119)).
+
+### Decided in round 4: attachments
+
+- **D230. The details list an item's attachments** (the owner's 9, its
+  files part; [foundation D229](foundation.md#D229)), after the
+  description, under a paperclip: each a row with a mark (a sheet for a
+  file, by link or inline; a chain for a bare link), its name (or, for a
+  link with none, its host and path), and under it its kind and size. The
+  kind is the name's extension ("DOCX"; one with a letter, so "v1.2" names none), else a known type's usual one
+  (`text/plain` "TXT", `application/pdf` "PDF", Office's and
+  OpenDocument's), else what the type says in words ("Image", "Audio",
+  "Video", "Text"), else none: a subtype such as `plain` or `vnd.…` says
+  nothing to a reader. The size is in the language's own units ("482 kB";
+  under a kilobyte "22 B" / "22 Б"), the unit promoted after rounding, so
+  never "1000 kB" (`calendar/attachments.ts`). A web link opens where the
+  description's links open, a new tab or the system's browser (the
+  desktop's `setWindowOpenHandler`, Android's WebView); a link of another
+  kind (`javascript:`, `data:`, `ftp:`) is shown as written and not
+  followed. A file inline in the object is a button, "Save figures.txt":
+  decoded then, and saved under its name, by each platform its own way:
+  the web downloads it (a link of its bytes attached to the page for its
+  click; the link's URL let go when the list closes, not on a timer); the
+  desktop's Electron asks where to save it, as for any download
+  (`apps/desktop/e2e/attachments.spec.ts` answers and reads the file);
+  Android's WebView downloads no `blob:` link, so the platform saves it
+  (`Platform.saveFile`): the shell plugin's `saveFile` opens the system's
+  "Save to" picker (`ACTION_CREATE_DOCUMENT`, no storage permission) and
+  decodes and writes the bytes where the user picks on a thread of its
+  own, never the main one (its TypeScript glue is unit tested; the picker
+  itself is not driven on a device in CI). A save that fails is said under
+  the list at once ("figures.txt could not be saved.", an alert); one the
+  user backed out of says nothing. The rows are
+  AstroTime's own drawings ([D43](#D43)), loaded with the details. The
+  demo's "Budget planning" carries one of each.
 
 ## Deferred
 
