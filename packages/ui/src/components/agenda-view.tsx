@@ -12,6 +12,7 @@ import type { ObjectCache } from "../calendar/query.ts";
 import { useEntries } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { AgendaCard } from "./items.tsx";
+import { reducedMotion, SLIDE, SLIDE_MS } from "./pager.tsx";
 import { DayHeader } from "./time-grid.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
@@ -37,7 +38,8 @@ const around = (day: string): Loaded => ({
   ceiling: addDays(day, REACH),
 });
 
-const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** Pixels a picked day slides in from, above or below (design D154). */
+const JUMP_PX = 24;
 
 /** Within a screen of the end. */
 const nearEnd = (element: HTMLElement) =>
@@ -150,12 +152,13 @@ export function AgendaView({
       // (design D154); the list's first day on open comes as it is.
       const from = top.current?.day;
       if (from && from !== jump && moved.current !== jump && !reducedMotion()) {
+        const by = jump > from ? JUMP_PX : -JUMP_PX;
         list.current?.animate(
           [
-            { transform: `translateY(${jump > from ? 24 : -24}px)`, opacity: 0 },
+            { transform: `translateY(${by}px)`, opacity: 0 },
             { transform: "none", opacity: 1 },
           ],
-          { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+          { duration: SLIDE_MS, easing: SLIDE },
         );
       }
       moved.current = jump;
@@ -165,7 +168,11 @@ export function AgendaView({
       }
       // Too near the end to come to the top: again once more is read.
       const short = target && element.scrollTop + 1 < target.offsetTop;
-      if (!short || range.to >= range.ceiling) setJump(null);
+      if (!short || range.to >= range.ceiling) {
+        setJump(null);
+        // Done with: the same day picked again slides in again.
+        moved.current = null;
+      }
     } else if (top.current) {
       const kept = top.current;
       const group = groups.find((g) => g.dataset["day"] === kept.day);

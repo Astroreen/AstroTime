@@ -971,39 +971,44 @@ Settings, the colours and the lists controls open.
   (56 to 120 px) or a flick of 24 px on at 0.4 px/ms, and back otherwise
   (`swipeOutcome`); the step lands in the same frame as the settle ends (and
   a step that changed no period gives the track back, so a swipe never stays
-  stuck on a neighbour), the periods drawn in time order so none is moved in
-  the page and each keeps its scroll. A vertical move is the grid's scroll,
-  a long press the drag's ([D111](#D111)), a tap (no move past the 8 px) no
-  swipe at all: none moves the period or starts a settle. A step to a period
-  the read already drawn holds lands from it at once, even while a newer
-  read of another range goes on (a swipe's neighbour was drawn from it), so
-  a step never snaps back to wait for its read. A step by the arrows, the
-  keys, Today, the month picker or a day opened slides the new period in
-  from the side it comes from (40 px and a fade, 220 ms), on every screen;
-  another view fades in (160 ms); the Agenda slides a picked day in from
-  above or below (24 px). Only `transform` and `opacity` move, with the Web
-  Animations API, on the compositor. `prefers-reduced-motion` swaps at once:
-  no slide, no fade, no follow. The time grid's scroll is kept from period
-  to period and view to view (it was kept by its one grid; each period now
-  has its own). A double click's second click on the grid creates nothing
-  when it lands on the slot its first took, or when its first was not on
-  that grid: the second click of a double click on the month picker's day
-  passes the closing picker ([D136](#D136)) to the grid, and with the period
-  drawn at once it can land on an empty hour, where the old week's taller
-  strip had taken it before; a second click on another slot of the same grid
-  is a click of its own. A grid that has had no click of its own takes a
-  double click's second click as the picker's: a first click on something
-  drawn over the grid (a menu, a popover) makes the second create nothing
-  there either, which is the same case. Tested in
-  `apps/web/e2e/motion.spec.ts` from the page's own calls to `animate`, so
-  no test waits for an animation: the slide's side, the fade, nothing with
-  reduced motion, the track under the finger and its settle, a short swipe
-  going back, a vertical scroll moving nothing; in
-  `packages/ui/test/pager.browser.test.tsx`, a step that changed no period
-  freeing the swipe and a swipe with nothing beside stepping at once; in
-  `drag.spec.ts`, a double click on an empty hour making one new event
-  there. Year view and a swipe between the Agenda's days are not part of it;
-  three periods are drawn on a touch screen only, as a desktop has no swipe.
+  stuck on a neighbour; a settle ends only on its own step, the period it
+  went to in the view it began in: a key, Today or another view pressed
+  meanwhile ends the settle and moves as it would, sliding or fading in),
+  the periods drawn in time order so none is moved in the page and each
+  keeps its scroll. A vertical move is the grid's scroll, a long press the
+  drag's ([D111](#D111)), a tap (no move past the 8 px) no swipe at all:
+  none moves the period or starts a settle. A step to a period the read
+  already drawn holds lands from it at once, even while a newer read of
+  another range goes on (a swipe's neighbour was drawn from it), so a step
+  never snaps back to wait for its read. A step by the arrows, the keys,
+  Today, the month picker or a day opened slides the new period in from the
+  side it comes from (40 px and a fade, 220 ms), on every screen; another
+  view fades in (160 ms); the Agenda slides a picked day in from above or
+  below (24 px), the same day picked again after a scroll too. Only
+  `transform` and `opacity` move, with the Web Animations API, on the
+  compositor. `prefers-reduced-motion` swaps at once: no slide, no fade, no
+  follow. The time grid's scroll is kept from period to period and view to
+  view (it was kept by its one grid; each period now has its own). A double
+  click's second click on the grid creates nothing when it lands on the slot
+  its first took, or when its first was not on that grid: the second click
+  of a double click on the month picker's day passes the closing picker
+  ([D136](#D136)) to the grid, and with the period drawn at once it can land
+  on an empty hour, where the old week's taller strip had taken it before; a
+  second click on another slot of the same grid is a click of its own. Where
+  the first click went is read from the grid's own presses (an empty slot,
+  or an item), not from the clicks it handled: a second click after a press
+  on an item of the grid, or on another slot, creates; one whose first press
+  was not on the grid within a second (the closing picker's, or a menu's
+  drawn over it) creates nothing. Tested in `apps/web/e2e/motion.spec.ts`
+  from the page's own calls to `animate`, so no test waits for an animation:
+  the slide's side, the fade, nothing with reduced motion, the track under
+  the finger and its settle, a short swipe going back, a vertical scroll
+  moving nothing; in `packages/ui/test/pager.browser.test.tsx`, a step that
+  changed no period freeing the swipe and a swipe with nothing beside
+  stepping at once; in `drag.spec.ts`, a double click on an empty hour
+  making one new event there. Year view and a swipe between the Agenda's
+  days are not part of it; three periods are drawn on a touch screen only,
+  as a desktop has no swipe.
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
