@@ -74,6 +74,7 @@ export {
   type CalendarRights,
   type Changes,
   type FileStore,
+  type Person,
   type Provider,
   type RemoteCalendar,
   type RemoteFile,

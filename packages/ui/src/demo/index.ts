@@ -233,8 +233,8 @@ const CALENDARS: readonly DemoCalendar[] = [
           at(zone, day(0), "12:30"),
           {
             DESCRIPTION: t(
-              "## Agenda\\n- [x] Last quarter's **actuals**\\n- [ ] Next year's *draft*\\n- Travel\\, see `travel.ods`\\n\\n> Bring the numbers\\, not the slides.\\n\\n[The sheet](https://example.com/budget)",
-              "## Повестка\\n- [x] **Итоги** прошлого квартала\\n- [ ] *Черновик* на следующий год\\n- Поездки\\, см. `travel.ods`\\n\\n> Принесите цифры\\, а не слайды.\\n\\n[Таблица](https://example.com/budget)",
+              "## Agenda\\n- [x] Last quarter's **actuals**\\n- [ ] Next year's *draft*\\n- Travel\\, see `travel.ods`\\n\\n> Bring the numbers\\, not the slides.\\n\\n[The sheet](https://example.com/budget)\\, ask [@Anna Berg](mailto:anna@example.com)",
+              "## Повестка\\n- [x] **Итоги** прошлого квартала\\n- [ ] *Черновик* на следующий год\\n- Поездки\\, см. `travel.ods`\\n\\n> Принесите цифры\\, а не слайды.\\n\\n[Таблица](https://example.com/budget)\\, спросите [@Анна Берг](mailto:anna@example.com)",
             ),
           },
           [],

@@ -4,7 +4,7 @@ import { XMLParser } from "fast-xml-parser";
 // parsing: the names CalDAV uses do not collide across DAV:, CalDAV,
 // CalendarServer and Apple's namespace.
 
-const NAMESPACES =
+export const NAMESPACES =
   'xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:ic="http://apple.com/ns/ical/" xmlns:nc="http://nextcloud.com/ns"';
 
 export function propfind(props: readonly string[]): string {
@@ -19,7 +19,7 @@ export function multiget(hrefs: readonly string[]): string {
   return `<?xml version="1.0" encoding="utf-8"?><c:calendar-multiget ${NAMESPACES}><d:prop><d:getetag/><c:calendar-data/></d:prop>${hrefs.map((h) => `<d:href>${escape(h)}</d:href>`).join("")}</c:calendar-multiget>`;
 }
 
-function escape(raw: string): string {
+export function escape(raw: string): string {
   return raw.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 

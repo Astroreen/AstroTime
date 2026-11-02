@@ -44,6 +44,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   7 days ahead and at most 100, are the **reminder set** (foundation D100).
   The **reminder tally** counts, on this device, the reminders the user
   added, which the edit dialog offers first (`AlarmTally`, design D206).
+- **Mention** — a person named in a description with "@", written as a
+  Markdown link to their e-mail (`[@Anna Berg](mailto:anna@example.com)`)
+  and drawn as a chip; it invites no one (design D208).
 - **Place** — an item's `LOCATION` picked on the map: its text ("name,
   address") with its **point** (`GEO`, and Apple's structured location).
   Text typed and not picked is a location with no point (foundation D176).

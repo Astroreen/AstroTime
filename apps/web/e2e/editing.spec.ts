@@ -267,12 +267,17 @@ test("the details read the description as Markdown; the editor keeps it as typed
   await expect(link).toHaveAttribute("href", "https://example.com/budget");
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  // A mention is a chip (design D208), its e-mail on its title.
+  await expect(details.getByRole("button", { name: "@Anna Berg" })).toHaveAttribute(
+    "title",
+    "anna@example.com",
+  );
   // The text itself is what was written, Markdown and all.
   await details.getByRole("button", { name: "Edit" }).click();
   await expect(
     page.getByRole("dialog", { name: "Edit event" }).getByRole("textbox", { name: "Description" }),
   ).toHaveValue(
-    "## Agenda\n- [x] Last quarter's **actuals**\n- [ ] Next year's *draft*\n- Travel, see `travel.ods`\n\n> Bring the numbers, not the slides.\n\n[The sheet](https://example.com/budget)",
+    "## Agenda\n- [x] Last quarter's **actuals**\n- [ ] Next year's *draft*\n- Travel, see `travel.ods`\n\n> Bring the numbers, not the slides.\n\n[The sheet](https://example.com/budget), ask [@Anna Berg](mailto:anna@example.com)",
   );
 });
 
