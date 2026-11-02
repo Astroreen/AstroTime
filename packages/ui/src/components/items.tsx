@@ -6,7 +6,7 @@
 import { wallClockOf, type Placed } from "@astrotime/core";
 import type { CSSProperties } from "react";
 
-import type { Entry } from "../calendar/query.ts";
+import { DRAFT, type Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { useDragSource, type DragSource } from "./drag.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
@@ -162,6 +162,7 @@ export function StripChip({
       aria-label={name}
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
+      data-draft={entry.objectId === DRAFT || undefined}
       {...dragProps(entry, source, held)}
       className={[
         "item relative flex h-full items-center leading-none font-medium",
@@ -201,6 +202,7 @@ export function AgendaCard({
   return (
     <div
       role="listitem"
+      data-draft={entry.objectId === DRAFT || undefined}
       aria-label={name}
       data-done={entry.done || undefined}
       className="item relative flex min-h-11 items-center gap-2 rounded-[8px] px-2.5 py-1.5"
@@ -278,6 +280,7 @@ export function TimedItem({
       aria-label={name}
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
+      data-draft={entry.objectId === DRAFT || undefined}
       {...dragProps(entry, source, held)}
       className={[
         "item absolute overflow-hidden rounded-[6px]",

@@ -8,10 +8,11 @@ import { useTranslation } from "react-i18next";
 
 import { agendaDays } from "../calendar/agenda.ts";
 import { addDays } from "../calendar/dates.ts";
-import type { ObjectCache } from "../calendar/query.ts";
+import type { DrawnDraft, ObjectCache } from "../calendar/query.ts";
 import { useEntries } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { AgendaCard } from "./items.tsx";
+import { reducedMotion, SLIDE, SLIDE_MS } from "./pager.tsx";
 import { DayHeader } from "./time-grid.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
@@ -37,7 +38,8 @@ const around = (day: string): Loaded => ({
   ceiling: addDays(day, REACH),
 });
 
-const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** Pixels a picked day slides in from, above or below (design D154). */
+const JUMP_PX = 24;
 
 /** Within a screen of the end. */
 const nearEnd = (element: HTMLElement) =>
@@ -72,6 +74,8 @@ export interface AgendaViewProps {
   readonly onVisibleDay: (day: string) => void;
   /** "Hide completed tasks" (design D96): completed tasks leave the list. */
   readonly hideCompleted?: boolean;
+  /** The edit dialog's item as its form says (design D155). */
+  readonly draft?: DrawnDraft | null;
 }
 
 export function AgendaView({
@@ -83,28 +87,24 @@ export function AgendaView({
   undoneColor,
   onVisibleDay,
   hideCompleted = false,
+  draft = null,
 }: AgendaViewProps) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   const [range, setRange] = useState(() => around(anchor));
   const data = useEntries(store, cache, { ids, from: range.from, to: range.to, today, timeZone });
   const loaded = data !== null && data.from === range.from && data.to === range.to;
-  const days = useMemo(
-    () =>
-      data
-        ? agendaDays(
-            hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries,
-            data.from,
-            data.to,
-            {
-              today,
-              timeZone,
-              undone: data.undoneCurrent ? data.undone.length : 0,
-            },
-          )
-        : [],
-    [data, today, timeZone, hideCompleted],
-  );
+  const days = useMemo(() => {
+    if (!data) return [];
+    const shown = hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries;
+    // The edit dialog's item as its form says (design D155).
+    const entries = draft ? draft.apply(shown, { from: data.from, to: data.to, timeZone }) : shown;
+    return agendaDays(entries, data.from, data.to, {
+      today,
+      timeZone,
+      undone: data.undoneCurrent ? data.undone.length : 0,
+    });
+  }, [data, today, timeZone, hideCompleted, draft]);
 
   const scroller = useRef<HTMLDivElement>(null);
   /** The group at the top of the screen and how far the list is scrolled past its top. */
@@ -150,12 +150,13 @@ export function AgendaView({
       // (design D154); the list's first day on open comes as it is.
       const from = top.current?.day;
       if (from && from !== jump && moved.current !== jump && !reducedMotion()) {
+        const by = jump > from ? JUMP_PX : -JUMP_PX;
         list.current?.animate(
           [
-            { transform: `translateY(${jump > from ? 24 : -24}px)`, opacity: 0 },
+            { transform: `translateY(${by}px)`, opacity: 0 },
             { transform: "none", opacity: 1 },
           ],
-          { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+          { duration: SLIDE_MS, easing: SLIDE },
         );
       }
       moved.current = jump;
@@ -165,7 +166,11 @@ export function AgendaView({
       }
       // Too near the end to come to the top: again once more is read.
       const short = target && element.scrollTop + 1 < target.offsetTop;
-      if (!short || range.to >= range.ceiling) setJump(null);
+      if (!short || range.to >= range.ceiling) {
+        setJump(null);
+        // Done with: the same day picked again slides in again.
+        moved.current = null;
+      }
     } else if (top.current) {
       const kept = top.current;
       const group = groups.find((g) => g.dataset["day"] === kept.day);

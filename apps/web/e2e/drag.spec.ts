@@ -352,6 +352,48 @@ test("a double click on an empty hour makes one new event there (design D154)", 
   await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
 });
 
+test("a double click's second click on an empty hour after a press on an item is a click of its own (design D154)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const lunch = item(page, "Wednesday, November 4", "Lunch with Marta, 1:00 – 2:00 PM");
+  await expect(lunch).toBeVisible();
+  // The browser's own events, as a quick press on the item and then a second
+  // click on an empty hour within the double click's time give them: the
+  // item's press opens nothing here, only its click would.
+  const from = await pointIn(lunch);
+  const to = await pointOn(page, "Tuesday, November 3", 16.1);
+  await page.evaluate(
+    ([itemPoint, slotPoint]) => {
+      const at = (point: { x: number; y: number }) => document.elementFromPoint(point.x, point.y)!;
+      const press = (point: { x: number; y: number }, detail: number) => {
+        const target = at(point);
+        const init = { bubbles: true, clientX: point.x, clientY: point.y, detail, button: 0 };
+        target.dispatchEvent(
+          new PointerEvent("pointerdown", { ...init, pointerType: "mouse", isPrimary: true }),
+        );
+        target.dispatchEvent(
+          new PointerEvent("pointerup", { ...init, pointerType: "mouse", isPrimary: true }),
+        );
+        return target;
+      };
+      press(itemPoint!, 1);
+      press(slotPoint!, 2).dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: slotPoint!.x,
+          clientY: slotPoint!.y,
+          detail: 2,
+        }),
+      );
+    },
+    [from, to],
+  );
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
+});
+
 test("keys move a focused item and say where it went; Shift moves its end", async ({ page }) => {
   await openDemo(page, "week");
   const opener = day(page, "Wednesday, November 4").getByRole("button", {

@@ -65,6 +65,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Span** — a chip drawn as one bar over every day the item covers, in
   the all-day strip of a week and in each week of the Month view (where
   timed items are spans too); a one-day item is a span of one day.
+- **Draft** — the item the edit dialog makes or edits, drawn in the views
+  behind it as its form says now (design D155).
 - **Ghost** — what a drag draws where the item would go, with its new
   time, while the item stays dimmed where it was until the drop is saved
   (design D111).

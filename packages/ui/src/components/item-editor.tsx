@@ -33,7 +33,9 @@ import {
   type Form,
   type Problem,
   type RepeatChoice,
+  type Target,
 } from "../calendar/editing.ts";
+import type { DrawnDraft } from "../calendar/query.ts";
 import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
 import { defaultColorOf, useSettings } from "../settings.ts";
 import { useCalendar } from "./context.ts";
@@ -53,6 +55,7 @@ import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { useDraft, useDraftAside } from "./draft-aside.ts";
 
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
@@ -77,6 +80,12 @@ const field =
   "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 /** A dropdown's button in the form, as a field (design D167). */
 const fieldButton = "h-10 w-full min-w-0 rounded-lg bg-canvas pr-2 pl-3 ring-1 ring-line";
+/** Where the dialog stands: beside the draft on a wide screen, or in the middle (design D155). */
+const ASIDE = {
+  middle: "",
+  right: "lg:right-6 lg:left-auto lg:translate-x-0",
+  left: "lg:left-6 lg:translate-x-0",
+} as const;
 /** A dropdown's label above it. */
 const fieldLabel = "text-small text-ink-muted";
 
@@ -86,6 +95,8 @@ export function ItemEditor({
   onChange,
   onSave,
   onClose,
+  target,
+  onDraft,
 }: {
   state: EditorState | null;
   /** The calendars the item may be saved in. */
@@ -93,10 +104,17 @@ export function ItemEditor({
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
+  /** The item edited; `null` for a new one. */
+  target: Target | null;
+  /** The item as the form says now, for the views to draw (design D155). */
+  onDraft: (draft: DrawnDraft | null) => void;
 }) {
   const { t } = useTranslation();
   const formId = useId();
   const form = state?.form;
+  useDraft(target, form ?? null, onDraft);
+  // Beside the item it makes, on a wide screen (design D155).
+  const aside = useDraftAside(state !== null);
   const title = form
     ? t(
         state.existing
@@ -111,8 +129,12 @@ export function ItemEditor({
   return (
     <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <DialogBackdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}>
+        <DialogBackdrop
+          className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "lg:bg-black/20" : ""}`}
+        />
+        <DialogPopup
+          className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))] ${ASIDE[aside ?? "middle"]}`}
+        >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>
               <CloseIcon className="size-5" />
