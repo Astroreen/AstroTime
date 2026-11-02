@@ -329,6 +329,9 @@ export const ru = {
   "attachments.uploading": "Загрузка {{name}}…",
   "attachments.uploadFailed": "Не удалось загрузить {{name}}.",
   "attachments.tooBig": "{{name}} больше 50 МБ: прикрепите его из ваших файлов.",
+  "attachments.moved":
+    "{{name}} загружен в папку Calendar ваших файлов, но не прикреплён, пока событие в календаре другого аккаунта: верните его, чтобы прикрепить.",
+  "attachments.notLink": "Это ещё не веб-ссылка: добавьте https:// в начале.",
   "attachments.file": "Файл",
   "details.reminders": "Напоминания",
   "details.guests": "Гости",

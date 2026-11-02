@@ -1,7 +1,9 @@
 // What the UI says of an attachment (design D230; foundation D229): where
 // its link goes, its kind and size in words, its name.
-import type { Attachment } from "@astrotime/core";
+import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { TFunction } from "i18next";
+
+import type { AttachmentChoice } from "./editing.ts";
 
 /**
  * Where a link goes: absolute, or relative to the calendar's server, as
@@ -25,6 +27,26 @@ export function attachmentHref(uri: string, base: string | undefined): string | 
 export function sameLink(a: string | null, b: string | null, base: string | undefined): boolean {
   if (a === null || b === null) return false;
   return (attachmentHref(a, base) ?? a) === (attachmentHref(b, base) ?? b);
+}
+
+/**
+ * The form's attachments with new ones after them, each once (a file there
+ * already, its link as it resolves, is not added again; design D233): the
+ * same list when nothing is added.
+ */
+export function withAttached(
+  value: readonly AttachmentChoice[],
+  attachments: readonly NewAttachment[],
+  base: string | undefined,
+): readonly AttachmentChoice[] {
+  const added: AttachmentChoice[] = [];
+  const there = (attachment: NewAttachment) =>
+    [value, added].some((list) =>
+      list.some((choice) => sameLink(choice.attachment.uri, attachment.uri, base)),
+    );
+  for (const attachment of attachments)
+    if (!there(attachment)) added.push({ kind: "new", attachment });
+  return added.length === 0 ? value : [...value, ...added];
 }
 
 /** Formats known by their media type, named as their files' usual extension. */
@@ -115,16 +137,26 @@ export function attachmentText(
   return { name, about };
 }
 
-/** A name that ends as a file's does, not a host's. */
-const FILE_NAME =
-  /\.(pdf|txt|docx?|xlsx?|pptx?|odt|ods|odp|csv|png|jpe?g|gif|webp|heic|svg|mp3|mp4)$/i;
+/**
+ * Whether what was typed is a file's name alone: one word and a common
+ * file's ending, with nothing after it (`report.pdf`, `notes.md`,
+ * `archive.zip`), no link until it says so with `https://`, a path, a query
+ * or a fragment. A site's name typed alone (`example.org`, `google.com`)
+ * is a link.
+ */
+export const bareName = (typed: string) =>
+  /^[^.\s/:?#@]+\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|jpe?g|png|gif|heic|webp|mp3|mp4|zip|rar|7z|tar|gz|md|json|svg)$/i.test(
+    typed.trim(),
+  );
 
 /**
  * A web link typed: with `http://` or `https://`, else `https://` before it.
- * Its host has a dot (`example.org`, `192.168.1.10`), is `localhost`, or is
- * a name with its port (`nas:8080`); a number (`1234`), a time (`12:30`),
- * a bare word, a file's name (`report.pdf`) or a mail address (`a@b.com`)
- * is not one, nor another scheme (`javascript:`, `mailto:`) or text with a
+ * Its host has a dot (`docs.example.org`, `example.org/plan`,
+ * `192.168.1.10`), is `localhost`, or is a name with its port
+ * (`nas:8080`). Not one: a number (`1234`), a time (`12:30`), a bare word,
+ * one word and an ending alone (`report.pdf`, `example.org`: a file's name
+ * as likely as a site, a link once `https://` is before it), a mail address
+ * (`a@b.com`), another scheme (`javascript:`, `mailto:`) or text with a
  * space.
  */
 export function typedLink(text: string): string | null {
@@ -136,8 +168,7 @@ export function typedLink(text: string): string | null {
   const host = /^(?:https?:\/\/)?([^/:?#]*)/i.exec(trimmed)?.[1] ?? "";
   // An address with a user (`a@b.com`, `user@host`) is mail, not a page.
   if (host.includes("@")) return null;
-  // A file's name typed alone (`report.pdf`) is no host.
-  if (!scheme && !/[/:]/.test(trimmed) && FILE_NAME.test(host)) return null;
+  if (bareName(trimmed)) return null;
   // Digits and dots: an address only as four numbers (no "1.5" read as 1.0.0.5).
   if (/^[\d.]+$/.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
   try {

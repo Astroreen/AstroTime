@@ -5,10 +5,12 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   attachmentHref,
   attachmentText,
+  bareName,
   kindOf,
   sameLink,
   sizeText,
   typedLink,
+  withAttached,
 } from "../src/calendar/attachments.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
@@ -97,6 +99,8 @@ describe("a size", () => {
 
 test("a link typed: a host with a dot, localhost, or a name with its port; never a number or a time", () => {
   expect(typedLink("example.org/minutes")).toBe("https://example.org/minutes");
+  expect(typedLink("docs.example.org")).toBe("https://docs.example.org/");
+  expect(typedLink("https://example.org")).toBe("https://example.org/");
   expect(typedLink("  http://example.org  ")).toBe("http://example.org/");
   expect(typedLink("nas:8080/files/a.pdf")).toBe("https://nas:8080/files/a.pdf");
   expect(typedLink("localhost")).toBe("https://localhost/");
@@ -106,6 +110,34 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   expect(typedLink("1.5")).toBeNull();
   expect(typedLink("nas")).toBeNull();
   expect(typedLink("report.pdf")).toBeNull();
+  expect(typedLink("archive.zip")).toBeNull();
+  expect(typedLink("notes.md")).toBeNull();
+  // A site's name typed alone is a link, the most common thing typed.
+  expect(typedLink("example.org")).toBe("https://example.org/");
+  expect(typedLink("google.com")).toBe("https://google.com/");
+  // A query or a fragment says it is a link.
+  expect(typedLink("example.org?x=1")).toBe("https://example.org/?x=1");
+  expect(typedLink("example.org#top")).toBe("https://example.org/#top");
+  const names = [
+    "report.pdf",
+    " notes.md ",
+    "data.JSON",
+    "a.7z",
+    "logo.svg",
+    "example.org",
+    "google.com",
+  ];
+  expect([...names, "1234", "a.b.pdf"].map(bareName)).toEqual([
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+  ]);
   expect(typedLink("a@b.com")).toBeNull();
   expect(typedLink("https://user@example.org/")).toBeNull();
   expect(typedLink("example.org/report.pdf")).toBe("https://example.org/report.pdf");
@@ -123,4 +155,26 @@ test("two links are one file as they resolve: Nextcloud Calendar's relative form
   );
   expect(sameLink("/index.php/f/241", "/index.php/f/242", base)).toBe(false);
   expect(sameLink(null, null, base)).toBe(false);
+});
+
+test("files attached all at once, each once: two held files both join the list", () => {
+  const base = "https://cloud.example.com/remote.php/dav/calendars/astro/work/";
+  const there = { kind: "new", attachment: { uri: "/index.php/f/1" } } as const;
+  const next = withAttached(
+    [there],
+    [
+      { uri: "https://cloud.example.com/index.php/f/2", name: "/Calendar/a.txt" },
+      { uri: "https://cloud.example.com/index.php/f/3", name: "/Calendar/b.txt" },
+      // There already, written absolute: not twice.
+      { uri: "https://cloud.example.com/index.php/f/1" },
+    ],
+    base,
+  );
+  expect(next.map((choice) => choice.attachment.uri)).toEqual([
+    "/index.php/f/1",
+    "https://cloud.example.com/index.php/f/2",
+    "https://cloud.example.com/index.php/f/3",
+  ]);
+  // Nothing new: the same list, so nothing is written.
+  expect(withAttached(next, [{ uri: "/index.php/f/2" }], base)).toBe(next);
 });

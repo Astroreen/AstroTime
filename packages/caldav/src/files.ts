@@ -93,12 +93,13 @@ const MAX_NAME_BYTES = 200;
  * (foundation D232).
  */
 export function safeName(name: string): string {
-  const cleaned =
-    name
-      .replaceAll(/[\\/:*?"<>|\p{Cc}]/gu, "_")
+  // Its ends made safe: again after a cut, which may leave a dot, a space or ".part" last.
+  const ends = (part: string) =>
+    part
       .replace(/^[\s.]+/, "")
       .replace(/[\s.]+$/, "")
-      .replace(/\.(file)?part$/i, (ending) => `_${ending.slice(1)}`) || "file";
+      .replace(/\.(file)?part$/i, (ending) => `_${ending.slice(1)}`);
+  const cleaned = ends(name.replaceAll(/[\\/:*?"<>|\p{Cc}]/gu, "_")) || "file";
   const bytes = (value: string) => new TextEncoder().encode(value).length;
   if (bytes(cleaned) <= MAX_NAME_BYTES) return cleaned;
   const dot = cleaned.lastIndexOf(".");
@@ -107,7 +108,7 @@ export function safeName(name: string): string {
   // By code points, so no character is cut in half.
   const stem = Array.from(cleaned.slice(0, cleaned.length - extension.length));
   while (stem.length > 1 && bytes(stem.join("") + extension) > MAX_NAME_BYTES) stem.pop();
-  return stem.join("").trimEnd() + extension;
+  return ends(stem.join("") + extension) || "file";
 }
 
 /** Nextcloud Calendar's attachments folder, where it uploads a file from the device (its `attachmentsFolder` setting's default). */
