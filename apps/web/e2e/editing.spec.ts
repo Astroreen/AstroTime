@@ -387,6 +387,25 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
+  test("a press the browser takes for a scroll (pointercancel) is no tap, whatever click follows", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await loadEditor(page);
+    const spot = await tuesday(page);
+    // A finger's press that becomes a scroll: down, then cancelled by the
+    // browser; a click there after it is no tap of that press.
+    await page.getByRole("list", { name: "All day" }).evaluate((strip, { x, y }) => {
+      const at = { clientX: x, clientY: y, bubbles: true, pointerId: 7, pointerType: "touch" };
+      strip.dispatchEvent(new PointerEvent("pointerdown", { ...at, isPrimary: true }));
+      strip.dispatchEvent(new PointerEvent("pointercancel", at));
+      strip.dispatchEvent(
+        new MouseEvent("click", { clientX: x, clientY: y, bubbles: true, detail: 1 }),
+      );
+    }, spot);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
   test("a double click opens one new item, with its first click", async ({ page }) => {
     await openDemo(page, "week");
     // The editor's chunk loaded, so the dialog is there before the second
