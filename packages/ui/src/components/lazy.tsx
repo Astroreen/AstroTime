@@ -25,6 +25,9 @@ interface Closable {
   readonly onClose: () => void;
 }
 
+/** How long a deferred part's code waits for the page to be idle before it is fetched anyway. */
+const IDLE_AT_MOST_MS = 2000;
+
 export function deferred<P extends Closable, M = unknown>(
   load: () => Promise<M>,
   pick: (module: M) => ComponentType<P>,
@@ -73,7 +76,9 @@ export function deferred<P extends Closable, M = unknown>(
       // A failure here is met again, and said, at the opening.
       const fetch = () => void preload().catch(() => {});
       if (typeof requestIdleCallback === "function") {
-        const id = requestIdleCallback(fetch);
+        // A page that is never idle (a busy phone, a test run's many frames)
+        // still fetches it, at most this long after.
+        const id = requestIdleCallback(fetch, { timeout: IDLE_AT_MOST_MS });
         return () => cancelIdleCallback(id);
       }
       const id = setTimeout(fetch);
