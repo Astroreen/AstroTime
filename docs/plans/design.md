@@ -1912,7 +1912,9 @@ own (below).
   one in a `srcset` for a phone.
 - **D221. A place's photo is credited, kept and can be turned off.**
   - **Credit** at the foot of the details' header: "Photo: author,
-    licence · Wikipedia", the author linking to the photo's Commons page,
+    licence · en.wikipedia.org" (the article's site by its address), the
+    author linking to the photo's Commons page (the licence does, when
+    Commons names no author),
     the licence to its text (only an https address: Commons' metadata is
     anyone's to edit, so a `javascript:` one is no link), "Wikipedia" to
     the article, as Commons' licences (CC BY, CC BY-SA) ask of a reuse;

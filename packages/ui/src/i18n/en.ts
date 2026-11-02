@@ -276,8 +276,6 @@ export const en = {
   "settings.pictures.placePhotos.hint":
     "A place's name and point (to about 100 m) go to {{host}} for its photo",
   "pictures.photoBy": "Photo:",
-  "pictures.photoAuthorUnknown": "unknown author",
-  "pictures.photoWikipedia": "Wikipedia",
   "settings.places": "Places",
   "settings.places.search": "Search places on the map",
   "settings.places.hint":

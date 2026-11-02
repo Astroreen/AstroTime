@@ -81,28 +81,36 @@ export function usePlacePhoto(
 export function PhotoCredit({ photo, className = "" }: { photo: PlacePhoto; className?: string }) {
   const { t } = useTranslation();
   const link = "underline underline-offset-2";
+  // The author's name links to the photo's page; with none named, the licence does.
+  const licence = photo.licenceUrl ? (
+    <a href={photo.licenceUrl} target="_blank" rel="noopener noreferrer license" className={link}>
+      {photo.licence}
+    </a>
+  ) : (
+    photo.licence
+  );
   return (
     <p className={className}>
       {t("pictures.photoBy")}{" "}
-      <a href={photo.source} target="_blank" rel="noopener noreferrer" className={link}>
-        {photo.author ?? t("pictures.photoAuthorUnknown")}
-      </a>
-      {", "}
-      {photo.licenceUrl ? (
-        <a
-          href={photo.licenceUrl}
-          target="_blank"
-          rel="noopener noreferrer license"
-          className={link}
-        >
+      {photo.author !== null && (
+        <>
+          <a href={photo.source} target="_blank" rel="noopener noreferrer" className={link}>
+            {photo.author}
+          </a>
+          {", "}
+        </>
+      )}
+      {photo.author === null && !photo.licenceUrl ? (
+        <a href={photo.source} target="_blank" rel="noopener noreferrer" className={link}>
           {photo.licence}
         </a>
       ) : (
-        photo.licence
+        licence
       )}
       {" · "}
+      {/* The article by its site's own name, a web address: no word to translate. */}
       <a href={photo.article} target="_blank" rel="noopener noreferrer" className={link}>
-        {t("pictures.photoWikipedia")}
+        {new URL(photo.article).host}
       </a>
     </p>
   );

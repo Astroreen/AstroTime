@@ -289,8 +289,6 @@ export const ru = {
   "settings.pictures.placePhotos.hint":
     "Название места и его точка (около 100 м) уходят в {{host}} за его фото",
   "pictures.photoBy": "Фото:",
-  "pictures.photoAuthorUnknown": "автор неизвестен",
-  "pictures.photoWikipedia": "Википедия",
   "settings.places": "Места",
   "settings.places.search": "Искать места на карте",
   "settings.places.hint":
