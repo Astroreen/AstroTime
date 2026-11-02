@@ -181,6 +181,10 @@ export function CalendarScreen({
     setBeforeAgenda(read);
   }
   const drawn = fresh ? { view, days, anchor, read } : held;
+  // What the view waits for while it keeps what it drew: its days' read, or
+  // its chip's (a data hook the tests wait on).
+  const waiting =
+    agenda || fresh ? undefined : read?.from === from && read.to === to ? "chip" : "days";
   const drawnRead = drawn?.read;
   // Drawn before its chip's tasks are read (on open): no chip yet.
   const data = drawnRead
@@ -479,7 +483,12 @@ export function CalendarScreen({
                   {drawer}
                 </nav>
               )}
-              <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
+              <main
+                aria-label={title}
+                aria-busy={waiting ? true : undefined}
+                data-waiting={waiting}
+                className="relative flex min-w-0 flex-1 flex-col"
+              >
                 {/* The period shown, the page's heading; the top bar shows it as the month picker's button. */}
                 <h1 className="sr-only">{title}</h1>
                 {view === "agenda" ? (

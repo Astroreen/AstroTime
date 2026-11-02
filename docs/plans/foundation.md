@@ -1842,7 +1842,10 @@ the built web app (`scripts/bench-cold-start.ts`).
     a period: a view keeps what it drew, chip and all, until both reads are
     its own (the calendars shown, today, the zone); so a calendar hidden, or
     midnight, shows no stale chip, and none that goes and comes back to move
-    the strip's rows. The two reads are two live queries: during a sync they
+    the strip's rows. Tasks that cannot be read are had as none, as a
+    range that cannot be read is (D59), so no view waits on them for good.
+    While a view keeps what it drew, its `main` is `aria-busy`, and says
+    what it waits for (`data-waiting`: the days or the chip). The two reads are two live queries: during a sync they
     may each show the store a write apart, until the next run of each.
   - **One `t` for the calendar** (`CalendarContext`): every item drawn asked
     `useTranslation`, which made a copy of i18next's instance per item; the

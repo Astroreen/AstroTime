@@ -192,15 +192,43 @@ test("a calendar hidden keeps the view as drawn, chip and all, until both its re
   await userEvent.click(page.getByRole("button", { name: "Main menu" }));
   await userEvent.click(page.getByRole("checkbox", { name: "Tasks" }));
   await userEvent.keyboard("{Escape}");
-  // The days are read for the new calendars, the chip's tasks not yet: the
-  // view stays as drawn, its chip with it.
+  // The days are read for the new calendars and handled, the chip's tasks
+  // not yet: the view stays as drawn, its chip with it, waiting for the chip.
   await daysAnswered;
+  await expect.element(page.getByRole("main")).toHaveAttribute("data-waiting", "chip");
   await expect.element(strip.getByRole("button", { name: "3 undone tasks" })).toBeInTheDocument();
   expect(strip.element().getBoundingClientRect().height).toBe(height);
   release();
   await expect.element(strip.getByRole("button", { name: "1 undone task" })).toBeInTheDocument();
+  await expect.element(page.getByRole("main")).not.toHaveAttribute("data-waiting");
   // The strip kept its rows: the grid below it did not move.
   expect(strip.element().getBoundingClientRect().height).toBe(height);
+});
+
+test("the undone tasks that cannot be read hold no view: it draws, and moves on, with no chip (D146)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(() => errors.mockRestore());
+  const store = await demoStore(["en-US"]);
+  const broken = Object.assign(Object.create(store) as Store, {
+    undoneTasksBefore: () => Promise.reject(new Error("The disk is gone.")),
+  });
+  render(Promise.resolve(broken), ["en-US"]);
+  await expect
+    .element(
+      page
+        .getByRole("list", { name: "Wednesday, November 4" })
+        .getByRole("listitem", { name: /^Design review, / }),
+    )
+    .toBeInTheDocument();
+  await userEvent.keyboard("n");
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5" }))
+    .toBeInTheDocument();
+  await expect.element(page.getByRole("main")).not.toHaveAttribute("data-waiting");
+  expect(page.getByRole("button", { name: /undone task/ }).elements()).toEqual([]);
+  expect(errors).toHaveBeenCalled();
 });
 
 test("back from the Agenda, the day is drawn as the store has it now, not as read before (design D59)", async () => {

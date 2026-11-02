@@ -129,6 +129,13 @@ export function useEntries(
       store,
       () => store.undoneTasksBefore(ids, today, timeZone),
       (tasks) => setUndone({ key, tasks }),
+      (error) => {
+        console.error(error);
+        // Tasks that could not be read are had as none, and those read
+        // before as they were, anew, as the range's: a view that waits for
+        // this read draws (design D59).
+        setUndone((last) => (last?.key === key ? { ...last } : { key, tasks: NONE }));
+      },
     );
   }, [store, idsKey, reading, today, timeZone]);
   const tasks = undone?.tasks ?? NONE;

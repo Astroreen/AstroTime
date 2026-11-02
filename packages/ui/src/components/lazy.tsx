@@ -10,6 +10,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useRef,
   useState,
   type ComponentProps,
   type ComponentType,
@@ -59,6 +60,8 @@ export function deferred<P extends Closable, M = unknown>(
     const [failed, setFailed] = useState(false);
     /** "Try again" failed too: what failed may be a file it shares, which only a reload brings. */
     const [retried, setRetried] = useState(false);
+    /** Counts tries and failures: a try's arrival speaks for that try alone. */
+    const generation = useRef(0);
     // Closed after a failure: the next opening tries again.
     if (failed && !open) {
       setFailed(false);
@@ -78,18 +81,25 @@ export function deferred<P extends Closable, M = unknown>(
     }, []);
     if (!wanted) return null;
     const retry = () => {
+      const mine = ++generation.current;
       setLoaded(attempt);
       setFailed(false);
       setRetried(true);
-      // Arrived, a later failure is a new one: "Try again" first again.
+      // Arrived, a later failure is a new one: "Try again" first again; not
+      // once another failure or another try came meanwhile (a close resets it).
       void preload().then(
-        () => setRetried(false),
+        () => generation.current === mine && setRetried(false),
         () => {},
       );
     };
     if (failed) return <LoadFailed again={retried} onRetry={retry} onClose={props.onClose} />;
     return (
-      <Failed onFail={() => setFailed(true)}>
+      <Failed
+        onFail={() => {
+          generation.current++;
+          setFailed(true);
+        }}
+      >
         <Suspense fallback={null}>
           <Loaded {...props} />
         </Suspense>
