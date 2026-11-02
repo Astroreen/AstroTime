@@ -59,8 +59,10 @@ export function celebrate({ x, y }: { readonly x: number; readonly y: number }):
       ],
       { duration: 640 + Math.random() * 160, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" },
     );
-    ends.push(flight.finished);
+    // Each gone as it lands: one quicker than the rest must not spring back
+    // to the start, whole, while they finish.
+    const gone = () => piece.remove();
+    ends.push(flight.finished.then(gone, gone));
   }
-  const gone = () => layer.remove();
-  Promise.allSettled(ends).then(gone, gone);
+  void Promise.allSettled(ends).then(() => layer.remove());
 }

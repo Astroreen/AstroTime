@@ -85,6 +85,30 @@ test("completing a task from its checkbox throws a burst from it; not completing
   expect(await thrown()).toEqual([]);
 });
 
+test("a shape that lands before the others is gone, not back at the start while they fly", async ({
+  page,
+}) => {
+  await logBursts(page);
+  const panel = await openTasks(page);
+  await panel.getByRole("checkbox", { name: "Send the report" }).click();
+  await page.evaluate(() => (window as unknown as { burst: Promise<void> }).burst);
+  const left = await page.evaluate(async () => {
+    const pieces = [...document.querySelectorAll<HTMLElement>("[data-celebration] > span")];
+    // The others held mid-flight; the first run to its end.
+    for (const piece of pieces.slice(1)) for (const flight of piece.getAnimations()) flight.pause();
+    const [first] = pieces[0]!.getAnimations();
+    first!.finish();
+    await first!.finished;
+    // Its removal follows its end in a microtask.
+    await Promise.resolve();
+    return {
+      landed: pieces[0]!.isConnected,
+      flying: pieces.slice(1).filter((piece) => piece.isConnected).length,
+    };
+  });
+  expect(left).toEqual({ landed: false, flying: 17 });
+});
+
 test("a burst whose code comes late starts where the press was, though the row has moved on", async ({
   page,
 }) => {
