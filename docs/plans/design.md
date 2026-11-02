@@ -1506,10 +1506,13 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   Linux and Windows, the same in light and dark. Now, in `styles.css`:
   Chromium (and so Electron and Android's WebView) and WebKit draw
   `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
-  ink colour at 22% on a clear track, 42% while the pointer is anywhere
+  ink colour at 52% on a clear track, 3:1 or more against every surface a
+  scroller sits on in light and dark (WCAG 1.4.11, as [D120](#D120) holds
+  the items to AA; it was 22%, 1.6:1), 66% while the pointer is anywhere
   over what scrolls (`:hover` on the scroller, so a scroller holding
   another lights too while the pointer is over the inner one; on purpose:
-  both scroll under it), 6 px wide under the pointer and 58% while dragged; Firefox has
+  both scroll under it), 6 px wide under the pointer and 80% while
+  dragged; Firefox has
   only the standard properties, `scrollbar-width: thin` in the same
   colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
   the standard ones win over it). Light and dark come with the ink
@@ -1518,12 +1521,14 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   still keeps the day headers over their columns, now 10 px wide on both;
   a phone's scrollbars are the system's overlay ones, drawn only while
   scrolling, and Firefox on Linux draws its own overlay ones too. The
-  thumb shows faintly at rest rather than only while scrolling: telling
-  "scrolling now" apart needs a script on every scroller, and a faint
-  thumb already reads as quiet. Checked in Chromium and Firefox (headed,
+  thumb shows at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller. Checked in Chromium and Firefox (headed,
   light and dark); WebKit does not start on the development machine, and
   draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
-  `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
+  `packages/ui/test/scrollbar-colors.test.ts` (the thumb's contrast at
+  rest, under the pointer and dragged, over the canvas, a tile, a raised
+  surface and its hover, light and dark, read from `styles.css`; failing
+  at 22%), `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
   Saturday's header ends where its column does; failing before at 15 px:
   Playwright's headless Chromium hides scrollbars from the screen but
   keeps their width in the layout, which is what this measures). The
@@ -1861,7 +1866,8 @@ own (below).
 ## Deferred
 
 - **The scrollbars' untested parts** ([D191](#D191)): the thumb's
-  colour under the pointer and while dragged, Firefox's `scrollbar-width`
+  colours as an engine draws them (the shares are proven, not the
+  pixels), Firefox's `scrollbar-width`
   branch, and a WebKit run (Playwright's WebKit does not start on the
   development machine) were looked at by eye or not at all; a check per
   engine needs headed runs in CI. A thumb hidden until the user scrolls,

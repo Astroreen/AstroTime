@@ -119,8 +119,8 @@
     color-scheme: dark;
   }
   /*
-   * Scrollbars (design D191): thin, rounded, in the theme's ink, faint until
-   * the pointer is over what scrolls, as Google's are. Chromium (and so
+   * Scrollbars (design D191): thin, rounded, in the theme's ink, quiet at
+   * rest and stronger with the pointer over what scrolls. Chromium (and so
    * Android's WebView and Electron) and WebKit draw `::-webkit-scrollbar`:
    * a 10 px gutter (what `scrollbar-gutter: stable` keeps) with a 4 px
    * thumb in it, 6 px under the pointer. Firefox has only the standard
@@ -130,9 +130,11 @@
    * system's overlay ones, drawn only while scrolling, whatever this says.
    */
   :root {
-    --scrollbar: color-mix(in srgb, var(--color-ink) 22%, transparent);
-    --scrollbar-hover: color-mix(in srgb, var(--color-ink) 42%, transparent);
-    --scrollbar-active: color-mix(in srgb, var(--color-ink) 58%, transparent);
+    /* 3:1 or more against what is under it, light and dark (WCAG 1.4.11;
+     * test/scrollbar-colors.test.ts proves it over the theme's surfaces). */
+    --scrollbar: color-mix(in srgb, var(--color-ink) 52%, transparent);
+    --scrollbar-hover: color-mix(in srgb, var(--color-ink) 66%, transparent);
+    --scrollbar-active: color-mix(in srgb, var(--color-ink) 80%, transparent);
   }
   @supports not selector(::-webkit-scrollbar) {
     * {
