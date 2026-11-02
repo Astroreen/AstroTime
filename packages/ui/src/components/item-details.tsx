@@ -1,9 +1,9 @@
 // An item's details (docs/plans/foundation.md#D14, D9, D10), as Google
 // Calendar shows them when an item is tapped: its colour, title, when it is
 // and how it repeats, where, its description with its links, its reminders,
-// its guests (shown, never invited: no iTIP), its calendar; a task's due,
-// status, priority and subtasks, with complete and star. Edit and delete
-// show only where the calendar can be written.
+// its guests (shown, never invited: no iTIP), its calendar; a task's due and
+// subtasks, with complete and star (no status, priority, progress or tags,
+// design D162). Edit and delete show only where the calendar can be written.
 import {
   isDone,
   repeatOf,
@@ -29,7 +29,6 @@ import {
   BellIcon,
   CalendarIcon,
   CheckIcon,
-  ClockIcon,
   CloseIcon,
   EditIcon,
   NotesIcon,
@@ -201,25 +200,6 @@ function Body({
                   })}
             </Row>
           )}
-          {task && (
-            <Row icon={<ClockIcon className="size-5" />}>
-              <span className="flex flex-col">
-                <span>{t(`status.${statusOf(task)}`)}</span>
-                {task.percentComplete !== null && task.percentComplete > 0 && !done && (
-                  <span className="text-ink-muted">
-                    {t("details.progress", { percent: task.percentComplete })}
-                  </span>
-                )}
-                {task.priority !== null && (
-                  <span className="text-ink-muted">
-                    {t("details.priority", {
-                      priority: t(`priority.${priorityOf(task.priority)}`),
-                    })}
-                  </span>
-                )}
-              </span>
-            </Row>
-          )}
           {item.location && (
             <Row icon={<PlaceIcon className="size-5" />} label={t("edit.location")}>
               <PlaceCard location={item.location} geo={item.geo} onCopyFailed={onCopyFailed} />
@@ -267,7 +247,7 @@ function Body({
               <p className="mt-1 text-note text-ink-muted">{t("details.guestsNote")}</p>
             </Row>
           )}
-          {item.categories.length > 0 && (
+          {!task && item.categories.length > 0 && (
             <Row icon={<NotesIcon className="size-5" />}>
               {t("details.categories", { categories: item.categories.join(", ") })}
             </Row>
@@ -343,17 +323,6 @@ function Person({ person }: { person: Participant }) {
 
 const PARTSTATS = ["ACCEPTED", "DECLINED", "TENTATIVE", "NEEDS-ACTION", "DELEGATED"] as const;
 const partstat = (status: string) => PARTSTATS.find((s) => s === status.toUpperCase());
-
-const STATUSES = ["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"] as const;
-function statusOf(task: Task): (typeof STATUSES)[number] {
-  if (task.completed && !task.status) return "COMPLETED";
-  return STATUSES.find((s) => s === task.status?.toUpperCase()) ?? "NEEDS-ACTION";
-}
-
-/** RFC 5545 §3.8.1.9 by thirds, as Nextcloud Tasks shows it: 1–4 high, 5 medium, 6–9 low. */
-export function priorityOf(priority: number): "high" | "medium" | "low" {
-  return priority <= 4 ? "high" : priority === 5 ? "medium" : "low";
-}
 
 /** The item's own zone, when it is not the user's (or UTC). */
 function zoneNote(time: ItemTime | null, timeZone: string): string | null {

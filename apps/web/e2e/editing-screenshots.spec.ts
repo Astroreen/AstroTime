@@ -48,6 +48,7 @@ const WORDS = {
     dueDate: "Due date",
     startDate: "Start date",
     pack: "Pack the bags",
+    description: "Description",
   },
   ru: {
     today: "среда, 4 ноября",
@@ -80,6 +81,7 @@ const WORDS = {
     dueDate: "Дата срока",
     startDate: "Дата начала",
     pack: "Собрать вещи",
+    description: "Описание",
   },
 } as const;
 
@@ -228,6 +230,9 @@ for (const language of ["en", "ru"] as const) {
       await task.getByRole("button", { name: w.addDue }).click();
       await task.getByLabel(w.dueDate).fill("2026-11-06");
       await shot(phone, name("task-due", "phone"));
+      // Its last fields: no status, priority, progress or tags (design D162).
+      await task.getByRole("textbox", { name: w.description }).scrollIntoViewIfNeeded();
+      await shot(phone, name("task-fields", "phone"));
       await task.getByRole("button", { name: w.save }).click();
       await expect(task).toHaveCount(0);
       await shot(phone, name("task-chip", "phone"));

@@ -1,9 +1,10 @@
 // The edit dialog (docs/plans/foundation.md#D9, D10), as Google Calendar's:
 // the whole screen on a phone, a dialog on a wide screen. Event or task when
 // creating; title; all day; start and end (a task's start and its optional
-// due, design D159); the zone when it is not the user's; repeat presets and a custom rule;
-// reminders; the calendar; colour; location; description; a task's status,
-// priority, progress and tags. Enter in a field saves, Escape closes.
+// due, design D159); the zone when it is not the user's; repeat presets and a
+// custom rule; reminders; the calendar; colour; location; description (a task
+// has no status, priority, progress or tags here, design D162). Enter in a
+// field saves, Escape closes.
 import {
   nthWeekdayOf,
   WEEKDAYS,
@@ -11,7 +12,6 @@ import {
   type ItemTime,
   type Repeat,
   type RepeatEnd,
-  type TaskStatus,
   type Weekday,
 } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
@@ -21,6 +21,7 @@ import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  dueIsDate,
   switchKind,
   withAlarms,
   withAllDay,
@@ -45,7 +46,7 @@ import {
   PlaceIcon,
   RepeatIcon,
 } from "./icons.tsx";
-import { dialogIcon, priorityOf, sheet } from "./item-details.tsx";
+import { dialogIcon, sheet } from "./item-details.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
@@ -249,6 +250,7 @@ function Fields({
               <div className="min-w-0 flex-1">
                 <DateTime
                   form={form}
+                  allDay={dueIsDate(form)}
                   dateLabel={t("edit.dueDate")}
                   timeLabel={t("edit.dueTime")}
                   date={form.endDate}
@@ -322,65 +324,6 @@ function Fields({
           className={`${field} h-auto py-2`}
         />
       </Section>
-
-      {!event && (
-        <Section icon={<NotesIcon className="size-5" />}>
-          <Select
-            label={t("edit.status")}
-            value={form.status}
-            onChange={(status) => set({ status: status as TaskStatus })}
-            options={(["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"] as const).map(
-              (s) => [s, t(`status.${s}`)],
-            )}
-          />
-          <Select
-            label={t("edit.priority")}
-            value={form.priority === null ? "" : priorityOf(form.priority)}
-            onChange={(value) =>
-              set({
-                priority: value === "" ? null : value === "high" ? 1 : value === "medium" ? 5 : 9,
-              })
-            }
-            options={[
-              ["", t("priority.none")],
-              ["high", t("priority.high")],
-              ["medium", t("priority.medium")],
-              ["low", t("priority.low")],
-            ]}
-          />
-          <Labelled label={t("edit.percent")}>
-            {(id) => (
-              <input
-                id={id}
-                type="number"
-                min={0}
-                max={100}
-                step={5}
-                value={form.percent ?? ""}
-                onChange={(e) =>
-                  set({
-                    percent:
-                      e.target.value === ""
-                        ? null
-                        : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))),
-                  })
-                }
-                className={field}
-              />
-            )}
-          </Labelled>
-          <Labelled label={t("edit.categories")}>
-            {(id) => (
-              <input
-                id={id}
-                value={form.categories}
-                onChange={(e) => set({ categories: e.target.value })}
-                className={field}
-              />
-            )}
-          </Labelled>
-        </Section>
-      )}
     </div>
   );
 }
@@ -427,8 +370,11 @@ function DateTime({
   time,
   onDate,
   onTime,
+  allDay,
 }: {
   form: Form;
+  /** A date alone, or a date and a time; the form's "All day" by default. */
+  allDay?: boolean;
   dateLabel: string;
   timeLabel: string;
   date: string;
@@ -446,7 +392,7 @@ function DateTime({
         onChange={(e) => e.target.value && onDate(e.target.value)}
         className={`${field} flex-[3]`}
       />
-      {!form.allDay && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
+      {!(allDay ?? form.allDay) && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
     </div>
   );
 }
