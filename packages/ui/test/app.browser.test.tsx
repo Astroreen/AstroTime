@@ -580,10 +580,7 @@ test("a calendar shared to edit, without adding or deleting: its item shows Edit
   });
   render(Promise.resolve(store), ["en-US"]);
   const options = (dialog: ReturnType<typeof page.getByRole>) =>
-    [
-      ...(dialog.getByRole("combobox", { name: "Calendar" }).element() as HTMLSelectElement)
-        .options,
-    ].map((option) => option.text);
+    optionsOf(dialog.getByRole("combobox", { name: "Calendar" }));
 
   const opener = page
     .getByRole("list", { name: "Wednesday, November 4" })
@@ -599,7 +596,7 @@ test("a calendar shared to edit, without adding or deleting: its item shows Edit
   (details.getByRole("button", { name: "Edit" }).element() as HTMLElement).click();
   const editor = page.getByRole("dialog", { name: "Edit event" });
   await expect.element(editor).toBeInTheDocument();
-  expect(options(editor)).toEqual(["Team"]);
+  expect(await options(editor)).toEqual(["Team"]);
   (editor.getByRole("button", { name: "Close without saving" }).element() as HTMLElement).click();
   await expect.element(editor).not.toBeInTheDocument();
   (details.getByRole("button", { name: "Close", exact: true }).element() as HTMLElement).click();
@@ -609,8 +606,22 @@ test("a calendar shared to edit, without adding or deleting: its item shows Edit
   (page.getByRole("button", { name: "Create" }).element() as HTMLElement).click();
   const creating = page.getByRole("dialog", { name: "New event" });
   await expect.element(creating).toBeInTheDocument();
-  expect(options(creating)).toEqual(["Personal", "Work"]);
+  expect(await options(creating)).toEqual(["Personal", "Work"]);
 });
+
+/** The names a dropdown offers (design D167): it opens, is read, and closes. */
+async function optionsOf(field: ReturnType<typeof page.getByRole>): Promise<string[]> {
+  await field.click();
+  const list = page.getByRole("listbox");
+  await expect.element(list).toBeInTheDocument();
+  const names = list
+    .getByRole("option")
+    .elements()
+    .map((option) => option.textContent ?? "");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(list).not.toBeInTheDocument();
+  return names;
+}
 
 // The app's stylesheet lifts a dialog above Base UI's own backdrop; these
 // tests load no CSS, so a dialog's buttons get the clicks only with this.
@@ -815,10 +826,12 @@ test("a new event's dialog open as the calendar on this device steps aside saves
   render(Promise.resolve(store), ["en-US"]);
   await page.getByRole("button", { name: "Create", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
-  await expect
-    .element(dialog.getByRole("combobox", { name: "Calendar" }))
-    .toHaveValue((await store.calendars())[0]!.id);
+  const field = dialog.getByRole("combobox", { name: "Calendar" });
+  await expect.element(field).toHaveTextContent("Personal");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Made meanwhile");
+  // The list stays open while the calendars change under it.
+  await field.click();
+  const list = page.getByRole("listbox");
   // Meanwhile a server's account brings calendars for events and tasks: the
   // unused calendar on this device steps aside under the open dialog.
   const server = await store.addAccount({
@@ -835,16 +848,11 @@ test("a new event's dialog open as the calendar on this device steps aside saves
     components: ["VEVENT", "VTODO"],
     rights: ALL_RIGHTS,
   });
-  await expect
-    .element(
-      dialog.getByRole("combobox", { name: "Calendar" }).getByRole("option", { name: "Work" }),
-    )
-    .toBeInTheDocument();
-  await expect
-    .element(
-      dialog.getByRole("combobox", { name: "Calendar" }).getByRole("option", { name: "Personal" }),
-    )
-    .not.toBeInTheDocument();
+  await expect.element(list.getByRole("option", { name: "Work" })).toBeInTheDocument();
+  await expect.element(list.getByRole("option", { name: "Personal" })).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(list).not.toBeInTheDocument();
+  await expect.element(field).toHaveTextContent("Work");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.element(dialog).not.toBeInTheDocument();
   const [saved] = await store.pending(work.id);
@@ -875,7 +883,7 @@ test("a hidden calendar that stepped aside leaves the view and new items to the 
     serverUrl: `${SERVER}/`,
     username: "astro",
   });
-  const work = await store.saveCalendar({
+  await store.saveCalendar({
     accountId: server.id,
     url: `${SERVER}/remote.php/dav/calendars/astro/work/`,
     name: "Work",
@@ -887,7 +895,9 @@ test("a hidden calendar that stepped aside leaves the view and new items to the 
   render(Promise.resolve(store), ["en-US"], { preferences });
   await page.getByRole("button", { name: "Create", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
-  await expect.element(dialog.getByRole("combobox", { name: "Calendar" })).toHaveValue(work.id);
+  await expect
+    .element(dialog.getByRole("combobox", { name: "Calendar" }))
+    .toHaveTextContent("Work");
   await dialog.getByRole("textbox", { name: "Title" }).fill("After the step aside");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.element(dialog).not.toBeInTheDocument();
@@ -1043,12 +1053,12 @@ test("a new event's calendar that no longer takes events stays in the field, and
   await page.getByRole("button", { name: "Create", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   const field = dialog.getByRole("combobox", { name: "Calendar" });
-  await expect.element(field).toHaveValue(work.id);
+  await expect.element(field).toHaveTextContent("Work");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Refused");
   // The calendar is shared read-only now: it stays chosen in the field.
   await store.saveCalendar({ ...work, rights: { create: false, edit: false, delete: false } });
-  await expect.element(field.getByRole("option", { name: "Work" })).toBeInTheDocument();
-  await expect.element(field).toHaveValue(work.id);
+  expect(await optionsOf(field)).toContain("Work");
+  await expect.element(field).toHaveTextContent("Work");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect
     .element(

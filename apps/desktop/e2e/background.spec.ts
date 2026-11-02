@@ -8,7 +8,7 @@
 import { test as base, expect, type ElectronApplication } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { keepPassword, launch, launchAgain, profile, signInByPassword } from "./support.ts";
+import { choose, keepPassword, launch, launchAgain, profile, signInByPassword } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -98,7 +98,7 @@ test("the window's frame follows the theme setting", async ({ radicale }) => {
         ipcMain.on("astrotime:shell", heard);
       });
     }, theme);
-    await page.getByLabel("Theme").selectOption({ label });
+    await choose(page.getByLabel("Theme"), label);
     expect(await app.evaluate(() => (globalThis as { applied?: Promise<string> }).applied)).toBe(
       theme,
     );

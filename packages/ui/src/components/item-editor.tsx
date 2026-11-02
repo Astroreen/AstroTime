@@ -42,6 +42,7 @@ import {
   RepeatIcon,
 } from "./icons.tsx";
 import { dialogIcon, priorityOf, sheet } from "./item-details.tsx";
+import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
@@ -77,6 +78,10 @@ export interface EditorState {
 
 const field =
   "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
+/** A dropdown's button in the form, as a field (design D167). */
+const fieldButton = "h-10 w-full min-w-0 rounded-lg bg-canvas pr-2 pl-3 ring-1 ring-line";
+/** A dropdown's label above it. */
+const fieldLabel = "text-small text-ink-muted";
 
 export function ItemEditor({
   state,
@@ -473,18 +478,13 @@ function TimeSelect({
   const { formats } = useCalendar();
   const times = QUARTERS.includes(value) ? QUARTERS : [...QUARTERS, value].toSorted();
   return (
-    <select
-      aria-label={label}
+    <Dropdown
+      label={label}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${field} flex-[2]`}
-    >
-      {times.map((time) => (
-        <option key={time} value={time}>
-          {formats.clock(time)}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={times.map((time) => ({ value: time, label: formats.clock(time) }))}
+      className={`${fieldButton} flex-[2]`}
+    />
   );
 }
 
@@ -512,17 +512,16 @@ function Select({
   options: readonly (readonly [string, string])[];
 }) {
   return (
-    <Labelled label={label}>
-      {(id) => (
-        <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={field}>
-          {options.map(([option, name]) => (
-            <option key={option} value={option}>
-              {name}
-            </option>
-          ))}
-        </select>
-      )}
-    </Labelled>
+    <div className="flex flex-col gap-1">
+      <Dropdown
+        label={label}
+        labelClassName={fieldLabel}
+        value={value}
+        onChange={onChange}
+        options={options.map(([option, name]) => ({ value: option, label: name }))}
+        className={fieldButton}
+      />
+    </div>
   );
 }
 
@@ -617,39 +616,36 @@ function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: Repeat
   const words = (r: Repeat | null) => (r ? repeatWords(r, start, t, formats) : t("repeat.none"));
   return (
     <>
-      <Labelled label={t("edit.repeat")}>
-        {(id) => (
-          <select
-            id={id}
-            value={current}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === "custom") {
-                setCustom(true);
-                if (!repeat || repeat === "kept") onChange(presetRepeat("weekly", day));
-              } else if (value === "kept") {
-                setCustom(false);
-                onChange("kept");
-              } else if (value !== "current") {
-                setCustom(false);
-                onChange(presetRepeat(value as Preset, day));
-              }
-            }}
-            className={field}
-          >
-            {PRESETS.map((p) => (
-              <option key={p} value={p}>
-                {words(presetRepeat(p, day))}
-              </option>
-            ))}
-            {kept && <option value="kept">{t("repeat.kept", { rule: t("repeat.custom") })}</option>}
-            {current === "current" && repeat !== "kept" && repeat !== null && (
-              <option value="current">{words(repeat)}</option>
-            )}
-            <option value="custom">{t("repeat.custom")}</option>
-          </select>
-        )}
-      </Labelled>
+      <div className="flex flex-col gap-1">
+        <Dropdown
+          label={t("edit.repeat")}
+          labelClassName={fieldLabel}
+          value={current}
+          onChange={(value) => {
+            if (value === "custom") {
+              setCustom(true);
+              if (!repeat || repeat === "kept") onChange(presetRepeat("weekly", day));
+            } else if (value === "kept") {
+              setCustom(false);
+              onChange("kept");
+            } else if (value !== "current") {
+              setCustom(false);
+              onChange(presetRepeat(value as Preset, day));
+            }
+          }}
+          options={[
+            ...PRESETS.map((p) => ({ value: p, label: words(presetRepeat(p, day)) })),
+            ...(kept
+              ? [{ value: "kept", label: t("repeat.kept", { rule: t("repeat.custom") }) }]
+              : []),
+            ...(current === "current" && repeat !== "kept" && repeat !== null
+              ? [{ value: "current", label: words(repeat) }]
+              : []),
+            { value: "custom", label: t("repeat.custom") },
+          ]}
+          className={fieldButton}
+        />
+      </div>
       {current === "current" && repeat && repeat !== "kept" && (
         <CustomRepeat repeat={repeat} day={day} onChange={onChange} />
       )}
@@ -863,25 +859,17 @@ function Reminders({
           ))}
         </ul>
       )}
-      <select
-        aria-label={t("edit.addReminder")}
-        value=""
-        onChange={(e) => {
-          if (e.target.value === "") return;
-          onChange([
-            ...form.alarms,
-            { kind: "new", relatedTo, offsetSeconds: Number(e.target.value) },
-          ]);
-        }}
-        className={field}
-      >
-        <option value="">{t("edit.addReminder")}</option>
-        {presets.map((offset) => (
-          <option key={offset} value={offset}>
-            {wordsOf({ kind: "new", relatedTo, offsetSeconds: offset })}
-          </option>
-        ))}
-      </select>
+      <MenuButton
+        label={t("edit.addReminder")}
+        options={presets.map((offset) => ({
+          value: String(offset),
+          label: wordsOf({ kind: "new", relatedTo, offsetSeconds: offset }),
+        }))}
+        onChoose={(offset) =>
+          onChange([...form.alarms, { kind: "new", relatedTo, offsetSeconds: Number(offset) }])
+        }
+        className={fieldButton}
+      />
     </>
   );
 }

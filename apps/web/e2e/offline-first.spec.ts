@@ -6,7 +6,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { startRadicale } from "../../../packages/sync/test/servers.ts";
-import { addAccount, openApp, WIDE } from "./support.ts";
+import { addAccount, choose, openApp, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -27,7 +27,7 @@ test("with no account and no network, an event made on this device stays after a
   await page.getByRole("button", { name: "Create" }).first().click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Dentist");
-  await dialog.getByLabel("Start time").selectOption("16:00");
+  await choose(dialog.getByLabel("Start time"), "4:00 PM");
   await dialog.getByRole("button", { name: "Save" }).click();
   const dentist = wednesday(page).getByRole("listitem", { name: "Dentist, 4:00 – 5:00 PM" });
   await expect(dentist).toBeVisible();

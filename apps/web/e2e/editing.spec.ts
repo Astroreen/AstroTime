@@ -5,7 +5,7 @@
 // calendar, and the Conflicts list (D6).
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -30,15 +30,15 @@ test('"+" creates an event on the day shown from the next half hour; it shows in
   const dialog = page.getByRole("dialog", { name: "New event" });
   // Google's prefill: today, from the next half hour after 10:40, an hour long.
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-04");
-  await expect(dialog.getByLabel("Start time")).toHaveValue("11:00");
-  await expect(dialog.getByLabel("End time")).toHaveValue("12:00");
+  await expect(dialog.getByLabel("Start time")).toHaveText("11:00 AM");
+  await expect(dialog.getByLabel("End time")).toHaveText("12:00 PM");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Haircut");
   // A new start keeps the length; Sunday, which has room in the Month view.
-  await dialog.getByLabel("Start time").selectOption("17:00");
-  await expect(dialog.getByLabel("End time")).toHaveValue("18:00");
+  await choose(dialog.getByLabel("Start time"), "5:00 PM");
+  await expect(dialog.getByLabel("End time")).toHaveText("6:00 PM");
   await dialog.getByLabel("Start date").fill("2026-11-01");
   await expect(dialog.getByLabel("End date")).toHaveValue("2026-11-01");
-  await dialog.getByRole("combobox", { name: "Calendar" }).selectOption({ label: "Personal" });
+  await choose(dialog.getByRole("combobox", { name: "Calendar" }), "Personal");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
 
@@ -58,8 +58,8 @@ test("Enter in the title saves; a tap on an empty slot of the grid creates there
   const box = (await column.boundingBox())!;
   await column.click({ position: { x: box.width - 10, y: 14.25 * 56 } });
   const dialog = page.getByRole("dialog", { name: "New event" });
-  await expect(dialog.getByLabel("Start time")).toHaveValue("14:00");
-  await expect(dialog.getByLabel("End time")).toHaveValue("15:00");
+  await expect(dialog.getByLabel("Start time")).toHaveText("2:00 PM");
+  await expect(dialog.getByLabel("End time")).toHaveText("3:00 PM");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Call the plumber");
   await dialog.getByRole("textbox", { name: "Title" }).press("Enter");
   await expect(dialog).toHaveCount(0);
@@ -75,7 +75,7 @@ test("an end before the start is refused, in words; Escape closes without saving
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Backwards");
-  await dialog.getByLabel("End time").selectOption("10:00");
+  await choose(dialog.getByLabel("End time"), "10:00 AM");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toHaveText("The end must be after the start.");
   await page.keyboard.press("Escape");
@@ -102,7 +102,7 @@ test("the details of an event show where, the description's link, the reminder, 
   await details.getByRole("button", { name: "Edit" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Design review, round 2");
-  await dialog.getByLabel("Start time").selectOption("16:00");
+  await choose(dialog.getByLabel("Start time"), "4:00 PM");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(details).toHaveCount(0);
@@ -128,7 +128,7 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   test("all occurrences: a new time moves the whole series", async ({ page }) => {
     await openDemo(page, "week");
     const dialog = await editItem(page, "Friday, November 6", /^Stand-up, /, "Stand-up");
-    await dialog.getByLabel("Start time").selectOption("09:15");
+    await choose(dialog.getByLabel("Start time"), "9:15 AM");
     await dialog.getByRole("button", { name: "Save" }).click();
     const scope = page.getByRole("alertdialog", { name: "Edit recurring event" });
     await scope.getByRole("radio", { name: "All occurrences" }).check();
@@ -265,7 +265,7 @@ test("the tasks screen adds a task to its list, undated, and completes it", asyn
     .getByRole("button", { name: "Add a task" })
     .click();
   const dialog = page.getByRole("dialog", { name: "New task" });
-  await expect(dialog.getByLabel("List")).toHaveValue(/.+/);
+  await expect(dialog.getByLabel("List")).toHaveText(/.+/);
   await expect(dialog.getByRole("switch", { name: "Due date" })).not.toBeChecked();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Buy stamps");
   await dialog.getByRole("button", { name: "Save" }).click();
@@ -357,10 +357,10 @@ test.describe("on a phone, in Russian", () => {
     const box = (await dialog.boundingBox())!;
     expect(box.width).toBe(PHONE.width);
     await dialog.getByRole("textbox", { name: "Название" }).fill("Бассейн");
-    await dialog.getByLabel("Повтор").selectOption({ label: "Настроить…" });
+    await choose(dialog.getByLabel("Повтор"), "Настроить…");
     await dialog.getByLabel("Интервал").fill("2");
     await dialog.getByRole("button", { name: "Понедельник" }).click();
-    await expect(dialog.getByLabel("Повтор").locator("option:checked")).toHaveText(
+    await expect(dialog.getByRole("combobox", { name: "Повтор" })).toHaveText(
       "Каждые 2 недели в понедельник, среду",
     );
     await dialog.getByRole("button", { name: "Сохранить" }).click();

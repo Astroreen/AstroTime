@@ -259,8 +259,8 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   await page.mouse.up();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-07");
-  await expect(dialog.getByLabel("Start time")).toHaveValue("14:00");
-  await expect(dialog.getByLabel("End time")).toHaveValue("16:30");
+  await expect(dialog.getByLabel("Start time")).toHaveText("2:00 PM");
+  await expect(dialog.getByLabel("End time")).toHaveText("4:30 PM");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 
