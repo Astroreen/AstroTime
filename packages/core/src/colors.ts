@@ -34,6 +34,41 @@ export function hexColor(value: string): string | null {
   return rgb ? `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}` : null;
 }
 
+/** CSS3's other spellings of colours the table names once. */
+const TWINS = new Set([
+  "cyan",
+  "magenta",
+  "grey",
+  "darkgrey",
+  "darkslategrey",
+  "dimgrey",
+  "lightgrey",
+  "lightslategrey",
+  "slategrey",
+]);
+
+/** The table's spelling of a twin: `grey` is `gray`, `cyan` `aqua`. */
+const spelling = (name: string) =>
+  name === "cyan"
+    ? "aqua"
+    : name === "magenta"
+      ? "fuchsia"
+      : TWINS.has(name)
+        ? name.replace("grey", "gray")
+        : name;
+
+/** Whether `value` is one of CSS3's colour names, in any case. */
+export function isColorName(value: string): boolean {
+  return colorNameHex(value) !== null;
+}
+
+/** The hex of a CSS3 colour name, in any case and either spelling; `null` for none. */
+export function colorNameHex(value: string): string | null {
+  const name = spelling(value.trim().toLowerCase());
+  const found = named().find(([n]) => n === name);
+  return found ? `#${found[1].map((c) => c.toString(16).padStart(2, "0")).join("")}` : null;
+}
+
 /** The CSS3 colour name nearest a hex colour, by distance in RGB; `null` for no hex. */
 export function nearestColorName(hex: string): string | null {
   const rgb = rgbOf(hex);

@@ -1,9 +1,10 @@
 // The Settings screen (design D53, D131): the whole screen on a phone, a
 // dialog from 640 px, in groups: general (theme, language), the views (week
-// start, clock, "hide completed", week numbers), the accounts with how each
-// syncs, whether it syncs at all (foundation D171), its menu and its
-// calendars, each shown or not (D137), reminders (foundation D101), places on
-// the map (D175) and, on the desktop, whether closing the window quits
+// start, clock, "hide completed", week numbers), the colours (D172, D173),
+// the accounts with how each syncs, whether it syncs at all (foundation
+// D171), its menu and its calendars, each shown or not (D137), reminders
+// (foundation D101), places on the map (D175) and, on the desktop, whether
+// closing the window quits
 // (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
@@ -16,6 +17,7 @@ import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../sett
 import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
+import { ColorSettings } from "./color-settings.tsx";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
@@ -151,6 +153,10 @@ function SettingsGroups({
           onChange={(weekNumbers) => change({ weekNumbers })}
         />
       </Group>
+      {/* What new items start with, and the user's own colours (D172, D173). */}
+      <Group title={t("settings.colors")}>
+        <ColorSettings rowClassName={choiceRow} />
+      </Group>
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
       <Group title={t("accounts.title")}>
@@ -271,6 +277,9 @@ function Toggle({
   );
 }
 
+/** A setting's row with its name on the left and its dropdown on the right (D131). */
+const choiceRow = "flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-body";
+
 function Choice({
   label,
   value,
@@ -284,7 +293,7 @@ function Choice({
 }) {
   // The name on the left, its value on the right; the value wraps below on a narrow screen.
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-body">
+    <div className={choiceRow}>
       <Select
         label={label}
         labelClassName="min-w-0 flex-1"

@@ -1,8 +1,10 @@
 // The evidence for editing (docs/plans/foundation.md#pr-6--editing): the
 // details of an event and of a task, the edit dialog on a phone and on a
 // wide screen, the repeat picker, the scope dialog and the Conflicts list,
-// AstroTime's own dropdowns open (design D167; on a phone by touch), in both themes and both languages, from the demo data with the clock
-// frozen. Runs only when ASTROTIME_SCREENSHOTS names a directory:
+// AstroTime's own dropdowns open (design D167; on a phone by touch), the
+// colour dropdown and the colours in Settings (D168, D173), in both themes
+// and both languages, from the demo data with the clock frozen. Runs only
+// when ASTROTIME_SCREENSHOTS names a directory:
 //
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e editing-screenshots
 import { expect, test, type Browser, type Page } from "@playwright/test";
@@ -30,6 +32,11 @@ const WORDS = {
     title: "Title",
     startTime: "Start time",
     twoPm: "2:00 PM",
+    noRepeat: "Does not repeat",
+    colour: "Colour",
+    addColour: "Add a colour",
+    newColour: "New colour",
+    hex: "Hex code",
     menu: "Main menu",
     settings: "Settings",
     language: "Language",
@@ -63,6 +70,11 @@ const WORDS = {
     title: "Название",
     startTime: "Время начала",
     twoPm: "14:00",
+    noRepeat: "Не повторяется",
+    colour: "Цвет",
+    addColour: "Добавить цвет",
+    newColour: "Новый цвет",
+    hex: "Код цвета",
     menu: "Главное меню",
     settings: "Настройки",
     language: "Язык",
@@ -140,6 +152,11 @@ for (const language of ["en", "ru"] as const) {
       await expect(wide.getByRole("listbox")).toBeVisible();
       await shot(wide, name("dropdown-time", "wide"));
       await wide.keyboard.press("Escape");
+      await expect(wide.getByRole("listbox")).toHaveCount(0);
+      await editing.getByRole("combobox", { name: w.colour }).click();
+      await expect(wide.getByRole("listbox")).toBeVisible();
+      await shot(wide, name("dropdown-colour", "wide"));
+      await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
       await expect(wide.getByRole("dialog")).toHaveCount(0);
@@ -187,7 +204,7 @@ for (const language of ["en", "ru"] as const) {
       await create.getByRole("combobox", { name: w.repeat }).tap();
       await expect(phone.getByRole("listbox")).toBeVisible();
       await shot(phone, name("dropdown-repeat", "phone"));
-      await phone.getByRole("option").first().tap();
+      await phone.getByRole("option", { name: w.noRepeat, exact: true }).tap();
       await expect(phone.getByRole("listbox")).toHaveCount(0);
       await choose(create.getByLabel(w.repeat, { exact: true }), w.custom);
       await create.getByLabel(w.interval, { exact: true }).fill("2");
@@ -203,6 +220,19 @@ for (const language of ["en", "ru"] as const) {
       await phone.getByRole("dialog", { name: w.settings }).getByLabel(w.language).tap();
       await expect(phone.getByRole("listbox")).toBeVisible();
       await shot(phone, name("dropdown-settings", "phone"));
+      await phone.getByRole("option").first().tap();
+      await expect(phone.getByRole("listbox")).toHaveCount(0);
+
+      // The colours in Settings, with an own colour, and its dialog.
+      const settings = phone.getByRole("dialog", { name: w.settings });
+      await settings.getByRole("button", { name: w.addColour }).tap();
+      const colour = phone.getByRole("dialog", { name: w.newColour });
+      await colour.getByRole("textbox", { name: w.hex }).fill("#c48b9f");
+      await shot(phone, name("colour-editor", "phone"));
+      await colour.getByRole("textbox", { name: w.hex }).press("Enter");
+      await expect(colour).toHaveCount(0);
+      await settings.getByRole("button", { name: w.addColour }).scrollIntoViewIfNeeded();
+      await shot(phone, name("settings-colours", "phone"));
       await phone.context().close();
     });
   }

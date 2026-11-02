@@ -100,6 +100,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Dropdown** — a button that opens a list under it to choose from:
   AstroTime's own (`Select`, `MenuButton`), never the browser's `<select>`
   (design D167).
+- **Own colour** — a colour the user made in Settings, named from its
+  colour until they name it (design D170, D173).
 - **Details** — the dialog a tap on an item opens: when it is, how it
   repeats, where, its reminders and guests, with edit and delete (design
   D108).

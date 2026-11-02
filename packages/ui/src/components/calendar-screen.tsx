@@ -31,7 +31,7 @@ import {
 } from "../calendar/views.ts";
 import { useEntries, useMediaQuery, useNow, type Entries } from "../hooks.ts";
 import { KEYS, readHidden, usePreference, type Preferences } from "../preferences.ts";
-import { useSettings } from "../settings.ts";
+import { defaultColorOf, useSettings } from "../settings.ts";
 import { AccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { AgendaView } from "./agenda-view.tsx";
@@ -83,7 +83,8 @@ export function CalendarScreen({
   const formats = useMemo(() => new Formats(settings), [settings]);
   const { today, minutes } = useNow(timeZone);
   const wide = useMediaQuery("(min-width: 1024px)");
-  const { hideCompleted, weekNumbers } = useSettings().settings;
+  const chosen = useSettings().settings;
+  const { hideCompleted, weekNumbers } = chosen;
 
   const [view, setView] = usePreference<View>(
     preferences,
@@ -241,6 +242,10 @@ export function CalendarScreen({
     today,
     minutes,
     colorOf: (target) => validColor(target.item.color) ?? colorOfCalendar(target.calendarId),
+    defaultColors: {
+      event: defaultColorOf(chosen, "event"),
+      task: defaultColorOf(chosen, "task"),
+    },
     onChanged: () => scheduler.changed(),
   });
   // The draft brought into sight when its day or time changes, where the
