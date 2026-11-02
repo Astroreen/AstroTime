@@ -1763,8 +1763,8 @@ optimization is lacking").
     the budget, saying why.
   - **Measured by hand** with `scripts/bench-cold-start.ts`: the built app
     on the image's server, its store filled with `big-calendar.ts`'s 12 230
-    objects (D118's), the median of five new tabs, the service worker kept
-    out so the network and the HTTP cache are what is measured; it prints
+    objects (D118's), the median of five new tabs, the service worker passed
+    by so the network and the HTTP cache are what is measured; it prints
     when the first paint came, when the week's first event was drawn, the
     main thread's blocked time until then and the bytes fetched, and stops
     at the first error the page throws. On an i7-14700KF, and with Chrome's

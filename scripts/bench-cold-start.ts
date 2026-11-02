@@ -50,10 +50,7 @@ await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 const browser = await chromium.launch({ args: ["--enable-precise-memory-info"] });
-// The network and the HTTP cache are measured: the service worker (D124)
-// would serve every file from its own cache after the first visit.
 const context = await browser.newContext({
-  serviceWorkers: "block",
   locale: "en-US",
   timezoneId: "Europe/Vilnius",
   viewport: { width: 1440, height: 900 },
@@ -129,6 +126,9 @@ async function measure(label: string, cold: boolean) {
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     await cdp.send("Network.enable");
+    // The network and the HTTP cache are measured: the service worker (D124)
+    // registers as ever, but would serve every file from its own cache.
+    await cdp.send("Network.setBypassServiceWorker", { bypass: true });
     if (cold) await cdp.send("Network.clearBrowserCache");
     if (slow) {
       await cdp.send("Network.emulateNetworkConditions", {
