@@ -17,7 +17,12 @@ const HEADINGS = ["text-title", "text-row font-semibold", "text-body font-semibo
 function block(node: Block, key: number): ReactNode {
   switch (node.type) {
     case "paragraph":
-      return <p key={key}>{node.children.map(inline)}</p>;
+      // Spaces as typed, as the plain text it is in other clients.
+      return (
+        <p key={key} className="whitespace-pre-wrap">
+          {node.children.map(inline)}
+        </p>
+      );
     case "heading": {
       const Tag = `h${Math.min(6, node.level + 2)}` as "h3";
       return (

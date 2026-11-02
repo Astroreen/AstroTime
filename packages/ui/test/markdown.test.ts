@@ -377,3 +377,41 @@ describe("random text (a seeded fuzz)", () => {
     }
   });
 });
+
+describe("after #94's review (design D207)", () => {
+  test("a plain description keeps its spaces and indents inside a paragraph", () => {
+    expect(parseMarkdown("Room:   4\n  second floor   ")).toEqual([
+      paragraph("Room:   4", { type: "break" }, "  second floor"),
+    ]);
+  });
+
+  test("a code span wins over emphasis; a mark inside a bare link closes nothing", () => {
+    expect(parseMarkdown("*foo `a*` bar*")).toEqual([
+      paragraph({ type: "em", children: ["foo ", { type: "code", text: "a*" }, " bar"] }),
+    ]);
+    expect(parseMarkdown("*see https://example.com/a*b now*")).toEqual([
+      paragraph({
+        type: "em",
+        children: [
+          "see ",
+          { type: "link", href: "https://example.com/a*b", children: ["https://example.com/a*b"] },
+          " now",
+        ],
+      }),
+    ]);
+  });
+
+  test("a tab inside fenced code stays a tab, at the top and in a list", () => {
+    expect(parseMarkdown("```\n\tindented\ta\n```")).toEqual([
+      { type: "code", text: "\tindented\ta" },
+    ]);
+    const [list] = parseMarkdown("- a\n  ```\n  \tx\n  ```");
+    expect(JSON.stringify(list)).toContain('"text":"\\tx"');
+  });
+
+  test("an empty heading is text, not an empty heading", () => {
+    expect(parseMarkdown("#")).toEqual([paragraph("#")]);
+    expect(parseMarkdown("## ##")).toEqual([paragraph("## ##")]);
+    expect(parseMarkdown("Total\n#")).toEqual([paragraph("Total", { type: "break" }, "#")]);
+  });
+});
