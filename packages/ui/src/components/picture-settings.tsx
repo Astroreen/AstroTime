@@ -9,13 +9,7 @@ import { useTranslation } from "react-i18next";
 
 import { addPictureStrings } from "../i18n/pictures.ts";
 import { MONTH_ART } from "../pictures/art.ts";
-import {
-  addPicture,
-  NotAPictureError,
-  removePicture,
-  sweepPictures,
-  usePictureUrl,
-} from "../pictures/own.ts";
+import { addPicture, NotAPictureError, removePicture, usePictureUrl } from "../pictures/own.ts";
 import { useSettings, type OwnWord } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon, PlusIcon } from "./icons.tsx";
@@ -86,15 +80,6 @@ export function PictureSettings() {
   const [editing, setEditing] = useState<OwnWord | "new" | null>(null);
   const [banners, setBanners] = useState(false);
   const wordsId = useId();
-  // As Settings opens: pictures nothing names (a dialog closed unsaved) are forgotten.
-  useEffect(() => {
-    const named = new Set([
-      ...settings.ownWords.map((own) => own.picture),
-      ...Object.values(settings.ownBanners),
-    ]);
-    sweepPictures(named).catch(console.error);
-    // Once, as it opens: a pick in a dialog open later is the dialog's own.
-  }, []);
   return (
     <>
       <h3 id={wordsId} className="px-4 pt-3 pb-1 text-note text-ink-muted">

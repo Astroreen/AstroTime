@@ -1,7 +1,8 @@
 // The user's own pictures (docs/plans/design.md#D222): kept on this device,
 // in the page's IndexedDB (`astrotime-pictures`), never in the calendars and
 // never sent anywhere. A picture is made smaller as it is added (its long
-// side at most 1600 px, WebP where the browser writes it, else JPEG), so a
+// side at most 1600 px, WebP where the browser writes it, else JPEG; kept as
+// it came where the browser has no canvas to draw it on), so a
 // phone's photo of several megabytes keeps a few hundred kilobytes. The
 // settings hold only each picture's id (`Settings.ownWords`, `ownBanners`).
 import { useEffect, useState } from "react";
@@ -63,14 +64,45 @@ async function smaller(file: Blob): Promise<Blob> {
   } catch (error) {
     throw new NotAPictureError(error);
   }
-  const { width, height } = keptSize(bitmap.width, bitmap.height);
-  const canvas = new OffscreenCanvas(width, height);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-  const webp = await canvas.convertToBlob({ type: "image/webp", quality: 0.85 });
-  return webp.type === "image/webp"
-    ? webp
-    : canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  try {
+    const { width, height } = keptSize(bitmap.width, bitmap.height);
+    const canvas = canvasOf(width, height);
+    const context = canvas?.getContext("2d") as
+      | CanvasRenderingContext2D
+      | OffscreenCanvasRenderingContext2D
+      | null
+      | undefined;
+    // No canvas to draw on (an old WebView): the picture is kept as it came.
+    if (!canvas || !context) return file;
+    context.drawImage(bitmap, 0, 0, width, height);
+    const webp = await blobOf(canvas, "image/webp");
+    return webp?.type === "image/webp" ? webp : ((await blobOf(canvas, "image/jpeg")) ?? file);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** A canvas to draw on: off the page where the browser has one, else the page's own. */
+function canvasOf(width: number, height: number): OffscreenCanvas | HTMLCanvasElement | null {
+  if (typeof OffscreenCanvas === "function") return new OffscreenCanvas(width, height);
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+/** The canvas as a picture of `type`, or `null` when the browser writes none. */
+async function blobOf(
+  canvas: OffscreenCanvas | HTMLCanvasElement,
+  type: string,
+): Promise<Blob | null> {
+  try {
+    if ("convertToBlob" in canvas) return await canvas.convertToBlob({ type, quality: 0.85 });
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, 0.85));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -102,17 +134,6 @@ export async function pictureOf(id: string): Promise<Blob | undefined> {
   return transact("readonly", (store) => store.get(id) as IDBRequest<Blob | undefined>);
 }
 
-/**
- * Forgets every kept picture but those `keep` names (design D222): one a
- * dialog kept and then closed unsaved, or a pick that arrived after its
- * dialog had gone, has nothing naming it. Run as Settings opens.
- */
-export async function sweepPictures(keep: ReadonlySet<string>): Promise<void> {
-  const ids = await transact("readonly", (store) => store.getAllKeys());
-  const stray = ids.filter((id): id is string => typeof id === "string" && !keep.has(id));
-  await Promise.all(stray.map(removePicture));
-}
-
 /** Forgets a picture; one that is not kept is no error. */
 export async function removePicture(id: string): Promise<void> {
   urls.get(id)?.then(
@@ -125,16 +146,19 @@ export async function removePicture(id: string): Promise<void> {
 
 /** Each picture's object URL, made once and kept while the page is open; a miss or a failure is asked again. */
 const urls = new Map<string, Promise<string | null>>();
+/** A kept picture's object URL, `null` when there is none (or it was removed while read). */
+export const pictureUrl = (id: string): Promise<string | null> => urlOf(id);
+
 const urlOf = (id: string) => {
-  let url = urls.get(id);
-  if (!url) {
-    url = pictureOf(id).then(
-      (blob) => (blob ? URL.createObjectURL(blob) : null),
-      () => null,
-    );
-    urls.set(id, url);
-    void url.then((found) => found === null && urls.delete(id));
-  }
+  const known = urls.get(id);
+  if (known) return known;
+  const url: Promise<string | null> = pictureOf(id).then(
+    // Removed while it was read (`urls` no longer holds this read): no URL is made.
+    (blob) => (blob && urls.get(id) === url ? URL.createObjectURL(blob) : null),
+    () => null,
+  );
+  urls.set(id, url);
+  void url.then((found) => found === null && urls.get(id) === url && urls.delete(id));
   return url;
 };
 

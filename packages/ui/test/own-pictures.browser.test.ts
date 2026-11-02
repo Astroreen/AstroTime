@@ -1,15 +1,15 @@
 // The user's own pictures on the device (design D222), in Chromium's
 // IndexedDB: kept smaller, read back, forgotten; a file that is no picture
 // refused.
-import { expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import {
   addPicture,
   keptSize,
   NotAPictureError,
   pictureOf,
+  pictureUrl,
   removePicture,
-  sweepPictures,
 } from "../src/pictures/own.ts";
 
 /** A picture as a phone's camera gives one: a PNG, 3000 × 1000. */
@@ -57,11 +57,24 @@ test("a picture already small enough keeps its size", () => {
   expect(keptSize(1000, 4000)).toEqual({ width: 400, height: 1600 });
 });
 
-test("the sweep forgets every picture nothing names, and keeps those named", async () => {
-  const named = await addPicture(await photo());
-  const stray = await addPicture(await photo());
-  await sweepPictures(new Set([named]));
-  expect(await pictureOf(named)).toBeDefined();
-  expect(await pictureOf(stray)).toBeUndefined();
-  await removePicture(named);
+test("a picture removed while its URL is read gets none: nothing is left to revoke", async () => {
+  const id = await addPicture(await photo());
+  const reading = pictureUrl(id);
+  await removePicture(id);
+  expect(await reading).toBeNull();
+  // Asked again, still none: the miss is not remembered, and nothing is there.
+  expect(await pictureUrl(id)).toBeNull();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+test("with no OffscreenCanvas the page's own canvas makes it smaller", async () => {
+  const source = await photo();
+  vi.stubGlobal("OffscreenCanvas", undefined);
+  const id = await addPicture(source);
+  const bitmap = await createImageBitmap((await pictureOf(id))!);
+  expect([bitmap.width, bitmap.height]).toEqual([1600, 533]);
+  await removePicture(id);
 });

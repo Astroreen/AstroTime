@@ -2125,9 +2125,14 @@ own (below).
   and nothing is kept. The settings hold only each picture's id; a word
   deleted, a picture replaced or a banner reset forgets its picture, and
   so does a dialog closed unsaved (its pick, or one that arrives after it
-  closed); as Settings opens, any picture nothing names is swept away. A
-  picture that could not be read is asked for again next time, not
-  remembered as missing.
+  closed). No sweep of pictures nothing names: every tab and window
+  shares the database, and one tab's sweep would take a picture another
+  tab has just picked and not yet saved; a picture left by a tab closed
+  mid-pick stays ([Deferred](#deferred)). A picture that could not be read
+  is asked for again next time, not remembered as missing; one removed
+  while it was read gets no URL. Where the browser has no
+  `OffscreenCanvas` the page's own canvas draws it, and with no canvas at
+  all it is kept as it came.
   Across devices: [Deferred](#deferred), as own colours are (D173).
 - **D223. Your words and pictures, your month banners.** Settings →
   Pictures, under its switches (`picture-settings.tsx`, loaded with
@@ -2195,6 +2200,11 @@ own (below).
   device; the account's own files (thread N's `Provider.files()`, a
   folder of the account's WebDAV) could carry them and the words to the
   user's other devices.
+- **A picture left by a tab closed mid-pick** ([D222](#D222)): a dialog's
+  pick is forgotten as the dialog closes, but a tab closed with the dialog
+  open leaves its pick in the database, named by nothing. A sweep safe
+  for every tab (pictures older than a day that no tab's settings name,
+  read again right before deleting) would take them.
 - **A picture for one item** ([D223](#D223)): an item's own picture, which
   its calendar object would carry (an `ATTACH` or an `X-` property) for
   other devices and clients to show.
