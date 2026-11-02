@@ -245,6 +245,9 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+    - `description.tsx` — an item's description in the details, drawn
+      as Markdown from `calendar/markdown.ts`'s tree (`parseMarkdown`; no
+      HTML, links only to http(s), mailto, tel). → `plans/design.md#D207`
     - `attachments.tsx` — an item's attachments in its details: links
       that open, inline files saved on demand (`Platform.saveFile` where
       the platform saves files). → `plans/design.md#D230`
