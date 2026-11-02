@@ -202,6 +202,18 @@ test.describe("the screens and dialogs", () => {
           page.getByRole("dialog", { name: "Settings" }).getByLabel("Theme"),
         ).toBeVisible();
         await audit(page, "the settings dialog");
+        // The colours (design D168, D173): an own colour's dialog, and the defaults' dropdown.
+        const settings = page.getByRole("dialog", { name: "Settings" });
+        await settings.getByRole("button", { name: "Add a colour" }).click();
+        await expect(page.getByRole("dialog", { name: "New colour" })).toBeVisible();
+        await audit(page, "an own colour's dialog");
+        await page
+          .getByRole("dialog", { name: "New colour" })
+          .getByRole("button", { name: "Save" })
+          .click();
+        await settings.getByRole("combobox", { name: "Colour of new events" }).click();
+        await expect(page.getByRole("listbox")).toBeVisible();
+        await audit(page, "the colour dropdown");
       });
 
       test("search with results", async ({ page }) => {

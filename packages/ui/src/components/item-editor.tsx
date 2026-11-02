@@ -17,7 +17,7 @@ import {
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -35,6 +35,7 @@ import {
   type RepeatChoice,
 } from "../calendar/editing.ts";
 import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
+import { defaultColorOf, useSettings, type DefaultColors } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -47,23 +48,11 @@ import {
   RepeatIcon,
 } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
+import { ColorSelect } from "./color-select.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
-
-/** RFC 7986 `COLOR`s to pick from: CSS names, as Nextcloud writes them. */
-const COLORS = [
-  "tomato",
-  "orange",
-  "gold",
-  "mediumseagreen",
-  "lightseagreen",
-  "steelblue",
-  "slateblue",
-  "palevioletred",
-  "slategray",
-] as const;
 
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
@@ -186,6 +175,11 @@ function Fields({
 }) {
   const { t } = useTranslation();
   const { timeZone } = useCalendar();
+  const { settings } = useSettings();
+  const defaults = {
+    event: defaultColorOf(settings, "event"),
+    task: defaultColorOf(settings, "task"),
+  };
   const set = (changes: Partial<Form>) => onChange({ ...form, ...changes });
   const event = form.kind === "event";
   return (
@@ -198,7 +192,7 @@ function Fields({
               type="button"
               role="radio"
               aria-checked={form.kind === kind}
-              onClick={() => onChange(switchKind(form, kind))}
+              onClick={() => onChange(withKindColor(form, switchKind(form, kind), defaults))}
               className="rounded-full px-4 py-1.5 text-body font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-accent aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t(`edit.kind.${kind}`)}
@@ -303,11 +297,16 @@ function Fields({
       </Section>
 
       <Section icon={<PaletteIcon className="size-5" />}>
-        <Colors
-          value={form.color}
-          calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
-          onChange={(color) => set({ color })}
-        />
+        <div className="flex flex-col gap-1">
+          <ColorSelect
+            label={t("edit.color")}
+            labelClassName={fieldLabel}
+            value={form.color}
+            calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
+            onChange={(color) => set({ color })}
+            className={fieldButton}
+          />
+        </div>
       </Section>
 
       <Section icon={<PlaceIcon className="size-5" />}>
@@ -331,6 +330,11 @@ function Fields({
       </Section>
     </div>
   );
+}
+
+/** Switched kind, a new item still in its kind's default colour takes the other's (design D172). */
+function withKindColor(form: Form, next: Form, defaults: DefaultColors): Form {
+  return form.color === defaults[form.kind] ? { ...next, color: defaults[next.kind] } : next;
 }
 
 function Section({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -469,41 +473,6 @@ function Select({
         options={options.map(([option, name]) => ({ value: option, label: name }))}
         className={fieldButton}
       />
-    </div>
-  );
-}
-
-function Colors({
-  value,
-  calendarColor,
-  onChange,
-}: {
-  value: string | null;
-  /** The calendar's own colour, the first choice (design D47). */
-  calendarColor: string | null;
-  onChange: (color: string | null) => void;
-}) {
-  const { t } = useTranslation();
-  const choices: ((typeof COLORS)[number] | null)[] = [null, ...COLORS];
-  return (
-    <div
-      role="radiogroup"
-      aria-label={t("edit.color")}
-      className="flex flex-wrap items-center gap-2 py-1.5"
-    >
-      {choices.map((color) => (
-        <button
-          key={color ?? "calendar"}
-          type="button"
-          role="radio"
-          aria-checked={value === color}
-          aria-label={color ? t(`color.${color}`) : t("edit.colorDefault")}
-          title={color ? t(`color.${color}`) : t("edit.colorDefault")}
-          onClick={() => onChange(color)}
-          className="item-color grid size-8 place-items-center rounded-full bg-[var(--item-fill)] ring-1 ring-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-2 aria-checked:ring-offset-raised focus-visible:outline-2 focus-visible:outline-accent"
-          style={{ "--item": color ?? calendarColor ?? undefined } as CSSProperties}
-        ></button>
-      ))}
     </div>
   );
 }

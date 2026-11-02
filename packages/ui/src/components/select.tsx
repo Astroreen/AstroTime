@@ -6,6 +6,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { Select as BaseSelect } from "@base-ui/react/select";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CaretIcon, CheckIcon } from "./icons.tsx";
 
@@ -30,7 +31,8 @@ export const row =
 /**
  * One value from a list. With `labelClassName` its label shows in that
  * style next to the button (the caller's layout places both); without, the
- * label only names the button for a screen reader.
+ * label only names the button for a screen reader. A value no option has
+ * (a calendar gone meanwhile) reads "Not chosen" on the button, never blank.
  */
 export function Select({
   label,
@@ -48,6 +50,7 @@ export function Select({
   /** The button's size and background. */
   className?: string;
 }) {
+  const { t } = useTranslation();
   const chosen = options.find((option) => option.value === value);
   return (
     <BaseSelect.Root value={value} onValueChange={(next) => next !== null && onChange(next)}>
@@ -60,7 +63,11 @@ export function Select({
       >
         <BaseSelect.Value className="flex min-w-0 flex-1 items-center gap-2">
           {chosen?.leading}
-          <span className="min-w-0 flex-1 truncate">{chosen?.label}</span>
+          {chosen ? (
+            <span className="min-w-0 flex-1 truncate">{chosen.label}</span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-ink-muted">{t("select.none")}</span>
+          )}
         </BaseSelect.Value>
         <BaseSelect.Icon className="shrink-0 text-ink-muted">
           <CaretIcon className="size-5" />
