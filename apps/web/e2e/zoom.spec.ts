@@ -5,7 +5,7 @@
 // step waits for what it draws.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE } from "./support.ts";
 
 const grid = (page: Page) => page.locator("main [data-current] [data-scroller]");
 const standUp = (page: Page) =>
@@ -136,6 +136,48 @@ test.describe("on a phone", () => {
     await expect(main(page)).toHaveCSS("--hour", "24px");
     const day = (await page.getByRole("list", { name: "Wednesday, November 4" }).boundingBox())!;
     expect(Math.round(day.height)).toBe(24 * 24);
+  });
+});
+
+test.describe("a pinch begun sideways (design D192)", () => {
+  test.use({ viewport: PHONE, hasTouch: true });
+
+  test("a first finger that moves sideways, then a second, pinch: no swipe to other days", async ({
+    page,
+  }) => {
+    await openDemo(page, "3days");
+    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    const box = (await grid(page).boundingBox())!;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    // Chromium's touch input, its moves 50 ms apart by their own times.
+    let time = Date.now() / 1000;
+    const touch = (
+      type: "touchStart" | "touchMove" | "touchEnd",
+      points: { x: number; y: number }[],
+    ) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: points.map((point, id) => ({ ...point, id })),
+        timestamp: (time += 0.05),
+      });
+    // The first finger alone, sideways: a swipe to the next days begins.
+    await touch("touchStart", [{ x: 330, y }]);
+    for (let step = 1; step <= 6; step++) await touch("touchMove", [{ x: 330 - step * 18, y }]);
+    await expect(page.locator("[data-track]")).toHaveAttribute("style", /translateX/);
+    // A second finger lands, and the two spread apart.
+    for (const spread of [40, 80, 120, 160, 200]) {
+      await touch(spread === 40 ? "touchStart" : "touchMove", [
+        { x: 222, y: y - spread / 2 },
+        { x: 222, y: y + spread / 2 },
+      ]);
+    }
+    await touch("touchEnd", []);
+    // Zoomed, on the same days, the swipe gone back.
+    await expect(main(page)).not.toHaveCSS("--hour", "56px");
+    await expect(page.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
+    await expect(page.locator("[data-track]")).not.toHaveAttribute("style", /translateX/);
+    await expect(page.getByRole("heading", { name: "Saturday, November 7" })).toHaveCount(0);
   });
 });
 

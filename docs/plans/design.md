@@ -1643,8 +1643,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     already scrolling with one is no pinch: the browser has made that
     touch its scroll and no longer lets the page cancel its moves, so the
     zoom stops there rather than set the scroll against the browser's. A
-    swipe follows the first finger alone ([D152](#D152)), and a
-    real two-finger pinch did not swipe (below); a third finger ends the
+    second finger is no swipe ([D152](#D152)): a swipe the first finger
+    began sideways goes back, and none starts; a third finger ends the
     pinch where it is, and when one of three lifts, the two left begin
     anew from there, so the zoom never measures one pair of fingers
     against another;
@@ -1683,7 +1683,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   nothing; three wheels compounding to 102 px; a second finger on a grid
   the browser already scrolls, no zoom; a pinch the browser cancels, kept
   at 112 px through a reload; a third finger ending a pinch at 84 px and
-  the two left beginning anew, to 168 px rather than 240). Tried by hand
+  the two left beginning anew, to 168 px rather than 240; a first finger
+  moved sideways, then a second, pinching: zoomed, the swipe gone back). Tried by hand
   on Android 16's Chrome in an emulator, a real two-finger pinch to twice the size: the hours twice as
   tall about the pinch, the page not zoomed, no swipe;
   `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
