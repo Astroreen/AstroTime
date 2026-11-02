@@ -399,6 +399,30 @@ test("an undone task due before today stays on its day and counts in today's chi
   await expect(strip(page).getByRole("button", { name: /undone/ })).toHaveCount(0);
 });
 
+for (const [view, viewport] of [
+  ["week", WIDE],
+  ["3days", { width: 390, height: 844 }],
+] as const) {
+  test(`today's circle keeps 8 px from the all-day items under it in ${view} (design D189)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openDemo(page, view);
+    const circle = header(page, "Wednesday, November 4").locator("[data-day-number]");
+    const circleBox = (await circle.boundingBox())!;
+    const stripBox = (await strip(page).boundingBox())!;
+    expect(stripBox.y - (circleBox.y + circleBox.height)).toBeGreaterThanOrEqual(8);
+  });
+}
+
+test("the Day view's hours start 8 px under its all-day strip (design D189)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openDemo(page, "day");
+  const stripBox = (await strip(page).boundingBox())!;
+  const scroller = (await page.locator("main [data-current] [data-scroller]").boundingBox())!;
+  expect(scroller.y - (stripBox.y + stripBox.height)).toBeGreaterThanOrEqual(8);
+});
+
 test("the theme follows the system; data-theme overrides it (D44)", async ({ page }) => {
   await openDemo(page, "week");
   const body = page.locator("body");
