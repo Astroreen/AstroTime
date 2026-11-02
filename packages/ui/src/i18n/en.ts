@@ -236,6 +236,7 @@ export const en = {
   "tasks.none": "No tasks yet",
   "tasks.allDone": "All tasks complete",
   "tasks.completed": "Completed ({{n}})",
+  "tasks.completedLabel": "Completed",
   "tasks.completedList": "Completed tasks",
 
   "search.label": "Search",
