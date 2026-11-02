@@ -3,7 +3,13 @@
 // (`layoutSpans` with `timed`); a tile shows as many rows as fit, then "+N".
 import { dayRange, layoutSpans, type Occurrence } from "@astrotime/core";
 
-import { shownOn, undoneChip, type Entry, type LayoutContext, type StripSpan } from "./query.ts";
+import {
+  byOccurrence,
+  undoneChip,
+  type Entry,
+  type LayoutContext,
+  type StripSpan,
+} from "./query.ts";
 
 export interface MonthWeek {
   readonly days: readonly string[];
@@ -17,9 +23,9 @@ export function layoutMonth(
   options: LayoutContext,
 ): MonthWeek[] {
   const { today, timeZone, undone } = options;
-  const byOccurrence = shownOn(entries, today, timeZone);
+  const shown = byOccurrence(entries);
   // The days each occurrence shows on, once, so each week takes only its own.
-  const covered = [...byOccurrence.keys()].map((occurrence) => {
+  const covered = [...shown.keys()].map((occurrence) => {
     const { first, last } = dayRange(occurrence, timeZone);
     return { occurrence, first, last };
   });
@@ -34,7 +40,7 @@ export function layoutMonth(
     if (undone > 0 && week.includes(today)) occurrences.push(undoneChip(today));
     const spans = layoutSpans(occurrences, week, timeZone, { timed: true }).map((span) => ({
       span,
-      entry: byOccurrence.get(span.occurrence) ?? null,
+      entry: shown.get(span.occurrence) ?? null,
     }));
     weeks.push({ days: week, spans });
   }
