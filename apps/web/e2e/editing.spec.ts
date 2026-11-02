@@ -299,6 +299,9 @@ test("the details of an event show where, the description's link, the reminder, 
   await expect(details.getByRole("definition").filter({ hasText: /^Work$/ })).toBeVisible();
   await expect(details.getByRole("term").filter({ hasText: /^Calendar$/ })).toHaveCount(1);
   await expect(details.getByText("Calendar: Work")).toHaveCount(0);
+  // Every row's term names it: none is an icon alone to a screen reader.
+  const terms = await details.getByRole("term").allTextContents();
+  expect(terms).toEqual(["Location", "Description", "Reminders", "Guests", "Calendar"]);
 
   await details.getByRole("button", { name: "Edit" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit event" });

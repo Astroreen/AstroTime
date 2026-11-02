@@ -217,7 +217,7 @@ function Body({
         </div>
         <dl className="mt-4 flex flex-col gap-3 text-body">
           {rule && (
-            <Row icon={<RepeatIcon className="size-5" />}>
+            <Row icon={<RepeatIcon className="size-5" />} label={t("edit.repeat")}>
               {rule.exact
                 ? repeatWords(rule.repeat, times.start ?? times.end, t, formats)
                 : t("repeat.kept", {
@@ -236,7 +236,7 @@ function Body({
             </Row>
           )}
           {item.description && (
-            <Row icon={<NotesIcon className="size-5" />}>
+            <Row icon={<NotesIcon className="size-5" />} label={t("edit.description")}>
               <span className="break-words whitespace-pre-wrap">{linkify(item.description)}</span>
             </Row>
           )}
@@ -278,12 +278,12 @@ function Body({
             </Row>
           )}
           {!task && item.categories.length > 0 && (
-            <Row icon={<NotesIcon className="size-5" />}>
+            <Row icon={<NotesIcon className="size-5" />} label={t("details.tags")}>
               {t("details.categories", { categories: item.categories.join(", ") })}
             </Row>
           )}
           {task && (related.parent || related.subtasks.length > 0) && (
-            <Row icon={<SubtasksIcon className="size-5" />}>
+            <Row icon={<SubtasksIcon className="size-5" />} label={t("details.subtasks")}>
               {related.parent && <p>{t("details.parent", { title: related.parent })}</p>}
               {related.subtasks.length > 0 && (
                 <div>
@@ -329,12 +329,13 @@ function Body({
   );
 }
 
-function Row({ icon, label, children }: { icon: ReactNode; label?: string; children: ReactNode }) {
+/** A row of the details: its icon, and its name for a screen reader as the term (design D196). */
+function Row({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-4">
       <dt className="mt-px shrink-0 text-ink-muted">
         {icon}
-        {label && <span className="sr-only">{label}</span>}
+        <span className="sr-only">{label}</span>
       </dt>
       <dd className="min-w-0 flex-1">{children}</dd>
     </div>

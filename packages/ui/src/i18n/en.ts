@@ -291,6 +291,7 @@ export const en = {
   "details.due": "Due {{time}}",
   "details.zone": "Set in the {{zone}} time zone",
   "details.categories": "Tags: {{categories}}",
+  "details.tags": "Tags",
   "details.parent": "Subtask of {{title}}",
   "details.subtasks": "Subtasks",
   "details.complete": "Mark completed",

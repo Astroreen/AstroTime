@@ -304,6 +304,7 @@ export const ru = {
   "details.due": "Срок: {{time}}",
   "details.zone": "Задано в часовом поясе {{zone}}",
   "details.categories": "Метки: {{categories}}",
+  "details.tags": "Метки",
   "details.parent": "Подзадача задачи «{{title}}»",
   "details.subtasks": "Подзадачи",
   "details.complete": "Отметить выполненной",
