@@ -245,6 +245,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `draft-aside.ts` — `useDraft`, the edit dialog's draft made in the
       editor's chunk and handed to the views (`DrawnDraft`), and where the
       dialog stands on a wide screen, beside it. → `plans/design.md#D155`
+    - `pinch.ts` — `zoomable`: the time grid's hour pinched to any height
+      by two fingers, Ctrl and a wheel, or the keys, drawn through `--hour`
+      and kept on the device; loaded after the view. → `plans/design.md#D192`
     - `pager.tsx` — `Pager`: how a view moves from one period to the
       next, a swipe's periods side by side under the finger, a step's
       slide, a view's fade. → `plans/design.md#D154`

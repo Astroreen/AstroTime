@@ -1560,7 +1560,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   editor's chunk loaded first, then a single click on the backdrop
   closing it; a double tap by touch on a wide screen; a dialog opened by a
   single click closing on a backdrop click counted as a second elsewhere,
-  which `detail` alone kept open; each failing before its change).
+  which `detail` alone kept open; each failing before its change), and
+  `editing.spec.ts` (a double click on the all-day strip with the chunk
+  loaded, failing without the strip's `press`).
 - **D191. Scrollbars are thin, rounded and in the theme** (the owner's
   feedback 14b: "redo the design of the overflow scrollbars"). Every
   scroller had the platform's classic scrollbar, a 15 px grey bar on
@@ -1595,6 +1597,58 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   keeps their width in the layout, which is what this measures). The
   thumb's colours under the pointer and while dragged, Firefox's
   `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
+- **D192. The time grid's hours are as tall as the user pinches them**
+  (the owner's feedback 15: "when the user pinches in/out, the distance
+  between hours changes ... not fixed steps: any value"). The hour was
+  56 px. It is now any height from 24 to 240 px (`hourIn` in `items.tsx`,
+  the one place of the bounds), the same in Day, 3 days and Week, kept on
+  the device (`astrotime.hour` in the preferences; another tab's new
+  height reaches this one when it opens again):
+  - **two fingers** on the grid spread or close it; the time between them
+    stays between them. The page never zooms there: the grid's
+    `touch-action` is `pan-y`, which leaves the browser no pinch of its
+    own, so the two fingers' moves are the grid's to take, and it takes
+    them before the browser scrolls. A second finger added to a grid
+    already scrolling with one is no pinch: the browser has made that
+    touch its scroll and no longer lets the page cancel its moves, so the
+    zoom stops there rather than set the scroll against the browser's. A
+    second finger is no swipe either ([D152](#D152)): the swipe lets go of
+    the first;
+  - **a trackpad's pinch, or Ctrl and a wheel** (a trackpad's pinch comes
+    to the page as a wheel with Ctrl) over the grid does the same about
+    the pointer, in place of the page's zoom there; elsewhere the page
+    zooms as the browser does;
+  - **the keys "+" (or "="), "-" and "0"** step it by a quarter, or bring
+    back 56 px, about the middle of the grid shown, as the view's other
+    keys ([D88](#D88)), when nothing else has the key: a field, a dialog,
+    a menu, a list box, a tab list, or another handler that took it.
+    Ctrl and "+" are left to the browser, whose page zoom low-vision users
+    rely on (WCAG 1.4.4).
+
+  While a zoom goes, only `--hour` on the view and the grid's scroll
+  change, with no React render: the grid, its hours, tiles, items, the
+  current time and a drag's ghost are drawn with `calc(var(--hour) * …)`,
+  and each step starts from the height drawn, not the one React last
+  rendered. It is drawn as it is kept, to a tenth of a pixel
+  (`keptHour`), so the time under the fingers does not move when the
+  zoom ends. When the fingers go, the keys are pressed or the wheel rests
+  for a quarter of a second, the height is kept, and the views render once
+  with it: what a block's text fits ([D153](#D153)), where a drag lands and
+  where a tap creates follow it. The handling is a chunk of its own
+  (`pinch.ts`), loaded once the view is drawn ([foundation
+  D145](foundation.md#D145)); until then the page zooms as before.
+  Safari's own pinch gestures (`gesturestart`) are not handled
+  ([Deferred](#deferred)). Tested: `apps/web/e2e/zoom.spec.ts` (Ctrl and a
+  wheel over 1:00 PM in 3 days: 92.3 px, 1:00 PM still under the pointer,
+  a 30-minute block then fitting its time line, and the height kept after
+  a reload; the keys up to 240 px, "0" to 56, down to 24; two fingers side
+  by side on a phone, spread to twice apart: 112 px, the time between them
+  kept, the days not swiped; two fingers closing in the Day view, held at
+  24 px, the day 576 px tall). Tried by hand on Android 16's Chrome in an
+  emulator, a real two-finger pinch to twice the size: the hours twice as
+  tall about the pinch, the page not zoomed, no swipe;
+  `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
+  time under the fingers kept through steps and after).
 
 ### Decided in round 4: the editor
 
@@ -2056,6 +2110,10 @@ own (below).
 
 ## Deferred
 
+- **Safari's pinch on a Mac's trackpad** ([D192](#D192)): Safari sends
+  `gesturestart`/`gesturechange` rather than a wheel with Ctrl; the time
+  grid's zoom hears only the second, so there Safari's trackpad pinch
+  zooms the page.
 - **The scrollbars' untested parts** ([D191](#D191)): the thumb's
   colours as an engine draws them (the shares are proven, not the
   pixels), Firefox's `scrollbar-width`
