@@ -1748,8 +1748,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   compile yet, which leaves a component unmemoized too) and holds them to
   those known; a new one fails there. It catches what cost round 4 a
   quiet bail-out once (a `??=` in a hook, which made the first load look
-  1.7 KiB smaller). The ones known besides those chosen are
-  [Deferred](#deferred).
+  1.7 KiB smaller), and caught one more as it came in: a destructuring
+  with a computed key in `picture-settings.tsx`, written another way. The
+  ones known besides those chosen are [Deferred](#deferred).
 
 ### Decided in round 4: the editor
 

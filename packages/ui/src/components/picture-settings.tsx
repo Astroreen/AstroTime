@@ -292,7 +292,11 @@ function BannerEditor({ open, onClose }: { open: boolean; onClose: () => void })
   const year = new Date().getFullYear();
   const set = (month: number, id: string | null) => {
     const before = settings.ownBanners[String(month)];
-    const { [String(month)]: _, ...others } = settings.ownBanners;
+    // Not a destructuring with a computed key, which the React Compiler
+    // cannot compile: the editor would be left unmemoized (design D194).
+    const others = Object.fromEntries(
+      Object.entries(settings.ownBanners).filter(([key]) => key !== String(month)),
+    );
     change({ ownBanners: id ? { ...others, [String(month)]: id } : others });
     if (before) void removePicture(before);
   };
