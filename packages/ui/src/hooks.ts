@@ -1,12 +1,11 @@
 import type { Store, UndoneTask } from "@astrotime/storage";
 import {
   useEffect,
+  useEffectEvent,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
-  type PointerEvent,
-  type PointerEventHandler,
+  type RefObject,
 } from "react";
 
 import { nowIn } from "./calendar/dates.ts";
@@ -146,27 +145,68 @@ export function useEntries(
   );
 }
 
-/** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period (design D59). */
-export function useSwipe(onSwipe: (direction: 1 | -1) => void): {
-  onPointerDown: PointerEventHandler;
-  onPointerUp: PointerEventHandler;
-  onPointerCancel: PointerEventHandler;
-} {
-  const start = useRef<{ x: number; y: number } | null>(null);
-  return {
-    onPointerDown: (event: PointerEvent) => {
-      start.current = event.pointerType === "touch" ? { x: event.clientX, y: event.clientY } : null;
-    },
-    onPointerUp: (event: PointerEvent) => {
-      const from = start.current;
-      start.current = null;
-      if (!from) return;
+/** Pixels a finger moves before its swipe knows its axis, under the browser's own touch slop. */
+const SWIPE_SLOP = 8;
+/** Pixels a swipe goes sideways to move the period. */
+const SWIPE_DISTANCE = 56;
+
+/**
+ * A horizontal swipe on a touch screen over `ref`'s element: the next (`1`)
+ * or previous (`-1`) period (design D59). The axis is locked on the first
+ * movement past a few pixels (design D152): a sideways one is the swipe's,
+ * and its `touchmove`s are cancelled, so the browser starts no fling of its
+ * own, whose stop would take the next tap's click (a top-bar button had to
+ * be pressed twice after a swipe); an upward or downward one is the grid's
+ * scroll, which the browser runs (`touch-action: pan-y`).
+ */
+export function useSwipe(
+  ref: RefObject<HTMLElement | null>,
+  onSwipe: (direction: 1 | -1) => void,
+): void {
+  const swiped = useEffectEvent(onSwipe);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    let start: { id: number; x: number; y: number; axis: "x" | "y" | null } | null = null;
+    const down = (event: globalThis.PointerEvent) => {
+      start =
+        event.pointerType === "touch" && event.isPrimary
+          ? { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null }
+          : null;
+    };
+    const move = (event: globalThis.PointerEvent) => {
+      if (!start || event.pointerId !== start.id || start.axis) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.hypot(dx, dy) >= SWIPE_SLOP) start.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    };
+    const touchMove = (event: TouchEvent) => {
+      if (start?.axis === "x" && event.cancelable) event.preventDefault();
+    };
+    const up = (event: globalThis.PointerEvent) => {
+      const from = start;
+      if (!from || event.pointerId !== from.id) return;
+      start = null;
+      if (from.axis === "y") return;
       const dx = event.clientX - from.x;
       const dy = event.clientY - from.y;
-      if (Math.abs(dx) > 56 && Math.abs(dx) > 2 * Math.abs(dy)) onSwipe(dx < 0 ? 1 : -1);
-    },
-    onPointerCancel: () => {
-      start.current = null;
-    },
-  };
+      if (Math.abs(dx) > SWIPE_DISTANCE && Math.abs(dx) > 2 * Math.abs(dy)) swiped(dx < 0 ? 1 : -1);
+    };
+    const cancel = () => {
+      start = null;
+    };
+    element.addEventListener("pointerdown", down);
+    element.addEventListener("pointermove", move);
+    element.addEventListener("pointerup", up);
+    element.addEventListener("pointercancel", cancel);
+    // Not passive: the browser waits for it before it moves the page.
+    element.addEventListener("touchmove", touchMove, { passive: false });
+    return () => {
+      element.removeEventListener("pointerdown", down);
+      element.removeEventListener("pointermove", move);
+      element.removeEventListener("pointerup", up);
+      element.removeEventListener("pointercancel", cancel);
+      element.removeEventListener("touchmove", touchMove);
+    };
+  }, [ref]);
 }

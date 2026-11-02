@@ -43,7 +43,6 @@ export interface MonthViewProps {
 export function MonthView(props: MonthViewProps) {
   const { weeks, today, onSwipe } = props;
   const { formats } = useCalendar();
-  const swipe = useSwipe(onSwipe);
   const body = useRef<HTMLDivElement>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
   // How many rows of chips a tile fits: every tile is as tall, so the
@@ -62,6 +61,7 @@ export function MonthView(props: MonthViewProps) {
   }, [weeks.length]);
 
   const root = useRef<HTMLDivElement>(null);
+  useSwipe(root, onSwipe);
   const tiles = useRef(new Map<string, HTMLElement>());
   // The day under a point: the tile it is on, or the nearest.
   const surface: DragSurface = {
@@ -98,7 +98,6 @@ export function MonthView(props: MonthViewProps) {
         ref={root}
         data-view="month"
         className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
-        {...swipe}
       >
         <div aria-hidden="true" className="grid shrink-0 pb-1" style={columns}>
           <span />

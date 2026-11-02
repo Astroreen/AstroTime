@@ -231,7 +231,8 @@ When you add a package, app or module, add its line here in the same PR.
       `moved`, `keyMove`), the slot and column under a point, the ghost's
       occurrence, when a press is a drag. → `plans/foundation.md#D113`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
-    `useSwipe`, `useNow`, `useMediaQuery`.
+    `useSwipe` (a finger's sideways swipe, its axis locked first,
+    `plans/design.md#D152`), `useNow`, `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
     localStorage, the web's and the desktop's.
   - `settings.ts` — the settings, kept in the preferences and
