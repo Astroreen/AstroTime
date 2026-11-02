@@ -10,7 +10,7 @@ import { Checkbox } from "@base-ui/react/checkbox";
 import { Menu } from "@base-ui/react/menu";
 import { Tabs } from "@base-ui/react/tabs";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import { liveQuery, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
@@ -54,6 +54,8 @@ const iconButton = `${roundButton} text-ink disabled:text-ink-muted`;
 
 /** Milliseconds a tick the user drew shows before its row moves (design D197). */
 const HOLD_MS = 160;
+/** How soon after a tick the store's read must come to wait for it: a write that changed nothing leaves no wait behind. */
+const FRESH_MS = 1000;
 
 type Motion = typeof import("./task-motion.ts");
 
@@ -113,8 +115,11 @@ export function TasksScreen({
   /** Whether the tasks move: their code came, and less motion was not asked for. */
   const [moves, setMoves] = useState(false);
   const measured = useRef<ReturnType<Motion["measure"]> | null>(null);
-  /** A tick the user drew: its row waits for it before it moves. */
-  const held = useRef(false);
+  /**
+   * When the user last drew a tick (`performance.now()`): its row waits for
+   * it before it moves, if the store's read of it comes soon after.
+   */
+  const held = useRef(Number.NEGATIVE_INFINITY);
   /** The task the user just completed, whose row in "Completed" draws its tick. */
   const drawn = useRef<string | null>(null);
   useEffect(() => {
@@ -151,9 +156,12 @@ export function TasksScreen({
     const was = measured.current;
     measured.current = null;
     if (was && stage.current && motion.current) {
-      motion.current.play(stage.current, was, held.current ? HOLD_MS : 0);
+      const fresh = performance.now() - held.current < FRESH_MS;
+      motion.current.play(stage.current, was, fresh ? HOLD_MS : 0);
     }
-    held.current = false;
+    held.current = Number.NEGATIVE_INFINITY;
+    // Its row in "Completed" was drawn with this read, if it moved there.
+    drawn.current = null;
   }, [rows]);
   const byList = taskLists(rows, {
     sort,
@@ -168,11 +176,20 @@ export function TasksScreen({
   // a local change goes up soon (docs/plans/foundation.md#D91, D99).
   const actions: Actions = {
     complete: (row, done) => {
-      held.current = true;
+      held.current = performance.now();
       drawn.current = done ? row.stored.id : null;
-      return editing.rewrite(targetOfRow(row), (current) =>
-        completeTask(current, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
-      );
+      return editing
+        .rewrite(targetOfRow(row), (current) =>
+          completeTask(current, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
+        )
+        .then((landed) => {
+          // Not written: nothing will move for it, and nothing is drawn.
+          if (!landed) {
+            held.current = Number.NEGATIVE_INFINITY;
+            drawn.current = null;
+          }
+          return landed;
+        });
     },
     star: (row) =>
       void editing.rewrite(targetOfRow(row), (current) =>
@@ -508,16 +525,15 @@ function ListCards({
             onClick={() => setOpen(!showCompleted)}
             className="flex h-14 w-full items-center gap-2 rounded-2xl pr-4 pl-5 text-left text-row font-medium hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent"
           >
-            {/* The count apart, so it can tick over (design D197). */}
+            {/* The count in its own box, so it can tick over (design D197). */}
             <span className="min-w-0 flex-1">
-              {t("tasks.completedLabel")}{" "}
-              <span className="inline-block">
-                (
-                <span data-completed-count="" className="inline-block">
-                  {completed.length}
-                </span>
-                )
-              </span>
+              <Trans
+                i18nKey="tasks.completedCount"
+                values={{ n: completed.length }}
+                components={{
+                  count: <span data-completed-count="" className="inline-block" />,
+                }}
+              />
             </span>
             <ChevronIcon direction={showCompleted ? "up" : "down"} className="size-5" />
           </button>

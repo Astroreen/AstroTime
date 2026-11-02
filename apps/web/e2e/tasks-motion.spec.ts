@@ -93,6 +93,41 @@ test("a task completed slides toward the folded Completed, the rows below close 
   }
 });
 
+test("two tasks completed quickly: each leaves once, the first still leaving through the second's change", async ({
+  page,
+}) => {
+  const taken = await logAnimations(page);
+  const panel = await openTasks(page);
+  await panel.getByRole("checkbox", { name: "Send the report" }).click();
+  await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+  // Held mid-way: the first is still leaving when the second change comes.
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.pause();
+  });
+  const first = await taken();
+  expect(first.filter((call) => call.where.startsWith("ghost:")).length).toBe(1);
+  await panel.getByRole("checkbox", { name: "Reply to Olga" }).click({ force: true });
+  await expect(panel.getByRole("button", { name: "Completed (5)" })).toBeVisible();
+  const calls = await taken();
+  // Only the second leaves now; the first is neither measured nor moved again.
+  expect(
+    calls
+      .filter((call) => /^(ghost|row):Send the report/.test(call.where))
+      .map((call) => call.where),
+  ).toEqual([]);
+  expect(calls.filter((call) => call.where.startsWith("ghost:")).length).toBe(1);
+  // The first is still on the layer, its leaving not cancelled by the second change.
+  const send = page
+    .locator("[data-motion-layer] [data-task]")
+    .filter({ hasText: "Send the report" });
+  await expect(send).toHaveCount(1);
+  expect(
+    await send.evaluate((element) =>
+      element.getAnimations().map((animation) => animation.playState),
+    ),
+  ).toEqual(["paused"]);
+});
+
 test("with Completed open, a task completed moves down into it, and back up when not completed", async ({
   page,
 }) => {

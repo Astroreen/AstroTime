@@ -32,13 +32,21 @@ export interface Snapshot {
 }
 
 const ROW = "[data-task]";
+const LAYER = "[data-motion-layer]";
 const CARD = "[data-card]";
 const COUNT = "[data-completed-count]";
+
+/**
+ * The rows in the list, not those leaving on the layer: a row that left
+ * goes on leaving through the next change, never measured or moved again.
+ */
+const rowsOf = (root: HTMLElement) =>
+  [...root.querySelectorAll<HTMLElement>(ROW)].filter((row) => !row.closest(LAYER));
 
 /** Where each row and card of `root` is now. */
 export function measure(root: HTMLElement): Snapshot {
   const rows = new Map<string, Measured>();
-  for (const element of root.querySelectorAll<HTMLElement>(ROW)) {
+  for (const element of rowsOf(root)) {
     rows.set(element.dataset["task"]!, { rect: element.getBoundingClientRect(), element });
   }
   const cards = new Map<string, DOMRect>();
@@ -62,7 +70,7 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
   };
   const slide = (element: Element, frames: Keyframe[], options = timing) =>
     element.animate(frames, options);
-  const rows = [...root.querySelectorAll<HTMLElement>(ROW)];
+  const rows = rowsOf(root);
   const cards = [...root.querySelectorAll<HTMLElement>(CARD)];
   // Where everything is now, measured before anything moves: a move still
   // running ends here (`before` saw it where it was drawn), and a card's own
@@ -127,7 +135,7 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
 
   // Rows that left: drawn on over the list where they were, they leave
   // toward "Completed" when its count rose, else fade where they are.
-  const layer = root.querySelector<HTMLElement>("[data-motion-layer]");
+  const layer = root.querySelector<HTMLElement>(LAYER);
   const count = root.querySelector<HTMLElement>(COUNT);
   const counted = Number(count?.textContent ?? 0);
   const rose = counted > Number(before.count ?? 0);

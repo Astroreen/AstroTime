@@ -1348,8 +1348,13 @@ whole row".
   that changed height is stretched from the one it had: its background is
   apart from its rows, so the rows are not stretched with it. A change the
   user did not make (a sync, the details' "Mark completed", another tab)
-  moves the same way, without the wait for a tick; a new row comes in from
-  above; more than 40 rows moving at once (a sync's batch) change in place.
+  moves the same way, without the wait for a tick (a tick waits only for
+  a read that comes within a second of it, and not at all when its write
+  did not land); a new row comes in from above; more than 40 rows moving
+  at once (a sync's batch) change in place. A row leaving goes on leaving
+  through the next change, never measured or moved again, so tasks
+  completed one after another each leave once. The count is its own box
+  inside the one translated string ("Completed (<count>3</count>)").
   Only `transform` and `opacity` move, with the Web Animations API, as
   [D154](#D154) has it; `prefers-reduced-motion` changes everything in
   place. The code that moves them (`components/task-motion.ts`) is loaded

@@ -249,7 +249,7 @@ export const ru = {
   "tasks.none": "Задач пока нет",
   "tasks.allDone": "Все задачи выполнены",
   "tasks.completed": "Выполненные ({{n}})",
-  "tasks.completedLabel": "Выполненные",
+  "tasks.completedCount": "Выполненные (<count>{{n}}</count>)",
   "tasks.completedList": "Выполненные задачи",
 
   "search.label": "Поиск",
