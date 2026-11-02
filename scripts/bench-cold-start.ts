@@ -28,7 +28,7 @@ const slow = process.env["ASTROTIME_BENCH_SLOW"] === "1";
 const web = fileURLToPath(new URL("../apps/web/", import.meta.url));
 const dist = `${web}dist`;
 
-execFileSync("vp", ["build"], { cwd: web, stdio: "ignore" });
+execFileSync("vp", ["build"], { cwd: web, stdio: "inherit" });
 // The page that fills the store, beside the app on its origin.
 execFileSync(
   "vp",
@@ -41,7 +41,7 @@ execFileSync(
     `${dist}/bench`,
     "--emptyOutDir",
   ],
-  { cwd: fileURLToPath(new URL("..", import.meta.url)), stdio: "ignore" },
+  { cwd: fileURLToPath(new URL("..", import.meta.url)), stdio: "inherit" },
 );
 await compress(dist);
 
@@ -50,7 +50,10 @@ await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 const browser = await chromium.launch({ args: ["--enable-precise-memory-info"] });
+// The network and the HTTP cache are measured: the service worker (D124)
+// would serve every file from its own cache after the first visit.
 const context = await browser.newContext({
+  serviceWorkers: "block",
   locale: "en-US",
   timezoneId: "Europe/Vilnius",
   viewport: { width: 1440, height: 900 },
@@ -58,9 +61,25 @@ const context = await browser.newContext({
 // The app opens in the Week.
 await context.addInitScript(() => localStorage.setItem("astrotime.view", "week"));
 
+/**
+ * Waits as long as `done` takes in the page, which may be long on a slow
+ * machine; an error the page throws ends the wait, and the bench, instead.
+ */
+async function until(page: Page, done: () => boolean): Promise<void> {
+  let fail!: (error: Error) => void;
+  const failed = new Promise<never>((_, reject) => (fail = reject));
+  const onError = (error: Error) => fail(new Error(`The page failed: ${error.message}`));
+  page.on("pageerror", onError);
+  try {
+    await Promise.race([page.waitForFunction(done, null, { timeout: 0 }), failed]);
+  } finally {
+    page.off("pageerror", onError);
+  }
+}
+
 const seed = await context.newPage();
 await seed.goto(`${origin}/bench/index.html`);
-await seed.waitForFunction(() => document.title === "filled", null, { timeout: 0 });
+await until(seed, () => document.title === "filled");
 await seed.close();
 
 interface Run {
@@ -90,10 +109,9 @@ async function open(page: Page, cdp: CDPSession): Promise<Run> {
   let fetched = 0;
   cdp.on("Network.loadingFinished", (event) => (fetched += event.encodedDataLength));
   await page.goto(origin);
-  await page.waitForFunction(
+  await until(
+    page,
     () => (globalThis as unknown as { astrotimeBench: { drawn: number } }).astrotimeBench.drawn > 0,
-    null,
-    { timeout: 0 },
   );
   return page.evaluate((bytes) => {
     const marks = (globalThis as unknown as { astrotimeBench: { drawn: number; blocked: number } })

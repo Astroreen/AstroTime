@@ -1742,23 +1742,34 @@ optimization is lacking").
   every returning browser fetch all of it, React and the libraries too.
   - **Libraries in chunks of their own** (`apps/web/vite.config.ts`,
     Rolldown's `codeSplitting` groups): React, Base UI, ical.js, Drizzle,
-    i18next and the rest each in one, cached across updates; an update of
-    AstroTime's own code is one chunk.
+    i18next and the rest each in one, cached across updates. The groups take
+    only what the page loads at once (`$initial`), so a library only a
+    dialog loaded later uses (Base UI's switch) loads with that dialog.
   - **Dialogs with their first opening**: the edit dialog, Settings and the
     Conflicts list (`components/lazy.tsx`), each a stand-in with its props
-    that draws nothing until first open and fetches its code once the page
-    is idle. Signing in and the sync stack stay in the first load
+    that draws nothing until first open, stays drawn after, and fetches its
+    code once the page is idle. Code that does not arrive (offline before
+    the service worker kept it, [D124](#D124), or a release that replaced
+    it) is no blank app: in the dialog's place AstroTime says it could not
+    load that part, with "Try again", "Reload" and "Close"; a failed load is
+    not kept, so trying again, or the next opening, asks again, under a URL
+    of its own since the browser keeps a module that failed as failed.
+    Signing in and the sync stack stay in the first load
     ([Deferred](#deferred)).
   - **A budget CI holds**: `scripts/bundle-budget.ts`, after the web build,
-    fails when what a visit loads at once passes 340 KiB gzipped (318 at
-    D145) or AstroTime's own code in it 130 KiB (120); a PR that needs more raises it, saying
-    why.
+    reads Vite's manifest (`build.manifest`) for the chunks the page loads
+    at once and fails when they pass 340 KiB gzipped (318 at D145) or
+    AstroTime's own code in them 130 KiB (120); a PR that needs more raises
+    the budget, saying why.
   - **Measured by hand** with `scripts/bench-cold-start.ts`: the built app
     on the image's server, its store filled with `big-calendar.ts`'s 12 230
-    objects (D118's), the median of five new tabs; it prints when the first
-    paint came, when the week's first event was drawn, the main thread's
-    blocked time until then and the bytes fetched. On an i7-14700KF, and
-    with Chrome's "Fast 4G" and a CPU four times slower (`ASTROTIME_BENCH_SLOW`):
+    objects (D118's), the median of five new tabs, the service worker kept
+    out so the network and the HTTP cache are what is measured; it prints
+    when the first paint came, when the week's first event was drawn, the
+    main thread's blocked time until then and the bytes fetched, and stops
+    at the first error the page throws. On an i7-14700KF, and with Chrome's
+    "Fast 4G" and a CPU four times slower (`ASTROTIME_BENCH_SLOW`), at
+    6ecfe90 before and after:
 
     | cold start, week drawn        |  before |   after |
     | ----------------------------- | ------: | ------: |
