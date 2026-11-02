@@ -172,9 +172,9 @@ export function layoutRange(
   const shown = byOccurrence(entries);
   const occurrences = [...shown.keys()];
   const chip = undone > 0 && days.includes(today) ? undoneChip(today) : null;
-  const strip = layoutSpans(chip ? [...occurrences, chip] : occurrences, days, timeZone).map(
-    (span) => ({ span, entry: shown.get(span.occurrence) ?? null }),
-  );
+  const strip = layoutSpans(chip ? [...occurrences, chip] : occurrences, days, timeZone, {
+    first: draftsAmong(shown),
+  }).map((span) => ({ span, entry: shown.get(span.occurrence) ?? null }));
   const columns = days.map((day) => ({
     day,
     timed: layoutDay(occurrences, day, { timeZone }).timed.map((placed) => ({
@@ -183,6 +183,13 @@ export function layoutRange(
     })),
   }));
   return { strip, rows: Math.max(0, ...strip.map(({ span }) => span.row + 1)), columns };
+}
+
+/** The draft's occurrences among the entries, laid out first so no fold hides them (design D187). */
+export function draftsAmong(entries: ReadonlyMap<Occurrence, Entry>): Set<Occurrence> {
+  const drafts = new Set<Occurrence>();
+  for (const [occurrence, entry] of entries) if (entry.objectId === DRAFT) drafts.add(occurrence);
+  return drafts;
 }
 
 /** A stand-in task for the "N undone tasks" chip, so the layout engine places it. */

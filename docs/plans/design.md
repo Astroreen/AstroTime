@@ -1039,7 +1039,9 @@ Settings, the colours and the lists controls open.
   the others ([D153](#D153)), raised over them with a shadow (`data-draft`),
   and brought into sight where the view scrolls when its day or time changes
   (not with each letter of its title); it goes with the dialog, and a saved
-  item is then drawn from the store. The editor makes it, in its own chunk
+  item is then drawn from the store. _Since [D187](#D187):_ it is laid out
+  first, so no fold hides it, and the dialog stands beside it wherever
+  there is a phone's width of room. The editor makes it, in its own chunk
   (`useDraft` in `draft-aside.ts`, on `calendar/draft.ts`'s `draftOf` and
   `withDraft`), so nothing of it is in the first load ([foundation
   D145](foundation.md#D145)), and hands the views what it does to their
@@ -1053,7 +1055,9 @@ Settings, the colours and the lists controls open.
   and a day of a week fit side by side, the dialog stands at the side of the
   screen away from the draft (`useDraftAside`), and its backdrop dims less
   (20%), as Google Calendar's web app keeps its draft beside its dialog;
-  narrower, it stays in the middle (on a phone it is the whole screen). The
+  narrower, it stays in the middle, and on a phone it is the whole screen
+  (_since [D187](#D187): beside it wherever the dialog floats, from 640 px,
+  with a phone's width of room_). The
   Agenda draws it too. Tested: `packages/ui/test/draft.test.ts` (a new
   event, a new series, an edited event and an edited occurrence of a series,
   a form with no date, which draws nothing and tells nothing; a fault other
@@ -1347,6 +1351,41 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   (on a phone: today's tasks under the chip a tap on "+N" away in the Day
   view; a Friday with three items kept whole in 3 days, failing before the
   change).
+- **D187. The item being made is never hidden** (the owner's feedback 1:
+  "when I tap the calendar and choose to create a task, the task does not
+  appear in the background; when I also turn on 'All day', the task does
+  not appear at the top"). It changes [D155](#D155). The draft was drawn
+  (`data-draft` was there, a task as a chip, an all-day one in the
+  strip), but hidden twice over. First, the dialog stood beside the draft
+  only from 1024 px; narrower, it stood in the middle of the screen, over
+  the middle days of a week, where a tapped day usually is (the owner's
+  window was under 1024 px). Second, the draft was laid out with the
+  others by their order (longer first, events before tasks, then by
+  title), so an all-day draft on a day whose strip folds ([D51](#D51)) or
+  whose Month tile is full went behind "+N". Now:
+  - **it is laid out first** (`layoutSpans`' `first`, the entries of
+    `DRAFT`): in the strip and in a Month week it takes the first free row
+    before any other item, so no fold hides it; the others make room while
+    the dialog is open, and the saved item then takes its own place. On
+    purpose, in a Month week a timed draft goes before the all-day items
+    too, as a full tile would hide it otherwise: an edited event shows in
+    its tile's first row while its dialog is open, and goes back to its
+    place among the timed items once saved;
+  - **the dialog stands beside it wherever it floats** (from 640 px), on
+    the side with more room, as wide as that room up to its 36 rem, down
+    to 360 px, a phone's width, which the form is made for (`besideOf`,
+    with its place and width in `asideStyle`, one source for both);
+    with less room on both sides (the Day view's one wide column, a narrow
+    window) it stays in the middle, as before. The backdrop dims less
+    (20%) whenever it stands aside.
+    A timed draft was never folded; it was only covered. Tested:
+    `packages/core/test/layout.test.ts` (`first` in the strip and in a
+    month's week), `packages/ui/test/draft.test.ts` (where the dialog
+    stands, how wide, 360 px against 359, a tie, under 640 px),
+    `apps/web/e2e/draft.spec.ts` (at 1000 px a task on a tapped slot of a
+    full today, timed and then all day under a title sorted after today's
+    tasks, beside the dialog; a task's draft on a full today in the Month),
+    each failing before the change.
 
 ### Decided in round 4: the editor
 
