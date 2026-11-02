@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { applyMine, conflictViews, keepServer, type ConflictView } from "../calendar/conflicts.ts";
 import { addDays } from "../calendar/dates.ts";
 import type { Formats } from "../calendar/format.ts";
-import { liveQuery } from "../calendar/live.ts";
+import { liveQuery, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
@@ -55,7 +55,7 @@ export function ConflictsDialog({
   useEffect(
     () =>
       open
-        ? liveQuery(store, () => conflictViews(store, t("local.calendar")), setViews)
+        ? liveQuery(whileShown(store), () => conflictViews(store, t("local.calendar")), setViews)
         : undefined,
     [store, open, t],
   );

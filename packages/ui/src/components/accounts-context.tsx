@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
-import { everyRun, liveQuery } from "../calendar/live.ts";
+import { everyRun, liveQuery, whileShown } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
 import { KEYS } from "../preferences.ts";
@@ -95,7 +95,7 @@ export function AccountsProvider({
 
   const [conflicts, setConflicts] = useState(0);
   useEffect(
-    () => liveQuery(store, async () => (await store.conflicts()).length, setConflicts),
+    () => liveQuery(whileShown(store), async () => (await store.conflicts()).length, setConflicts),
     [store],
   );
 

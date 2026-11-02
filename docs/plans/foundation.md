@@ -2052,6 +2052,27 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
   - Proved by `idle.spec.ts`: the Month view beside a calendar on this
     device that stays draws a handful of commits for a change another tab
     makes, 294 before.
+- **D182. A hidden tab does no work but what must not wait.** A tab behind
+  another, or a window minimised, spends nothing on what nobody sees.
+  - **Keeps running:** the sync, by its own rules ([D91](#D91),
+    [D129](#D129): its timer only while visible, once on coming back,
+    after a local change and when the network returns, held back by a
+    server's refusal, [D128](#D128)); the reminders ([D101](#D101): the
+    planner still follows the store, and the platform's timers fire); the
+    store itself, which a leader tab serves to the others ([D98](#D98));
+    the writes the UI makes of itself (the calendar on this device made or
+    stepped aside, [D122](#D122)).
+  - **Waits for `visibilitychange`:** every live query of what is drawn
+    (the views' range and undone tasks, the calendars' lists, the tasks
+    screen, search, an item's details, the conflicts) hears the store
+    through `whileShown`: the changes made while the page is hidden wait,
+    and come as one when it is shown, so the views read once and draw what
+    changed. The clock (`useNow`, the now-line and today) stops and ticks
+    at once when shown. Measuring (`ResizeObserver`) waits by itself: a
+    hidden page lays nothing out.
+  - Proved by `idle.spec.ts`: a hidden Month tab draws nothing for another
+    tab's event and draws it once shown; ten minutes of a hidden tab's
+    timers do not move the now-line, which moves at once when shown.
 
 ## Deferred
 

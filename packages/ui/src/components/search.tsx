@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
 import type { Formats } from "../calendar/format.ts";
-import { liveQuery } from "../calendar/live.ts";
+import { liveQuery, whileShown } from "../calendar/live.ts";
 import { useCalendar } from "./context.ts";
 import { EmptyState } from "./empty-state.tsx";
 import { BackIcon, CheckCircleIcon, SearchIcon } from "./icons.tsx";
@@ -112,7 +112,7 @@ export function SearchResults({
   useEffect(() => {
     const asked = ids === "" ? [] : ids.split(",");
     return liveQuery(
-      store,
+      whileShown(store),
       async () => ({
         query,
         found: resultsOf(await store.search(asked, query), today, timeZone),

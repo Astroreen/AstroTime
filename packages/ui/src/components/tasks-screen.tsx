@@ -11,7 +11,7 @@ import { Tabs } from "@base-ui/react/tabs";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { liveQuery } from "../calendar/live.ts";
+import { liveQuery, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import {
   isSort,
@@ -104,7 +104,7 @@ export function TasksScreen({
   useEffect(() => {
     const ids = listKey === "" ? [] : listKey.split(",");
     return liveQuery(
-      store,
+      whileShown(store),
       async () => cache.rows(await store.tasks(ids), today, timeZone),
       setRows,
     );

@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { nowIn } from "./calendar/dates.ts";
-import { liveQuery } from "./calendar/live.ts";
+import { documentVisibility, liveQuery, whileShown } from "./calendar/live.ts";
 import type { Entry, ObjectCache } from "./calendar/query.ts";
 
 /** Whether a media query matches, kept up to date. */
@@ -27,7 +27,11 @@ export function useMediaQuery(query: string): boolean {
   );
 }
 
-/** Today and the minutes past midnight in `timeZone`, updated each minute. */
+/**
+ * Today and the minutes past midnight in `timeZone`, updated each minute
+ * while the page is shown, and at once when it is shown again
+ * (docs/plans/foundation.md#D182).
+ */
 export function useNow(timeZone: string): { today: string; minutes: number } {
   const [now, setNow] = useState(() => nowIn(Date.now(), timeZone));
   useEffect(() => {
@@ -37,9 +41,20 @@ export function useNow(timeZone: string): { today: string; minutes: number } {
         current.today === next.today && current.minutes === next.minutes ? current : next,
       );
     };
-    tick();
-    const timer = setInterval(tick, 15_000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const follow = () => {
+      clearInterval(timer);
+      timer = undefined;
+      if (!documentVisibility.shown()) return;
+      tick();
+      timer = setInterval(tick, 15_000);
+    };
+    follow();
+    const stop = documentVisibility.onChange(follow);
+    return () => {
+      clearInterval(timer);
+      stop();
+    };
   }, [timeZone]);
   return now;
 }
@@ -101,7 +116,7 @@ export function useEntries(
     const ids = idsKey === "" ? [] : idsKey.split(",");
     const range = { from, to, timeZone };
     return liveQuery(
-      store,
+      whileShown(store),
       async () => ({
         from,
         to,
@@ -127,7 +142,7 @@ export function useEntries(
     const ids = idsKey === "" ? [] : idsKey.split(",");
     const key = `${idsKey}|${today}|${timeZone}`;
     return liveQuery(
-      store,
+      whileShown(store),
       () => store.undoneTasksBefore(ids, today, timeZone),
       (tasks) => setUndone({ key, tasks }),
       (error) => {

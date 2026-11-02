@@ -16,7 +16,7 @@ import { addDays } from "../calendar/dates.ts";
 import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { shownCalendars } from "../calendar/calendars.ts";
-import { liveQuery } from "../calendar/live.ts";
+import { liveQuery, whileShown } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import { layoutMonth, type MonthWeek } from "../calendar/month.ts";
 import { layoutRange, ObjectCache, type Entry, type RangeLayout } from "../calendar/query.ts";
@@ -126,7 +126,7 @@ export function CalendarScreen({
   useEffect(
     () =>
       liveQuery(
-        store,
+        whileShown(store),
         async () => {
           const accounts = await store.accounts();
           // Named in the language spoken now (foundation D122).
