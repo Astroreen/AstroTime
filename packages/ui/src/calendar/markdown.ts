@@ -31,11 +31,16 @@ export type Block =
   | { readonly type: "rule" };
 
 /**
- * The parser's steps, counted where it walks the text: a test reads it to
+ * A parse's steps, counted where it walks the text: a test reads them to
  * see that twice the text costs about twice the work (design D207), with
  * no clock.
  */
-export const work = { steps: 0 };
+export interface ParseStats {
+  steps: number;
+}
+
+/** The stats of the parse running now: each parse has its own (parsing never waits). */
+let work: ParseStats = { steps: 0 };
 
 /** How deep quotes and lists nest before the rest reads as text. */
 const DEEPEST = 8;
@@ -49,7 +54,8 @@ const ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])([ \t]+|$)/;
 const BLANK = /^[ \t]*$/;
 
 /** The description as blocks. */
-export function parseMarkdown(text: string): readonly Block[] {
+export function parseMarkdown(text: string, stats: ParseStats = { steps: 0 }): readonly Block[] {
+  work = stats;
   work.steps += text.length;
   return blocks(text.replace(/\r\n?/g, "\n").split("\n"), 0);
 }
@@ -207,8 +213,9 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
       if (indentOf(next) >= Math.min(indent, 2))
         body.push(dropColumns(next, Math.min(indent, indentOf(next))));
       else if (ITEM.test(next) || interrupts(next)) break;
-      // A lazy line carries the item's paragraph on.
-      else body.push(next);
+      // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
+      else if (body.at(-1)?.trim()) body.push(next);
+      else break;
       i++;
     }
     const task = /^\[([ xX])\](?:[ \t]+|$)/.exec(body[0]!);

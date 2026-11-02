@@ -1597,12 +1597,14 @@ reminders and its description.
     character, as long or longer; a tab indents to the next stop of 4
     (and stays a tab inside code); a written link's target keeps balanced
     parentheses (`…/wiki/Foo_(bar)`); a code span wins over emphasis, and
-    no mark closes inside a bare link; a lone `#` is text. A paragraph
+    no mark closes inside a bare link; a lone `#` is text; an empty item
+    (`-`) takes no next line in as its own. A paragraph
     keeps its spaces and indents as typed (`white-space: pre-wrap`, as the
     details drew a description before), so a plain description reads as
     it did.
   - **A checklist's box** is drawn where a bullet would be, read-only
-    (`role="checkbox"`, `aria-readonly`, named by its text): ticking one
+    (`role="checkbox"`, `aria-readonly`, named by its own first line, or
+    "An empty item" when it has none): ticking one
     would rewrite the user's text; a ticked item is struck and muted, as
     in Google Keep.
   - **What is stored does not change** ([foundation D7](foundation.md#D7)):

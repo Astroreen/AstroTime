@@ -2,7 +2,7 @@
 // details draw, and what is never a link or markup.
 import { describe, expect, test } from "vite-plus/test";
 
-import { linkOf, parseMarkdown, safeHref, work } from "../src/calendar/markdown.ts";
+import { linkOf, parseMarkdown, safeHref } from "../src/calendar/markdown.ts";
 
 const paragraph = (...children: unknown[]) => ({ type: "paragraph", children });
 
@@ -299,12 +299,12 @@ describe("what the review found (design D207)", () => {
 
 describe("untrusted text costs work in proportion to its length", () => {
   // Each of these took seconds when every opener scanned the rest of the
-  // text for its closer. The parser counts its steps (`work`): twice the
+  // text for its closer. The parser counts its steps (`ParseStats`): twice the
   // text costs about twice the steps, not four times. No clock is read.
   const stepsOf = (text: string) => {
-    work.steps = 0;
-    parseMarkdown(text);
-    return work.steps;
+    const stats = { steps: 0 };
+    parseMarkdown(text, stats);
+    return stats.steps;
   };
   test.each([
     ["unclosed stars", (n: number) => "*a ".repeat(n)],
@@ -413,5 +413,30 @@ describe("after #94's review (design D207)", () => {
     expect(parseMarkdown("#")).toEqual([paragraph("#")]);
     expect(parseMarkdown("## ##")).toEqual([paragraph("## ##")]);
     expect(parseMarkdown("Total\n#")).toEqual([paragraph("Total", { type: "break" }, "#")]);
+  });
+});
+
+describe("after #94's last review (design D207)", () => {
+  test("each parse counts its own steps", () => {
+    const first = { steps: 0 };
+    const second = { steps: 0 };
+    parseMarkdown("*a* b", first);
+    parseMarkdown("*a* b", second);
+    expect(first.steps).toBeGreaterThan(0);
+    expect(second.steps).toBe(first.steps);
+  });
+
+  test("an empty item does not take the next line in as its own", () => {
+    expect(parseMarkdown("-\nnext")).toEqual([
+      { type: "list", start: null, items: [{ checked: null, children: [] }] },
+      paragraph("next"),
+    ]);
+    expect(parseMarkdown("- a\nlazy")).toEqual([
+      {
+        type: "list",
+        start: null,
+        items: [{ checked: null, children: [paragraph("a", { type: "break" }, "lazy")] }],
+      },
+    ]);
   });
 });

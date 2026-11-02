@@ -346,6 +346,7 @@ export const en = {
   "edit.colorDefault": "The calendar's colour",
   "edit.location": "Location",
   "edit.description": "Description",
+  "description.emptyItem": "An empty item",
   "places.results": "Places",
   "places.credit": "Places from © OpenStreetMap contributors",
   "places.map": "Map of {{place}}",

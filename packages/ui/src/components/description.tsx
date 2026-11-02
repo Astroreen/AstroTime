@@ -2,6 +2,7 @@
 // React elements from `parseMarkdown`'s tree: nothing is read as HTML, and a
 // link opens elsewhere, without the page that opened it.
 import { useId, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon } from "./icons.tsx";
 import { parseMarkdown, type Block, type Inline, type ListItem } from "../calendar/markdown.ts";
@@ -77,6 +78,7 @@ function block(node: Block, key: number): ReactNode {
  * as it is written: read-only, not ticked here (the text stays the user's).
  */
 function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
+  const { t } = useTranslation();
   const id = useId();
   const body = <div className="flex flex-col gap-1">{item.children.map(block)}</div>;
   if (item.checked === null) return <li>{body}</li>;
@@ -87,7 +89,8 @@ function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
         role="checkbox"
         aria-checked={item.checked}
         aria-readonly="true"
-        aria-labelledby={id}
+        // An item with no words is still named.
+        {...(first ? { "aria-labelledby": id } : { "aria-label": t("description.emptyItem") })}
         className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded ${item.checked ? "bg-accent text-on-accent" : "ring-1 ring-ink-muted ring-inset"}`}
       >
         {item.checked && <CheckIcon className="size-3.5" />}

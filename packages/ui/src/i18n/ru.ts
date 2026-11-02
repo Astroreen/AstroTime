@@ -366,6 +366,7 @@ export const ru = {
   "places.copy": "Копировать адрес",
   "places.copied": "Скопировано",
   "edit.description": "Описание",
+  "description.emptyItem": "Пустой пункт",
   "edit.save": "Сохранить",
   "edit.close": "Закрыть без сохранения",
   "edit.noCalendar": "Здесь нет календаря, в котором можно это сохранить.",
