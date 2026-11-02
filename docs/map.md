@@ -269,7 +269,10 @@ When you add a package, app or module, add its line here in the same PR.
       to…" (`saveCopy`, `copyToForm`, design D164), loaded with the menu;
       `when.ts` — when an item is, in words (the details' line, a move's
       announcement); `words.ts` — rules and reminders in
-      words; `conflicts.ts` — the Conflicts list's two ways out.
+      words; `alarms.ts` — the reminders the edit dialog offers (the
+      four most added on this device, `astrotime.alarmTally`) and one of
+      the user's own (`customOffset`), design D206; `conflicts.ts` — the
+      Conflicts list's two ways out.
       → `plans/foundation.md#D103`, `plans/foundation.md#D107`
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
       `moved`, `keyMove`), the slot and column under a point, the ghost's

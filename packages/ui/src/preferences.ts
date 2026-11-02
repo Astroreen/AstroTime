@@ -63,6 +63,8 @@ export const KEYS = {
   presetSignIn: "astrotime.presetSignIn",
   /** The town of the last place picked, which the place search prefers (design D175). */
   placesNear: "astrotime.placesNear",
+  /** The reminders added on this device and how often, which the edit dialog offers first (design D206). */
+  alarmTally: "astrotime.alarmTally",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */
