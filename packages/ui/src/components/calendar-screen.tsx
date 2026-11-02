@@ -10,7 +10,7 @@
 import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -53,6 +53,7 @@ import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
 import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
+import { HOUR, hourIn } from "./items.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
@@ -93,6 +94,30 @@ export function CalendarScreen({
   const [hidden, setHidden] = usePreference(preferences, KEYS.hiddenCalendars, readHidden, (ids) =>
     JSON.stringify([...ids]),
   );
+  // The time grid's hour, pinched on this device (design D192).
+  const [hour, setHour] = usePreference(
+    preferences,
+    KEYS.hour,
+    (stored) => hourIn(Number(stored) || HOUR),
+    String,
+  );
+  const mainRef = useRef<HTMLElement>(null);
+  const hourNow = useRef(hour);
+  hourNow.current = hour;
+  // Pinching, its own chunk once the view is drawn (foundation D145).
+  useEffect(() => {
+    const main = mainRef.current;
+    let detach: (() => void) | undefined;
+    let gone = false;
+    if (main)
+      void import("./pinch.ts").then(({ zoomable }) => {
+        if (!gone) detach = zoomable(main, () => hourNow.current, setHour);
+      });
+    return () => {
+      gone = true;
+      detach?.();
+    };
+  }, []);
   const [anchor, setAnchor] = useState(today);
   // A tab left open overnight: an anchor on today moves on to the new today.
   const [seenToday, setSeenToday] = useState(today);
@@ -455,7 +480,7 @@ export function CalendarScreen({
 
   return (
     <CalendarContext.Provider
-      value={{ t, formats, timeZone, colorOf, weekNumbers, found: foundId }}
+      value={{ t, formats, timeZone, colorOf, weekNumbers, hour, found: foundId }}
     >
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
@@ -589,6 +614,8 @@ export function CalendarScreen({
                 </div>
               )}
               <main
+                ref={mainRef}
+                style={{ "--hour": `${hour}px` } as CSSProperties}
                 hidden={wideTasks}
                 aria-label={title}
                 aria-busy={waiting ? true : undefined}

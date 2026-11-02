@@ -1544,8 +1544,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
   task made from it, an item tapped opens its details; a press from an
   item to an empty spot, a press moved 12 px, a press that leaves the
-  strip and comes back, and a double click opening one item, the first
-  three failing without the check; a phone's Day view
+  strip and comes back, a press the browser cancels for a scroll, and a
+  double click opening one item, the first four failing without the
+  check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
@@ -1585,41 +1586,100 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   editor's chunk loaded first, then a single click on the backdrop
   closing it; a double tap by touch on a wide screen; a dialog opened by a
   single click closing on a backdrop click counted as a second elsewhere,
-  which `detail` alone kept open; each failing before its change).
+  which `detail` alone kept open; each failing before its change), and
+  `editing.spec.ts` (a double click on the all-day strip with the chunk
+  loaded, failing without the strip's `press`).
 - **D191. Scrollbars are thin, rounded and in the theme** (the owner's
   feedback 14b: "redo the design of the overflow scrollbars"). Every
   scroller had the platform's classic scrollbar, a 15 px grey bar on
   Linux and Windows, the same in light and dark. Now, in `styles.css`:
   Chromium (and so Electron and Android's WebView) and WebKit draw
   `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
-  ink colour at 52% on a clear track, 3:1 or more against every surface a
-  scroller sits on in light and dark (WCAG 1.4.11, as [D120](#D120) holds
-  the items to AA; it was 22%, 1.6:1), 66% while the pointer is anywhere
-  over what scrolls (`:hover` on the scroller, so a scroller holding
-  another lights too while the pointer is over the inner one; on purpose:
-  both scroll under it), 6 px wide under the pointer and 80% while
-  dragged; Firefox has
-  only the standard properties, `scrollbar-width: thin` in the same
-  colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
-  the standard ones win over it). Light and dark come with the ink
-  colour. Nothing about scrolling changes: the wheel, the keys, a finger
-  and dragging the thumb work as they did; `scrollbar-gutter: stable`
-  still keeps the day headers over their columns, now 10 px wide on both;
-  a phone's scrollbars are the system's overlay ones, drawn only while
-  scrolling, and Firefox on Linux draws its own overlay ones too. The
-  thumb shows at rest rather than only while scrolling: telling
-  "scrolling now" apart needs a script on every scroller. Checked in Chromium and Firefox (headed,
-  light and dark); WebKit does not start on the development machine, and
-  draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
-  `packages/ui/test/scrollbar-colors.test.ts` (the thumb's contrast at
-  rest, under the pointer and dragged, over the canvas, a tile, a raised
-  surface and its hover, light and dark, read from `styles.css`; failing
-  at 22%), `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
-  Saturday's header ends where its column does; failing before at 15 px:
+  ink colour at 52% on a clear track: 3:1 or more against the theme's
+  surfaces a scroller sits on (the canvas, a tile, a raised surface such
+  as a dialog or a popover, and a raised surface's hover), light and dark
+  (WCAG 1.4.11, as [D120](#D120) holds the items to AA; it was 22%,
+  1.6:1). It is 66% while the pointer is anywhere over what scrolls
+  (`:hover` on the scroller, so a scroller holding another lights too
+  while the pointer is over the inner one; on purpose: both scroll under
+  it), 6 px wide under the pointer and 80% while dragged. Firefox has only
+  the standard properties, `scrollbar-width: thin` in the same colours,
+  set only where `::-webkit-scrollbar` is unknown (Chromium lets the
+  standard ones win over it); its stronger colour comes with `:hover` and
+  with `:focus-visible`, which, as `:hover` does, holds for every scroller
+  around the focus too. In forced colours (Windows' high contrast) none of
+  this applies: the system draws its own scrollbars in the colours the
+  user chose. Nothing about scrolling changes: the wheel, the keys, a
+  finger and dragging the thumb work as they did; `scrollbar-gutter:
+  stable` still keeps the day headers over their columns, now 10 px wide
+  on both; a phone's scrollbars are the system's overlay ones, drawn only
+  while scrolling, and Firefox on Linux draws its own overlay ones too.
+  The thumb shows at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller. Checked in
+  Chromium and Firefox (headed, light and dark); WebKit does not start on
+  the development machine, and draws the same `::-webkit-scrollbar` rules
+  as Chromium. Tested: `packages/ui/test/scrollbar-colors.test.ts` (the
+  thumb's contrast at rest, under the pointer and dragged, over those
+  four surfaces, light and dark, read from `styles.css`; failing at 22%),
+  `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, 15 px
+  again in forced colours, and Saturday's header ends where its column
+  does; failing before at 15 px and at 10 px in forced colours:
   Playwright's headless Chromium hides scrollbars from the screen but
   keeps their width in the layout, which is what this measures). The
   thumb's colours under the pointer and while dragged, Firefox's
   `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
+- **D192. The time grid's hours are as tall as the user pinches them**
+  (the owner's feedback 15: "when the user pinches in/out, the distance
+  between hours changes ... not fixed steps: any value"). The hour was
+  56 px. It is now any height from 24 to 240 px (`hourIn` in `items.tsx`,
+  the one place of the bounds), the same in Day, 3 days and Week, kept on
+  the device (`astrotime.hour` in the preferences; another tab's new
+  height reaches this one when it opens again):
+  - **two fingers** on the grid spread or close it; the time between them
+    stays between them. The page never zooms there: the grid's
+    `touch-action` is `pan-y`, which leaves the browser no pinch of its
+    own, so the two fingers' moves are the grid's to take, and it takes
+    them before the browser scrolls. A second finger added to a grid
+    already scrolling with one is no pinch: the browser has made that
+    touch its scroll and no longer lets the page cancel its moves, so the
+    zoom stops there rather than set the scroll against the browser's. A
+    second finger is no swipe either ([D152](#D152)): the swipe lets go of
+    the first;
+  - **a trackpad's pinch, or Ctrl and a wheel** (a trackpad's pinch comes
+    to the page as a wheel with Ctrl) over the grid does the same about
+    the pointer, in place of the page's zoom there; elsewhere the page
+    zooms as the browser does;
+  - **the keys "+" (or "="), "-" and "0"** step it by a quarter, or bring
+    back 56 px, about the middle of the grid shown, as the view's other
+    keys ([D88](#D88)), when nothing else has the key: a field, a dialog,
+    a menu, a list box, a tab list, or another handler that took it.
+    Ctrl and "+" are left to the browser, whose page zoom low-vision users
+    rely on (WCAG 1.4.4).
+
+  While a zoom goes, only `--hour` on the view and the grid's scroll
+  change, with no React render: the grid, its hours, tiles, items, the
+  current time and a drag's ghost are drawn with `calc(var(--hour) * …)`,
+  and each step starts from the height drawn, not the one React last
+  rendered. It is drawn as it is kept, to a tenth of a pixel
+  (`keptHour`), so the time under the fingers does not move when the
+  zoom ends. When the fingers go, the keys are pressed or the wheel rests
+  for a quarter of a second, the height is kept, and the views render once
+  with it: what a block's text fits ([D153](#D153)), where a drag lands and
+  where a tap creates follow it. The handling is a chunk of its own
+  (`pinch.ts`), loaded once the view is drawn ([foundation
+  D145](foundation.md#D145)); until then the page zooms as before.
+  Safari's own pinch gestures (`gesturestart`) are not handled
+  ([Deferred](#deferred)). Tested: `apps/web/e2e/zoom.spec.ts` (Ctrl and a
+  wheel over 1:00 PM in 3 days: 92.3 px, 1:00 PM still under the pointer,
+  a 30-minute block then fitting its time line, and the height kept after
+  a reload; the keys up to 240 px, "0" to 56, down to 24; two fingers side
+  by side on a phone, spread to twice apart: 112 px, the time between them
+  kept, the days not swiped; two fingers closing in the Day view, held at
+  24 px, the day 576 px tall). Tried by hand on Android 16's Chrome in an
+  emulator, a real two-finger pinch to twice the size: the hours twice as
+  tall about the pinch, the page not zoomed, no swipe;
+  `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
+  time under the fingers kept through steps and after).
 
 ### Decided in round 4: the editor
 
@@ -2085,6 +2145,10 @@ own (below).
   web shows every list side by side, each a column with its own "Add a
   task", and tasks dragged from one to another. AstroTime shows one list at
   a time under its tabs; columns come with dragging tasks between lists.
+- **Safari's pinch on a Mac's trackpad** ([D192](#D192)): Safari sends
+  `gesturestart`/`gesturechange` rather than a wheel with Ctrl; the time
+  grid's zoom hears only the second, so there Safari's trackpad pinch
+  zooms the page.
 - **The scrollbars' untested parts** ([D191](#D191)): the thumb's
   colours as an engine draws them (the shares are proven, not the
   pixels), Firefox's `scrollbar-width`
