@@ -91,6 +91,23 @@ test.describe("on a wide screen", () => {
   });
 });
 
+test("a new item's draft is in its kind's default colour (design D172)", async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "astrotime.settings",
+      JSON.stringify({ defaultColors: { event: "#e91e63", task: "#00897b" } }),
+    ),
+  );
+  await openDemo(page, "week");
+  await expect(page.getByRole("list", { name: "Wednesday, November 4" })).toBeVisible();
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(draft(page)).toHaveCSS("--item", "#e91e63");
+  await page.getByRole("dialog").getByRole("radio", { name: "Task" }).click();
+  await expect(draft(page)).toHaveAttribute("aria-label", /^Task: /);
+  await expect(draft(page)).toHaveCSS("--item", "#00897b");
+});
+
 test.describe("on a phone", () => {
   test.use({ viewport: PHONE });
 
