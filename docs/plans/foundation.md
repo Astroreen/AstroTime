@@ -2223,14 +2223,36 @@ task?"
   calendars' do. Recorded from the test user on Nextcloud 34.0.5
   (`packages/caldav/test/fixtures/nextcloud-files-*.xml`).
 
+- **D232. A file from the device, uploaded to the account's files** (the
+  owner's 9; the brief's "on Android, uploading from the device's picker;
+  on desktop, a file dialog"). Where an account has files
+  ([D231](#D231)), the edit dialog's "From this device" opens the
+  system's file dialog (the browser's, Electron's, Android's picker in the
+  WebView), and the file goes where Nextcloud Calendar puts what it
+  uploads, `/Calendar` (its `attachmentsFolder` default; `MKCOL` makes it,
+  `405` says it is there), under its name with a slash or a control
+  character made `_`, never over a file there: `PUT` with `If-None-Match:
+  *`, and on `412` "name (2).ext", then "(3)"…, up to twenty. Listed back
+  with `Depth: 0`, it is attached as a file picked from the account is
+  ([D231](#D231)). For that, a request's body may be bytes
+  (`HttpRequest.body: string | Uint8Array`) on every platform: the web's
+  `fetch` sends them as they are, and its proxy forwards a body as bytes,
+  not as text ([D39](#D39): a file is no UTF-8); the desktop's main
+  process takes them over IPC and writes them (`checks.ts` lets bytes
+  through, nothing else); Android's bridge carries text only, so they
+  cross it in base64 (`bodyBase64`) and the plugin decodes them with
+  Okio's base64 (the JVM tests' too) into OkHttp's body. A file over 50 MB
+  is refused before anything is sent (Android holds it in memory twice,
+  as bytes and as base64), with what to do instead: attach it from the
+  account's files. While it goes the row says "Uploading minutes.txt…";
+  one that failed says so.
+
 ## Deferred
 
-- **Uploading a file from the device to the account's files** ([D231](#D231))
-  — Nextcloud Calendar's "Upload from device" puts it in the user's
-  attachments folder (`/Calendar` unless the user chose another in its
-  settings, which AstroTime does not read) and links it; it needs a
-  request body of bytes through every platform's HTTP (the web's proxy,
-  the desktop's and Android's own clients carry text today).
+- **The user's own attachments folder** ([D232](#D232)) — Nextcloud
+  Calendar lets the user choose where uploads go (its `attachmentsFolder`
+  setting, kept by its app, not over WebDAV); AstroTime uploads to its
+  default, `/Calendar`.
 - **Files on other servers** — only Nextcloud's calendar home says where
   its files are ([D231](#D231)); a WebDAV server of files named by the
   user is not offered.

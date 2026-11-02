@@ -11,7 +11,7 @@
 // `@astrotime/sync/files`, with the file picker.
 import type { FileStore, NewAttachment, RemoteFile } from "@astrotime/core";
 
-import type { HttpClient } from "./http.ts";
+import type { HttpClient, HttpRequest } from "./http.ts";
 import { basic, NEXTCLOUD_HOME, send, type Credentials } from "./provider.ts";
 import { children, parseMultistatus, text, type DavResponse } from "./xml.ts";
 
@@ -28,32 +28,60 @@ export function filesOf(
   if (!match) return null;
   const [, root = "", user = ""] = match;
   const files = `${root}/remote.php/dav/files/${user}`;
+  /** A path's URL in the user's files, each part encoded. */
+  const urlOf = (path: string) =>
+    `${files}${path === "/" ? "" : path.split("/").map(encodeURIComponent).join("/")}`;
+  const request = (
+    method: string,
+    url: string,
+    accept: number[],
+    extra: Partial<HttpRequest> = {},
+  ) => send(http, authorization, { method, url, headers: {}, ...extra }, accept);
+  const list = async (path: string, depth: "0" | "1") => {
+    const folder = `/${path.split("/").filter(Boolean).join("/")}`;
+    const response = await request("PROPFIND", `${urlOf(folder)}${depth === "1" ? "/" : ""}`, [], {
+      headers: { Depth: depth, "Content-Type": "application/xml; charset=utf-8" },
+      body: PROPS,
+    });
+    const base = new URL(response.url);
+    const own = new URL(`${files}/`, base).pathname;
+    return parseMultistatus(response.body)
+      .responses.map((entry) => fileOf(entry, base, own, root))
+      .filter(
+        (file): file is RemoteFile => file !== null && (depth === "0" || file.path !== folder),
+      );
+  };
   return {
     async list(path) {
-      const folder = `/${path.split("/").filter(Boolean).join("/")}`;
-      const url = `${files}${folder === "/" ? "" : folder.split("/").map(encodeURIComponent).join("/")}/`;
-      const response = await send(
-        http,
-        authorization,
-        {
-          method: "PROPFIND",
-          url,
-          headers: { Depth: "1", "Content-Type": "application/xml; charset=utf-8" },
-          body: PROPS,
-        },
-        [],
+      return (await list(path, "1")).toSorted((a, b) =>
+        a.folder === b.folder ? a.name.localeCompare(b.name) : a.folder ? -1 : 1,
       );
-      const base = new URL(response.url);
-      const own = new URL(`${files}/`, base).pathname;
-      return parseMultistatus(response.body)
-        .responses.map((entry) => fileOf(entry, base, own, root))
-        .filter((file): file is RemoteFile => file !== null && file.path !== folder)
-        .toSorted((a, b) =>
-          a.folder === b.folder ? a.name.localeCompare(b.name) : a.folder ? -1 : 1,
-        );
+    },
+    async upload(name, type, bytes) {
+      // Where Nextcloud Calendar keeps what is uploaded for an item, made if it is not there (405: it is).
+      await request("MKCOL", urlOf(ATTACHMENTS), [405]);
+      // A name taken is never written over: "Q3.pdf", then "Q3 (2).pdf"…
+      const safe = name.replaceAll(/[/\\\p{Cc}]/gu, "_").trim() || "file";
+      const dot = safe.lastIndexOf(".");
+      const [stem, extension] = dot > 0 ? [safe.slice(0, dot), safe.slice(dot)] : [safe, ""];
+      for (let n = 1; n <= 20; n++) {
+        const path = `${ATTACHMENTS}/${n === 1 ? safe : `${stem} (${n})${extension}`}`;
+        const put = await request("PUT", urlOf(path), [412], {
+          headers: { "Content-Type": type || "application/octet-stream", "If-None-Match": "*" },
+          body: bytes,
+        });
+        if (put.status === 412) continue;
+        const [file] = await list(path, "0");
+        if (!file) throw new Error(`${path} was uploaded but is not listed.`);
+        return file;
+      }
+      throw new Error(`No free name for ${safe} in ${ATTACHMENTS}.`);
     },
   };
 }
+
+/** Nextcloud Calendar's attachments folder, where it uploads a file from the device (its `attachmentsFolder` setting's default). */
+const ATTACHMENTS = "/Calendar";
 
 /** One entry of a folder's listing, its path in the user's files; none outside them. */
 function fileOf(entry: DavResponse, base: URL, own: string, root: string): RemoteFile | null {

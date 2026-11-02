@@ -65,11 +65,8 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
     "if-match",
     "ocs-apirequest",
   ]);
-  expect(seen[0]?.init).toMatchObject({
-    method: "PROPFIND",
-    body: "<propfind/>",
-    redirect: "manual",
-  });
+  expect(seen[0]?.init).toMatchObject({ method: "PROPFIND", redirect: "manual" });
+  expect(new TextDecoder().decode(seen[0]?.init.body as ArrayBuffer)).toBe("<propfind/>");
   expect(response.status).toBe(207);
   expect([...response.headers.keys()].toSorted()).toEqual([
     "cache-control",
@@ -78,6 +75,25 @@ test("only CalDAV's headers pass, both ways; cookies never", async () => {
     "etag",
     "retry-after",
   ]);
+});
+
+test("a file's bytes pass as they are, not as text (foundation D232)", async () => {
+  const { seen, fetchImpl } = upstream(() => new Response(null, { status: 201 }));
+  const handler = proxyHandler({
+    prefix: "/dav-proxy/",
+    allow: ["https://cloud.example.com"],
+    fetch: fetchImpl,
+  });
+  // Not UTF-8: decoded as text, these bytes would come out otherwise.
+  const bytes = new Uint8Array([0, 255, 254, 0xc3, 0x28, 10, 13]);
+  const response = await handler(
+    new Request(
+      `http://app.localhost${via.to("https://cloud.example.com/remote.php/dav/files/astro/Calendar/x.bin")}`,
+      { method: "PUT", body: bytes },
+    ),
+  );
+  expect(response.status).toBe(201);
+  expect(new Uint8Array(seen[0]!.init.body as ArrayBuffer)).toEqual(bytes);
 });
 
 test("a redirect comes back mapped into the proxy", async () => {

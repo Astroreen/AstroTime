@@ -8,12 +8,16 @@
 import { CertificateError, ProxyRefusedError, type HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 
+import { base64Of } from "./shell.ts";
+
 /** One exchange, as the plugin takes it. */
 export interface NativeRequest {
   readonly method: string;
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: string;
+  /** A file's bytes in base64 (design D232): the bridge carries text only. */
+  readonly bodyBase64?: string;
   /** The origins plain http may go to, on any hop (`http://host:port`). */
   readonly cleartext: readonly string[];
 }
@@ -47,7 +51,11 @@ export function nativeClient(
         method: request.method,
         url: request.url,
         headers: request.headers,
-        ...(request.body === undefined ? {} : { body: request.body }),
+        ...(request.body === undefined
+          ? {}
+          : typeof request.body === "string"
+            ? { body: request.body }
+            : { bodyBase64: base64Of(request.body) }),
         cleartext: await cleartext(),
       });
     } catch (error) {

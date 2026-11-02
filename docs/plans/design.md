@@ -1731,8 +1731,8 @@ bar, the sidebar and the accounts panel.
   with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
   a web link (typed with `http://` or `https://`, or with neither, which
   is `https://`; its host has a dot, is `localhost`, or is a name with its
-  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, or a bare
-  word is none, and "Add" waits until it is one; another scheme,
+  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, a bare
+  word, a file's name, `report.pdf`, or a mail address, `a@b.com`, is none, and "Add" waits until it is one; another scheme,
   `javascript:` or `mailto:`, never is), added with Enter or "Add", Escape leaving
   it; Enter there adds the link and does not save the dialog. The form
   keeps them as reminders are kept (`AttachmentChoice`: one the item has,
@@ -1761,7 +1761,9 @@ bar, the sidebar and the accounts panel.
   too). Asking whether an account has files makes no request (its
   calendar home says); the picker's code, the files' with it, loads with
   its first opening.
-  Uploading a file from the device is [Deferred](foundation.md#deferred).
+  _Since [foundation D232](foundation.md#D232):_ "From this device", a third
+  action beside them, uploads a file from the device to the account's
+  files and attaches it.
 
 ### Decided in round 4: pictures
 

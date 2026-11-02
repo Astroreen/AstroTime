@@ -7,7 +7,8 @@
 import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
-import { useEffect, useId, useState } from "react";
+import { accountFiles } from "@astrotime/sync/files";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
@@ -26,6 +27,9 @@ const shown = (attachment: NewAttachment): Attachment => ({
   size: attachment.size ?? null,
   inline: false,
 });
+
+/** The largest file uploaded from the device: Android's bridge carries it in base64, in memory. */
+const MAX_UPLOAD = 50_000_000;
 
 /**
  * The account a calendar is in, where it may have files (foundation D231):
@@ -67,6 +71,42 @@ export function AttachmentsField({
   const { t, i18n } = useTranslation();
   const account = useFilesAccount(calendar);
   const [browsing, setBrowsing] = useState(false);
+  const { platform } = useAccounts();
+  // A file from the device on its way to the account's files (design D232).
+  const [uploading, setUploading] = useState<
+    | { readonly state: "sending"; readonly name: string }
+    | { readonly state: "failed"; readonly name: string; readonly tooBig: boolean }
+    | null
+  >(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const attach = (attachment: NewAttachment) => {
+    // A file attached already is not attached twice, its link as it resolves.
+    if (!value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, calendar?.url)))
+      onChange([...value, { kind: "new", attachment }]);
+  };
+  const upload = async (file: File) => {
+    if (!account) return;
+    if (file.size > MAX_UPLOAD) {
+      setUploading({ state: "failed", name: file.name, tooBig: true });
+      return;
+    }
+    setUploading({ state: "sending", name: file.name });
+    try {
+      const files = await accountFiles({ http: platform.http, secrets: platform.secrets }, account);
+      if (!files) throw new Error("This account's files cannot be opened.");
+      const sent = await files.upload(
+        file.name,
+        file.type,
+        new Uint8Array(await file.arrayBuffer()),
+      );
+      if (!sent.attachment) throw new Error("The file uploaded has no link.");
+      attach(sent.attachment);
+      setUploading(null);
+    } catch (error) {
+      console.error(error);
+      setUploading({ state: "failed", name: file.name, tooBig: false });
+    }
+  };
   const [adding, setAdding] = useState(false);
   const [link, setLink] = useState("");
   const inputId = useId();
@@ -140,11 +180,46 @@ export function AttachmentsField({
             {t("attachments.addLink")}
           </button>
           {account && (
-            <button type="button" className={textButton} onClick={() => setBrowsing(true)}>
-              {t("attachments.fromFiles")}
-            </button>
+            <>
+              <button type="button" className={textButton} onClick={() => setBrowsing(true)}>
+                {t("attachments.fromFiles")}
+              </button>
+              <button
+                type="button"
+                className={textButton}
+                disabled={uploading?.state === "sending"}
+                onClick={() => picker.current?.click()}
+              >
+                {t("attachments.upload")}
+              </button>
+              {/* The system's file dialog, Android's picker in the WebView. */}
+              <input
+                ref={picker}
+                type="file"
+                hidden
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void upload(file);
+                }}
+              />
+            </>
           )}
         </div>
+      )}
+      {uploading && (
+        <p
+          role={uploading.state === "failed" ? "alert" : "status"}
+          className={`text-note ${uploading.state === "failed" ? "text-danger" : "text-ink-muted"}`}
+        >
+          {uploading.state === "sending"
+            ? t("attachments.uploading", { name: uploading.name })
+            : uploading.tooBig
+              ? t("attachments.tooBig", { name: uploading.name })
+              : t("attachments.uploadFailed", { name: uploading.name })}
+        </p>
       )}
       {account && (
         <FilePicker
@@ -153,11 +228,7 @@ export function AttachmentsField({
           onClose={() => setBrowsing(false)}
           onPick={(attachment) => {
             setBrowsing(false);
-            // A file attached already is not attached twice, its link as it resolves.
-            const there = value.some((choice) =>
-              sameLink(choice.attachment.uri, attachment.uri, calendar?.url),
-            );
-            if (!there) onChange([...value, { kind: "new", attachment }]);
+            attach(attachment);
           }}
         />
       )}

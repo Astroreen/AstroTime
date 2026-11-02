@@ -6,7 +6,8 @@ export interface HttpRequest {
   readonly method: string;
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
-  readonly body?: string;
+  /** Text; or a file's bytes, uploaded to an account's files (docs/plans/foundation.md#D232). */
+  readonly body?: string | Uint8Array;
 }
 
 export interface HttpResponse {
@@ -53,7 +54,10 @@ export function fetchClient(
         response = await run(via.to(request.url), {
           method: request.method,
           headers: request.headers,
-          ...(request.body === undefined ? {} : { body: request.body }),
+          ...(request.body === undefined
+            ? {}
+            : // Bytes as fetch takes them: on an ArrayBuffer of their own.
+              { body: typeof request.body === "string" ? request.body : request.body.slice() }),
           credentials: "omit",
           signal: abort.signal,
         });

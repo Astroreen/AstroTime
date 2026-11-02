@@ -61,8 +61,9 @@ export function checkRequest(value: unknown): HttpRequest {
     if (FORBIDDEN.has(name.toLowerCase())) throw new TypeError(`Not a header to set: ${name}.`);
     checked[name] = header;
   }
-  if (body !== undefined && typeof body !== "string") {
-    throw new TypeError("An HTTP request's body is a string.");
+  // Text, or a file's bytes (foundation D232).
+  if (body !== undefined && typeof body !== "string" && !(body instanceof Uint8Array)) {
+    throw new TypeError("An HTTP request's body is a string or bytes.");
   }
   return { method, url, headers: checked, ...(body === undefined ? {} : { body }) };
 }

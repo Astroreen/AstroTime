@@ -51,6 +51,9 @@ function store(failing = 0): FileStore & { readonly asked: string[] } {
   };
   return {
     asked,
+    upload: async () => {
+      throw new Error("Not uploaded here.");
+    },
     list: async (path) => {
       asked.push(path);
       if (asked.length <= failing) throw new Error("offline");

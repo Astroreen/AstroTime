@@ -40,8 +40,9 @@ const EVENT = [
   "",
 ].join("\r\n");
 
-/** The fake server, behind the dev server's proxy: it keeps what is PUT. */
-async function fakeNextcloud(page: Page): Promise<void> {
+/** The fake server, behind the dev server's proxy: it keeps what is PUT, the files uploaded by path. */
+async function fakeNextcloud(page: Page): Promise<Map<string, Buffer>> {
+  const uploaded = new Map<string, Buffer>();
   let event = { etag: '"1"', ics: EVENT };
   let token = 1;
   await page.route("**/dav-proxy/**", async (route) => {
@@ -89,6 +90,18 @@ async function fakeNextcloud(page: Page): Promise<void> {
       return xml(fixture("nextcloud-files-root.xml"));
     if (method === "PROPFIND" && path === `/remote.php/dav/files/${USER}/Calendar/`)
       return xml(fixture("nextcloud-files-calendar.xml"));
+    // An upload from the device (foundation D232): the folder is there, the
+    // file is kept as sent and listed with an id of its own.
+    if (method === "MKCOL" && path === `/remote.php/dav/files/${USER}/Calendar`)
+      return route.fulfill({ status: 405, body: "" });
+    if (method === "PUT" && path.startsWith(`/remote.php/dav/files/${USER}/Calendar/`)) {
+      uploaded.set(path, request.postDataBuffer() ?? Buffer.alloc(0));
+      return route.fulfill({ status: 201, body: "" });
+    }
+    if (method === "PROPFIND" && uploaded.has(path))
+      return xml(
+        `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>${encodeURI(path)}</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontenttype>text/plain</d:getcontenttype><d:getcontentlength>${uploaded.get(path)!.length}</d:getcontentlength><oc:fileid>5005</oc:fileid><nc:has-preview>false</nc:has-preview></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
+      );
     if (method === "PUT" && path === `${CALENDAR}review.ics`) {
       token += 1;
       event = { etag: `"${token}"`, ics: request.postData() ?? "" };
@@ -96,6 +109,7 @@ async function fakeNextcloud(page: Page): Promise<void> {
     }
     return route.fulfill({ status: 404, body: "" });
   });
+  return uploaded;
 }
 
 async function signIn(page: Page, language: "en" | "ru") {
@@ -160,6 +174,53 @@ test("a file of the account's attached from the edit dialog reaches the server a
       .getByRole("dialog", { name: "Quarterly review" })
       .getByRole("link", { name: /AstroTime fixture\.txt/ }),
   ).toHaveAttribute("href", "https://cloud.example.com/index.php/f/1041771");
+});
+
+test("a file from the device is uploaded to /Calendar and attached as Nextcloud Calendar's (foundation D232)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  const uploaded = await fakeNextcloud(page);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  // The system's file dialog, answered for the user.
+  const chooser = page.waitForEvent("filechooser");
+  await edit.getByRole("button", { name: "From this device" }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: "minutes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Minutes\n\u00ff\u0000", "latin1"),
+  });
+  const list = edit.getByRole("list", { name: "Attachments" });
+  await expect(list.getByRole("listitem")).toHaveText([/minutes\.txt.*TXT · 10\sB/]);
+  // The bytes reached the server as they were.
+  expect([...uploaded.entries()].map(([path, bytes]) => [path, [...bytes]])).toEqual([
+    [
+      `/remote.php/dav/files/${USER}/Calendar/minutes.txt`,
+      [...Buffer.from("Minutes\n\u00ff\u0000", "latin1")],
+    ],
+  ]);
+  const saved = page.waitForRequest(
+    (request) => request.method() === "PUT" && request.url().endsWith("/review.ics"),
+  );
+  await edit.getByRole("button", { name: "Save" }).click();
+  // Unfolded (RFC 5545 §3.1): a long line is written over two.
+  expect(((await saved).postData() ?? "").replaceAll(/\r\n[ \t]/g, "")).toContain(
+    "ATTACH;FMTTYPE=text/plain;FILENAME=/Calendar/minutes.txt;SIZE=10;X-NC-FILE-ID=5005;X-NC-HAS-PREVIEW=false:https://cloud.example.com/index.php/f/5005",
+  );
 });
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];

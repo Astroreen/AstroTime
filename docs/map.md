@@ -151,7 +151,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `filesOf` (`files.ts`, `@astrotime/caldav/files`) — an account's
     Nextcloud files beside its calendars (`keepsFiles`, whether its home
     has them): a folder listed, each file with the `ATTACH` Nextcloud
-    Calendar writes. → `plans/foundation.md#D231`
+    Calendar writes; a file from the device uploaded to `/Calendar`.
+    → `plans/foundation.md#D231`, `plans/foundation.md#D232`
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
   - `CertificateError` — a server certificate the platform refused (Android's
     plugin tells it apart). → `plans/android.md#D62`
@@ -432,7 +433,9 @@ When you add a package, app or module, add its line here in the same PR.
     (`android/app/src/main/java/io/github/astroreen/astrotime/shell/`): the
     system bars follow the theme the page shows; `src/shell.ts` is its
     TypeScript side, with the back button. → `plans/android.md#D68`;
-    `saveFile`, a file saved through the system's "Save to" picker.
+    `saveFile`, a file saved through the system's "Save to" picker;
+    `AstroTimeHttp` takes a file's bytes as `bodyBase64`
+    (`plans/foundation.md#D232`).
     → `plans/design.md#D230`
   - `src/webview.ts` — the WebView's Chromium version, checked before the
     store opens. → `plans/android.md#D61`

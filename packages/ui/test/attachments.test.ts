@@ -105,6 +105,10 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   expect(typedLink("12:30")).toBeNull();
   expect(typedLink("1.5")).toBeNull();
   expect(typedLink("nas")).toBeNull();
+  expect(typedLink("report.pdf")).toBeNull();
+  expect(typedLink("a@b.com")).toBeNull();
+  expect(typedLink("https://user@example.org/")).toBeNull();
+  expect(typedLink("example.org/report.pdf")).toBe("https://example.org/report.pdf");
   expect(typedLink("not a link")).toBeNull();
   expect(typedLink("javascript:alert(1)")).toBeNull();
   expect(typedLink("mailto:me@example.org")).toBeNull();
