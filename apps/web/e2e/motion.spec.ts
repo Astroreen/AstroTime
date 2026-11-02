@@ -206,6 +206,45 @@ test.describe("an item saved, the strip opened (design D193)", () => {
     await expect(saved).toHaveAttribute("data-landed", "true");
     await expect(saved).toHaveCSS("animation-name", "item-land");
     await expect(page.locator("main [data-landed]")).toHaveCount(1);
+    // Landed once: when its landing ends it is a plain item, and a week
+    // away and back draws it again without landing again.
+    await expect(saved).not.toHaveAttribute("data-landed");
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(header(page, "Sunday, November 8")).toBeVisible();
+    await page.getByRole("button", { name: "Previous week" }).click();
+    await expect(saved).toBeVisible();
+    await expect(page.locator("main [data-landed]")).toHaveCount(0);
+  });
+
+  test("a new series lands where its form put it, not on each of its days", async ({ page }) => {
+    // A landing that lasts, so its mark is there to read.
+    await page.addInitScript(() =>
+      document.addEventListener("DOMContentLoaded", () => {
+        const style = document.createElement("style");
+        style.textContent = "[data-landed] { animation-duration: 600s !important; }";
+        document.head.append(style);
+      }),
+    );
+    await openDemo(page, "month");
+    await expect(page.locator('[data-view="month"]')).toBeVisible();
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Swimming");
+    await dialog.getByLabel("Start date").fill("2026-11-10");
+    await dialog.getByRole("combobox", { name: "Repeat" }).click();
+    await page
+      .getByRole("option", { name: /^Every week/ })
+      .first()
+      .click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+    const swims = page.locator('main [role=listitem][aria-label^="Swimming"]');
+    // Every Tuesday the month shows, from the 10th on.
+    await expect(swims).toHaveCount(5);
+    await expect(page.locator("main [data-landed]")).toHaveCount(1);
+    await expect(
+      page.getByRole("list", { name: "Tuesday, November 10" }).locator("[data-landed]"),
+    ).toHaveCount(1);
   });
 
   test("opening the strip fades its new rows in; on the next period, opened already, they are just there", async ({

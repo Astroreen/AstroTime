@@ -498,6 +498,14 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   });
 
   test("this and following: the series is split at Thursday", async ({ page }) => {
+    // A landing that lasts, so its mark is there to read (design D193).
+    await page.addInitScript(() =>
+      document.addEventListener("DOMContentLoaded", () => {
+        const style = document.createElement("style");
+        style.textContent = "[data-landed] { animation-duration: 600s !important; }";
+        document.head.append(style);
+      }),
+    );
     await openDemo(page, "week");
     const dialog = await editItem(page, "Thursday, November 5", /^Stand-up, /, "Stand-up");
     await dialog.getByRole("textbox", { name: "Title" }).fill("Daily sync");
@@ -508,6 +516,15 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
     await expect(item(page, "Thursday, November 5", /^Daily sync, 9:00/)).toBeVisible();
     await expect(item(page, "Friday, November 6", /^Daily sync, 9:00/)).toBeVisible();
     await expect(item(page, "Wednesday, November 4", /^Stand-up, 9:00/)).toBeVisible();
+    // The occurrence edited lands, in the new series it is in now; its
+    // following days do not (design D193).
+    await expect(item(page, "Thursday, November 5", /^Daily sync, 9:00/)).toHaveAttribute(
+      "data-landed",
+      "true",
+    );
+    await expect(item(page, "Friday, November 6", /^Daily sync, 9:00/)).not.toHaveAttribute(
+      "data-landed",
+    );
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(item(page, "Monday, November 9", /^Daily sync, 9:00/)).toBeVisible();
   });

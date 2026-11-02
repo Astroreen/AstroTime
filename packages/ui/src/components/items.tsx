@@ -7,7 +7,7 @@ import { wallClockOf, type Placed } from "@astrotime/core";
 import type { CSSProperties, Ref } from "react";
 
 import { DRAFT, type Entry } from "../calendar/query.ts";
-import { useCalendar } from "./context.ts";
+import { useCalendar, type Landed } from "./context.ts";
 import { useDragSource, type DragSource } from "./drag.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
 import { CheckCircleIcon } from "./icons.tsx";
@@ -120,6 +120,23 @@ export function Title({
 export const itemStyle = (color: string, style: CSSProperties = {}) =>
   ({ "--item": color, ...style }) as CSSProperties;
 
+/**
+ * The occurrence the edit dialog saved lands, once (design D193): its own
+ * item and start, not the series' others; when it has, it lands no more.
+ */
+function landing(
+  entry: Entry,
+  landed: Landed | null | undefined,
+  timeZone: string,
+  onLanded: (() => void) | undefined,
+) {
+  const lands =
+    landed != null &&
+    entry.occurrence.item.uid === landed.uid &&
+    wallClockOf(entry.occurrence.start, timeZone).startsWith(landed.at);
+  return lands ? { "data-landed": true, onAnimationEnd: onLanded } : {};
+}
+
 /** What the list item of a draggable entry takes: its key, whether it is held, its press. */
 function dragProps(entry: Entry, source: DragSource | null, held: boolean) {
   return {
@@ -151,7 +168,7 @@ export function StripChip({
   dense?: boolean;
   opens?: boolean;
 }) {
-  const { colorOf, found, landed } = useCalendar();
+  const { colorOf, found, landed, onLanded, timeZone } = useCalendar();
   const label = useItemLabel();
   const { source, held } = useDragSource(entry, dense ? "month" : "strip");
   const task = entry.occurrence.item.kind === "task";
@@ -163,7 +180,7 @@ export function StripChip({
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
       data-draft={entry.objectId === DRAFT || undefined}
-      data-landed={entry.occurrence.item.uid === landed || undefined}
+      {...landing(entry, landed, timeZone, onLanded)}
       {...dragProps(entry, source, held)}
       className={[
         "item relative flex h-full items-center leading-none font-medium",
@@ -197,7 +214,7 @@ export function AgendaCard({
   /** The card, for one that may yet be drawn over a place's photo (design D220). */
   ref?: Ref<HTMLDivElement>;
 }) {
-  const { t, colorOf, landed } = useCalendar();
+  const { t, colorOf, landed, onLanded, timeZone } = useCalendar();
   const timeOf = useItemTime();
   const label = useItemLabel();
   const time = part ? t("agenda.dayOf", part) : timeOf(entry, allDay);
@@ -208,7 +225,7 @@ export function AgendaCard({
       ref={ref}
       role="listitem"
       data-draft={entry.objectId === DRAFT || undefined}
-      data-landed={entry.occurrence.item.uid === landed || undefined}
+      {...landing(entry, landed, timeZone, onLanded)}
       aria-label={name}
       data-done={entry.done || undefined}
       className="item relative flex min-h-11 items-center gap-2 rounded-[8px] px-2.5 py-1.5"
@@ -266,7 +283,7 @@ export function TimedItem({
   compact: boolean;
 }) {
   const { shape, top, bottom, left, width, layer, room, continuesBefore, continuesAfter } = placed;
-  const { colorOf, formats, timeZone, found, landed } = useCalendar();
+  const { colorOf, formats, timeZone, found, landed, onLanded } = useCalendar();
   const label = useItemLabel();
   const { source, held } = useDragSource(entry, "grid");
   const height = ((bottom - top) / 60) * HOUR - 2;
@@ -287,7 +304,7 @@ export function TimedItem({
       data-done={entry.done || undefined}
       data-found={entry.objectId === found || undefined}
       data-draft={entry.objectId === DRAFT || undefined}
-      data-landed={entry.occurrence.item.uid === landed || undefined}
+      {...landing(entry, landed, timeZone, onLanded)}
       {...dragProps(entry, source, held)}
       className={[
         "item absolute overflow-hidden rounded-[6px]",
