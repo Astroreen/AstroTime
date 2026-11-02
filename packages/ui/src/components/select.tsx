@@ -108,24 +108,35 @@ export function Select({
   );
 }
 
-/** A button whose list runs one action: "Add reminder" and its choices. */
+/**
+ * A button whose list runs one action: "Add reminder" and its choices; with
+ * `icon`, an icon button named `label`, as the details' "⋯" (design D163).
+ */
 export function MenuButton({
   label,
   options,
   onChoose,
+  icon,
   className = "",
 }: {
   label: string;
   options: readonly SelectOption[];
   onChoose: (value: string) => void;
+  icon?: ReactNode;
   className?: string;
 }) {
   return (
     <Menu.Root>
-      <Menu.Trigger className={`${button} ${className}`}>
-        <span className="min-w-0 flex-1 truncate text-ink-muted">{label}</span>
-        <CaretIcon className="size-5 shrink-0 text-ink-muted" />
-      </Menu.Trigger>
+      {icon ? (
+        <Menu.Trigger aria-label={label} title={label} className={className}>
+          {icon}
+        </Menu.Trigger>
+      ) : (
+        <Menu.Trigger className={`${button} ${className}`}>
+          <span className="min-w-0 flex-1 truncate text-ink-muted">{label}</span>
+          <CaretIcon className="size-5 shrink-0 text-ink-muted" />
+        </Menu.Trigger>
+      )}
       <Menu.Portal>
         <Menu.Positioner sideOffset={4} collisionPadding={8} className="z-[200] outline-none">
           <Menu.Popup className={popup}>

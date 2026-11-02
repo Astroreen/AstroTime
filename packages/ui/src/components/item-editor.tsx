@@ -57,6 +57,8 @@ import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
   readonly existing: boolean;
+  /** A new item filled from another ("Copy to", design D164): its kind stays. */
+  readonly copy?: boolean;
   readonly form: Form;
   /** Why the form cannot be saved, or why saving it did not work. */
   readonly problem:
@@ -138,6 +140,7 @@ export function ItemEditor({
               <Fields
                 form={form}
                 existing={state.existing}
+                copy={state.copy ?? false}
                 calendars={calendars}
                 onChange={onChange}
               />
@@ -160,11 +163,13 @@ export function ItemEditor({
 function Fields({
   form,
   existing,
+  copy,
   calendars,
   onChange,
 }: {
   form: Form;
   existing: boolean;
+  copy: boolean;
   calendars: readonly Calendar[];
   onChange: (form: Form) => void;
 }) {
@@ -179,7 +184,7 @@ function Fields({
   const event = form.kind === "event";
   return (
     <div className="flex flex-col gap-4">
-      {!existing && (
+      {!existing && !copy && (
         <div role="radiogroup" aria-label={t("edit.kind")} className="flex gap-2">
           {(["event", "task"] as const).map((kind) => (
             <button

@@ -1184,9 +1184,54 @@ Settings, the colours and the lists controls open.
   task's `STATUS`, `PRIORITY`, `PERCENT-COMPLETE` and `CATEGORIES` are
   written back as they were (foundation [D7](foundation.md#D7)), and only
   completing changes the first and the third.
+- **D163. Delete is in a "⋯" menu with "Make a copy" and "Copy to…"**
+  (the owner's feedback 11). The details' Delete button becomes "More
+  actions" (`MenuButton` with an icon, [D167](#D167)): Delete, "Make a
+  copy" ("Сделать копию"), "Copy to…" ("Копировать в…"), in that order,
+  each where the rights allow it (foundation [D37](foundation.md#D37),
+  `rightsOf`): Delete as [D108](#D108) said; "Make a copy" when the item's
+  calendar takes new items; "Copy to…" when any calendar takes one of its
+  kind, so a read-only calendar's item can still be copied elsewhere. The
+  menu shows only with one action in it. Edit stays a button of its own.
+- **D164. What a copy is** (`copyItem` in `@astrotime/core`):
+  - **"Make a copy"** saves the copy at once in the item's calendar, closes
+    the details and says "Copy made" ("Копия создана"), with Open, which
+    opens the copy's details; the notice goes by itself after 8 seconds,
+    as a snackbar does. **"Copy to…"** opens the edit dialog as a new
+    item, every field filled from this one, the calendar too (the first
+    that takes it, when its own takes no new items); its kind cannot be
+    switched; Save makes it wherever the dialog says, the copy with the
+    user's changes, its first revision (`SEQUENCE:0`, `createFromCopy`).
+    One notice shows at a time: a copy's replaces a failed change's, and
+    the other way round.
+  - **An occurrence of a series is copied alone**, as an item that does
+    not repeat, at that occurrence's time and with its exception's fields:
+    the copy is what the user tapped. Google's own help does not say, and a
+    report of its "copy to my calendar" copying one instance of a series
+    is the nearest evidence; a series copied whole is
+    [Deferred](#deferred).
+  - **What it keeps:** every line of the item, those AstroTime has no
+    field for included (`X-*`, `GEO`, `X-APPLE-STRUCTURED-LOCATION`,
+    `RELATED-TO`, the star; foundation [D7](foundation.md#D7)), and the
+    calendar's other components (its `VTIMEZONE`s). "Copy to…" saves the
+    copy with what the user changed, not a new item made of the fields.
+  - **What it does not:** a new `UID`, `DTSTAMP`, `CREATED` and
+    `LAST-MODIFIED`, `SEQUENCE:0`; no `RRULE`, `RDATE`, `EXDATE` or
+    `RECURRENCE-ID`; no `ORGANIZER` or `ATTENDEE`, so no server that
+    schedules sends an invitation for it and no guest's answer is copied
+    (AstroTime does not invite, [D108](#D108)); a task is not done in its
+    copy (`STATUS:NEEDS-ACTION`, no `COMPLETED`, `PERCENT-COMPLETE:0` when
+    it had one); its reminders keep their times, without their `UID` and
+    their `ACKNOWLEDGED`, and the item without Thunderbird's
+    `X-MOZ-LASTACK`: those say the original's reminders were seen, which
+    the copy's were not.
 
 ## Deferred
 
+- **A series copied whole** — "Make a copy" and "Copy to…" copy the
+  occurrence tapped as an item that does not repeat ([D164](#D164)); a
+  choice to copy the whole series, its rule and exceptions with it, would
+  be the scope question's.
 - **Own colours with the account** — the user's colours are this device's
   ([D173](#D173)); with no place for them on a CalDAV server, a second
   device starts without them.
