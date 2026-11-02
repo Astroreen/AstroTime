@@ -779,6 +779,47 @@ describe("the scope of an edit of one occurrence (D11)", () => {
       expect(component.getAllProperties("geo").length).toBeLessThanOrEqual(1);
   });
 
+  test("all: an exception with the series' text but no point is a place of its own (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const placed = editItem(
+      series(),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    ).ics;
+    // Another client kept the text on one occurrence and dropped its point.
+    const exception = CalendarObject.parse(
+      editItem(
+        CalendarObject.parse(placed),
+        { summary: "Standup!" },
+        { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+      ).ics,
+    );
+    for (const component of exception.root.getAllSubcomponents("vevent")) {
+      if (!component.hasProperty("recurrence-id")) continue;
+      component.removeAllProperties("geo");
+      component.removeAllProperties("x-apple-structured-location");
+    }
+    const stripped = exception.serialize();
+    const { ics } = editItem(
+      CalendarObject.parse(stripped),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const occurrences = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-11-01",
+      to: "2027-01-01",
+      timeZone,
+    });
+    const at = (day: string) =>
+      occurrences.find((o) => o.start.type === "zoned" && o.start.local.startsWith(day))!.item;
+    expect([at("2026-11-23").location, at("2026-11-23").geo?.lat]).toEqual(["Mill, Berlin", 52.1]);
+    expect([at("2026-12-21").location, at("2026-12-21").geo]).toEqual(["Gate, Berlin", null]);
+  });
+
   test("all: a new title reaches an exception that had the series' title, not one renamed on its own", () => {
     const withCopy = editItem(
       series(),

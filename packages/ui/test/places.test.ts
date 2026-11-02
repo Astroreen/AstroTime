@@ -248,7 +248,10 @@ describe("the edit dialog's place (D176)", () => {
       "Europe/Berlin",
       "2026-11-04",
     );
-    expect(form.place).toEqual({ ...gate, text });
+    expect(form.place).toEqual({
+      ...gate,
+      written: { text, name: gate.name, address: gate.address },
+    });
     expect(changesOf(form, form, "R")).toEqual({});
     expect(changesOf(form, { ...form, location: "Café" }, "R").location).toBe("Café");
     // A form made again from the same item is the same place: nothing to write.
@@ -274,7 +277,7 @@ describe("the edit dialog's place (D176)", () => {
       name: "Apple Park",
       address: "One Apple Park Way, Cupertino, CA 95014",
       geo: { lat: 37.334682, lon: -122.008944 },
-      text: "Apple Park\nOne Apple Park Way, Cupertino",
+      written: { text: "Apple Park\nOne Apple Park Way, Cupertino" },
     });
   });
 });

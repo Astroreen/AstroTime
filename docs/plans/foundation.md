@@ -1969,19 +1969,24 @@ and [D177](design.md#D177); what reaches a server, and which:
     place alone keeps every line of it ([D7](#D7)): this is D7's one
     exception, a property tied to a field the user changed. Text changed
     and changed back is no change: nothing is written; and the core holds
-    to it too: a `LOCATION` written with the text it already has keeps its
-    point and every parameter of Apple's. A place picked, or an item
+    to it too: a `LOCATION` written with the text it already has, or a
+    place picked with the text and point it already has, keeps every line
+    of its place, Apple's parameters and all. A place picked, or an item
     copied, writes Apple's structured location in AstroTime's shape (its
     `X-APPLE-RADIUS` 70), not another client's; a copy keeps the text the
-    point was read with (Apple's lines too, `Place.text`), so it keeps the
-    point. The edit dialog compares places by their text and point, not as
+    point was read with (Apple's lines too, `Place.written`), so it keeps
+    the point. That text holds only while the name and the address are
+    the ones it was read with: either changed, the place is written as
+    "name, address" again. The edit dialog compares places by their text and point, not as
     objects, so a form made again from the same item writes nothing.
   - **A point off the globe is none**: a place whose point is not a number,
-    is out of range or is exactly 0,0 (which some clients write for "no
-    coordinates") is written as text alone, and read as no point.
+    is out of range, is cut off ("52.5;") or is exactly 0,0 (which some
+    clients write for "no coordinates") is written as text alone, and read
+    as no point.
   - **A series' place**: a new place for every occurrence reaches the
     exceptions that had the series' place, text and point alike; one with a
-    place of its own keeps it, as an exception's own title stays
+    place of its own keeps it (the series' text with no point, as another
+    client may leave it, is a place of its own), as an exception's own title stays
     ([D105](#D105)). Each component's place is its own: a change removes
     the old point from the component changed and from no other.
   - **A geocoder's text goes on one line**: newlines and runs of spaces in
@@ -1998,8 +2003,8 @@ and [D177](design.md#D177); what reaches a server, and which:
     carry Apple's guard, and a point dropped on a guess would hide a right
     map more often than it hides a wrong one; a test pins it. A `GEO`
     another parser wrote as text ("lat;lon") reads the same. Apple's name
-    and address of the point (`Item.placeLabel`) name the place on its
-    card ([design D177](design.md#D177)). The guard's limit: a new text that
+    and address of its own point (`Item.placeLabel`, never beside a `GEO`
+    read in its stead) name the place on its card ([design D177](design.md#D177)). The guard's limit: a new text that
     still holds the old name ("Cafe Roma Nuovo" over "Cafe Roma") keeps
     the old point, and one that drops it ("the café" for "Cafe Roma") loses
     a point that was still right; a word-for-word match would lose more

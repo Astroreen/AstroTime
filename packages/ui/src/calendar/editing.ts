@@ -20,6 +20,7 @@ import {
   type Alarm,
   type CalendarRights,
   type Place,
+  type Geo,
   type Item,
   type ItemChanges,
   type ItemTime,
@@ -177,13 +178,7 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     alarms: item.alarms.map((alarm, index) => ({ kind: "existing", index, alarm })),
     location: item.location ?? "",
     // The point with the very text it belongs to, so a copy writes both (D176).
-    place: item.geo
-      ? {
-          ...nameAndAddress(item.location ?? "", item.placeLabel),
-          geo: item.geo,
-          text: item.location ?? "",
-        }
-      : null,
+    place: item.geo ? placeOfItem(item.location ?? "", item.geo, item.placeLabel) : null,
     description: item.description ?? "",
     color: item.color,
   };
@@ -462,6 +457,12 @@ function sameRepeat(a: RepeatChoice, b: RepeatChoice): boolean {
 function ruleChanged(initial: Form, form: Form): boolean {
   const moved = repeatMoved(initial.repeat, anchorDay(initial), anchorDay(form));
   return !sameRepeat(moved, form.repeat);
+}
+
+/** An item's place: its name, address and point, with the text it was written as. */
+function placeOfItem(location: string, geo: Geo, label: Item["placeLabel"]): Place {
+  const { name, address } = nameAndAddress(location, label);
+  return { name, address, geo, written: { text: location, name, address } };
 }
 
 /** Two places alike: the same text on the same point, however each form was made. */
