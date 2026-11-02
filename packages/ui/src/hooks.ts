@@ -258,7 +258,8 @@ export function useSwipe(ref: RefObject<HTMLElement | null>, handlers: SwipeHand
       const from = finger.current;
       if (!from || event.pointerId !== from.id) return;
       finger.current = null;
-      if (from.axis === "y") return;
+      // A tap, or the grid's scroll: no swipe to end, nothing settles.
+      if (from.axis !== "x") return;
       const first = from.samples[0]!;
       const elapsed = event.timeStamp - first.t;
       const velocity = elapsed > 0 ? (event.clientX - first.x) / elapsed : 0;

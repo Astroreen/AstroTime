@@ -96,3 +96,27 @@ test("with no period drawn beside it, a swipe steps at once, with no settle", ()
   expect(track.getAnimations()).toEqual([]);
   expect(track.style.transform).toBe("");
 });
+
+test("a tap is no swipe: nothing settles, and a swipe right after follows the finger", () => {
+  const onStep = vi.fn();
+  const { track, viewport } = render({ next: page("2026-11-05"), onStep });
+  const at = (type: string, x: number, pointerId: number) =>
+    viewport.dispatchEvent(
+      new PointerEvent(type, {
+        pointerType: "touch",
+        isPrimary: true,
+        pointerId,
+        clientX: x,
+        clientY: 150,
+        bubbles: true,
+      }),
+    );
+  at("pointerdown", 200, 4);
+  at("pointerup", 202, 4);
+  expect(onStep).not.toHaveBeenCalled();
+  expect(track.getAnimations()).toEqual([]);
+  at("pointerdown", 200, 5);
+  at("pointermove", 170, 5);
+  at("pointermove", 140, 5);
+  expect(track.style.transform).toBe("translateX(-60px)");
+});

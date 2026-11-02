@@ -162,6 +162,8 @@ test("a swipe on a touch screen moves to the next period", async ({ page }) => {
   const grid = day(page, "Thursday, November 5");
   const touch = { pointerType: "touch", isPrimary: true, clientY: 500 };
   await grid.dispatchEvent("pointerdown", { ...touch, clientX: 300 });
+  // A finger moves before it lets go: a press and a release alone are a tap.
+  await grid.dispatchEvent("pointermove", { ...touch, clientX: 200 });
   await grid.dispatchEvent("pointerup", { ...touch, clientX: 120 });
   await expect(header(page, "Saturday, November 7")).toBeVisible();
 });

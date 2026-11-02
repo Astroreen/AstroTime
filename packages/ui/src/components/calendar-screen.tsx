@@ -188,7 +188,14 @@ export function CalendarScreen({
     setHeld(null);
     setBeforeAgenda(read);
   }
-  const drawn = fresh ? { view, days, anchor, read } : held;
+  // A step to a period the read drawn holds lands at once from it, even
+  // while a newer read goes on: a swipe's neighbour was drawn from it
+  // (design D154), and the step does not snap back to wait.
+  const kept =
+    !agenda && !fresh && held !== null && held.view === view && holds(held.read, days)
+      ? { view, days, anchor, read: held.read }
+      : null;
+  const drawn = fresh ? { view, days, anchor, read } : (kept ?? held);
   // What the view waits for while it keeps what it drew: its days' read, or
   // its chip's (a data hook the tests wait on).
   const waiting = agenda || fresh ? undefined : read && holds(read, days) ? "chip" : "days";

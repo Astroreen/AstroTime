@@ -49,6 +49,7 @@ test("a swipe whose listeners are attached again while the finger is down still 
   flushSync(() => root.render(<Surface generation={1} onEnd={onEnd} />));
   // The same element, its listeners new.
   expect(host.querySelector("[data-surface]")).toBe(surface);
+  finger("pointermove", 200);
   finger("pointerup", 120);
   expect(onEnd).toHaveBeenCalledTimes(1);
   expect(onEnd.mock.calls[0]![0]).toBe(-180);
