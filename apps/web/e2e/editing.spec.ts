@@ -247,6 +247,35 @@ test("the tally counts a saved item's reminders only, each under the kind it was
   ]);
 });
 
+test("the details read the description as Markdown; the editor keeps it as typed (design D207)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await opener(page, "Wednesday, November 4", /^Budget planning, /).click();
+  const details = page.getByRole("dialog", { name: "Budget planning" });
+  await expect(details.getByRole("heading", { name: "Agenda", level: 4 })).toBeVisible();
+  await expect(details.getByRole("checkbox", { name: "Last quarter's actuals" })).toBeChecked();
+  await expect(details.getByRole("checkbox", { name: "Next year's draft" })).not.toBeChecked();
+  await expect(details.getByRole("checkbox", { name: "Next year's draft" })).toHaveAttribute(
+    "aria-readonly",
+    "true",
+  );
+  await expect(details.locator("strong")).toHaveText("actuals");
+  await expect(details.locator("code")).toHaveText("travel.ods");
+  await expect(details.locator("blockquote")).toHaveText("Bring the numbers, not the slides.");
+  const link = details.getByRole("link", { name: "The sheet" });
+  await expect(link).toHaveAttribute("href", "https://example.com/budget");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  // The text itself is what was written, Markdown and all.
+  await details.getByRole("button", { name: "Edit" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Edit event" }).getByRole("textbox", { name: "Description" }),
+  ).toHaveValue(
+    "## Agenda\n- [x] Last quarter's **actuals**\n- [ ] Next year's *draft*\n- Travel, see `travel.ods`\n\n> Bring the numbers, not the slides.\n\n[The sheet](https://example.com/budget)",
+  );
+});
+
 test("Enter in the title saves; a tap on an empty slot of the grid creates there", async ({
   page,
 }) => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { linkOf } from "../src/components/item-details.tsx";
+import { linkOf } from "../src/calendar/markdown.ts";
 
 describe("a link in a description", () => {
   test.each([
