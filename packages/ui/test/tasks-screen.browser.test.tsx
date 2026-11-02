@@ -71,7 +71,7 @@ test("a box checked by a write that changed nothing lets go of its check once th
         <CalendarContext.Provider
           value={{
             t: i18n.t,
-            formats: new Formats({ locale: "en-US", hour12: true, weekStart: 7 }),
+            formats: new Formats({ language: "en", locale: "en-US", hour12: true, weekStart: 7 }),
             timeZone: "Europe/Vilnius",
             colorOf: () => "#3367d6",
             weekNumbers: true,
