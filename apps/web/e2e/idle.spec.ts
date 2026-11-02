@@ -82,28 +82,64 @@ test("the Month view beside a calendar on this device that stays draws once per 
   expect(drawn).toBeLessThan(10);
 });
 
+/**
+ * Counts the page's reads of a range of days (`Store.objectsBetween`, a
+ * view's), as its store's driver sends them to the leader (D98).
+ */
+async function countRangeReads(page: Page): Promise<() => Promise<number>> {
+  await page.addInitScript(() => {
+    const counted = globalThis as unknown as { rangeReads: number };
+    counted.rangeReads = 0;
+    const post = BroadcastChannel.prototype.postMessage;
+    BroadcastChannel.prototype.postMessage = function (message: unknown) {
+      const request = message as { type?: string; sql?: string };
+      if (request.type === "query" && /"start_ms" <=/.test(request.sql ?? "")) counted.rangeReads++;
+      return post.call(this, message);
+    };
+  });
+  return () => page.evaluate(() => (globalThis as unknown as { rangeReads: number }).rangeReads);
+}
+
 test("a hidden tab draws another tab's change once it is shown again (D182)", async ({
   page,
   context,
 }) => {
   const commits = await countCommits(page);
+  const rangeReads = await countRangeReads(page);
   await page.clock.setFixedTime(NOW);
   await page.addInitScript(() => localStorage.setItem("astrotime.view", "month"));
   await page.goto("/?demo");
   await expect(page.getByRole("listitem", { name: /^Stand-up/ }).first()).toBeVisible();
-  await setShown(page, false);
-  const hidden = await commits();
-
   const other = await context.newPage();
   await openApp(other);
+  // The other tab's store is open, and has read: its next commit is the event.
+  await expect(other.getByRole("listitem", { name: /^Stand-up/ }).first()).toBeVisible();
+
+  await setShown(page, false);
+  const [hiddenCommits, hiddenReads] = [await commits(), await rangeReads()];
+  // Heard on a channel made after the store's, so after the store's own
+  // driver heard it, and after everything that ran at once on it: a view
+  // that followed the store would have sent its read by then.
+  await page.evaluate(() => {
+    const heard = new BroadcastChannel("astrotime-store:astrotime");
+    (globalThis as unknown as { heard: Promise<void> }).heard = new Promise<void>((resolve) =>
+      heard.addEventListener("message", (event: MessageEvent<{ type: string }>) => {
+        if (event.data.type !== "changed") return;
+        heard.close();
+        resolve();
+      }),
+    );
+  });
   await createEvent(other, "Plumber", "2026-11-21");
-  await expect(other.getByRole("listitem", { name: /^Plumber/ })).toBeVisible();
-  // Hidden, the tab neither read nor drew it.
+  await page.evaluate(() => (globalThis as unknown as { heard: Promise<void> }).heard);
+  // Hidden, the tab heard the change, and neither read nor drew it.
+  expect(await rangeReads()).toBe(hiddenReads);
+  expect(await commits()).toBe(hiddenCommits);
   await expect(page.getByRole("listitem", { name: /^Plumber/ })).toHaveCount(0);
-  expect(await commits()).toBe(hidden);
 
   await setShown(page, true);
   await expect(page.getByRole("listitem", { name: /^Plumber/ })).toBeVisible();
+  expect(await rangeReads()).toBeGreaterThan(hiddenReads);
 });
 
 test("a hidden tab's clock stands still, and shows the time at once when shown (D182)", async ({
