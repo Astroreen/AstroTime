@@ -17,6 +17,8 @@ export interface CalendarContextValue {
   readonly colorOf: (entry: Entry) => string;
   /** Whether the views show the week numbers (design D169). */
   readonly weekNumbers: boolean;
+  /** Pixels per hour of the time grid, as last pinched on this device (design D192). */
+  readonly hour: number;
   /** The stored object a search jumped to, marked on the views (design D53). */
   readonly found?: string | null;
 }

@@ -376,11 +376,14 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
 
   test("a double click opens one new item, with its first click", async ({ page }) => {
     await openDemo(page, "week");
+    // The editor's chunk loaded, so the dialog is there before the second
+    // press, which then lands on its backdrop (design D190).
+    await loadEditor(page);
     const spot = await tuesday(page);
     await page.mouse.dblclick(spot.x, spot.y);
     const dialog = page.getByRole("dialog", { name: "New event" });
-    await expect(dialog).toHaveCount(1);
     await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
+    await expect(page.getByRole("dialog")).toHaveCount(1);
   });
 });
 

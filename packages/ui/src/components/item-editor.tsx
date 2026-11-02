@@ -1067,6 +1067,9 @@ function useSecondPress(opener: Press | undefined): (event: Event) => boolean {
     asked.current = opener;
     return (
       first !== undefined &&
+      // Base UI hands the `click` that closes a dialog with a backdrop, a
+      // MouseEvent by mouse and by touch alike (drag.spec.ts tests both);
+      // anything else closes it, as before D190.
       event instanceof MouseEvent &&
       event.detail === first.detail + 1 &&
       Math.abs(event.clientX - first.x) < SAME_SPOT &&

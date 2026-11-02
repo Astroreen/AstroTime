@@ -1,0 +1,139 @@
+// Pinching the time grid (design D192): two fingers, a trackpad's pinch
+// (which the browser sends as a wheel with Ctrl) or Ctrl and a wheel, and
+// the keys "+", "-" and "0" change the hour's height to any value from 24
+// to 240 px, the time under the fingers or the pointer kept where it is.
+// While it goes, only `--hour` on the view and the grid's scroll change, no
+// React render; once it stops, the height is handed back and kept. Loaded
+// after the view is drawn, in a chunk of its own (foundation D145).
+import { HOUR } from "./items.tsx";
+
+const MIN_HOUR = 24;
+const MAX_HOUR = 240;
+/** How much a key step changes the height. */
+const STEP = 1.25;
+/** How long after a wheel's last turn the zoom counts as ended. */
+const SETTLE_MS = 250;
+
+const clamp = (hour: number) => Math.min(MAX_HOUR, Math.max(MIN_HOUR, hour));
+
+/** Whether a key's target is somewhere typing or a dialog's, where keys are its own. */
+function typing(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest("input, textarea, select, [contenteditable], [role=dialog]") !== null ||
+    target.closest("[role=listbox], [role=menu]") !== null
+  );
+}
+
+/**
+ * Lets the time grids in `main` be pinched; `hour` is the height drawn now,
+ * `commit` keeps one a zoom ended on. Returns what detaches it.
+ */
+export function zoomable(
+  main: HTMLElement,
+  hour: () => number,
+  commit: (hour: number) => void,
+): () => void {
+  let live: number | null = null;
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  const current = () => live ?? hour();
+  const scrollerOf = (target: EventTarget | null) =>
+    target instanceof Element ? target.closest<HTMLElement>("[data-scroller]") : null;
+
+  /** Draws `next` px an hour, keeping the time at `y` (a viewport's y) where it is. */
+  const zoomTo = (next: number, scroller: HTMLElement, y: number) => {
+    const from = current();
+    const to = clamp(next);
+    if (to === from) return;
+    const offset = y - scroller.getBoundingClientRect().top;
+    const hours = (scroller.scrollTop + offset) / from;
+    live = to;
+    main.style.setProperty("--hour", `${to}px`);
+    scroller.scrollTop = hours * to - offset;
+  };
+  const end = () => {
+    clearTimeout(settle);
+    if (live === null) return;
+    const ended = live;
+    live = null;
+    commit(Math.round(ended * 10) / 10);
+  };
+
+  const wheel = (event: WheelEvent) => {
+    const scroller = scrollerOf(event.target);
+    if (!event.ctrlKey || !scroller) return;
+    // Not the page's zoom: the grid's.
+    event.preventDefault();
+    const lines = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+    zoomTo(current() * Math.exp((-event.deltaY * lines) / 200), scroller, event.clientY);
+    clearTimeout(settle);
+    settle = setTimeout(end, SETTLE_MS);
+  };
+
+  let pinch: { scroller: HTMLElement; spread: number; hour: number } | null = null;
+  const spreadOf = (touches: TouchList) =>
+    Math.hypot(
+      touches[0]!.clientX - touches[1]!.clientX,
+      touches[0]!.clientY - touches[1]!.clientY,
+    );
+  const touchStart = (event: TouchEvent) => {
+    if (event.touches.length !== 2) return;
+    const scroller = scrollerOf(event.target);
+    pinch = scroller ? { scroller, spread: spreadOf(event.touches), hour: current() } : null;
+  };
+  const touchMove = (event: TouchEvent) => {
+    if (!pinch || event.touches.length !== 2) return;
+    // The two fingers zoom the grid; they neither scroll it nor zoom the page.
+    if (event.cancelable) event.preventDefault();
+    const middle = (event.touches[0]!.clientY + event.touches[1]!.clientY) / 2;
+    zoomTo(
+      (pinch.hour * spreadOf(event.touches)) / Math.max(1, pinch.spread),
+      pinch.scroller,
+      middle,
+    );
+  };
+  const touchEnd = (event: TouchEvent) => {
+    if (!pinch || event.touches.length === 2) return;
+    pinch = null;
+    end();
+  };
+
+  // "+" and "-" step the height, "0" brings back the usual one: on the
+  // grid shown, about its middle, as the view's other keys (design D88).
+  const key = (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) return;
+    const scale =
+      event.key === "+" || event.key === "="
+        ? STEP
+        : event.key === "-"
+          ? 1 / STEP
+          : event.key === "0"
+            ? 0
+            : null;
+    const scroller = main.querySelector<HTMLElement>("[data-current] [data-scroller]");
+    if (scale === null || !scroller || main.hidden) return;
+    event.preventDefault();
+    const { top, height } = scroller.getBoundingClientRect();
+    zoomTo(scale === 0 ? HOUR : current() * scale, scroller, top + height / 2);
+    end();
+  };
+
+  // Said for the tests, which wait for it before they pinch.
+  main.dataset["zoomable"] = "";
+  main.addEventListener("wheel", wheel, { passive: false });
+  main.addEventListener("touchstart", touchStart, { passive: true });
+  main.addEventListener("touchmove", touchMove, { passive: false });
+  main.addEventListener("touchend", touchEnd);
+  main.addEventListener("touchcancel", touchEnd);
+  window.addEventListener("keydown", key);
+  return () => {
+    delete main.dataset["zoomable"];
+    clearTimeout(settle);
+    main.removeEventListener("wheel", wheel);
+    main.removeEventListener("touchstart", touchStart);
+    main.removeEventListener("touchmove", touchMove);
+    main.removeEventListener("touchend", touchEnd);
+    main.removeEventListener("touchcancel", touchEnd);
+    window.removeEventListener("keydown", key);
+  };
+}
