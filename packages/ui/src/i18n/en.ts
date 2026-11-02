@@ -108,6 +108,10 @@ export const en = {
   "sync.syncing": "Syncing…",
   "sync.never": "Not synced yet",
   "sync.syncedAt": "Synced at {{time}}",
+  "sync.off": "Sync is off",
+  "accounts.sync": "Sync",
+  "accounts.sync.hint":
+    "Nothing goes to this server or comes from it; changes made here wait on this device until sync is on again.",
   "sync.offline": "Offline: changes wait until the server can be reached",
   "sync.signed-out": "Signed out: sign in again to sync",
   "sync.refused": "This AstroTime's administrator does not allow this server",

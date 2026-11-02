@@ -88,6 +88,11 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE calendars ADD COLUMN rights TEXT;
   UPDATE calendars SET rights = CASE read_only WHEN 0 THEN 'create,edit,delete' ELSE '' END;
   `,
+  // 8: an account whose sync the user turned off (docs/plans/foundation.md#D171).
+  // Every account synced before it: off for none.
+  `
+  ALTER TABLE accounts ADD COLUMN sync_off INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

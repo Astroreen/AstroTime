@@ -141,10 +141,19 @@ export class Store {
   // Accounts
 
   addAccount(
-    input: Omit<Account, "id" | "createdAt" | "homeUrl"> & { homeUrl?: string | null },
+    input: Omit<Account, "id" | "createdAt" | "homeUrl" | "syncOff"> & {
+      homeUrl?: string | null;
+      syncOff?: boolean;
+    },
   ): Promise<Account> {
     return this.exclusive(async () => {
-      const account = { homeUrl: null, ...input, id: crypto.randomUUID(), createdAt: Date.now() };
+      const account = {
+        homeUrl: null,
+        syncOff: false,
+        ...input,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+      };
       await this.db.insert(schema.accounts).values(account);
       return account;
     });
@@ -156,7 +165,9 @@ export class Store {
    * D99), so two sign-ins to one account at once, in two tabs too, add it once.
    */
   findOrAddAccount(
-    input: Omit<Account, "id" | "createdAt" | "provider" | "homeUrl"> & { homeUrl: string },
+    input: Omit<Account, "id" | "createdAt" | "provider" | "homeUrl" | "syncOff"> & {
+      homeUrl: string;
+    },
   ): Promise<{ readonly account: Account; readonly added: boolean }> {
     return this.exclusive(async () => {
       const [existing] = await this.db
@@ -177,6 +188,7 @@ export class Store {
       const account = {
         ...input,
         provider: "caldav" as const,
+        syncOff: false,
         id: crypto.randomUUID(),
         createdAt: Date.now(),
       };
@@ -211,6 +223,7 @@ export class Store {
         serverUrl: LOCAL_SERVER,
         username: null,
         homeUrl: null,
+        syncOff: false,
         createdAt: Date.now(),
       };
       await this.db.insert(schema.accounts).values(account);
@@ -272,10 +285,13 @@ export class Store {
     });
   }
 
-  /** Changes what an account says of itself (signing in again finds its home anew). */
+  /**
+   * Changes what an account says of itself (signing in again finds its home
+   * anew), or whether it syncs (D171).
+   */
   updateAccount(
     id: string,
-    changes: Partial<Pick<Account, "name" | "username" | "homeUrl">>,
+    changes: Partial<Pick<Account, "name" | "username" | "homeUrl" | "syncOff">>,
   ): Promise<void> {
     return this.exclusive(async () => {
       await this.db.update(schema.accounts).set(changes).where(eq(schema.accounts.id, id));

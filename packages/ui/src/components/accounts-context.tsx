@@ -35,6 +35,11 @@ export interface AccountsValue {
   readonly held: { readonly server: string; readonly username: string } | null;
   signIn(request: SignInRequest): void;
   remove(account: Account): void;
+  /**
+   * Turns an account's sync on or off (foundation D171); on again, it syncs
+   * at once, as the user's own "Sync now".
+   */
+  setSyncing(account: Account, on: boolean): Promise<void>;
 }
 
 const AccountsContext = createContext<AccountsValue | null>(null);
@@ -288,6 +293,10 @@ export function AccountsProvider({
     held,
     signIn: setSigningIn,
     remove: setRemoving,
+    async setSyncing(account, on) {
+      await store.updateAccount(account.id, { syncOff: !on });
+      if (on) await scheduler.syncNow();
+    },
   };
   return (
     <AccountsContext.Provider value={value}>

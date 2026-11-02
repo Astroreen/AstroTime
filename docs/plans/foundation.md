@@ -1878,6 +1878,34 @@ the built web app (`scripts/bench-cold-start.ts`).
     not; after the first visit the service worker ([D124](#D124)) serves
     them anyway.
 
+### Decided in round 3
+
+The owner's feedback after v0.3.0, tried on a phone and a computer.
+
+**Settings, colours, dropdowns, accounts.**
+
+- **D171. An account's sync can be turned off** (feedback 12: "Syncing can
+  be turned off for some accounts"). Settings → Accounts gives each CalDAV
+  account a switch, "Sync", on unless turned off; kept with the account in
+  the store (`accounts.sync_off`, migration 8), so every tab, the Android
+  background run and the desktop's timer read the same.
+  - **Off, no request goes to its server.** `syncAll` leaves it out, and
+    does not report it: no sync, no discovery, no "Sign in again" offered
+    (the account's menu and its row hide it), and the reminders never asked
+    a server anyway ([D100](#D100)). Removing the account still revokes an
+    app password Login Flow gave it ([D90](#D90)): the user asked for that
+    request.
+  - **Its calendars stay** on the views, from the store, and the account
+    says calmly "Sync is off", never as a problem: the account button's dot
+    and its status ignore what its last sync said.
+  - **Changes made meanwhile wait** on this device as they do offline
+    ([D91](#D91)), pending, and go up with its next sync; nothing is asked
+    or refused while off.
+  - **On again, it syncs at once**: the user's own "Sync now"
+    ([D128](#D128): a hold is tried too).
+  - A tab of a build before migration 8 knows no switch and still syncs
+    it, until it updates ([D124](#D124)).
+
 ## Deferred
 
 - **An `RDATE` period's own length** — an occurrence from an `RDATE` of a

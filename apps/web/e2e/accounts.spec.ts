@@ -176,6 +176,64 @@ test("removing an account, once confirmed, deletes its calendars from this devic
   await expect(page.getByRole("region", { name: "On this device" })).toBeVisible();
 });
 
+test("an account whose sync is off asks nothing of its server, even on Sync now; on again, it syncs at once (D171)", async ({
+  page,
+  radicale,
+}) => {
+  const work = await radicale.mkcalendar("work");
+  await radicale.put(
+    work,
+    "planning",
+    "Planning with Radicale",
+    "20261104T140000",
+    "20261104T150000",
+  );
+  await openApp(page);
+  await signInByPassword(page, radicale);
+  await expect(
+    wednesday(page).getByRole("listitem", { name: /^Planning with Radicale, / }),
+  ).toBeVisible();
+  const name = `astro@${new URL(radicale.url).host}`;
+
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const section = settings.getByRole("region", { name });
+  await section.getByRole("switch", { name: "Sync" }).click();
+  await expect(section.getByText("Sync is off")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
+
+  // Another client adds an event; Sync now, while the sync is off, reaches no server.
+  await radicale.put(work, "review", "Review from the phone", "20261104T160000", "20261104T170000");
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/dav-proxy/")) asked.push(request.url());
+  });
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  const accounts = page.getByRole("dialog", { name: "Accounts" });
+  await accounts.getByRole("button", { name: "Sync now" }).click();
+  await expect(accounts.getByRole("status").filter({ hasText: "Accounts, synced" })).toHaveCount(1);
+  expect(asked).toEqual([]);
+  await expect(accounts.getByText("Sync is off")).toBeVisible();
+  await accounts.getByRole("button", { name: "Close" }).click();
+  await expect(
+    wednesday(page).getByRole("listitem", { name: /^Planning with Radicale, / }),
+  ).toBeVisible();
+  await expect(
+    wednesday(page).getByRole("listitem", { name: /^Review from the phone, / }),
+  ).toHaveCount(0);
+
+  // On again: it syncs at once and brings the event.
+  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await section.getByRole("switch", { name: "Sync" }).click();
+  await expect(section.getByText(/^Synced at /)).toBeVisible();
+  expect(asked.length).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(
+    wednesday(page).getByRole("listitem", { name: /^Review from the phone, / }),
+  ).toBeVisible();
+});
+
 test("a server this AstroTime does not carry is named as the administrator's choice (D20)", async ({
   page,
 }) => {

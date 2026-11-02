@@ -76,7 +76,10 @@ export type AccountSync =
     };
 
 export interface SyncAllReport {
-  /** Every account that syncs, in the store's order; the demo's never does. */
+  /**
+   * Every account that syncs, in the store's order; the demo's never does,
+   * nor one whose sync is off (D171).
+   */
   readonly accounts: readonly AccountSync[];
   readonly finishedAt: number;
   /**
@@ -149,7 +152,8 @@ const ignore = () => {};
  * instance's sync of the store to end (D91). An account whose server refused
  * its saved credentials, or asked to be left alone, is not tried again
  * meanwhile (D128): its last result stands, unless `retry` (the user asked)
- * says to try it anyway, which implies `fresh`.
+ * says to try it anyway, which implies `fresh`. An account whose sync the
+ * user turned off is left out: no request goes to its server (D171).
  */
 export function syncAll(
   context: SyncContext,
@@ -194,8 +198,10 @@ async function everyAccount(
   const held: string[] = [];
   const known = new Set<string>();
   for (const account of await context.store.accounts()) {
-    // The demo's items live in the store alone.
-    if (account.provider !== "caldav" || state.removing.has(account.id)) continue;
+    // The demo's items live in the store alone; an account whose sync the
+    // user turned off asks nothing of its server (D171), and is not reported.
+    if (account.provider !== "caldav" || account.syncOff || state.removing.has(account.id))
+      continue;
     known.add(account.id);
     const result = await syncOne(context, state.holds, account, retry);
     // Held now, by this run's own answer too: its next sync waits for the hold.

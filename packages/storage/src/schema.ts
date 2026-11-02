@@ -18,6 +18,12 @@ export const accounts = sqliteTable("accounts", {
   createdAt: integer("created_at").notNull(),
   /** The calendar home discovery found (migration 5); `null`: discover it again. */
   homeUrl: text("home_url"),
+  /**
+   * The user turned this account's sync off (migration 8,
+   * docs/plans/foundation.md#D171): no request goes to its server; its
+   * calendars stay, and changes made here wait as they do offline.
+   */
+  syncOff: integer("sync_off", { mode: "boolean" }).notNull().default(false),
 });
 
 export const calendars = sqliteTable(

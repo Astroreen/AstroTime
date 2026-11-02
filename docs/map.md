@@ -68,7 +68,8 @@ When you add a package, app or module, add its line here in the same PR.
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
   - `Store` — accounts (with the calendar home discovery found, migration 5;
-    `findOrAddAccount`, one per home and user),
+    `findOrAddAccount`, one per home and user; whether the user turned its
+    sync off, migration 8, `plans/foundation.md#D171`),
     calendars (with their rights, migration 7), objects with pending local changes, conflicts; finds objects
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
@@ -139,7 +140,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D37`
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
-  - `syncAll` — the one sync entry every shell calls: every account, joins
+  - `syncAll` — the one sync entry every shell calls: every account (but
+    one whose sync is off, D171), joins
     a running sync, waits for another tab's (`SyncLock`, D91);
     `connectCalDav` opens an account's provider; `saveAccount`,
     `removeAccount` keep an account with its credentials.

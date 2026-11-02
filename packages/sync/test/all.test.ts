@@ -127,6 +127,43 @@ test("every account syncs and reports how it went; the demo's never does", async
   });
 });
 
+test("an account whose sync is off asks nothing of its server; its change waits, and goes up once it is on (D171)", async () => {
+  const { store, b, net, context, add } = await setup();
+  const first = (await add("a.example")).account;
+  const second = (await add("b.example")).account;
+  await syncAll(context);
+  await store.updateAccount(second.id, { syncOff: true });
+  // A change made here meanwhile, in the account that is off.
+  const [calendar] = await store.calendars(second.id);
+  await store.saveLocal(calendar!.id, task("here"));
+  b.objects.set("https://b.example/cal/three.ics", { etag: '"1"', ics: task("three") });
+  net.connections.length = 0;
+
+  const report = await syncAll(context, { retry: true });
+  expect(report.accounts.map((r) => r.accountId)).toEqual([first.id]);
+  expect(net.connections).toEqual(["https://a.example/ as astro"]);
+  expect((await store.undated([calendar!.id])).map((o) => o.uid).toSorted()).toEqual([
+    "here",
+    "two",
+  ]);
+  expect([...b.objects.values()].map((o) => o.ics).join()).not.toContain("UID:here");
+
+  // On again: the next sync takes it, both ways.
+  await store.updateAccount(second.id, { syncOff: false });
+  expect((await store.accounts()).find((x) => x.id === second.id)?.syncOff).toBe(false);
+  const again = await syncAll(context);
+  expect(again.accounts.map((r) => [r.accountId, r.status])).toEqual([
+    [first.id, "synced"],
+    [second.id, "synced"],
+  ]);
+  expect([...b.objects.values()].map((o) => o.ics).join()).toContain("UID:here");
+  expect((await store.undated([calendar!.id])).map((o) => o.uid).toSorted()).toEqual([
+    "here",
+    "three",
+    "two",
+  ]);
+});
+
 test("an account whose credentials are missing or unreadable asks to sign in again", async () => {
   const { secrets, context, add } = await setup();
   const { account } = await add("a.example");

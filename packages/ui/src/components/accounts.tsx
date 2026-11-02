@@ -54,6 +54,8 @@ function StatusLine({ account, value }: { account: Account; value: AccountsValue
   const { t } = useTranslation();
   if (account.provider === "local") return <>{t("local.status")}</>;
   if (!syncs(account)) return <>{t("accounts.demo")}</>;
+  // Turned off by the user (foundation D171): said calmly, never as a problem.
+  if (account.syncOff) return <>{t("sync.off")}</>;
   const { status, settings, timeZone } = value;
   const known: AccountStatus | undefined = status.accounts.get(account.id);
   if (status.running) return <>{t("sync.syncing")}</>;
@@ -104,7 +106,8 @@ const againRequest = (account: Account) => ({
 });
 
 /**
- * An account's menu: sign in again, remove. `onLeave` closes what it sits in
+ * An account's menu: sign in again (not while its sync is off, foundation
+ * D171: no request goes to its server), remove. `onLeave` closes what it sits in
  * first. No "Sync now" here: a sync is every account's (the accounts
  * dialog's button says so), and one for a single account is Deferred
  * (design D137).
@@ -125,7 +128,7 @@ function AccountMenu({ account, onLeave }: { account: Account; onLeave: () => vo
       <Menu.Portal>
         <Menu.Positioner sideOffset={4} align="end" className="z-[120]">
           <Menu.Popup className="min-w-52 origin-[var(--transform-origin)] rounded-xl bg-raised p-1 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            {syncs(account) && (
+            {syncs(account) && !account.syncOff && (
               <Menu.Item
                 className={item}
                 onClick={() => {
@@ -190,7 +193,7 @@ export function AccountRow({
         </div>
         <AccountMenu account={account} onLeave={onLeave} />
       </div>
-      {last?.status === "signed-out" && (
+      {last?.status === "signed-out" && !account.syncOff && (
         <button
           type="button"
           className={`${textButton} self-end`}
@@ -202,7 +205,7 @@ export function AccountRow({
           {t("accounts.signInAgain")}
         </button>
       )}
-      {!compact && <Problems last={last} />}
+      {!compact && !account.syncOff && <Problems last={last} />}
     </div>
   );
 }
@@ -217,7 +220,10 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   // rows use, never as synced (D122).
   const offline =
     value.status.offline ||
-    accounts.some((account) => value.status.accounts.get(account.id)?.last.status === "offline");
+    accounts.some(
+      (account) =>
+        !account.syncOff && value.status.accounts.get(account.id)?.last.status === "offline",
+    );
   // A sync ran while the dialog was open: its end is said.
   const [syncedWhileOpen, setSyncedWhileOpen] = useState(false);
   const [wasRunning, setWasRunning] = useState(value.status.running);
@@ -227,7 +233,10 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
   }
   const attention =
     value.conflicts > 0 ||
-    accounts.some((account) => needsAttention(value.status.accounts.get(account.id)?.last));
+    // An account whose sync is off says nothing of its last sync (foundation D171).
+    accounts.some(
+      (account) => !account.syncOff && needsAttention(value.status.accounts.get(account.id)?.last),
+    );
   const label = value.status.running
     ? t("accounts.buttonSyncing")
     : attention

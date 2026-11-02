@@ -115,6 +115,7 @@ test("migration 5 keeps existing accounts, with no calendar home until they sync
       username: "u",
       createdAt: 0,
       homeUrl: null,
+      syncOff: false,
     },
   ]);
 });
@@ -191,4 +192,30 @@ test("migration 7 gives a writable calendar every right and a read-only one none
   // …and marks one read-only where this build had written every right: read_only wins for editing.
   await driver.query("UPDATE calendars SET read_only = 1 WHERE id = 'mine'", []);
   expect((await store.calendars()).find((c) => c.id === "mine")?.rights.edit).toBe(false);
+});
+
+test("migration 8 keeps every account syncing; a tab of an older build adds one that syncs too", async () => {
+  const { MIGRATIONS_FOR_TESTS } = await import("../src/migrations.ts");
+  const { Store } = await import("../src/index.ts");
+  const driver = nodeDriver();
+  await migrate(driver, MIGRATIONS_FOR_TESTS.slice(0, 7));
+  await driver.query(
+    "INSERT INTO accounts VALUES ('a', 'caldav', 'A', 'https://x/', 'u', 0, 'https://x/home/')",
+    [],
+  );
+  const store = await Store.open(driver);
+  // An older build names its columns and knows no sync_off (D98).
+  await driver.query(
+    "INSERT INTO accounts (id, provider, name, server_url, username, created_at, home_url) VALUES ('b', 'caldav', 'B', 'https://y/', 'u', 1, NULL)",
+    [],
+  );
+  expect((await store.accounts()).map((a) => [a.id, a.syncOff])).toEqual([
+    ["a", false],
+    ["b", false],
+  ]);
+  await store.updateAccount("a", { syncOff: true });
+  expect((await store.accounts()).map((a) => [a.id, a.syncOff])).toEqual([
+    ["a", true],
+    ["b", false],
+  ]);
 });
