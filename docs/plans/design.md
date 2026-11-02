@@ -1410,8 +1410,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     dialog says the draft's edges it stands beside (`data-aside-for`).
     Closing, it fades where it stood: the aside is not worked out again
     once the dialog is closed, as its draft is gone already. The backdrop
-    dims less (20%) whenever it stands aside. **Where there is no such room it stays in the middle and can
-    still cover the draft**: on a phone, where it is the whole screen
+    dims less (20%) whenever it stands aside. **Where there is no such
+    room it stays in the middle and can still cover the draft**: on a
+    phone, where it is the whole screen
     (the draft is drawn behind it, as D155 has it); in the Day view, whose
     one column leaves less than 360 px on either side at any width; and on
     a window under about 800 px for a day in the middle of a week.
@@ -1426,21 +1427,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     a task's draft on a full today in the Month), each failing before the
     change, and a wheel sideways over the views moving neither the draft
     nor the dialog (a regression guard: it waits two frames, then finds
-    nothing in `main` scrolled sideways); `packages/ui/test/draft-aside.browser.test.tsx` (a
-    closing dialog keeps its aside, failing before).
-- **D189. Today's circle stands clear of the all-day items** (the owner's
-  feedback 14a: "the active day's number, the circle around it, sits too
-  close to the events"). In 3 days and Week the all-day strip began right
-  under the day headers, so today's filled circle ([D49](#D49)) touched
-  the first row of items. The strip now starts 8 px under the headers, the
-  chevron that folds it moving down with it, and the time grid starts 8 px
-  under the strip (it was 4 px), so the header reads in even steps:
-  weekday, number, a gap, the items, a gap, the hours, as Google Calendar's
-  web app spaces its own. The Day view's header stands beside the strip,
-  not over it, and keeps its spacing. Tested: `apps/web/e2e/calendar.spec.ts`
-  (8 px or more between today's circle and the strip in the Week on a wide
-  screen and 3 days on a phone, failing before the change).
-
+    nothing in `main` scrolled sideways);
+    `packages/ui/test/draft-aside.browser.test.tsx` (a closing dialog
+    keeps its aside, failing before).
 - **D188. A tap on an empty spot of the all-day strip creates there,
   all day** (the owner's feedback 4: "tapping the top island where all-day
   events live, in the views from Week to Day, I cannot create a task or
@@ -1464,6 +1453,21 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
+- **D189. Today's circle stands clear of the all-day items** (the owner's
+  feedback 14a: "the active day's number, the circle around it, sits too
+  close to the events"). In 3 days and Week the all-day strip began right
+  under the day headers, so today's filled circle ([D49](#D49)) touched
+  the first row of items. The strip now starts 8 px under the headers, the
+  chevron that folds it moving down with it, and the time grid starts 8 px
+  under the strip (it was 4 px), so the header reads in even steps:
+  weekday, number, a gap, the items, a gap, the hours, as Google Calendar's
+  web app spaces its own. The Day view's header stands beside the strip,
+  not over it, so its strip keeps its top; its time grid starts 8 px under
+  the strip too, the same calm step in every view with a grid. Tested:
+  `apps/web/e2e/calendar.spec.ts` (8 px or more between today's circle,
+  marked `data-day-number`, and the strip in the Week on a wide screen and
+  3 days on a phone, failing before the change; 8 px between the strip
+  and the hours in the Day view).
 
 ### Decided in round 4: the editor
 

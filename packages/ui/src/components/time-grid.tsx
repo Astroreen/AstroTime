@@ -315,6 +315,7 @@ export function DayHeader({
       </span>
       <span
         aria-hidden="true"
+        data-day-number=""
         className={`grid size-8 place-items-center rounded-full text-title leading-none ${
           isToday ? "bg-accent font-medium text-on-accent" : "text-ink"
         }`}

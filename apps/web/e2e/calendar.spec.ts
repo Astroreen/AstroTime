@@ -408,12 +408,20 @@ for (const [view, viewport] of [
   }) => {
     await page.setViewportSize(viewport);
     await openDemo(page, view);
-    const circle = header(page, "Wednesday, November 4").locator("span").nth(1);
+    const circle = header(page, "Wednesday, November 4").locator("[data-day-number]");
     const circleBox = (await circle.boundingBox())!;
     const stripBox = (await strip(page).boundingBox())!;
     expect(stripBox.y - (circleBox.y + circleBox.height)).toBeGreaterThanOrEqual(8);
   });
 }
+
+test("the Day view's hours start 8 px under its all-day strip (design D189)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openDemo(page, "day");
+  const stripBox = (await strip(page).boundingBox())!;
+  const scroller = (await page.locator("main [data-current] [data-scroller]").boundingBox())!;
+  expect(scroller.y - (stripBox.y + stripBox.height)).toBeGreaterThanOrEqual(8);
+});
 
 test("the theme follows the system; data-theme overrides it (D44)", async ({ page }) => {
   await openDemo(page, "week");
