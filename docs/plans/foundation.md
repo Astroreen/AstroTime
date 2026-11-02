@@ -2068,11 +2068,13 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
   - **Waits for `visibilitychange`:** every live query of what is drawn
     (the views' range and undone tasks, the calendars' lists, the tasks
     screen, search, an item's details, the conflicts), and the question
-    whether to keep the data ([D121](#D121): Firefox asks it in the tab,
-    where a hidden one would ask nobody), hears the store
+    whether to keep the data ([D121](#D121): Firefox asks it in the tab),
+    hears the store
     through `whileShown`: the changes made while the page is hidden wait,
     and come as one when it is shown, so the views read once and draw what
-    changed. The clock (`useNow`, the now-line and today) stops and ticks
+    changed. A live query still reads once when it starts, shown or not: a
+    tab loaded behind another reads its views once, and may ask whether to
+    keep the data at that load, as a shown one would. The clock (`useNow`, the now-line and today) stops and ticks
     at once when shown. Measuring (`ResizeObserver`) waits by itself: a
     hidden page lays nothing out.
   - Along the way, a render asks the browser less: the month asks whether
@@ -2087,6 +2089,15 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
 
 ## Deferred
 
+- **A tab loaded hidden** still reads its live queries once at the load,
+  and can ask whether to keep the data then ([D182](#D182)); starting them
+  only when first shown would save that read.
+- **`useMediaQuery`'s lists** are kept for the page's life, one per query
+  ([D182](#D182)): a test that replaces `matchMedia` after the first ask
+  would get the old list. No test does; none covers the cache either.
+- **`useNow`'s visibility** is the document's (`documentVisibility`), not
+  injected as `whileShown`'s is ([D182](#D182)); its test fakes the
+  document instead.
 - **A fixture of Nextcloud's custom colour** — what Nextcloud Calendar
   writes for a colour of its picker ([D174](#D174) reads its source:
   the nearest CSS3 name); `scripts/record-nextcloud-fixtures.ts` can record

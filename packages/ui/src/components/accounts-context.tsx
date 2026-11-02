@@ -255,8 +255,9 @@ export function AccountsProvider({
   // item on the calendar on this device; not the empty calendar a first run
   // makes), the browser is asked to keep its data rather than evict it under
   // pressure, once on this device: its answer is kept, granted or refused
-  // (D121). Firefox asks the user, so never on a first visit's load, and
-  // not in a hidden tab, where nobody sees the question (D182).
+  // (D121). Firefox asks the user, so never on a first visit's load. Once
+  // loaded, a change heard while the tab is hidden waits until it is shown
+  // (D182); the read at the load is made hidden or not, as every live query's.
   useEffect(() => {
     const { keepData } = platform;
     if (!keepData || preferences.get(KEYS.keepData) !== null) return;
