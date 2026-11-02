@@ -90,8 +90,11 @@ async function open(
   return page;
 }
 
-const shot = (page: Page, name: string) =>
-  page.screenshot({ path: `${directory}/${name}.png`, animations: "disabled" });
+/** A screenshot once Base UI's popups have finished entering or leaving. */
+async function shot(page: Page, name: string): Promise<void> {
+  await expect(page.locator("[data-starting-style], [data-ending-style]")).toHaveCount(0);
+  await page.screenshot({ path: `${directory}/${name}.png`, animations: "disabled" });
+}
 
 for (const language of ["en", "ru"] as const) {
   for (const theme of ["dark", "light"] as const) {
