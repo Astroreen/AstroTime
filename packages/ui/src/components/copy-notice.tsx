@@ -29,6 +29,14 @@ export function CopyNotice({
   const close = useEffectEvent(() => onClose());
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  // A notice gone from under the pointer or with the focus hears no leave:
+  // the next copy's starts unheld, so it still goes by itself.
+  const [shown, setShown] = useState(copied);
+  if (shown !== copied) {
+    setShown(copied);
+    setHovered(false);
+    setFocused(false);
+  }
   const paused = hovered || focused;
   useEffect(() => {
     if (!copied || paused) return;

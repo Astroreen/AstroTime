@@ -125,3 +125,34 @@ test("a pointer over the notice holds it as well", () => {
   vi.advanceTimersByTime(1);
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+test("a notice closed while held does not hold the next one", () => {
+  vi.useFakeTimers();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const i18n = createI18n("en");
+  cleanups.push(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  const onClose = vi.fn();
+  const draw = (shown: Target | null) =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <CopyNotice copied={shown} onOpen={() => {}} onClose={onClose} />
+        </I18nextProvider>,
+      ),
+    );
+  draw(copied);
+  const notice = host.querySelector<HTMLElement>('[role="status"]')!;
+  act(() =>
+    notice.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, relatedTarget: null })),
+  );
+  // Closed from under the pointer (its ✕, or Open): no pointer leaves it.
+  draw(null);
+  draw({ ...copied, objectId: "another" });
+  vi.advanceTimersByTime(8000);
+  expect(onClose).toHaveBeenCalledOnce();
+});

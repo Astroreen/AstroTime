@@ -13,7 +13,7 @@ import {
   type Task,
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -387,6 +387,12 @@ export function useEditingState({
 
   const writes = () => ({ now: Date.now(), uid: () => crypto.randomUUID() });
 
+  // What an action whose code loads later finds when it arrives (D145).
+  const fresh = useRef({ details, calendars, hidden, timeZone, today });
+  useEffect(() => {
+    fresh.current = { details, calendars, hidden, timeZone, today };
+  });
+
   /** "Make a copy" (design D164): saved at once, then a notice that opens it. */
   const copy = () => {
     if (!details) return;
@@ -418,9 +424,16 @@ export function useEditingState({
     const target = details;
     copying().then(
       ({ copyToForm }) => {
-        const { ics, form: initial } = copyToForm(target, calendars, hidden, {
-          timeZone,
-          today,
+        // The code came later: the details may be another item's now, or
+        // closed; the calendars as they are now.
+        const now = fresh.current;
+        const same =
+          now.details?.objectId === target.objectId &&
+          JSON.stringify(now.details.recurrenceId) === JSON.stringify(target.recurrenceId);
+        if (!same || !now.details) return;
+        const { ics, form: initial } = copyToForm(now.details, now.calendars, now.hidden, {
+          timeZone: now.timeZone,
+          today: now.today,
           writes: writes(),
         });
         setEditing({

@@ -21,7 +21,7 @@ import type { ItemTime } from "./time.ts";
  * `COMPLETED`, `PERCENT-COMPLETE:0` when it had one); its reminders without
  * their identity (`UID`, Apple's `X-WR-ALARMUID`) and `ACKNOWLEDGED`, and no
  * `X-MOZ-LASTACK` or `X-MOZ-SNOOZE-TIME*` (Thunderbird's), and no snooze
- * `VALARM` (RFC 9074, one with `RELATED-TO`): the original's reminders were
+ * `VALARM` (RFC 9074 §7, `RELATED-TO;RELTYPE=SNOOZE`): the original's reminders were
  * seen or put off, not the copy's, which are fresh. The calendar's other components and
  * properties (its `VTIMEZONE`s) come along. Returns the iCalendar text.
  */
@@ -54,9 +54,10 @@ export function copyItem(
     }
   }
   for (const alarm of component.getAllSubcomponents("valarm")) {
-    // A snooze (RFC 9074: a VALARM related to the one put off) belongs to the
-    // original's reminder, which the copy's never rang: it goes whole.
-    if (alarm.hasProperty("related-to")) {
+    // A snooze (RFC 9074 §7: RELATED-TO;RELTYPE=SNOOZE, to the alarm put
+    // off) belongs to the original's reminder, which the copy's never rang:
+    // it goes whole. An alarm related to another in any other way stays.
+    if (isSnooze(alarm)) {
       component.removeSubcomponent(alarm);
       continue;
     }
@@ -87,4 +88,11 @@ export function createFromCopy(
     component?.updatePropertyWithValue("sequence", 0);
   }
   return object.serialize();
+}
+
+/** A snooze alarm, as RFC 9074 §7 writes one: `RELATED-TO;RELTYPE=SNOOZE`. */
+function isSnooze(alarm: ICAL.Component): boolean {
+  return alarm
+    .getAllProperties("related-to")
+    .some((property) => String(property.getParameter("reltype") ?? "").toUpperCase() === "SNOOZE");
 }

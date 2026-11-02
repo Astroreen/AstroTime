@@ -1253,7 +1253,9 @@ Settings, the colours and the lists controls open.
     opens the copy's details; the notice goes by itself after 8 seconds,
     as a snackbar does, but not while a pointer is over it or the focus is
     in it (WCAG 2.2.1, [D119](#D119)): its 8 seconds start again once they
-    leave. **"Copy to…"** opens the edit dialog as a new
+    leave, and the next copy's notice starts unheld, though the last one
+    went from under the pointer. "Copy to…"'s dialog opens only while the
+    details it was chosen in are still that item's. **"Copy to…"** opens the edit dialog as a new
     item, every field filled from this one, the calendar too (the first
     that takes it, when its own takes no new items); its kind cannot be
     switched; Save makes it wherever the dialog says, the copy with the
@@ -1280,7 +1282,8 @@ Settings, the colours and the lists controls open.
     it had one); its reminders keep their times, without their `UID` and
     their `ACKNOWLEDGED` and Apple's `X-WR-ALARMUID`, and the item without
     Thunderbird's `X-MOZ-LASTACK` and `X-MOZ-SNOOZE-TIME*`, and without a
-    snooze `VALARM` (RFC 9074, one with `RELATED-TO`): those say the
+    snooze `VALARM` (RFC 9074 §7: `RELATED-TO;RELTYPE=SNOOZE`; an alarm
+    related to another in another way stays): those say the
     original's reminders were seen or put off, which the copy's were not.
     A subtask's `RELATED-TO` stays: copied into another list, its parent
     is not there, so the tasks screen shows it at the top and its details

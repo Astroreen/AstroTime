@@ -1946,6 +1946,13 @@ describe("a copy of an item (design D164)", () => {
     );
     const copy = copyItem(sub, null, { now: NOW, uid: "c" });
     expect(CalendarObject.parse(copy).master).toMatchObject({ parentUid: "report" });
+    // An alarm related to another in another way than a snooze stays.
+    const related = object(
+      "BEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nBEGIN:VALARM\r\nUID:a\r\nACTION:DISPLAY\r\nDESCRIPTION:T\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nBEGIN:VALARM\r\nUID:b\r\nRELATED-TO;RELTYPE=SIBLING:a\r\nACTION:DISPLAY\r\nDESCRIPTION:T\r\nTRIGGER:-PT5M\r\nEND:VALARM\r\nEND:VTODO\r\n",
+    );
+    expect(
+      CalendarObject.parse(copyItem(related, null, { now: NOW, uid: "c" })).master?.alarms,
+    ).toHaveLength(2);
     expect(CalendarObject.parse(copy).master?.alarms).toHaveLength(1);
     const lines = contentLines(copy);
     expect(lines).toContain("RELATED-TO:report");
