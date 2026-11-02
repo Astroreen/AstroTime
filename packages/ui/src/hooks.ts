@@ -243,6 +243,8 @@ export function useSwipe(ref: RefObject<HTMLElement | null>, handlers: SwipeHand
     if (!element) return;
     const dragging = () => document.documentElement.dataset["dragging"] !== undefined;
     const down = (event: globalThis.PointerEvent) => {
+      // A second finger makes it a pinch (design D192), no swipe.
+      if (event.pointerType === "touch" && !event.isPrimary) return drop();
       finger.current =
         event.pointerType === "touch" && event.isPrimary
           ? {

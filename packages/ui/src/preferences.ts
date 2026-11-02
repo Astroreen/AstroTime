@@ -65,6 +65,8 @@ export const KEYS = {
   placesNear: "astrotime.placesNear",
   /** The reminders added on this device and how often, which the edit dialog offers first (design D206). */
   alarmTally: "astrotime.alarmTally",
+  /** Pixels per hour of the time grid, as pinched on this device (design D192). */
+  hour: "astrotime.hour",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */

@@ -77,6 +77,7 @@ test("a box checked by a write that changed nothing lets go of its check once th
               timeZone: "Europe/Vilnius",
               colorOf: () => "#3367d6",
               weekNumbers: true,
+              hour: 56,
             }}
           >
             <EditingContext.Provider value={editing}>

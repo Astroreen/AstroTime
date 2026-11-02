@@ -423,23 +423,29 @@ test("the Day view's hours start 8 px under its all-day strip (design D189)", as
   expect(scroller.y - (stripBox.y + stripBox.height)).toBeGreaterThanOrEqual(8);
 });
 
-test("the scrollbars are 10 px, and the headers keep the same gutter as the grid under them (design D191)", async ({
+test("the scrollbars are 10 px, the system's in forced colours, and the headers keep the same gutter as the grid under them (design D191)", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
   await expect(header(page, "Saturday, November 7")).toBeVisible();
+  // Playwright's headless Chromium hides scrollbars from the screen but
+  // keeps their width in the layout, which is what this reads: 15 px for
+  // the platform's own, 10 for ours. A headed run with overlay scrollbars
+  // would read 0 for both.
   const scroller = page.locator("main [data-current] [data-scroller]");
-  expect(
-    await scroller.evaluate(
-      (element) => (element as HTMLElement).offsetWidth - element.clientWidth,
-    ),
-  ).toBe(10);
+  const gutter = () =>
+    scroller.evaluate((element) => (element as HTMLElement).offsetWidth - element.clientWidth);
+  expect(await gutter()).toBe(10);
   // Saturday's header and column end on the same pixel: the header's
   // `scrollbar-gutter` takes what the grid's scrollbar does.
   const head = (await header(page, "Saturday, November 7").boundingBox())!;
   const column = (await day(page, "Saturday, November 7").boundingBox())!;
   expect(Math.round(head.x + head.width)).toBe(Math.round(column.x + column.width));
+  // In forced colours (Windows' high contrast) the system's own scrollbar
+  // comes back, in the colours the user chose.
+  await page.emulateMedia({ forcedColors: "active" });
+  expect(await gutter()).toBe(15);
 });
 
 test("the theme follows the system; data-theme overrides it (D44)", async ({ page }) => {
