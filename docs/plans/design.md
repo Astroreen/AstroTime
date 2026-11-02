@@ -909,7 +909,10 @@ For the items' editor and details:
     its time on the time grid, or one line in the all-day strip on its day,
     whatever its due and however far it is (`layoutDay`, `dayRange`; the
     Month and the Agenda show it on that day only). One with only a due
-    (another client's, below) shows at its due the same way;
+    (another client's, below) shows at its due the same way. On purpose,
+    tasks other clients wrote with a start and a due lose the block from
+    one to the other: the due shows in the details only (a mark of it on
+    the calendar is [Deferred](#deferred));
   - **the due is a field of its own, off at first**: "Add due" ("Добавить
     срок"); tapped, it is set on the start's day, an hour after its start
     for a timed task (the next day's past midnight), the day alone for an
@@ -921,9 +924,11 @@ For the items' editor and details:
     `withStartDate`), and a drag or a key moves both, a due date by the
     days the start moved (foundation [D113](foundation.md#D113)); a task
     is never resized, as it has no length on the grid;
-  - **its reminders count from its start**, where the calendar shows it
-    (`RELATED=START`); one with only a due counts from its due
-    (`RELATED=END`, as RFC 5545 §3.6.6 requires a `DTSTART` for the first);
+  - **its new reminders count from its start**, where the calendar shows
+    it (`RELATED=START`); one with only a due counts from its due
+    (`RELATED=END`, as RFC 5545 §3.6.6 requires a `DTSTART` for the
+    first). A reminder it already has keeps its relation as written,
+    unless the user removes it (foundation [D7](foundation.md#D7));
   - **its details and a search result read its start** ("Wednesday,
     November 4, 3:00 PM · Due Friday, November 6"), its due after it.
 - **D160. Tasks other clients wrote stay as they are.** Nextcloud Tasks
@@ -931,9 +936,12 @@ For the items' editor and details:
   task shows at its due ([D159](#D159)), or on the tasks screen only with
   neither, as before. The edit dialog opens it with a start shown from its
   due (the due's day and time, all day for a due date), or today, all day,
-  without either; that start is the form's from the moment it opens, so it
-  is written only when the user changes the task's times, with them
-  (foundation [D7](foundation.md#D7)): a new title alone writes the title.
+  without either (`startless` in the form). That start is shown, not
+  written (foundation [D7](foundation.md#D7)): while the user leaves it, it
+  follows the due (`withDueAt`), and the task keeps only its `DUE`, so a
+  due moved or made all day shows where it now is; a new title alone
+  writes the title. Once the user sets the start, it is written; and when
+  the due is cleared, the start shown is written, as a task needs a time.
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
   - A task is **overdue**, and rolls over to today's "N undone tasks"
@@ -955,6 +963,10 @@ For the items' editor and details:
   browser's date field; its calendar is no list, so [D167](#D167) left it.
   The month picker's grid is the natural start.
 
+- **A task's due on the calendar** — since [D159](#D159) a task shows at
+  its start only, and its due, however far, shows in its details alone;
+  a mark on the due's day (Google's deadline flag) would show that a
+  task is still open there.
 - **Year view** ([D48](#D48)).
 - **A long press in the Month view to create** — as Google's Android app
   does; a tap keeps opening the day ([D108](#D108)).

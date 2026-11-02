@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import {
   switchKind,
   withDue,
+  withDueAt,
   withStartTime,
   withStartDate,
   type AlarmChoice,
@@ -249,8 +250,8 @@ function Fields({
                   timeLabel={t("edit.dueTime")}
                   date={form.endDate}
                   time={form.endTime}
-                  onDate={(endDate) => set({ endDate })}
-                  onTime={(endTime) => set({ endTime })}
+                  onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
+                  onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
                 />
               </div>
               <button

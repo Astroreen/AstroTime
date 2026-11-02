@@ -72,7 +72,10 @@ export interface Form {
    * change of its times (foundation D7).
    */
   readonly startDate: string;
-  /** A task opened without a start, whose start the form only shows. */
+  /**
+   * A task opened without a start (design D160): the form shows one, its
+   * due's (following it) or today's, and writes none until the user sets it.
+   */
   readonly startless?: boolean;
   /** `HH:MM`. */
   readonly startTime: string;
@@ -262,7 +265,8 @@ const clockOf = (minutes: number) =>
  * with it, over midnight too (design D108); a task's due moves with its
  * start the same way (design D159).
  */
-export function withStartTime(form: Form, startTime: string): Form {
+export function withStartTime(given: Form, startTime: string): Form {
+  const form = started(given);
   if (form.allDay || !form.startDate || !form.endDate) return { ...form, startTime };
   const days = daysBetween(form.startDate, form.endDate);
   const length = days * 1440 + minutesOf(form.endTime) - minutesOf(form.startTime);
@@ -278,7 +282,8 @@ export function withStartTime(form: Form, startTime: string): Form {
 }
 
 /** The start date moved: an event keeps its length in days, a task its due as many days after. */
-export function withStartDate(form: Form, startDate: string): Form {
+export function withStartDate(given: Form, startDate: string): Form {
+  const form = started(given);
   if (!form.startDate || !form.endDate) return { ...form, startDate };
   return {
     ...form,
@@ -292,14 +297,30 @@ export function withStartDate(form: Form, startDate: string): Form {
  * hour after its start when it has a time (the next day's past midnight).
  */
 export function withDue(form: Form, due: boolean): Form {
-  if (!due) return { ...form, endDate: "" };
-  if (form.allDay) return { ...form, endDate: form.startDate };
+  // A task without a start keeps the one shown once its due goes: it needs a time.
+  if (!due) return { ...started(form), endDate: "" };
+  if (form.allDay) return withDueAt(form, { endDate: form.startDate });
   const end = minutesOf(form.startTime) + 60;
-  return {
-    ...form,
+  return withDueAt(form, {
     endDate: addDays(form.startDate, Math.floor(end / 1440)),
     endTime: clockOf(end),
-  };
+  });
+}
+
+/**
+ * A task's due day or time changed; one without a start shows its start
+ * there too, as the calendar will show it (design D160).
+ */
+export function withDueAt(form: Form, due: { endDate?: string; endTime?: string }): Form {
+  const next = { ...form, ...due };
+  return next.startless ? { ...next, startDate: next.endDate, startTime: next.endTime } : next;
+}
+
+/** The form with its start set by the user: written from now on (design D160). */
+function started(form: Form): Form {
+  if (!form.startless) return form;
+  const { startless: _, ...rest } = form;
+  return rest;
 }
 
 /** The day an item's occurrences are counted from: its start (a task always has one, design D159). */
@@ -343,7 +364,7 @@ export function timesOfForm(form: Form): ItemTimes {
     };
   }
   return {
-    start: form.startDate ? timeOf(form, form.startDate, form.startTime) : null,
+    start: form.startDate && !form.startless ? timeOf(form, form.startDate, form.startTime) : null,
     end: form.endDate ? timeOf(form, form.endDate, form.endTime) : null,
   };
 }

@@ -36,6 +36,7 @@ import {
   switchKind,
   timesOfForm,
   withDue,
+  withDueAt,
   withStartDate,
   withStartTime,
   type Form,
@@ -724,6 +725,79 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(row.ics).toContain("SUMMARY:Ping 2\r\n");
     expect(row.ics).not.toContain("DTEND");
     expect(row.ics).not.toContain("DURATION");
+  });
+
+  test("another client's task keeps what the user did not change: its reminder before the due, its X- lines (D7, design D159)", async () => {
+    const { store, byName } = await demo();
+    const list = byName("Tasks");
+    const stored = await store.saveFromServer(list.id, {
+      href: "essay.ics",
+      etag: '"1"',
+      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:essay\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSUMMARY:Essay\r\nX-OTHER-CLIENT:kept\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Essay\r\nTRIGGER;RELATED=END:-PT1H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+    });
+    const target = await targetOn(store, stored, "2026-11-05");
+    const initial = formOf(target, timeZone, TODAY);
+    // A new reminder counts from the start; the one it had keeps its relation.
+    const form = {
+      ...initial,
+      summary: "Essay draft",
+      alarms: [
+        ...initial.alarms,
+        { kind: "new" as const, relatedTo: "start" as const, offsetSeconds: -900 },
+      ],
+    };
+    await saveForm(
+      store,
+      { target, initial, form, scope: "all", untitled: "Reminder" },
+      { now: NOW, uid: uids },
+    );
+    const { ics } = (await store.objectAt(list.id, "essay.ics"))!;
+    expect(ics).toContain("SUMMARY:Essay draft\r\n");
+    expect(ics).toContain("X-OTHER-CLIENT:kept\r\n");
+    expect(ics).toContain("TRIGGER;RELATED=END:-PT1H\r\n");
+    expect(ics).toContain("TRIGGER:-PT15M\r\n");
+    expect(ics).toContain("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n");
+    expect(ics).toContain("DUE;TZID=Europe/Vilnius:20261106T170000\r\n");
+  });
+
+  test("a task with only a due stays so when its due moves; a start set is written (design D160)", async () => {
+    const { store, byName } = await demo();
+    const list = byName("Tasks");
+    const save = async (href: string, change: (form: Form) => Form) => {
+      const stored = await store.saveFromServer(list.id, {
+        href,
+        etag: '"1"',
+        ics: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:${href}\r\nDTSTAMP:20261101T000000Z\r\nDUE;TZID=Europe/Vilnius:20261105T150000\r\nSUMMARY:Call\r\nEND:VTODO\r\nEND:VCALENDAR\r\n`,
+      });
+      const target = await targetOn(store, stored, "2026-11-05");
+      const initial = formOf(target, timeZone, TODAY);
+      await saveForm(
+        store,
+        { target, initial, form: change(initial), scope: "all", untitled: "Reminder" },
+        { now: NOW, uid: uids },
+      );
+      return (await store.objectAt(list.id, href))!.ics;
+    };
+    // The due moved: the start shown follows it, and none is written.
+    const due = await save("due.ics", (form) => {
+      const moved = withDueAt(form, { endTime: "17:00" });
+      expect(moved).toMatchObject({ startTime: "17:00", endTime: "17:00", startless: true });
+      return moved;
+    });
+    expect(due).toContain("DUE;TZID=Europe/Vilnius:20261105T170000\r\n");
+    expect(due).not.toContain("DTSTART");
+    // Made all day: still only a due, now a date.
+    const allDay = await save("all-day.ics", (form) => ({ ...form, allDay: true }));
+    expect(allDay).toContain("DUE;VALUE=DATE:20261105\r\n");
+    expect(allDay).not.toContain("DTSTART");
+    // The start set by the user is written, the due kept as far after it.
+    const started = await save("started.ics", (form) => withStartTime(form, "14:00"));
+    expect(started).toContain("DTSTART;TZID=Europe/Vilnius:20261105T140000\r\n");
+    expect(started).toContain("DUE;TZID=Europe/Vilnius:20261105T140000\r\n");
+    // The due cleared: the start shown is kept, a task needs a time.
+    const cleared = await save("cleared.ics", (form) => withDue(form, false));
+    expect(cleared).toContain("DTSTART;TZID=Europe/Vilnius:20261105T150000\r\n");
+    expect(cleared).not.toContain("DUE");
   });
 
   test("a series saved with nothing changed asks no scope and writes nothing", async () => {
