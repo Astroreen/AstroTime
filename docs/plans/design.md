@@ -1498,6 +1498,28 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   marked `data-day-number`, and the strip in the Week on a wide screen and
   3 days on a phone, failing before the change; 8 px between the strip
   and the hours in the Day view).
+- **D190. A double click on an empty slot keeps the dialog it opened.**
+  The first click of a double click on an empty slot of the grid (or the
+  all-day strip, [D188](#D188)) opens the new item's dialog; once the
+  editor's chunk is loaded, the dialog is there before the second press,
+  which lands on its backdrop and closed it again, so nothing stayed open
+  ([D154](#D154) had a double click make one event only on a first load).
+  A click on the backdrop no longer closes the edit dialog when it is the
+  second of the double click whose first click opened it. The grid and the
+  strip, which create from a click, hand that click to the dialog
+  (`create`'s `press`, the dialog's `opener`: where, its count, when); a
+  key, a button or a copy hands none. The dialog then lets pass only its
+  first click outside, if its count (`detail`) is one more, within 8 px
+  and 500 ms (`useSecondPress` in `item-editor.tsx`). Base UI closes a
+  dialog that has a backdrop on a `click`, by mouse or by touch, whose
+  `detail` counts the clicks or taps. Any other click there still closes
+  it ([D136](#D136)), one the browser counts as a second click too (after
+  a click elsewhere). Found while testing D188. Tested:
+  `apps/web/e2e/drag.spec.ts` (a double click on an empty hour with the
+  editor's chunk loaded first, then a single click on the backdrop
+  closing it; a double tap by touch on a wide screen; a dialog opened by a
+  single click closing on a backdrop click counted as a second elsewhere,
+  which `detail` alone kept open; each failing before its change).
 
 ### Decided in round 4: the editor
 
