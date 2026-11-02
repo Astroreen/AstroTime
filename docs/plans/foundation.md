@@ -1809,9 +1809,11 @@ optimization is lacking").
   - **Dialogs with their first opening**: the edit dialog, Settings and the
     Conflicts list (`components/lazy.tsx`), each a stand-in with its props
     that draws nothing until first open, stays drawn after, and fetches its
-    code once the page is idle, or 2 seconds after it is drawn on a page
-    never idle (a busy phone; a test run's many frames, where a wait for
-    idle alone outlasted a test's 15 s on CI). Code that does not arrive (offline before
+    code once the page is idle, or at most 2 seconds after it is drawn:
+    a product decision, since a page that is never idle (a busy phone)
+    would otherwise never fetch it, and its first opening would wait for
+    the network. No test depends on the 2 seconds: the tests wait for the
+    chunk's load or the dialog itself. Code that does not arrive (offline before
     the service worker kept it, [D124](#D124), or a release that replaced
     it) is no blank app: in the dialog's place AstroTime says it could not
     load that part, with "Try again", "Reload" and "Close"; a failed load is

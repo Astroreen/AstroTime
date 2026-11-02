@@ -212,10 +212,13 @@ test.describe("Agenda", () => {
     await expect(page.getByRole("main", { name: "November" })).toBeVisible();
     // November 1 has nothing left on it (its task rolled over to today): the next day with something.
     await expect(header(page, "Monday, November 2")).toBeInViewport();
-    await page.getByRole("button", { name: "Show earlier" }).click();
+    // Pressed where it is, as a keyboard's Enter would: Playwright's click
+    // scrolls it into view first, and the list near its top reads earlier
+    // days by itself, moving the button between that scroll and the click.
+    await page.getByRole("button", { name: "Show earlier" }).dispatchEvent("click");
     await expect(day(page, "Sunday, September 20")).toBeAttached();
-    await expect(header(page, "Wednesday, October 21")).toBeInViewport();
     // Read above the day on top: the list did not jump to its new start.
+    await expect(header(page, "Monday, November 2")).toBeInViewport();
     await expect(page.getByRole("button", { name: "Show earlier" })).not.toBeInViewport();
   });
 });

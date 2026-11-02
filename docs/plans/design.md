@@ -1293,6 +1293,11 @@ Settings, the colours and the lists controls open.
 
 ## Deferred
 
+- **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
+  RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no
+  recorded fixture shows how Apple's apps write one, so one with a
+  `RELATED-TO` and no `RELTYPE` is still copied, a stray one-off reminder.
+  A fixture recorded from Apple's Calendar settles it.
 - **The draft beside the dialog in the Day view and the Agenda**
   ([D155](#D155)): there the draft is as wide as the view, so the dialog,
   standing at one side, still covers part of it; a dialog placed by the

@@ -76,8 +76,8 @@ export function deferred<P extends Closable, M = unknown>(
       // A failure here is met again, and said, at the opening.
       const fetch = () => void preload().catch(() => {});
       if (typeof requestIdleCallback === "function") {
-        // A page that is never idle (a busy phone, a test run's many frames)
-        // still fetches it, at most this long after.
+        // A page that is never idle (a busy phone) still fetches it, at most
+        // this long after, so its first opening need not wait (D145).
         const id = requestIdleCallback(fetch, { timeout: IDLE_AT_MOST_MS });
         return () => cancelIdleCallback(id);
       }
