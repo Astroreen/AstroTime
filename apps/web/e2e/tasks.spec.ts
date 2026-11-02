@@ -131,6 +131,8 @@ test("on a phone the tasks are a screen of their own; back returns to the calend
 
 /** A point on a task's own row right of its title: left of the star (40 px at its end), level with the checkbox. */
 const rightOfTitle = async (item: Locator) => {
+  // Where it rests: a list chosen slides in (design D199).
+  await item.locator("> div").click({ trial: true });
   const row = (await item.locator("> div").boundingBox())!;
   const checkbox = (await item.getByRole("checkbox").first().boundingBox())!;
   return { x: row.x + row.width - 60, y: checkbox.y + checkbox.height / 2 };
@@ -138,6 +140,7 @@ const rightOfTitle = async (item: Locator) => {
 
 /** A point on a task's due line. */
 const onDue = async (item: Locator) => {
+  await item.locator("> div").click({ trial: true });
   const due = (await item.locator("> div > div > span").first().boundingBox())!;
   return { x: due.x + 4, y: due.y + due.height / 2 };
 };
@@ -451,6 +454,8 @@ test.describe("on a touch screen", () => {
     const panel = tasks(page);
     await panel.getByRole("tab", { name: /^Tasks/ }).click();
     const row = panel.getByRole("listitem", { name: "Send the report" }).locator("> div");
+    // Where it rests: a list chosen slides in (design D199).
+    await row.click({ trial: true });
     const box = (await row.boundingBox())!;
     await page.touchscreen.tap(box.x + box.width - 60, box.y + box.height / 2);
     const details = page.getByRole("dialog", { name: "Send the report" });

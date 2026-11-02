@@ -1365,6 +1365,23 @@ whole row".
   place. The code that moves them (`components/task-motion.ts`) is loaded
   with the tasks screen's first showing, not with the app (D145), and never
   when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
+- **D199. Task lists move as periods do** (the owner's item 13: "smooth
+  transitions between lists in Tasks"). The tasks screen draws its lists
+  with the views' `Pager` ([D154](#D154)), each list a page in the order of
+  the tabs: a list chosen by its tab, the arrow keys and Enter, slides in
+  from the side it comes from (40 px and a fade, 220 ms); on a touch screen
+  (`any-pointer: coarse`) the lists before and after the one shown are
+  drawn beside it, `inert` and hidden from a screen reader, and a sideways
+  swipe carries them under the finger and settles on the next or previous
+  list past a quarter of the width or a flick, as a period's swipe does
+  ([D152](#D152)); a vertical move scrolls the list. The tab strip follows
+  the list chosen, its indicator sliding as before. `prefers-reduced-motion`
+  swaps lists at once. On a wide screen the lists stay one at a time under
+  their tabs, in the column the calendar | tasks switch shows them in
+  ([D227](#D227)); Google Tasks web's lists side by side as columns are
+  [deferred](#deferred): with few lists the tabs carry the counts the
+  columns would not, and columns ask for dragging tasks between lists,
+  which AstroTime does not have yet (`apps/web/e2e/tasks-lists.spec.ts`).
 
 ### Decided in round 4: the calendar views
 
@@ -1890,6 +1907,10 @@ own (below).
 
 ## Deferred
 
+- **Task lists as columns on a wide screen** (design D199) — Google Tasks
+  web shows every list side by side, each a column with its own "Add a
+  task", and tasks dragged from one to another. AstroTime shows one list at
+  a time under its tabs; columns come with dragging tasks between lists.
 - **More illustrated subjects** ([D215](#D215)): meetings and calls,
   haircut, code, cleaning, the car, a wedding, the beach and holidays,
   Halloween; and words in languages other than English and Russian. Each

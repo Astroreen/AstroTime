@@ -24,8 +24,10 @@ import {
   type TaskNode,
   type TaskRow,
 } from "../calendar/tasks.ts";
+import { useMediaQuery } from "../hooks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
 import { useCalendar } from "./context.ts";
+import { Pager, type Page } from "./pager.tsx";
 import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
 import {
@@ -273,6 +275,14 @@ export function TasksScreen({
   };
   const clearOpen = () => clear(openTab());
   const hasLists = lists.length > 0;
+  // The lists as the Pager's pages (design D199): in their order, which a
+  // page's first "day" carries, as the Pager compares them to slide.
+  const coarse = useMediaQuery("(any-pointer: coarse)");
+  const index = lists.findIndex((list) => list.id === selected);
+  const pageOf = (at: number): ListPage | null => {
+    const list = lists[at];
+    return list ? { key: list.id, days: [String(at).padStart(4, "0")], list } : null;
+  };
   useEffect(() => {
     const element = strip.current;
     if (!element) return;
@@ -415,13 +425,20 @@ export function TasksScreen({
             data-moves={moves || undefined}
             className="relative flex min-h-0 flex-1 flex-col"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
-              {lists.map((list) => (
-                <Tabs.Panel
-                  key={list.id}
-                  value={list.id}
-                  className="flex flex-col gap-3 rounded-xl"
-                >
+            {/* Lists move as periods do (design D199): one slides in from
+                the side it comes from; on a touch screen the lists beside
+                are drawn beside it and a sideways swipe carries them. */}
+            <Pager
+              view="tasks"
+              current={pageOf(index)!}
+              previous={coarse ? pageOf(index - 1) : null}
+              next={coarse ? pageOf(index + 1) : null}
+              onStep={(step) => {
+                const list = lists[index + step];
+                if (list) setChosen(list.id);
+              }}
+              render={({ list }, current) => {
+                const cards = (
                   <ListCards
                     list={list}
                     tasks={byList.get(list.id)}
@@ -429,9 +446,20 @@ export function TasksScreen({
                     onSort={setSort}
                     actions={actions}
                   />
-                </Tabs.Panel>
-              ))}
-            </div>
+                );
+                return (
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
+                    {current ? (
+                      <Tabs.Panel value={list.id} className="flex flex-col gap-3 rounded-xl">
+                        {cards}
+                      </Tabs.Panel>
+                    ) : (
+                      <div className="flex flex-col gap-3">{cards}</div>
+                    )}
+                  </div>
+                );
+              }}
+            />
             {/* Rows leaving are drawn on it, out of reach of a press, the keyboard and a screen reader. */}
             <div
               data-motion-layer=""
@@ -460,6 +488,11 @@ export function TasksScreen({
       )}
     </section>
   );
+}
+
+/** A list as a page of the Pager (design D199). */
+interface ListPage extends Page {
+  readonly list: Calendar;
 }
 
 /** Where a count goes in a translated string, to cut it there. */
