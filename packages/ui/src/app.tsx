@@ -34,6 +34,10 @@ type Opening =
   | { readonly status: "failed"; readonly error: unknown };
 
 export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimeProps) {
+  // Not memoized by the React Compiler, on purpose: the root renders when a
+  // setting or the store's opening changes, and its memos would add 0.6 KiB
+  // to the first load (foundation D145, design D194).
+  "use no memo";
   const { store, preferences } = platform;
   // The settings (design D53, D131), applied as soon as they change.
   const [chosen, setChosen] = usePreference(preferences, KEYS.settings, readSettings, (value) =>

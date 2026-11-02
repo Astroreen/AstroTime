@@ -1656,6 +1656,30 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
   time under the fingers kept through steps and after).
 
+- **D194. The React Compiler's bail-outs are chosen, not found** (the
+  owner cares for battery and CPU: foundation [D181](foundation.md#D181),
+  [D182](foundation.md#D182)). The compiler leaves a component it cannot
+  prove safe unmemoized, with no error at build: it then renders all of
+  its tree again on every render. Its diagnostics (`oxc-transform-react`
+  with `reportDiagnostics`) showed three on the first load's path:
+  `CalendarScreen` (a manual `useMemo` it could not keep), `TimeGrid` (a
+  prop's ref written in a handler) and the root `AstroTime` (a ref
+  written during render). Each was made compilable and measured: its
+  memos would add 3.7, 1.4 and 0.6 KiB to the first load, past what the
+  budget has left ([foundation D145](foundation.md#D145)). So they stay
+  unmemoized, on purpose and said so (`"use no memo"`, with why in each):
+  `CalendarScreen`'s costly part, laying out the periods drawn, is a
+  `useMemo` of its own, and the views and items under them are memoized.
+  An idle tab does no work either way ([D181](foundation.md#D181);
+  `idle.spec.ts`, unchanged). What keeps it so is a check:
+  `apps/web/src/compiler.test.ts` reads the compiler's diagnostics for
+  every module of `@astrotime/ui` (errors, and advice on syntax it cannot
+  compile yet, which leaves a component unmemoized too) and holds them to
+  those known; a new one fails there. It catches what cost round 4 a
+  quiet bail-out once (a `??=` in a hook, which made the first load look
+  1.7 KiB smaller). The ones known besides those chosen are
+  [Deferred](#deferred).
+
 ### Decided in round 4: the editor
 
 The owner's feedback after round 3 on the edit dialog: its icons and its
@@ -2116,6 +2140,19 @@ own (below).
 
 ## Deferred
 
+- **The React Compiler's other bail-outs** ([D194](#D194)), known when
+  its check came, each in its owner's area: `accounts-context.tsx` (a
+  `try` with `finally`, a counter changed in a callback),
+  `attachments-field.tsx` (a `throw` inside `try`), `tasks-screen.tsx` and
+  `celebration.ts` (an `import()` in a component; moved to a function of
+  the module, as `pinch.ts`'s is, it compiles), and `draft-aside.ts` (its
+  form read from a ref on purpose). Each is worth looking at with its
+  first-load cost measured, as D194 did.
+- **The landing's lows** ([D193](#D193)): `landed` optional in the
+  calendar's context where it could be required; tests of an edit saved
+  for "all" and for "this" occurrence; the strip's fade kept in state
+  per strip rather than per period; an occurrence saved in a hidden
+  calendar and shown again later lands then.
 - **Safari's pinch on a Mac's trackpad** ([D192](#D192)): Safari sends
   `gesturestart`/`gesturechange` rather than a wheel with Ctrl; the time
   grid's zoom hears only the second, so there Safari's trackpad pinch
