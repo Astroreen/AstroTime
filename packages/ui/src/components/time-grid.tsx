@@ -148,7 +148,7 @@ export function TimeGrid(props: TimeGridProps) {
     <DragContext.Provider value={drag.value}>
       <div ref={root} className="flex min-h-0 flex-1 flex-col">
         <div
-          className="grid shrink-0 overflow-y-hidden pb-1 [scrollbar-gutter:stable]"
+          className="grid shrink-0 overflow-y-hidden pb-2 [scrollbar-gutter:stable]"
           style={columns}
         >
           {single ? (
@@ -172,10 +172,14 @@ export function TimeGrid(props: TimeGridProps) {
               {days.map((day) => (
                 <DayHeader key={day} day={day} today={today} />
               ))}
-              <div className="pt-0.5">{chevron}</div>
+              <div className="pt-2.5">{chevron}</div>
             </>
           )}
-          <div style={{ gridColumn: `2 / span ${days.length}` }} className={single ? "pt-1" : ""}>
+          {/* Today's circle 8 px clear of the items under it (design D189). */}
+          <div
+            style={{ gridColumn: `2 / span ${days.length}` }}
+            className={single ? "pt-1" : "pt-2"}
+          >
             <Strip {...props} collapsed={collapsible && !expanded} ghost={ghost} />
           </div>
         </div>
@@ -311,6 +315,7 @@ export function DayHeader({
       </span>
       <span
         aria-hidden="true"
+        data-day-number=""
         className={`grid size-8 place-items-center rounded-full text-title leading-none ${
           isToday ? "bg-accent font-medium text-on-accent" : "text-ink"
         }`}
