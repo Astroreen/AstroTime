@@ -2002,7 +2002,10 @@ and [D177](design.md#D177); what reaches a server, and which:
     write a bare `GEO` change it with their text, AstroTime's own points
     carry Apple's guard, and a point dropped on a guess would hide a right
     map more often than it hides a wrong one; a test pins it. A `GEO`
-    another parser wrote as text ("lat;lon") reads the same. Apple's name
+    another parser wrote as text ("lat;lon", split at its semicolon alone,
+    so a decimal comma is never a separator) reads the same; Apple's `geo:`
+    URI is read as RFC 5870 writes it, an altitude and parameters after the
+    point (`geo:52.5,13.4,35;u=10`). Apple's name
     and address of its own point (`Item.placeLabel`, never beside a `GEO`
     read in its stead) name the place on its card ([design D177](design.md#D177)). The guard's limit: a new text that
     still holds the old name ("Cafe Roma Nuovo" over "Cafe Roma") keeps

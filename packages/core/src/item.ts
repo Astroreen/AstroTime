@@ -307,7 +307,10 @@ function placeOf(component: ICAL.Component): Pick<Item, "geo" | "placeLabel"> {
     const location = loosely(text(component, "location") ?? "");
     if (typeof title === "string" && loosely(title) && !location.includes(loosely(title)))
       return { geo: null, placeLabel: null };
-    const uri = /^geo:([^,]*),(.*)$/i.exec(String(apple.getFirstValue() ?? ""));
+    // RFC 5870: geo:lat,lon[,alt][;param…]; latitude and longitude alone count.
+    const uri = /^geo:([^,;]*),([^,;]*)(?:,[^;]*)?(?:;.*)?$/i.exec(
+      String(apple.getFirstValue() ?? ""),
+    );
     const geo = uri ? pointOf(uri[1], uri[2]) : null;
     if (geo) {
       const address = apple.getParameter("x-address");
@@ -326,7 +329,7 @@ function placeOf(component: ICAL.Component): Pick<Item, "geo" | "placeLabel"> {
   const [lat, lon] = Array.isArray(geo)
     ? geo.map(part)
     : typeof geo === "string"
-      ? geo.split(/[;,]/)
+      ? geo.split(";")
       : [];
   return { geo: pointOf(lat, lon), placeLabel: null };
 }

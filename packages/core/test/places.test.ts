@@ -99,6 +99,27 @@ describe("reading a place's point", () => {
     });
   });
 
+  test("Apple's geo: URI as RFC 5870 writes it: an altitude and parameters after the point", () => {
+    const apple = (uri: string) =>
+      master(
+        event(
+          "LOCATION:Apple Park",
+          `X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Apple Park:${uri}`,
+        ),
+      ).geo;
+    expect(apple("geo:52.5,13.4;u=10")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(apple("geo:52.5,13.4,35")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(apple("geo:52.5,13.4,35;crs=wgs84;u=10")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(master(fixture("apple-event-attendees.ics")).geo).toEqual({
+      lat: 37.334682,
+      lon: -122.008944,
+    });
+  });
+
+  test("GEO's parts are split at its semicolon alone: a decimal comma is no separator", () => {
+    expect(master(event("LOCATION:Somewhere", "GEO;VALUE=TEXT:52,5;13,4")).geo).toBeNull();
+  });
+
   test("a cut-off GEO is no point", () => {
     for (const value of ["52.5;", ";13.4", ";", "52.5"])
       expect(master(event("LOCATION:Somewhere", `GEO;VALUE=TEXT:${value}`)).geo, value).toBeNull();

@@ -200,6 +200,10 @@ describe("the place card", () => {
         address: "Main St",
       }),
     ).toEqual({ name: "Room 5, Building B", address: "Main St" });
+    // Apple's name with no X-ADDRESS: the address its text holds.
+    expect(
+      nameAndAddress("Apple Park\nOne Apple Park Way", { name: "Apple Park", address: "" }),
+    ).toEqual({ name: "Apple Park", address: "One Apple Park Way" });
   });
 });
 

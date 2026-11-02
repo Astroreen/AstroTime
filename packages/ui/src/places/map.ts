@@ -67,8 +67,9 @@ export function nameAndAddress(
   location: string,
   label: { readonly name: string; readonly address: string } | null = null,
 ): { name: string; address: string } {
-  if (label) return label;
   const text = location.trim();
+  // Apple's own name, with the address its text holds when it names none.
+  if (label) return label.address ? label : { ...label, address: nameAndAddress(text).address };
   const at = text.includes("\n") ? text.indexOf("\n") : text.indexOf(", ");
   if (at < 0) return { name: text, address: "" };
   const gap = text[at] === "\n" ? 1 : 2;
