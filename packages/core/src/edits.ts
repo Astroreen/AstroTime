@@ -7,6 +7,7 @@
 // all occurrences (the master).
 import ICAL from "ical.js";
 
+import { setAttachments, type NewAttachment } from "./attachments.ts";
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { hexColor, isColorName, nearestColorName } from "./colors.ts";
 import { point, readItem, X_COLOR, type Geo } from "./item.ts";
@@ -67,6 +68,14 @@ export interface ItemChanges {
      * `DESCRIPTION`), in the user's language: the core holds no UI strings (D103).
      */
     readonly untitled: string;
+  };
+  /**
+   * Attachments removed, by their index among the item's `ATTACH`es, and
+   * added; the others stay as written (foundation D229).
+   */
+  readonly attachments?: {
+    readonly remove: readonly number[];
+    readonly add: readonly NewAttachment[];
   };
   /**
    * The item's own colour: a CSS colour name, written as RFC 7986 `COLOR`,
@@ -324,6 +333,7 @@ function apply(
     else component.updatePropertyWithValue("percent-complete", changes.percentComplete);
   }
   if (changes.alarms) setAlarms(component, changes.alarms);
+  if (changes.attachments) setAttachments(component, changes.attachments);
   if (changes.time) setTimes(component, root, changes.time);
   if (changes.time || changes.repeat !== undefined) significant(component, now);
   touch(component, now);
@@ -949,6 +959,12 @@ function editSeries(
     }
     if (changes.alarms && JSON.stringify(own.alarms) === JSON.stringify(before.alarms)) {
       follow["alarms"] = changes.alarms;
+    }
+    if (
+      changes.attachments &&
+      JSON.stringify(own.attachments) === JSON.stringify(before.attachments)
+    ) {
+      follow["attachments"] = changes.attachments;
     }
     if (Object.keys(follow).length > 0) apply(exception, root, follow, now);
   }

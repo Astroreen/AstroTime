@@ -2143,8 +2143,47 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
     `live.test.ts` (one read on show) and `now.browser.test.tsx` (no timer
     while hidden).
 
+### Decided in round 4: attachments
+
+The owner's feedback 9 after round 3, its files part: "if we connect
+WebDAV and files are stored there, why not attach them to an event or
+task?"
+
+- **D229. Attachments are read, shown and kept as written.** An item's
+  `ATTACH`es (RFC 5545 §3.8.1.1) are `Item.attachments`
+  (`packages/core/src/attachments.ts`): each a link (`uri`) or a file
+  inline in the object (`VALUE=BINARY`, base64; `uri` null), with its
+  name, type and size where its client wrote them. The name is `FILENAME`
+  (Nextcloud Calendar's and RFC 8607's), else Outlook's `X-FILENAME`,
+  Apple's `X-APPLE-FILENAME` or Oracle's `X-ORACLE-FILENAME`, its last
+  path part (Nextcloud's `FILENAME` is the file's path in the user's
+  files, `/Calendar/report.pdf`); the type is `FMTTYPE`; the size is
+  `SIZE` (RFC 8607), else an inline file's own, counted from its base64
+  without decoding it, so a list of attachments never holds their bytes.
+  An inline file is decoded only when the user saves it (`inlineFile`,
+  through ical.js's own base64, the core having no `atob`). An alarm's
+  `ATTACH` (Apple's sound) is the alarm's, not the item's. A link may be
+  relative to the server, as Nextcloud Calendar writes its users' files
+  (`/index.php/f/241`): the UI resolves it against the calendar's URL, and
+  follows only `http` and `https` links. Every `ATTACH` and its parameters
+  stay byte for byte through any other edit ([D7](#D7)); an edit removes
+  one by its index among the item's `ATTACH`es and adds one with its
+  `FILENAME`, `FMTTYPE`, `SIZE` and a provider's own parameters, written as
+  given (`ItemChanges.attachments`), and, as a reminder's change does, a
+  change to the series reaches the exceptions that had the series'
+  attachments. A copy keeps them (design [D164](design.md#D164)). The
+  fixtures `nextcloud-calendar-event-attachments.ics` (Nextcloud
+  Calendar 5.5's form, from its source), `apple-event-attachments.ics`
+  (a managed attachment, RFC 8607, and a bare link) and
+  `outlook-event-inline-attachment.ics` (base64 inline) are written by
+  hand in each client's shape.
+
 ## Deferred
 
+- **Apple's managed attachments, written** — RFC 8607's `MANAGED-ID`
+  attachments (iCloud, Apple's servers, `POST ?action=attachment-add`) are
+  read, shown and kept ([D229](#D229)), but AstroTime adds none that way:
+  no server it syncs with today offers them.
 - **A tab loaded hidden** still reads its live queries once at the load,
   and can ask whether to keep the data then ([D182](#D182)); starting them
   only when first shown would save that read.

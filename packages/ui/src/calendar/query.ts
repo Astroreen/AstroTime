@@ -206,6 +206,7 @@ export function undoneChip(today: string): Occurrence {
     lastModified: null,
     recurring: false,
     alarms: [],
+    attachments: [],
     start: null,
     due: { type: "date", date: today },
     completed: null,

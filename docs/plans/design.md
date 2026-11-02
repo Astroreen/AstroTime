@@ -1364,6 +1364,21 @@ The owner's feedback after round 3 on the edit dialog: its icons.
   `editing.spec.ts` measures each icon against its control on a phone and a
   wide screen.
 
+### Decided in round 4: attachments
+
+- **D230. The details list an item's attachments** (the owner's 9, its
+  files part; [foundation D229](foundation.md#D229)), after the
+  description, under a paperclip: each a row with a mark (a sheet for a
+  file, by link or inline; a chain for a bare link), its name (or, for a
+  link with none, its host and path), and under it its kind (the name's
+  extension, else the type's: "PDF") and size ("482 kB", the language's
+  own units; under a kilobyte "22 B" / "22 Б"). A web link opens where the
+  description's links open, a new tab or the system's browser; a link of
+  another kind is shown and not followed. A file inline in the object is a
+  button, "Save figures.txt": decoded then, and saved under its name. The
+  rows are AstroTime's own drawings ([D43](#D43)), loaded with the details.
+  The demo's "Budget planning" carries one of each.
+
 ## Deferred
 
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as

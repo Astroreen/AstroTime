@@ -72,6 +72,10 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
+  - `Item.attachments`, `inlineFile` (`attachments.ts`) — an item's
+    `ATTACH`es: links and inline files, with name, type and size, kept as
+    written; `ItemChanges.attachments` removes and adds.
+    → `plans/foundation.md#D229`
   - `Item.geo`, `Item.placeLabel`, `Place`, `placeText` — a place's point
     (and Apple's name for it), read from `GEO` or
     Apple's structured location and written with a place picked on the
@@ -238,6 +242,8 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+    - `attachments.tsx` — an item's attachments in its details: links
+      that open, inline files saved on demand. → `plans/design.md#D230`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
       map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
@@ -344,6 +350,8 @@ When you add a package, app or module, add its line here in the same PR.
     `places.spec.ts` searches and picks a place on a phone and a wide
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
+    `attachments.spec.ts` lists an item's attachments in its details and
+    saves an inline one. → `plans/design.md#D230`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

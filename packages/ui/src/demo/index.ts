@@ -223,11 +223,22 @@ const CALENDARS: readonly DemoCalendar[] = [
             "",
           ].join("\r\n"),
         ),
+        // With attachments (design D230): a file of the account's by its link,
+        // as Nextcloud Calendar writes one, a web link, and a file inline.
         event(
           "demo-budget",
           t("Budget planning", "Планирование бюджета"),
           at(zone, day(0), "11:00"),
           at(zone, day(0), "12:30"),
+          {},
+          [],
+          [
+            `ATTACH;FMTTYPE=application/pdf;FILENAME=/Calendar/${t("Budget 2027", "Бюджет 2027")}.pdf;SIZE=482133;X-NC-FILE-ID=241;X-NC-HAS-PREVIEW=false:https://example.com/index.php/f/241`,
+            "ATTACH:https://example.com/budget/sheet",
+            // "Q1: 12 000\nQ2: 14 500\n", inline.
+            "ATTACH;ENCODING=BASE64;VALUE=BINARY;FMTTYPE=text/plain;FILENAME=figures.txt:UTE6IDEyIDAwMApRMjogMTQgNTAwCg==",
+            "",
+          ].join("\r\n"),
         ),
         event(
           "demo-conference",
