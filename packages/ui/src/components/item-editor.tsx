@@ -1,7 +1,7 @@
 // The edit dialog (docs/plans/foundation.md#D9, D10), as Google Calendar's:
 // the whole screen on a phone, a dialog on a wide screen. Event or task when
-// creating; title; all day; start and end (a task's optional start and due);
-// the zone when it is not the user's; repeat presets and a custom rule;
+// creating; title; all day; start and end (a task's start and its optional
+// due, design D159); the zone when it is not the user's; repeat presets and a custom rule;
 // reminders; the calendar; colour; location; description; a task's status,
 // priority, progress and tags. Enter in a field saves, Escape closes.
 import {
@@ -22,6 +22,10 @@ import { useTranslation } from "react-i18next";
 
 import {
   switchKind,
+  withAlarms,
+  withAllDay,
+  withDue,
+  withDueAt,
   withStartTime,
   withStartDate,
   type AlarmChoice,
@@ -208,64 +212,61 @@ function Fields({
         <Toggle
           label={t("edit.allDay")}
           checked={form.allDay}
-          onChange={(allDay) => set({ allDay })}
+          onChange={(allDay) => onChange(withAllDay(form, allDay))}
+        />
+        <DateTime
+          form={form}
+          dateLabel={t("edit.startDate")}
+          timeLabel={t("edit.startTime")}
+          date={form.startDate}
+          time={form.startTime}
+          onDate={(date) => onChange(withStartDate(form, date))}
+          onTime={(startTime) => onChange(withStartTime(form, startTime))}
         />
         {event ? (
-          <>
-            <DateTime
-              form={form}
-              dateLabel={t("edit.startDate")}
-              timeLabel={t("edit.startTime")}
-              date={form.startDate}
-              time={form.startTime}
-              onDate={(date) => onChange(withStartDate(form, date))}
-              onTime={(startTime) => onChange(withStartTime(form, startTime))}
-            />
-            <DateTime
-              form={form}
-              dateLabel={t("edit.endDate")}
-              timeLabel={t("edit.endTime")}
-              date={form.endDate}
-              time={form.endTime}
-              onDate={(endDate) => set({ endDate })}
-              onTime={(endTime) => set({ endTime })}
-            />
-          </>
+          <DateTime
+            form={form}
+            dateLabel={t("edit.endDate")}
+            timeLabel={t("edit.endTime")}
+            date={form.endDate}
+            time={form.endTime}
+            onDate={(endDate) => set({ endDate })}
+            onTime={(endTime) => set({ endTime })}
+          />
+        ) : form.endDate === "" ? (
+          <button
+            type="button"
+            onClick={() => onChange(withDue(form, true))}
+            className="flex min-h-10 items-center self-start rounded-lg px-1 text-row text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {t("edit.addDue")}
+          </button>
         ) : (
-          <>
-            <Toggle
-              label={t("edit.hasStart")}
-              checked={form.startDate !== ""}
-              onChange={(on) => set({ startDate: on ? form.endDate || todayOf(timeZone) : "" })}
-            />
-            {form.startDate !== "" && (
-              <DateTime
-                form={form}
-                dateLabel={t("edit.startDate")}
-                timeLabel={t("edit.startTime")}
-                date={form.startDate}
-                time={form.startTime}
-                onDate={(date) => onChange(withStartDate(form, date))}
-                onTime={(startTime) => set({ startTime })}
-              />
-            )}
-            <Toggle
-              label={t("edit.hasDue")}
-              checked={form.endDate !== ""}
-              onChange={(on) => set({ endDate: on ? form.startDate || todayOf(timeZone) : "" })}
-            />
-            {form.endDate !== "" && (
-              <DateTime
-                form={form}
-                dateLabel={t("edit.dueDate")}
-                timeLabel={t("edit.dueTime")}
-                date={form.endDate}
-                time={form.endTime}
-                onDate={(endDate) => set({ endDate })}
-                onTime={(endTime) => set({ endTime })}
-              />
-            )}
-          </>
+          <div role="group" aria-label={t("edit.due")} className="flex flex-col gap-1">
+            <span className="text-small text-ink-muted">{t("edit.due")}</span>
+            <div className="flex items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <DateTime
+                  form={form}
+                  dateLabel={t("edit.dueDate")}
+                  timeLabel={t("edit.dueTime")}
+                  date={form.endDate}
+                  time={form.endTime}
+                  onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
+                  onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
+                />
+              </div>
+              <button
+                type="button"
+                aria-label={t("edit.removeDue")}
+                title={t("edit.removeDue")}
+                onClick={() => onChange(withDue(form, false))}
+                className={dialogIcon}
+              >
+                <CloseIcon className="size-4" />
+              </button>
+            </div>
+          </div>
         )}
         {!form.allDay && form.zone === null && (
           <p className="text-small text-ink-muted">{t("edit.floating")}</p>
@@ -280,7 +281,7 @@ function Fields({
       </Section>
 
       <Section icon={<BellIcon className="size-5" />}>
-        <Reminders form={form} onChange={(alarms) => set({ alarms })} />
+        <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
       </Section>
 
       <Section icon={<CalendarIcon className="size-5" />}>
@@ -382,10 +383,6 @@ function Fields({
       )}
     </div>
   );
-}
-
-function todayOf(timeZone: string): string {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone }).format(Date.now());
 }
 
 function Section({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -608,7 +605,7 @@ function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: Repeat
   const { formats } = useCalendar();
   const [kept] = useState(form.repeat === "kept");
   const [custom, setCustom] = useState(false);
-  const day = form.startDate || form.endDate || todayOf("UTC");
+  const day = form.startDate;
   const start: ItemTime = { type: "date", date: day };
   const repeat = form.repeat;
   const preset = PRESETS.find((p) => same(presetRepeat(p, day), repeat));
@@ -820,8 +817,9 @@ function Reminders({
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
   const task = form.kind === "task";
-  // A task's reminder is before its due when it has one (RFC 5545 §3.8.6.3: RELATED=END).
-  const relatedTo = task && form.endDate ? "end" : "start";
+  // A task is at its start, as the calendar shows it: its reminders count from
+  // there (design D159); one with only a due, from its due (RFC 5545 §3.6.6).
+  const relatedTo = task && form.startless && form.endDate ? "end" : "start";
   const options = { allDay: form.allDay, task };
   const wordsOf = (choice: AlarmChoice) =>
     alarmWords(

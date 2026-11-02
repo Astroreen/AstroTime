@@ -128,7 +128,7 @@ export function TasksScreen({
     star: (row) =>
       editing.rewrite(targetOfRow(row), (current) => starTask(current, !row.starred, Date.now())),
     open: (row) => editing.open(targetOfRow(row)),
-    add: (list) => editing.create("task", { day: null, calendarId: list.id }),
+    add: (list) => editing.create("task", { day: today, allDay: true, calendarId: list.id }),
     found,
     today,
     now,

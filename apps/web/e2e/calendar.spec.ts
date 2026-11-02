@@ -46,14 +46,16 @@ test.describe("each view draws the demo data", () => {
     ).toHaveCount(0);
   });
 
-  test("3 days: today and the two after it, a start–due task as a block", async ({ page }) => {
+  test("3 days: today and the two after it, a start–due task as a chip at its start", async ({
+    page,
+  }) => {
     await openDemo(page, "3days");
     await expect(header(page, "Wednesday, November 4")).toBeVisible();
     await expect(header(page, "Friday, November 6")).toBeVisible();
     await expect(header(page, "Tuesday, November 3")).toHaveCount(0);
     await expect(
       day(page, "Thursday, November 5").getByRole("listitem", {
-        name: "Task: Write the proposal, 10:00 AM – 12:00 PM",
+        name: "Task: Write the proposal, 10:00 AM",
       }),
     ).toBeVisible();
     await expect(

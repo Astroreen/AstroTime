@@ -35,7 +35,7 @@ import {
   type Store,
 } from "@astrotime/storage";
 
-import { addDays } from "./dates.ts";
+import { addDays, daysBetween } from "./dates.ts";
 import { rightsOf } from "./rights.ts";
 
 /** An item opened from a view, a search or the tasks screen: one occurrence of a stored object. */
@@ -64,9 +64,19 @@ export interface Form {
   readonly kind: "event" | "task";
   readonly calendarId: string;
   readonly summary: string;
+  /** A task's start and due alike (design D159). */
   readonly allDay: boolean;
-  /** `YYYY-MM-DD`; a task's is `""` when it has no start. */
+  /**
+   * `YYYY-MM-DD`. A task always has one (design D159): one opened without a
+   * start shows its due's, or today's without either, written only with a
+   * change of its times (foundation D7).
+   */
   readonly startDate: string;
+  /**
+   * A task opened without a start (design D160): the form shows one, its
+   * due's (following it) or today's, and writes none until the user sets it.
+   */
+  readonly startless?: boolean;
   /** `HH:MM`. */
   readonly startTime: string;
   /** An event's last day (inclusive) or end date; a task's due date, `""` for none. */
@@ -88,11 +98,10 @@ export interface Form {
   /** The categories, comma-separated. */
   readonly categories: string;
   /**
-   * While creating, an event switched to a task: whether it was all day, how
-   * many days after its start it ended, and at what time; switched back, it
-   * has them again.
+   * While creating, an event switched to a task: how many days after its
+   * start it ended, and at what time; switched back, it has them again.
    */
-  readonly asEvent?: { readonly allDay: boolean; readonly days: number; readonly endTime: string };
+  readonly asEvent?: { readonly days: number; readonly endTime: string };
 }
 
 /** The form's view of a wall clock: its date and its `HH:MM`. */
@@ -115,29 +124,41 @@ function zoneOf(times: ItemTimes, timeZone: string): { zone: string | null; utc:
 
 /** Times as the form shows them in `zone`: dates and clocks, an all-day event's end its last day. */
 function formTimes(kind: "event" | "task", times: ItemTimes, zone: string | null) {
-  const allDay = (times.start ?? times.end)?.type === "date";
+  const first = times.start ?? times.end;
+  // A task with neither a start nor a due is a day's, as one made today (design D159).
+  const allDay = first ? first.type === "date" : kind === "task";
   const start = times.start ? split(times.start, zone) : { date: "", time: "" };
   let end = times.end ? split(times.end, zone) : { date: "", time: "" };
+  // A task's due date after a timed start (another client's) shows at the
+  // start's time on its day, so a new start moves it by whole days (design D160).
+  if (kind === "task" && !allDay && end.date && !end.time) end = { ...end, time: start.time };
   // An all-day event's DTEND is the day after its last; the form shows the last.
   if (kind === "event" && allDay && times.end) end = { date: addDays(end.date, -1), time: "" };
   return { allDay, start, end };
 }
 
-/** The form for an item opened: the occurrence's times, the item's fields. */
-export function formOf(target: Target, timeZone: string): Form {
+/**
+ * The form for an item opened: the occurrence's times, the item's fields. A
+ * task without a start starts at its due, or today without one (design
+ * D159); the form holds it from the first, so it is written only when the
+ * user changes the times (foundation D7).
+ */
+export function formOf(target: Target, timeZone: string, today: string): Form {
   const { item, object } = target;
   const times = timesOf(object, target.recurrenceId);
   const { zone, utc } = zoneOf(times, timeZone);
   const { allDay, start, end } = formTimes(item.kind, times, zone);
   const rule = repeatOf(object);
   const task = item.kind === "task" ? item : null;
+  const from = task && !start.date ? (end.date ? end : { date: today, time: "" }) : start;
   return {
     kind: item.kind,
     calendarId: target.calendarId,
     summary: item.summary ?? "",
     allDay,
-    startDate: start.date,
-    startTime: start.time || "09:00",
+    startDate: from.date,
+    startTime: from.time || "09:00",
+    ...(task && !start.date ? { startless: true } : {}),
     endDate: end.date,
     endTime: end.time || "10:00",
     zone,
@@ -157,41 +178,41 @@ export function formOf(target: Target, timeZone: string): Form {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
- * A new item's form, as Google prefills it: an event on `day` from the next
- * half hour after `minutes` (or at `at`, a tapped slot), an hour long (or
- * `length` minutes, a press dragged over the grid); a task due on `day`,
- * all day, or undated without one.
+ * A new item's form, as Google prefills it: on `day` from the next half
+ * hour after `minutes` (or at `at`, a tapped slot), or all day; an event an
+ * hour long (or `length` minutes, a press dragged over the grid), a task
+ * at that start with no due (design D159).
  */
 export function newForm(
   kind: "event" | "task",
   options: {
     readonly calendarId: string;
-    readonly day: string | null;
-    /** Minutes past midnight now; the event starts at the next half hour. */
+    readonly day: string;
+    /** Minutes past midnight now; the item starts at the next half hour. */
     readonly minutes: number;
-    /** Minutes past midnight of a tapped slot: the event starts there. */
+    /** Minutes past midnight of a tapped slot: the item starts there. */
     readonly at?: number;
     /** Minutes the event lasts; an hour by default. */
     readonly length?: number;
+    /** On the day, with no time: the tasks screen's new task. */
+    readonly allDay?: boolean;
     readonly timeZone: string;
   },
 ): Form {
+  const allDay = options.allDay ?? false;
   const startMinutes = options.at ?? Math.ceil((options.minutes + 1) / 30) * 30;
-  const day = options.day ?? "";
-  const startDay = addDays(day || "2000-01-01", Math.floor(startMinutes / 1440));
+  const startDay = allDay ? options.day : addDays(options.day, Math.floor(startMinutes / 1440));
   const endMinutes = startMinutes + (options.length ?? 60);
-  const endDay = addDays(day || "2000-01-01", Math.floor(endMinutes / 1440));
-  const clock = (m: number) => `${pad(Math.floor((m % 1440) / 60))}:${pad(m % 60)}`;
-  const event = kind === "event";
+  const endDay = allDay ? options.day : addDays(options.day, Math.floor(endMinutes / 1440));
   return {
     kind,
     calendarId: options.calendarId,
     summary: "",
-    allDay: !event,
-    startDate: event ? startDay : "",
-    startTime: clock(startMinutes),
-    endDate: event ? endDay : day,
-    endTime: clock(endMinutes),
+    allDay,
+    startDate: startDay,
+    startTime: clockOf(startMinutes),
+    endDate: kind === "event" ? endDay : "",
+    endTime: clockOf(endMinutes),
     zone: options.timeZone,
     utc: false,
     repeat: null,
@@ -206,53 +227,34 @@ export function newForm(
   };
 }
 
-/** The form switched to the other kind while creating: the same day and title. */
+/**
+ * The form switched to the other kind while creating: the same title, start
+ * and all-day state (design D159). A task has no due to begin with; the
+ * event it was keeps its days and end time, and has them again switched
+ * back (D143). A task made an event otherwise lasts an hour, or its one day.
+ */
 export function switchKind(form: Form, kind: "event" | "task"): Form {
   if (form.kind === kind) return form;
   if (kind === "task") {
-    const days =
-      form.startDate && form.endDate
-        ? Math.round(
-            (Date.parse(`${form.endDate}T00:00:00Z`) - Date.parse(`${form.startDate}T00:00:00Z`)) /
-              86_400_000,
-          )
-        : 0;
-    return {
-      ...form,
-      kind,
-      allDay: true,
-      endDate: form.startDate || form.endDate,
-      startDate: "",
-      asEvent: { allDay: form.allDay, days, endTime: form.endTime },
-    };
+    const days = form.endDate ? daysBetween(form.startDate, form.endDate) : 0;
+    return { ...form, kind, endDate: "", asEvent: { days, endTime: form.endTime } };
   }
-  const day = form.endDate || form.startDate;
   const { asEvent, ...task } = form;
-  // The event it was, on the task's day, as long as it was.
+  const event: Form = { ...task, kind };
   if (asEvent) {
-    return {
-      ...task,
-      kind,
-      allDay: asEvent.allDay,
-      startDate: day,
-      endDate: addDays(day, asEvent.days),
+    const back = {
+      ...event,
+      endDate: addDays(form.startDate, asEvent.days),
       endTime: asEvent.endTime,
     };
+    // An end the start has passed meanwhile is the start's hour, as a new event's.
+    if (form.allDay || back.endDate > back.startDate || back.endTime >= back.startTime) return back;
   }
-  // A task made an event is rebuilt on its one day: an end after the start
-  // is that day's; one before it was the next day's (an event over
-  // midnight); one at it, no length, becomes an hour, as a new event's.
-  if (form.endTime > form.startTime) {
-    return { ...form, kind, allDay: false, startDate: day, endDate: day };
-  }
-  const past = form.endTime < form.startTime;
-  const end = past ? minutesOf(form.endTime) + 1440 : minutesOf(form.startTime) + 60;
+  if (form.allDay) return { ...event, endDate: form.startDate };
+  const end = minutesOf(form.startTime) + 60;
   return {
-    ...form,
-    kind,
-    allDay: false,
-    startDate: day,
-    endDate: addDays(day, Math.floor(end / 1440)),
+    ...event,
+    endDate: addDays(form.startDate, Math.floor(end / 1440)),
     endTime: clockOf(end),
   };
 }
@@ -263,16 +265,13 @@ const clockOf = (minutes: number) =>
 
 /**
  * A new start time: a timed event keeps its length, as Google moves its end
- * with it, over midnight too (design D108).
+ * with it, over midnight too (design D108); a task's due moves with its
+ * start the same way (design D159).
  */
-export function withStartTime(form: Form, startTime: string): Form {
-  if (form.kind !== "event" || form.allDay || !form.startDate || !form.endDate) {
-    return { ...form, startTime };
-  }
-  const days = Math.round(
-    (Date.parse(`${form.endDate}T00:00:00Z`) - Date.parse(`${form.startDate}T00:00:00Z`)) /
-      86_400_000,
-  );
+export function withStartTime(given: Form, startTime: string): Form {
+  const form = started(given);
+  if (form.allDay || !form.startDate || !form.endDate) return { ...form, startTime };
+  const days = daysBetween(form.startDate, form.endDate);
   const length = days * 1440 + minutesOf(form.endTime) - minutesOf(form.startTime);
   // No length (no DTEND) is a length too: the end moves with the start.
   if (length < 0) return { ...form, startTime };
@@ -285,17 +284,65 @@ export function withStartTime(form: Form, startTime: string): Form {
   };
 }
 
-/** The start date moved: an event keeps its length in days. */
-export function withStartDate(form: Form, startDate: string): Form {
-  if (form.kind !== "event" || !form.startDate || !form.endDate) return { ...form, startDate };
-  const days = Math.round(
-    (Date.parse(`${form.endDate}T00:00:00Z`) - Date.parse(`${form.startDate}T00:00:00Z`)) /
-      86_400_000,
-  );
-  return { ...form, startDate, endDate: addDays(startDate, days) };
+/** The start date moved: an event keeps its length in days, a task its due as many days after. */
+export function withStartDate(given: Form, startDate: string): Form {
+  const form = started(given);
+  if (!form.startDate || !form.endDate) return { ...form, startDate };
+  return {
+    ...form,
+    startDate,
+    endDate: addDays(startDate, daysBetween(form.startDate, form.endDate)),
+  };
 }
 
-/** The day an item's occurrences are counted from: its start, or a task's due without one. */
+/**
+ * A task's due set or cleared (design D159): set, on its start's day, an
+ * hour after its start when it has a time (the next day's past midnight).
+ */
+export function withDue(form: Form, due: boolean): Form {
+  // A task without a start keeps the one shown once its due goes: it needs a time.
+  if (!due) return { ...started(form), endDate: "" };
+  if (form.allDay) return withDueAt(form, { endDate: form.startDate });
+  const end = minutesOf(form.startTime) + 60;
+  return withDueAt(form, {
+    endDate: addDays(form.startDate, Math.floor(end / 1440)),
+    endTime: clockOf(end),
+  });
+}
+
+/**
+ * A task's due day or time changed; one without a start shows its start
+ * there too, as the calendar will show it (design D160).
+ */
+export function withDueAt(form: Form, due: { endDate?: string; endTime?: string }): Form {
+  const next = { ...form, ...due };
+  return next.startless ? { ...next, startDate: next.endDate, startTime: next.endTime } : next;
+}
+
+/**
+ * The reminders changed. A task with no time written gets its start shown
+ * written with a new reminder, which counts from it (RFC 5545 §3.6.6 wants
+ * a `DTSTART` for `RELATED=START`; design D160).
+ */
+export function withAlarms(form: Form, alarms: readonly AlarmChoice[]): Form {
+  const added = alarms.some((alarm) => alarm.kind === "new");
+  const timeless = form.startless && !form.endDate;
+  return { ...(added && timeless ? started(form) : form), alarms };
+}
+
+/** All day or not, the start's and the due's alike: the start shown is written from then on (design D160). */
+export function withAllDay(form: Form, allDay: boolean): Form {
+  return { ...started(form), allDay };
+}
+
+/** The form with its start set by the user: written from now on (design D160). */
+function started(form: Form): Form {
+  if (!form.startless) return form;
+  const { startless: _, ...rest } = form;
+  return rest;
+}
+
+/** The day an item's occurrences are counted from: its start (a task always has one, design D159). */
 const anchorDay = (form: Form) => form.startDate || form.endDate;
 
 /** A rule moved with its item from day `from` to day `to`, as `@astrotime/core` moves the RRULE (D105). */
@@ -336,7 +383,7 @@ export function timesOfForm(form: Form): ItemTimes {
     };
   }
   return {
-    start: form.startDate ? timeOf(form, form.startDate, form.startTime) : null,
+    start: form.startDate && !form.startless ? timeOf(form, form.startDate, form.startTime) : null,
     end: form.endDate ? timeOf(form, form.endDate, form.endTime) : null,
   };
 }
@@ -358,7 +405,7 @@ function compare(a: ItemTime, b: ItemTime): number {
  * starts.
  */
 export function problemOf(form: Form, initial: Form | null = null): Problem | null {
-  if (form.kind === "event" && (!form.startDate || !form.endDate)) return "noDate";
+  if (!form.startDate || (form.kind === "event" && !form.endDate)) return "noDate";
   const { start, end } = timesOfForm(form);
   if (start && end && form.kind === "event") {
     const length = compare(end, start);
@@ -413,13 +460,15 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   if (differs("location") && (was || form.location.trim())) changes.location = form.location.trim();
   if (differs("description") && (was || form.description.trim()))
     changes.description = form.description.trim();
-  // The clock matters only for a timed item; an undated new task has no time at all.
+  // The clock matters only for a timed item; a new item always has a start (design D159).
   const timeChanged = was
     ? was.allDay !== form.allDay ||
+      // A start shown, now to be written (design D160).
+      Boolean(was.startless) !== Boolean(form.startless) ||
       was.startDate !== form.startDate ||
       was.endDate !== form.endDate ||
       (!form.allDay && (was.startTime !== form.startTime || was.endTime !== form.endTime))
-    : form.kind === "event" || form.startDate !== "" || form.endDate !== "";
+    : true;
   if (timeChanged) changes.time = timesOfForm(form);
   // A rule only moved with the item's day is the core's to move (D105).
   if (form.repeat !== "kept" && (was ? ruleChanged(was, form) : form.repeat)) {

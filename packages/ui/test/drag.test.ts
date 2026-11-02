@@ -288,20 +288,27 @@ describe("what a drop gives an event", () => {
   });
 });
 
-describe("what a drop gives a task (foundation D16)", () => {
-  test("a chip moves its due; a start on a date goes with it by the days it moved", () => {
+describe("what a drop gives a task (foundation D16, design D159)", () => {
+  test("a task with only a due moves its due; a chip has no ends to resize", () => {
     const report = task(null, zoned("2026-11-04T15:00:00"));
     expect(moved(report, "move", 120, timeZone)).toEqual({
       start: null,
       end: zoned("2026-11-04T17:00:00"),
     });
-    const dated = task(date("2026-11-02"), zoned("2026-11-04T15:00:00"));
-    expect(moved(dated, "move", 24 * 60 + 60, timeZone)).toEqual({
-      start: date("2026-11-03"),
-      end: zoned("2026-11-05T16:00:00"),
-    });
-    // A chip has no ends to resize.
     expect(moved(report, "end", 30, timeZone)).toBeNull();
+  });
+
+  test("a task on a day moves its due by the days it moved, a timed due by as long", () => {
+    const dated = task(date("2026-11-02"), date("2026-11-04"));
+    expect(moved(dated, "move", 24 * 60, timeZone)).toEqual({
+      start: date("2026-11-03"),
+      end: date("2026-11-05"),
+    });
+    const mixed = task(date("2026-11-02"), zoned("2026-11-04T15:00:00"));
+    expect(moved(mixed, "move", 2 * 24 * 60, timeZone)).toEqual({
+      start: date("2026-11-04"),
+      end: zoned("2026-11-06T15:00:00"),
+    });
   });
 
   test("a chip of a task with only a start moves its start", () => {
@@ -312,20 +319,92 @@ describe("what a drop gives a task (foundation D16)", () => {
     });
   });
 
-  test("a start–due block moves both; either end resizes", () => {
+  test("a task with a start and a due is a chip at its start: moved, its due goes with it; never resized", () => {
     const proposal = task(zoned("2026-11-05T10:00:00"), zoned("2026-11-05T12:00:00"));
     expect(walls(moved(proposal, "move", 60, timeZone))).toEqual([
       "2026-11-05T11:00:00",
       "2026-11-05T13:00:00",
     ]);
-    expect(walls(moved(proposal, "end", 30, timeZone))).toEqual([
-      "2026-11-05T10:00:00",
-      "2026-11-05T12:30:00",
+    expect(moved(proposal, "end", 30, timeZone)).toBeNull();
+    expect(moved(proposal, "start", -45, timeZone)).toBeNull();
+    // A due date moves by the days the start moved, not by the minutes.
+    const essay = task(zoned("2026-11-05T00:15:00"), date("2026-11-07"));
+    expect(moved(essay, "move", -30, timeZone)).toEqual({
+      start: zoned("2026-11-04T23:45:00"),
+      end: date("2026-11-06"),
+    });
+  });
+
+  test("across the night the clocks go back, start and due move on the wall clock, a due date by days", () => {
+    // Vilnius goes from 04:00 back to 03:00 on Sunday, October 25, 2026.
+    const essay = task(zoned("2026-10-24T09:00:00"), zoned("2026-10-26T17:00:00"));
+    expect(walls(moved(essay, "move", 24 * 60, timeZone))).toEqual([
+      "2026-10-25T09:00:00",
+      "2026-10-27T17:00:00",
     ]);
-    expect(walls(moved(proposal, "start", -45, timeZone))).toEqual([
-      "2026-11-05T09:15:00",
-      "2026-11-05T12:00:00",
+    expect(walls(moved(essay, "move", 30, timeZone))).toEqual([
+      "2026-10-24T09:30:00",
+      "2026-10-26T17:30:00",
     ]);
+    const late = task(zoned("2026-10-24T23:30:00"), date("2026-10-26"));
+    expect(moved(late, "move", 60, timeZone)).toEqual({
+      start: zoned("2026-10-25T00:30:00"),
+      end: date("2026-10-27"),
+    });
+    // Into the strip on the day of the change and back: the due on its day as many days after.
+    const strip = dropped(
+      essay,
+      "move",
+      { day: "2026-10-24", minutes: 9 * 60 },
+      { day: "2026-10-25", minutes: null },
+      timeZone,
+    );
+    expect(strip).toEqual({ start: date("2026-10-25"), end: date("2026-10-27") });
+    expect(
+      walls(
+        dropped(
+          task(strip!.start, strip!.end),
+          "move",
+          { day: "2026-10-25", minutes: null },
+          { day: "2026-10-24", minutes: 9 * 60 },
+          timeZone,
+        ),
+      ),
+    ).toEqual(["2026-10-24T09:00:00", "2026-10-26T09:00:00"]);
+    // A task over days in the strip dropped onto the grid on the day of the change.
+    expect(
+      walls(
+        dropped(
+          task(date("2026-10-23"), date("2026-10-26")),
+          "move",
+          { day: "2026-10-23", minutes: null },
+          { day: "2026-10-25", minutes: 9 * 60 },
+          timeZone,
+        ),
+      ),
+    ).toEqual(["2026-10-25T09:00:00", "2026-10-28T09:00:00"]);
+  });
+
+  test("a task with a start and a due into the strip and back keeps its due as many days after", () => {
+    const essay = task(zoned("2026-11-04T09:00:00"), zoned("2026-11-06T17:00:00"));
+    expect(
+      dropped(
+        essay,
+        "move",
+        { day: "2026-11-04", minutes: 9 * 60 },
+        { day: "2026-11-05", minutes: null },
+        timeZone,
+      ),
+    ).toEqual({ start: date("2026-11-05"), end: date("2026-11-07") });
+    expect(
+      dropped(
+        task(date("2026-11-05"), date("2026-11-07")),
+        "move",
+        { day: "2026-11-05", minutes: null },
+        { day: "2026-11-05", minutes: 10 * 60 },
+        timeZone,
+      ),
+    ).toEqual({ start: zoned("2026-11-05T10:00:00"), end: zoned("2026-11-07T10:00:00") });
   });
 
   test("a task due on a day moves in the strip; into the grid it is due at the slot, out of it due that day", () => {

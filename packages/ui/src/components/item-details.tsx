@@ -358,8 +358,10 @@ const dayIn = (time: ItemTime, timeZone: string) =>
   time.type === "date" ? time.date : wallClockOf(time, timeZone).slice(0, 10);
 
 /**
- * "Wednesday, November 4 · 10:00 – 11:30", "November 4 – 6", "Due Thursday,
- * November 5, 15:00": the details' line, and what a move announces (design D112).
+ * "Wednesday, November 4 · 10:00 – 11:30", "November 4 – 6", a task's
+ * "Wednesday, November 4, 15:00 · Due Thursday, November 5" (its start as
+ * the calendar shows it, design D159): the details' line, and what a move
+ * announces (design D112).
  */
 export function whenText(
   task: Task | null,
@@ -368,15 +370,15 @@ export function whenText(
   { t, formats, timeZone }: { t: TFunction; formats: Formats; timeZone: string },
 ): string {
   const year = new Date().getFullYear().toString();
-  // A task's dates follow "Due", "Starts": not capitalized.
-  const at = (time: ItemTime) =>
+  // A task's due follows "Due": not capitalized.
+  const at = (time: ItemTime, capital = true) =>
     time.type === "date"
-      ? formats.longDate(time.date, year, false)
-      : `${formats.longDate(dayIn(time, timeZone), year, false)}, ${formats.time(time, timeZone)}`;
+      ? formats.longDate(time.date, year, capital)
+      : `${formats.longDate(dayIn(time, timeZone), year, capital)}, ${formats.time(time, timeZone)}`;
   if (task) {
     const parts = [];
-    if (times.start) parts.push(t("details.starts", { time: at(times.start) }));
-    if (times.end) parts.push(t("details.due", { time: at(times.end) }));
+    if (times.start) parts.push(at(times.start));
+    if (times.end) parts.push(t("details.due", { time: at(times.end, false) }));
     return parts.join(" · ");
   }
   const { start, end } = times;

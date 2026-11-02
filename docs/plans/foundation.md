@@ -105,10 +105,13 @@ logic worth borrowing.
   only when it starts at least the other's title room (45 minutes) later;
   starting together or sooner, they take columns side by side.
 - **D16. Where a task goes.**
+  _Changed in round 3 ([design D159](design.md#D159)): a task is a chip at
+  its start, whatever its due; `DTSTART` and `DUE` are no longer a block._
   - Only `DUE` with a time: a chip at the due time (drawn about
     30 minutes tall); dragging it moves `DUE`.
-  - `DTSTART` and `DUE`: a block from start to due, like an event; resizing
-    moves either end.
+  - `DTSTART` (with or without `DUE`): a chip at the start, or the all-day
+    strip of its day for a date; dragging it moves both. It was: a block
+    from start to due, like an event; resizing moved either end.
   - `DUE` with a date only: the all-day strip of that day.
   - No date: the tasks screen only (design D52).
   - _Built in PR 6b:_ a chip drags its time; either end of a start–due
@@ -603,10 +606,12 @@ Decided while building the layout engine, ahead of PR 5's screens.
     too), or covering a whole day of the user's wall clock, goes to the
     all-day strip, as Google shows a three-day conference;
   - a task's due date is its last day (an event's `DTEND` date is the day
-    after its last);
-  - a task is a chip when it has a timed due and no timed start (a date
-    start included), or a timed start and no due; the chip sits on the day
-    of that time only, the occurrence's own time in a series (until PR 6b
+    after its last), though it shows on its start's day only;
+  - a task shows at its start, or its due without one, on that day only:
+    a chip at a time, in the strip for a date, whatever its due
+    ([design D159](design.md#D159); it was a chip for a timed due with no
+    timed start, or a timed start with no due, and a block from a timed
+    start to a due), the occurrence's own time in a series (until PR 6b
     a series' chips took the first one's and showed on its day only);
   - an occurrence that does not show on the day it is laid out for is left
     out;
@@ -1428,16 +1433,22 @@ Decided while building PR 6b.
     §3.3.5), and the end keeps its wall clock, as every move's does; only
     where that would leave it at or before the moved start (an item no
     longer than the skipped hour) it keeps the elapsed length instead.
-  - **A chip** ([D16](#D16)) moves its due, or its start when it has no due;
-    a task's start on a date goes with its due by the days the chip moved,
-    so it is never due before it starts.
+  - **A task** ([D16](#D16), [design D159](design.md#D159)) moves its
+    start, and its due with it by as long (a due date by the days the
+    start moved), so it is never due before it starts; one with only a
+    due moves its due. _Until round 3:_ a chip moved its due, or its start
+    when it had no due, and a start–due block moved and resized as an
+    event's.
   - **A resize** moves one end of a block, kept at least 15 minutes from
     the other and within its own day (an end at most the next midnight).
   - **Into the all-day strip** an event becomes all day on that day (its
-    `DTEND` the day after) and a task due that day (a start the same day);
+    `DTEND` the day after) and a task starts on that day, due as many days
+    after it as before (_until round 3:_ due that day too), its due's time
+    of day gone with its start's ([design Deferred](design.md#deferred));
     **out of it onto the grid**, an all-day item starts at the slot in the
-    user's zone, an hour long (a task with only a due is due there), and a
-    timed item over a day or more keeps its length.
+    user's zone, an hour long (a task starts there, due as many days after
+    at that time; one with only a due is due there), and a timed item over
+    a day or more keeps its length.
   - **The Month and the strip** move by days, keeping times.
   - Times that would not change write nothing. The scope asked follows
     `scopesFor`'s rule (`scopesForTimes`): the rule stays, so a new day for

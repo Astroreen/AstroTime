@@ -97,16 +97,33 @@ export interface Held {
 }
 
 /**
- * The time a task's chip shows on the time grid (foundation D16, D42): its
- * due, when timed and the task has no timed start, or its start when timed
- * and the task has no due; `null` for anything else.
+ * The time a task's chip shows at on the time grid (foundation D16, D42,
+ * design D159): its start when timed, or its due when timed and it has no
+ * start; `null` for anything else.
  */
 function chipOf(held: Held): "start" | "end" | null {
   if (held.kind !== "task") return null;
   const { start, end: due } = held.times;
-  if (due && due.type !== "date" && (start === null || start.type === "date")) return "end";
-  if (!due && start && start.type !== "date") return "start";
-  return null;
+  const shown = start ?? due;
+  if (!shown || shown.type === "date") return null;
+  return start ? "start" : "end";
+}
+
+/** The day of the user's wall clock a time is on. */
+const dayOf = (time: ItemTime, timeZone: string) =>
+  time.type === "date" ? time.date : wallClockOf(time, timeZone).slice(0, 10);
+
+/** A task's due moved as its start moved from `from` to `to`: by as long, a due date by the days. */
+function dueWith(
+  due: ItemTime | null,
+  from: ItemTime,
+  to: ItemTime,
+  minutes: number,
+  timeZone: string,
+): ItemTime | null {
+  if (!due) return null;
+  if (due.type !== "date") return shifted(due, minutes, timeZone);
+  return shifted(due, daysBetween(dayOf(from, timeZone), dayOf(to, timeZone)) * DAY, timeZone);
 }
 
 /** Whether an item is all day: its first time is a date (an all-day event, a task due on a day). */
@@ -158,9 +175,10 @@ function endDay(wall: string): string {
 /**
  * The item moved by `minutes` of the wall clock (foundation D113): both ends
  * of a block, so it keeps the length the grid draws, even onto a day the
- * clocks change; a chip's time, and a task's start on a date with it by the
- * days the chip moved. With `grip` an end, that end only, kept at least
- * `SNAP` from the other and within its own day, as the grid draws it.
+ * clocks change; a task's start, and its due with it (design D159), by as
+ * long (a date by the days it moved); a task with only a due, its due. With
+ * `grip` an end, a block's end only, kept at least `SNAP` from the other and
+ * within its own day, as the grid draws it.
  * Returns `null` when nothing changes.
  */
 export function moved(held: Held, grip: Grip, minutes: number, timeZone: string): ItemTimes | null {
@@ -187,8 +205,9 @@ export function moved(held: Held, grip: Grip, minutes: number, timeZone: string)
       wallClockOf(due, timeZone).slice(0, 10),
     );
     next = { start: start && shifted(start, days * DAY, timeZone), end: due };
-  } else if (chip === "start") {
-    next = { start: shifted(start!, minutes, timeZone), end };
+  } else if (held.kind === "task" && start) {
+    const s = shifted(start, minutes, timeZone);
+    next = { start: s, end: dueWith(end, start, s, minutes, timeZone) };
   } else {
     const s = start && shifted(start, minutes, timeZone);
     let e = end && shifted(end, minutes, timeZone);
@@ -223,9 +242,11 @@ function sameTimes(a: ItemTimes, b: ItemTimes): boolean {
  * - on the time grid, moved by the slots and days between them, or an
  *   end resized by the slots;
  * - in the all-day strip or the Month, moved by the days, keeping its time;
- * - from the grid into the strip, all day on that day (a task due that day);
- * - from the strip onto the grid, at that slot, an hour long (a task with
- *   only a due, due there); an item longer than a day keeps its length.
+ * - from the grid into the strip, all day on that day (a task's due on the
+ *   day as many days after);
+ * - from the strip onto the grid, at that slot, an hour long (a task starts
+ *   there, its due as many days after, at that time; one with only a due is
+ *   due there); an item longer than a day keeps its length.
  */
 export function dropped(
   held: Held,
@@ -251,10 +272,12 @@ export function dropped(
 function allDayOn(held: Held, day: string, timeZone: string): ItemTimes | null {
   const date = (d: string): ItemTime => ({ type: "date", date: d });
   const { start, end } = held.times;
+  const days = (time: ItemTime) =>
+    daysBetween(dayOf(start ?? time, timeZone), dayOf(time, timeZone));
   const next =
     held.kind === "event"
       ? { start: date(day), end: date(addDays(day, daysCovered(start, end, timeZone))) }
-      : { start: start && date(day), end: end && date(day) };
+      : { start: start && date(day), end: end && date(addDays(day, days(end))) };
   return sameTimes(next, held.times) ? null : next;
 }
 
@@ -289,9 +312,11 @@ function timedAt(
   const time = (w: string) => zonedTime(w, timeZone);
   const later = plus(wall, DROPPED_LENGTH);
   if (held.kind === "event") return { start: time(wall), end: time(later) };
-  return start && end
-    ? { start: time(wall), end: time(later) }
-    : { start: start && time(wall), end: end && time(wall) };
+  const days = (due: ItemTime) => daysBetween(dayOf(start ?? due, timeZone), dayOf(due, timeZone));
+  return {
+    start: start && time(wall),
+    end: end && time(plus(wall, days(end) * DAY)),
+  };
 }
 
 /**

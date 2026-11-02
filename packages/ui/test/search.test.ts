@@ -21,19 +21,23 @@ function result(lines: string) {
 }
 
 describe("when a search result is", () => {
-  test("a task that starts on one day and is due on another reads as its due", () => {
+  test("a task reads as the calendar shows it: at its start, however far its due (design D159)", () => {
     const task = result(
       "DTSTART;TZID=Europe/Vilnius:20261103T090000\r\nDUE;TZID=Europe/Vilnius:20261105T120000\r\n",
     );
     const when = resultWhen(task, { noDate: "No date", formats, timeZone, today: "2026-11-01" });
-    expect(when).toBe(`${formats.day("2026-11-05", "2026-11-01")}, 12:00 PM`);
+    expect(when).toBe(`${formats.day("2026-11-03", "2026-11-01")}, 9:00 AM`);
   });
 
-  test("a task due on a date reads as that day, whatever its start", () => {
-    const task = result(
-      "DTSTART;TZID=Europe/Vilnius:20261103T090000\r\nDUE;VALUE=DATE:20261105\r\n",
+  test("a task with only a due reads as its due; one on a day as that day", () => {
+    const at = (props: string) =>
+      resultWhen(result(props), { noDate: "No date", formats, timeZone, today: "2026-11-01" });
+    expect(at("DUE;TZID=Europe/Vilnius:20261105T120000\r\n")).toBe(
+      `${formats.day("2026-11-05", "2026-11-01")}, 12:00 PM`,
     );
-    const when = resultWhen(task, { noDate: "No date", formats, timeZone, today: "2026-11-01" });
-    expect(when).toBe(formats.day("2026-11-05", "2026-11-01"));
+    expect(at("DUE;VALUE=DATE:20261105\r\n")).toBe(formats.day("2026-11-05", "2026-11-01"));
+    expect(at("DTSTART;VALUE=DATE:20261103\r\nDUE;VALUE=DATE:20261105\r\n")).toBe(
+      formats.day("2026-11-03", "2026-11-01"),
+    );
   });
 });

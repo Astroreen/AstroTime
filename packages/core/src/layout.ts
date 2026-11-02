@@ -10,7 +10,7 @@ const DAY_MINUTES = 24 * 60;
 export interface LayoutOptions {
   /** The IANA zone the calendar is shown in. */
   readonly timeZone: string;
-  /** How tall a task with only a due time is drawn (D16). */
+  /** How tall a task is drawn at its time (D16, design D159). */
   readonly chipMinutes?: number;
   /** The shortest a block is drawn, so a 5-minute event can still be hit. */
   readonly minBlockMinutes?: number;
@@ -29,7 +29,7 @@ export interface LayoutOptions {
 /** A timed item placed in one day's column. */
 export interface Placed {
   readonly occurrence: Occurrence;
-  /** `chip`: a task with only a due time; `block`: anything with a length. */
+  /** `chip`: a task at its time; `block`: anything with a length. */
   readonly shape: "block" | "chip";
   /** Minutes from the day's midnight; clipped to the day. */
   readonly top: number;
@@ -73,33 +73,26 @@ function daysBetween(a: string, b: string): number {
 }
 
 /**
- * Where a task's chip sits, or `null` when the task is not a chip (D16,
- * D42): a timed due with no timed start to span from, or a timed start
- * with no due at all. The occurrence's own time, not the item's: a series'
- * occurrences share the master's item.
+ * Where a task shows (D16, D42, design D159): at its start, or at its due
+ * when it has no start, whatever its due; `null` for an event. The
+ * occurrence's own time, not the item's: a series' occurrences share the
+ * master's item. A task with neither has no occurrence.
  */
-function chipTime(occurrence: Occurrence): ItemTime | null {
-  const { item } = occurrence;
-  if (item.kind !== "task") return null;
-  const { start, due } = item;
-  if (due && due.type !== "date" && (start === null || start.type === "date")) {
-    return occurrence.end;
-  }
-  if (!due && start && start.type !== "date") return occurrence.start;
-  return null;
+function taskAt(occurrence: Occurrence): ItemTime | null {
+  return occurrence.item.kind === "task" ? occurrence.start : null;
 }
 
 /**
  * Whether an occurrence belongs to the all-day strip: an all-day item (a
- * date, a task due on a date) or a timed one lasting a whole day or more,
- * as Google shows a 3-day conference (D42).
+ * date, a task on a day) or a timed event lasting a whole day or more, as
+ * Google shows a 3-day conference (D42). A task with a time is a chip at
+ * that time, however far its due.
  */
 export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
-  const { item, start, end } = occurrence;
-  // One rule for tasks first, so a date start with a timed due is a chip, not a bar.
-  if (chipTime(occurrence)) return false;
+  const { start, end } = occurrence;
+  const at = taskAt(occurrence);
+  if (at) return at.type === "date";
   if (start.type === "date") return true;
-  if (item.kind === "task" && item.due?.type === "date") return true;
   // A day or more of time, or a whole day of the user's wall clock (midnight
   // to midnight is a day even when DST makes it 23 hours).
   if (minutesBetween(start, end, timeZone) >= DAY_MINUTES) return true;
@@ -110,17 +103,18 @@ export function isAllDay(occurrence: Occurrence, timeZone: string): boolean {
 }
 
 /**
- * The first and last day an occurrence shows on in the user's zone: a task's
- * chip on the day of its time only, anything else from the day it starts to
- * the day it ends (an end at midnight belongs to the day before).
+ * The first and last day an occurrence shows on in the user's zone: a task
+ * on the day of its start (its due without one) only, anything else from
+ * the day it starts to the day it ends (an end at midnight belongs to the
+ * day before).
  */
 export function dayRange(
   occurrence: Occurrence,
   timeZone: string,
 ): { first: string; last: string } {
-  const at = chipTime(occurrence);
+  const at = taskAt(occurrence);
   if (at) {
-    const day = wallClockOf(at, timeZone).slice(0, 10);
+    const day = at.type === "date" ? at.date : wallClockOf(at, timeZone).slice(0, 10);
     return { first: day, last: day };
   }
   return daysOf(occurrence, timeZone);
@@ -139,6 +133,12 @@ function daysOf(occurrence: Occurrence, timeZone: string): { first: string; last
   return { first, last };
 }
 
+/** How long an occurrence is drawn: a task as a chip (design D159), anything else its length. */
+function shownMinutes(occurrence: Occurrence, timeZone: string): number {
+  if (occurrence.item.kind === "task") return occurrence.start.type === "date" ? DAY_MINUTES : 30;
+  return minutesBetween(occurrence.start, occurrence.end, timeZone);
+}
+
 /**
  * How long an item lasts: elapsed time when both ends are instants (so a
  * day across a DST change is 23 or 25 hours), wall-clock time otherwise.
@@ -153,7 +153,7 @@ function minutesBetween(start: ItemTime, end: ItemTime, timeZone: string): numbe
 /**
  * One day's layout. `occurrences` are usually the day's, as
  * `occurrencesBetween` returns them for this one day; anything that does not
- * show on `day` (a chip due another day, an item outside it) is left out.
+ * show on `day` (a task that starts another day, an item outside it) is left out.
  */
 export function layoutDay(
   occurrences: readonly Occurrence[],
@@ -173,11 +173,11 @@ export function layoutDay(
 
   for (const occurrence of occurrences) {
     if (isAllDay(occurrence, timeZone)) {
-      const { first, last } = daysOf(occurrence, timeZone);
+      const { first, last } = dayRange(occurrence, timeZone);
       if (first <= day && day <= last) allDay.push(occurrence);
       continue;
     }
-    const at = chipTime(occurrence);
+    const at = taskAt(occurrence);
     const chip = at !== null;
     const s = wallClockOf(at ?? occurrence.start, timeZone);
     const e = wallClockOf(at ?? occurrence.end, timeZone);
@@ -239,7 +239,7 @@ function sortAllDay(occurrences: Occurrence[], timeZone: string): Occurrence[] {
   return sortByKey(
     occurrences,
     (o) => ({
-      length: minutesBetween(o.start, o.end, timeZone),
+      length: shownMinutes(o, timeZone),
       event: o.item.kind === "event",
       title: o.item.summary ?? "",
     }),
@@ -351,8 +351,8 @@ function sortTimed(occurrences: Occurrence[], timeZone: string): Occurrence[] {
   return sortByKey(
     occurrences,
     (o) => ({
-      start: wallClockOf(chipTime(o) ?? o.start, timeZone),
-      length: minutesBetween(o.start, o.end, timeZone),
+      start: wallClockOf(o.start, timeZone),
+      length: shownMinutes(o, timeZone),
       title: o.item.summary ?? "",
     }),
     (a, b) => compare(a.start, b.start) || b.length - a.length || compare(a.title, b.title),

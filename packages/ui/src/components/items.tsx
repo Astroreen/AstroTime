@@ -50,13 +50,13 @@ function Opener({
   );
 }
 
-/** When an item is: "All day", its time, or its start and end. */
+/** When an item is: "All day", its time (a task's start, design D159), or its start and end. */
 function useItemTime(): (entry: Entry, allDay: boolean) => string {
   const { t, formats, timeZone } = useCalendar();
   return (entry, allDay) => {
-    const { start, end } = entry.occurrence;
+    const { item, start, end } = entry.occurrence;
     if (allDay) return t("grid.allDay");
-    return wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
+    return item.kind === "task" || wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
       ? formats.time(start, timeZone)
       : formats.timeRange(start, end, timeZone);
   };
