@@ -350,16 +350,18 @@ the project.
     weekday, every year, "Custom…": every n days, weeks, months or years,
     the weekdays, the month's day or weekday, and the end: never, on a day,
     after n times; another client's rule beyond these is kept as written
-    until another is chosen); the reminders (before a timed item: at the
-    start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days, a week; for
-    an all-day item: on the day, a day, two days and a week before, at
-    9:00); the calendar, from those that hold the item's component and
-    take new items, or for an existing item its own, and others only when
-    its own lets it be deleted (a move is a creation there and a deletion
-    here, [foundation D106](foundation.md#D106)); the colour, the calendar's or one of nine CSS names; the
-    location; the description. A new start keeps the event's length, and a
-    task's due as far after it ([D159](#D159)); a new start date moves its
-    end, and the rule with it ([foundation D105](foundation.md#D105)). An end
+    until another is chosen); the reminders ([D206](#D206)'s menu, the four
+    most added and "Custom…"; _until round 4_ a fixed list: before a timed
+    item at the start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days,
+    a week; for an all-day item on the day, a day, two days and a week
+    before, at 9:00); the calendar, from those that hold the item's
+    component and take new items, or for an existing item its own, and
+    others only when its own lets it be deleted (a move is a creation there
+    and a deletion here, [foundation D106](foundation.md#D106)); the colour,
+    the calendar's or one of nine CSS names; the location; the
+    description. A new start keeps the event's length, and a task's due
+    as far after it ([D159](#D159)); a new start date moves its end, and
+    the rule with it ([foundation D105](foundation.md#D105)). An end
     before the start, a due before the start or a repeat ending before the
     item is refused, in words;
   - **creating**: the "+" button makes an event on the day shown from the
@@ -1348,7 +1350,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
 
 ### Decided in round 4: the editor
 
-The owner's feedback after round 3 on the edit dialog: its icons.
+The owner's feedback after round 3 on the edit dialog: its icons and its
+reminders.
 
 - **D205. Each row's icon is level with the middle of its control** (the
   owner's feedback 12 after round 3: "Some icons are not centred with their
@@ -1363,6 +1366,52 @@ The owner's feedback after round 3 on the edit dialog: its icons.
   stood 10 px from its row's top, beside the label of a labelled field.
   `editing.spec.ts` measures each icon against its control on a phone and a
   wide screen.
+
+- **D206. Reminders of the user's own; the menu offers the four most added**
+  (the owner's feedback 2 after round 3: "Reminders must be dynamic. I want a
+  reminder 2 weeks before and one 4 days before … add an option to create
+  your own reminder. The dropdown stays; its list now shows up to 4 of the
+  most used reminders"). It replaces [D108](#D108)'s fixed list of ten (and
+  four for an all-day item).
+  - **The menu** ("Add a reminder", [D167](#D167)) offers at most four,
+    then "Custom…": those this device's user added most, a tie the latest
+    added first; then Google's defaults (10 and 30 minutes, an hour, a day
+    before a timed item; on the day, a day, two days and a week before an
+    all-day one, at 9:00), then more of the old list, so four are offered
+    while the item has some of them; none the item already has. Timed and
+    all-day items count apart. A reminder the item has that the menu does
+    not offer still shows in its list above the menu, chosen, as before.
+  - **"Custom…"** opens a small picker under the menu, as Google's custom
+    notification: an amount (0–999) and a unit, minutes, hours, days or
+    weeks before a timed item; days or weeks before an all-day item's day,
+    at a time of the day (the quarters of [D108](#D108)'s time list). It
+    reads the reminder in words as it is set ("2 weeks before at 9:00"),
+    adds it with "Add" or Enter (Enter there does not save the item, nor
+    one that ends an input method's composition), and closes with
+    "Cancel". One the item has already is not added twice: the picker says
+    so and "Add" waits; so it does while the amount is empty (it can be
+    emptied to type another). 0 is the start itself, or the day. In Russian it reads "Напомнить за [2] [недели]",
+    so the units are in the accusative. Several per item, as before.
+  - **What is written:** a `VALARM` as [foundation D103](foundation.md#D103)
+    writes one added, a relative `TRIGGER` (`-P2W`, `-P13DT15H` for two
+    weeks before an all-day day at 9:00); the item's other alarms, another
+    client's included, stay byte for byte ([foundation D7](foundation.md#D7)).
+  - **Where "most added" comes from: the reminder tally on this device**
+    (`calendar/alarms.ts`, the preference `astrotime.alarmTally`): each
+    reminder added in the edit dialog counts once the item is saved (the
+    dialog closes from saving; a refusal leaves it open and counts
+    nothing), under the kind of item it was added to (a timed reminder
+    added before "All day" was switched on stays a timed one); the 24 most
+    added of each kind are kept, and one added now always is: the least
+    added of the others makes room for it. The dialog reads the tally as it opens. A
+    task's reminder before its due (`RELATED=END`, [D159](#D159)) counts
+    with those before a start: the menu words both "… before" and adds
+    them to the time the item counts from. Not the store's
+    alarms: counting those reads and parses every object with a `VALARM`
+    at each opening, which D118's big calendar makes slow, and it would
+    count what other clients add by default (Nextcloud's, Thunderbird's)
+    as the user's choice. A new device starts from the defaults
+    ([Deferred](#deferred)).
 
 ### Decided in round 4: attachments
 
@@ -1380,6 +1429,13 @@ The owner's feedback after round 3 on the edit dialog: its icons.
   The demo's "Budget planning" carries one of each.
 
 ## Deferred
+
+- **The reminder tally across devices** — [D206](#D206)'s "most added"
+  is counted per device; a new device offers the defaults until the user
+  adds some there. Counting from the store's alarms (the user's own items
+  only, made or edited in AstroTime) would follow the user everywhere; it
+  needs a cheap read of the alarms (a column or table filled as objects are
+  saved) so the edit dialog does not parse every object.
 
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
   RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no

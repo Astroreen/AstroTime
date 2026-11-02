@@ -250,9 +250,12 @@ test.describe("the screens and dialogs", () => {
         await edit.getByRole("button", { name: "Add a reminder" }).click();
         await expect(page.getByRole("menu")).toBeVisible();
         await audit(page, "the edit dialog's reminder menu");
-        await page.keyboard.press("Escape");
-        await expect(page.getByRole("menu")).toHaveCount(0);
-        await expect(edit).toBeVisible();
+        // A reminder of the user's own (design D206).
+        await page.getByRole("menuitem", { name: "Custom…" }).click();
+        await expect(edit.getByRole("group", { name: "Custom reminder" })).toBeVisible();
+        await audit(page, "the edit dialog's custom reminder");
+        await edit.getByRole("button", { name: "Cancel" }).click();
+        await expect(edit.getByRole("group", { name: "Custom reminder" })).toHaveCount(0);
         await edit.getByRole("textbox", { name: "Title" }).fill("Stand-up!");
         await edit.getByRole("button", { name: "Save" }).click();
         await expect(page.getByRole("alertdialog", { name: "Edit recurring event" })).toBeVisible();

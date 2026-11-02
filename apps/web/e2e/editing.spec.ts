@@ -113,6 +113,140 @@ for (const [size, viewport] of [
   });
 }
 
+test("the reminder menu offers four, the most added first; Custom… adds any amount before (design D206)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Visa appointment");
+  // Nothing added on this device yet: Google's defaults.
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "10 minutes before",
+    "30 minutes before",
+    "1 hour before",
+    "1 day before",
+    "Custom…",
+  ]);
+  await page.getByRole("menuitem", { name: "Custom…" }).click();
+  const custom = dialog.getByRole("group", { name: "Custom reminder" });
+  await custom.getByRole("spinbutton", { name: "How many" }).fill("2");
+  await choose(custom.getByRole("combobox", { name: "Unit" }), "weeks");
+  await expect(custom.getByText("2 weeks before", { exact: true })).toBeVisible();
+  await custom.getByRole("button", { name: "Add" }).click();
+  await expect(custom).toHaveCount(0);
+  // Another, by Enter in the amount: it adds, it does not save the item.
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await page.getByRole("menuitem", { name: "Custom…" }).click();
+  await custom.getByRole("spinbutton", { name: "How many" }).fill("4");
+  await choose(custom.getByRole("combobox", { name: "Unit" }), "days");
+  await custom.getByRole("spinbutton", { name: "How many" }).press("Enter");
+  await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveText([
+    "2 weeks before",
+    "4 days before",
+  ]);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await opener(page, "Wednesday, November 4", /^Visa appointment, /).click();
+  const details = page.getByRole("dialog", { name: "Visa appointment" });
+  await expect(details.getByText("2 weeks before", { exact: true })).toBeVisible();
+  await expect(details.getByText("4 days before", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // The next item, after a reload, offers what this device adds, the latest of a tie first.
+  await page.reload();
+  await expect(opener(page, "Wednesday, November 4", /^Design review, /)).toBeVisible();
+  await page.getByRole("button", { name: "Create" }).click();
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "4 days before",
+    "2 weeks before",
+    "10 minutes before",
+    "30 minutes before",
+    "Custom…",
+  ]);
+  await page.keyboard.press("Escape");
+  // An all-day item: days or weeks before, at a time of the day.
+  await dialog.getByRole("switch", { name: "All day" }).click();
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await page.getByRole("menuitem", { name: "Custom…" }).click();
+  await custom.getByRole("spinbutton", { name: "How many" }).fill("2");
+  await choose(custom.getByRole("combobox", { name: "Unit" }), "weeks");
+  await choose(custom.getByRole("combobox", { name: "Time" }), "6:30 PM");
+  await custom.getByRole("button", { name: "Add" }).click();
+  await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveText([
+    "2 weeks before at 6:30 PM",
+  ]);
+  // One the item has already is not added twice, and the picker says so.
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await page.getByRole("menuitem", { name: "Custom…" }).click();
+  await custom.getByRole("spinbutton", { name: "How many" }).fill("2");
+  await choose(custom.getByRole("combobox", { name: "Unit" }), "weeks");
+  await choose(custom.getByRole("combobox", { name: "Time" }), "6:30 PM");
+  await expect(custom.getByText("The item already has this reminder")).toBeVisible();
+  await expect(custom.getByRole("button", { name: "Add" })).toBeDisabled();
+  await custom.getByRole("spinbutton", { name: "How many" }).press("Enter");
+  await expect(custom).toBeVisible();
+  await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveCount(
+    1,
+  );
+});
+
+test("the tally counts a saved item's reminders only, each under the kind it was added to (design D206)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  const custom = dialog.getByRole("group", { name: "Custom reminder" });
+  const offers = async (items: readonly string[]) => {
+    await dialog.getByRole("button", { name: "Add a reminder" }).click();
+    await expect(page.getByRole("menuitem")).toHaveText([...items, "Custom…"]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  };
+  const addCustom = async (amount: string, unit: string) => {
+    await dialog.getByRole("button", { name: "Add a reminder" }).click();
+    await page.getByRole("menuitem", { name: "Custom…" }).click();
+    const field = custom.getByRole("spinbutton", { name: "How many" });
+    // Emptied, it stays empty while the next amount is typed; nothing to add yet.
+    await field.fill("");
+    await expect(field).toHaveValue("");
+    await expect(custom.getByText("Type how many")).toBeVisible();
+    await expect(custom.getByRole("button", { name: "Add" })).toBeDisabled();
+    await field.fill(amount);
+    await choose(custom.getByRole("combobox", { name: "Unit" }), unit);
+    await custom.getByRole("button", { name: "Add" }).click();
+  };
+  const defaults = ["10 minutes before", "30 minutes before", "1 hour before", "1 day before"];
+
+  // A save refused (the end before the start) and the dialog closed: nothing counted.
+  await page.getByRole("button", { name: "Create" }).click();
+  await addCustom("5", "hours");
+  await dialog.getByLabel("End date").fill("2026-11-03");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("The end must be after the start.");
+  await dialog.getByRole("button", { name: "Close without saving" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Create" }).click();
+  await offers(defaults);
+
+  // Added to a timed item, then "All day" switched on and saved: a timed reminder still.
+  await addCustom("3", "hours");
+  await dialog.getByRole("switch", { name: "All day" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Create" }).click();
+  await offers(["3 hours before", ...defaults.slice(0, 3)]);
+  await dialog.getByRole("switch", { name: "All day" }).click();
+  await offers([
+    "On the day at 9:00 AM",
+    "1 day before at 9:00 AM",
+    "2 days before at 9:00 AM",
+    "1 week before at 9:00 AM",
+  ]);
+});
+
 test("Enter in the title saves; a tap on an empty slot of the grid creates there", async ({
   page,
 }) => {
