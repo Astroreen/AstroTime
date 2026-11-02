@@ -1735,15 +1735,19 @@ reminders, its description and mentions in it.
     Radicale answers it with nobody; a server that refuses the report
     finds no one. `peopleOf` (`@astrotime/sync`) asks with the account's
     credentials; offline or refused, it finds no one, and a mention can
-    still be typed. Tested on recorded answers of Nextcloud 34 and
-    Radicale 3.8 (`packages/caldav/test/fixtures`), and end to end on
-    Radicale with Nextcloud's answer served for that one report.
+    still be typed. Tested on recorded answers of Nextcloud 34 (the test
+    user, who has no e-mail) and Radicale 3.8, and on one written by hand
+    for the e-mail, group and room paths, in the shape Sabre documents
+    (`packages/caldav/test/fixtures`); end to end on Radicale with that
+    answer served for the one report.
   - **What is written:** a Markdown link to the person's e-mail,
-    `[@Anna Berg](mailto:anna@example.com)` (every mark Markdown reads in
-    a link's words escaped in the name, so it reads back as it is), which
-    reads as plain text in
+    `[@Anna Berg](mailto:anna@example.com)` (in the name only what would
+    change a link's words escaped: brackets, a backslash, `*`, `_`, a
+    backtick, `~`, `<`; a hyphen or a full stop stays as typed, so it reads
+    so in other clients), which reads as plain text in
     Nextcloud's apps and others and keeps who was meant (in the address a
-    space, a bracket, `%`, `<`, `>`, a quote or a backslash percent-encoded,
+    space, a bracket, `%`, `<`, `>`, a quote, a backslash, `?` or `#`
+    percent-encoded,
     so the link stays whole; read back decoded, or as written when it does
     not decode); someone with no e-mail is written `@Name`. A mention invites no one and sends nothing:
     no `ATTENDEE` is written ([D108](#D108): AstroTime does not invite).

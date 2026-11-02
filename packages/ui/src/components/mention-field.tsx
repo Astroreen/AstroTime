@@ -27,11 +27,12 @@ interface Query {
 
 /**
  * An e-mail as a link's address: what would end it or break it (a space,
- * brackets, "%", "<", ">", a quote) percent-encoded; the rest as written,
+ * brackets, "%", "<", ">", a quote, a backslash; "?" and "#", which start a
+ * query or a fragment) percent-encoded; the rest as written,
  * so it reads in other clients.
  */
 export function addressOf(email: string): string {
-  return email.replace(/[\s%()<>"[\]\\]/g, (char) =>
+  return email.replace(/[\s%()<>"[\]\\?#]/g, (char) =>
     [...new TextEncoder().encode(char)]
       .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
       .join(""),
@@ -40,8 +41,10 @@ export function addressOf(email: string): string {
 
 /** How a person picked is written into the description. */
 export function mentionOf(person: Person): string {
-  // Every mark Markdown reads in a link's words is escaped: the name reads as written.
-  const name = person.name.replace(/[\\`*_{}[\]()#+\-.!~<>|]/g, "\\$&");
+  // Only what would change a link's words is escaped (brackets, a backslash,
+  // emphasis, code, a tag): the name reads as written here and, with as few
+  // backslashes as can be, in clients that show the text as it is.
+  const name = person.name.replace(/[[\]\\*_`~<]/g, "\\$&");
   return person.email ? `[@${name}](mailto:${addressOf(person.email)})` : `@${name}`;
 }
 

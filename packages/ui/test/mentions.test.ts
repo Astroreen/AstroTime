@@ -35,9 +35,9 @@ test("an address that does not decode is read as written, not thrown on", () => 
 });
 
 test("an e-mail written as a link's address keeps the Markdown whole and reads back the same", () => {
-  const email = 'odd (name) 100%"x"@example.com';
+  const email = 'odd (name) 100%"x"?#@example.com';
   const address = addressOf(email);
-  expect(address).toBe("odd%20%28name%29%20100%25%22x%22@example.com");
+  expect(address).toBe("odd%20%28name%29%20100%25%22x%22%3F%23@example.com");
   expect(addressOf("anna@example.com")).toBe("anna@example.com");
   const [paragraph] = parseMarkdown(`Ask [@Odd](mailto:${address}) now`);
   const link = (paragraph as unknown as { children: unknown[] }).children[1] as {
@@ -50,6 +50,10 @@ test("an e-mail written as a link's address keeps the Markdown whole and reads b
 
 test("a name with Markdown's marks is written escaped and reads back as it is", () => {
   const person = { name: "A*b_c `d` ~~e~~ <f> [g] \\h #1.", email: "a@example.com" };
+  // What does not change a link's words is not escaped: it reads as typed in Nextcloud.
+  expect(mentionOf({ name: "Anna-Marie O'Neil (Jr.) #2!", email: "a@example.com" })).toBe(
+    "[@Anna-Marie O'Neil (Jr.) #2!](mailto:a@example.com)",
+  );
   const [paragraph] = parseMarkdown(`Ask ${mentionOf(person)}`);
   const link = (paragraph as unknown as { children: unknown[] }).children[1] as {
     href: string;
