@@ -154,7 +154,9 @@ test("the reminder menu offers four, the most added first; Custom… adds any am
   await expect(details.getByText("4 days before", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // The next item offers what this device adds, the latest of a tie first.
+  // The next item, after a reload, offers what this device adds, the latest of a tie first.
+  await page.reload();
+  await expect(opener(page, "Wednesday, November 4", /^Design review, /)).toBeVisible();
   await page.getByRole("button", { name: "Create" }).click();
   await dialog.getByRole("button", { name: "Add a reminder" }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
@@ -176,6 +178,19 @@ test("the reminder menu offers four, the most added first; Custom… adds any am
   await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveText([
     "2 weeks before at 6:30 PM",
   ]);
+  // One the item has already is not added twice, and the picker says so.
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await page.getByRole("menuitem", { name: "Custom…" }).click();
+  await custom.getByRole("spinbutton", { name: "How many" }).fill("2");
+  await choose(custom.getByRole("combobox", { name: "Unit" }), "weeks");
+  await choose(custom.getByRole("combobox", { name: "Time" }), "6:30 PM");
+  await expect(custom.getByText("The item already has this reminder")).toBeVisible();
+  await expect(custom.getByRole("button", { name: "Add" })).toBeDisabled();
+  await custom.getByRole("spinbutton", { name: "How many" }).press("Enter");
+  await expect(custom).toBeVisible();
+  await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveCount(
+    1,
+  );
 });
 
 test("Enter in the title saves; a tap on an empty slot of the grid creates there", async ({

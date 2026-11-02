@@ -578,6 +578,7 @@ export const ru = {
   "alarm.custom.time": "Время",
   "alarm.custom.cancel": "Отмена",
   "alarm.custom.add": "Добавить",
+  "alarm.custom.had": "Это напоминание уже есть",
   "alarm.unit.minutes_one": "минуту",
   "alarm.unit.minutes_few": "минуты",
   "alarm.unit.minutes_many": "минут",

@@ -194,6 +194,12 @@ export function ItemEditor({
 }
 
 /**
+ * Whether the item was all day when each reminder was added to it: the
+ * kind it counts under (design D206), even if "All day" switched since.
+ */
+const addedAllDay = new WeakMap<AlarmChoice, boolean>();
+
+/**
  * Counts the reminders added to an item once it is saved (design D206): the
  * dialog closes from saving, not from a refusal, which leaves it open.
  */
@@ -208,8 +214,12 @@ function useAlarmCount(state: EditorState | null) {
     const saved = saving.current;
     saving.current = null;
     if (state === null && saved) {
-      const added = saved.alarms.flatMap((a) => (a.kind === "new" ? [a.offsetSeconds] : []));
-      countAlarms(platform.preferences, saved.allDay, added);
+      const added = saved.alarms.flatMap((a) =>
+        a.kind === "new"
+          ? [{ allDay: addedAllDay.get(a) ?? saved.allDay, offset: a.offsetSeconds }]
+          : [],
+      );
+      countAlarms(platform.preferences, added);
     }
   }, [state, platform]);
 }
@@ -824,6 +834,8 @@ function Reminders({
   const { formats, timeZone } = useCalendar();
   const { platform } = useAccounts();
   const [custom, setCustom] = useState(false);
+  // What this device added, read as the dialog opens: it does not change while open.
+  const [tally] = useState(() => readTally(platform.preferences.get(KEYS.alarmTally)));
   const task = form.kind === "task";
   // A task is at its start, as the calendar shows it: its reminders count from
   // there (design D159); one with only a due, from its due (RFC 5545 §3.6.6).
@@ -845,14 +857,14 @@ function Reminders({
       formats,
       timeZone,
     );
-  const add = (offsetSeconds: number) =>
-    onChange([...form.alarms, { kind: "new", relatedTo, offsetSeconds }]);
+  const add = (offsetSeconds: number) => {
+    const choice = { kind: "new", relatedTo, offsetSeconds } as const;
+    addedAllDay.set(choice, form.allDay);
+    onChange([...form.alarms, choice]);
+  };
+  const taken = offsetsOf(form.alarms);
   // The four most added on this device, then the defaults (design D206).
-  const offered = offeredAlarms(
-    readTally(platform.preferences.get(KEYS.alarmTally)),
-    form.allDay,
-    offsetsOf(form.alarms),
-  );
+  const offered = offeredAlarms(tally, form.allDay, taken);
   return (
     <>
       {form.alarms.length > 0 && (
@@ -888,9 +900,10 @@ function Reminders({
         <CustomReminder
           allDay={form.allDay}
           wordsOf={(offsetSeconds) => wordsOf({ kind: "new", relatedTo, offsetSeconds })}
+          taken={taken}
           onAdd={(offset) => {
             setCustom(false);
-            if (!offsetsOf(form.alarms).includes(offset)) add(offset);
+            add(offset);
           }}
           onCancel={() => setCustom(false)}
         />
@@ -907,11 +920,14 @@ function Reminders({
 function CustomReminder({
   allDay,
   wordsOf,
+  taken,
   onAdd,
   onCancel,
 }: {
   allDay: boolean;
   wordsOf: (offsetSeconds: number) => string;
+  /** The item's reminders: one of them is not added twice, and says so. */
+  taken: readonly number[];
   onAdd: (offsetSeconds: number) => void;
   onCancel: () => void;
 }) {
@@ -923,6 +939,8 @@ function CustomReminder({
   // A switch of "All day" meanwhile leaves a unit it has not: its first.
   const shown = (units as readonly AlarmUnit[]).includes(unit) ? unit : units[0];
   const offset = customOffset(amount, shown, allDay, time);
+  const had = taken.includes(offset);
+  const submit = () => !had && onAdd(offset);
   return (
     <div
       role="group"
@@ -944,10 +962,11 @@ function CustomReminder({
               setAmount(Math.min(MOST, Math.max(0, Math.round(Number(e.target.value) || 0))))
             }
             onKeyDown={(e) => {
-              // Enter adds the reminder, not saves the item.
-              if (e.key === "Enter") {
+              // Enter adds the reminder, not saves the item; not one that
+              // ends an input method's composition.
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onAdd(offset);
+                submit();
               }
             }}
             className={field}
@@ -974,12 +993,13 @@ function CustomReminder({
       )}
       <p aria-live="polite" className="text-body">
         {wordsOf(offset)}
+        {had && <span className="block text-small text-ink-muted">{t("alarm.custom.had")}</span>}
       </p>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={textButton}>
           {t("alarm.custom.cancel")}
         </button>
-        <button type="button" onClick={() => onAdd(offset)} className={primaryButton}>
+        <button type="button" disabled={had} onClick={submit} className={primaryButton}>
           {t("alarm.custom.add")}
         </button>
       </div>

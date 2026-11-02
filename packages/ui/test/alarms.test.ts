@@ -54,12 +54,22 @@ describe("offeredAlarms", () => {
 });
 
 describe("the tally", () => {
-  test("is kept in the preferences as items are saved", () => {
+  test("is kept in the preferences as items are saved, each under the kind it was added to", () => {
     const preferences = memoryPreferences();
-    countAlarms(preferences, true, [-14 * DAY + 9 * HOUR]);
-    countAlarms(preferences, false, []);
-    const tally = readTally(preferences.get(KEYS.alarmTally));
-    expect(tally).toEqual({ timed: [], allDay: [[-14 * DAY + 9 * HOUR, 1]] });
+    countAlarms(preferences, [{ allDay: true, offset: -14 * DAY + 9 * HOUR }]);
+    countAlarms(preferences, []);
+    // Added before "All day" switched on: a timed reminder still.
+    countAlarms(preferences, [
+      { allDay: false, offset: -10 * MINUTE },
+      { allDay: true, offset: -15 * HOUR },
+    ]);
+    expect(readTally(preferences.get(KEYS.alarmTally))).toEqual({
+      timed: [[-10 * MINUTE, 1]],
+      allDay: [
+        [-15 * HOUR, 1],
+        [-14 * DAY + 9 * HOUR, 1],
+      ],
+    });
   });
 
   test("anything unreadable counts nothing", () => {

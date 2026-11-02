@@ -10,7 +10,7 @@ const DAY = 86_400;
 const WEEK = 7 * DAY;
 
 /** How many the menu offers, besides "Custom…". */
-export const OFFERED = 4;
+const OFFERED = 4;
 /** How many offsets the tally keeps of each kind: the most added. */
 const KEPT = 24;
 
@@ -75,15 +75,22 @@ export function tallied(
   return { ...tally, [kind]: kept };
 }
 
-/** Counts the reminders an item was saved with in this device's preferences. */
+/**
+ * Counts the reminders an item was saved with in this device's preferences,
+ * each under the kind of item it was added to: an offset from an all-day
+ * item's midnight means another thing than one before a time.
+ */
 export function countAlarms(
   preferences: Preferences,
-  allDay: boolean,
-  offsets: readonly number[],
+  added: readonly { readonly allDay: boolean; readonly offset: number }[],
 ): void {
-  if (offsets.length === 0) return;
-  const tally = readTally(preferences.get(KEYS.alarmTally));
-  preferences.set(KEYS.alarmTally, JSON.stringify(tallied(tally, allDay, offsets)));
+  if (added.length === 0) return;
+  let tally = readTally(preferences.get(KEYS.alarmTally));
+  for (const allDay of [false, true]) {
+    const offsets = added.filter((a) => a.allDay === allDay).map((a) => a.offset);
+    if (offsets.length > 0) tally = tallied(tally, allDay, offsets);
+  }
+  preferences.set(KEYS.alarmTally, JSON.stringify(tally));
 }
 
 /**

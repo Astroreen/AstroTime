@@ -350,16 +350,18 @@ the project.
     weekday, every year, "Custom…": every n days, weeks, months or years,
     the weekdays, the month's day or weekday, and the end: never, on a day,
     after n times; another client's rule beyond these is kept as written
-    until another is chosen); the reminders (before a timed item: at the
-    start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days, a week; for
-    an all-day item: on the day, a day, two days and a week before, at
-    9:00; _since round 4_ the four most added and "Custom…", [D206](#D206)); the calendar, from those that hold the item's component and
-    take new items, or for an existing item its own, and others only when
-    its own lets it be deleted (a move is a creation there and a deletion
-    here, [foundation D106](foundation.md#D106)); the colour, the calendar's or one of nine CSS names; the
-    location; the description. A new start keeps the event's length, and a
-    task's due as far after it ([D159](#D159)); a new start date moves its
-    end, and the rule with it ([foundation D105](foundation.md#D105)). An end
+    until another is chosen); the reminders ([D206](#D206)'s menu, the four
+    most added and "Custom…"; _until round 4_ a fixed list: before a timed
+    item at the start, 5, 10, 15, 30 minutes, 1 and 2 hours, 1 and 2 days,
+    a week; for an all-day item on the day, a day, two days and a week
+    before, at 9:00); the calendar, from those that hold the item's
+    component and take new items, or for an existing item its own, and
+    others only when its own lets it be deleted (a move is a creation there
+    and a deletion here, [foundation D106](foundation.md#D106)); the colour,
+    the calendar's or one of nine CSS names; the location; the
+    description. A new start keeps the event's length, and a task's due
+    as far after it ([D159](#D159)); a new start date moves its end, and
+    the rule with it ([foundation D105](foundation.md#D105)). An end
     before the start, a due before the start or a repeat ending before the
     item is refused, in words;
   - **creating**: the "+" button makes an event on the day shown from the
@@ -1369,8 +1371,10 @@ reminders.
     weeks before a timed item; days or weeks before an all-day item's day,
     at a time of the day (the quarters of [D108](#D108)'s time list). It
     reads the reminder in words as it is set ("2 weeks before at 9:00"),
-    adds it with "Add" or Enter (Enter there does not save the item), and
-    closes with "Cancel". In Russian it reads "Напомнить за [2] [недели]",
+    adds it with "Add" or Enter (Enter there does not save the item, nor
+    one that ends an input method's composition), and closes with
+    "Cancel". One the item has already is not added twice: the picker says
+    so and "Add" waits. In Russian it reads "Напомнить за [2] [недели]",
     so the units are in the accusative. Several per item, as before.
   - **What is written:** a `VALARM` as [foundation D103](foundation.md#D103)
     writes one added, a relative `TRIGGER` (`-P2W`, `-P13DT15H` for two
@@ -1380,7 +1384,12 @@ reminders.
     (`calendar/alarms.ts`, the preference `astrotime.alarmTally`): each
     reminder added in the edit dialog counts once the item is saved (the
     dialog closes from saving; a refusal leaves it open and counts
-    nothing); the 24 most added of each kind are kept. Not the store's
+    nothing), under the kind of item it was added to (a timed reminder
+    added before "All day" was switched on stays a timed one); the 24 most
+    added of each kind are kept. The dialog reads the tally as it opens. A
+    task's reminder before its due (`RELATED=END`, [D159](#D159)) counts
+    with those before a start: the menu words both "… before" and adds
+    them to the time the item counts from. Not the store's
     alarms: counting those reads and parses every object with a `VALARM`
     at each opening, which D118's big calendar makes slow, and it would
     count what other clients add by default (Nextcloud's, Thunderbird's)
