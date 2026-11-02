@@ -17,6 +17,14 @@ const lunch = (page: Page) =>
     .getByRole("list", { name: "Wednesday, November 4" })
     .getByRole("listitem", { name: "Lunch with Marta, 1:00 – 2:00 PM" });
 const main = (page: Page) => page.locator("main");
+/**
+ * Ready to zoom: the pinch's code loaded (`data-zoomable`), which may be
+ * before the period is drawn, and the grid it zooms drawn.
+ */
+async function zoomable(page: Page) {
+  await expect(main(page)).toHaveAttribute("data-zoomable", "");
+  await expect(grid(page)).toBeVisible();
+}
 
 test.describe("on a wide screen", () => {
   test.use({ viewport: WIDE });
@@ -30,7 +38,7 @@ test.describe("on a wide screen", () => {
     // A 30-minute block at 56 px an hour has no room for its time line.
     await expect(standUp(page).getByText("9:00 – 9:30 AM")).toHaveCount(0);
     // The pinch's code, loaded once the view is drawn.
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const before = (await lunch(page).boundingBox())!;
     // On 1:00 PM itself, the line Lunch's top is drawn a pixel under.
     await page.mouse.move(before.x + 10, before.y - 1);
@@ -54,7 +62,7 @@ test.describe("on a wide screen", () => {
     page,
   }) => {
     await openDemo(page, "week");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     await page.keyboard.press("+");
     await expect(main(page)).toHaveCSS("--hour", "70px");
     for (let step = 0; step < 12; step++) await page.keyboard.press("+");
@@ -73,7 +81,7 @@ test.describe("on a phone", () => {
     page,
   }) => {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const middle = box.y + box.height / 2;
@@ -113,7 +121,7 @@ test.describe("on a phone", () => {
     page,
   }) => {
     await openDemo(page, "day");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const middle = box.y + box.height / 2;
@@ -146,7 +154,7 @@ test.describe("a pinch begun sideways (design D192)", () => {
     page,
   }) => {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const y = box.y + box.height / 2;
     const cdp = await page.context().newCDPSession(page);
@@ -188,7 +196,7 @@ test.describe("what is no zoom, and what ends one (design D192)", () => {
     page,
   }) => {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     await page.getByRole("button", { name: "Create" }).click();
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).press("+");
@@ -239,7 +247,7 @@ test.describe("fingers on a phone (design D192)", () => {
 
   async function setUp(page: Page) {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
