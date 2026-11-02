@@ -72,6 +72,10 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
+  - `Item.attachments`, `inlineFile` (`attachments.ts`) — an item's
+    `ATTACH`es: links and inline files, with name, type and size, kept as
+    written; `ItemChanges.attachments` removes and adds.
+    → `plans/foundation.md#D229`
   - `Item.geo`, `Item.placeLabel`, `Place`, `placeText` — a place's point
     (and Apple's name for it), read from `GEO` or
     Apple's structured location and written with a place picked on the
@@ -243,6 +247,9 @@ When you add a package, app or module, add its line here in the same PR.
       `item-picture.tsx`, whether an item has one and the details' header;
       `month-banner.tsx`, the Agenda's banner above a month.
       → `plans/design.md#D216`, `plans/design.md#D218`
+    - `attachments.tsx` — an item's attachments in its details: links
+      that open, inline files saved on demand (`Platform.saveFile` where
+      the platform saves files). → `plans/design.md#D230`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
       map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
@@ -265,6 +272,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `rights.ts` — `rightsOf`: what the user may do in a calendar, the
       one check of whether an item can be created, edited or deleted.
       → `plans/foundation.md#D37`
+    - `attachments.ts` — an attachment in words: where its link goes, its
+      kind and size. → `plans/design.md#D230`
     - `draft.ts` — the draft: the edit dialog's item as its form says,
       drawn into the views' entries (`draftOf`, `withDraft`).
       → `plans/design.md#D155`
@@ -357,6 +366,8 @@ When you add a package, app or module, add its line here in the same PR.
     `places.spec.ts` searches and picks a place on a phone and a wide
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
+    `attachments.spec.ts` lists an item's attachments in its details and
+    saves an inline one. → `plans/design.md#D230`;
     `shell.spec.ts` drives the wide calendar | tasks switch and what
     brings the calendar back. → `plans/design.md#D227`;
     `idle.spec.ts` counts React commits in the Month view across another
@@ -400,7 +411,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `AstroTimeShell` — the shell's own plugin
     (`android/app/src/main/java/io/github/astroreen/astrotime/shell/`): the
     system bars follow the theme the page shows; `src/shell.ts` is its
-    TypeScript side, with the back button. → `plans/android.md#D68`
+    TypeScript side, with the back button. → `plans/android.md#D68`;
+    `saveFile`, a file saved through the system's "Save to" picker.
+    → `plans/design.md#D230`
   - `src/webview.ts` — the WebView's Chromium version, checked before the
     store opens. → `plans/android.md#D61`
   - `src/reminders.ts` — `androidReminders`: reminders as local
@@ -439,7 +452,8 @@ When you add a package, app or module, add its line here in the same PR.
     (Radicale), HTTP's redirects, a private CA, credentials with a keyring
     of the test's own and without one (`keyringSession`), living in the
     background (`background.spec.ts`: one instance, the close, resume's
-    sync and reminder, the theme), Login Flow v2
+    sync and reminder, the theme), an inline attachment saved
+    (`attachments.spec.ts`, `plans/design.md#D230`), Login Flow v2
     against a Nextcloud (`ASTROTIME_NEXTCLOUD_*`), and the screenshots
     (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
   - `electron-builder.yml` — packaging: the AppImage and deb, the fuses,

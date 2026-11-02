@@ -31,7 +31,8 @@ export function DrawerContent({
   onSettings,
   create,
 }: {
-  view: View;
+  /** The view shown; none while the tasks screen takes its place (design D227). */
+  view: View | null;
   onView: (view: View) => void;
   accounts: readonly Account[];
   calendars: readonly Calendar[];

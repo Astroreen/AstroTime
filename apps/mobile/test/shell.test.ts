@@ -2,7 +2,7 @@
 // replaced: the back button, the bars' colour, the WebView's version.
 import { expect, test } from "vite-plus/test";
 
-import { backButton, hexOf, type NativeApp } from "../src/shell.ts";
+import { backButton, base64Of, hexOf, saveFile, type NativeApp } from "../src/shell.ts";
 import { chromiumVersion, MINIMUM_WEBVIEW } from "../src/webview.ts";
 
 /** `@capacitor/app` with a back button the test presses. */
@@ -64,4 +64,24 @@ test("the WebView's Chromium version comes from its user agent", () => {
     chromiumVersion("Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"),
   ).toBeNull();
   expect(MINIMUM_WEBVIEW).toBe(123);
+});
+
+test("a file is handed to the shell's picker in base64, a big one too (design D230)", async () => {
+  const asked: { name: string; type: string; data: string }[] = [];
+  const save = saveFile({
+    setBars: async () => {},
+    saveFile: async (options) => {
+      asked.push(options);
+      return { saved: true };
+    },
+  });
+  await save({
+    name: "figures.txt",
+    type: "text/plain",
+    bytes: new TextEncoder().encode("Q1: 12 000\n"),
+  });
+  expect(asked).toEqual([{ name: "figures.txt", type: "text/plain", data: "UTE6IDEyIDAwMAo=" }]);
+  // Past one piece of 32 KiB: every byte, in order.
+  const big = Uint8Array.from({ length: 100_000 }, (_, i) => i % 251);
+  expect(Uint8Array.from(atob(base64Of(big)), (c) => c.charCodeAt(0))).toEqual(big);
 });

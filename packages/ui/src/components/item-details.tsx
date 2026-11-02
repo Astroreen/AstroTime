@@ -1,6 +1,7 @@
 // An item's details (docs/plans/foundation.md#D14, D9, D10), as Google
 // Calendar shows them when an item is tapped: its colour, title, when it is
-// and how it repeats, where, its description with its links, its reminders,
+// and how it repeats, where, its description with its links, its
+// attachments (design D230), its reminders,
 // its guests (shown, never invited: no iTIP), its calendar; a task's due and
 // subtasks, with complete and, beside Edit, star (no status, priority, progress or tags,
 // design D162). Edit shows only where the calendar can be written; Delete,
@@ -30,6 +31,7 @@ import {
   StarIcon,
   SubtasksIcon,
 } from "./icons.tsx";
+import { AttachmentList, AttachmentsIcon } from "./attachments.tsx";
 import { DetailsPicture } from "./item-picture.tsx";
 import { PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
@@ -242,6 +244,11 @@ function Body({
           {item.description && (
             <Row icon={<NotesIcon className="size-5" />} label={t("edit.description")}>
               <span className="break-words whitespace-pre-wrap">{linkify(item.description)}</span>
+            </Row>
+          )}
+          {item.attachments.length > 0 && (
+            <Row icon={<AttachmentsIcon className="size-5" />} label={t("attachments.title")}>
+              <AttachmentList target={target} calendar={calendar} />
             </Row>
           )}
           {item.alarms.length > 0 && (

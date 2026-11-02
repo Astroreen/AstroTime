@@ -1,15 +1,23 @@
 // AstroTime's shell plugin (docs/plans/android.md#D68): the system bars
 // follow the theme the app shows, which the user may set apart from the
-// system's. The TypeScript side is apps/mobile/src/shell.ts.
+// system's; and a file the user keeps (an inline attachment, design D230) is
+// saved where they pick, through the system's "Save to" picker, which needs
+// no storage permission. The TypeScript side is apps/mobile/src/shell.ts.
 package io.github.astroreen.astrotime.shell
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
+import android.util.Base64
+import androidx.activity.result.ActivityResult
 import androidx.core.view.WindowCompat
+import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import java.util.concurrent.Executors
 
 @CapacitorPlugin(name = "AstroTimeShell")
 class ShellPlugin : Plugin() {
@@ -26,6 +34,67 @@ class ShellPlugin : Plugin() {
             call.resolve()
         }
     }
+
+    /** Asks where to save `data` (base64) as `name`, then writes it there; resolves `{ saved }`. */
+    @PluginMethod
+    fun saveFile(call: PluginCall) {
+        val name = call.getString("name")
+        val data = call.getString("data")
+        if (name.isNullOrBlank() || data == null) {
+            call.reject("saveFile needs `name` and `data`.", "invalid")
+            return
+        }
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = call.getString("type")?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        startActivityForResult(call, intent, "fileSaved")
+    }
+
+    @ActivityCallback
+    private fun fileSaved(call: PluginCall, result: ActivityResult) {
+        val target = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || target == null) {
+            call.resolve(JSObject().put("saved", false))
+            return
+        }
+        // Decoded and written off the main thread: a big file must not stall the UI.
+        writer.execute {
+            try {
+                val bytes = Base64.decode(call.getString("data") ?: "", Base64.DEFAULT)
+                write(target, bytes)
+                call.resolve(JSObject().put("saved", true))
+            } catch (error: Exception) {
+                call.reject("The file could not be written.", "write", error)
+            }
+        }
+    }
+
+    /**
+     * Writes `bytes` over what is at `target`: "wt" truncates a file the
+     * user picked to replace; a provider that refuses "wt" gets "w", and
+     * what was longer is cut through its file descriptor.
+     */
+    private fun write(target: android.net.Uri, bytes: ByteArray) {
+        val resolver = context.contentResolver
+        val truncating = runCatching { resolver.openOutputStream(target, "wt") }.getOrNull()
+        if (truncating != null) {
+            truncating.use { it.write(bytes) }
+            return
+        }
+        val descriptor = resolver.openFileDescriptor(target, "w")
+            ?: throw java.io.IOException("No file for $target")
+        descriptor.use {
+            java.io.FileOutputStream(it.fileDescriptor).use { stream ->
+                stream.channel.truncate(0)
+                stream.write(bytes)
+            }
+        }
+    }
+
+    /** One file written at a time, in the background. */
+    private val writer = Executors.newSingleThreadExecutor()
 }
 
 /** The bars' style the app asked for last, kept to be put back after a configuration change. */
