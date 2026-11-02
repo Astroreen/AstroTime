@@ -1365,6 +1365,20 @@ whole row".
   place. The code that moves them (`components/task-motion.ts`) is loaded
   with the tasks screen's first showing, not with the app (D145), and never
   when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
+- **D200. A little more motion** (the owner's item 13: "and much more you
+  can think of"), each small and in CSS where it can be: a star the user
+  lights pops (scaled to 1.35 and back in 300 ms), on the tasks screen and
+  in a task's details; one lit already when the screen opens, or lit by a
+  sync, does not (the pop answers a press: the button is marked when
+  pressed, and the pop runs when it shows lit). An item's details grow out
+  of the press that opened them: the popup's scale starts from where the row
+  or the item was pressed (on a phone too, from 0.9, where it only faded
+  before; from 0.95 on a wide screen, as before, now from the press); opened
+  by a key, they grow from their middle. The press is heard by the details'
+  own code, loaded later (D145), so the first load carries only the star's
+  pop. With D197's tick drawn in and a new task coming in from above, and
+  D198's burst, that is the tasks' motion; `prefers-reduced-motion` stops
+  all of it (`apps/web/e2e/details-motion.spec.ts`).
 
 ### Decided in round 4: the calendar views
 

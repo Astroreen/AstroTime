@@ -726,7 +726,11 @@ function TaskItem({
             disabled={readOnly}
             aria-pressed={row.starred}
             aria-label={t("tasks.star", { title })}
-            onClick={() => actions.star(row)}
+            onClick={(event) => {
+              // Its star pops when it lights, after this press (design D200).
+              event.currentTarget.dataset["pop"] = "";
+              actions.star(row);
+            }}
             className={`${roundButton} relative z-10 ${row.starred ? "text-accent" : "text-ink-muted"}`}
           >
             <StarIcon filled={row.starred} className="size-[22px]" />
