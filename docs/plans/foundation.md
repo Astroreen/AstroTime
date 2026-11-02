@@ -2070,9 +2070,15 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
     changed. The clock (`useNow`, the now-line and today) stops and ticks
     at once when shown. Measuring (`ResizeObserver`) waits by itself: a
     hidden page lays nothing out.
+  - Along the way, a render asks the browser less: the month asks whether
+    there is a mouse once, not in each of its tiles, and `useMediaQuery`
+    keeps one `MediaQueryList` per query instead of calling `matchMedia` on
+    every render (2 % of the owner's profile, [D181](#D181)).
   - Proved by `idle.spec.ts`: a hidden Month tab draws nothing for another
     tab's event and draws it once shown; ten minutes of a hidden tab's
-    timers do not move the now-line, which moves at once when shown.
+    timers do not move the now-line, which moves at once when shown; and by
+    `live.test.ts` (one read on show) and `now.browser.test.tsx` (no timer
+    while hidden).
 
 ## Deferred
 

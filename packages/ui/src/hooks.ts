@@ -14,17 +14,27 @@ import { nowIn } from "./calendar/dates.ts";
 import { documentVisibility, liveQuery, whileShown } from "./calendar/live.ts";
 import type { Entry, ObjectCache } from "./calendar/query.ts";
 
+/** Each media query asked, one list for the page: no `matchMedia` on a render. */
+const mediaQueries = new Map<
+  string,
+  { subscribe: (onChange: () => void) => () => void; matches: () => boolean }
+>();
+
 /** Whether a media query matches, kept up to date. */
 export function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const list = matchMedia(query);
-      list.addEventListener("change", onChange);
-      return () => list.removeEventListener("change", onChange);
-    },
-    () => matchMedia(query).matches,
-    () => false,
-  );
+  let known = mediaQueries.get(query);
+  if (!known) {
+    const list = matchMedia(query);
+    known = {
+      subscribe(onChange) {
+        list.addEventListener("change", onChange);
+        return () => list.removeEventListener("change", onChange);
+      },
+      matches: () => list.matches,
+    };
+    mediaQueries.set(query, known);
+  }
+  return useSyncExternalStore(known.subscribe, known.matches, () => false);
 }
 
 /**

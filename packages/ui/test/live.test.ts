@@ -40,8 +40,12 @@ function answered<T>() {
       await run.promise.catch(() => {});
     },
   });
+  let started = 0;
   return {
+    /** How many runs have started. */
+    started: () => started,
     run: () => {
+      started++;
       const run = Promise.withResolvers<T>();
       const next = waiting.shift();
       if (next) next(run);
@@ -165,4 +169,27 @@ test("while the page is hidden the store's changes wait, and come as one when it
   changed();
   show();
   expect([heard, listeners.size]).toEqual([2, 0]);
+});
+
+test("a live query on `whileShown` reads once when the page is shown, whatever changed while hidden (D182)", async () => {
+  const { store, changed } = changingStore();
+  const { page, show, hide } = fakePage();
+  const query = answered<number>();
+  const reported: number[] = [];
+  liveQuery(whileShown(store, page), query.run, (result) => reported.push(result));
+  await (await query.asked()).answer(1);
+  hide();
+  changed();
+  changed();
+  changed();
+  // Hidden: no read.
+  expect(query.started()).toBe(1);
+  show();
+  expect(query.started()).toBe(2);
+  await (await query.asked()).answer(2);
+  expect(reported).toEqual([1, 2]);
+  // Shown again with nothing changed: no read.
+  hide();
+  show();
+  expect(query.started()).toBe(2);
 });
