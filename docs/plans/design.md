@@ -293,7 +293,8 @@ the project.
   ([foundation D101](foundation.md#D101)); after it, on the desktop only
   (the `Platform`'s `shell`), "Keep running when the window is closed",
   on unless turned off, with a line saying how to quit while it is on
-  ([desktop D75](desktop.md#D75)).
+  ([desktop D75](desktop.md#D75)). _Since [D169](#D169):_ "Show week
+  numbers", after "Hide completed tasks".
 - **D97. Search, in detail** (D53): `Store.search` finds the objects whose
   title holds the text, in the visible calendars, at most 50, the latest
   start first. Migration 6 adds a `titles` column: every component's
@@ -866,7 +867,7 @@ I make it"; "sometimes an item's text is covered by another event".
   (`apps/web/e2e/calendar.spec.ts`; on the phone's views it failed before).
   D15, D42's cascade and D50 point here.
 
-For Settings, the colours and the lists controls open:
+**Settings, colours, dropdowns, accounts.**
 
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
@@ -891,6 +892,13 @@ For Settings, the colours and the lists controls open:
     time list and its reminder menu open, in both themes.
   - A choice may carry something before its name (`leading`), drawn in the
     list and on the button: the colour dropdown's dot.
+- **D169. Week numbers can be turned off** (feedback 10: "a setting whether
+  to show week numbers"). "Show week numbers", in Settings' views group
+  after "Hide completed tasks", on unless turned off: today's look stays
+  the default, as Google Calendar's web app and Nextcloud's show them. Off,
+  the week views' pill above the hour labels goes ([D49](#D49)) and the
+  Month's column of pills goes, its gap too ([D86](#D86)), so the days
+  start at the edge. One value with the other settings ([D96](#D96)).
 
 For the items' editor and details:
 

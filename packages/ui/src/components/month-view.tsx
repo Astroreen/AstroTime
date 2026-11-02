@@ -24,10 +24,11 @@ const NUMBER = 26;
 const ROW = 17;
 const GAP = 3;
 
-const columns: CSSProperties = {
-  gridTemplateColumns: "var(--weeks) repeat(7, minmax(0, 1fr))",
+/** The week numbers' column, unless they are turned off (design D169), then the days. */
+const columnsOf = (weekNumbers: boolean): CSSProperties => ({
+  gridTemplateColumns: `${weekNumbers ? "var(--weeks) " : ""}repeat(7, minmax(0, 1fr))`,
   gap: GAP,
-};
+});
 
 export interface MonthViewProps {
   /** The first day of the month shown. */
@@ -42,7 +43,7 @@ export interface MonthViewProps {
 
 export function MonthView(props: MonthViewProps) {
   const { weeks, today, onSwipe } = props;
-  const { formats } = useCalendar();
+  const { formats, weekNumbers } = useCalendar();
   const body = useRef<HTMLDivElement>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
   // How many rows of chips a tile fits: every tile is as tall, so the
@@ -99,8 +100,8 @@ export function MonthView(props: MonthViewProps) {
         data-view="month"
         className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
       >
-        <div aria-hidden="true" className="grid shrink-0 pb-1" style={columns}>
-          <span />
+        <div aria-hidden="true" className="grid shrink-0 pb-1" style={columnsOf(weekNumbers)}>
+          {weekNumbers && <span />}
           {weeks[0]?.days.map((day) => (
             <span
               key={day}
@@ -149,8 +150,10 @@ function Week({
   ghost: Ghost | null;
   tile: (day: string) => (element: HTMLElement | null) => void;
 }) {
-  const { t, formats, timeZone, colorOf } = useCalendar();
+  const { t, formats, timeZone, colorOf, weekNumbers } = useCalendar();
   const { shown, more } = foldWeek(week.spans, capacity);
+  // The first day's column: after the week's number, or the first (design D169).
+  const first = weekNumbers ? 2 : 1;
   const number = formats.weekNumber(week.days);
   // A drag's ghost over the days of this week it goes to, on the first row.
   const over = ghost?.kind === "item" ? dayRange(ghost.occurrence, timeZone) : null;
@@ -158,14 +161,16 @@ function Week({
     ? week.days.flatMap((day, i) => (over.first <= day && day <= over.last ? [i] : []))
     : [];
   return (
-    <div className="grid min-h-0" style={columns}>
-      <div
-        className="flex justify-center rounded-full bg-pill pt-1.5 text-note font-medium text-ink-muted tabular-nums"
-        style={{ gridColumn: 1, gridRow: 1 }}
-      >
-        <span aria-hidden="true">{number}</span>
-        <span className="sr-only">{t("grid.week", { number })}</span>
-      </div>
+    <div className="grid min-h-0" style={columnsOf(weekNumbers)}>
+      {weekNumbers && (
+        <div
+          className="flex justify-center rounded-full bg-pill pt-1.5 text-note font-medium text-ink-muted tabular-nums"
+          style={{ gridColumn: 1, gridRow: 1 }}
+        >
+          <span aria-hidden="true">{number}</span>
+          <span className="sr-only">{t("grid.week", { number })}</span>
+        </div>
+      )}
       {week.days.map((day, index) => (
         <DayTile
           key={day}
@@ -181,7 +186,7 @@ function Week({
           )}
           more={more.find((m) => m.index === index)?.count ?? 0}
           moreRow={Math.max(1, capacity) - 1}
-          column={index + 2}
+          column={index + first}
           tile={tile(day)}
         />
       ))}
@@ -189,7 +194,7 @@ function Week({
         <div
           className="pointer-events-none relative z-[3] min-w-0 self-start px-[1.5px]"
           style={{
-            gridColumn: `${covered[0]! + 2} / ${covered.at(-1)! + 3}`,
+            gridColumn: `${covered[0]! + first} / ${covered.at(-1)! + first + 1}`,
             gridRow: 1,
             marginTop: NUMBER,
             height: ROW - 1,

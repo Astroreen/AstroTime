@@ -80,7 +80,7 @@ export function CalendarScreen({
   const formats = useMemo(() => new Formats(settings), [settings]);
   const { today, minutes } = useNow(timeZone);
   const wide = useMediaQuery("(min-width: 1024px)");
-  const { hideCompleted } = useSettings().settings;
+  const { hideCompleted, weekNumbers } = useSettings().settings;
 
   const [view, setView] = usePreference<View>(
     preferences,
@@ -369,7 +369,9 @@ export function CalendarScreen({
   );
 
   return (
-    <CalendarContext.Provider value={{ t, formats, timeZone, colorOf, found: foundId }}>
+    <CalendarContext.Provider
+      value={{ t, formats, timeZone, colorOf, weekNumbers, found: foundId }}
+    >
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
           <div className="relative isolate flex h-dvh flex-col bg-canvas pt-(--inset-top) pr-(--inset-right) pb-(--inset-bottom) pl-(--inset-left) text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
