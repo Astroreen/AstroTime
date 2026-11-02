@@ -2230,22 +2230,27 @@ task?"
   system's file dialog (the browser's, Electron's, Android's picker in the
   WebView), and the file goes where Nextcloud Calendar puts what it
   uploads, `/Calendar` (its `attachmentsFolder` default; `MKCOL` makes it,
-  `405` says it is there), under its name with a slash or a control
-  character made `_`, never over a file there: `PUT` with `If-None-Match:
-  *`, and on `412` "name (2).ext", then "(3)"…, up to twenty. Listed back
-  with `Depth: 0`, it is attached as a file picked from the account is
-  ([D231](#D231)). For that, a request's body may be bytes
-  (`HttpRequest.body: string | Uint8Array`) on every platform: the web's
-  `fetch` sends them as they are, and its proxy forwards a body as bytes,
-  not as text ([D39](#D39): a file is no UTF-8); the desktop's main
-  process takes them over IPC and writes them (`checks.ts` lets bytes
-  through, nothing else); Android's bridge carries text only, so they
-  cross it in base64 (`bodyBase64`) and the plugin decodes them with
-  Okio's base64 (the JVM tests' too) into OkHttp's body. A file over 50 MB
-  is refused before anything is sent (Android holds it in memory twice,
-  as bytes and as base64), with what to do instead: attach it from the
-  account's files. While it goes the row says "Uploading minutes.txt…";
-  one that failed says so.
+  `405` says it is there), under a name Nextcloud takes that stays in that
+  folder (`safeName`: the characters its clients refuse, `\ / : * ? " <
+  > |`, and control characters made `_`, spaces and dots trimmed from its
+  > ends, so no `.`, `..`or hidden`.htaccess`, "file" when nothing is
+  > left), never over a file there: `PUT`with`If-None-Match:
+  > *`, and on `412`"name (2).ext", then "(3)"…, up to twenty. Listed back
+  > with`Depth: 0`, it is attached as a file picked from the account is
+  > ([D231](#D231)). For that, a request's body may be bytes
+  > (`HttpRequest.body: string | Uint8Array`) on every platform: the web's
+  > `fetch` sends them as they are, and its proxy forwards a body as bytes,
+  > not as text ([D39](#D39): a file is no UTF-8); the desktop's main
+  > process takes them over IPC and writes them (`checks.ts` lets bytes
+  > through, nothing else); Android's bridge carries text only, so they
+  > cross it in base64 (`bodyBase64`) and the plugin decodes them with
+  > Okio's base64 (the JVM tests' too) into OkHttp's body. A file over 50 MB
+  > is refused before anything is sent (Android holds it in memory twice,
+  > as bytes and as base64), with what to do instead: attach it from the
+  > account's files. While it goes the row says "Uploading minutes.txt…";
+  > one that failed says so. The file joins the attachments as they are when
+  > it is ready, not as they were when it was picked: what the user changed
+  > meanwhile (a link added, the title) stays.
 
 ## Deferred
 

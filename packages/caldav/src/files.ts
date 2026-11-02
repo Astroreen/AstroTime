@@ -61,7 +61,7 @@ export function filesOf(
       // Where Nextcloud Calendar keeps what is uploaded for an item, made if it is not there (405: it is).
       await request("MKCOL", urlOf(ATTACHMENTS), [405]);
       // A name taken is never written over: "Q3.pdf", then "Q3 (2).pdf"…
-      const safe = name.replaceAll(/[/\\\p{Cc}]/gu, "_").trim() || "file";
+      const safe = safeName(name);
       const dot = safe.lastIndexOf(".");
       const [stem, extension] = dot > 0 ? [safe.slice(0, dot), safe.slice(dot)] : [safe, ""];
       for (let n = 1; n <= 20; n++) {
@@ -78,6 +78,20 @@ export function filesOf(
       throw new Error(`No free name for ${safe} in ${ATTACHMENTS}.`);
     },
   };
+}
+
+/**
+ * A name Nextcloud takes, which stays in its folder: the characters its
+ * clients refuse (`\\ / : * ? " < > |`) and control characters made `_`,
+ * spaces and dots trimmed from its ends (no `.` or `..`, no hidden
+ * `.htaccess`), "file" when nothing is left (foundation D232).
+ */
+export function safeName(name: string): string {
+  const cleaned = name
+    .replaceAll(/[\\/:*?"<>|\p{Cc}]/gu, "_")
+    .replace(/^[\s.]+/, "")
+    .replace(/[\s.]+$/, "");
+  return cleaned || "file";
 }
 
 /** Nextcloud Calendar's attachments folder, where it uploads a file from the device (its `attachmentsFolder` setting's default). */

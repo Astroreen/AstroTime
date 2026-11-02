@@ -8,7 +8,7 @@ import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
 import { accountFiles } from "@astrotime/sync/files";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
@@ -79,11 +79,13 @@ export function AttachmentsField({
     | null
   >(null);
   const picker = useRef<HTMLInputElement>(null);
-  const attach = (attachment: NewAttachment) => {
+  // The form as it is when the file is ready, not when it was picked: an
+  // upload takes a while, and what the user changed meanwhile stays.
+  const attach = useEffectEvent((attachment: NewAttachment) => {
     // A file attached already is not attached twice, its link as it resolves.
     if (!value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, calendar?.url)))
       onChange([...value, { kind: "new", attachment }]);
-  };
+  });
   const upload = async (file: File) => {
     if (!account) return;
     if (file.size > MAX_UPLOAD) {

@@ -41,7 +41,11 @@ const EVENT = [
 ].join("\r\n");
 
 /** The fake server, behind the dev server's proxy: it keeps what is PUT, the files uploaded by path. */
-async function fakeNextcloud(page: Page): Promise<Map<string, Buffer>> {
+async function fakeNextcloud(
+  page: Page,
+  /** What an upload's answer waits for, to hold it while the test acts. */
+  uploadAnswered: Promise<void> = Promise.resolve(),
+): Promise<Map<string, Buffer>> {
   const uploaded = new Map<string, Buffer>();
   let event = { etag: '"1"', ics: EVENT };
   let token = 1;
@@ -96,6 +100,7 @@ async function fakeNextcloud(page: Page): Promise<Map<string, Buffer>> {
       return route.fulfill({ status: 405, body: "" });
     if (method === "PUT" && path.startsWith(`/remote.php/dav/files/${USER}/Calendar/`)) {
       uploaded.set(path, request.postDataBuffer() ?? Buffer.alloc(0));
+      await uploadAnswered;
       return route.fulfill({ status: 201, body: "" });
     }
     if (method === "PROPFIND" && uploaded.has(path))
@@ -221,6 +226,43 @@ test("a file from the device is uploaded to /Calendar and attached as Nextcloud 
   expect(((await saved).postData() ?? "").replaceAll(/\r\n[ \t]/g, "")).toContain(
     "ATTACH;FMTTYPE=text/plain;FILENAME=/Calendar/minutes.txt;SIZE=10;X-NC-FILE-ID=5005;X-NC-HAS-PREVIEW=false:https://cloud.example.com/index.php/f/5005",
   );
+});
+
+test("what the user changes while a file uploads stays: the file joins the list as it is then (design D232)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  let answer!: () => void;
+  const held = new Promise<void>((resolve) => (answer = resolve));
+  await fakeNextcloud(page, held);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  const chooser = page.waitForEvent("filechooser");
+  await edit.getByRole("button", { name: "From this device" }).click();
+  await (
+    await chooser
+  ).setFiles({ name: "minutes.txt", mimeType: "text/plain", buffer: Buffer.from("Minutes") });
+  // The server holds its answer; meanwhile a link is added and the title changed.
+  await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  await edit.getByRole("textbox", { name: "Link" }).fill("example.org/agenda");
+  await edit.getByRole("textbox", { name: "Link" }).press("Enter");
+  await edit.getByRole("textbox", { name: "Title" }).fill("Quarterly review, v2");
+  answer();
+  const list = edit.getByRole("list", { name: "Attachments" });
+  await expect(list.getByRole("listitem")).toHaveText([/example\.org\/agenda/, /minutes\.txt/]);
+  await expect(edit.getByRole("textbox", { name: "Title" })).toHaveValue("Quarterly review, v2");
 });
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];

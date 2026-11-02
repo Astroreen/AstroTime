@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
-import { filesOf } from "../src/files.ts";
+import { filesOf, safeName } from "../src/files.ts";
 import type { HttpClient, HttpRequest } from "../src/index.ts";
 
 const HOME = "https://cloud.example.com/remote.php/dav/calendars/astrotime-test/";
@@ -176,4 +176,38 @@ test("a name with a slash or a control character is made safe before it is uploa
   expect(urls[1]).toBe(
     "https://cloud.example.com/remote.php/dav/files/astrotime-test/Calendar/a_b_.txt",
   );
+});
+
+test("a name Nextcloud takes, inside /Calendar: no `.` or `..`, no hidden file, none of its refused characters", async () => {
+  expect(safeName("..")).toBe("file");
+  expect(safeName(".")).toBe("file");
+  expect(safeName("")).toBe("file");
+  expect(safeName("../../etc/passwd")).toBe("_.._etc_passwd");
+  expect(safeName(".htaccess")).toBe("htaccess");
+  expect(safeName('Q3: "final"? <v2> | a*b.pdf')).toBe("Q3_ _final__ _v2_ _ a_b.pdf");
+  expect(safeName("  notes.txt . ")).toBe("notes.txt");
+  // Uploaded, a traversal stays a name in /Calendar: never the files' root or its parent.
+  const urls: string[] = [];
+  const http: HttpClient = async (request) => {
+    urls.push(`${request.method} ${request.url}`);
+    return {
+      status: request.method === "MKCOL" ? 201 : 207,
+      url: request.url,
+      header: () => null,
+      body: "<multistatus/>",
+    };
+  };
+  for (const name of ["..", "../../x.txt"])
+    await expect(
+      filesOf(http, { username: "u", password: "p" }, HOME)!.upload(
+        name,
+        "text/plain",
+        new Uint8Array(),
+      ),
+    ).rejects.toThrow(/not listed/);
+  const root = "https://cloud.example.com/remote.php/dav/files/astrotime-test/Calendar";
+  expect(urls.filter((url) => url.startsWith("PUT "))).toEqual([
+    `PUT ${root}/file`,
+    `PUT ${root}/_.._x.txt`,
+  ]);
 });
