@@ -3,6 +3,7 @@ import * as caldav from "@astrotime/caldav";
 import { expect, test } from "vite-plus/test";
 
 import {
+  carryPictures,
   isAppPage,
   namedFiles,
   PRESET_MARK,
@@ -110,4 +111,30 @@ test("what the worker does with a request, at the root and under a base path (D1
   expect(routeOf("/", true, "/calendar/", listed)).toBeNull();
   expect(routeOf("/", false, "/calendar/", listed)).toBeNull();
   expect(routeOf("/assets/x.js", false, "/calendar/", listed)).toBeNull();
+});
+
+test("a new version takes over the pictures a kept version showed; one it cannot read or write is skipped, never fatal (design D219)", async () => {
+  const kept = new Map([
+    ["old/a.svg", new Response("a")],
+    ["older/b.svg", new Response("b")],
+    ["old/broken.svg", new Response("x")],
+    ["old/full.svg", new Response("y")],
+  ]);
+  const put: string[] = [];
+  const carried = await carryPictures(
+    ["a.svg", "b.svg", "never.svg", "broken.svg", "full.svg"],
+    ["old", "older"],
+    {
+      match: async (path, cacheName) => {
+        if (path === "broken.svg") throw new Error("a damaged cache");
+        return kept.get(`${cacheName}/${path}`);
+      },
+      put: async (path) => {
+        if (path === "full.svg") throw new DOMException("over the quota", "QuotaExceededError");
+        put.push(path);
+      },
+    },
+  );
+  expect(carried.toSorted()).toEqual(["a.svg", "b.svg"]);
+  expect(put.toSorted()).toEqual(["a.svg", "b.svg"]);
 });

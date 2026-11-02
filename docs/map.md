@@ -286,9 +286,9 @@ When you add a package, app or module, add its line here in the same PR.
     maps". `test/fixtures/`, Photon's recorded answers:
     [`README.md`](../packages/ui/test/fixtures/README.md).
     → `plans/design.md#D175`, `plans/foundation.md#D178`
-  - `pictures/` — the pictures: `themeOf` (`themes.ts`), the theme a
+  - `pictures/` — the pictures: `subjectOf` (`subjects.ts`), the subject a
     title's words give an item; `bannerOf` (`months.ts`), a month's banner,
-    south of the equator too; `art.ts`, the pictures' URLs and grounds;
+    south of the equator too (`southern-zones.ts`, generated); `art.ts`, the pictures' URLs and grounds;
     `art/`, AstroTime's own SVGs, each a file fetched when shown.
     → `plans/design.md#D215`, `plans/design.md#D218`, `plans/design.md#D219`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
@@ -465,6 +465,9 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
   `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
   → `plans/foundation.md#D32`
+- `scripts/generate-southern-zones.ts` — fetches a pinned IANA tz release
+  and writes `packages/ui/src/pictures/southern-zones.ts`, the zones south
+  of the equator. → `plans/design.md#D218`
 - `scripts/big-calendar.ts` — D118's big calendar, generated the same on
   every run, for both benchmarks. → `plans/foundation.md#D118`
 - `scripts/bench-cold-start.ts` — the built web app opened on that calendar

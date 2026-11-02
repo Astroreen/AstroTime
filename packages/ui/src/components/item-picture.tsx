@@ -3,15 +3,15 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { ITEM_ART, type Art } from "../pictures/art.ts";
-import { themeOf } from "../pictures/themes.ts";
+import { subjectOf } from "../pictures/subjects.ts";
 import { useSettings } from "../settings.ts";
 
-/** The illustration an item is drawn over, if any: its theme's, while illustrations are on. */
+/** The illustration an item is drawn over, if any: its subject's, while illustrations are on. */
 export function useItemArt(title: string | null | undefined): Art | null {
   const { settings } = useSettings();
   if (!settings.illustrations) return null;
-  const theme = themeOf(title);
-  return theme && ITEM_ART[theme];
+  const subject = subjectOf(title);
+  return subject && ITEM_ART[subject];
 }
 
 /**

@@ -27,7 +27,7 @@ import month09 from "./art/month-09.svg?no-inline";
 import month10 from "./art/month-10.svg?no-inline";
 import month11 from "./art/month-11.svg?no-inline";
 import month12 from "./art/month-12.svg?no-inline";
-import type { Theme } from "./themes.ts";
+import type { Subject } from "./subjects.ts";
 
 export interface Art {
   readonly url: string;
@@ -35,7 +35,7 @@ export interface Art {
   readonly ground: string;
 }
 
-export const ITEM_ART: Readonly<Record<Theme, Art>> = {
+export const ITEM_ART: Readonly<Record<Subject, Art>> = {
   birthday: { url: birthday, ground: "#c6b3e6" },
   winter: { url: winter, ground: "#2f4a7a" },
   travel: { url: travel, ground: "#a8c7fa" },

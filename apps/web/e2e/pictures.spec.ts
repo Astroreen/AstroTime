@@ -36,6 +36,24 @@ test("a lunch is drawn over its picture in the Agenda and its details; a stand-u
   await expect(details).toBeHidden();
 });
 
+test("with a large text the card grows and its title wraps, never clipped (D216)", async ({
+  page,
+}) => {
+  await openDemo(page, "agenda");
+  await page.addStyleTag({
+    content: "html { font-size: 200%; } :root { --text-body: 28px; --text-note: 25px; }",
+  });
+  const lunch = page.getByRole("listitem", { name: /^Lunch with Marta/ });
+  await lunch.scrollIntoViewIfNeeded();
+  const fits = await lunch.evaluate((card) =>
+    [...card.querySelectorAll<HTMLElement>(".picture-text > *")].every(
+      (line) => line.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom,
+    ),
+  );
+  expect(fits).toBe(true);
+  expect((await lunch.boundingBox())!.height).toBeGreaterThan(104);
+});
+
 test("Settings → Pictures → Illustrations off: every card and the details are plain (D217)", async ({
   page,
 }) => {

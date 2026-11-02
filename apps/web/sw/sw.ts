@@ -4,7 +4,15 @@
 // /sw.js as one classic script (its import is bundled in); the build fills in
 // the two constants below (apps/web/service-worker.ts). CalDAV through
 // /dav-proxy/ and anything else that is not the app's is never touched.
-import { namedFiles, presetKey, presetOf, routeOf, withoutPreset, withPresetBack } from "./page.ts";
+import {
+  carryPictures,
+  namedFiles,
+  presetKey,
+  presetOf,
+  routeOf,
+  withoutPreset,
+  withPresetBack,
+} from "./page.ts";
 
 declare const self: ServiceWorkerGlobalScope;
 /** Every file of this version, by path under the app's base; the base itself is the page. */
@@ -99,17 +107,15 @@ self.addEventListener("install", (event) => {
       try {
         // Hashed names never change their content: whatever answers is this version's.
         await cache.addAll([...FILES].filter((path) => path !== BASE));
-        // A picture a kept version showed, under the same hashed name, is the
-        // same picture: this version starts with it (design D219).
-        const before = (await kept()).versions.filter((name) => name !== CACHE);
-        await Promise.all(
-          [...PICTURES].map(async (path) => {
-            for (const cacheName of before) {
-              const shown = await caches.match(path, { cacheName });
-              if (shown) return cache.put(path, shown);
-            }
-          }),
+        // The pictures a kept version showed, as far as they can be read (design D219).
+        const before = await kept().then(
+          ({ versions }) => versions.filter((name) => name !== CACHE),
+          () => [],
         );
+        await carryPictures(PICTURES, before, {
+          match: (path, cacheName) => caches.match(path, { cacheName }),
+          put: (path, shown) => cache.put(path, shown),
+        });
         const page = await fetch(BASE, { cache: "no-store" });
         if (!keepable(page))
           throw new Error(`The app's page is not one to keep (${page.status}, ${page.type}).`);

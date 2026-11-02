@@ -88,3 +88,40 @@ export function routeOf(
 
 /** Where the preset of the latest network page is kept, beside the page. */
 export const presetKey = (base: string) => `${base}.astrotime-preset`;
+
+/** What `carryPictures` reads and writes: the kept versions' caches, and this version's. */
+interface PictureCaches {
+  match(path: string, cacheName: string): Promise<Response | undefined>;
+  put(path: string, picture: Response): Promise<void>;
+}
+
+/**
+ * Gives a new version the pictures a kept version showed (design D219),
+ * looked up at once, one version after another per picture. Only an
+ * optimisation: a picture that cannot be read or written (a quota, a
+ * damaged cache) is left to be fetched when it is next shown, and never
+ * fails the install. Resolves with the paths carried.
+ */
+export async function carryPictures(
+  pictures: Iterable<string>,
+  versions: readonly string[],
+  caches: PictureCaches,
+): Promise<string[]> {
+  const carried = await Promise.all(
+    [...pictures].map(async (path) => {
+      try {
+        for (const cacheName of versions) {
+          const shown = await caches.match(path, cacheName);
+          if (shown) {
+            await caches.put(path, shown);
+            return path;
+          }
+        }
+      } catch {
+        // Not carried: fetched again when shown.
+      }
+      return null;
+    }),
+  );
+  return carried.filter((path) => path !== null);
+}

@@ -1,4 +1,4 @@
-// The illustrations' themes (design D215): a title's words, in English and
+// The illustrations' subjects (design D215): a title's words, in English and
 // Russian with their forms, give an item its picture; a month its season's
 // banner, south of the equator too (D218); and the pictures are only shapes.
 import { readFileSync } from "node:fs";
@@ -6,9 +6,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vite-plus/test";
 
 import { bannerOf, isSouthern } from "../src/pictures/months.ts";
-import { THEMES, themeOf } from "../src/pictures/themes.ts";
+import { SUBJECTS, subjectOf } from "../src/pictures/subjects.ts";
 
-describe("an item's theme from its title", () => {
+describe("an item's subject from its title", () => {
   test.each([
     ["Lunch with Anna", "meal"],
     ["К бабушке на обед", "meal"],
@@ -47,8 +47,8 @@ describe("an item's theme from its title", () => {
     ["Новый год", "winter"],
     ["Встречаем Новый год у Лены", "winter"],
     ["New Year's Eve", "winter"],
-  ] as const)("%s → %s", (title, theme) => {
-    expect(themeOf(title)).toBe(theme);
+  ] as const)("%s → %s", (title, subject) => {
+    expect(subjectOf(title)).toBe(subject);
   });
 
   test.each([
@@ -60,39 +60,51 @@ describe("an item's theme from its title", () => {
     "Team sync",
     "",
   ])("%s has none, or not the wrong one", (title) => {
-    expect(themeOf(title)).not.toBe("meal");
-    expect(themeOf(title)).not.toBe("sport");
-    expect(themeOf(title)).not.toBe("music");
-    expect(themeOf(title)).not.toBe("birthday");
+    expect(subjectOf(title)).not.toBe("meal");
+    expect(subjectOf(title)).not.toBe("sport");
+    expect(subjectOf(title)).not.toBe("music");
+    expect(subjectOf(title)).not.toBe("birthday");
   });
 
   test("words that only look alike give nothing", () => {
-    expect(themeOf("Завтра позвонить")).toBeNull();
-    expect(themeOf("Победа")).toBeNull();
-    expect(themeOf("и др.")).toBeNull();
-    expect(themeOf("Team sync")).toBeNull();
-    expect(themeOf(null)).toBeNull();
+    expect(subjectOf("Завтра позвонить")).toBeNull();
+    expect(subjectOf("Победа")).toBeNull();
+    expect(subjectOf("и др.")).toBeNull();
+    expect(subjectOf("Team sync")).toBeNull();
+    expect(subjectOf(null)).toBeNull();
   });
 
   test("a run that is no sport", () => {
-    expect(themeOf("Run the release")).toBeNull();
+    expect(subjectOf("Run the release")).toBeNull();
   });
 
   test("a tutor is study, a rehearsal music", () => {
-    expect(themeOf("Репетитор")).toBe("study");
-    expect(themeOf("Репетиция")).toBe("music");
+    expect(subjectOf("Репетитор")).toBe("study");
+    expect(subjectOf("Репетиция")).toBe("music");
   });
 
-  test("a title with two themes' words gets the more specific", () => {
-    expect(themeOf("Birthday dinner")).toBe("birthday");
-    expect(themeOf("Обед после концерта")).toBe("music");
-    expect(themeOf("Coffee at the airport")).toBe("travel");
+  test("a party of no kind named is a birthday's picture, but never beats a subject", () => {
+    expect(subjectOf("Christmas party")).toBe("winter");
+    expect(subjectOf("New Year party")).toBe("winter");
+    expect(subjectOf("Новогодний корпоратив")).toBe("winter");
+    expect(subjectOf("Корпоратив в ресторане")).toBe("meal");
+    expect(subjectOf("Dinner party")).toBe("meal");
+    expect(subjectOf("Birthday party")).toBe("birthday");
+    expect(subjectOf("Doctor's birthday")).toBe("birthday");
+    expect(subjectOf("Вечеринка у Пети")).toBe("birthday");
+    expect(subjectOf("Party")).toBe("birthday");
+  });
+
+  test("a title with two subjects' words gets the more specific", () => {
+    expect(subjectOf("Birthday dinner")).toBe("birthday");
+    expect(subjectOf("Обед после концерта")).toBe("music");
+    expect(subjectOf("Coffee at the airport")).toBe("travel");
   });
 
   test("case and diacritics do not matter", () => {
-    expect(themeOf("LUNCH")).toBe("meal");
-    expect(themeOf("Café")).toBe("coffee");
-    expect(themeOf("ПЕРЕЛЕТ")).toBe("travel");
+    expect(subjectOf("LUNCH")).toBe("meal");
+    expect(subjectOf("Café")).toBe("coffee");
+    expect(subjectOf("ПЕРЕЛЕТ")).toBe("travel");
   });
 });
 
@@ -122,9 +134,21 @@ describe("a month's banner", () => {
       "Chile/Continental",
     ])
       expect(isSouthern(zone), zone).toBe(true);
-    // The tropics north of the equator, and zones that only sound southern, are not.
+    // Every zone the tz database places south of the equator, the tropics too.
+    for (const zone of [
+      "Pacific/Tahiti",
+      "Pacific/Apia",
+      "Pacific/Rarotonga",
+      "Africa/Luanda",
+      "Africa/Lubumbashi",
+      "America/La_Paz",
+      "America/Lima",
+    ])
+      expect(isSouthern(zone), zone).toBe(true);
+    // North of it, however near: the northern months.
     expect(isSouthern("America/Bogota")).toBe(false);
     expect(isSouthern("Asia/Singapore")).toBe(false);
+    expect(isSouthern("UTC")).toBe(false);
   });
 });
 
@@ -137,8 +161,8 @@ describe("the pictures' files", () => {
     /^<svg[^>]*>\s*<rect[^>]*fill="(#[0-9a-f]{6})"/i.exec(svg)?.[1]?.toLowerCase();
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 
-  test.each(THEMES)("%s: a ground as its first shape, the one art.ts names", (theme) => {
-    expect(art).toContain(`${theme}: { url: ${theme}, ground: "${groundOf(file(theme))}" }`);
+  test.each(SUBJECTS)("%s: a ground as its first shape, the one art.ts names", (subject) => {
+    expect(art).toContain(`${subject}: { url: ${subject}, ground: "${groundOf(file(subject))}" }`);
   });
 
   test.each(months)("month %s: a ground as its first shape, the one art.ts names", (month) => {
@@ -146,7 +170,7 @@ describe("the pictures' files", () => {
   });
 
   test.each([
-    ...THEMES.map((theme) => [theme, "0 0 360 120"] as const),
+    ...SUBJECTS.map((subject) => [subject, "0 0 360 120"] as const),
     ...months.map((month) => [`month-${month}`, "0 0 800 200"] as const),
   ])("%s: nothing but shapes (no script, text, image or link)", (name, viewBox) => {
     const svg = file(name);
