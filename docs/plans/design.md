@@ -863,10 +863,7 @@ I make it"; "sometimes an item's text is covered by another event".
   (`apps/web/e2e/calendar.spec.ts`; on the phone's views it failed before).
   D15, D42's cascade and D50 point here.
 
-### Decided in round 3: settings, colours, dropdowns, accounts
-
-The owner's feedback after v0.3.0, tried on a phone and a computer, for
-Settings, the colours and the lists controls open.
+**Settings, colours, dropdowns, accounts.**
 
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
@@ -891,15 +888,12 @@ Settings, the colours and the lists controls open.
     time list and its reminder menu open, in both themes.
   - A choice may carry something before its name (`leading`), drawn in the
     list and on the button: the colour dropdown's dot.
-
-**Settings, colours, dropdowns, accounts.**
-
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group
   after "Hide completed tasks", on unless turned off: today's look stays
   the default, as Google Calendar's web app and Nextcloud's show them. Off,
   the week views' pill above the hour labels goes ([D49](#D49)) and the
-  Month's column of pills goes with its room ([D86](#D86)), so the days
+  Month's column of pills goes, its gap too ([D86](#D86)), so the days
   start at the edge. One value with the other settings ([D96](#D96)).
 
 ## Deferred
