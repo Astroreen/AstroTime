@@ -6,7 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { _electron, expect, type ElectronApplication, type Page } from "@playwright/test";
+import {
+  _electron,
+  expect,
+  type ElectronApplication,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 import type { CalDavServer } from "../../../packages/sync/test/servers.ts";
 
@@ -16,6 +22,16 @@ const NOW = new Date("2026-11-04T10:40:00+02:00");
 /** Outside Electron, the `electron` package names its binary: the dev shell's nixpkgs one, or CI's. */
 const executablePath = createRequire(import.meta.url)("electron") as string;
 const appDir = fileURLToPath(new URL("..", import.meta.url));
+
+/** Chooses `option` in one of AstroTime's dropdowns (design D167): opens it, taps the option. */
+export async function choose(field: Locator, option: string): Promise<void> {
+  await field.click();
+  await field
+    .page()
+    .getByRole("listbox")
+    .getByRole("option", { name: option, exact: true })
+    .click();
+}
 
 /** A fresh profile: the app's userData, with its store. */
 export const profile = () => mkdtempSync(join(tmpdir(), "astrotime-desktop-"));

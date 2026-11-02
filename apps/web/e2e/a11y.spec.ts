@@ -6,7 +6,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, WIDE } from "./support.ts";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"];
 
@@ -229,6 +229,18 @@ test.describe("the screens and dialogs", () => {
         const edit = page.getByRole("dialog", { name: "Edit event" });
         await expect(edit).toBeVisible();
         await audit(page, "the edit dialog");
+        // Its own dropdowns, open (design D167): the time list and the reminders' menu.
+        await edit.getByRole("combobox", { name: "Start time" }).click();
+        await expect(page.getByRole("option", { name: "9:30 AM" })).toBeVisible();
+        await audit(page, "the edit dialog's time list");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("listbox")).toHaveCount(0);
+        await edit.getByRole("button", { name: "Add a reminder" }).click();
+        await expect(page.getByRole("menu")).toBeVisible();
+        await audit(page, "the edit dialog's reminder menu");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("menu")).toHaveCount(0);
+        await expect(edit).toBeVisible();
         await edit.getByRole("textbox", { name: "Title" }).fill("Stand-up!");
         await edit.getByRole("button", { name: "Save" }).click();
         await expect(page.getByRole("alertdialog", { name: "Edit recurring event" })).toBeVisible();
@@ -289,7 +301,7 @@ test("Russian: the document's language follows the UI's", async ({ browser }) =>
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await audit(page, "the week in Russian");
   await page.getByRole("banner").getByRole("button", { name: "Настройки" }).click();
-  await page.getByLabel("Язык").selectOption({ label: "English" });
+  await choose(page.getByLabel("Язык"), "English");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await context.close();
 });

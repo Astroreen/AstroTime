@@ -1,13 +1,13 @@
 // The evidence for editing (docs/plans/foundation.md#pr-6--editing): the
 // details of an event and of a task, the edit dialog on a phone and on a
 // wide screen, the repeat picker, the scope dialog and the Conflicts list,
-// in both themes and both languages, from the demo data with the clock
+// AstroTime's own dropdowns open (design D167; on a phone by touch), in both themes and both languages, from the demo data with the clock
 // frozen. Runs only when ASTROTIME_SCREENSHOTS names a directory:
 //
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e editing-screenshots
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, WIDE } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -28,6 +28,10 @@ const WORDS = {
     newEvent: "New event",
     editEvent: "Edit event",
     title: "Title",
+    startTime: "Start time",
+    menu: "Main menu",
+    settings: "Settings",
+    language: "Language",
     repeat: "Repeat",
     custom: "Custom…",
     interval: "Interval",
@@ -49,6 +53,10 @@ const WORDS = {
     newEvent: "Новое мероприятие",
     editEvent: "Изменить мероприятие",
     title: "Название",
+    startTime: "Время начала",
+    menu: "Главное меню",
+    settings: "Настройки",
+    language: "Язык",
     repeat: "Повтор",
     custom: "Настроить…",
     interval: "Интервал",
@@ -71,6 +79,8 @@ async function open(
     colorScheme: options.theme,
     viewport: options.size,
     timezoneId: "Europe/Vilnius",
+    // A phone is touched: the dropdowns' rows are a finger's (design D167).
+    ...(options.size === PHONE ? { hasTouch: true, isMobile: true } : {}),
   });
   const page = await context.newPage();
   await openDemo(page, view);
@@ -99,8 +109,13 @@ for (const language of ["en", "ru"] as const) {
       await expect(details).toBeVisible();
       await shot(wide, name("details-event", "wide"));
       await details.getByRole("button", { name: w.edit }).click();
-      await expect(wide.getByRole("dialog", { name: w.editEvent })).toBeVisible();
+      const editing = wide.getByRole("dialog", { name: w.editEvent });
+      await expect(editing).toBeVisible();
       await shot(wide, name("edit", "wide"));
+      await editing.getByRole("combobox", { name: w.startTime }).click();
+      await expect(wide.getByRole("listbox")).toBeVisible();
+      await shot(wide, name("dropdown-time", "wide"));
+      await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
       await expect(wide.getByRole("dialog")).toHaveCount(0);
@@ -145,11 +160,25 @@ for (const language of ["en", "ru"] as const) {
         .getByRole("textbox", { name: w.title })
         .fill(language === "en" ? "Swimming" : "Бассейн");
       await shot(phone, name("edit", "phone"));
-      await create.getByLabel(w.repeat, { exact: true }).selectOption({ label: w.custom });
+      await create.getByRole("combobox", { name: w.repeat }).tap();
+      await expect(phone.getByRole("listbox")).toBeVisible();
+      await shot(phone, name("dropdown-repeat", "phone"));
+      await phone.getByRole("option").first().tap();
+      await expect(phone.getByRole("listbox")).toHaveCount(0);
+      await choose(create.getByLabel(w.repeat, { exact: true }), w.custom);
       await create.getByLabel(w.interval, { exact: true }).fill("2");
       await create.getByRole("button", { name: w.monday }).click();
       await create.getByLabel(w.repeat, { exact: true }).scrollIntoViewIfNeeded();
       await shot(phone, name("repeat", "phone"));
+      await phone.keyboard.press("Escape");
+      await expect(phone.getByRole("dialog")).toHaveCount(0);
+
+      // Settings' dropdowns on a phone.
+      await phone.getByRole("button", { name: w.menu }).tap();
+      await phone.getByRole("dialog").getByRole("button", { name: w.settings }).tap();
+      await phone.getByRole("dialog", { name: w.settings }).getByLabel(w.language).tap();
+      await expect(phone.getByRole("listbox")).toBeVisible();
+      await shot(phone, name("dropdown-settings", "phone"));
       await phone.context().close();
     });
   }

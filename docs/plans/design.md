@@ -829,7 +829,40 @@ I make it"; "sometimes an item's text is covered by another event".
   were checked after a swipe on a phone's viewport: each takes the first
   tap; the two `pan-y` views were the only ones it took.
 
+### Decided in round 3: settings, colours, dropdowns, accounts
+
+The owner's feedback after v0.3.0, tried on a phone and a computer, for
+Settings, the colours and the lists controls open.
+
+- **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
+  a not very pretty native list"). Every list a control opens is
+  AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
+  UI's Select: the edit dialog's times, repeat, calendar and the custom
+  rule's fields, and Settings' choices), `MenuButton` runs one action from
+  a list (Base UI's Menu: "Add a reminder"). No `<select>` is left.
+  - **One popup on every screen**, under its button, at least as wide as
+    it and never wider than the screen, as Material's exposed dropdown
+    menu is on Android; not a bottom sheet: Google's Android app opens a
+    list under the field for the edit dialog's choices, and the popup
+    keeps the field in sight. On a touch screen (`pointer: coarse`) its
+    rows are 48 px; with a mouse 40 px.
+  - **The chosen value** is checked and in the accent colour, and the list
+    opens scrolled to it, so the time list's 96 quarters start where the
+    item is. The popup never covers its button (Base UI's
+    `alignItemWithTrigger` off): the same on a phone as with a mouse.
+  - **Keyboard and screen reader** are Base UI's: a `combobox` button
+    named by its label, a `listbox` of `option`s, arrows, typing to jump,
+    Enter, Escape closing the list and not the dialog under it. The
+    accessibility audit ([D119](#D119)) runs on the edit dialog with its
+    time list and its reminder menu open, in both themes.
+  - A choice may carry something before its name (`leading`), drawn in the
+    list and on the button: the colour dropdown's dot.
+
 ## Deferred
+
+- **A date picker of our own** — the edit dialog's dates are still the
+  browser's date field; its calendar is no list, so [D167](#D167) left it.
+  The month picker's grid is the natural start.
 
 - **Year view** ([D48](#D48)).
 - **A long press in the Month view to create** — as Google's Android app

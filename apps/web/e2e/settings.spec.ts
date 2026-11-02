@@ -3,7 +3,7 @@
 // and is kept.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openApp, openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openApp, openDemo, PHONE, WIDE } from "./support.ts";
 
 const header = (page: Page, name: string) => page.getByRole("heading", { name });
 const day = (page: Page, name: string) => page.getByRole("list", { name });
@@ -30,19 +30,14 @@ test("theme, week start, clock, hide completed and language apply at once and ar
 
   // The theme overrides the system's (D44, D58), at once, under the dialog too.
   await inSettings(page, async (settings) => {
-    await settings.getByLabel("Theme").selectOption({ label: "Light" });
+    await choose(settings.getByLabel("Theme"), "Light");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await expect(body).toHaveCSS("background-color", "rgb(238, 240, 244)");
   });
 
   // The week starts on Monday instead of the locale's Sunday (D45).
   await expect(header(page, "Sunday, November 1")).toBeVisible();
-  await inSettings(page, (settings) =>
-    settings
-      .getByLabel("Start of the week")
-      .selectOption({ label: "Monday" })
-      .then(() => {}),
-  );
+  await inSettings(page, (settings) => choose(settings.getByLabel("Start of the week"), "Monday"));
   await expect(header(page, "Sunday, November 1")).toHaveCount(0);
   await expect(header(page, "Monday, November 2")).toBeVisible();
   await expect(header(page, "Sunday, November 8")).toBeVisible();
@@ -52,12 +47,7 @@ test("theme, week start, clock, hide completed and language apply at once and ar
     name: /^Task: Send the report/,
   });
   await expect(report).toHaveAccessibleName("Task: Send the report, 3:00 PM");
-  await inSettings(page, (settings) =>
-    settings
-      .getByLabel("Clock")
-      .selectOption({ label: "24-hour" })
-      .then(() => {}),
-  );
+  await inSettings(page, (settings) => choose(settings.getByLabel("Clock"), "24-hour"));
   await expect(report).toHaveAccessibleName("Task: Send the report, 15:00");
 
   // Hide completed: completed tasks' chips go from every view; the undone chip stays (D51).
@@ -80,12 +70,7 @@ test("theme, week start, clock, hide completed and language apply at once and ar
   ).toHaveCount(0);
 
   // The language: Russian, with the week start and clock still as chosen.
-  await inSettings(page, (settings) =>
-    settings
-      .getByLabel("Language")
-      .selectOption({ label: "Русский" })
-      .then(() => {}),
-  );
+  await inSettings(page, (settings) => choose(settings.getByLabel("Language"), "Русский"));
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(page.getByRole("main", { name: "Ноябрь" })).toBeVisible();
   await expect(header(page, "понедельник, 2 ноября")).toBeVisible();
@@ -95,7 +80,7 @@ test("theme, week start, clock, hide completed and language apply at once and ar
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(header(page, "понедельник, 2 ноября")).toBeVisible();
   await inSettings(page, async (settings) => {
-    await expect(settings.getByLabel("Тема")).toHaveValue("light");
+    await expect(settings.getByLabel("Тема")).toHaveText("Светлая");
     await expect(
       settings.getByRole("switch", { name: "Скрывать выполненные задачи" }),
     ).toBeChecked();
@@ -120,7 +105,7 @@ test("on a phone, Settings is the drawer's last row and a screen of its own", as
   const box = (await settings.boundingBox())!;
   expect(box.width).toBe(PHONE.width);
   expect(box.height).toBe(PHONE.height);
-  await settings.getByLabel("Theme").selectOption({ label: "Dark" });
+  await choose(settings.getByLabel("Theme"), "Dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await settings.getByRole("button", { name: "Close settings" }).click();
   await expect(settings).toBeHidden();
@@ -160,7 +145,7 @@ test("the calendar on this device is named so in Settings (design D137)", async 
   // The account, and its calendar's own row, named in the language spoken now.
   const local = accounts.getByRole("region", { name: "On this device" });
   await expect(local.getByRole("checkbox", { name: "Personal" })).toBeChecked();
-  await page.getByLabel("Language").selectOption({ label: "Русский" });
+  await choose(page.getByLabel("Language"), "Русский");
   const russian = page
     .getByRole("dialog", { name: "Настройки" })
     .getByRole("region", { name: "Аккаунты" })

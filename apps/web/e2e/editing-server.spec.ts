@@ -7,7 +7,7 @@
 import { test as base, expect } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { addAccount, openApp, WIDE } from "./support.ts";
+import { addAccount, choose, openApp, WIDE } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -44,7 +44,7 @@ test("an event created here reaches the server, and again once dragged", async (
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Made in AstroTime");
-  await dialog.getByLabel("Start time").selectOption("16:00");
+  await choose(dialog.getByLabel("Start time"), "4:00 PM");
   // The upload is the event to wait for: the sync after a local change (D91).
   const uploaded = page.waitForResponse((response) => response.request().method() === "PUT");
   await dialog.getByRole("button", { name: "Save" }).click();
@@ -119,7 +119,7 @@ test("a change the server dropped is told in the accounts dialog and in Settings
   await page.getByRole("button", { name: "Create" }).click();
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Gone elsewhere");
-  await dialog.getByLabel("Start time").selectOption("16:00");
+  await choose(dialog.getByLabel("Start time"), "4:00 PM");
   const uploaded = page.waitForResponse((response) => response.request().method() === "PUT");
   await dialog.getByRole("button", { name: "Save" }).click();
   const response = await uploaded;

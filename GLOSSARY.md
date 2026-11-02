@@ -86,6 +86,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   Month view and the Agenda).
 - **Undone tasks chip** — the one chip on today that stands for every
   undone task due before today, "N undone tasks" (design D51).
+- **Dropdown** — a button that opens a list under it to choose from:
+  AstroTime's own (`Select`, `MenuButton`), never the browser's `<select>`
+  (design D167).
 - **Details** — the dialog a tap on an item opens: when it is, how it
   repeats, where, its reminders and guests, with edit and delete (design
   D108).

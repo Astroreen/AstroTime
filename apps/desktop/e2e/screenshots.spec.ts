@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 import { startRadicale } from "../../../packages/sync/test/servers.ts";
-import { keepPassword, launch, profile, putEvent, signInByPassword } from "./support.ts";
+import { choose, keepPassword, launch, profile, putEvent, signInByPassword } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -78,8 +78,8 @@ test("Settings with the desktop's keep-running switch, English dark and Russian 
   const settings = page.getByRole("dialog", { name: "Settings" });
   await settings.getByRole("switch", { name: "Keep running when the window is closed" }).focus();
   await page.screenshot({ path: join(directory!, "desktop-settings-keep-running-dark-en.png") });
-  await page.getByLabel("Language").selectOption({ label: "Русский" });
-  await page.getByLabel("Тема").selectOption({ label: "Светлая" });
+  await choose(page.getByLabel("Language"), "Русский");
+  await choose(page.getByLabel("Тема"), "Светлая");
   const russian = page.getByRole("dialog", { name: "Настройки" });
   await russian.getByRole("switch", { name: "Работать в фоне после закрытия окна" }).focus();
   await page.screenshot({ path: join(directory!, "desktop-settings-keep-running-light-ru.png") });

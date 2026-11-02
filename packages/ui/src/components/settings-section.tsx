@@ -19,6 +19,7 @@ import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { dialogIcon, sheet } from "./item-details.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
+import { Select } from "./select.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** A language's name in itself: "English", "Русский". */
@@ -262,25 +263,17 @@ function Choice({
   onChange: (value: string) => void;
   options: readonly (readonly [string, string])[];
 }) {
-  const id = useId();
   // The name on the left, its value on the right; the value wraps below on a narrow screen.
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-body">
-      <label htmlFor={id} className="min-w-0 flex-1">
-        {label}
-      </label>
-      <select
-        id={id}
+      <Select
+        label={label}
+        labelClassName="min-w-0 flex-1"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 max-w-full min-w-40 rounded-lg bg-raised px-2 text-input text-ink focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        {options.map(([option, name]) => (
-          <option key={option} value={option}>
-            {name}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={options.map(([option, name]) => ({ value: option, label: name }))}
+        className="h-9 max-w-full min-w-40 rounded-lg bg-raised pr-1 pl-2"
+      />
     </div>
   );
 }
