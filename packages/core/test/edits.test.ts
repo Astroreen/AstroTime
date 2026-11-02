@@ -1959,6 +1959,14 @@ describe("a copy of an item (design D164)", () => {
     expect(lines.filter((line) => line.startsWith("RELATED-TO"))).toEqual(["RELATED-TO:report"]);
   });
 
+  test("of Apple's event: its reminder fresh, Apple's own alarm lines otherwise kept", () => {
+    const copy = copyItem(load("apple-event-attendees.ics"), null, { now: NOW, uid: "c" });
+    const lines = contentLines(copy);
+    expect(lines).toContain("X-APPLE-DEFAULT-ALARM:TRUE");
+    expect(lines).toContain("TRIGGER:-PT15M");
+    expect(lines.some((line) => /^(X-WR-ALARMUID|ACKNOWLEDGED)[:;]/.test(line))).toBe(false);
+  });
+
   test("of a completed task is a task to do, its start, due, star and parent kept", () => {
     const task = object(
       "BEGIN:VTODO\r\nUID:report\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Report\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSTATUS:COMPLETED\r\nCOMPLETED:20261105T120000Z\r\nPERCENT-COMPLETE:100\r\nRELATED-TO:parent\r\nX-ASTROTIME-STARRED:TRUE\r\nEND:VTODO\r\n",

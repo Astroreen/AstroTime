@@ -1283,7 +1283,9 @@ Settings, the colours and the lists controls open.
     their `ACKNOWLEDGED` and Apple's `X-WR-ALARMUID`, and the item without
     Thunderbird's `X-MOZ-LASTACK` and `X-MOZ-SNOOZE-TIME*`, and without a
     snooze `VALARM` (RFC 9074 §7: `RELATED-TO;RELTYPE=SNOOZE`; an alarm
-    related to another in another way stays): those say the
+    related to another in another way stays; a known gap: no recorded
+    fixture shows how Apple's apps write a snooze, so one written with a
+    `RELATED-TO` and no `RELTYPE` would be kept): those say the
     original's reminders were seen or put off, which the copy's were not.
     A subtask's `RELATED-TO` stays: copied into another list, its parent
     is not there, so the tasks screen shows it at the top and its details
