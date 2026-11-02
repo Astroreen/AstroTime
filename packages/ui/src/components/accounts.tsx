@@ -281,14 +281,22 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
         {attention ? t("accounts.buttonAttention") : ""}
       </span>
       <Dialog.Portal>
+        {/*
+          The panel hangs under the top bar, the button that opened it in
+          sight, on a wide screen at its right (design D225). Nested in the
+          drawer's dialog root, Base UI draws no backdrop for it: the page
+          is not dimmed.
+        */}
         <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup className="fixed top-3 left-1/2 z-[90] max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-3 lg:left-auto lg:translate-x-0">
-          {/* Closed by ✕ before its title, as every other dialog (design D137). */}
-          <div className="mb-2 flex items-center gap-2">
+        <DialogPopup className="fixed top-[calc(3.5rem+var(--inset-top))] left-1/2 z-[90] max-h-[calc(100dvh-4.5rem-var(--inset-top)-var(--inset-bottom))] origin-top w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-[calc(0.5rem+var(--inset-right))] lg:left-auto lg:origin-top-right lg:translate-x-0 ring-1 ring-line">
+          {/* Its title, then ✕ at the right, as the owner asked (design D225). */}
+          <div className="mb-2 flex items-center gap-2 pl-2">
+            <Dialog.Title className="flex-1 text-title font-medium">
+              {t("accounts.title")}
+            </Dialog.Title>
             <Dialog.Close className={dialogIcon} aria-label={t("accounts.close")}>
               <CloseIcon className="size-5" />
             </Dialog.Close>
-            <Dialog.Title className="text-title font-medium">{t("accounts.title")}</Dialog.Title>
           </div>
           {/*
             The accounts' one live region while the dialog is open: a sync is

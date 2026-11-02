@@ -159,7 +159,10 @@ test("a change the server dropped is told in the accounts dialog and in Settings
   await page.keyboard.press("Escape");
   await expect(accounts).toHaveCount(0);
   // …and Settings, on the same row.
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   await expect(
     page
       .getByRole("dialog", { name: "Settings" })

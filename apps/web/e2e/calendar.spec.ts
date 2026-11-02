@@ -439,7 +439,7 @@ test.describe("the shell around the views (design D132, D133)", () => {
     expect(area.y + area.height - (fab.y + fab.height)).toBe(16);
   });
 
-  test("the wide top bar: menu, Today, previous, next, the period, then search, Settings, tasks, the account", async ({
+  test("the wide top bar: menu, Today, previous, next, the period, then search, the calendar | tasks switch, the account", async ({
     page,
   }) => {
     await page.setViewportSize(WIDE);
@@ -457,7 +457,8 @@ test.describe("the shell around the views (design D132, D133)", () => {
       "Next week",
       "November, choose a date",
       "Search",
-      "Settings",
+      // The calendar | tasks switch (design D227).
+      "Calendar",
       "Tasks",
       // With what it says about the accounts: the demo holds a conflict.
       expect.stringMatching(/^Accounts/),

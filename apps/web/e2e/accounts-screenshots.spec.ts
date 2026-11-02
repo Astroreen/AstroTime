@@ -229,7 +229,10 @@ for (const language of ["en", "ru"] as const) {
         const page = await open(browser, { language, theme, size: viewport });
         await signIn(page, language, server);
         if (size === "wide") {
-          await page.getByRole("banner").getByRole("button", { name: text.settings }).click();
+          await page
+            .getByRole("navigation", { name: text.menu })
+            .getByRole("button", { name: text.settings })
+            .click();
         } else {
           await page.getByRole("button", { name: text.menu }).click();
           await page.getByRole("dialog").getByRole("button", { name: text.settings }).click();
