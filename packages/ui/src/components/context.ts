@@ -1,9 +1,16 @@
+import type { TFunction } from "i18next";
 import { createContext, useContext } from "react";
 
 import type { Formats } from "../calendar/format.ts";
 import type { Entry } from "../calendar/query.ts";
 
 export interface CalendarContextValue {
+  /**
+   * The UI's words, the view's own: every item drawn asks for them, and
+   * `useTranslation` in each made a copy of i18next's instance per item
+   * (docs/plans/foundation.md#D146). It changes with the language.
+   */
+  readonly t: TFunction;
   readonly formats: Formats;
   readonly timeZone: string;
   /** An item's colour: its own `COLOR`, else its calendar's (design D47). */

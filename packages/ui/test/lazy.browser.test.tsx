@@ -115,3 +115,18 @@ test("closed after a failure, the next opening asks again", async () => {
   await expect.element(page.getByRole("button", { name: "The dialog" })).toBeVisible();
   expect(loads.count).toBe(3);
 });
+
+test("tried again and failed again, Reload comes first: a shared file only a reload brings", async () => {
+  const loads = render(3);
+  await loads.reached(1);
+  await userEvent.click(page.getByRole("button", { name: "Open" }));
+  const failed = page.getByRole("alertdialog", { name: /Could not load this part of AstroTime/ });
+  await userEvent.click(failed.getByRole("button", { name: "Try again" }));
+  const again = page.getByRole("alertdialog", { name: /Reload AstroTime to finish updating/ });
+  await expect.element(again).toBeVisible();
+  expect(loads.count).toBe(3);
+  await expect.element(again.getByRole("button", { name: "Reload AstroTime" })).toHaveFocus();
+  // Trying again still works, once what failed arrives.
+  await userEvent.click(again.getByRole("button", { name: "Try again" }));
+  await expect.element(page.getByRole("button", { name: "The dialog" })).toBeVisible();
+});

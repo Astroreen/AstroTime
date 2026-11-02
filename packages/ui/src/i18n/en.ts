@@ -17,6 +17,9 @@ export const en = {
   "lazy.retry": "Try again",
   "lazy.reload": "Reload",
   "lazy.close": "Close",
+  "lazy.failedAgain":
+    "This part of AstroTime still could not load. Reload AstroTime to finish updating.",
+  "lazy.reloadToUpdate": "Reload AstroTime",
 
   "secrets.unprotected.title": "No keyring to keep your password safe",
   "secrets.unprotected.body":

@@ -5,7 +5,6 @@
 // ghost a drag draws looks like it.
 import { wallClockOf, type Placed } from "@astrotime/core";
 import type { CSSProperties } from "react";
-import { useTranslation } from "react-i18next";
 
 import type { Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
@@ -53,8 +52,7 @@ function Opener({
 
 /** When an item is: "All day", its time, or its start and end. */
 function useItemTime(): (entry: Entry, allDay: boolean) => string {
-  const { t } = useTranslation();
-  const { formats, timeZone } = useCalendar();
+  const { t, formats, timeZone } = useCalendar();
   return (entry, allDay) => {
     const { start, end } = entry.occurrence;
     if (allDay) return t("grid.allDay");
@@ -66,7 +64,7 @@ function useItemTime(): (entry: Entry, allDay: boolean) => string {
 
 /** The accessible name of an item: what it is, its title and when. */
 function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => string {
-  const { t } = useTranslation();
+  const { t } = useCalendar();
   const timeOf = useItemTime();
   return (entry, allDay, time = timeOf(entry, allDay)) => {
     const { item } = entry.occurrence;
@@ -78,7 +76,7 @@ function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => strin
 
 /** The title on one line, cut with an ellipsis, or (`clip`) cut short as the month's chips are. */
 function Title({ entry, wrap, clip }: { entry: Entry; wrap: boolean; clip?: boolean }) {
-  const { t } = useTranslation();
+  const { t } = useCalendar();
   const title = entry.occurrence.item.summary?.trim() || t("item.untitled");
   if (wrap) return <span className="item-title-wrap">{title}</span>;
   return (
@@ -165,8 +163,7 @@ export function AgendaCard({
   allDay: boolean;
   part: { index: number; total: number } | null;
 }) {
-  const { t } = useTranslation();
-  const { colorOf } = useCalendar();
+  const { t, colorOf } = useCalendar();
   const timeOf = useItemTime();
   const label = useItemLabel();
   const time = part ? t("agenda.dayOf", part) : timeOf(entry, allDay);

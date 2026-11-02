@@ -1790,7 +1790,11 @@ optimization is lacking").
     it) is no blank app: in the dialog's place AstroTime says it could not
     load that part, with "Try again", "Reload" and "Close"; a failed load is
     not kept, so trying again, or the next opening, asks again, under a URL
-    of its own since the browser keeps a module that failed as failed.
+    of its own since the browser keeps a module that failed as failed. That
+    URL is the dialog's own file; a file it shares with others, which failed
+    the same way, it still asks for under the old one, which fails again:
+    so once trying again has failed, Reload is the dialog's first action,
+    "Reload AstroTime to finish updating" ([D146](#D146)).
     Signing in and the sync stack stay in the first load
     ([Deferred](#deferred)).
   - **A budget CI holds**: `scripts/bundle-budget.ts`, after the web build,
@@ -1822,6 +1826,48 @@ optimization is lacking").
     store in its worker (sqlite-wasm, OPFS, the migrations check), the
     view's and the undone chip's reads, then placing their objects and
     drawing.
+
+### The first draw
+
+Measured, with Chrome's profiler, in the performance QA after v0.2.0 (the
+owner's feedback: "the optimization is lacking"), on D118's calendar in
+the built web app (`scripts/bench-cold-start.ts`).
+
+- **D146. The week draws before what it can wait for.**
+  - **The undone chip after the days** (`useEntries`, `hooks.ts`): its
+    tasks are a read of their own, asked after the range's, so the store's
+    worker answers the range first and the view draws its days; the chip
+    joins when its tasks are read, each parsed for its latest undone
+    occurrence (some 660 of D118's calendar). It is not drawn until then;
+    the strip may grow by its row once ([design D59](design.md#D59) keeps
+    the period's own items from arriving under a press).
+  - **One `t` for the calendar** (`CalendarContext`): every item drawn asked
+    `useTranslation`, which made a copy of i18next's instance per item; the
+    views' items take the screen's.
+  - **Reload first once trying again failed** ([D145](#D145)): a dialog
+    whose code did not arrive after "Try again" either says "Reload
+    AstroTime to finish updating", Reload its first action.
+  - **Measured** (`scripts/bench-cold-start.ts`, i7-14700KF; the
+    phone-class run with Chrome's "Fast 4G" and a CPU four times slower;
+    both on main at 8be35a2), the median of five new tabs:
+
+    | week drawn, blocked until then |       before |                   after |
+    | ------------------------------ | -----------: | ----------------------: |
+    | phone-class, empty HTTP cache  | 2094, 262 ms |             2027, 40 ms |
+    | phone-class, cached            | 1250, 240 ms |             1182, 38 ms |
+    | desktop, empty HTTP cache      |    435, 0 ms | within the runs' spread |
+
+    The main thread's long tasks before the week shows fall by five sixths,
+    so the page answers a tap at once while the chip's tasks are read.
+
+  - **Weighed and left out: the store's files with the page.** The store's
+    worker and SQLite's wasm (some 475 KiB gzipped) are asked for only once
+    the app's code has run and started the worker. Preloaded from the
+    page's head they drew the week some 150 ms sooner on a first visit at
+    phone-class speed, but the first paint came some 290 ms later, as they
+    shared the network with the page's own code, `fetchpriority="low"` or
+    not; after the first visit the service worker ([D124](#D124)) serves
+    them anyway.
 
 ## Deferred
 
@@ -1974,6 +2020,11 @@ optimization is lacking").
   such a page has no controller, which `serviceWorkerUpdates` reads once at
   start, so it never offers the waiting version; it gets it on the next
   normal load.
+- **A worker or tab an old tab starts after Reload** ([D124](#D124)) —
+  the version before's files go only to the tabs and workers that were open
+  when the user asked for the new version; one an old tab starts after that
+  is not in that set, so a lazily loaded file of the old version comes from
+  the network, which may no longer have it.
 - **A preset on Android and the desktop** ([D123](#D123)) — they have no
   page served by an AstroTime server; a build-time or first-start preset
   comes if someone deploys them for one person.

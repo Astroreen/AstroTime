@@ -350,7 +350,7 @@ export function CalendarScreen({
   );
 
   return (
-    <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>
+    <CalendarContext.Provider value={{ t, formats, timeZone, colorOf, found: foundId }}>
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
           <div className="relative isolate flex h-dvh flex-col bg-canvas pt-(--inset-top) pr-(--inset-right) pb-(--inset-bottom) pl-(--inset-left) text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">

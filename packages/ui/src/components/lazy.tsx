@@ -57,9 +57,12 @@ export function deferred<P extends Closable, M = unknown>(
     if (open && !wanted) setWanted(true);
     const [Loaded, setLoaded] = useState(attempt);
     const [failed, setFailed] = useState(false);
+    /** "Try again" failed too: what failed may be a file it shares, which only a reload brings. */
+    const [retried, setRetried] = useState(false);
     // Closed after a failure: the next opening tries again.
     if (failed && !open) {
       setFailed(false);
+      setRetried(false);
       setWanted(false);
       setLoaded(attempt);
     }
@@ -77,8 +80,9 @@ export function deferred<P extends Closable, M = unknown>(
     const retry = () => {
       setLoaded(attempt);
       setFailed(false);
+      setRetried(true);
     };
-    if (failed) return <LoadFailed onRetry={retry} onClose={props.onClose} />;
+    if (failed) return <LoadFailed again={retried} onRetry={retry} onClose={props.onClose} />;
     return (
       <Failed onFail={() => setFailed(true)}>
         <Suspense fallback={null}>
@@ -110,9 +114,22 @@ class Failed extends Component<{ onFail: () => void; children: ReactNode }, { fa
   }
 }
 
-/** What shows in a dialog's place when its code did not arrive. */
-function LoadFailed({ onRetry, onClose }: { onRetry: () => void; onClose: () => void }) {
+/**
+ * What shows in a dialog's place when its code did not arrive: "Try again"
+ * first, and once that failed too, "Reload AstroTime to finish updating"
+ * (docs/plans/foundation.md#D145).
+ */
+function LoadFailed({
+  again,
+  onRetry,
+  onClose,
+}: {
+  again: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
+  const reload = () => location.reload();
   return (
     <div
       role="alertdialog"
@@ -122,18 +139,31 @@ function LoadFailed({ onRetry, onClose }: { onRetry: () => void; onClose: () => 
     >
       <div className="flex max-w-sm flex-col gap-4 rounded-3xl bg-raised p-6 text-ink shadow-2xl">
         <p id="astrotime-load-failed" className="text-[15px]">
-          {t("lazy.failed")}
+          {t(again ? "lazy.failedAgain" : "lazy.failed")}
         </p>
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className={textButton} onClick={onClose}>
             {t("lazy.close")}
           </button>
-          <button type="button" className={textButton} onClick={() => location.reload()}>
-            {t("lazy.reload")}
-          </button>
-          <button type="button" className={primaryButton} onClick={onRetry} autoFocus>
-            {t("lazy.retry")}
-          </button>
+          {again ? (
+            <>
+              <button type="button" className={textButton} onClick={onRetry}>
+                {t("lazy.retry")}
+              </button>
+              <button type="button" className={primaryButton} onClick={reload} autoFocus>
+                {t("lazy.reloadToUpdate")}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className={textButton} onClick={reload}>
+                {t("lazy.reload")}
+              </button>
+              <button type="button" className={primaryButton} onClick={onRetry} autoFocus>
+                {t("lazy.retry")}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

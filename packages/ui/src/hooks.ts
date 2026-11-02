@@ -1,6 +1,7 @@
 import type { Store, UndoneTask } from "@astrotime/storage";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -56,6 +57,12 @@ export interface Entries {
  * (docs/plans/foundation.md#D54). Nothing is read while `ids` (the calendars
  * are not read yet) or `from` is null; the last result stays meanwhile. A
  * range whose read fails comes back empty.
+ *
+ * The undone tasks are a read of their own, after the range's: a view draws
+ * its days as soon as they are read, and the "N undone tasks" chip joins it
+ * when its tasks are, every one of them parsed to find its latest undone
+ * occurrence (docs/plans/foundation.md#D146). Until then the chip is not
+ * drawn.
  */
 export function useEntries(
   store: Store,
@@ -72,35 +79,40 @@ export function useEntries(
   // The ids by value: the calendars' list is new on every store write, and
   // the query already runs again on every write.
   const idsKey = query.ids?.join(",") ?? null;
-  const [data, setData] = useState<Entries | null>(null);
+  const [read, setRead] = useState<Omit<Entries, "undone"> | null>(null);
+  const [undone, setUndone] = useState<readonly UndoneTask[]>([]);
   useEffect(() => {
     if (idsKey === null || from === null || to === null) return;
     const ids = idsKey === "" ? [] : idsKey.split(",");
     const range = { from, to, timeZone };
     return liveQuery(
       store,
-      async () => {
-        const [rows, undone] = await Promise.all([
-          store.objectsBetween(ids, range),
-          store.undoneTasksBefore(ids, today, timeZone),
-        ]);
-        return { from, to, entries: cache.entries(rows, range), undone };
-      },
-      setData,
+      async () => ({
+        from,
+        to,
+        entries: cache.entries(await store.objectsBetween(ids, range), range),
+      }),
+      setRead,
       (error) => {
         console.error(error);
         // A range that could not be read is had as empty, and one read
         // before as it was, anew: either way a view that waits for this
         // read draws it (design D59).
-        setData((last) =>
-          last?.from === from && last.to === to
-            ? { ...last }
-            : { from, to, entries: [], undone: last?.undone ?? [] },
+        setRead((last) =>
+          last?.from === from && last.to === to ? { ...last } : { from, to, entries: [] },
         );
       },
     );
-  }, [store, cache, idsKey, from, to, timeZone, today]);
-  return data;
+  }, [store, cache, idsKey, from, to, timeZone]);
+  // Asked after the range, so the store's worker answers the range first;
+  // not again for a new range, which does not change it.
+  const reading = from !== null;
+  useEffect(() => {
+    if (idsKey === null || !reading) return;
+    const ids = idsKey === "" ? [] : idsKey.split(",");
+    return liveQuery(store, () => store.undoneTasksBefore(ids, today, timeZone), setUndone);
+  }, [store, idsKey, reading, today, timeZone]);
+  return useMemo(() => (read ? { ...read, undone } : null), [read, undone]);
 }
 
 /** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period (design D59). */

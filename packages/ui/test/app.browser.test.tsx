@@ -133,6 +133,35 @@ test("a period whose items cannot be read is drawn all the same, empty, not held
   expect(errors).toHaveBeenCalled();
 });
 
+test("the day draws before the undone chip's tasks are read; the chip joins them (D146)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  // The chip's read waits until the test lets it through.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const slow = Object.assign(Object.create(store) as Store, {
+    undoneTasksBefore: async (...args: Parameters<Store["undoneTasksBefore"]>) => {
+      await held;
+      return store.undoneTasksBefore(...args);
+    },
+  });
+  render(Promise.resolve(slow), ["en-US"]);
+  await expect
+    .element(
+      page
+        .getByRole("list", { name: "Wednesday, November 4" })
+        .getByRole("listitem", { name: /^Design review, / }),
+    )
+    .toBeInTheDocument();
+  const chip = page.getByRole("list", { name: "All day" }).getByRole("button", {
+    name: "3 undone tasks",
+  });
+  expect(chip.elements()).toEqual([]);
+  release();
+  await expect.element(chip).toBeInTheDocument();
+});
+
 test("back from the Agenda, the day is drawn as the store has it now, not as read before (design D59)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);

@@ -13,7 +13,6 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { useTranslation } from "react-i18next";
 
 import { daysBetween } from "../calendar/dates.ts";
 import { columnAt, slotAt } from "../calendar/drag.ts";
@@ -47,8 +46,7 @@ export interface TimeGridProps {
 
 export function TimeGrid(props: TimeGridProps) {
   const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe, floating } = props;
-  const { t } = useTranslation();
-  const { formats } = useCalendar();
+  const { t, formats } = useCalendar();
   const single = days.length === 1;
   const compact = days.length > 3;
   const columns: CSSProperties = {
@@ -204,8 +202,7 @@ export function TimeGrid(props: TimeGridProps) {
 
 /** A drag's ghost in a day's column: the item where it goes, or the new event a press sizes. */
 function ColumnGhost({ ghost, day, compact }: { ghost: Ghost; day: string; compact: boolean }) {
-  const { t } = useTranslation();
-  const { colorOf, formats, timeZone } = useCalendar();
+  const { t, colorOf, formats, timeZone } = useCalendar();
   if (ghost.kind === "create") {
     if (ghost.day !== day) return null;
     const clock = (minutes: number): Occurrence["start"] => ({
@@ -307,8 +304,7 @@ function Strip({
   onExpandedChange,
   ghost,
 }: TimeGridProps & { collapsed: boolean; ghost: Ghost | null }) {
-  const { t } = useTranslation();
-  const { formats, timeZone, colorOf } = useCalendar();
+  const { t, formats, timeZone, colorOf } = useCalendar();
   // A drag's ghost over the days it goes to, on the first row.
   const over =
     ghost?.kind === "item" && isAllDay(ghost.occurrence, timeZone)
