@@ -10,15 +10,26 @@ import type { AppUpdates } from "@astrotime/ui";
 const CHECK_EVERY_MS = 60 * 60_000;
 
 export interface ServiceWorkerUpdates extends AppUpdates {
-  /** Registers `/sw.js`; a failure is logged, and the app runs as it would without one. */
+  /** Registers the worker; a failure is logged, and the app runs as it would without one. */
   register(): Promise<void>;
 }
 
 export function serviceWorkerUpdates(
   container: ServiceWorkerContainer,
-  options: { reload: () => void; now?: () => number; document?: Document },
+  options: {
+    reload: () => void;
+    /** The app's base path (Vite's `BASE_URL`): the worker is `sw.js` there, its scope the app's. */
+    base?: string;
+    now?: () => number;
+    document?: Pick<Document, "visibilityState" | "addEventListener">;
+  },
 ): ServiceWorkerUpdates {
-  const { reload, now = () => Date.now(), document: page = globalThis.document } = options;
+  const {
+    reload,
+    base = "/",
+    now = () => Date.now(),
+    document: page = globalThis.document,
+  } = options;
   const listeners = new Set<() => void>();
   let registration: ServiceWorkerRegistration | null = null;
   let waiting = false;
@@ -68,11 +79,14 @@ export function serviceWorkerUpdates(
     },
     async register() {
       try {
-        registration = await container.register("/sw.js", { scope: "/" });
+        registration = await container.register(`${base}sw.js`, { scope: base });
       } catch (error) {
         console.error(error);
         return;
       }
+      // A browser that blocks workers (Playwright's `serviceWorkers: "block"`,
+      // some embedders) answers with none: the app runs as it would without.
+      if (!registration) return;
       const current = registration;
       if (current.waiting) found();
       watch(current.installing);

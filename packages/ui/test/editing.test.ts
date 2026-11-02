@@ -446,7 +446,7 @@ describe("what a calendar's rights offer (D37)", () => {
 });
 
 describe("saving writes pending changes through the store (D5)", () => {
-  test("a new item's calendar: the dialog's field and the save are one rule on one list (foundation D122)", async () => {
+  test("a new item's calendar: the dialog's field and the save are one rule (foundation D122)", () => {
     const calendar = (id: string, components: ("VEVENT" | "VTODO")[], create = true) =>
       ({
         id,

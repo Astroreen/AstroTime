@@ -21,12 +21,17 @@ function filesUnder(dir: string): string[] {
 
 export function serviceWorker(): Plugin {
   let publicDir = "";
+  /** The app's base path (Vite's `base`): the page, and the prefix of every file. */
+  let base = "/";
   return {
     name: "astrotime-service-worker",
     apply: "build",
     // After Vite's own: the page is in the bundle by then.
     enforce: "post",
     config: () => ({
+      // The tests' hook, only in a build made for them: elsewhere it is
+      // `false` before the build minifies, so the image's worker has none of it.
+      define: { ASTROTIME_TEST_HOOKS: String(process.env["ASTROTIME_SW_TEST_HOOKS"] === "1") },
       build: {
         rollupOptions: {
           input: { index: "index.html", sw: "sw/sw.ts" },
@@ -39,6 +44,7 @@ export function serviceWorker(): Plugin {
     }),
     configResolved(config) {
       publicDir = config.publicDir;
+      base = config.base;
     },
     generateBundle(_options, bundle) {
       const worker = bundle[SW];
@@ -58,7 +64,7 @@ export function serviceWorker(): Plugin {
       // The page too: a change to it alone (its tags, the preset's place) is a new version.
       const page = bundle["index.html"];
       if (page?.type === "asset") hash.update("index.html").update(page.source);
-      const files = ["/", ...[...built, ...own].toSorted().map((file) => `/${file}`)];
+      const files = [base, ...[...built, ...own].toSorted().map((file) => `${base}${file}`)];
       for (const file of files) hash.update(file);
       const version = hash.digest("base64url").slice(0, 16);
       const code = worker.code
