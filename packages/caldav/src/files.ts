@@ -80,18 +80,34 @@ export function filesOf(
   };
 }
 
+/** The longest name uploaded, in UTF-8 bytes: Nextcloud takes 255, and " (20)" may follow. */
+const MAX_NAME_BYTES = 200;
+
 /**
  * A name Nextcloud takes, which stays in its folder: the characters its
- * clients refuse (`\\ / : * ? " < > |`) and control characters made `_`,
- * spaces and dots trimmed from its ends (no `.` or `..`, no hidden
- * `.htaccess`), "file" when nothing is left (foundation D232).
+ * clients refuse (backslash, slash, colon, star, question mark, quote,
+ * angle brackets, bar) and control characters made `_`, spaces and dots
+ * trimmed from its ends (no `.` or `..`, no hidden `.htaccess`), its
+ * refused endings `.part` and `.filepart` made `_part`, `_filepart`, at
+ * most 200 bytes with its extension kept, "file" when nothing is left
+ * (foundation D232).
  */
 export function safeName(name: string): string {
-  const cleaned = name
-    .replaceAll(/[\\/:*?"<>|\p{Cc}]/gu, "_")
-    .replace(/^[\s.]+/, "")
-    .replace(/[\s.]+$/, "");
-  return cleaned || "file";
+  const cleaned =
+    name
+      .replaceAll(/[\\/:*?"<>|\p{Cc}]/gu, "_")
+      .replace(/^[\s.]+/, "")
+      .replace(/[\s.]+$/, "")
+      .replace(/\.(file)?part$/i, (ending) => `_${ending.slice(1)}`) || "file";
+  const bytes = (value: string) => new TextEncoder().encode(value).length;
+  if (bytes(cleaned) <= MAX_NAME_BYTES) return cleaned;
+  const dot = cleaned.lastIndexOf(".");
+  // An extension is kept only when it is short, as a file's is.
+  const extension = dot > 0 && cleaned.length - dot <= 16 ? cleaned.slice(dot) : "";
+  // By code points, so no character is cut in half.
+  const stem = Array.from(cleaned.slice(0, cleaned.length - extension.length));
+  while (stem.length > 1 && bytes(stem.join("") + extension) > MAX_NAME_BYTES) stem.pop();
+  return stem.join("").trimEnd() + extension;
 }
 
 /** Nextcloud Calendar's attachments folder, where it uploads a file from the device (its `attachmentsFolder` setting's default). */

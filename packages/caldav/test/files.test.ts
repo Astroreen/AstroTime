@@ -186,6 +186,14 @@ test("a name Nextcloud takes, inside /Calendar: no `.` or `..`, no hidden file, 
   expect(safeName(".htaccess")).toBe("htaccess");
   expect(safeName('Q3: "final"? <v2> | a*b.pdf')).toBe("Q3_ _final__ _v2_ _ a_b.pdf");
   expect(safeName("  notes.txt . ")).toBe("notes.txt");
+  // Endings Nextcloud refuses for a file in progress.
+  expect(safeName("backup.part")).toBe("backup_part");
+  expect(safeName("x.FILEPART")).toBe("x_FILEPART");
+  // At most 200 bytes of UTF-8, the extension kept, no character cut in half.
+  const long = safeName(`${"я".repeat(150)}.pdf`);
+  expect(new TextEncoder().encode(long).length).toBeLessThanOrEqual(200);
+  expect(long).toBe(`${"я".repeat(98)}.pdf`);
+  expect(safeName("a".repeat(300))).toBe("a".repeat(200));
   // Uploaded, a traversal stays a name in /Calendar: never the files' root or its parent.
   const urls: string[] = [];
   const http: HttpClient = async (request) => {

@@ -2230,30 +2230,44 @@ task?"
   system's file dialog (the browser's, Electron's, Android's picker in the
   WebView), and the file goes where Nextcloud Calendar puts what it
   uploads, `/Calendar` (its `attachmentsFolder` default; `MKCOL` makes it,
-  `405` says it is there), under a name Nextcloud takes that stays in that
-  folder (`safeName`: the characters its clients refuse, `\ / : * ? " <
-  > |`, and control characters made `_`, spaces and dots trimmed from its
-  > ends, so no `.`, `..`or hidden`.htaccess`, "file" when nothing is
-  > left), never over a file there: `PUT`with`If-None-Match:
-  > *`, and on `412`"name (2).ext", then "(3)"…, up to twenty. Listed back
-  > with`Depth: 0`, it is attached as a file picked from the account is
-  > ([D231](#D231)). For that, a request's body may be bytes
-  > (`HttpRequest.body: string | Uint8Array`) on every platform: the web's
-  > `fetch` sends them as they are, and its proxy forwards a body as bytes,
-  > not as text ([D39](#D39): a file is no UTF-8); the desktop's main
-  > process takes them over IPC and writes them (`checks.ts` lets bytes
-  > through, nothing else); Android's bridge carries text only, so they
-  > cross it in base64 (`bodyBase64`) and the plugin decodes them with
-  > Okio's base64 (the JVM tests' too) into OkHttp's body. A file over 50 MB
-  > is refused before anything is sent (Android holds it in memory twice,
-  > as bytes and as base64), with what to do instead: attach it from the
-  > account's files. While it goes the row says "Uploading minutes.txt…";
-  > one that failed says so. The file joins the attachments as they are when
-  > it is ready, not as they were when it was picked: what the user changed
-  > meanwhile (a link added, the title) stays.
+  `405` says it is there).
+  - **Its name** is one Nextcloud takes and that stays in that folder
+    (`safeName`): the characters its clients refuse (backslash, slash,
+    colon, star, question mark, quote, angle brackets, bar) and control
+    characters made `_`; spaces and dots trimmed from its ends, so no `.`,
+    `..` or hidden `.htaccess`; the endings it refuses, `.part` and
+    `.filepart`, made `_part` and `_filepart`; at most 200 bytes of UTF-8
+    (Nextcloud takes 255, and " (20)" may follow), the extension kept and
+    no character cut in half; "file" when nothing is left.
+  - **Never over a file there**: `PUT` with `If-None-Match: *`, and on
+    `412` "name (2).ext", then "(3)", up to twenty; past that, or on any
+    other refusal (a quota full, a name refused), the upload says it
+    failed. Listed back with `Depth: 0`, the file is attached as one
+    picked from the account is ([D231](#D231)).
+  - **Bytes on every platform**: a request's body may be bytes
+    (`HttpRequest.body: string | Uint8Array`). The web's `fetch` sends
+    them as they are, and its proxy forwards a body as bytes, not as text
+    ([D39](#D39): a file is no UTF-8); the desktop's main process takes
+    them over IPC and writes them (`checks.ts` lets bytes through, nothing
+    else); Android's bridge carries text only, so they cross it in base64
+    (`bodyBase64`), which the plugin decodes with Okio's base64 (the JVM
+    tests' too) into OkHttp's body.
+  - **In the dialog**: a file over 50 MB is refused before anything is
+    sent (Android holds it in memory twice, as bytes and as base64), with
+    what to do instead: attach it from the account's files. While it goes
+    the row says "Uploading minutes.txt…", and one that failed says so.
+    The file joins the attachments as they are when it is ready, not as
+    they were when it was picked: what the user changed meanwhile (a link
+    added, the title) stays. A dialog closed before the upload ended is
+    left alone: nothing changes in it after, and the file stays in
+    `/Calendar`, uploaded and not attached ([Deferred](#deferred)).
 
 ## Deferred
 
+- **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
+  in the user's `/Calendar`, attached to nothing; attaching it to the item
+  if that was saved meanwhile, or removing it, waits for an upload that
+  outlives its dialog.
 - **The user's own attachments folder** ([D232](#D232)) — Nextcloud
   Calendar lets the user choose where uploads go (its `attachmentsFolder`
   setting, kept by its app, not over WebDAV); AstroTime uploads to its

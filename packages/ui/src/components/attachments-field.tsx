@@ -79,9 +79,19 @@ export function AttachmentsField({
     | null
   >(null);
   const picker = useRef<HTMLInputElement>(null);
+  // Whether the dialog is still open: an upload that ends after it closed
+  // changes nothing here (foundation D232).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   // The form as it is when the file is ready, not when it was picked: an
   // upload takes a while, and what the user changed meanwhile stays.
   const attach = useEffectEvent((attachment: NewAttachment) => {
+    if (!mounted.current) return;
     // A file attached already is not attached twice, its link as it resolves.
     if (!value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, calendar?.url)))
       onChange([...value, { kind: "new", attachment }]);
@@ -103,10 +113,10 @@ export function AttachmentsField({
       );
       if (!sent.attachment) throw new Error("The file uploaded has no link.");
       attach(sent.attachment);
-      setUploading(null);
+      if (mounted.current) setUploading(null);
     } catch (error) {
       console.error(error);
-      setUploading({ state: "failed", name: file.name, tooBig: false });
+      if (mounted.current) setUploading({ state: "failed", name: file.name, tooBig: false });
     }
   };
   const [adding, setAdding] = useState(false);
