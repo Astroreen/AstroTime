@@ -97,6 +97,8 @@ describe("a size", () => {
 
 test("a link typed: a host with a dot, localhost, or a name with its port; never a number or a time", () => {
   expect(typedLink("example.org/minutes")).toBe("https://example.org/minutes");
+  expect(typedLink("docs.example.org")).toBe("https://docs.example.org/");
+  expect(typedLink("https://example.org")).toBe("https://example.org/");
   expect(typedLink("  http://example.org  ")).toBe("http://example.org/");
   expect(typedLink("nas:8080/files/a.pdf")).toBe("https://nas:8080/files/a.pdf");
   expect(typedLink("localhost")).toBe("https://localhost/");
@@ -106,6 +108,9 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   expect(typedLink("1.5")).toBeNull();
   expect(typedLink("nas")).toBeNull();
   expect(typedLink("report.pdf")).toBeNull();
+  expect(typedLink("archive.zip")).toBeNull();
+  expect(typedLink("notes.md")).toBeNull();
+  expect(typedLink("example.org")).toBeNull();
   expect(typedLink("a@b.com")).toBeNull();
   expect(typedLink("https://user@example.org/")).toBeNull();
   expect(typedLink("example.org/report.pdf")).toBe("https://example.org/report.pdf");

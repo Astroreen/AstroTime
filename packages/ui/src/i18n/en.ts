@@ -312,6 +312,9 @@ export const en = {
   "attachments.uploading": "Uploading {{name}}…",
   "attachments.uploadFailed": "{{name}} could not be uploaded.",
   "attachments.tooBig": "{{name}} is over 50 MB: attach it from your files instead.",
+  "attachments.moved":
+    "{{name}} was uploaded, but the item is now in another account's calendar: it is not attached.",
+  "attachments.notLink": "Not a web link yet: put https:// before it.",
   "attachments.file": "File",
   "details.reminders": "Reminders",
   "details.guests": "Guests",

@@ -115,16 +115,14 @@ export function attachmentText(
   return { name, about };
 }
 
-/** A name that ends as a file's does, not a host's. */
-const FILE_NAME =
-  /\.(pdf|txt|docx?|xlsx?|pptx?|odt|ods|odp|csv|png|jpe?g|gif|webp|heic|svg|mp3|mp4)$/i;
-
 /**
  * A web link typed: with `http://` or `https://`, else `https://` before it.
- * Its host has a dot (`example.org`, `192.168.1.10`), is `localhost`, or is
- * a name with its port (`nas:8080`); a number (`1234`), a time (`12:30`),
- * a bare word, a file's name (`report.pdf`) or a mail address (`a@b.com`)
- * is not one, nor another scheme (`javascript:`, `mailto:`) or text with a
+ * Its host has a dot (`docs.example.org`, `example.org/plan`,
+ * `192.168.1.10`), is `localhost`, or is a name with its port
+ * (`nas:8080`). Not one: a number (`1234`), a time (`12:30`), a bare word,
+ * one word and an ending alone (`report.pdf`, `example.org`: a file's name
+ * as likely as a site, a link once `https://` is before it), a mail address
+ * (`a@b.com`), another scheme (`javascript:`, `mailto:`) or text with a
  * space.
  */
 export function typedLink(text: string): string | null {
@@ -136,8 +134,10 @@ export function typedLink(text: string): string | null {
   const host = /^(?:https?:\/\/)?([^/:?#]*)/i.exec(trimmed)?.[1] ?? "";
   // An address with a user (`a@b.com`, `user@host`) is mail, not a page.
   if (host.includes("@")) return null;
-  // A file's name typed alone (`report.pdf`) is no host.
-  if (!scheme && !/[/:]/.test(trimmed) && FILE_NAME.test(host)) return null;
+  // One word, a dot and another, with nothing after (`report.pdf`,
+  // `notes.md`, `example.org`): as likely a file's name as a site. It is a
+  // link once it says so, with `https://` or a path (the field says how).
+  if (!scheme && !/[/:]/.test(trimmed) && /^[^.]+\.[^.]+$/.test(host)) return null;
   // Digits and dots: an address only as four numbers (no "1.5" read as 1.0.0.5).
   if (/^[\d.]+$/.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
   try {

@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, NOW, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
+import { addAccount, choose, NOW, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
 
 const SERVER = "https://cloud.example.com";
 const USER = "astrotime-test";
@@ -263,6 +263,69 @@ test("what the user changes while a file uploads stays: the file joins the list 
   const list = edit.getByRole("list", { name: "Attachments" });
   await expect(list.getByRole("listitem")).toHaveText([/example\.org\/agenda/, /minutes\.txt/]);
   await expect(edit.getByRole("textbox", { name: "Title" })).toHaveValue("Quarterly review, v2");
+});
+
+test("an item moved to another account's calendar while its file uploads: not attached, and said so (design D232)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  let answer!: () => void;
+  const held = new Promise<void>((resolve) => (answer = resolve));
+  await fakeNextcloud(page, held);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  const chooser = page.waitForEvent("filechooser");
+  await edit.getByRole("button", { name: "From this device" }).click();
+  await (
+    await chooser
+  ).setFiles({ name: "minutes.txt", mimeType: "text/plain", buffer: Buffer.from("Minutes") });
+  await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
+  // Meanwhile the item goes to the calendar on this device, which has no files.
+  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
+  answer();
+  await expect(edit.getByRole("alert")).toHaveText(
+    "minutes.txt was uploaded, but the item is now in another account's calendar: it is not attached.",
+  );
+  await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
+});
+
+test("a word and an ending alone is not taken for a link: the field says to put https:// before it (design D233)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  await fakeNextcloud(page);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  const link = edit.getByRole("textbox", { name: "Link" });
+  await link.fill("report.pdf");
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await expect(edit.getByText("Not a web link yet: put https:// before it.")).toBeVisible();
+  await link.fill("https://example.org/report.pdf");
+  await expect(edit.getByText("Not a web link yet: put https:// before it.")).toHaveCount(0);
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
 });
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];

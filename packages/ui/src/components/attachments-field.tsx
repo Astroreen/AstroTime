@@ -8,7 +8,7 @@ import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
 import { accountFiles } from "@astrotime/sync/files";
-import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
@@ -76,26 +76,34 @@ export function AttachmentsField({
   const [uploading, setUploading] = useState<
     | { readonly state: "sending"; readonly name: string }
     | { readonly state: "failed"; readonly name: string; readonly tooBig: boolean }
+    // Uploaded, but the item's calendar moved to another account meanwhile.
+    | { readonly state: "moved"; readonly name: string }
     | null
   >(null);
   const picker = useRef<HTMLInputElement>(null);
-  // Whether the dialog is still open: an upload that ends after it closed
-  // changes nothing here (foundation D232).
-  const mounted = useRef(true);
+  // The form as it is now, read when an upload ends (it takes a while, and
+  // what the user changed meanwhile stays); null once the dialog closed,
+  // which an upload that ends after it leaves alone (foundation D232).
+  const latest = useRef<{
+    readonly value: readonly AttachmentChoice[];
+    readonly onChange: (attachments: readonly AttachmentChoice[]) => void;
+    readonly calendar: Calendar | undefined;
+  } | null>(null);
   useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  // The form as it is when the file is ready, not when it was picked: an
-  // upload takes a while, and what the user changed meanwhile stays.
-  const attach = useEffectEvent((attachment: NewAttachment) => {
-    if (!mounted.current) return;
-    // A file attached already is not attached twice, its link as it resolves.
-    if (!value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, calendar?.url)))
-      onChange([...value, { kind: "new", attachment }]);
+    latest.current = { value, onChange, calendar };
   });
+  useEffect(
+    () => () => {
+      latest.current = null;
+    },
+    [],
+  );
+  const attach = (attachment: NewAttachment, base: string | undefined) => {
+    const now = latest.current;
+    // A file attached already is not attached twice, its link as it resolves.
+    if (now && !now.value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, base)))
+      now.onChange([...now.value, { kind: "new", attachment }]);
+  };
   const upload = async (file: File) => {
     if (!account) return;
     if (file.size > MAX_UPLOAD) {
@@ -103,6 +111,7 @@ export function AttachmentsField({
       return;
     }
     setUploading({ state: "sending", name: file.name });
+    const from = account.id;
     try {
       const files = await accountFiles({ http: platform.http, secrets: platform.secrets }, account);
       if (!files) throw new Error("This account's files cannot be opened.");
@@ -112,11 +121,19 @@ export function AttachmentsField({
         new Uint8Array(await file.arrayBuffer()),
       );
       if (!sent.attachment) throw new Error("The file uploaded has no link.");
-      attach(sent.attachment);
-      if (mounted.current) setUploading(null);
+      const now = latest.current;
+      if (!now) return;
+      // The item moved to another account's calendar meanwhile: a link to
+      // this account's file would not open there. Not attached, and said so.
+      if (now.calendar?.accountId !== from) {
+        setUploading({ state: "moved", name: sent.name });
+        return;
+      }
+      attach(sent.attachment, now.calendar.url);
+      setUploading(null);
     } catch (error) {
       console.error(error);
-      if (mounted.current) setUploading({ state: "failed", name: file.name, tooBig: false });
+      if (latest.current) setUploading({ state: "failed", name: file.name, tooBig: false });
     }
   };
   const [adding, setAdding] = useState(false);
@@ -221,16 +238,22 @@ export function AttachmentsField({
           )}
         </div>
       )}
+      {adding && link.trim() !== "" && !typed && (
+        // Not a web link yet: what makes it one (design D233).
+        <p className="text-note text-ink-muted">{t("attachments.notLink")}</p>
+      )}
       {uploading && (
         <p
-          role={uploading.state === "failed" ? "alert" : "status"}
-          className={`text-note ${uploading.state === "failed" ? "text-danger" : "text-ink-muted"}`}
+          role={uploading.state === "sending" ? "status" : "alert"}
+          className={`text-note ${uploading.state === "sending" ? "text-ink-muted" : "text-danger"}`}
         >
           {uploading.state === "sending"
             ? t("attachments.uploading", { name: uploading.name })
-            : uploading.tooBig
-              ? t("attachments.tooBig", { name: uploading.name })
-              : t("attachments.uploadFailed", { name: uploading.name })}
+            : uploading.state === "moved"
+              ? t("attachments.moved", { name: uploading.name })
+              : uploading.tooBig
+                ? t("attachments.tooBig", { name: uploading.name })
+                : t("attachments.uploadFailed", { name: uploading.name })}
         </p>
       )}
       {account && (
@@ -240,7 +263,7 @@ export function AttachmentsField({
           onClose={() => setBrowsing(false)}
           onPick={(attachment) => {
             setBrowsing(false);
-            attach(attachment);
+            attach(attachment, calendar?.url);
           }}
         />
       )}

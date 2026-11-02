@@ -2238,7 +2238,8 @@ task?"
     `..` or hidden `.htaccess`; the endings it refuses, `.part` and
     `.filepart`, made `_part` and `_filepart`; at most 200 bytes of UTF-8
     (Nextcloud takes 255, and " (20)" may follow), the extension kept and
-    no character cut in half; "file" when nothing is left.
+    no character cut in half, its ends made safe again after the cut;
+    "file" when nothing is left.
   - **Never over a file there**: `PUT` with `If-None-Match: *`, and on
     `412` "name (2).ext", then "(3)", up to twenty; past that, or on any
     other refusal (a quota full, a name refused), the upload says it
@@ -2258,7 +2259,12 @@ task?"
     the row says "Uploading minutes.txt…", and one that failed says so.
     The file joins the attachments as they are when it is ready, not as
     they were when it was picked: what the user changed meanwhile (a link
-    added, the title) stays. A dialog closed before the upload ended is
+    added, the title) stays; but if the item went to another account's
+    calendar meanwhile, the file is not attached (a link to the first
+    account's file would not open there), and the dialog says so. The form and its callback are read as
+    the latest render left them (a ref, not what was there when the file
+    was picked). A dialog closed
+    before the upload ended is
     left alone: nothing changes in it after, and the file stays in
     `/Calendar`, uploaded and not attached ([Deferred](#deferred)).
 
