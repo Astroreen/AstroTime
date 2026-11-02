@@ -102,6 +102,17 @@ export async function pictureOf(id: string): Promise<Blob | undefined> {
   return transact("readonly", (store) => store.get(id) as IDBRequest<Blob | undefined>);
 }
 
+/**
+ * Forgets every kept picture but those `keep` names (design D222): one a
+ * dialog kept and then closed unsaved, or a pick that arrived after its
+ * dialog had gone, has nothing naming it. Run as Settings opens.
+ */
+export async function sweepPictures(keep: ReadonlySet<string>): Promise<void> {
+  const ids = await transact("readonly", (store) => store.getAllKeys());
+  const stray = ids.filter((id): id is string => typeof id === "string" && !keep.has(id));
+  await Promise.all(stray.map(removePicture));
+}
+
 /** Forgets a picture; one that is not kept is no error. */
 export async function removePicture(id: string): Promise<void> {
   urls.get(id)?.then(
@@ -112,7 +123,7 @@ export async function removePicture(id: string): Promise<void> {
   await transact("readwrite", (store) => store.delete(id));
 }
 
-/** Each picture's object URL, made once and kept while the page is open. */
+/** Each picture's object URL, made once and kept while the page is open; a miss or a failure is asked again. */
 const urls = new Map<string, Promise<string | null>>();
 const urlOf = (id: string) => {
   let url = urls.get(id);
@@ -122,6 +133,7 @@ const urlOf = (id: string) => {
       () => null,
     );
     urls.set(id, url);
+    void url.then((found) => found === null && urls.delete(id));
   }
   return url;
 };

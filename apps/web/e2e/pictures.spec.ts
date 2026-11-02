@@ -326,6 +326,51 @@ test.describe("the user's own pictures", () => {
     await expect(again.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  test("a picture picked in a dialog closed unsaved is not kept; an existing word's dialog says it edits (D222, D223)", async ({
+    page,
+  }) => {
+    const stored = () =>
+      page.evaluate(
+        () =>
+          new Promise<number>((resolve, reject) => {
+            const open = indexedDB.open("astrotime-pictures", 1);
+            open.addEventListener("upgradeneeded", () => open.result.createObjectStore("pictures"));
+            open.addEventListener("error", () => reject(open.error));
+            open.addEventListener("success", () => {
+              const count = open.result.transaction("pictures").objectStore("pictures").count();
+              count.addEventListener("success", () => {
+                open.result.close();
+                resolve(count.result);
+              });
+            });
+          }),
+      );
+    await openDemo(page, "agenda");
+    const settings = await openSettings(page);
+    await settings.getByRole("button", { name: "Add a word with a picture" }).click();
+    const editor = page.getByRole("dialog", { name: "A word's picture" });
+    const chooser = page.waitForEvent("filechooser");
+    await editor.getByRole("button", { name: "Choose a picture" }).click();
+    await (await chooser).setFiles({ name: "team.png", mimeType: "image/png", buffer: OWN });
+    await expect(editor.locator("img")).toHaveAttribute("src", /^blob:/);
+    expect(await stored()).toBe(1);
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+    // The form's delete began as it closed; a later transaction on the store waits for it.
+    expect(await stored()).toBe(0);
+    // An existing word's dialog says it edits.
+    await settings.getByRole("button", { name: "Add a word with a picture" }).click();
+    const fresh = page.getByRole("dialog", { name: "A word's picture" });
+    await fresh.getByRole("textbox", { name: "Word" }).fill("stand");
+    const again = page.waitForEvent("filechooser");
+    await fresh.getByRole("button", { name: "Choose a picture" }).click();
+    await (await again).setFiles({ name: "team.png", mimeType: "image/png", buffer: OWN });
+    await expect(fresh.locator("img")).toHaveAttribute("src", /^blob:/);
+    await fresh.getByRole("button", { name: "Save" }).click();
+    await settings.getByRole("listitem").filter({ hasText: "stand" }).getByRole("button").click();
+    await expect(page.getByRole("dialog", { name: "Change a word's picture" })).toBeVisible();
+  });
+
   test("a month banner of the user's own, and back to AstroTime's (D223)", async ({ page }) => {
     await openDemo(page, "agenda");
     const settings = await openSettings(page);

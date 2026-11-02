@@ -2049,7 +2049,11 @@ own (below).
   phone camera's photo of several megabytes keeps a few hundred
   kilobytes. A file that is no picture is refused, said in the dialog,
   and nothing is kept. The settings hold only each picture's id; a word
-  deleted, a picture replaced or a banner reset forgets its picture.
+  deleted, a picture replaced or a banner reset forgets its picture, and
+  so does a dialog closed unsaved (its pick, or one that arrives after it
+  closed); as Settings opens, any picture nothing names is swept away. A
+  picture that could not be read is asked for again next time, not
+  remembered as missing.
   Across devices: [Deferred](#deferred), as own colours are (D173).
 - **D223. Your words and pictures, your month banners.** Settings →
   Pictures, under its switches (`picture-settings.tsx`, loaded with

@@ -9,6 +9,7 @@ import {
   NotAPictureError,
   pictureOf,
   removePicture,
+  sweepPictures,
 } from "../src/pictures/own.ts";
 
 /** A picture as a phone's camera gives one: a PNG, 3000 × 1000. */
@@ -54,4 +55,13 @@ test("a file that is no picture is refused, and nothing is kept", async () => {
 test("a picture already small enough keeps its size", () => {
   expect(keptSize(800, 600)).toEqual({ width: 800, height: 600 });
   expect(keptSize(1000, 4000)).toEqual({ width: 400, height: 1600 });
+});
+
+test("the sweep forgets every picture nothing names, and keeps those named", async () => {
+  const named = await addPicture(await photo());
+  const stray = await addPicture(await photo());
+  await sweepPictures(new Set([named]));
+  expect(await pictureOf(named)).toBeDefined();
+  expect(await pictureOf(stray)).toBeUndefined();
+  await removePicture(named);
 });

@@ -4,12 +4,18 @@
 // its own, as own colours are (D173); the pictures are kept on this device
 // (`pictures/own.ts`), the settings hold their ids. Loaded with Settings.
 import { Dialog } from "@base-ui/react/dialog";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addPictureStrings } from "../i18n/pictures.ts";
 import { MONTH_ART } from "../pictures/art.ts";
-import { addPicture, NotAPictureError, removePicture, usePictureUrl } from "../pictures/own.ts";
+import {
+  addPicture,
+  NotAPictureError,
+  removePicture,
+  sweepPictures,
+  usePictureUrl,
+} from "../pictures/own.ts";
 import { useSettings, type OwnWord } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon, PlusIcon } from "./icons.tsx";
@@ -80,6 +86,15 @@ export function PictureSettings() {
   const [editing, setEditing] = useState<OwnWord | "new" | null>(null);
   const [banners, setBanners] = useState(false);
   const wordsId = useId();
+  // As Settings opens: pictures nothing names (a dialog closed unsaved) are forgotten.
+  useEffect(() => {
+    const named = new Set([
+      ...settings.ownWords.map((own) => own.picture),
+      ...Object.values(settings.ownBanners),
+    ]);
+    sweepPictures(named).catch(console.error);
+    // Once, as it opens: a pick in a dialog open later is the dialog's own.
+  }, []);
   return (
     <>
       <h3 id={wordsId} className="px-4 pt-3 pb-1 text-note text-ink-muted">
@@ -188,6 +203,19 @@ function WordForm({
   const [picture, setPicture] = useState<string | null>(own?.picture ?? null);
   const [failed, setFailed] = useState(false);
   const url = usePictureUrl(picture);
+  // A picture picked here and not saved is forgotten as the dialog closes,
+  // and one that arrives after it closed at once (design D222).
+  const unsaved = useRef<string | null>(null);
+  const open = useRef(true);
+  useEffect(() => {
+    // Open again after React's second mounting in development (StrictMode).
+    open.current = true;
+    return () => {
+      open.current = false;
+      if (unsaved.current) void removePicture(unsaved.current);
+      unsaved.current = null;
+    };
+  }, []);
   const wordId = useId();
   const hintId = useId();
   const errorId = useId();
@@ -197,15 +225,18 @@ function WordForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        if (ready)
-          onSave(
-            { id: own?.id ?? crypto.randomUUID(), word: word.trim(), picture },
-            own?.picture ?? null,
-          );
+        if (!ready) return;
+        unsaved.current = null;
+        onSave(
+          { id: own?.id ?? crypto.randomUUID(), word: word.trim(), picture },
+          own?.picture ?? null,
+        );
       }}
       className="flex flex-col gap-4"
     >
-      <Dialog.Title className="pr-10 text-title font-medium">{t("ownPictures.new")}</Dialog.Title>
+      <Dialog.Title className="pr-10 text-title font-medium">
+        {t(own ? "ownPictures.edit" : "ownPictures.new")}
+      </Dialog.Title>
       <div className="flex flex-col gap-1">
         <label htmlFor={wordId} className="text-small text-ink-muted">
           {t("ownPictures.word")}
@@ -229,9 +260,11 @@ function WordForm({
           label={t("ownPictures.choose")}
           className={textButton}
           onPicked={(id) => {
+            if (!open.current) return void removePicture(id);
             setFailed(false);
             // A picture chosen and then another: the first is kept no more.
-            if (picture && picture !== own?.picture) void removePicture(picture);
+            if (unsaved.current) void removePicture(unsaved.current);
+            unsaved.current = id;
             setPicture(id);
           }}
           onFailed={(error) => {
