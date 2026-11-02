@@ -284,8 +284,6 @@ export const en = {
   "notice.copied": "Copy made",
   "notice.open": "Open",
   "details.readOnly": "{{calendar}} is read-only: this item cannot be changed here.",
-  "details.calendar": "Calendar: {{calendar}}",
-  "details.list": "List: {{calendar}}",
   "details.reminders": "Reminders",
   "details.guests": "Guests",
   "details.organizer": "Organizer",

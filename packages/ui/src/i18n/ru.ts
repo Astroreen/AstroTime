@@ -297,8 +297,6 @@ export const ru = {
   "notice.copied": "Копия создана",
   "notice.open": "Открыть",
   "details.readOnly": "Календарь «{{calendar}}» только для чтения: здесь это не изменить.",
-  "details.calendar": "Календарь: {{calendar}}",
-  "details.list": "Список: {{calendar}}",
   "details.reminders": "Напоминания",
   "details.guests": "Гости",
   "details.organizer": "Организатор",

@@ -348,3 +348,90 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
   });
 });
+
+test("a task's row is three tab stops: its checkbox, its title that opens it, its star (design D195)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const panel = tasks(page);
+  await panel.getByRole("tab", { name: /^Tasks/ }).click();
+  const report = panel.getByRole("listitem", { name: "Send the report" });
+  const checkbox = report.getByRole("checkbox", { name: "Send the report" });
+  const title = report.getByRole("button", { name: "Send the report", exact: true });
+  const star = report.getByRole("button", { name: "Star: Send the report" });
+  await checkbox.focus();
+  await page.keyboard.press("Tab");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(star).toBeFocused();
+  // The next stop is the next row's checkbox: the row has no other.
+  await page.keyboard.press("Tab");
+  await expect(
+    panel.getByRole("listitem", { name: "Take out the recycling" }).getByRole("checkbox"),
+  ).toBeFocused();
+  // Enter on the title opens the task; Space on the checkbox completes it, not opens it.
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Send the report" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(checkbox).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+for (const colorScheme of ["dark", "light"] as const) {
+  test(`a row under the mouse shows its hover background on its card, ${colorScheme} (design D195)`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.setViewportSize(WIDE);
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    await panel.getByRole("tab", { name: /^Tasks/ }).click();
+    const item = panel.getByRole("listitem", { name: "Send the report" });
+    const row = item.locator("> div");
+    // The row lies on its list's card: nothing of its own until the mouse is over it.
+    const card = await item.evaluate((element) => {
+      let parent = element.parentElement;
+      while (parent && getComputedStyle(parent).backgroundColor === "rgba(0, 0, 0, 0)") {
+        parent = parent.parentElement;
+      }
+      return getComputedStyle(parent!).backgroundColor;
+    });
+    await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    const box = (await row.boundingBox())!;
+    await page.mouse.move(box.x + box.width - 60, box.y + box.height / 2);
+    await expect(row).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(row).not.toHaveCSS("background-color", card);
+  });
+}
+
+test.describe("on a touch screen", () => {
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+  test("a tapped row keeps no hover background once its details close (design D195)", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    await panel.getByRole("tab", { name: /^Tasks/ }).click();
+    const row = panel.getByRole("listitem", { name: "Send the report" }).locator("> div");
+    const box = (await row.boundingBox())!;
+    await page.touchscreen.tap(box.x + box.width - 60, box.y + box.height / 2);
+    const details = page.getByRole("dialog", { name: "Send the report" });
+    await details.getByRole("button", { name: "Close" }).click();
+    await expect(details).toHaveCount(0);
+    // A finger has no hover: Tailwind's `hover:` holds only under `(hover: hover)`.
+    expect(await page.evaluate(() => matchMedia("(hover: hover)").matches)).toBe(false);
+    await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  });
+});

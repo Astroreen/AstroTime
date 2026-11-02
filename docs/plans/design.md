@@ -1308,6 +1308,22 @@ whole row".
   checkbox and the star sit above the cover and keep their own actions. The
   row shows it is one target: a hover background, and the focus ring drawn
   around the row, not the title (`apps/web/e2e/tasks.spec.ts`).
+- **D196. A task's star is beside its pencil; its list is its name** (the
+  owner's item 6: "the Star button next to the pencil, not a separate
+  button at the bottom; 'List: Personal' simply as 'Personal', an icon and
+  the list's name"). In a task's details the star is an icon toggle in the
+  top bar, left of Edit, where the calendar can be written: one name,
+  "Star", its state as `aria-pressed`, filled in the accent when starred,
+  its tooltip saying what a press does ("Star", "Remove star"). "Mark
+  completed" stays the one button below. The list, and in an event's
+  details the calendar, is its icon and its name alone; a screen reader
+  hears what it is from the row's term ("List", "Calendar"), as the other
+  rows' icons say theirs. The rows are a `<dl>`, so a later row (an
+  attachments list) takes its place among them as one more `Row`
+  (`apps/web/e2e/editing.spec.ts`). The tasks screen's row is proved
+  further for D195: three tab stops (the checkbox, the title, the star),
+  its hover background differs from its card's in both themes, and a
+  finger leaves none behind (`apps/web/e2e/tasks.spec.ts`).
 
 ### Decided in round 4: the calendar views
 
