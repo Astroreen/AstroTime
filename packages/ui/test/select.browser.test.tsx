@@ -1,14 +1,17 @@
 // AstroTime's own dropdowns (design D167): `Select` says "Not chosen" for a
 // value no option has, never a blank button; `MenuButton` runs the action
-// chosen and keeps no value.
+// chosen and keeps no value; the colour dropdown names an item's own colour
+// that is none of its entries (D168).
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, expect, test } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser/context";
 
+import { ColorSelect } from "../src/components/color-select.tsx";
 import { MenuButton, Select } from "../src/components/select.tsx";
 import { createI18n } from "../src/i18n/index.ts";
+import { DEFAULT_SETTINGS, SettingsContext } from "../src/settings.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -77,4 +80,20 @@ test("a menu button runs the chosen action with its value and keeps its own labe
   await userEvent.keyboard("{Enter}");
   await expect.element(page.getByRole("menu")).not.toBeInTheDocument();
   expect(chosen).toEqual(["3600", "600"]);
+});
+
+test("an item's own CSS name outside the palette is named from its hex, in the UI's language (D168)", async () => {
+  render(
+    <SettingsContext.Provider value={{ settings: DEFAULT_SETTINGS, change: () => {} }}>
+      <ColorSelect label="Colour" value="darkkhaki" onChange={() => {}} calendarColor="#4f8fd6" />
+    </SettingsContext.Provider>,
+  );
+  const field = page.getByRole("combobox", { name: "Colour" });
+  // #bdb76b, named by D170 as a yellow, never "Its own colour".
+  await expect.element(field).toHaveTextContent("Yellow");
+  await field.click();
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect.element(options.last()).toHaveTextContent("Yellow");
+  expect(options.elements().map((option) => option.textContent)).toContain("The calendar's colour");
+  await userEvent.keyboard("{Escape}");
 });

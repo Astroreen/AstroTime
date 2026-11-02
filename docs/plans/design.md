@@ -1040,8 +1040,8 @@ Settings, the colours and the lists controls open.
   dot the calendar's; in Settings, where there is no one calendar, a ring),
   the palette's nine CSS names, the user's own colours ([D173](#D173)), and
   an item's own colour that is none of them (from another client, or one
-  since deleted) by its generated name ([D170](#D170)), or "Its own colour"
-  for a CSS name. A calendar's colour stays the server's: AstroTime does
+  since deleted) by its generated name ([D170](#D170)), a CSS name by its
+  hex's (`colorNameHex`), "Its own colour" only for what is no colour. A calendar's colour stays the server's: AstroTime does
   not change it (Deferred).
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group

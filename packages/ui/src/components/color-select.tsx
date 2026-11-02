@@ -2,6 +2,7 @@
 // the colour left of its name: "The calendar's colour" first, then the
 // palette, then the user's own colours (D173), and the item's own colour
 // when it is none of them.
+import { colorNameHex } from "@astrotime/core";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -93,7 +94,8 @@ export function ColorSelect({
   if (value && !options.some((option) => option.value === value)) {
     options.push({
       value,
-      label: colorName(value, language) ?? t("edit.colorCustom"),
+      // A CSS name (Nextcloud writes one) is named from its hex too (D168).
+      label: colorName(colorNameHex(value) ?? value, language) ?? t("edit.colorCustom"),
       leading: <Dot color={value} />,
     });
   }

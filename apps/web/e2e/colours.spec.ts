@@ -112,8 +112,14 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   await expect(drawn).toHaveAttribute("style", /--item: #c48b9f/);
 
   // Its edit dialog shows the colour by its name; a palette colour replaces it.
-  await drawn.click();
-  await page.getByRole("dialog", { name: "Pottery" }).getByRole("button", { name: "Edit" }).click();
+  // Opened as the editing tests open an item: its button, its details, then Edit.
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Pottery, / })
+    .click();
+  const details = page.getByRole("dialog", { name: "Pottery" });
+  await expect(details).toBeVisible();
+  await details.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog", { name: "Edit event" });
   await expect(edit.getByRole("combobox", { name: "Colour" })).toHaveText("Dusty rose");
   await choose(edit.getByRole("combobox", { name: "Colour" }), "Pink");

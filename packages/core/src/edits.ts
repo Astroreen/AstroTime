@@ -16,6 +16,12 @@ import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-e
 import { fromIcalTime, keepTzid, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
 
+/** Refuses a colour `COLOR` cannot take before anything is written (D174). */
+function checkColor(color: string | null | undefined): void {
+  if (color && !hexColor(color) && !isColorName(color))
+    throw new RangeError(`Not a CSS3 colour name or a hex: ${color}`);
+}
+
 /** Which occurrences of a series an edit or a deletion applies to (D11). */
 export type Scope = "this" | "following" | "all";
 
@@ -105,6 +111,7 @@ export function createItem(
   changes: ItemChanges,
   options: { readonly now: number; readonly uid: string },
 ): string {
+  checkColor(changes.color);
   const root = new ICAL.Component("vcalendar");
   root.addPropertyWithValue("version", "2.0");
   root.addPropertyWithValue("prodid", PRODID);
@@ -176,6 +183,7 @@ export function editItem(
     readonly newUid?: string;
   },
 ): { readonly ics: string; readonly split: string | null } {
+  checkColor(changes.color);
   const copy = CalendarObject.parse(object.serialize());
   const now = utc(options.now);
   const recurrenceId = options.recurrenceId ?? null;
@@ -321,12 +329,11 @@ function withoutRepeat(changes: ItemChanges): ItemChanges {
 /**
  * `COLOR` takes a CSS colour name: a hex is written as its nearest, as
  * Nextcloud Calendar writes one, and kept exactly in `X-ASTROTIME-COLOR`
- * (D174). A name or none drops the hex; anything else is refused.
+ * (D174). A name or none drops the hex; anything else was refused at the
+ * top (`checkColor`), so no series is left half written.
  */
 function setColor(component: ICAL.Component, color: string | null): void {
   const exact = hexColor(color ?? "");
-  if (!exact && color && !isColorName(color))
-    throw new RangeError(`Not a CSS3 colour name or a hex: ${color}`);
   setText(component, "color", exact ? nearestColorName(exact)! : (color ?? ""));
   setText(component, X_COLOR, exact ?? "");
 }
