@@ -83,7 +83,8 @@ the project.
   [D161](#D161)) is before the
   start of today, in the user's zone, collapse into one chip on today,
   "N undone tasks", which opens them; it shows only on today, in every view
-  that has today, and the days they were due no longer show them. This is
+  that has today, and each also stays on the day it was due ([D185](#D185);
+  _until round 4 the days they were due no longer showed them_). This is
   D16's roll-over, drawn as one chip, even for a single
   task (Google shows "1 undone task" too). It counts undone tasks only, so
   "hide completed" does not change it. A task with neither stays on the
@@ -1212,8 +1213,8 @@ Settings, the colours and the lists controls open.
   own zone (foundation [D7](foundation.md#D7)).
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
-  - A task is **overdue**, and rolls over to today's "N undone tasks"
-    ([D51](#D51)), when its due is before today, or, without a due, its
+  - A task is **overdue**, and counts in today's "N undone tasks"
+    ([D51](#D51); on its own day too since [D185](#D185)), when its due is before today, or, without a due, its
     start is (`isUndoneBefore`, unchanged: the occurrence ends at its due,
     else at its start). So a task with no due goes overdue on the day after
     its start, whatever time it started: one made at 15:00 today is not
@@ -1290,6 +1291,45 @@ Settings, the colours and the lists controls open.
     A subtask's `RELATED-TO` stays: copied into another list, its parent
     is not there, so the tasks screen shows it at the top and its details
     name no parent.
+
+### Decided in round 4: the calendar views
+
+The owner's feedback after round 3 (round 4), the calendar views' part.
+
+- **D185. An overdue task stays on its day** (the owner's feedback 3:
+  "tasks do not appear in the calendar, even when the date matches"). It
+  changes [D51](#D51) and [D161](#D161). Reproduced on the demo data: the
+  data path draws every kind of task where it belongs (only a `DUE`, as
+  Nextcloud Tasks and Google Tasks write it, a date or a time, in a zone,
+  in UTC or floating; a `DTSTART` and a `DUE`; a start alone; done or not:
+  each on its start's day, else its due's), but two rules hid tasks whose
+  day was shown. First, an undone task due before today left its day for
+  the chip on today (`shownOn` dropped it from every view), so the day the
+  user looked at had nothing; second, [D186](#D186)'s fold. Google's rule
+  is now AstroTime's: **a task is drawn on its own day, always; an undone
+  one due before today also counts in today's "N undone tasks"**, which
+  still opens them all. A recurring task's occurrences each stay on their
+  days; the chip counts the series once, as before. Nothing else of D51
+  changes: the chip shows on today only, counts undone tasks only, and
+  "hide completed" does not touch it. Tested:
+  `packages/ui/test/query.test.ts` and `month-agenda.test.ts` (an overdue
+  task on its day in the week and the month, failing before the change),
+  `apps/web/e2e/calendar.spec.ts` and `month-agenda.spec.ts`.
+- **D186. A folded all-day strip shows a day's third item instead of
+  "+1".** The strip of Day, 3 days and Week folded past three rows to two
+  and "+N" on every day, the third row given to "+N" even on a day with
+  one item past two: a task, sorted after the events, was the one hidden,
+  and on today the "N undone tasks" chip took the second row, so a day's
+  tasks were all behind "+N" (the Day view on a phone showed none of
+  today's). It now folds as a month's week does (`foldWeek`,
+  [D86](#D86)): only a day with more than three gives its third row to
+  "+N"; any other day keeps its three. The fold, the chevron and the
+  expanded strip stay as D51 and [D151](#D151) have them. Tested:
+  `packages/ui/test/month-agenda.test.ts` (the fold at the strip's three
+  rows, a span over two days in the third), `apps/web/e2e/calendar.spec.ts`
+  (on a phone: today's tasks under the chip a tap on "+N" away in the Day
+  view; a Friday with three items kept whole in 3 days, failing before the
+  change).
 
 ### Decided in round 4: the editor
 

@@ -72,7 +72,7 @@ describe("the demo data on the views", () => {
     expect(placed["Send the report"]).toEqual({ left: 0, shape: "chip" });
   });
 
-  test("a week: spans across days, undone tasks gone from their days, done ones kept", async () => {
+  test("a week: spans across days, undone tasks on their days and in the chip, done ones kept (design D185)", async () => {
     const { store, ids } = await demoStore();
     const days = daysFrom("2026-11-02", 7);
     const layout = await layoutOf(store, ids, days);
@@ -90,7 +90,8 @@ describe("the demo data on the views", () => {
     ).toMatchObject([{ firstDay: 2, lastDay: 2 }]);
     const monday = layout.columns[0]!.timed.map(({ entry }) => entry.occurrence.item.summary);
     expect(monday).toContain("Stand-up");
-    expect(monday).not.toContain("Reply to Olga");
+    // Overdue, on its own day still, as Google draws it; the chip counts it too.
+    expect(monday).toContain("Reply to Olga");
     // The night train goes on past midnight.
     const sunday = layout.columns[6]!.timed.find(
       ({ entry }) => entry.occurrence.item.summary === "Night train",

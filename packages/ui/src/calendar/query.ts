@@ -6,7 +6,6 @@ import {
   CalendarObject,
   ExpansionLimitError,
   isDone,
-  isUndoneBefore,
   layoutDay,
   layoutSpans,
   occurrencesBetween,
@@ -150,27 +149,19 @@ export interface LayoutContext {
 }
 
 /**
- * The entries the views draw, by occurrence: undone tasks due before today
- * leave their days for the chip on today (design D51).
+ * The entries the views draw, by occurrence: every one on its own days, an
+ * undone task due before today too, which also counts in the chip on today
+ * (design D185).
  */
-export function shownOn(
-  entries: readonly Entry[],
-  today: string,
-  timeZone: string,
-): Map<Occurrence, Entry> {
-  const byOccurrence = new Map<Occurrence, Entry>();
-  for (const entry of entries) {
-    if (isUndoneBefore(entry.object, entry.occurrence, today, timeZone)) continue;
-    byOccurrence.set(entry.occurrence, entry);
-  }
-  return byOccurrence;
+export function byOccurrence(entries: readonly Entry[]): Map<Occurrence, Entry> {
+  return new Map(entries.map((entry) => [entry.occurrence, entry]));
 }
 
 /**
- * Lays out the visible days. Undone tasks due before today leave their days
- * (design D51); when there are any, today's strip gets the chip that stands
- * for them, placed where a one-day task with the first title would go: after
- * longer spans and one-day events, before other tasks.
+ * Lays out the visible days. When there are undone tasks due before today,
+ * today's strip gets the chip that counts them (design D51, D185), placed
+ * where a one-day task with the first title would go: after longer spans
+ * and one-day events, before other tasks.
  */
 export function layoutRange(
   entries: readonly Entry[],
@@ -178,17 +169,17 @@ export function layoutRange(
   options: LayoutContext,
 ): RangeLayout {
   const { today, timeZone, undone } = options;
-  const byOccurrence = shownOn(entries, today, timeZone);
-  const occurrences = [...byOccurrence.keys()];
+  const shown = byOccurrence(entries);
+  const occurrences = [...shown.keys()];
   const chip = undone > 0 && days.includes(today) ? undoneChip(today) : null;
   const strip = layoutSpans(chip ? [...occurrences, chip] : occurrences, days, timeZone).map(
-    (span) => ({ span, entry: byOccurrence.get(span.occurrence) ?? null }),
+    (span) => ({ span, entry: shown.get(span.occurrence) ?? null }),
   );
   const columns = days.map((day) => ({
     day,
     timed: layoutDay(occurrences, day, { timeZone }).timed.map((placed) => ({
       placed,
-      entry: byOccurrence.get(placed.occurrence)!,
+      entry: shown.get(placed.occurrence)!,
     })),
   }));
   return { strip, rows: Math.max(0, ...strip.map(({ span }) => span.row + 1)), columns };
