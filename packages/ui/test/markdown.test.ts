@@ -2,7 +2,7 @@
 // details draw, and what is never a link or markup.
 import { describe, expect, test } from "vite-plus/test";
 
-import { linkOf, parseMarkdown, safeHref, work } from "../src/calendar/markdown.ts";
+import { linkOf, parseMarkdown, safeHref } from "../src/calendar/markdown.ts";
 
 const paragraph = (...children: unknown[]) => ({ type: "paragraph", children });
 
@@ -299,12 +299,12 @@ describe("what the review found (design D207)", () => {
 
 describe("untrusted text costs work in proportion to its length", () => {
   // Each of these took seconds when every opener scanned the rest of the
-  // text for its closer. The parser counts its steps (`work`): twice the
+  // text for its closer. The parser counts its steps (`ParseStats`): twice the
   // text costs about twice the steps, not four times. No clock is read.
   const stepsOf = (text: string) => {
-    work.steps = 0;
-    parseMarkdown(text);
-    return work.steps;
+    const stats = { steps: 0 };
+    parseMarkdown(text, stats);
+    return stats.steps;
   };
   test.each([
     ["unclosed stars", (n: number) => "*a ".repeat(n)],
@@ -375,5 +375,116 @@ describe("random text (a seeded fuzz)", () => {
       ).join("");
       parseMarkdown(text).forEach(check);
     }
+  });
+});
+
+describe("after #94's review (design D207)", () => {
+  test("a plain description keeps its spaces and indents inside a paragraph", () => {
+    expect(parseMarkdown("Room:   4\n  second floor   ")).toEqual([
+      paragraph("Room:   4", { type: "break" }, "  second floor"),
+    ]);
+  });
+
+  test("a code span wins over emphasis; a mark inside a bare link closes nothing", () => {
+    expect(parseMarkdown("*foo `a*` bar*")).toEqual([
+      paragraph({ type: "em", children: ["foo ", { type: "code", text: "a*" }, " bar"] }),
+    ]);
+    expect(parseMarkdown("*see https://example.com/a*b now*")).toEqual([
+      paragraph({
+        type: "em",
+        children: [
+          "see ",
+          { type: "link", href: "https://example.com/a*b", children: ["https://example.com/a*b"] },
+          " now",
+        ],
+      }),
+    ]);
+  });
+
+  test("a tab inside fenced code stays a tab, at the top and in a list", () => {
+    expect(parseMarkdown("```\n\tindented\ta\n```")).toEqual([
+      { type: "code", text: "\tindented\ta" },
+    ]);
+    const [list] = parseMarkdown("- a\n  ```\n  \tx\n  ```");
+    expect(JSON.stringify(list)).toContain('"text":"\\tx"');
+  });
+
+  test("an empty heading is text, not an empty heading", () => {
+    expect(parseMarkdown("#")).toEqual([paragraph("#")]);
+    expect(parseMarkdown("## ##")).toEqual([paragraph("## ##")]);
+    expect(parseMarkdown("Total\n#")).toEqual([paragraph("Total", { type: "break" }, "#")]);
+  });
+});
+
+describe("after #94's last review (design D207)", () => {
+  test("each parse counts its own steps", () => {
+    const first = { steps: 0 };
+    const second = { steps: 0 };
+    parseMarkdown("*a* b", first);
+    parseMarkdown("*a* b", second);
+    expect(first.steps).toBeGreaterThan(0);
+    expect(second.steps).toBe(first.steps);
+  });
+
+  test("an empty item does not take the next line in as its own", () => {
+    expect(parseMarkdown("-\nnext")).toEqual([
+      { type: "list", start: null, items: [{ checked: null, children: [] }] },
+      paragraph("next"),
+    ]);
+    expect(parseMarkdown("- a\nlazy")).toEqual([
+      {
+        type: "list",
+        start: null,
+        items: [{ checked: null, children: [paragraph("a", { type: "break" }, "lazy")] }],
+      },
+    ]);
+  });
+});
+
+describe("after #94's low review (design D207)", () => {
+  test("a link or image with no words is named by its address", () => {
+    expect(parseMarkdown("[](https://example.com/a) ![](https://example.com/b.png)")).toEqual([
+      paragraph(
+        { type: "link", href: "https://example.com/a", children: ["https://example.com/a"] },
+        " ",
+        {
+          type: "link",
+          href: "https://example.com/b.png",
+          children: ["https://example.com/b.png"],
+        },
+      ),
+    ]);
+  });
+
+  test("a written target's escapes are taken out", () => {
+    expect(parseMarkdown("[a](https://example.com/a\\)b)")).toEqual([
+      paragraph({ type: "link", href: "https://example.com/a)b", children: ["a"] }),
+    ]);
+  });
+});
+
+describe("an item's lines, from its content's column (design D207)", () => {
+  const item = (...children: unknown[]) => ({ checked: null, children });
+  const list = (start: number | null, ...items: unknown[]) => ({ type: "list", start, items });
+
+  test("a sibling indented less than the content's column is a sibling", () => {
+    expect(parseMarkdown("1. x\n  2. y")).toEqual([
+      list(1, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+    expect(parseMarkdown("- x\n - y")).toEqual([
+      list(null, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+    expect(parseMarkdown("  - x\n  - y")).toEqual([
+      list(null, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+  });
+
+  test("an item under a number nests from its content's column, under a bullet from 2", () => {
+    expect(parseMarkdown("1. x\n   - y")).toEqual([
+      list(1, item(paragraph("x"), list(null, item(paragraph("y"))))),
+    ]);
+    expect(parseMarkdown("- x\n  - y")).toEqual([
+      list(null, item(paragraph("x"), list(null, item(paragraph("y"))))),
+    ]);
   });
 });
