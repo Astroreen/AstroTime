@@ -74,6 +74,44 @@ test("a reminder picked from the menu is saved with the item and shown in its de
   await expect(details.getByText("10 minutes before", { exact: true })).toBeVisible();
 });
 
+for (const [size, viewport] of [
+  ["phone", PHONE],
+  ["wide", WIDE],
+] as const) {
+  test(`every row's icon is level with the middle of its control, labelled or not, on a ${size} (design D205)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("button", { name: "Add a reminder" }).click();
+    await page.getByRole("menuitem", { name: "10 minutes before" }).click();
+    const controls = [
+      dialog.getByRole("switch", { name: "All day" }),
+      dialog.getByRole("combobox", { name: "Repeat" }),
+      dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem").first(),
+      dialog.getByRole("combobox", { name: "Calendar" }),
+      dialog.getByRole("combobox", { name: "Colour" }),
+      dialog.getByRole("combobox", { name: "Location" }),
+    ];
+    for (const control of controls) {
+      // The row's icon: the hidden one before the column the control is in.
+      const icon = control.locator(
+        "xpath=ancestor::div[contains(@class, 'items-start')][1]/span[@aria-hidden='true']",
+      );
+      // The switch is in its 40 px row, "All day" beside it.
+      const box = await (
+        control === controls[0] ? control.locator("xpath=parent::label") : control
+      ).boundingBox();
+      const drawn = await icon.boundingBox();
+      expect(box && drawn).toBeTruthy();
+      const middle = box!.y + box!.height / 2;
+      expect(Math.abs(drawn!.y + drawn!.height / 2 - middle)).toBeLessThanOrEqual(1);
+    }
+  });
+}
+
 test("Enter in the title saves; a tap on an empty slot of the grid creates there", async ({
   page,
 }) => {
