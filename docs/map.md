@@ -192,8 +192,9 @@ When you add a package, app or module, add its line here in the same PR.
       the calendar on this device.
       → `plans/foundation.md#D92`, `plans/foundation.md#D122`,
       `plans/foundation.md#D123`, `plans/design.md#D137`
-    - `tasks-screen.tsx` — the tasks screen, or panel on a wide screen.
-      → `plans/design.md#D95`
+    - `tasks-screen.tsx` — the tasks screen, in the view's place on a wide
+      screen, from the top bar's calendar | tasks switch.
+      → `plans/design.md#D95`, `plans/design.md#D227`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
     - `empty-state.tsx` — what a screen shows with nothing to list.
@@ -211,8 +212,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `calendar-row.tsx` — a calendar's row with its checkbox, the drawer's
       and Settings'. → `plans/design.md#D137`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
-      screen), from the top bar's gear or the drawer's last row.
-      → `plans/design.md#D131`, `plans/design.md#D96`
+      screen), from the drawer's foot. → `plans/design.md#D131`,
+      `plans/design.md#D96`, `plans/design.md#D226`
     - `lazy.tsx` — dialogs that load with their first opening: the
       details, the edit dialog, Settings, the Conflicts list, and the
       copy's notice (`copy-notice.tsx`); and the Agenda with its first
@@ -356,6 +357,8 @@ When you add a package, app or module, add its line here in the same PR.
     `places.spec.ts` searches and picks a place on a phone and a wide
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
+    `shell.spec.ts` drives the wide calendar | tasks switch and what
+    brings the calendar back. → `plans/design.md#D227`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

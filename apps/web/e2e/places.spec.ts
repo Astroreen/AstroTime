@@ -171,7 +171,10 @@ test("with places off in Settings, Location is a text field that asks nothing", 
 }) => {
   const { searched } = await fakeServices(page);
   await openDemo(page, "day");
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   const settings = page.getByRole("dialog", { name: "Settings" });
   const toggle = settings.getByRole("switch", { name: "Search places on the map" });
   await expect(toggle).toBeChecked();

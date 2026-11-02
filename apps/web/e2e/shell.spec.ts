@@ -1,0 +1,126 @@
+// The app shell (design D227): on a wide screen the top bar's calendar |
+// tasks switch shows one or the other, the tasks in the view's place; on a
+// phone the tasks cover the calendar.
+import { expect, test, type Page } from "@playwright/test";
+
+import { openDemo, PHONE, WIDE } from "./support.ts";
+
+test.use({ viewport: WIDE });
+
+const switchTo = (page: Page) => page.getByRole("group", { name: "Calendar or tasks" });
+const tasks = (page: Page) => page.getByRole("region", { name: "Tasks" });
+const header = (page: Page, name: string) => page.getByRole("heading", { name });
+
+test("the switch shows the calendar or the tasks; the period's controls and keys wait meanwhile", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const calendar = switchTo(page).getByRole("button", { name: "Calendar" });
+  const tasksButton = switchTo(page).getByRole("button", { name: "Tasks" });
+  await expect(calendar).toHaveAttribute("aria-pressed", "true");
+  await expect(tasksButton).toHaveAttribute("aria-pressed", "false");
+  await expect(header(page, "Wednesday, November 4")).toBeVisible();
+
+  await tasksButton.click();
+  await expect(tasksButton).toHaveAttribute("aria-pressed", "true");
+  await expect(calendar).toHaveAttribute("aria-pressed", "false");
+  await expect(tasks(page).getByRole("checkbox").first()).toBeVisible();
+  // The calendar is not drawn, nor what moves it.
+  await expect(page.getByRole("main")).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Today, / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Next week" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "November, choose a date" })).toHaveCount(0);
+  // A step's keys move nothing unseen: back on the calendar, the same week.
+  await page.keyboard.press("n");
+  await page.keyboard.press("j");
+  await calendar.click();
+  await expect(tasks(page)).toHaveCount(0);
+  await expect(header(page, "Wednesday, November 4")).toBeVisible();
+  // On the calendar they step, as ever.
+  await page.keyboard.press("n");
+  await expect(header(page, "Sunday, November 8")).toBeVisible();
+});
+
+test("a view's key or a view picked in the sidebar brings the calendar back", async ({ page }) => {
+  await openDemo(page, "week");
+  const calendar = switchTo(page).getByRole("button", { name: "Calendar" });
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page.keyboard.press("d");
+  await expect(tasks(page)).toHaveCount(0);
+  await expect(calendar).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("main")).toBeVisible();
+
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Week" })
+    .click();
+  await expect(tasks(page)).toHaveCount(0);
+  await expect(header(page, "Wednesday, November 4")).toBeVisible();
+  await expect(calendar).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the switch selects: the half shown pressed again changes nothing", async ({ page }) => {
+  await openDemo(page, "week");
+  const tasksButton = switchTo(page).getByRole("button", { name: "Tasks" });
+  await tasksButton.click();
+  await expect(tasks(page)).toBeVisible();
+  await tasksButton.click();
+  await expect(tasks(page)).toBeVisible();
+  await expect(tasksButton).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the tasks stay open across a resize, over the calendar on a phone and in its place when wide", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page.setViewportSize(PHONE);
+  // A phone's screen: a back arrow, the calendar under it.
+  await expect(tasks(page).getByRole("button", { name: "Back to the calendar" })).toBeVisible();
+  await page.setViewportSize(WIDE);
+  await expect(switchTo(page).getByRole("button", { name: "Tasks" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("main")).toBeHidden();
+});
+
+test("on a phone a view's key closes the tasks screen too", async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page.keyboard.press("m");
+  await expect(tasks(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("a dated search result closes the tasks and forgets the task a search asked for", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const search = async (words: string, result: string) => {
+    await page.getByRole("button", { name: "Search" }).click();
+    await page.getByRole("searchbox", { name: "Search" }).fill(words);
+    await page
+      .getByRole("list", { name: "Search results" })
+      .getByRole("button", { name: result })
+      .click();
+    await page.keyboard.press("Escape");
+  };
+  await search("library", "Return the library books, No date");
+  const books = tasks(page).getByRole("listitem", { name: "Return the library books" });
+  await expect(books).toHaveAttribute("data-found", "true");
+  await search("report", "Send the report, Today, 3:00 PM");
+  await expect(tasks(page)).toHaveCount(0);
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(books).toBeVisible();
+  await expect(books).not.toHaveAttribute("data-found");
+});

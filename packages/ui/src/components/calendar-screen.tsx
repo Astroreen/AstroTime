@@ -1,8 +1,9 @@
 // The app shell around the views (design D46): the top bar with the account
 // button, the drawer (a sidebar on a wide screen, headed by Create), the view
-// and the floating "+" button where no sidebar holds Create (D132); search,
-// the tasks screen and, on a wide screen, Settings open from the top bar
-// (D52, D53, D131, D133), Settings from the drawer on a phone. The calendar
+// and the floating "+" button where no sidebar holds Create (D132); search
+// and the tasks screen open from the top bar (D52, D133), on a wide screen by
+// its calendar | tasks switch, the tasks screen then in the view's place
+// (D227); Settings from the drawer's foot (D131, D226). The calendar
 // shows from the first run, with no account: the calendar on this device
 // (docs/plans/foundation.md#D122). The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
@@ -37,12 +38,12 @@ import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
 import { EditingContext, targetOf, useEditingState } from "./editing.tsx";
 import {
+  CalendarIcon,
   CheckCircleIcon,
   ChevronIcon,
   MenuIcon,
   PlusIcon,
   SearchIcon,
-  SettingsIcon,
   TodayIcon,
 } from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
@@ -315,7 +316,8 @@ export function CalendarScreen({
       const day = wallClockOf(result.occurrence.start, timeZone).slice(0, 10);
       setAnchor(day);
       setFound({ objectId: result.stored.id, anchor: day });
-      if (!wide) setTasksOpen(false);
+      setTasksOpen(false);
+      setTaskFocus(null);
     } else {
       // An undated task lives on the tasks screen only (docs/plans/foundation.md#D16).
       setTaskFocus({ calendarId: result.stored.calendarId, objectId: result.stored.id });
@@ -328,12 +330,16 @@ export function CalendarScreen({
     setTaskFocus(null);
   };
   const phoneTasks = !wide && tasksOpen;
+  // On a wide screen the tasks screen takes the view's place (D227).
+  const wideTasks = wide && tasksOpen;
   const covered = phoneTasks || searching;
 
   const go = (direction: 1 | -1) => setAnchor((current) => stepAnchor(view, current, direction));
   const pickView = (next: View) => {
     setView(next);
     setDrawerOpen(false);
+    // A view picked in the sidebar is the calendar's (D227).
+    closeTasks();
   };
   const openDay = (day: string) => {
     setView("day");
@@ -349,7 +355,8 @@ export function CalendarScreen({
     setSearching(false);
     setDrawerOpen(false);
     setSettingsOpen(false);
-    if (!wide) setTasksOpen(false);
+    setTasksOpen(false);
+    setTaskFocus(null);
     if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
     const stored = await store.object(reminder.objectId);
     if (!stored || stored.pending === "delete") return;
@@ -394,14 +401,22 @@ export function CalendarScreen({
         /^[a-z]$/.test(typed) || !event.code.startsWith("Key")
           ? typed
           : event.code.slice(3).toLowerCase();
+      // With the tasks in the view's place, a step would move a calendar
+      // nobody sees (D227): only a view's key, which brings it back, counts.
+      if (wideTasks && !VIEW_KEYS.has(key)) return;
       if (key === "n" || key === "j") setAnchor((current) => stepAnchor(view, current, 1));
       else if (key === "p" || key === "k") setAnchor((current) => stepAnchor(view, current, -1));
       else if (key === "t") setAnchor(today);
-      else if (VIEW_KEYS.has(key)) setView(VIEW_KEYS.get(key)!);
+      else if (VIEW_KEYS.has(key)) {
+        setView(VIEW_KEYS.get(key)!);
+        // A view's key is the calendar's, as a view picked in the sidebar (D227).
+        setTasksOpen(false);
+        setTaskFocus(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, today, setView]);
+  }, [view, today, setView, wideTasks]);
 
   const title = formats.period(...titleRange(view, days, anchor), today.slice(0, 4));
   // A new event on the day shown, from the next half hour (Google).
@@ -425,14 +440,10 @@ export function CalendarScreen({
       onToggle={toggleCalendar}
       colorOf={(calendar) => colorOfCalendar(calendar.id)}
       onLeave={() => setDrawerOpen(false)}
-      onSettings={
-        wide
-          ? undefined
-          : () => {
-              setDrawerOpen(false);
-              setSettingsOpen(true);
-            }
-      }
+      onSettings={() => {
+        setDrawerOpen(false);
+        setSettingsOpen(true);
+      }}
       create={wide ? { disabled: !editing.value.canCreate, onCreate: create } : undefined}
     />
   );
@@ -468,8 +479,8 @@ export function CalendarScreen({
                   <MenuIcon />
                 </Dialog.Trigger>
               )}
-              {/* On a wide screen, Google's web order: today, previous, next, then the period they move (D133). */}
-              {wide && (
+              {/* On a wide screen, Google's web order: today, previous, next, then the period they move (D133); none while the tasks screen is shown (D227). */}
+              {!wideTasks && wide && (
                 <>
                   <button
                     type="button"
@@ -498,13 +509,15 @@ export function CalendarScreen({
                   </button>
                 </>
               )}
-              <MonthPicker
-                title={title}
-                anchor={anchor}
-                today={today}
-                weekStart={settings.weekStart}
-                onPick={setAnchor}
-              />
+              {!wideTasks && (
+                <MonthPicker
+                  title={title}
+                  anchor={anchor}
+                  today={today}
+                  weekStart={settings.weekStart}
+                  onPick={setAnchor}
+                />
+              )}
               <div className="flex-1" />
               <button
                 type="button"
@@ -516,46 +529,62 @@ export function CalendarScreen({
                 <SearchIcon />
               </button>
               {wide ? (
-                <button
-                  type="button"
-                  className={iconButton}
-                  aria-label={t("settings.title")}
-                  title={t("settings.title")}
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  <SettingsIcon />
-                </button>
+                <ScreenSwitch
+                  tasks={tasksOpen}
+                  onTasks={(tasks) => (tasks ? setTasksOpen(true) : closeTasks())}
+                />
               ) : (
-                <button
-                  type="button"
-                  className={iconButton}
-                  // Its name says the day its icon shows (WCAG 2.5.3).
-                  aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
-                  title={t("topBar.today")}
-                  onClick={() => setAnchor(today)}
-                >
-                  <TodayIcon day={formats.dayNumber(today)} />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={iconButton}
+                    // Its name says the day its icon shows (WCAG 2.5.3).
+                    aria-label={t("topBar.todayLabel", { date: formats.fullDate(today) })}
+                    title={t("topBar.today")}
+                    onClick={() => setAnchor(today)}
+                  >
+                    <TodayIcon day={formats.dayNumber(today)} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
+                    aria-label={t("topBar.tasks")}
+                    title={t("topBar.tasks")}
+                    aria-pressed={tasksOpen}
+                    onClick={() => (tasksOpen ? closeTasks() : setTasksOpen(true))}
+                  >
+                    <CheckCircleIcon />
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                className={`${iconButton} ${tasksOpen ? "bg-accent-soft" : ""}`}
-                aria-label={t("topBar.tasks")}
-                title={t("topBar.tasks")}
-                aria-pressed={tasksOpen}
-                onClick={() => (tasksOpen ? closeTasks() : setTasksOpen(true))}
-              >
-                <CheckCircleIcon />
-              </button>
               <AccountButton accounts={lists?.accounts ?? []} />
             </header>
             <div inert={covered} aria-hidden={covered || undefined} className="flex min-h-0 flex-1">
               {sidebar && (
-                <nav aria-label={t("topBar.menu")} className="w-64 shrink-0 overflow-y-auto">
+                <nav
+                  aria-label={t("topBar.menu")}
+                  className="flex w-64 shrink-0 flex-col overflow-y-auto bg-canvas"
+                >
                   {drawer}
                 </nav>
               )}
+              {wideTasks && (
+                // The tasks screen in the view's place, a column in the middle (D227).
+                <div className="mx-auto w-full max-w-[40rem] min-w-0 animate-screen-in">
+                  <TasksScreen
+                    store={store}
+                    preferences={preferences}
+                    lists={taskLists}
+                    today={today}
+                    now={nowOf(today, minutes)}
+                    wide
+                    focus={taskFocus}
+                    onClose={closeTasks}
+                  />
+                </div>
+              )}
               <main
+                hidden={wideTasks}
                 aria-label={title}
                 aria-busy={waiting ? true : undefined}
                 data-waiting={waiting}
@@ -626,20 +655,6 @@ export function CalendarScreen({
                   </button>
                 )}
               </main>
-              {wide && tasksOpen && (
-                <aside className="w-[22.5rem] shrink-0 border-l border-line">
-                  <TasksScreen
-                    store={store}
-                    preferences={preferences}
-                    lists={taskLists}
-                    today={today}
-                    now={nowOf(today, minutes)}
-                    wide
-                    focus={taskFocus}
-                    onClose={closeTasks}
-                  />
-                </aside>
-              )}
             </div>
             {searching && (
               <div className="absolute top-[calc(3.5rem+var(--inset-top))] right-(--inset-right) bottom-(--inset-bottom) left-(--inset-left) z-[75] overflow-y-auto bg-canvas">
@@ -671,10 +686,12 @@ export function CalendarScreen({
             )}
           </div>
           <Dialog.Portal>
-            <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-            <DialogPopup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised pt-(--inset-top) pb-(--inset-bottom) pl-(--inset-left) text-ink shadow-2xl transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
+            <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-300 data-ending-style:opacity-0 data-ending-style:duration-200 data-starting-style:opacity-0" />
+            <DialogPopup className="fixed inset-y-0 left-0 z-[90] w-[min(20rem,85vw)] overflow-y-auto rounded-r-2xl bg-raised pt-(--inset-top) pb-(--inset-bottom) pl-(--inset-left) text-ink shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.05,0.7,0.1,1)] data-ending-style:-translate-x-full data-ending-style:duration-200 data-ending-style:ease-[cubic-bezier(0.3,0,0.8,0.15)] data-starting-style:-translate-x-full">
               <Dialog.Title className="sr-only">{t("topBar.menu")}</Dialog.Title>
-              <nav aria-label={t("topBar.menu")}>{drawer}</nav>
+              <nav aria-label={t("topBar.menu")} className="flex min-h-full flex-col bg-inherit">
+                {drawer}
+              </nav>
             </DialogPopup>
           </Dialog.Portal>
         </Dialog.Root>
@@ -690,6 +707,49 @@ export function CalendarScreen({
         {editing.dialogs}
       </EditingContext.Provider>
     </CalendarContext.Provider>
+  );
+}
+
+/**
+ * The wide top bar's calendar | tasks switch (design D227), Google Calendar
+ * web's: two buttons, the one shown pressed, under an indicator that slides
+ * to it (at once when less motion is asked for, as every transition).
+ */
+function ScreenSwitch({ tasks, onTasks }: { tasks: boolean; onTasks: (tasks: boolean) => void }) {
+  const { t } = useTranslation();
+  const half =
+    "relative grid h-full w-12 place-items-center rounded-full text-ink focus-visible:outline-2 focus-visible:outline-accent";
+  return (
+    <div
+      role="group"
+      aria-label={t("topBar.switch")}
+      className="relative mx-1 flex h-10 shrink-0 rounded-full border border-line p-0.5"
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0.5 left-0.5 w-12 rounded-full bg-accent-soft transition-transform duration-250 ease-[cubic-bezier(0.2,0,0,1)] ${tasks ? "translate-x-12" : ""}`}
+      />
+      <button
+        type="button"
+        className={`${half} ${tasks ? "hover:bg-raised" : ""}`}
+        aria-label={t("topBar.calendar")}
+        title={t("topBar.calendar")}
+        aria-pressed={!tasks}
+        onClick={() => onTasks(false)}
+      >
+        <CalendarIcon className="size-5" />
+      </button>
+      <button
+        type="button"
+        className={`${half} ${tasks ? "" : "hover:bg-raised"}`}
+        aria-label={t("topBar.tasks")}
+        title={t("topBar.tasks")}
+        aria-pressed={tasks}
+        onClick={() => onTasks(true)}
+      >
+        <CheckCircleIcon className="size-5" />
+      </button>
+    </div>
   );
 }
 

@@ -198,8 +198,11 @@ test.describe("the screens and dialogs", () => {
         await page.getByRole("button", { name: "Tasks", exact: true }).click();
         await expect(screen.getByRole("checkbox").first()).toBeVisible();
         await audit(page, "the tasks panel");
-        // On a wide screen, the top bar's button; a dialog.
-        await page.getByRole("button", { name: "Settings" }).click();
+        // On a wide screen, the sidebar's foot (design D226); a dialog.
+        await page
+          .getByRole("navigation", { name: "Main menu" })
+          .getByRole("button", { name: "Settings" })
+          .click();
         await expect(
           page.getByRole("dialog", { name: "Settings" }).getByLabel("Theme"),
         ).toBeVisible();
@@ -317,7 +320,10 @@ test("Russian: the document's language follows the UI's", async ({ browser }) =>
   await expect(today(page).getByRole("listitem").first()).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await audit(page, "the week in Russian");
-  await page.getByRole("banner").getByRole("button", { name: "Настройки" }).click();
+  await page
+    .getByRole("navigation", { name: "Главное меню" })
+    .getByRole("button", { name: "Настройки" })
+    .click();
   await choose(page.getByLabel("Язык"), "English");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await context.close();

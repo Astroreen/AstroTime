@@ -195,7 +195,10 @@ test("an account whose sync is off asks nothing of its server, even on Sync now;
   ).toBeVisible();
   const name = `astro@${new URL(radicale.url).host}`;
 
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   const settings = page.getByRole("dialog", { name: "Settings" });
   const section = settings.getByRole("region", { name });
   await section.getByRole("switch", { name: "Sync" }).click();
@@ -224,7 +227,10 @@ test("an account whose sync is off asks nothing of its server, even on Sync now;
   ).toHaveCount(0);
 
   // On again: it syncs at once and brings the event.
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   await section.getByRole("switch", { name: "Sync" }).click();
   await expect(section.getByText(/^Synced at /)).toBeVisible();
   expect(asked.length).toBeGreaterThan(0);

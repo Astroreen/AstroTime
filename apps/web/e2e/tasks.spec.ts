@@ -6,11 +6,22 @@ import { openDemo, PHONE, WIDE } from "./support.ts";
 
 const tasks = (page: Page) => page.getByRole("region", { name: "Tasks" });
 
-test("the tasks panel beside the calendar: lists, counts, completing and starring", async ({
+/** The wide top bar's calendar | tasks switch (design D227): shows one or the other. */
+const show = (page: Page, screen: "Calendar" | "Tasks") =>
+  page
+    .getByRole("group", { name: "Calendar or tasks" })
+    .getByRole("button", { name: screen, exact: true })
+    .click();
+
+test("the tasks screen in the calendar's place: lists, counts, completing and starring", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
+  const chip = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("listitem", { name: /Send the report, 3:00 PM$/ });
+  await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -33,16 +44,22 @@ test("the tasks panel beside the calendar: lists, counts, completing and starrin
       .getByRole("listitem", { name: "Write the proposal" })
       .getByRole("listitem", { name: "Collect the figures" }),
   ).toBeVisible();
-  const chip = page
-    .getByRole("list", { name: "Wednesday, November 4" })
-    .getByRole("listitem", { name: /Send the report, 3:00 PM$/ });
-  await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
+  // The calendar is not drawn beside it: the screen took its place.
+  await expect(chip).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Today, / })).toHaveCount(0);
 
   // Completed: it moves to "Completed", the count drops, the calendar strikes it through.
   await report.click();
   await expect(panel.getByRole("tab", { name: "Tasks, 6 undone tasks" })).toBeVisible();
   await expect(list.getByRole("checkbox", { name: "Send the report" })).toHaveCount(0);
+  await show(page, "Calendar");
+  await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await expect(chip).toHaveAccessibleName("Completed task: Send the report, 3:00 PM");
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: "Tasks, 6 undone tasks" }).click();
   await panel.getByRole("button", { name: "Completed (4)" }).click();
   const completed = panel.getByRole("list", { name: "Completed tasks" });
   await expect(completed.getByRole("checkbox", { name: "Send the report" })).toBeChecked();
@@ -52,7 +69,10 @@ test("the tasks panel beside the calendar: lists, counts, completing and starrin
   await expect(list.getByRole("checkbox", { name: "Send the report" })).not.toBeChecked();
   await expect(panel.getByRole("button", { name: "Completed (3)" })).toBeVisible();
   await expect(panel.getByRole("tab", { name: "Tasks, 7 undone tasks" })).toBeVisible();
+  await show(page, "Calendar");
   await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: "Tasks, 7 undone tasks" }).click();
 
   // Starred, and sorted with the starred first.
   const star = panel.getByRole("button", { name: "Star: Write the proposal" });
@@ -85,9 +105,13 @@ test("a series is completed one occurrence at a time, the earliest first", async
   await expect(panel.getByRole("button", { name: "Completed (3)" })).toBeVisible();
   // Its latest occurrence before today is still undone: still counted on today.
   const strip = page.getByRole("list", { name: "All day" });
+  await show(page, "Calendar");
   await expect(strip.getByRole("button", { name: "3 undone tasks" })).toBeVisible();
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: /^Tasks/ }).click();
   await recycling.getByRole("checkbox").click();
   await expect(recycling).toContainText("Sun, Nov 8");
+  await show(page, "Calendar");
   await expect(strip.getByRole("button", { name: "2 undone tasks" })).toBeVisible();
 });
 
@@ -198,7 +222,9 @@ test.describe("in Russian", () => {
 });
 
 test.describe("the tab strip wider than the panel (design D135)", () => {
-  test.use({ locale: "ru-RU", viewport: WIDE });
+  // A phone's tasks screen 360 px wide, as the wide screen's panel was
+  // before the tasks took the calendar's place (design D227).
+  test.use({ locale: "ru-RU", viewport: { width: 360, height: 800 } });
 
   /** A real click on a tab's part that shows, `x` px in from its right edge: it scrolls nothing itself. */
   const clickShown = async (page: Page, tab: Locator, x = 12) => {
@@ -217,7 +243,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     const second = panel.getByRole("tab", { name: /^Личное/ });
     const fadesStart = /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/;
     const fadesEnd = /^linear-gradient\(to right, rgb\(0, 0, 0\),.*rgba\(0, 0, 0, 0\)\)$/;
-    // "+ Создать список" goes past the 360 px panel: the end fades, the start does not.
+    // "+ Создать список" goes past the phone's screen: the end fades, the start does not.
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
 
     // Scrolled to the end, the open first tab is under the start's fade.
@@ -346,5 +372,92 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     expect(await fromEnd()).toBeLessThan(40);
     await resized("[data-tab-strip] [role=tab]:first-child { padding-inline: 110px; }");
     expect(await strip.evaluate((element) => element.scrollLeft)).toBe(0);
+  });
+});
+
+test("a task's row is three tab stops: its checkbox, its title that opens it, its star (design D195)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const panel = tasks(page);
+  await panel.getByRole("tab", { name: /^Tasks/ }).click();
+  const report = panel.getByRole("listitem", { name: "Send the report" });
+  const checkbox = report.getByRole("checkbox", { name: "Send the report" });
+  const title = report.getByRole("button", { name: "Send the report", exact: true });
+  const star = report.getByRole("button", { name: "Star: Send the report" });
+  await checkbox.focus();
+  await page.keyboard.press("Tab");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(star).toBeFocused();
+  // The next stop is the next row's checkbox: the row has no other.
+  await page.keyboard.press("Tab");
+  await expect(
+    panel.getByRole("listitem", { name: "Take out the recycling" }).getByRole("checkbox"),
+  ).toBeFocused();
+  // Enter on the title opens the task; Space on the checkbox completes it, not opens it.
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Send the report" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(checkbox).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+for (const colorScheme of ["dark", "light"] as const) {
+  test(`a row under the mouse shows its hover background on its card, ${colorScheme} (design D195)`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.setViewportSize(WIDE);
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    await panel.getByRole("tab", { name: /^Tasks/ }).click();
+    const item = panel.getByRole("listitem", { name: "Send the report" });
+    const row = item.locator("> div");
+    // The row lies on its list's card: nothing of its own until the mouse is over it.
+    const card = await item.evaluate((element) => {
+      let parent = element.parentElement;
+      while (parent && getComputedStyle(parent).backgroundColor === "rgba(0, 0, 0, 0)") {
+        parent = parent.parentElement;
+      }
+      return getComputedStyle(parent!).backgroundColor;
+    });
+    await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    const box = (await row.boundingBox())!;
+    await page.mouse.move(box.x + box.width - 60, box.y + box.height / 2);
+    await expect(row).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(row).not.toHaveCSS("background-color", card);
+  });
+}
+
+test.describe("on a touch screen", () => {
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+  test("a tapped row keeps no hover background once its details close (design D195)", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    await panel.getByRole("tab", { name: /^Tasks/ }).click();
+    const row = panel.getByRole("listitem", { name: "Send the report" }).locator("> div");
+    const box = (await row.boundingBox())!;
+    await page.touchscreen.tap(box.x + box.width - 60, box.y + box.height / 2);
+    const details = page.getByRole("dialog", { name: "Send the report" });
+    await details.getByRole("button", { name: "Close" }).click();
+    await expect(details).toHaveCount(0);
+    // A finger has no hover: Tailwind's `hover:` holds only under `(hover: hover)`.
+    expect(await page.evaluate(() => matchMedia("(hover: hover)").matches)).toBe(false);
+    await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   });
 });
