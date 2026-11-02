@@ -2,11 +2,12 @@
 // banners are seasons, drawn for the northern hemisphere, so south of the
 // equator a month gets the banner six months on (July's winter is
 // January's). Where the user is is read from their time zone alone, never
-// asked: a zone whose place in the tz database lies south of the equator,
-// or any of its old names (`southern-zones.ts`, generated).
+// asked: a zone whose place in the tz database lies south of the Tropic of
+// Capricorn, or any of its old names (`southern-zones.ts`, generated); the
+// tropics have no such seasons either side of the equator.
 import { SOUTHERN_ZONES } from "./southern-zones.ts";
 
-/** Whether a time zone is south of the equator, with seasons the other way round. */
+/** Whether a time zone is in the southern temperate zone, its seasons the other way round. */
 export function isSouthern(timeZone: string): boolean {
   return SOUTHERN_ZONES.has(timeZone);
 }

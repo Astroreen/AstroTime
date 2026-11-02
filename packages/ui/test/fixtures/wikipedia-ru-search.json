@@ -1,0 +1,71 @@
+{
+  "batchcomplete": true,
+  "continue": {
+    "gsroffset": 3,
+    "continue": "gsroffset||"
+  },
+  "query": {
+    "pages": [
+      {
+        "pageid": 80393,
+        "ns": 0,
+        "title": "Красная площадь",
+        "index": 1,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ee/Kremlin_and_Red_Square.1.jpg/960px-Kremlin_and_Red_Square.1.jpg?utm_source=ru.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 638
+        },
+        "pageimage": "Kremlin_and_Red_Square.1.jpg",
+        "coordinates": [
+          {
+            "lat": 55.75416667,
+            "lon": 37.62,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      },
+      {
+        "pageid": 2285238,
+        "ns": 0,
+        "title": "Биржевая площадь (Москва)",
+        "index": 3,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Birzhevaya_Square.jpg/960px-Birzhevaya_Square.jpg?utm_source=ru.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 720
+        },
+        "pageimage": "Birzhevaya_Square.jpg",
+        "coordinates": [
+          {
+            "lat": 55.75519444,
+            "lon": 37.62519444,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      },
+      {
+        "pageid": 2897508,
+        "ns": 0,
+        "title": "Площадь Революции (Москва)",
+        "index": 2,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C_%D0%A0%D0%B5%D0%B2%D0%BE%D0%BB%D1%8E%D1%86%D0%B8%D0%B8_-_panoramio_%281%29.jpg/960px-%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C_%D0%A0%D0%B5%D0%B2%D0%BE%D0%BB%D1%8E%D1%86%D0%B8%D0%B8_-_panoramio_%281%29.jpg?utm_source=ru.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 640
+        },
+        "pageimage": "Площадь_Революции_-_panoramio_(1).jpg",
+        "coordinates": [
+          {
+            "lat": 55.7575,
+            "lon": 37.61969722,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      }
+    ]
+  }
+}

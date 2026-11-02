@@ -6,6 +6,7 @@
 // /dav-proxy/ and anything else that is not the app's is never touched.
 import {
   carryPictures,
+  keepsPicture,
   namedFiles,
   presetKey,
   presetOf,
@@ -246,7 +247,7 @@ async function picture(event: FetchEvent, pathname: string): Promise<Response> {
   const shown = await cache.match(pathname);
   if (shown) return shown;
   const answer = await fetch(event.request);
-  if (answer.ok && answer.type === "basic") {
+  if (keepsPicture(answer)) {
     event.waitUntil(cache.put(pathname, answer.clone()).catch(() => {}));
   }
   return answer;

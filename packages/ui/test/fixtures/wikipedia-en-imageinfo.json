@@ -1,0 +1,43 @@
+{
+  "continue": {
+    "iistart": "2009-04-26T13:21:21Z",
+    "continue": "||"
+  },
+  "query": {
+    "normalized": [
+      {
+        "fromencoded": false,
+        "from": "File:Brandenburger_Tor_abends.jpg",
+        "to": "File:Brandenburger Tor abends.jpg"
+      }
+    ],
+    "pages": [
+      {
+        "ns": 6,
+        "title": "File:Brandenburger Tor abends.jpg",
+        "missing": true,
+        "known": true,
+        "imagerepository": "shared",
+        "imageinfo": [
+          {
+            "extmetadata": {
+              "Artist": {
+                "value": "<b><a href=\"//commons.wikimedia.org/wiki/User:Der_Wolf_im_Wald\" title=\"User:Der Wolf im Wald\">Thomas Wolf</a></b>, <small><a rel=\"nofollow\" class=\"external text\" href=\"http://www.foto-tw.de\">www.foto-tw.de</a></small>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-SA 3.0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/3.0",
+                "source": "commons-desc-page"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

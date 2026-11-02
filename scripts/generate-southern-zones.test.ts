@@ -4,35 +4,57 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
-import { linksOf, renderModule, southernOf, withLinks } from "./generate-southern-zones.ts";
+import {
+  latitudeOf,
+  latitudesOf,
+  linksOf,
+  renderModule,
+  southernZones,
+} from "./generate-southern-zones.ts";
 
-test("a zone south of the equator by its latitude, with every name linked to it", () => {
-  const table = [
-    "# a comment",
-    "AR\t-3436-05827\tAmerica/Argentina/Buenos_Aires\tBuenos Aires (BA, CF)",
-    "LT\t+5441+02519\tEurope/Vilnius",
-    "EC\t-0210-07950\tAmerica/Guayaquil\tEcuador (mainland)",
-    "SG\t+0117+10351\tAsia/Singapore",
-    "NZ\t-364832+1744554\tPacific/Auckland",
-  ].join("\n");
-  const zones = southernOf(table);
-  expect(zones).toEqual([
-    "America/Argentina/Buenos_Aires",
-    "America/Guayaquil",
-    "Pacific/Auckland",
-  ]);
-  const links = linksOf(
-    "Link\tAmerica/Argentina/Buenos_Aires\tAmerica/Buenos_Aires\nLink\tPacific/Auckland\tNZ\t#= x\nLink\tNZ\tOld/Link\nLink\tEurope/Vilnius\tEurope/Other\n",
-  );
-  expect(withLinks(zones, links)).toEqual([
+const TABLE = [
+  "# a comment",
+  "AR\t-3436-05827\tAmerica/Argentina/Buenos_Aires\tBuenos Aires (BA, CF)",
+  "LT\t+5441+02519\tEurope/Vilnius",
+  "EC\t-0210-07950\tAmerica/Guayaquil\tEcuador (mainland)",
+  "BR\t-2332-04637\tAmerica/Sao_Paulo\tBrazil (southeast)",
+  "KE\t-0117+03649\tAfrica/Nairobi",
+  "UG\t+0019+03225\tAfrica/Kampala",
+  "NZ\t-364832+1744554\tPacific/Auckland",
+].join("\n");
+
+const LINKS = [
+  "Link\tAmerica/Argentina/Buenos_Aires\tAmerica/Buenos_Aires",
+  "Link\tPacific/Auckland\tNZ\t#= x",
+  "Link\tNZ\tOld/Link",
+  "Link\tAfrica/Nairobi\tAfrica/Kampala",
+  "Link\tEurope/Vilnius\tEurope/Other",
+].join("\n");
+
+test("a zone south of the Tropic of Capricorn by its own latitude, else by the zone it links to", () => {
+  expect(southernZones(latitudesOf(TABLE), linksOf(LINKS))).toEqual([
     "America/Argentina/Buenos_Aires",
     "America/Buenos_Aires",
-    "America/Guayaquil",
+    // Guayaquil and Nairobi are in the tropics: no seasons to flip.
+    "America/Sao_Paulo",
     "NZ",
     "Old/Link",
     "Pacific/Auckland",
   ]);
   expect(renderModule(["NZ"])).toContain("node scripts/generate-southern-zones.ts");
+});
+
+test("a link with a place of its own is placed by it, not by the zone it links to", () => {
+  // Kampala links to Nairobi in `backward`, but zone.tab places it north of the equator.
+  const southern = southernZones([...latitudesOf(TABLE), ["Africa/Nairobi", -30]], linksOf(LINKS));
+  expect(southern).toContain("Africa/Nairobi");
+  expect(southern).not.toContain("Africa/Kampala");
+});
+
+test("a latitude from zone.tab's degrees, minutes and seconds", () => {
+  expect(latitudeOf("-3436-05827")).toBeCloseTo(-34.6);
+  expect(latitudeOf("-364832+1744554")).toBeCloseTo(-36.809, 3);
+  expect(latitudeOf("+5441+02519")).toBeCloseTo(54.683, 3);
 });
 
 test("the checked-in list is the generator's, from a pinned tz release", () => {

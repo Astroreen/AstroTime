@@ -1,9 +1,11 @@
-// The evidence for the pictures (docs/plans/design.md#D215–D219): the
+// The evidence for the pictures (docs/plans/design.md#D215–D221): the
 // Agenda with its illustrated cards and a month's banner, and an item's
 // details under its picture, on a phone and on a wide screen, in both themes and both
 // languages. Runs only when ASTROTIME_SCREENSHOTS names a directory:
 //
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e pictures-screenshots
+import { readFileSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { openDemo } from "./support.ts";
@@ -66,4 +68,79 @@ for (const language of ["en", "ru"] as const) {
       });
     }
   }
+}
+
+// A place's photo (D220, D221): Photon and Wikipedia answer with their
+// recorded answers, and the "photo" is one of AstroTime's own banners, so
+// the evidence shows no one's photo.
+const PLACE = {
+  en: { photon: "photon-en.json", wiki: "en", title: "Sightseeing", query: "Brandenburger" },
+  ru: { photon: "photon-default.json", wiki: "ru", title: "Экскурсия", query: "Красная площадь" },
+} as const;
+const fixture = (name: string) =>
+  readFileSync(new URL(`../../../packages/ui/test/fixtures/${name}`, import.meta.url));
+
+for (const [language, theme, size] of [
+  ["en", "light", "phone"],
+  ["ru", "dark", "phone"],
+  ["en", "dark", "wide"],
+  ["ru", "light", "wide"],
+] as const) {
+  test(`place photo ${language} ${theme} ${size}`, async ({ browser }) => {
+    const phone = size === "phone";
+    const context = await browser.newContext({
+      locale: LOCALES[language],
+      colorScheme: theme,
+      viewport: phone ? PHONE : WIDE,
+      ...(phone ? { hasTouch: true, isMobile: true } : {}),
+      timezoneId: "Europe/Vilnius",
+    });
+    const page = await context.newPage();
+    const place = PLACE[language];
+    await page.route("https://photon.komoot.io/api/**", (route) =>
+      route.fulfill({ contentType: "application/json", body: fixture(place.photon) }),
+    );
+    await page.route(`https://${place.wiki}.wikipedia.org/w/api.php**`, (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: fixture(
+          new URL(route.request().url()).searchParams.has("gsrsearch")
+            ? `wikipedia-${place.wiki}-search.json`
+            : "wikipedia-en-imageinfo.json",
+        ),
+      }),
+    );
+    // The place card's map: a plain ground, no tile fetched (OpenStreetMap's policy: no bulk).
+    await page.route("https://tile.openstreetmap.org/**", (route) =>
+      route.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e8e4dc"/></svg>',
+      }),
+    );
+    await page.route("https://thumb.wikimedia.org/**", (route) =>
+      route.fulfill({
+        contentType: "image/svg+xml",
+        body: fixture("../../src/pictures/art/month-04.svg"),
+      }),
+    );
+    await openDemo(page, "agenda");
+    await page.getByRole("button", { name: /^(Create|Создать)$/ }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("textbox", { name: /^(Title|Название)$/ }).fill(place.title);
+    await dialog.getByRole("combobox", { name: /^(Location|Место)$/ }).fill(place.query);
+    await page.getByRole("listbox").getByRole("option").first().click();
+    await dialog.getByRole("button", { name: /^(Save|Сохранить)$/ }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const card = page.getByRole("listitem", { name: new RegExp(`^${place.title}`) });
+    await card.scrollIntoViewIfNeeded();
+    await expect(card.locator("img")).toHaveAttribute("data-shown", "true");
+    await pictures(page);
+    const name = `${directory}/place-photo-${language}-${theme}-${size}`;
+    await page.screenshot({ path: `${name}-agenda.png` });
+    await card.getByRole("button").click();
+    await expect(page.locator(".details-picture img")).toBeVisible();
+    await pictures(page);
+    await page.screenshot({ path: `${name}-details.png` });
+    await context.close();
+  });
 }

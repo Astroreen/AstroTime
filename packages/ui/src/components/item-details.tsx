@@ -165,8 +165,8 @@ function Body({
 
   return (
     <>
-      {/* Over the item's picture, when its title gives one (design D216). */}
-      <DetailsPicture title={item.summary}>
+      {/* Over the item's picture, when its title or its place gives one (design D216, D221). */}
+      <DetailsPicture item={item}>
         <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
           {/* A task's star beside the pencil, as an icon toggle (design D196). */}
           {task && rights.edit && (
