@@ -54,7 +54,7 @@ import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 interface CreateOptions {
   /** The day it is on. */
   readonly day: string;
-  /** On the day, with no time: the tasks screen's new task (design D159). */
+  /** On the day, with no time: the tasks screen's new task (design D159), a tap on the all-day strip (D188). */
   readonly allDay?: boolean;
   /** Minutes past midnight of a tapped slot of the time grid. */
   readonly at?: number;

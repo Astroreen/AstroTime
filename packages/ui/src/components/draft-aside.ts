@@ -18,7 +18,12 @@ import type { Form, Target } from "../calendar/editing.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
 import { useMediaQuery } from "../hooks.ts";
 
-/** From this wide, in rem, the dialog floats (Tailwind's `sm:`, `dialog-parts.tsx`'s `sheet`); narrower it is the whole screen. */
+/**
+ * From this wide, in rem, the dialog floats (Tailwind's `sm:`,
+ * `dialog-parts.tsx`'s `sheet`); narrower it is the whole screen. A media
+ * query counts rem from the browser's own font size, not the root's; the
+ * page sets no root size of its own, so the two are one.
+ */
 const FLOATS_REM = 40;
 /** The dialog's widest in rem, as the sheet's `sm:w-[min(36rem,…)]` in the middle: larger with the user's larger font. */
 const WIDEST_REM = 36;
@@ -60,10 +65,15 @@ export function useDraftAside(open: boolean): Placed | null {
     observer.observe(main);
     return () => observer.disconnect();
   }, [open, floating]);
-  // On every render: the draft moves as the form changes. A scroll moves it
-  // up or down only, which leaves its sides, and so the aside, as they are.
+  // On every render: the draft moves as the form changes. Nothing moves it
+  // sideways while the dialog is open: the views behind it are inert (no
+  // swipe, no keys), and none scrolls sideways; a scroll moves it up or
+  // down only, which leaves its sides, and so the aside, as they are.
   useLayoutEffect(() => {
-    const draft = open && floating ? shownDraft() : null;
+    // Closing, the dialog fades where it stood: its draft is gone already,
+    // and measuring now would put it in the middle for its last frames.
+    if (!open) return;
+    const draft = floating ? shownDraft() : null;
     const rect = draft?.getBoundingClientRect();
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const beside = rect ? besideOf(rect, window.innerWidth, rem) : null;
@@ -77,8 +87,7 @@ export function useDraftAside(open: boolean): Placed | null {
         : next,
     );
   });
-  // Not floating is the middle at once, with no render at the old place;
-  // a dialog closing keeps its place while it fades.
+  // Not floating is the middle at once, with no render at the old place.
   return floating ? aside : null;
 }
 
