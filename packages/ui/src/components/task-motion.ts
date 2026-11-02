@@ -7,7 +7,8 @@
 // "Completed" or fades; a new row comes in from above. Loaded with the tasks
 // screen's first showing, not with the app (D145); never with
 // `prefers-reduced-motion`.
-import { SLIDE } from "./pager.tsx";
+/** The Pager's `SLIDE`, Material's standard easing (design D154), not imported so the Pager stays out of this chunk. */
+const SLIDE = "cubic-bezier(0.2, 0, 0, 1)";
 
 /** Milliseconds a move takes, and a row that leaves. */
 const MOVE_MS = 280;

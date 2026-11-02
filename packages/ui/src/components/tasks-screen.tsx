@@ -10,7 +10,7 @@ import { Checkbox } from "@base-ui/react/checkbox";
 import { Menu } from "@base-ui/react/menu";
 import { Tabs } from "@base-ui/react/tabs";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 import { liveQuery, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
@@ -26,7 +26,6 @@ import {
 } from "../calendar/tasks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
 import { useCalendar } from "./context.ts";
-import { reducedMotion } from "./pager.tsx";
 import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
 import {
@@ -51,6 +50,13 @@ export interface TaskFocus {
 const roundButton =
   "grid size-10 shrink-0 place-items-center rounded-full hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:hover:bg-transparent";
 const iconButton = `${roundButton} text-ink disabled:text-ink-muted`;
+
+/**
+ * `prefers-reduced-motion`, as the Pager's `reducedMotion` asks it: asked
+ * here, so the screen does not take the Pager and its hooks into its own
+ * chunk (D145).
+ */
+const lessMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Milliseconds a tick the user drew shows before its row moves (design D197). */
 const HOLD_MS = 160;
@@ -123,7 +129,7 @@ export function TasksScreen({
   /** The task the user just completed, whose row in "Completed" draws its tick. */
   const drawn = useRef<string | null>(null);
   useEffect(() => {
-    if (reducedMotion()) return;
+    if (lessMotion()) return;
     import("./task-motion.ts").then(
       (module) => {
         motion.current = module;
@@ -145,7 +151,7 @@ export function TasksScreen({
       async () => cache.rows(await store.tasks(ids), today, timeZone),
       (next) => {
         measured.current =
-          motion.current && stage.current && !reducedMotion()
+          motion.current && stage.current && !lessMotion()
             ? motion.current.measure(stage.current)
             : null;
         setRows(next);
@@ -437,6 +443,9 @@ export function TasksScreen({
   );
 }
 
+/** Where a count goes in a translated string, to cut it there. */
+const COUNT_MARK = "\u2063";
+
 interface Actions {
   /** Resolves to whether the change landed. */
   readonly complete: (row: TaskRow, done: boolean) => Promise<boolean>;
@@ -474,6 +483,9 @@ function ListCards({
   // Completing and starring are edits; adding one is a creation (D37).
   const { create, edit } = rightsOf(list);
   const readOnly = !edit;
+  // "Completed (N)" as one translated string, cut at its count so the count
+  // is a box of its own that can tick over (design D197).
+  const around = t("tasks.completed", { n: COUNT_MARK }).split(COUNT_MARK);
   return (
     <>
       <div data-card="undone" className="relative isolate rounded-2xl pb-2">
@@ -527,13 +539,11 @@ function ListCards({
           >
             {/* The count in its own box, so it can tick over (design D197). */}
             <span className="min-w-0 flex-1">
-              <Trans
-                i18nKey="tasks.completedCount"
-                values={{ n: completed.length }}
-                components={{
-                  count: <span data-completed-count="" className="inline-block" />,
-                }}
-              />
+              {around[0]}
+              <span data-completed-count="" className="inline-block">
+                {completed.length}
+              </span>
+              {around[1]}
             </span>
             <ChevronIcon direction={showCompleted ? "up" : "down"} className="size-5" />
           </button>
