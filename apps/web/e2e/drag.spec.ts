@@ -509,3 +509,21 @@ test.describe("on a touch screen", () => {
     await expect(item(page, "Thursday, November 5", /^Lunch with Marta/)).toHaveCount(0);
   });
 });
+
+test.describe("by touch on a wide screen (design D190)", () => {
+  test.use({ hasTouch: true });
+
+  test("a double tap on an empty hour keeps the dialog its first tap opened", async ({ page }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const at = await pointOn(page, "Tuesday, November 3", 16.1);
+    await page.touchscreen.tap(at.x, at.y);
+    await page.touchscreen.tap(at.x, at.y);
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+  });
+});

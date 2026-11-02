@@ -47,7 +47,7 @@ import type { DrawnDraft } from "../calendar/query.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { ChangeNotice } from "./change-notice.tsx";
-import type { EditorState } from "./item-editor.tsx";
+import type { EditorState, Press } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor } from "./lazy.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
@@ -62,6 +62,8 @@ interface CreateOptions {
   readonly length?: number;
   /** The calendar (a task list) it goes in; the first that takes new items by default. */
   readonly calendarId?: string;
+  /** The click on an empty slot that asks for it, for the dialog to tell a double click's second from a click of its own (design D190). */
+  readonly press?: Press;
 }
 
 /** How a move or a resize ended (design D111): written, nothing to write, or why not. */
@@ -284,7 +286,13 @@ export function useEditingState({
       setEditing({
         target: null,
         initial: null,
-        state: { existing: false, form, problem: null, saving: false },
+        state: {
+          existing: false,
+          form,
+          problem: null,
+          saving: false,
+          ...(options.press ? { opener: options.press } : {}),
+        },
       });
     },
     canCreate: writable("event").length > 0 || writable("task").length > 0,

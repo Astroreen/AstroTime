@@ -67,9 +67,21 @@ import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 
+/** The click on an empty slot that opened a new item's dialog (design D190). */
+export interface Press {
+  readonly x: number;
+  readonly y: number;
+  /** The click's count: 1 for a single click, 2 for a double click's second. */
+  readonly detail: number;
+  /** Its `timeStamp`. */
+  readonly at: number;
+}
+
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
   readonly existing: boolean;
+  /** The click that opened it, on an empty slot; none for a key, a button or a copy (design D190). */
+  readonly opener?: Press;
   /** A new item filled from another ("Copy to", design D164): its kind stays. */
   readonly copy?: boolean;
   readonly form: Form;
@@ -117,7 +129,7 @@ export function ItemEditor({
   const formId = useId();
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
-  const secondPress = useSecondPress(state !== null);
+  const secondPress = useSecondPress(state?.opener);
   useAlarmCount(state);
   // Beside the item it makes, where there is room (design D155, D187).
   const aside = useDraftAside(state !== null);
@@ -1029,38 +1041,20 @@ const SAME_SPOT = 8;
 const DOUBLE_CLICK_MS = 500;
 
 /**
- * Whether a press outside the dialog is the second press of the double
- * click whose first click opened it (design D190): the first press outside
- * after it opened, one more in the click count than that click, at about
- * its spot, soon after it. Anything else (a single press, one after
- * another click, a second press elsewhere) is a press of its own.
+ * Whether a click outside the dialog (its backdrop's, as Base UI closes a
+ * dialog with a backdrop on a `click`, by mouse or touch) is the second of
+ * the double click whose first click opened it (design D190): the first
+ * click outside since it opened, one more in the click count, at about the
+ * same spot, soon after. Any other is a click of its own.
  */
-function useSecondPress(open: boolean): (event: Event) => boolean {
-  // The last click on the page, heard before any handler opens a dialog with it.
-  const lastClick = useRef<{ x: number; y: number; detail: number; at: number } | null>(null);
-  const opener = useRef<typeof lastClick.current>(null);
-  useEffect(() => {
-    const heard = (event: MouseEvent) => {
-      lastClick.current = {
-        x: event.clientX,
-        y: event.clientY,
-        detail: event.detail,
-        at: event.timeStamp,
-      };
-    };
-    document.addEventListener("click", heard, true);
-    return () => document.removeEventListener("click", heard, true);
-  }, []);
-  // On opening, the click that opened it, if it was one just now.
-  useEffect(() => {
-    const click = lastClick.current;
-    opener.current = open && click && performance.now() - click.at < DOUBLE_CLICK_MS ? click : null;
-  }, [open]);
+function useSecondPress(opener: Press | undefined): (event: Event) => boolean {
+  // Each opening's first click outside is the only one that may be its second.
+  const asked = useRef<Press | undefined>(undefined);
   return (event) => {
-    const first = opener.current;
-    opener.current = null;
+    const first = opener && asked.current !== opener ? opener : undefined;
+    asked.current = opener;
     return (
-      first !== null &&
+      first !== undefined &&
       event instanceof MouseEvent &&
       event.detail === first.detail + 1 &&
       Math.abs(event.clientX - first.x) < SAME_SPOT &&
