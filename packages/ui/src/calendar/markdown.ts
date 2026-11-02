@@ -33,8 +33,9 @@ export type Block =
 /** How deep quotes and lists nest before the rest reads as text. */
 const DEEPEST = 8;
 
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
-const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
+/** A fence opens a code block; a backtick one has no backtick after it, or it is inline code. */
+const FENCE = /^ {0,3}(`{3,}(?!.*`)|~{3,})/;
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/;
 const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 const QUOTE = /^ {0,3}> ?/;
 const ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])([ \t]+|$)/;
@@ -42,11 +43,38 @@ const BLANK = /^[ \t]*$/;
 
 /** The description as blocks. */
 export function parseMarkdown(text: string): readonly Block[] {
-  return blocks(text.replace(/\r\n?/g, "\n").split("\n"), 0);
+  return blocks(text.replace(/\r\n?/g, "\n").split("\n").map(expandIndent), 0);
 }
 
-const starts = (line: string) =>
-  FENCE.test(line) || HEADING.test(line) || RULE.test(line) || QUOTE.test(line) || ITEM.test(line);
+/** A line's leading tabs as spaces to the next stop of 4, so indents count and cut in columns. */
+function expandIndent(line: string): string {
+  const lead = /^[ \t]*/.exec(line)![0];
+  if (!lead.includes("\t")) return line;
+  let columns = 0;
+  for (const char of lead) columns = char === "\t" ? columns + 4 - (columns % 4) : columns + 1;
+  return " ".repeat(columns) + line.slice(lead.length);
+}
+
+/**
+ * Whether a line starts a block that cuts a paragraph short: an ordered
+ * list only from 1, and a list item only with words, as CommonMark's
+ * ("2019. was a good year" carries the paragraph on).
+ */
+const interrupts = (line: string) =>
+  FENCE.test(line) ||
+  HEADING.test(line) ||
+  RULE.test(line) ||
+  QUOTE.test(line) ||
+  /^ {0,3}(?:[-*+]|1[.)])[ \t]+\S/.test(line);
+
+/** A heading's words, without its closing `#`s (`## Steps ##`). */
+function headingWords(words: string): string {
+  let end = words.trimEnd().length;
+  let hashes = end;
+  while (hashes > 0 && words[hashes - 1] === "#") hashes--;
+  if (hashes < end && (hashes === 0 || /[ \t]/.test(words[hashes - 1]!))) end = hashes;
+  return words.slice(0, end).trim();
+}
 
 function blocks(lines: readonly string[], depth: number): Block[] {
   const out: Block[] = [];
@@ -60,16 +88,22 @@ function blocks(lines: readonly string[], depth: number): Block[] {
     const fence = FENCE.exec(line);
     if (fence) {
       const mark = fence[1]!;
+      // Closed by a fence of its own character, as long or longer, alone on its line.
+      const closing = new RegExp(`^ {0,3}${mark[0]}{${mark.length},}[ \t]*$`);
       const body: string[] = [];
       i++;
-      while (i < lines.length && !lines[i]!.trimStart().startsWith(mark)) body.push(lines[i++]!);
+      while (i < lines.length && !closing.test(lines[i]!)) body.push(lines[i++]!);
       i++;
       out.push({ type: "code", text: body.join("\n") });
       continue;
     }
     const heading = HEADING.exec(line);
     if (heading) {
-      out.push({ type: "heading", level: heading[1]!.length, children: inline(heading[2] ?? "") });
+      out.push({
+        type: "heading",
+        level: heading[1]!.length,
+        children: inline(headingWords(heading[2] ?? "")),
+      });
       i++;
       continue;
     }
@@ -85,7 +119,7 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       while (i < lines.length && !BLANK.test(lines[i]!)) {
         const next = lines[i]!;
         if (QUOTE.test(next)) body.push(next.replace(QUOTE, ""));
-        else if (starts(next)) break;
+        else if (interrupts(next)) break;
         else body.push(next);
         i++;
       }
@@ -102,7 +136,7 @@ function blocks(lines: readonly string[], depth: number): Block[] {
     while (
       i < lines.length &&
       !BLANK.test(lines[i]!) &&
-      (body.length === 0 || !starts(lines[i]!))
+      (body.length === 0 || !interrupts(lines[i]!))
     ) {
       body.push(lines[i++]!.trim());
     }
@@ -138,7 +172,7 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
       }
       if (indentOf(next) >= Math.min(indent, 2))
         body.push(next.slice(Math.min(indent, indentOf(next))));
-      else if (ITEM.test(next) || starts(next)) break;
+      else if (ITEM.test(next) || interrupts(next)) break;
       // A lazy line carries the item's paragraph on.
       else body.push(next);
       i++;
@@ -155,7 +189,8 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
   return [{ type: "list", start: ordered ? Number.parseInt(first[2]!, 10) : null, items }, i];
 }
 
-const indentOf = (line: string) => /^[ \t]*/.exec(line)![0].replace(/\t/g, "    ").length;
+/** A line's indent in columns: its tabs were made spaces (`expandIndent`). */
+const indentOf = (line: string) => /^ */.exec(line)![0].length;
 
 /** The schemes a link may have: the web, mail and the phone. */
 export function safeHref(href: string): string | null {
@@ -163,12 +198,73 @@ export function safeHref(href: string): string | null {
   return /^(https?:\/\/|mailto:|tel:)/i.test(url) && !/[\s<>"]/.test(url) ? url : null;
 }
 
-const BARE = /^(https?:\/\/|mailto:)[^\s<>"]+/i;
+const BARE = /(?:https?:\/\/|mailto:)[^\s<>"]+/iy;
+const AUTOLINK = /<((?:https?:\/\/|mailto:|tel:)[^\s<>]+)>/iy;
 const ESCAPABLE = /[\\`*_{}[\]()#+\-.!~<>|]/;
 const WORD = /[\p{L}\p{N}]/u;
 
-/** Text with its inline marks: code, emphasis, struck text, links (none inside a link's own words). */
-function inline(text: string, links = true): Inline[] {
+const DELIMITERS = [
+  ["**", "strong"],
+  ["__", "strong"],
+  ["~~", "del"],
+  ["*", "em"],
+  ["_", "em"],
+] as const;
+type Mark = (typeof DELIMITERS)[number][0];
+
+/**
+ * Where marks may close in `text`, found once, so an opener with no closer
+ * costs no scan of the rest (untrusted text, design D207): each mark's
+ * closing places, in order, as CommonMark lets one close (after no space or
+ * backslash; a single mark not half of a double; `_` not inside a word).
+ */
+function closersOf(text: string): Record<Mark, number[]> {
+  const found = { "**": [], __: [], "~~": [], "*": [], _: [] } as Record<Mark, number[]>;
+  for (let at = 1; at < text.length; at++) {
+    const before = text[at - 1]!;
+    if (/\s/.test(before) || before === "\\") continue;
+    for (const [mark] of DELIMITERS) {
+      if (!text.startsWith(mark, at)) continue;
+      const next = text[at + mark.length] ?? "";
+      if (mark.length === 1 && (next === mark || before === mark)) continue;
+      if (mark[0] === "_" && WORD.test(next)) continue;
+      found[mark].push(at);
+    }
+  }
+  return found;
+}
+
+/** The first of `sorted` at or after `from`, by halves. */
+function firstFrom(sorted: readonly number[], from: number): number | undefined {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (sorted[middle]! < from) low = middle + 1;
+    else high = middle;
+  }
+  return sorted[low];
+}
+
+/** Each `[` and the `]` that closes it, escapes aside: found once, with a stack. */
+function bracketsOf(text: string): Map<number, number> {
+  const pairs = new Map<number, number>();
+  const open: number[] = [];
+  for (let at = 0; at < text.length; at++) {
+    const char = text[at];
+    if (char === "\\") at++;
+    else if (char === "[") open.push(at);
+    else if (char === "]" && open.length > 0) pairs.set(open.pop()!, at);
+  }
+  return pairs;
+}
+
+/**
+ * Text with its inline marks: code, emphasis, struck text, links (none
+ * inside a link's own words). Marks nested deeper than `DEEPEST` read as
+ * text, and nothing is scanned twice for want of a closer.
+ */
+function inline(text: string, links = true, depth = 0): Inline[] {
   const out: Inline[] = [];
   let plain = "";
   const flush = () => {
@@ -179,10 +275,13 @@ function inline(text: string, links = true): Inline[] {
     flush();
     out.push(node);
   };
+  const closers = depth < DEEPEST ? closersOf(text) : null;
+  const brackets = links && depth < DEEPEST ? bracketsOf(text) : null;
+  /** By a run of backticks' length, where a search for its closer found none. */
+  const unclosed = new Map<number, number>();
   let i = 0;
   while (i < text.length) {
     const char = text[i]!;
-    const rest = text.slice(i);
     if (char === "\\" && ESCAPABLE.test(text[i + 1] ?? "")) {
       plain += text[i + 1];
       i += 2;
@@ -194,31 +293,34 @@ function inline(text: string, links = true): Inline[] {
       continue;
     }
     if (char === "`") {
-      const run = /^`+/.exec(rest)![0];
-      const end = text.indexOf(run, i + run.length);
+      let length = 1;
+      while (text[i + length] === "`") length++;
+      const run = "`".repeat(length);
+      const end = (unclosed.get(length) ?? -1) > i ? -1 : text.indexOf(run, i + length);
       if (end > 0) {
-        push({ type: "code", text: text.slice(i + run.length, end).replace(/\n/g, " ") });
-        i = end + run.length;
+        push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });
+        i = end + length;
         continue;
       }
+      unclosed.set(length, text.length);
       plain += run;
-      i += run.length;
+      i += length;
       continue;
     }
-    const emphasis = emphasisAt(text, i);
+    const emphasis = closers && emphasisAt(text, i, closers);
     if (emphasis) {
       push({
         type: emphasis.type,
-        children: inline(text.slice(emphasis.from, emphasis.to), links),
+        children: inline(text.slice(emphasis.from, emphasis.to), links, depth + 1),
       });
       i = emphasis.end;
       continue;
     }
-    if (links && char === "[") {
-      const link = linkAt(text, i);
+    if (brackets && char === "[") {
+      const link = linkAt(text, i, brackets.get(i));
       if (link) {
         const href = safeHref(link.href);
-        const children = inline(link.text, false);
+        const children = inline(link.text, false, depth + 1);
         if (href) push({ type: "link", href, children });
         else {
           // Not a link it may follow: its words, as written.
@@ -230,19 +332,24 @@ function inline(text: string, links = true): Inline[] {
       }
     }
     if (links && char === "<") {
-      const auto = /^<((?:https?:\/\/|mailto:|tel:)[^\s<>]+)>/i.exec(rest);
-      if (auto) {
+      AUTOLINK.lastIndex = i;
+      const auto = AUTOLINK.exec(text);
+      if (auto && safeHref(auto[1]!)) {
         push({ type: "link", href: auto[1]!, children: [auto[1]!] });
         i += auto[0].length;
         continue;
       }
     }
-    const bare = !links || WORD.test(text[i - 1] ?? "") ? null : BARE.exec(rest);
-    if (bare) {
-      const url = linkOf(bare[0]);
-      push({ type: "link", href: url, children: [url] });
-      i += url.length;
-      continue;
+    if (links && (char === "h" || char === "H" || char === "m" || char === "M")) {
+      BARE.lastIndex = i;
+      const bare = WORD.test(text[i - 1] ?? "") ? null : BARE.exec(text);
+      const url = bare ? linkOf(bare[0]) : "";
+      // Only a link with more than its scheme: "mailto::" is words.
+      if (bare && safeHref(url) && !/^(?:https?:\/\/|mailto:)$/i.test(url)) {
+        push({ type: "link", href: url, children: [url] });
+        i += url.length;
+        continue;
+      }
     }
     plain += char;
     i++;
@@ -251,18 +358,11 @@ function inline(text: string, links = true): Inline[] {
   return out;
 }
 
-const DELIMITERS = [
-  ["**", "strong"],
-  ["__", "strong"],
-  ["~~", "del"],
-  ["*", "em"],
-  ["_", "em"],
-] as const;
-
 /** Emphasis opening at `i` and where it closes; `_` only between words, as CommonMark's. */
 function emphasisAt(
   text: string,
   i: number,
+  closers: Record<Mark, number[]>,
 ): { type: "strong" | "em" | "del"; from: number; to: number; end: number } | null {
   for (const [mark, type] of DELIMITERS) {
     if (!text.startsWith(mark, i)) continue;
@@ -270,55 +370,90 @@ function emphasisAt(
     const after = text[from];
     if (after === undefined || /\s/.test(after)) return null;
     if (mark[0] === "_" && WORD.test(text[i - 1] ?? "")) return null;
-    let at = from;
-    for (;;) {
-      const to = text.indexOf(mark, at + 1);
-      if (to < 0) break;
-      const before = text[to - 1]!;
-      const next = text[to + mark.length] ?? "";
-      // A single mark is not the start of a double one; a closing mark follows a non-space.
-      const doubled = mark.length === 1 && next === mark;
-      if (!/\s/.test(before) && !doubled && !(mark[0] === "_" && WORD.test(next))) {
-        return { type, from, to, end: to + mark.length };
-      }
-      at = doubled ? to + 1 : to;
-    }
+    let to = firstFrom(closers[mark], from + 1);
+    if (to === undefined) continue;
+    // `***both***`: a double mark closes at the run's end, around the single inside.
+    while (mark.length === 2 && text[to + 2] === mark[0]) to++;
+    return { type, from, to, end: to + mark.length };
   }
   return null;
 }
 
-/** `[text](href)` at `i`, its brackets balanced. */
-function linkAt(text: string, i: number): { text: string; href: string; end: number } | null {
-  let depth = 0;
-  let close = -1;
-  for (let j = i; j < text.length; j++) {
-    if (text[j] === "\\") j++;
-    else if (text[j] === "[") depth++;
-    else if (text[j] === "]" && --depth === 0) {
-      close = j;
-      break;
+/**
+ * `[text](href)` at `i`, closed at `close`: the target's parentheses
+ * balanced (`…/wiki/Foo_(bar)`), or in angle brackets, then an optional
+ * title in quotes.
+ */
+function linkAt(
+  text: string,
+  i: number,
+  close: number | undefined,
+): { text: string; href: string; end: number } | null {
+  if (close === undefined || text[close + 1] !== "(") return null;
+  let at = close + 2;
+  // A target is looked for this far only: "[a](" over and over costs no scan of the rest.
+  const limit = Math.min(text.length, at + LONGEST_TARGET);
+  const skip = () => {
+    while (at < limit && text.charCodeAt(at) <= 32) at++;
+  };
+  skip();
+  let href = "";
+  if (text[at] === "<") {
+    const end = findBefore(text, ">", at, limit);
+    if (end < 0 || /[\n<]/.test(text.slice(at + 1, end))) return null;
+    href = text.slice(at + 1, end);
+    at = end + 1;
+  } else {
+    const start = at;
+    let open = 0;
+    for (; at < limit; at++) {
+      const code = text.charCodeAt(at);
+      if (code === 92) at++; // "\\"
+      else if (code <= 32) break; // a space, a tab, a line end
+      else if (code === 40) open++; // "("
+      else if (code === 41 && open-- === 0) break; // ")"
     }
+    href = text.slice(start, at);
   }
-  if (close < 0 || text[close + 1] !== "(") return null;
-  const target = /^\(\s*<?([^\s)>]*)>?(?:\s+"[^"]*")?\s*\)/.exec(text.slice(close + 1));
-  if (!target) return null;
-  return { text: text.slice(i + 1, close), href: target[1]!, end: close + 1 + target[0].length };
+  skip();
+  if (text[at] === '"') {
+    const end = findBefore(text, '"', at + 1, limit);
+    if (end < 0) return null;
+    at = end + 1;
+    skip();
+  }
+  if (text[at] !== ")") return null;
+  return { text: text.slice(i + 1, close), href, end: at + 1 };
 }
+
+/** Where `char` is in `text` from `from`, looked for up to `limit` only; -1 when not there. */
+function findBefore(text: string, char: string, from: number, limit: number): number {
+  for (let at = from; at < limit; at++) if (text[at] === char) return at;
+  return -1;
+}
+
+/** The longest link target, its title included, read after `](`. */
+const LONGEST_TARGET = 2048;
+
+const PAIRS: Record<string, string> = { ")": "(", "]": "[" };
 
 /**
  * A link as found in text, without what ends the sentence after it: a full
  * stop, a comma, or a closing bracket the link did not open
- * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own).
+ * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own). Counted once.
  */
 export function linkOf(found: string): string {
-  let url = found;
-  for (;;) {
-    url = url.replace(/[.,;:!?*_~]+$/, "");
-    const last = url.at(-1);
-    const open = last === ")" ? "(" : last === "]" ? "[" : null;
-    if (!last || !open || count(url, open) >= count(url, last)) return url;
-    url = url.slice(0, -1);
+  const counts = new Map<string, number>();
+  for (const char of found) counts.set(char, (counts.get(char) ?? 0) + 1);
+  let end = found.length;
+  while (end > 0) {
+    const last = found[end - 1]!;
+    const open = PAIRS[last];
+    if (".,;:!?*_~".includes(last)) end--;
+    else if (open && (counts.get(open) ?? 0) < (counts.get(last) ?? 0)) {
+      counts.set(last, counts.get(last)! - 1);
+      end--;
+    } else break;
   }
+  return found.slice(0, end);
 }
-
-const count = (text: string, char: string) => text.split(char).length - 1;

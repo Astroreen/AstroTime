@@ -175,3 +175,157 @@ describe("safety", () => {
     expect(linkOf("https://example.com/x**")).toBe("https://example.com/x");
   });
 });
+
+describe("what the review found (design D207)", () => {
+  test("a one-line ```code``` is inline code, not a fence that swallows the rest", () => {
+    expect(parseMarkdown("Run ```npm i``` now\n\nThen this.")).toEqual([
+      paragraph("Run ", { type: "code", text: "npm i" }, " now"),
+      paragraph("Then this."),
+    ]);
+    expect(parseMarkdown("```npm i```\nnext")).toEqual([
+      paragraph({ type: "code", text: "npm i" }, { type: "break" }, "next"),
+    ]);
+    // A fence closes only on its own character, as long or longer, alone.
+    expect(parseMarkdown("````\n```\nstill code\n````\nafter")).toEqual([
+      { type: "code", text: "```\nstill code" },
+      paragraph("after"),
+    ]);
+  });
+
+  test("a list nested by a tab keeps its marker: indents count and cut in columns", () => {
+    const nested = {
+      type: "list",
+      start: null,
+      items: [
+        {
+          checked: null,
+          children: [
+            paragraph("a"),
+            { type: "list", start: null, items: [{ checked: null, children: [paragraph("sub")] }] },
+          ],
+        },
+      ],
+    };
+    expect(parseMarkdown("- a\n\t- sub")).toEqual([nested]);
+    expect(parseMarkdown("- a\n  - sub")).toEqual([nested]);
+  });
+
+  test("a written link's target keeps its balanced parentheses", () => {
+    expect(parseMarkdown("[Foo](https://en.wikipedia.org/wiki/Foo_(bar)) and (that)")).toEqual([
+      paragraph(
+        { type: "link", href: "https://en.wikipedia.org/wiki/Foo_(bar)", children: ["Foo"] },
+        " and (that)",
+      ),
+    ]);
+    expect(parseMarkdown('[a](<https://example.com/a_(b> "title")')).toEqual([
+      paragraph({ type: "link", href: "https://example.com/a_(b", children: ["a"] }),
+    ]);
+  });
+
+  test("***both*** is strong around emphasis; an escaped mark closes nothing", () => {
+    expect(parseMarkdown("***both***")).toEqual([
+      paragraph({ type: "strong", children: [{ type: "em", children: ["both"] }] }),
+    ]);
+    expect(parseMarkdown("*a\\* b*")).toEqual([paragraph({ type: "em", children: ["a* b"] })]);
+  });
+
+  test("only a bullet or a list from 1 cuts a paragraph short", () => {
+    expect(parseMarkdown("A good year was\n2019. And 5) more")).toEqual([
+      paragraph("A good year was", { type: "break" }, "2019. And 5) more"),
+    ]);
+    expect(parseMarkdown("Steps:\n1. one").map((b) => b.type)).toEqual(["paragraph", "list"]);
+    // At a block's start any number begins a list, from that number.
+    expect(parseMarkdown("2019. great")).toEqual([
+      { type: "list", start: 2019, items: [{ checked: null, children: [paragraph("great")] }] },
+    ]);
+  });
+
+  test("emphasis nested deeper than eight reads as text", () => {
+    const deep = "*_".repeat(20) + "x" + "_*".repeat(20);
+    expect(() => parseMarkdown(deep)).not.toThrow();
+    let depth = 0;
+    let node: unknown = (parseMarkdown(deep)[0] as unknown as { children: unknown[] }).children[0];
+    while (node && typeof node === "object" && "children" in node) {
+      depth++;
+      node = (node as { children: unknown[] }).children[0];
+    }
+    expect(depth).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("untrusted text costs time in proportion to its length", () => {
+  // Each of these took seconds when every opener scanned the rest of the
+  // text for its closer; in proportion to their length they take a few
+  // milliseconds. The ceiling is generous: nothing here waits for time.
+  test.each([
+    ["unclosed stars", "*a ".repeat(20_000)],
+    ["unclosed underscores", "_a ".repeat(20_000)],
+    ["stars alone", "*".repeat(60_000)],
+    ["brackets", "[".repeat(60_000)],
+    ["targets with no end", "[a](".repeat(15_000)],
+    ["angle targets with no end", "[a](<".repeat(12_000)],
+    [
+      "backticks of every length",
+      Array.from({ length: 300 }, (_, i) => "`".repeat(i + 1) + "a").join(" "),
+    ],
+    ["a long bare link of brackets", `https://example.com/${")".repeat(60_000)}`],
+    ["a heading of spaces", `# ${" ".repeat(60_000)}x`],
+  ])("%s", (_, text) => {
+    const started = performance.now();
+    parseMarkdown(text);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe("random text (a seeded fuzz)", () => {
+  const ALPHABET = [
+    ..."*_~`[]()<>#->!\\ \t\n1.)xX:/",
+    "javascript:",
+    "https://",
+    "mailto:",
+    "tel:",
+    "<script>",
+    "data:",
+    "```",
+    "- [ ] ",
+    "> ",
+    "word",
+  ];
+  const KINDS = new Set(["paragraph", "heading", "code", "quote", "list", "rule"]);
+  const MARKS = new Set(["strong", "em", "del", "code", "link", "break"]);
+
+  /** Every node is one the details draw; every link one `safeHref` lets through. */
+  function check(node: unknown): void {
+    if (typeof node === "string") return;
+    const n = node as {
+      type?: string;
+      href?: string;
+      children?: unknown[];
+      items?: { children: unknown[] }[];
+    };
+    if (n.type === undefined) {
+      n.children?.forEach(check);
+      return;
+    }
+    expect(KINDS.has(n.type) || MARKS.has(n.type)).toBe(true);
+    if (n.type === "link") expect(safeHref(n.href!)).toBe(n.href);
+    n.children?.forEach(check);
+    n.items?.forEach((item) => item.children.forEach(check));
+  }
+
+  test("never throws, makes only known nodes and safe links, and finishes", () => {
+    let seed = 20_261_102;
+    const random = () => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed / 2_147_483_648;
+    };
+    for (let run = 0; run < 3000; run++) {
+      const length = Math.floor(random() * 80);
+      const text = Array.from(
+        { length },
+        () => ALPHABET[Math.floor(random() * ALPHABET.length)]!,
+      ).join("");
+      parseMarkdown(text).forEach(check);
+    }
+  });
+});

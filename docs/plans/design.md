@@ -1436,8 +1436,21 @@ reminders and its description.
     is not used). A link is one only to `http(s)`, `mailto` or `tel`;
     another (`javascript:`, `data:`, a relative path) shows its words, as
     text. Links open in a new tab with `rel="noopener noreferrer"`. No
-    link inside a link's words. Quotes and lists nested deeper than eight
-    read as text.
+    link inside a link's words. Quotes, lists and marks nested deeper than
+    eight read as text.
+  - **Untrusted text, read in time to its length:** a description comes
+    from any client, so where marks may close and which brackets pair are
+    found once per text, a run of backticks with no closer is not looked
+    for again, and a link's target is read 2 KiB ahead at most; random text
+    never throws (a seeded fuzz in `markdown.test.ts`), and 60 000
+    characters of open marks parse in milliseconds.
+  - **As CommonMark where text is plain:** only a bullet or a list from 1
+    cuts a paragraph short, so a wrapped line "2019. was a good year" stays
+    words; a backtick fence has no backtick after it on its line ("Run
+    `npm i` now" is inline code) and closes only on a fence of its own
+    character, as long or longer; a tab indents to the next stop of 4; a
+    written link's target keeps balanced parentheses
+    (`…/wiki/Foo_(bar)`).
   - **A checklist's box** is drawn where a bullet would be, read-only
     (`role="checkbox"`, `aria-readonly`, named by its text): ticking one
     would rewrite the user's text; a ticked item is struck and muted, as
