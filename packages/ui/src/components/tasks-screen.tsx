@@ -9,7 +9,7 @@ import type { Calendar, Store } from "@astrotime/storage";
 import { Checkbox } from "@base-ui/react/checkbox";
 import { Menu } from "@base-ui/react/menu";
 import { Tabs } from "@base-ui/react/tabs";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { liveQuery, sameResult, whileShown } from "../calendar/live.ts";
@@ -24,9 +24,11 @@ import {
   type TaskNode,
   type TaskRow,
 } from "../calendar/tasks.ts";
+import { useMediaQuery } from "../hooks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
 import { useCelebrate } from "./celebration.ts";
 import { useCalendar } from "./context.ts";
+import { Pager, type Page } from "./pager.tsx";
 import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
 import {
@@ -279,6 +281,19 @@ export function TasksScreen({
   };
   const clearOpen = () => clear(openTab());
   const hasLists = lists.length > 0;
+  // The lists as the Pager's pages (design D199): in their order, which a
+  // page's first "day" carries, as the Pager compares them to slide.
+  const coarse = useMediaQuery("(any-pointer: coarse)");
+  const tabIds = useId();
+  // A calendar's id holds no space (the store's UUID), so it can be part of a tab's.
+  const tabId = (list: string) => tabIds + list;
+  // Never -1 where it is used: `selected` is one of `lists` whenever it is
+  // not null, and the Pager is drawn only then.
+  const index = lists.findIndex((list) => list.id === selected);
+  const pageOf = (at: number): ListPage | null => {
+    const list = lists[at];
+    return list ? { key: list.id, days: [String(at).padStart(4, "0")], list } : null;
+  };
   useEffect(() => {
     const element = strip.current;
     if (!element) return;
@@ -380,6 +395,7 @@ export function TasksScreen({
                     <Tabs.Tab
                       key={list.id}
                       value={list.id}
+                      id={tabId(list.id)}
                       aria-label={
                         count > 0
                           ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
@@ -421,13 +437,20 @@ export function TasksScreen({
             data-moves={moves || undefined}
             className="relative flex min-h-0 flex-1 flex-col"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
-              {lists.map((list) => (
-                <Tabs.Panel
-                  key={list.id}
-                  value={list.id}
-                  className="flex flex-col gap-3 rounded-xl"
-                >
+            {/* Lists move as periods do (design D199): one slides in from
+                the side it comes from; on a touch screen the lists beside
+                are drawn beside it and a sideways swipe carries them. */}
+            <Pager
+              view="tasks"
+              current={pageOf(index)!}
+              previous={coarse ? pageOf(index - 1) : null}
+              next={coarse ? pageOf(index + 1) : null}
+              onStep={(step) => {
+                const list = lists[index + step];
+                if (list) setChosen(list.id);
+              }}
+              render={({ list }, current) => {
+                const cards = (
                   <ListCards
                     list={list}
                     tasks={byList.get(list.id)}
@@ -435,9 +458,24 @@ export function TasksScreen({
                     onSort={setSort}
                     actions={actions}
                   />
-                </Tabs.Panel>
-              ))}
-            </div>
+                );
+                // The same elements for the list shown and those beside it,
+                // so a list a swipe settles on keeps its state (its
+                // "Completed" open) and is not drawn anew: the shown one is
+                // the tab panel by its role and its tab's name.
+                return (
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
+                    <div
+                      role={current ? "tabpanel" : undefined}
+                      aria-labelledby={current ? tabId(list.id) : undefined}
+                      className="flex flex-col gap-3 rounded-xl"
+                    >
+                      {cards}
+                    </div>
+                  </div>
+                );
+              }}
+            />
             {/* Rows leaving are drawn on it, out of reach of a press, the keyboard and a screen reader. */}
             <div
               data-motion-layer=""
@@ -466,6 +504,11 @@ export function TasksScreen({
       )}
     </section>
   );
+}
+
+/** A list as a page of the Pager (design D199). */
+interface ListPage extends Page {
+  readonly list: Calendar;
 }
 
 /** Where a count goes in a translated string, to cut it there. */

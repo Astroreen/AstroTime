@@ -86,10 +86,19 @@ export function zoomable(
       touches[0]!.clientX - touches[1]!.clientX,
       touches[0]!.clientY - touches[1]!.clientY,
     );
-  const touchStart = (event: TouchEvent) => {
-    if (event.touches.length !== 2) return;
-    const scroller = scrollerOf(event.target);
+  /** Two fingers down on a grid: a pinch from the height drawn and how far apart they are. */
+  const begin = (event: TouchEvent, scroller: HTMLElement | null) => {
     pinch = scroller ? { scroller, spread: spreadOf(event.touches), hour: current() } : null;
+  };
+  // Two fingers begin a pinch; a third ends it where it is, and when one of
+  // three lifts, the two left begin anew from there: the zoom never
+  // measures one pair of fingers against another.
+  const touchStart = (event: TouchEvent) => {
+    if (event.touches.length === 2) return begin(event, scrollerOf(event.target));
+    if (event.touches.length > 2 && pinch) {
+      pinch = null;
+      end();
+    }
   };
   const touchMove = (event: TouchEvent) => {
     if (!pinch || event.touches.length !== 2) return;
@@ -112,7 +121,9 @@ export function zoomable(
     );
   };
   const touchEnd = (event: TouchEvent) => {
-    if (!pinch || event.touches.length === 2) return;
+    if (event.touches.length === 2)
+      return begin(event, pinch?.scroller ?? scrollerOf(event.target));
+    if (!pinch) return;
     pinch = null;
     end();
   };
@@ -148,7 +159,8 @@ export function zoomable(
   window.addEventListener("keydown", key);
   return () => {
     delete main.dataset["zoomable"];
-    clearTimeout(settle);
+    // A wheel's zoom still settling is kept, not lost with the view.
+    end();
     main.removeEventListener("wheel", wheel);
     main.removeEventListener("touchstart", touchStart);
     main.removeEventListener("touchmove", touchMove);
