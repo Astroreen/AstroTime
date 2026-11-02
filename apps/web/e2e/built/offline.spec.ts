@@ -245,6 +245,14 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
   await cp(DIST, second, { recursive: true });
   // A file only the older version has, as a lazily loaded chunk would be.
   await writeFile(join(first, "assets", "lazy-old.js"), "export const old = true;\n");
+  // A worker of the older page's own, as the store's worker is, that fetches what it is told.
+  await writeFile(
+    join(first, "assets", "probe-worker.js"),
+    `addEventListener("message", async ({ data }) => {
+      const answer = await fetch(data, { cache: "no-store" });
+      postMessage([answer.status, answer.ok ? await answer.text() : ""]);
+    });\n`,
+  );
   const firstWorker = await readFile(join(first, "sw.js"), "utf8");
   expect(firstWorker).toContain('["/",');
   await writeFile(
@@ -280,6 +288,16 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
     await other.goto(`http://127.0.0.1:${port}/`);
     await expect(other.getByRole("button", { name: /^Accounts/ })).toBeVisible();
     await other.evaluate(() => Object.assign(globalThis, { notReloaded: true }));
+    // Its worker, started before the newer version comes.
+    await other.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const probe = new Worker("/assets/probe-worker.js");
+          Object.assign(globalThis, { probe });
+          probe.addEventListener("message", () => resolve(), { once: true });
+          probe.postMessage("/assets/probe-worker.js", []);
+        }),
+    );
 
     // The server now has the newer version; the page looks for it.
     await close(server);
@@ -297,11 +315,9 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
     await reloaded;
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
     // The newer version runs; the older's files stay, for the tab it still runs.
-    expect((await page.evaluate(() => caches.keys())).toSorted()).toEqual([
-      `astrotime-${version}`,
-      "astrotime-newer-version-00",
-      "astrotime-versions",
-    ]);
+    expect((await page.evaluate(() => caches.keys())).toSorted()).toEqual(
+      [`astrotime-${version}`, "astrotime-newer-version-00", "astrotime-versions"].toSorted(),
+    );
     await expect(notice).toHaveCount(0);
     // The tab on the older page asks for a file only its version has, which
     // the server no longer has: it comes from the older version's cache. A
@@ -315,6 +331,17 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
         return [answer.status, answer.ok ? await answer.text() : ""];
       }, path);
     expect(await get(other, "/assets/lazy-old.js")).toEqual([200, "export const old = true;\n"]);
+    // Its worker asks under its own id, and is given the older file too.
+    expect(
+      await other.evaluate(
+        () =>
+          new Promise<unknown>((resolve) => {
+            const { probe } = globalThis as typeof globalThis & { probe: Worker };
+            probe.addEventListener("message", ({ data }) => resolve(data), { once: true });
+            probe.postMessage("/assets/lazy-old.js", []);
+          }),
+      ),
+    ).toEqual([200, "export const old = true;\n"]);
     expect(await get(page, "/assets/lazy-old.js")).toEqual([404, ""]);
     expect(await get(other, "/assets/nowhere.js")).toEqual([404, ""]);
     // With no network the page comes from the newer version's cache, never

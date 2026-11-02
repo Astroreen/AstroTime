@@ -73,8 +73,11 @@ async function keep(cache: Cache, answer: Response): Promise<void> {
     throw new Error(`The page names files this version does not have: ${missing.join(", ")}`);
   const headers = new Headers(answer.headers);
   headers.delete("Content-Length");
-  await cache.put(BASE, new Response(html, { status: answer.status, headers }));
+  // The preset first: a page is never kept without the preset it came with;
+  // a stop between the two leaves the older page with the newer preset, the
+  // same deployment's.
   await cache.put(PRESET, new Response(presetOf(text)));
+  await cache.put(BASE, new Response(html, { status: answer.status, headers }));
 }
 
 /** The kept page, with the preset the latest network page had; none before the install kept one. */
@@ -125,7 +128,11 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/** The tabs open when the user asked for this version: they run the older page. */
+/**
+ * The tabs open when the user asked for this version, and their workers:
+ * they run the older page. A worker such a tab starts later is not among
+ * them; it gets this version's files, or the network's.
+ */
 let olderTabs: string[] = [];
 
 self.addEventListener("message", (event) => {
@@ -134,7 +141,8 @@ self.addEventListener("message", (event) => {
   if (event.data === "astrotime-update") {
     event.waitUntil(
       (async () => {
-        const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        // Workers too: a tab's store worker asks for its files under its own id.
+        const open = await self.clients.matchAll({ type: "all", includeUncontrolled: true });
         olderTabs = open.map((client) => client.id);
         await self.skipWaiting();
       })(),

@@ -516,8 +516,9 @@ Decided while building PR 7.
     tags ([D123](#D123)): the block the server marks between
     `<!-- astrotime-preset -->` comments, and any
     `<meta name="astrotime-server|username">` however it is written. The
-    tags are kept apart and given back to the kept page each time it
-    answers, as the latest network page had them (none, if it had none), so
+    tags are kept apart (written before the page, so a page is never kept
+    without the preset it came with) and given back to the kept page each
+    time it answers, as the latest network page had them (none, if it had none), so
     a start with no network, or on a link too slow to begin answering,
     signs in as the server's page does; they are public ([D123](#D123)). A page
     that names a file this version does not list (a rolling deploy, the page
@@ -542,9 +543,10 @@ Decided while building PR 7.
     a navigation. Every path is under the app's base, the scope the worker
     is registered at (Vite's `base`), `/` or a sub-path alike. Activated, it
     keeps its own cache and the version before's (`astrotime-versions` lists
-    them, and the tabs that were open when the user asked for this version):
-    a file this version does not list comes from the older version's cache
-    only for one of those tabs, which still runs the older page and may ask
+    them, and the tabs that were open when the user asked for this version,
+    with their workers, which ask under ids of their own): a file this
+    version does not list comes from the older version's cache only for
+    one of those tabs or workers, which still runs the older page and may ask
     for its files (a lazily loaded chunk); any other tab, or a file neither
     has, goes to the network. This version's files and page come from its
     own cache only, never the older's. Older versions go. The proxy's static serving stays as
