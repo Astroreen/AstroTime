@@ -243,8 +243,22 @@ export function AgendaCard({
   );
 }
 
-/** HOUR pixels per hour in the time grid. */
+/**
+ * Pixels per hour in the time grid unless the user pinched it to another
+ * height (design D192): the CSS `--hour` the grid draws with, and the
+ * context's `hour` its arithmetic uses.
+ */
 export const HOUR = 56;
+
+/** An hour's height as the user may pinch it, 24 to 240 px (design D192). */
+export const hourIn = (px: number) => Math.min(240, Math.max(24, px));
+
+/** `minutes` down the grid, plus `px`, at the hour's height as drawn now (`--hour`). */
+export const down = (minutes: number, px = 0) => `calc(var(--hour) * ${minutes / 60} + ${px}px)`;
+
+/** A block's height from `top` to `bottom` minutes, 2 px clear, never under 12. */
+const blockHeight = (top: number, bottom: number) =>
+  `max(12px, calc(var(--hour) * ${(bottom - top) / 60} - 2px))`;
 /** Pixels a line of an item's title takes: `text-tiny` or `text-note` at `leading-[1.2]`. */
 const LINE = { compact: 13.2, wide: 15 } as const;
 /** Pixels of a block's padding, top and bottom: `py-px` or `py-0.5`. */
@@ -283,15 +297,15 @@ export function TimedItem({
   compact: boolean;
 }) {
   const { shape, top, bottom, left, width, layer, room, continuesBefore, continuesAfter } = placed;
-  const { colorOf, formats, timeZone, found, landed, onLanded } = useCalendar();
+  const { colorOf, formats, timeZone, found, hour, landed, onLanded } = useCalendar();
   const label = useItemLabel();
   const { source, held } = useDragSource(entry, "grid");
-  const height = ((bottom - top) / 60) * HOUR - 2;
+  const height = ((bottom - top) / 60) * hour - 2;
   const task = entry.occurrence.item.kind === "task";
   // Another item drawn over this one from `room` on: its text keeps above
   // that, as many whole lines as fit (design D153).
   const covered = room < bottom - top;
-  const fit = textFit(covered ? (room / 60) * HOUR - 2 : height, { compact, covered });
+  const fit = textFit(covered ? (room / 60) * hour - 2 : height, { compact, covered });
   const showTime = shape === "block" && fit.showTime;
   const lines = fit.lines;
   const name = label(entry, false);
@@ -318,8 +332,8 @@ export function TimedItem({
         source ? "draggable" : "",
       ].join(" ")}
       style={itemStyle(colorOf(entry), {
-        top: (top / 60) * HOUR + 1,
-        height: Math.max(height, 12),
+        top: down(top, 1),
+        height: blockHeight(top, bottom),
         left: `calc(${left * 100}% + 1.5px)`,
         width: `calc(${width * 100}% - 3px)`,
         zIndex: layer + 1,
@@ -386,8 +400,8 @@ export function GhostBlock({
   bottom: number;
   compact: boolean;
 }) {
-  const height = ((bottom - top) / 60) * HOUR - 2;
-  const short = height < 34;
+  const { hour } = useCalendar();
+  const short = ((bottom - top) / 60) * hour - 2 < 34;
   return (
     <div
       aria-hidden="true"
@@ -396,7 +410,7 @@ export function GhostBlock({
         "item pointer-events-none absolute inset-x-[1.5px] z-[55] overflow-hidden rounded-[6px] leading-[1.2] font-medium shadow-lg ring-2 shadow-black/40 ring-canvas",
         compact ? "px-[3px] py-px text-tiny" : "px-1.5 py-0.5 text-note",
       ].join(" ")}
-      style={itemStyle(color, { top: (top / 60) * HOUR + 1, height: Math.max(height, 12) })}
+      style={itemStyle(color, { top: down(top, 1), height: blockHeight(top, bottom) })}
     >
       {short ? (
         <span className="block truncate">

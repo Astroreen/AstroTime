@@ -25,7 +25,7 @@ import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
 import { useEditing } from "./editing.tsx";
 import { ChevronIcon } from "./icons.tsx";
-import { GhostBlock, GhostChip, HOUR, StripChip, TimedItem } from "./items.tsx";
+import { GhostBlock, GhostChip, StripChip, TimedItem, down } from "./items.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
 /** Past this many rows the strip folds: a day with more gives its last row to "+N" (design D51, D186). */
@@ -54,7 +54,7 @@ export interface TimeGridProps {
 export function TimeGrid(props: TimeGridProps) {
   const { days, layout, today, minutes, expanded, onExpandedChange, floating, current, scroll } =
     props;
-  const { t, formats, weekNumbers } = useCalendar();
+  const { t, formats, weekNumbers, hour } = useCalendar();
   const single = days.length === 1;
   const compact = days.length > 3;
   const columns: CSSProperties = {
@@ -80,8 +80,8 @@ export function TimeGrid(props: TimeGridProps) {
   useLayoutEffect(() => {
     const element = scroller.current;
     if (!element) return;
-    const hour = days.includes(today) ? Math.max(0, minutes / 60 - 2) : 7.5;
-    element.scrollTop = scroll.current ?? hour * HOUR;
+    const start = days.includes(today) ? Math.max(0, minutes / 60 - 2) : 7.5;
+    element.scrollTop = scroll.current ?? start * hour;
     // Only on open.
   }, []);
 
@@ -100,7 +100,7 @@ export function TimeGrid(props: TimeGridProps) {
       const day = days[index];
       if (!day) return null;
       if (grip === "move" && y < top) return { day, minutes: null };
-      return { day, minutes: slotAt(y - edges[index]!.top, HOUR) };
+      return { day, minutes: slotAt(y - edges[index]!.top, hour) };
     },
     scroller: () => scroller.current,
   };
@@ -120,7 +120,7 @@ export function TimeGrid(props: TimeGridProps) {
   // first one went (design D154).
   const presses = useRef<{ readonly spot: string; readonly at: number }[]>([]);
   const spotOf = (column: Element, y: number) =>
-    `${column.getAttribute("data-day")}/${Math.floor(((y - column.getBoundingClientRect().top) / HOUR) * 2) * 30}`;
+    `${column.getAttribute("data-day")}/${Math.floor(((y - column.getBoundingClientRect().top) / hour) * 2) * 30}`;
   const pressed = (event: PointerEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     const column = target?.closest("[data-day]");
@@ -199,17 +199,17 @@ export function TimeGrid(props: TimeGridProps) {
         >
           <div
             className="grid"
-            style={{ ...columns, height: 24 * HOUR }}
+            style={{ ...columns, height: down(24 * 60) }}
             onPointerDownCapture={pressed}
           >
             <div aria-hidden="true" className="relative">
-              {HOURS.slice(1).map((hour) => (
+              {HOURS.slice(1).map((at) => (
                 <span
-                  key={hour}
+                  key={at}
                   className="absolute right-1.5 -translate-y-1/2 text-tiny text-ink-muted tabular-nums"
-                  style={{ top: hour * HOUR }}
+                  style={{ top: down(at * 60) }}
                 >
-                  {formats.hour(hour)}
+                  {formats.hour(at)}
                 </span>
               ))}
             </div>
@@ -226,12 +226,12 @@ export function TimeGrid(props: TimeGridProps) {
                 onClick={createAt(column.day)}
                 onPointerDown={drag.pressEmpty(column.day)}
               >
-                {HOURS.map((hour) => (
+                {HOURS.map((at) => (
                   <div
-                    key={hour}
+                    key={at}
                     aria-hidden="true"
                     className="absolute inset-x-[1.5px] rounded-[6px] bg-tile"
-                    style={{ top: hour * HOUR + 1.5, height: HOUR - 3 }}
+                    style={{ top: down(at * 60, 1.5), height: down(60, -3) }}
                   />
                 ))}
                 {column.timed.map((placed) => (
@@ -345,7 +345,7 @@ function NowLine({ minutes }: { minutes: number }) {
       aria-hidden="true"
       data-now=""
       className="pointer-events-none absolute inset-x-0 z-50"
-      style={{ top: (minutes / 60) * HOUR }}
+      style={{ top: down(minutes) }}
     >
       <div className="h-0.5 -translate-y-1/2 bg-now" />
       <div className="absolute top-0 -left-[5px] size-2.5 -translate-y-1/2 rounded-full bg-now" />
@@ -418,7 +418,9 @@ function Strip({
       onPointerLeave={(event) => {
         if (event.buttons !== 0) pressed.current = null;
       }}
-      onPointerCancel={() => (pressed.current = null)}
+      onPointerCancel={() => {
+        pressed.current = null;
+      }}
       onClick={createAt}
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] touch-pan-y overflow-y-auto"}`}
       style={{

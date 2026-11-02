@@ -144,39 +144,43 @@
     --scrollbar-hover: color-mix(in srgb, var(--color-ink) 66%, transparent);
     --scrollbar-active: color-mix(in srgb, var(--color-ink) 80%, transparent);
   }
-  @supports not selector(::-webkit-scrollbar) {
-    * {
-      scrollbar-width: thin;
-      scrollbar-color: var(--scrollbar) transparent;
+  /* In forced colours (Windows' high contrast) the system draws its own,
+   * in the colours the user chose: none of this applies there. */
+  @media not (forced-colors: active) {
+    @supports not selector(::-webkit-scrollbar) {
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar) transparent;
+      }
+      :hover,
+      :focus-visible {
+        scrollbar-color: var(--scrollbar-hover) transparent;
+      }
     }
-    :hover,
-    :focus-visible {
-      scrollbar-color: var(--scrollbar-hover) transparent;
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+      background: transparent;
     }
-  }
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-    background: transparent;
-  }
-  ::-webkit-scrollbar-track,
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    border: 3px solid transparent;
-    border-radius: 999px;
-    background: var(--scrollbar) padding-box;
-  }
-  :hover::-webkit-scrollbar-thumb {
-    background-color: var(--scrollbar-hover);
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    border-width: 2px;
-  }
-  ::-webkit-scrollbar-thumb:active {
-    border-width: 2px;
-    background-color: var(--scrollbar-active);
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      border: 3px solid transparent;
+      border-radius: 999px;
+      background: var(--scrollbar) padding-box;
+    }
+    :hover::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar-hover);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      border-width: 2px;
+    }
+    ::-webkit-scrollbar-thumb:active {
+      border-width: 2px;
+      background-color: var(--scrollbar-active);
+    }
   }
   html,
   body {
@@ -343,6 +347,15 @@
   @keyframes tick-draw {
     from {
       stroke-dashoffset: 1;
+    }
+  }
+  /* A star the user lit pops (design D200); one lit already at a load does not. */
+  [data-pop][aria-pressed="true"] svg {
+    animation: star-pop 300ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  @keyframes star-pop {
+    40% {
+      scale: 1.35;
     }
   }
   /* The item a search jumped to (design D53). */
