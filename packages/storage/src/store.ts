@@ -52,6 +52,8 @@ export type Pending = StoredObject["pending"];
 /** What a local change (`Store.changeLocal`) reads and writes, inside its transaction. */
 export interface LocalChange {
   object(id: string): Promise<StoredObject | undefined>;
+  /** The calendars as the store holds them now, inside the change's transaction. */
+  calendars(): Promise<Calendar[]>;
   save(calendarId: string, ics: string, href?: string): Promise<StoredObject>;
   delete(id: string): Promise<void>;
 }
@@ -544,6 +546,7 @@ export class Store {
     return this.exclusive(() =>
       change({
         object: (id) => this.object(id),
+        calendars: () => this.calendars(),
         save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
         delete: (id) => this.deleteLocalNow(id),
       }),

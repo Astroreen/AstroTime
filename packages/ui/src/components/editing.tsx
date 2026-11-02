@@ -20,6 +20,7 @@ import {
   calendarsFor,
   deleteScopes,
   deleteTarget,
+  firstCalendarFor,
   followed,
   formOf,
   GoneError,
@@ -27,10 +28,13 @@ import {
   isOccurrence,
   itemOf,
   newForm,
+  newItemCalendar,
   noticeOf,
+  NowhereError,
   problemOf,
-  saveChanges,
+  RefusedError,
   rewriteTarget,
+  saveChanges,
   saveForm,
   scopesFor,
   scopesForTimes,
@@ -188,10 +192,8 @@ export function useEditingState({
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
-  const firstFor = (kind: "event" | "task") => {
-    const list = writable(kind);
-    return (list.find((c) => !hidden.has(c.id)) ?? list[0])?.id ?? null;
-  };
+  const firstFor = (kind: "event" | "task") =>
+    firstCalendarFor(calendars, kind, hidden)?.id ?? null;
   /** The calendar the item being edited was in; none for a new item. */
   const fromOf = (current: Editing) => byId(current.initial?.calendarId);
 
@@ -209,9 +211,11 @@ export function useEditingState({
   const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
     write(rewriteTarget(store, target, ics));
 
-  /** Why a save did not land, for the user (D99): gone meanwhile, unclear, or failed. */
-  const failureOf = (error: unknown): "gone" | "inDoubt" | "failed" => {
+  /** Why a save did not land, for the user (D99): gone or refused meanwhile, unclear, or failed. */
+  const failureOf = (error: unknown): "gone" | "refused" | "nowhere" | "inDoubt" | "failed" => {
     if (error instanceof GoneError) return "gone";
+    if (error instanceof RefusedError) return "refused";
+    if (error instanceof NowhereError) return "nowhere";
     if (error instanceof InDoubtError) return "inDoubt";
     console.error(error);
     return "failed";
@@ -256,7 +260,11 @@ export function useEditingState({
               onChanged();
               resolve("saved");
             },
-            (error: unknown) => resolve(failureOf(error)),
+            // A move keeps its own calendar, which a new item's refusal is not about.
+            (error: unknown) => {
+              const failure = failureOf(error);
+              resolve(failure === "refused" || failure === "nowhere" ? "failed" : failure);
+            },
           );
         };
         const rights = rightsOf(byId(target.calendarId));
@@ -289,23 +297,9 @@ export function useEditingState({
 
   const save = () => {
     if (!editing) return;
-    const { target, initial } = editing;
-    // A new item whose calendar went while the dialog was open (the calendar
-    // on this device stepping aside, foundation D122) goes where the dialog
-    // shows it going: the first calendar that takes it.
-    const stays = writable(editing.state.form.kind).some(
-      (c) => c.id === editing.state.form.calendarId,
-    );
-    const state =
-      target === null && !stays
-        ? {
-            ...editing.state,
-            form: {
-              ...editing.state.form,
-              calendarId: firstFor(editing.state.form.kind) ?? editing.state.form.calendarId,
-            },
-          }
-        : editing.state;
+    // A new item goes where its dialog shows it going: the save decides by
+    // the same rule, on the calendars as they are then (foundation D122).
+    const { target, initial, state } = editing;
     const problem = problemOf(state.form, initial);
     if (problem) {
       setEditing({ ...editing, state: { ...state, problem } });
@@ -315,7 +309,14 @@ export function useEditingState({
       setEditing((current) => current && { ...current, state: { ...current.state, saving: true } });
       saveForm(
         store,
-        { target, initial, form: state.form, scope, untitled: t("edit.untitledReminder") },
+        {
+          target,
+          initial,
+          form: state.form,
+          scope,
+          untitled: t("edit.untitledReminder"),
+          hidden,
+        },
         {
           now: Date.now(),
           uid: () => crypto.randomUUID(),
@@ -390,6 +391,20 @@ export function useEditingState({
   };
 
   const calendar = byId(details?.calendarId);
+  // A new item's field shows where it goes now (`newItemCalendar`, the save's
+  // own rule): its calendar while there, kept in the field even once it no
+  // longer takes the item; else the first that takes it (foundation D122).
+  const shown =
+    editing && editing.target === null
+      ? newItemCalendar(calendars, editing.state.form, hidden)
+      : null;
+  const shownState =
+    editing && shown
+      ? { ...editing.state, form: { ...editing.state.form, calendarId: shown.calendar.id } }
+      : (editing?.state ?? null);
+  const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
+  const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
+
   const dialogs = (
     <>
       <ItemDetails
@@ -404,8 +419,8 @@ export function useEditingState({
         onStar={star}
       />
       <ItemEditor
-        state={editing?.state ?? null}
-        calendars={editing ? writable(editing.state.form.kind, fromOf(editing)) : []}
+        state={shownState}
+        calendars={shownCalendars}
         onChange={change}
         onSave={save}
         onClose={() => setEditing(null)}

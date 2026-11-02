@@ -879,7 +879,15 @@ Decided while building PR 5a-3.
     failed or found none, only shared or read-only calendars, none for
     tasks), it stays, so the user always has somewhere to create either. A new
     item's dialog left open as it steps aside saves where the dialog then
-    shows, the first calendar that takes it. One that holds items stays
+    shows, the first calendar that takes it, decided in the save's own
+    transaction (`LocalChange.calendars`), since the screen's list of
+    calendars may not have caught up yet when Save is pressed. A calendar
+    still there that no longer takes the item (read-only now, its components
+    changed) is refused instead (`RefusedError`): the dialog stays open on
+    "this calendar no longer takes this item", since it still shows that
+    calendar chosen, and moving the item where the user did not pick would
+    surprise. A vanished calendar's fallback is no such surprise: the
+    dialog's field already shows the calendar it goes to. One that holds items stays
     beside the server's, as its own calendar, and its items move to a
     server's calendar one by one in the edit dialog ([D106](#D106)).
     Removing it asks first, and says its items are on no server. Uploading

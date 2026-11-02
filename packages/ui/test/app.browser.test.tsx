@@ -241,6 +241,7 @@ test("a completion or a star that did not land says so: the task gone meanwhile,
         return store.changeLocal((local) =>
           change({
             object: async () => undefined,
+            calendars: () => local.calendars(),
             save: (...args) => local.save(...args),
             delete: (id) => local.delete(id),
           }),
