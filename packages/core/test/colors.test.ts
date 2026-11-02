@@ -77,9 +77,13 @@ test("a colour that is neither a CSS3 name nor a hex is refused, nothing written
   for (const color of ["not-a-colour", "#12345", "rgb(1, 2, 3)", "rebeccapurple"]) {
     expect(() => editItem(object, { color }, { now: NOW })).toThrow(RangeError);
   }
-  // Every CSS3 spelling is a name: grey as gray, cyan as aqua, in any case.
-  for (const color of ["Grey", "cyan", "LightSlateGrey"]) {
-    expect(editItem(object, { color }, { now: NOW }).ics).toContain(`COLOR:${color}\r\n`);
+  // Every CSS3 spelling is a name, in any case; it is written as checked: trimmed, lower case.
+  for (const [color, written] of [
+    ["Grey", "grey"],
+    ["cyan", "cyan"],
+    [" LightSlateGrey ", "lightslategrey"],
+  ] as const) {
+    expect(editItem(object, { color }, { now: NOW }).ics).toContain(`COLOR:${written}\r\n`);
   }
 });
 

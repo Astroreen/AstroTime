@@ -32,8 +32,12 @@ export default defineConfig({
           exclude: ["@sqlite.org/sqlite-wasm"],
           include: [
             "drizzle-orm/sqlite-proxy",
+            "drizzle-orm/sqlite-core",
             "drizzle-orm",
+            "fast-xml-parser",
             "ical.js",
+            // The Base UI parts the UI imports: one left out is found mid-run.
+            "@base-ui/react/alert-dialog",
             "@base-ui/react/checkbox",
             "@base-ui/react/csp-provider",
             "@base-ui/react/dialog",
@@ -44,6 +48,7 @@ export default defineConfig({
             "@base-ui/react/tabs",
             "i18next",
             "react",
+            "react-dom",
             "react-dom/client",
             "react-i18next",
             "react/jsx-dev-runtime",

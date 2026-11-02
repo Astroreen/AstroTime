@@ -411,7 +411,12 @@ function withoutRepeat(changes: ItemChanges): ItemChanges {
  */
 function setColor(component: ICAL.Component, color: string | null): void {
   const exact = hexColor(color ?? "");
-  setText(component, "color", exact ? nearestColorName(exact)! : (color ?? ""));
+  // As checked: a name trimmed and in lower case, as CSS3 spells it.
+  setText(
+    component,
+    "color",
+    exact ? nearestColorName(exact)! : (color ?? "").trim().toLowerCase(),
+  );
   setText(component, X_COLOR, exact ?? "");
 }
 
