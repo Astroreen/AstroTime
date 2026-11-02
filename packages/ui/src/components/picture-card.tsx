@@ -29,9 +29,10 @@ export function AgendaItem(props: AgendaItemProps) {
   const item = props.entry.occurrence.item;
   const art = useItemArt(item.summary);
   const plain = useRef<HTMLDivElement>(null);
-  const [near, setNear] = useState(false);
+  // How many times the card came near the screen while it waits for its photo.
+  const [near, setNear] = useState(0);
   // A photo that comes while the card is above the screen's top would push
-  // what is on screen down: it waits for the card's next drawing, kept.
+  // what is on screen down: it waits, kept, for the card to come near again.
   const welcome = () => {
     const card = plain.current;
     const scroller = card?.closest("[data-agenda]")?.parentElement;
@@ -39,20 +40,21 @@ export function AgendaItem(props: AgendaItemProps) {
       !card || !scroller || card.getBoundingClientRect().top >= scroller.getBoundingClientRect().top
     );
   };
-  const photo = usePlacePhoto(item, !art && near, welcome);
+  const photo = usePlacePhoto(item, !art && near > 0, welcome, near);
   const waiting = !art && photo === undefined;
   useEffect(() => {
     const card = plain.current;
-    if (!waiting || near || !card || typeof IntersectionObserver !== "function") return;
+    if (!waiting || !card || typeof IntersectionObserver !== "function") return;
     const scroller = card.closest("[data-agenda]")?.parentElement ?? null;
+    // Each time it comes near: asks, or draws the photo a refusal kept.
     const observer = new IntersectionObserver(
-      (seen) => seen.some((entry) => entry.isIntersecting) && setNear(true),
+      (seen) => seen.some((entry) => entry.isIntersecting) && setNear((times) => times + 1),
       { root: scroller, rootMargin: "50% 0px" },
     );
     observer.observe(card);
     return () => observer.disconnect();
-  }, [waiting, near]);
-  if (art) return <PictureCard {...props} backdrop={backdropOf(art)} />;
+  }, [waiting]);
+  if (art) return <PictureCard {...props} backdrop={art} />;
   if (photo) return <PictureCard {...props} backdrop={backdropOf(photo)} />;
   return <AgendaCard {...props} ref={plain} />;
 }
@@ -77,20 +79,22 @@ function PictureCard({ entry, allDay, part, backdrop }: AgendaItemProps & { back
       className="item picture-card relative flex min-h-[6.5rem] items-end overflow-hidden rounded-[8px]"
       style={itemStyle(colorOf(entry), { "--ground": backdrop.ground } as CSSProperties)}
     >
-      <img
-        src={backdrop.url}
-        {...(backdrop.srcSet && {
-          srcSet: backdrop.srcSet,
-          sizes: "(min-width: 640px) 960px, 500px",
-        })}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-        data-shown={shown || undefined}
-        onLoad={() => setShownUrl(backdrop.url)}
-        className={`absolute inset-y-0 right-0 h-full w-full object-cover ${backdrop.photo ? "" : "max-w-[19.5rem] object-right"}`}
-      />
+      {backdrop.url && (
+        <img
+          src={backdrop.url}
+          {...(backdrop.srcSet && {
+            srcSet: backdrop.srcSet,
+            sizes: "(min-width: 640px) 960px, 500px",
+          })}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          data-shown={shown || undefined}
+          onLoad={() => setShownUrl(backdrop.url)}
+          className={`absolute inset-y-0 right-0 h-full w-full object-cover ${backdrop.photo ? "" : "max-w-[19.5rem] object-right"}`}
+        />
+      )}
       <span aria-hidden="true" className="picture-scrim absolute inset-0" />
       {/* A photo's author on the card as on its details, which credit it whole (D221). */}
       {backdrop.credit && (

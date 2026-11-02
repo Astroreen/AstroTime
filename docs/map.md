@@ -264,6 +264,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `picture-card.tsx` — the Agenda's card over its picture;
       `item-picture.tsx`, whether an item has one and the details' header;
       `month-banner.tsx`, the Agenda's banner above a month.
+      `picture-settings.tsx`, the user's words with their pictures and
+      their month banners in Settings (`plans/design.md#D223`);
       `place-photo.tsx`, a place's photo for a card or the details, and its
       credit (`plans/design.md#D221`).
       → `plans/design.md#D216`, `plans/design.md#D218`
@@ -327,7 +329,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `pictures/` — the pictures: `subjectOf` (`subjects.ts`), the subject a
     title's words give an item; `bannerOf` (`months.ts`), a month's banner,
     south of the equator too (`southern-zones.ts`, generated); `art.ts`, the pictures' URLs and grounds;
-    `art/`, AstroTime's own SVGs, each a file fetched when shown.
+    `art/`, AstroTime's own SVGs, each a file fetched when shown. `own.ts`, the
+    user's own pictures in IndexedDB; `ownWordOf` (`subjects.ts`), a word
+    of theirs a title has. → `plans/design.md#D222`, `plans/design.md#D223`
     → `plans/design.md#D215`, `plans/design.md#D218`, `plans/design.md#D219`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
@@ -347,7 +351,8 @@ When you add a package, app or module, add its line here in the same PR.
     "Reminders" setting in Settings and a tapped reminder opening its day
     and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
-  - `i18n/` — i18next and the English and Russian catalogs.
+  - `i18n/` — i18next and the English and Russian catalogs; `pictures.ts`,
+    the strings of the pictures' parts that load later.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`

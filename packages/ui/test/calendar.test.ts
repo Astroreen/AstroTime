@@ -209,6 +209,8 @@ describe("the drawer's settings override the locale (D53)", () => {
       monthBanners: false,
       placePhotos: false,
       celebrate: false,
+      ownWords: [{ id: "w", word: "Tennis", picture: "p" }],
+      ownBanners: { "11": "q" },
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
     // Reminders are on unless turned off (foundation D101), and so is
@@ -225,6 +227,23 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"placePhotos":"no"}').placePhotos).toBe(true);
     // A completed task is celebrated too (design D198).
     expect(readSettings('{"celebrate":"no"}').celebrate).toBe(true);
+    // The user's own words and banners (design D223): only readable entries.
+    expect(
+      readSettings(
+        JSON.stringify({
+          ownWords: [
+            { id: "w", word: "", picture: "p" },
+            { id: 1 },
+            "x",
+            { id: "v", word: "Gym", picture: "q" },
+          ],
+          ownBanners: { "0": "a", "12": "b", "13": "c", "3": 4 },
+        }),
+      ),
+    ).toMatchObject({
+      ownWords: [{ id: "v", word: "Gym", picture: "q" }],
+      ownBanners: { "12": "b" },
+    });
     // Colours that cannot be read are dropped; a blank name is the generated one (design D170).
     expect(
       readSettings(

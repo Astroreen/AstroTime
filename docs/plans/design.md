@@ -2107,12 +2107,12 @@ own (below).
   Agenda's scroller and half a screen around it), the details as they
   open; one request at a time across the app, one per place however many
   cards show it. A photo that comes while its card is above the screen's
-  top waits for the card's next drawing (kept, never noted as none), so
-  nothing on screen moves; a known one draws at once, tall from the start. 960 px, with the 500 px
+  top waits, kept (never noted as none), until the card comes near the
+  screen again, so nothing on screen moves; a known one draws at once, tall from the start. 960 px, with the 500 px
   one in a `srcset` for a phone.
 - **D221. A place's photo is credited, kept and can be turned off.**
   - **Credit**: in the details, at the foot of the header: "Photo: author,
-    licence · en.wikipedia.org" (the article's site by its address), the
+    licence · Wikipedia", the
     author linking to the photo's Commons page (the licence does, when
     Commons names no author),
     the licence to its text (only an https address: Commons' metadata is
@@ -2121,8 +2121,7 @@ own (below).
     the author as text, its HTML's tags gone and its entities read. The
     Agenda's card credits it too, "© author" (its licence when Commons
     names none) small in its top right corner; a tap opens the details
-    with the whole credit; the Agenda's card, a
-    thumbnail that opens the details, does not repeat it.
+    with the whole credit.
   - **Kept on this device**, in the preferences (`astrotime.placePhotos`),
     each place by its language, name and rounded point: its photo, or that
     it has none (asked again after 30 days, an article may come), the 300
@@ -2146,6 +2145,48 @@ own (below).
     else of the item, never its title. The page's policy names exactly
     those origins (`connect-src`, `img-src`, foundation D110), and none
     with places off.
+
+- **D222. The user's own pictures are kept on this device.** Feedback 10:
+  "the picture banners — it would be good to be able to make your own
+  too". A picture the user chooses (`pictures/own.ts`) is kept in the
+  page's IndexedDB (`astrotime-pictures`), never in a calendar, never
+  sent anywhere, made smaller as it is added: its long side at most
+  1600 px, WebP where the browser writes it, else JPEG, decoded and drawn
+  off the page's own canvas (`createImageBitmap`, `OffscreenCanvas`), so a
+  phone camera's photo of several megabytes keeps a few hundred
+  kilobytes. A file that is no picture is refused, said in the dialog,
+  and nothing is kept. The settings hold only each picture's id; a word
+  deleted, a picture replaced or a banner reset forgets its picture, and
+  so does a dialog closed unsaved (its pick, or one that arrives after it
+  closed). No sweep of pictures nothing names: every tab and window
+  shares the database, and one tab's sweep would take a picture another
+  tab has just picked and not yet saved; a picture left by a tab closed
+  mid-pick stays ([Deferred](#deferred)). A picture that could not be read
+  is asked for again next time, not remembered as missing; one removed
+  while it was read gets no URL. Where the browser has no
+  `OffscreenCanvas` the page's own canvas draws it, and with no canvas at
+  all it is kept as it came.
+  Across devices: [Deferred](#deferred), as own colours are (D173).
+- **D223. Your words and pictures, your month banners.** Settings →
+  Pictures, under its switches (`picture-settings.tsx`, loaded with
+  Settings, its strings too, `i18n/pictures.ts`, foundation
+  [D145](foundation.md#D145)):
+  - **"Your words and pictures"**: each word with its picture's
+    thumbnail; a tap edits it in a dialog of its own (the word, "Choose a
+    picture", Delete), as an own colour is; "Add a word with a picture"
+    makes one. An item whose title has a word of theirs (`ownWordOf`: each
+    of its words begins a title's word, three letters or more, a shorter
+    one whole; several in a row; case and diacritics aside) is drawn over
+    their picture in the Agenda and its details, before AstroTime's
+    subjects and place photos, and with illustrations off too: the user
+    chose it.
+  - **"Your month banners"**: the twelve months, each with AstroTime's
+    banner or theirs; "Choose a picture for <month>" sets it, "Back to
+    AstroTime's" resets it. Their banner shows for its month as named
+    (no hemisphere's turn: they chose it for that month), with month
+    banners off too.
+  - **For one item**, a picture of its own: [Deferred](#deferred); it
+    would need the item to carry it to other devices and clients.
 
 ## Deferred
 
@@ -2192,6 +2233,18 @@ own (below).
   "in the park"); reading a word's neighbours (a verb before an object)
   would let "Train for the marathon" be sport and "Park the car" nothing
   without a list of phrases.
+- **The user's own pictures across devices** ([D222](#D222)): kept on one
+  device; the account's own files (thread N's `Provider.files()`, a
+  folder of the account's WebDAV) could carry them and the words to the
+  user's other devices.
+- **A picture left by a tab closed mid-pick** ([D222](#D222)): a dialog's
+  pick is forgotten as the dialog closes, but a tab closed with the dialog
+  open leaves its pick in the database, named by nothing. A sweep safe
+  for every tab (pictures older than a day that no tab's settings name,
+  read again right before deleting) would take them.
+- **A picture for one item** ([D223](#D223)): an item's own picture, which
+  its calendar object would carry (an `ATTACH` or an `X-` property) for
+  other devices and clients to show.
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user
   adds some there. Counting from the store's alarms (the user's own items
