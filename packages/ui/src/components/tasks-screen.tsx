@@ -12,7 +12,7 @@ import { Tabs } from "@base-ui/react/tabs";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { liveQuery, whileShown } from "../calendar/live.ts";
+import { liveQuery, sameResult, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import {
   isSort,
@@ -60,8 +60,6 @@ const lessMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Milliseconds a tick the user drew shows before its row moves (design D197). */
 const HOLD_MS = 160;
-/** How soon after a tick the store's read must come to wait for it: a write that changed nothing leaves no wait behind. */
-const FRESH_MS = 1000;
 
 type Motion = typeof import("./task-motion.ts");
 
@@ -122,10 +120,13 @@ export function TasksScreen({
   const [moves, setMoves] = useState(false);
   const measured = useRef<ReturnType<Motion["measure"]> | null>(null);
   /**
-   * When the user last drew a tick (`performance.now()`): its row waits for
-   * it before it moves, if the store's read of it comes soon after.
+   * The completion the user made, until a read carries it (its row changed
+   * or left): that read's moves wait for its tick. `landed`: its write is in
+   * the store, so the next read carries it or never will (it changed nothing).
    */
-  const held = useRef(Number.NEGATIVE_INFINITY);
+  const pending = useRef<{ readonly id: string; readonly ics: string; landed: boolean } | null>(
+    null,
+  );
   /** The task the user just completed, whose row in "Completed" draws its tick. */
   const drawn = useRef<string | null>(null);
   useEffect(() => {
@@ -144,30 +145,41 @@ export function TasksScreen({
   const listKey = lists.map((list) => list.id).join(",");
   const [cache] = useState(() => new TaskCache());
   const [rows, setRows] = useState<TaskRow[]>([]);
+  const shown = useRef<TaskRow[]>(rows);
+  /** Reads the tasks now, as the live query does: after the user's write, so the screen has it. */
+  const read = useRef(async () => {});
   useEffect(() => {
     const ids = listKey === "" ? [] : listKey.split(",");
-    return liveQuery(
-      whileShown(store),
-      async () => cache.rows(await store.tasks(ids), today, timeZone),
-      (next) => {
-        measured.current =
-          motion.current && stage.current && !lessMotion()
-            ? motion.current.measure(stage.current)
-            : null;
-        setRows(next);
-      },
-    );
+    const query = async () => cache.rows(await store.tasks(ids), today, timeZone);
+    const show = (next: TaskRow[]) => {
+      // The same tasks, read again by the other way: nothing to draw or move.
+      if (sameResult(shown.current, next)) return;
+      shown.current = next;
+      measured.current =
+        motion.current && stage.current && !lessMotion()
+          ? motion.current.measure(stage.current)
+          : null;
+      setRows(next);
+    };
+    read.current = async () => show(await query());
+    return liveQuery(whileShown(store), query, show);
   }, [store, cache, listKey, today, timeZone]);
   useLayoutEffect(() => {
     const was = measured.current;
     measured.current = null;
+    // Whether this read carries the user's completion: its row changed, or left.
+    const mine = pending.current;
+    const row = rows.find((each) => each.stored.id === mine?.id);
+    const carries = mine !== null && row?.stored.ics !== mine.ics;
     if (was && stage.current && motion.current) {
-      const fresh = performance.now() - held.current < FRESH_MS;
-      motion.current.play(stage.current, was, fresh ? HOLD_MS : 0);
+      motion.current.play(stage.current, was, carries ? HOLD_MS : 0);
     }
-    held.current = Number.NEGATIVE_INFINITY;
-    // Its row in "Completed" was drawn with this read, if it moved there.
-    drawn.current = null;
+    // Done with once a read carried it (its row in "Completed" drawn with
+    // this read), or once a read after its write did not: it changed nothing.
+    if (carries || mine?.landed) {
+      pending.current = null;
+      drawn.current = null;
+    }
   }, [rows]);
   const byList = taskLists(rows, {
     sort,
@@ -182,19 +194,24 @@ export function TasksScreen({
   // a local change goes up soon (docs/plans/foundation.md#D91, D99).
   const actions: Actions = {
     complete: (row, done) => {
-      held.current = performance.now();
-      drawn.current = done ? row.stored.id : null;
+      const id = row.stored.id;
+      pending.current = { id, ics: row.stored.ics, landed: false };
+      drawn.current = done ? id : null;
       return editing
         .rewrite(targetOfRow(row), (current) =>
           completeTask(current, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
         )
-        .then((landed) => {
-          // Not written: nothing will move for it, and nothing is drawn.
-          if (!landed) {
-            held.current = Number.NEGATIVE_INFINITY;
+        .then(async (landed) => {
+          const mine = pending.current;
+          if (mine?.id === id && landed) mine.landed = true;
+          else if (mine?.id === id) {
+            // Not written: nothing will move for it, and nothing is drawn.
+            pending.current = null;
             drawn.current = null;
           }
-          return landed;
+          // What it wrote is read before its box lets go of its own state,
+          // so the two are drawn together.
+          if (landed) await read.current().catch(() => {});
         });
     },
     star: (row) =>
@@ -415,8 +432,10 @@ export function TasksScreen({
                 </Tabs.Panel>
               ))}
             </div>
+            {/* Rows leaving are drawn on it, out of reach of a press, the keyboard and a screen reader. */}
             <div
               data-motion-layer=""
+              inert
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 overflow-hidden"
             />
@@ -447,8 +466,8 @@ export function TasksScreen({
 const COUNT_MARK = "\u2063";
 
 interface Actions {
-  /** Resolves to whether the change landed. */
-  readonly complete: (row: TaskRow, done: boolean) => Promise<boolean>;
+  /** Resolves once the change is written and read, or did not land. */
+  readonly complete: (row: TaskRow, done: boolean) => Promise<void>;
   readonly star: (row: TaskRow) => void;
   /** Its details (docs/plans/foundation.md#D14). */
   readonly open: (row: TaskRow) => void;
@@ -630,7 +649,8 @@ function TaskItem({
   const title = row.task.summary?.trim() || t("item.untitled");
   const found = row.stored.id === actions.found;
   const element = useRef<HTMLLIElement>(null);
-  // Checked at once, before the store has it; back if it did not land.
+  // Checked at once, before the store has it; its own state let go once the
+  // store's read has it, or the write did not land (or changed nothing).
   const [checking, setChecking] = useState<boolean | null>(null);
   useEffect(() => setChecking(null), [row.stored.ics]);
   const checked = checking ?? row.done;
@@ -668,9 +688,8 @@ function TaskItem({
           onCheckedChange={(done) => {
             setChecking(done);
             setDraw(done);
-            void actions.complete(row, done).then((landed) => {
-              if (!landed) setChecking(null);
-            });
+            // Once written and read (the row then shows it), or not written.
+            void actions.complete(row, done).then(() => setChecking(null));
           }}
           aria-label={title}
           className="relative z-10 mt-2 grid size-[22px] shrink-0 place-items-center rounded-full border-2 border-ink-muted text-accent hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-checked:border-transparent"

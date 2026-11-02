@@ -1339,25 +1339,27 @@ whole row".
   finger leaves none behind (`apps/web/e2e/tasks.spec.ts`).
 - **D197. A task completed moves to "Completed"** (the owner's item 13: "a
   smooth move from 'not done' to 'done'"). Checked, its box is checked and
-  its title struck through at once, before the store has it (back if the
-  write did not land), and the tick is drawn in (160 ms). Then, after that
-  tick, the screen moves from where it was to where it is: each row and
-  card is measured before the store's new read is drawn and slides from
-  there (FLIP), the rows below closing the gap; with "Completed" open the
-  row itself slides down into it, and back up when it is not completed
-  again; with it folded the row goes on drawn where it was, over the list,
-  and fades out going down to "Completed", whose count ticks over. A card
-  that changed height is stretched from the one it had: its background is
-  apart from its rows, so the rows are not stretched with it. A change the
-  user did not make (a sync, the details' "Mark completed", another tab)
-  moves the same way, without the wait for a tick (a tick waits only for
-  a read that comes within a second of it, and not at all when its write
-  did not land); a new row comes in from above; more than 40 rows moving
-  at once (a sync's batch) change in place. A row leaving goes on leaving
-  through the next change, never measured or moved again, so tasks
-  completed one after another each leave once. The count is its own box
-  inside the one translated string ("Completed (<count>3</count>)").
-  Only `transform` and `opacity` move, with the Web Animations API, as
+  its title struck through at once, before the store has it, and the tick is
+  drawn in (160 ms); the box lets go of that state once its write is in the
+  store and read back (so the two are drawn together), or did not land, or
+  changed nothing. Then, after that tick, the screen moves from where it was
+  to where it is: each row and card is measured before the store's new read
+  is drawn and slides from there (FLIP), the rows below closing the gap;
+  with "Completed" open the row itself slides down into it, and back up when
+  it is not completed again; with it folded the row goes on drawn where it
+  was, over the list, and fades out going down to "Completed", whose count
+  ticks over. A card that changed height is stretched from the one it had:
+  its background is apart from its rows, so the rows are not stretched with
+  it. A change the user did not make (a sync, the details' "Mark completed",
+  another tab) moves the same way, without the wait for a tick: only the
+  read that carries the user's completion (its row changed or left) waits
+  for its tick, not a sync's read that came first; a new row comes in from
+  above; more than 40 rows moving at once (a sync's batch) change in place.
+  A row leaving goes on leaving through the next change, never measured or
+  moved again, so tasks completed one after another each leave once; its
+  layer is `inert` and hidden from a screen reader. The count is its own
+  box, cut out of the one translated string ("Completed ({{n}})"). Only
+  `transform` and `opacity` move, with the Web Animations API, as
   [D154](#D154) has it; `prefers-reduced-motion` changes everything in
   place. The code that moves them (`components/task-motion.ts`) is loaded
   with the tasks screen's first showing, not with the app (D145), and never

@@ -93,6 +93,32 @@ test("a task completed slides toward the folded Completed, the rows below close 
   }
 });
 
+test("a row leaving is out of reach: no press, no focus, nothing for a screen reader", async ({
+  page,
+}) => {
+  const panel = await openTasks(page);
+  await panel.getByRole("checkbox", { name: "Send the report" }).click();
+  await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+  // Held mid-way while it leaves.
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.pause();
+  });
+  const layer = page.locator("[data-motion-layer]");
+  await expect(layer.locator("[data-task]")).toHaveCount(1);
+  await expect(layer).toHaveAttribute("inert", "");
+  await expect(layer).toHaveAttribute("aria-hidden", "true");
+  // Its checkbox and title take no focus, from a script or the keyboard.
+  const focused = await layer.evaluate((element) =>
+    [...element.querySelectorAll<HTMLElement>('[role="checkbox"], button')].map((control) => {
+      control.focus();
+      return document.activeElement === control;
+    }),
+  );
+  expect(focused.length).toBeGreaterThan(0);
+  expect(focused.every((took) => !took)).toBe(true);
+  await expect(panel.getByRole("checkbox", { name: "Send the report" })).toHaveCount(0);
+});
+
 test("two tasks completed quickly: each leaves once, the first still leaving through the second's change", async ({
   page,
 }) => {
