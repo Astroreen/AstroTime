@@ -88,7 +88,7 @@ export function AttachmentList({
                 <a href={href} target="_blank" rel="noopener noreferrer" className={row}>
                   {content}
                 </a>
-              ) : attachment.uri === null ? (
+              ) : attachment.inline ? (
                 <button
                   type="button"
                   className={row}
@@ -106,7 +106,7 @@ export function AttachmentList({
                   {content}
                 </button>
               ) : (
-                // A link of another kind (not the web's) is shown, never followed.
+                // A link of another kind (not the web's), or an empty one, is shown, never followed.
                 <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">{content}</div>
               )}
             </li>

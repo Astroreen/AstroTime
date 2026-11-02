@@ -24,6 +24,8 @@ export interface Attachment {
   readonly type: string | null;
   /** Its size in bytes: `SIZE` (RFC 8607), or an inline file's own; null when not known. */
   readonly size: number | null;
+  /** Whether it holds its file, inline; a link that is empty is neither (`uri` null too). */
+  readonly inline: boolean;
 }
 
 /** The parameters clients write a file's name in, the standard's first. */
@@ -71,6 +73,7 @@ export function attachment(property: ICAL.Property): Attachment {
         : inline
           ? base64Size(textOf(property))
           : null,
+    inline,
   };
 }
 

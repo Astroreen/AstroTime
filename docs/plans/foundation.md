@@ -2177,7 +2177,10 @@ task?"
   ical.js quotes a `"`, `;`, `:` or `,` (RFC 6868), and a type that is no
   media type is left out; and, as a reminder's change does, a
   change to the series reaches the exceptions that had the series'
-  attachments. A copy keeps them (design [D164](design.md#D164)). The
+  attachments, compared as written (every parameter, an inline file's
+  bytes): two that read alike may be two files. An `ATTACH` with an empty
+  value is neither a link nor a file (`inline` false, `uri` null): shown,
+  never followed or saved. A copy keeps them (design [D164](design.md#D164)). The
   fixtures `nextcloud-calendar-event-attachments.ics` (Nextcloud
   Calendar 5.5's form, from its source), `apple-event-attachments.ics`
   (a managed attachment, RFC 8607, and a bare link) and

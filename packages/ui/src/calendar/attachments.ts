@@ -52,8 +52,9 @@ const FORMATS: Readonly<Record<string, string>> = {
  * nothing says (a subtype such as `plain` or `vnd.…` is no word to a reader).
  */
 export function kindOf(attachment: Attachment, t: TFunction): string | null {
+  // An extension has a letter: "v1.2" or "3.5" names no kind.
   const extension = /\.([a-z0-9]{1,5})$/i.exec(attachment.name ?? "")?.[1];
-  if (extension) return extension.toUpperCase();
+  if (extension && /[a-z]/i.test(extension)) return extension.toUpperCase();
   const type = attachment.type?.toLowerCase().split(";")[0]?.trim() ?? "";
   if (FORMATS[type]) return FORMATS[type];
   const general = type.split("/")[0];

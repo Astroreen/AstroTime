@@ -873,6 +873,15 @@ function editSeries(
   });
   const others = exceptions.filter((c) => c !== opened);
   const beforeOthers = others.map(readItem);
+  // Attachments as written, every parameter and an inline file's bytes:
+  // two that read alike may still be two files (foundation D229).
+  const attachLines = (component: ICAL.Component) =>
+    component
+      .getAllProperties("attach")
+      .map((property) => property.toICALString())
+      .join("\n");
+  const beforeAttach = attachLines(master);
+  const othersAttach = others.map(attachLines);
   const followers = new Set(
     others.filter((exception) => {
       const id = recurrenceIdOf(exception);
@@ -960,10 +969,7 @@ function editSeries(
     if (changes.alarms && JSON.stringify(own.alarms) === JSON.stringify(before.alarms)) {
       follow["alarms"] = changes.alarms;
     }
-    if (
-      changes.attachments &&
-      JSON.stringify(own.attachments) === JSON.stringify(before.attachments)
-    ) {
+    if (changes.attachments && othersAttach[index] === beforeAttach) {
       follow["attachments"] = changes.attachments;
     }
     if (Object.keys(follow).length > 0) apply(exception, root, follow, now);

@@ -63,12 +63,32 @@ class ShellPlugin : Plugin() {
         writer.execute {
             try {
                 val bytes = Base64.decode(call.getString("data") ?: "", Base64.DEFAULT)
-                val stream = context.contentResolver.openOutputStream(target, "w")
-                    ?: throw java.io.IOException("No stream for $target")
-                stream.use { it.write(bytes) }
+                write(target, bytes)
                 call.resolve(JSObject().put("saved", true))
             } catch (error: Exception) {
                 call.reject("The file could not be written.", "write", error)
+            }
+        }
+    }
+
+    /**
+     * Writes `bytes` over what is at `target`: "wt" truncates a file the
+     * user picked to replace; a provider that refuses "wt" gets "w", and
+     * what was longer is cut through its file descriptor.
+     */
+    private fun write(target: android.net.Uri, bytes: ByteArray) {
+        val resolver = context.contentResolver
+        val truncating = runCatching { resolver.openOutputStream(target, "wt") }.getOrNull()
+        if (truncating != null) {
+            truncating.use { it.write(bytes) }
+            return
+        }
+        val descriptor = resolver.openFileDescriptor(target, "w")
+            ?: throw java.io.IOException("No file for $target")
+        descriptor.use {
+            java.io.FileOutputStream(it.fileDescriptor).use { stream ->
+                stream.channel.truncate(0)
+                stream.write(bytes)
             }
         }
     }

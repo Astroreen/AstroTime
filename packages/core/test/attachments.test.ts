@@ -24,8 +24,20 @@ describe("reading", () => {
   test("Nextcloud Calendar's: a file of the user's by its link, its name the path's last part", () => {
     const item = load("nextcloud-calendar-event-attachments.ics").master!;
     expect(item.attachments).toEqual([
-      { uri: "/index.php/f/241", name: "Q3 report.pdf", type: "application/pdf", size: null },
-      { uri: "/index.php/f/318", name: "whiteboard.png", type: "image/png", size: null },
+      {
+        uri: "/index.php/f/241",
+        name: "Q3 report.pdf",
+        type: "application/pdf",
+        size: null,
+        inline: false,
+      },
+      {
+        uri: "/index.php/f/318",
+        name: "whiteboard.png",
+        type: "image/png",
+        size: null,
+        inline: false,
+      },
     ]);
   });
 
@@ -37,15 +49,22 @@ describe("reading", () => {
         name: "boarding-pass.pdf",
         type: "application/pdf",
         size: 48213,
+        inline: false,
       },
-      { uri: "https://example.org/ferry-timetable", name: null, type: null, size: null },
+      {
+        uri: "https://example.org/ferry-timetable",
+        name: null,
+        type: null,
+        size: null,
+        inline: false,
+      },
     ]);
   });
 
   test("Outlook's inline file: listed with its size, decoded only when opened", () => {
     const object = load("outlook-event-inline-attachment.ics");
     expect(object.master!.attachments).toEqual([
-      { uri: null, name: "agenda.txt", type: "text/plain", size: 21 },
+      { uri: null, name: "agenda.txt", type: "text/plain", size: 21, inline: true },
     ]);
     const file = inlineFile(object, null, 0)!;
     expect(new TextDecoder().decode(file.bytes)).toBe("1. Budget\n2. Roadmap\n");
@@ -104,6 +123,7 @@ describe("editing", () => {
       name: "notes.md",
       type: "text/markdown",
       size: 512,
+      inline: false,
     });
   });
 
@@ -150,6 +170,14 @@ describe("reading, every client's way", () => {
       first("ATTACH;X-FILENAME=outlook.pdf;X-APPLE-FILENAME=apple.pdf:https://x.org/1").name,
     ).toBe("outlook.pdf");
     expect(first("ATTACH:https://x.org/1").name).toBeNull();
+  });
+
+  test("an empty link is no file: no link and nothing inline", () => {
+    expect(first("ATTACH;FILENAME=a.pdf:")).toMatchObject({
+      uri: null,
+      inline: false,
+      name: "a.pdf",
+    });
   });
 
   test("a SIZE that is no size: an inline file counts its own, a link has none", () => {
@@ -237,6 +265,43 @@ describe("a series", () => {
       ["a.pdf", "b.pdf"],
       ["note.txt"],
     ]);
+  });
+
+  test("an exception's own file that reads like the series' (name, type, size) is its own: not removed", () => {
+    const inline = (data: string) =>
+      `ATTACH;ENCODING=BASE64;VALUE=BINARY;FMTTYPE=text/plain;FILENAME=a.txt:${data}`;
+    const twins = ics(
+      [
+        "UID:t",
+        "DTSTAMP:20261101T000000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DURATION:PT1H",
+        "RRULE:FREQ=WEEKLY;COUNT=3",
+        "SUMMARY:W",
+        inline("aGk="),
+      ],
+      [
+        "UID:t",
+        "DTSTAMP:20261101T000000Z",
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261109T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261109T090000",
+        "DURATION:PT1H",
+        "SUMMARY:W",
+        inline("aG8="),
+      ],
+    );
+    const object = CalendarObject.parse(twins);
+    // Alike as read: two of "a.txt", text, 2 bytes.
+    expect(object.exceptions[0]!.attachments).toEqual(object.master!.attachments);
+    const { ics: after } = editItem(
+      object,
+      { attachments: { remove: [0], add: [] } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    const parsed = CalendarObject.parse(after);
+    expect(parsed.master!.attachments).toEqual([]);
+    const kept = inlineFile(parsed, vilnius("2026-11-09T09:00:00"), 0)!;
+    expect(new TextDecoder().decode(kept.bytes)).toBe("ho");
   });
 
   test("an occurrence's inline file is its exception's; one with none is the series'", () => {

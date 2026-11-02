@@ -12,6 +12,7 @@ const file = (fields: Partial<Attachment>): Attachment => ({
   name: null,
   type: null,
   size: null,
+  inline: false,
   ...fields,
 });
 
@@ -39,6 +40,9 @@ describe("a kind in a word", () => {
   test("the name's extension first, then the known type's, then what the type says", () => {
     expect(kindOf(file({ name: "Q3.docx", type: "application/octet-stream" }), en)).toBe("DOCX");
     expect(kindOf(file({ type: "text/plain" }), en)).toBe("TXT");
+    // A version or a number after the last dot is no extension.
+    expect(kindOf(file({ name: "Release v1.2", type: "application/pdf" }), en)).toBe("PDF");
+    expect(kindOf(file({ name: "Budget 3.5" }), en)).toBeNull();
     expect(kindOf(file({ type: "text/plain; charset=utf-8" }), en)).toBe("TXT");
     expect(
       kindOf(
@@ -77,7 +81,7 @@ describe("a size", () => {
     expect(attachmentText(file({ uri: "javascript:alert(1)" }), null, en, "en").name).toBe(
       "javascript:alert(1)",
     );
-    expect(attachmentText(file({ uri: null, size: 3 }), null, en, "en")).toEqual({
+    expect(attachmentText(file({ uri: null, inline: true, size: 3 }), null, en, "en")).toEqual({
       name: "File",
       about: "3 B",
     });
