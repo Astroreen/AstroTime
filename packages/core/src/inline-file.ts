@@ -3,9 +3,9 @@
 // decodes loads with the details, not with the views.
 import ICAL from "ical.js";
 
-import { attachment, isInline, textOf } from "./attachments.ts";
+import { attachment, componentAt, isInline, textOf } from "./attachments.ts";
 import type { CalendarObject } from "./calendar-object.ts";
-import { fromIcalTime, type ItemTime } from "./time.ts";
+import type { ItemTime } from "./time.ts";
 
 /** An inline attachment's file, decoded when it is opened: its bytes, type and name. */
 export interface InlineFile {
@@ -24,16 +24,7 @@ export function inlineFile(
   recurrenceId: ItemTime | null,
   index: number,
 ): InlineFile | null {
-  const { master, exceptions } = object.components;
-  const id = recurrenceId && JSON.stringify(recurrenceId);
-  const exception =
-    id &&
-    exceptions.find((component) => {
-      const value = component.getFirstPropertyValue("recurrence-id");
-      return value instanceof ICAL.Time && JSON.stringify(fromIcalTime(value)) === id;
-    });
-  const component = exception || master || exceptions[0];
-  const property = component?.getAllProperties("attach")[index];
+  const property = componentAt(object, recurrenceId)?.getAllProperties("attach")[index];
   if (!property || !isInline(property)) return null;
   const { type, name } = attachment(property);
   // ical.js decodes base64 itself: the core has no `atob` (AGENTS.md rule 1).

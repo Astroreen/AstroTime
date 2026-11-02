@@ -1,5 +1,6 @@
 export {
   connectCalDav,
+  hasFiles,
   removeAccount,
   saveAccount,
   syncAll,
