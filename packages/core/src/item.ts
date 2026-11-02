@@ -34,6 +34,12 @@ export interface Alarm {
   readonly acknowledged: ItemTime | null;
 }
 
+/** A point on the map, WGS-84 degrees (RFC 5545 `GEO`). */
+export interface Geo {
+  readonly lat: number;
+  readonly lon: number;
+}
+
 /** An `ATTENDEE` or the `ORGANIZER`. */
 export interface Participant {
   /** The calendar user address, usually `mailto:…`. */
@@ -50,6 +56,12 @@ interface ItemFields {
   readonly summary: string | null;
   readonly description: string | null;
   readonly location: string | null;
+  /**
+   * Where `location` is on the map: `GEO`, or Apple's
+   * `X-APPLE-STRUCTURED-LOCATION`; none when another client changed the
+   * place and kept the old one's point (foundation D176).
+   */
+  readonly geo: Geo | null;
   readonly status: string | null;
   readonly categories: readonly string[];
   /** `CLASS`: PUBLIC, PRIVATE, CONFIDENTIAL. */
@@ -239,6 +251,7 @@ function fields(component: ICAL.Component): ItemFields {
     summary: text(component, "summary"),
     description: text(component, "description"),
     location: text(component, "location"),
+    geo: geoOf(component),
     status: text(component, "status"),
     categories: component
       .getAllProperties("categories")
@@ -254,6 +267,36 @@ function fields(component: ICAL.Component): ItemFields {
       .getAllSubcomponents("valarm")
       .map((valarm) => alarm(valarm, utcTime(component, "x-moz-lastack"))),
   };
+}
+
+const point = (lat: unknown, lon: unknown): Geo | null => {
+  const [a, b] = [Number(lat), Number(lon)];
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180
+    ? { lat: a, lon: b }
+    : null;
+};
+
+/** Text compared as a reader sees it: case and runs of spaces aside. */
+const loosely = (words: string) => words.replaceAll(/\s+/g, " ").trim().toLocaleLowerCase();
+
+/**
+ * The item's point (foundation D176). Apple's structured location names the
+ * place it is for (`X-TITLE`): when `LOCATION` no longer holds that name,
+ * case and spaces aside, another client changed the place and kept the old
+ * point, so there is none, `GEO` neither (AstroTime writes both).
+ */
+function geoOf(component: ICAL.Component): Geo | null {
+  const apple = component.getFirstProperty("x-apple-structured-location");
+  if (apple) {
+    const title = apple.getParameter("x-title");
+    const location = loosely(text(component, "location") ?? "");
+    if (typeof title === "string" && loosely(title) && !location.includes(loosely(title)))
+      return null;
+    const uri = /^geo:([-+\d.]+),([-+\d.]+)/i.exec(String(apple.getFirstValue() ?? ""));
+    if (uri) return point(uri[1], uri[2]);
+  }
+  const geo = component.getFirstPropertyValue("geo");
+  return Array.isArray(geo) ? point(geo[0], geo[1]) : null;
 }
 
 function parentUid(component: ICAL.Component): string | null {

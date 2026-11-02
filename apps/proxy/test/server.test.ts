@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { presetFrom, throughProxy } from "@astrotime/caldav";
+import { PLACES, placesFrom, presetFrom, throughProxy } from "@astrotime/caldav";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { compress } from "../src/compress.ts";
@@ -250,6 +250,45 @@ test("the page names the preset's server and user, escaped, on every route (D123
     expect(html.split("</head>")).toHaveLength(2);
   }
 });
+
+test("the place search a deployment names, or none, in the page and its policy (D178)", async () => {
+  expect(placesFrom({})).toBe(PLACES.photon);
+  expect(placesFrom({ ASTROTIME_PLACES_URL: "https://photon.example.org/api?x#y" })).toBe(
+    "https://photon.example.org/api",
+  );
+  expect(placesFrom({ ASTROTIME_PLACES_URL: " OFF " })).toBeNull();
+  for (const wrong of ["photon.example.org", "ftp://photon.example.org", "https://u:p@x.org"]) {
+    expect(() => placesFrom({ ASTROTIME_PLACES_URL: wrong })).toThrow(/not a Photon address/);
+  }
+  expect(contentSecurityPolicy(undefined, "https://photon.example.org:8443/api/")).toContain(
+    "connect-src 'self' https://photon.example.org:8443;",
+  );
+  const off = contentSecurityPolicy(undefined, null);
+  expect([off.includes("connect-src 'self';"), off.includes("img-src 'self';")]).toEqual([
+    true,
+    true,
+  ]);
+
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "index.html"), `<!doctype html><html><head></head><body></body></html>`);
+  for (const places of [PLACES.photon, null]) {
+    const server = createAppServer({ root, allow: [dav], places });
+    servers.push(server);
+    const page = await fetch(await listen(server));
+    const html = await page.text();
+    expect(page.headers.get("content-security-policy")).toBe(
+      contentSecurityPolicy(nonceIn(page.headers.get("content-security-policy")), places),
+    );
+    // The public Photon is the app's own default: the page says only "off".
+    expect(html).toBe(
+      places
+        ? "<!doctype html><html><head></head><body></body></html>"
+        : `<!doctype html><html><head><!-- astrotime-preset --><meta name="astrotime-places" content="off" /><!-- /astrotime-preset --></head><body></body></html>`,
+    );
+  }
+});
+
+const nonceIn = (policy: string | null) => /'nonce-([^']+)'/.exec(String(policy))?.[1];
 
 test("an answer that breaks off midway is cut off, never ended as if whole", async () => {
   const broken = (async () =>
@@ -518,15 +557,15 @@ describe("the Content Security Policy (D110)", () => {
     expect(new Set(nonces).size).toBe(nonces.length);
   });
 
-  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons", () => {
+  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons, and the places' (D178)", () => {
     expect(contentSecurityPolicy("n0nce").split("; ")).toEqual([
       "default-src 'none'",
       "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'nonce-n0nce'",
-      "connect-src 'self'",
+      "connect-src 'self' https://photon.komoot.io",
       "worker-src 'self'",
       "manifest-src 'self'",
-      "img-src 'self'",
+      "img-src 'self' https://tile.openstreetmap.org",
       "base-uri 'none'",
       "form-action 'none'",
       "frame-ancestors 'none'",

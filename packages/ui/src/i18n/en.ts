@@ -267,6 +267,10 @@ export const en = {
   "settings.keepRunning": "Keep running when the window is closed",
   "settings.keepRunning.hint":
     "AstroTime goes on syncing and reminding; quit it from the tray or the menu.",
+  "settings.places": "Places",
+  "settings.places.search": "Search places on the map",
+  "settings.places.hint":
+    "What you type in Location goes to {{search}} to find places, and the maps of places come from {{tiles}}.",
   "shell.open": "Open AstroTime",
   "shell.closeWindow": "Close window",
   "shell.quit": "Quit AstroTime",
@@ -328,6 +332,13 @@ export const en = {
   "edit.colorDefault": "The calendar's colour",
   "edit.location": "Location",
   "edit.description": "Description",
+  "places.results": "Places",
+  "places.credit": "Places from © OpenStreetMap contributors",
+  "places.map": "Map of {{place}}",
+  "places.attribution": "© OpenStreetMap",
+  "places.open": "Open in maps",
+  "places.copy": "Copy address",
+  "places.copied": "Copied",
   "edit.save": "Save",
   "edit.close": "Close without saving",
   "edit.noCalendar": "No calendar here can hold this item.",
@@ -348,6 +359,7 @@ export const en = {
   "notice.deleteInDoubt":
     "It is not clear whether it was deleted. Check your calendar, and delete it again if it is still there.",
   "notice.deleteFailed": "It could not be deleted. Try again.",
+  "notice.copyFailed": "The address could not be copied.",
   "notice.close": "Dismiss",
 
   "color.tomato": "Red",

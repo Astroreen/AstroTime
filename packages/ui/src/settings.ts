@@ -30,6 +30,11 @@ export interface Settings {
    * desktop, docs/plans/desktop.md#D75); off, closing it quits.
    */
   readonly keepRunning: boolean;
+  /**
+   * Location searches places on the map and the place card shows one,
+   * where the platform has them (design D175); off, neither asks anything.
+   */
+  readonly places: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   weekNumbers: true,
   reminders: true,
   keepRunning: true,
+  places: true,
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -65,6 +71,7 @@ export function readSettings(stored: string | null): Settings {
     weekNumbers: value.weekNumbers !== false,
     reminders: value.reminders !== false,
     keepRunning: value.keepRunning !== false,
+    places: value.places !== false,
   };
 }
 

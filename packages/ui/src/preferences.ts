@@ -61,6 +61,8 @@ export const KEYS = {
   keepData: "astrotime.keepData",
   /** `dismissed`: the preset's sign-in was closed unsigned, so it opens by itself no more (foundation D123). */
   presetSignIn: "astrotime.presetSignIn",
+  /** The town of the last place picked, which the place search prefers (design D175). */
+  placesNear: "astrotime.placesNear",
 } as const;
 
 /** The ids of hidden calendars, from what was stored (anything unreadable hides none). */

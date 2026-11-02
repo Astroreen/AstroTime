@@ -42,6 +42,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
   reminder. In code a `Reminder` is one time an alarm fires (each
   occurrence and each repeat its own); the reminders a platform is handed,
   7 days ahead and at most 100, are the **reminder set** (foundation D100).
+- **Place** — an item's `LOCATION` picked on the map: its text ("name,
+  address") with its **point** (`GEO`, and Apple's structured location).
+  Text typed and not picked is a location with no point (foundation D176).
+  `Place` in code; `Item.geo` is the point.
 - **Due** — a task's `DUE`, the time it must be done by; optional. A task
   is **overdue** when its due has passed (its start, without a due) and it
   is not completed (design D161).

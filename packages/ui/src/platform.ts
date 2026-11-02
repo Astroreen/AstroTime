@@ -4,6 +4,7 @@ import type { Store } from "@astrotime/storage";
 import type { SyncLock } from "@astrotime/sync";
 
 import type { UnprotectedPrompt } from "./accounts/unprotected.ts";
+import type { MapLinks } from "./places/map.ts";
 import type { Preferences } from "./preferences.ts";
 import type { Theme } from "./settings.ts";
 
@@ -32,6 +33,19 @@ export interface ShellState {
     readonly closeWindow: string;
     readonly quit: string;
   };
+}
+
+/**
+ * Places on the map (design D175, D177; foundation D178): what the page
+ * itself may reach for them, never through the DAV proxy.
+ */
+interface Places {
+  /** The Photon geocoder's `/api/` address, which Location searches. */
+  readonly photon: string;
+  /** The tile server the place card's map is drawn from. */
+  readonly tiles: string;
+  /** How "Open in maps" opens a place; OpenStreetMap's page when absent. */
+  readonly links?: MapLinks;
 }
 
 /**
@@ -120,4 +134,10 @@ export interface Platform {
    * stops listening.
    */
   readonly onSyncRequest?: (listener: (byUser: boolean) => void) => () => void;
+  /**
+   * Places on the map, where the page may reach them: the web's and
+   * Android's. Without, Location is a text and the place card has no map
+   * (the desktop's page reaches no network itself, desktop D72).
+   */
+  readonly places?: Places;
 }

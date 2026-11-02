@@ -78,6 +78,31 @@ describe("mergeObjects (D6)", () => {
     expect(merged.conflict).toBe(false);
   });
 
+  test("a place is one field: its text and its point never come from two sides (D176)", () => {
+    const now = Date.parse("2026-11-04T08:40:00Z");
+    const gate = {
+      name: "Brandenburg Gate",
+      address: "Pariser Platz 1, Berlin",
+      geo: { lat: 52.51627, lon: 13.377703 },
+    };
+    const ours = editItem(CalendarObject.parse(object(base)), { location: gate }, { now }).ics;
+    // The server's place changed too, text alone: a conflict, and the
+    // server's place whole, with no point of ours beside its text.
+    const theirs = object({ ...base, LOCATION: "Room 9" });
+    const both = mergeObjects(object(base), ours, theirs);
+    expect(both.conflict).toBe(true);
+    expect(master(both.ics)).toMatchObject({ location: "Room 9", geo: null });
+    expect(both.ics).not.toMatch(/^(GEO|X-APPLE-STRUCTURED-LOCATION)[:;]/m);
+    // Only ours changed it: our place lands whole, point and all.
+    const one = mergeObjects(object(base), ours, object({ ...base, SUMMARY: "Theirs" }));
+    expect(one.conflict).toBe(false);
+    expect(master(one.ics)).toMatchObject({
+      summary: "Theirs",
+      location: "Brandenburg Gate, Pariser Platz 1, Berlin",
+      geo: gate.geo,
+    });
+  });
+
   test("alarms are one field", () => {
     const alarm = "BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\n";
     const withAlarm = object(base).replace("END:VEVENT", `${alarm}END:VEVENT`);
@@ -299,6 +324,17 @@ describe("the fields two versions differ in, for the Conflicts list (D6)", () =>
     ).ics;
     expect(differences(source, ours)).toEqual(["alarms", "summary", "time"]);
     expect(differences(source, CalendarObject.parse(source).serialize())).toEqual([]);
+  });
+
+  test("a place's point is a difference in its location (D176)", () => {
+    const source = fixture("apple-event-attendees.ics");
+    const place = {
+      name: "Pier 39",
+      address: "San Francisco",
+      geo: { lat: 37.8087, lon: -122.4098 },
+    };
+    const ours = editItem(CalendarObject.parse(source), { location: place }, { now }).ics;
+    expect(differences(source, ours)).toEqual(["location"]);
   });
 
   test("an exception added, changed or gone is a difference in the occurrences", () => {

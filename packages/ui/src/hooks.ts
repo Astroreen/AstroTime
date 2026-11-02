@@ -149,43 +149,107 @@ export function useEntries(
 
 /** Pixels a finger moves before its swipe knows its axis, under the browser's own touch slop. */
 const SWIPE_SLOP = 8;
-/** Pixels a swipe goes sideways to move the period. */
+/** Pixels a swipe goes sideways to move the period, at least. */
 const SWIPE_DISTANCE = 56;
+/** A swipe let go this fast sideways (pixels a millisecond) moves the period from 24 px on. */
+const FLICK_SPEED = 0.4;
+const FLICK_DISTANCE = 24;
+/** How far back a release's speed is measured. */
+const SPEED_WINDOW = 100;
 
 /**
- * A horizontal swipe on a touch screen over `ref`'s element: the next (`1`)
- * or previous (`-1`) period (design D59). The axis is locked on the first
- * movement past a few pixels (design D152): a sideways one is the swipe's,
- * and its `touchmove`s are cancelled, so the browser starts no fling of its
- * own, whose stop would take the next tap's click (a top-bar button had to
- * be pressed twice after a swipe); an upward or downward one is the grid's
- * scroll, which the browser runs (`touch-action: pan-y`).
+ * Where a swipe let go goes (design D154): the next (`1`) or previous
+ * (`-1`) period past a quarter of the view's `width` (at least 56 px, at
+ * most 120), or a flick of 24 px on; else back (`0`). Mostly sideways only.
  */
-export function useSwipe(
-  ref: RefObject<HTMLElement | null>,
-  onSwipe: (direction: 1 | -1) => void,
-): void {
-  const swiped = useEffectEvent(onSwipe);
+export function swipeOutcome(dx: number, dy: number, velocity: number, width: number): 1 | -1 | 0 {
+  if (Math.abs(dx) <= 2 * Math.abs(dy)) return 0;
+  const far = Math.abs(dx) >= Math.min(120, Math.max(SWIPE_DISTANCE, width / 4));
+  const flick =
+    Math.abs(dx) >= FLICK_DISTANCE && Math.abs(velocity) >= FLICK_SPEED && velocity * dx > 0;
+  return far || flick ? (dx < 0 ? 1 : -1) : 0;
+}
+
+/** A finger on a swipe's element. */
+interface Finger {
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
+  axis: "x" | "y" | null;
+  /** The last moves, for the speed at the release. */
+  readonly samples: { x: number; t: number }[];
+}
+
+/** What a view does with a finger's sideways swipe (design D154). */
+export interface SwipeHandlers {
+  /** The finger locked sideways: the view gets ready to follow it. */
+  readonly onStart?: () => void;
+  /** How far sideways it went from where it pressed; on every move, so no render here. */
+  readonly onMove?: (dx: number) => void;
+  /** Let go: how far it went and its speed sideways (pixels a millisecond) at the end. */
+  readonly onEnd: (dx: number, dy: number, velocity: number) => void;
+  /** Taken by the browser's scroll or a drag after it began: back to where it was. */
+  readonly onCancel?: () => void;
+}
+
+/**
+ * A horizontal swipe on a touch screen over `ref`'s element (design D59).
+ * The axis is locked on the first movement past a few pixels (design D152):
+ * a sideways one is the swipe's, and its `touchmove`s are cancelled, so the
+ * browser starts no fling of its own, whose stop would take the next tap's
+ * click; an upward or downward one is the grid's scroll, which the browser
+ * runs (`touch-action: pan-y`). A drag (design D111) takes the finger from
+ * the swipe.
+ */
+export function useSwipe(ref: RefObject<HTMLElement | null>, handlers: SwipeHandlers): void {
+  const start = useEffectEvent(() => handlers.onStart?.());
+  const moved = useEffectEvent((dx: number) => handlers.onMove?.(dx));
+  const ended = useEffectEvent((dx: number, dy: number, velocity: number) =>
+    handlers.onEnd(dx, dy, velocity),
+  );
+  const cancelled = useEffectEvent(() => handlers.onCancel?.());
   // The finger down now, kept apart from the listeners: they may be attached
   // again while it is down (React's Strict Mode does so after mounting, in
   // development), and a swipe would then lose where it began (design D152).
-  const finger = useRef<{ id: number; x: number; y: number; axis: "x" | "y" | null } | null>(null);
+  const finger = useRef<Finger | null>(null);
   // Attached as the element is, before anything is painted or pressed.
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
+    const dragging = () => document.documentElement.dataset["dragging"] !== undefined;
     const down = (event: globalThis.PointerEvent) => {
       finger.current =
         event.pointerType === "touch" && event.isPrimary
-          ? { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null }
+          ? {
+              id: event.pointerId,
+              x: event.clientX,
+              y: event.clientY,
+              axis: null,
+              samples: [{ x: event.clientX, t: event.timeStamp }],
+            }
           : null;
     };
+    const drop = () => {
+      const was = finger.current;
+      finger.current = null;
+      if (was?.axis === "x") cancelled();
+    };
     const move = (event: globalThis.PointerEvent) => {
-      const start = finger.current;
-      if (!start || event.pointerId !== start.id || start.axis) return;
-      const dx = event.clientX - start.x;
-      const dy = event.clientY - start.y;
-      if (Math.hypot(dx, dy) >= SWIPE_SLOP) start.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      const now = finger.current;
+      if (!now || event.pointerId !== now.id) return;
+      if (dragging()) return drop();
+      const dx = event.clientX - now.x;
+      const dy = event.clientY - now.y;
+      now.samples.push({ x: event.clientX, t: event.timeStamp });
+      while (now.samples.length > 2 && event.timeStamp - now.samples[0]!.t > SPEED_WINDOW) {
+        now.samples.shift();
+      }
+      if (!now.axis) {
+        if (Math.hypot(dx, dy) < SWIPE_SLOP) return;
+        now.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (now.axis === "x") start();
+      }
+      if (now.axis === "x") moved(dx);
     };
     const touchMove = (event: TouchEvent) => {
       if (finger.current?.axis === "x" && event.cancelable) event.preventDefault();
@@ -194,25 +258,24 @@ export function useSwipe(
       const from = finger.current;
       if (!from || event.pointerId !== from.id) return;
       finger.current = null;
-      if (from.axis === "y") return;
-      const dx = event.clientX - from.x;
-      const dy = event.clientY - from.y;
-      if (Math.abs(dx) > SWIPE_DISTANCE && Math.abs(dx) > 2 * Math.abs(dy)) swiped(dx < 0 ? 1 : -1);
-    };
-    const cancel = () => {
-      finger.current = null;
+      // A tap, or the grid's scroll: no swipe to end, nothing settles.
+      if (from.axis !== "x") return;
+      const first = from.samples[0]!;
+      const elapsed = event.timeStamp - first.t;
+      const velocity = elapsed > 0 ? (event.clientX - first.x) / elapsed : 0;
+      ended(event.clientX - from.x, event.clientY - from.y, velocity);
     };
     element.addEventListener("pointerdown", down);
     element.addEventListener("pointermove", move);
     element.addEventListener("pointerup", up);
-    element.addEventListener("pointercancel", cancel);
+    element.addEventListener("pointercancel", drop);
     // Not passive: the browser waits for it before it moves the page.
     element.addEventListener("touchmove", touchMove, { passive: false });
     return () => {
       element.removeEventListener("pointerdown", down);
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", up);
-      element.removeEventListener("pointercancel", cancel);
+      element.removeEventListener("pointercancel", drop);
       element.removeEventListener("touchmove", touchMove);
     };
   }, [ref]);

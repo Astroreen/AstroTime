@@ -18,8 +18,8 @@ import { Formats } from "../calendar/format.ts";
 import { shownCalendars } from "../calendar/calendars.ts";
 import { liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
-import { layoutMonth } from "../calendar/month.ts";
-import { layoutRange, ObjectCache, type Entry } from "../calendar/query.ts";
+import { layoutMonth, type MonthWeek } from "../calendar/month.ts";
+import { layoutRange, ObjectCache, type Entry, type RangeLayout } from "../calendar/query.ts";
 import {
   isView,
   periodOf,
@@ -48,6 +48,7 @@ import {
 } from "./icons.tsx";
 import { MonthPicker } from "./month-picker.tsx";
 import { MonthView } from "./month-view.tsx";
+import { Pager, type Page } from "./pager.tsx";
 import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
 import { SettingsScreen } from "./lazy.tsx";
@@ -110,8 +111,14 @@ export function CalendarScreen({
   const [expanded, setExpanded] = useState(false);
 
   const days = periodOf(view, anchor, settings.weekStart);
-  const from = days[0]!;
-  const to = addDays(days.at(-1)!, 1);
+  // On a touch screen the periods before and after are read with this one,
+  // so a swipe carries them in beside it and a step to either draws at once
+  // (design D154); elsewhere, with no swipe, only the period shown is.
+  const coarse = useMediaQuery("(any-pointer: coarse)");
+  const before = coarse ? periodOf(view, stepAnchor(view, anchor, -1), settings.weekStart) : days;
+  const after = coarse ? periodOf(view, stepAnchor(view, anchor, 1), settings.weekStart) : days;
+  const from = before[0]!;
+  const to = addDays(after.at(-1)!, 1);
 
   const [lists, setLists] = useState<{ accounts: Account[]; calendars: Calendar[] } | null>(null);
   // The calendars could not be read: the view reads none, so it is drawn (design D59).
@@ -167,12 +174,13 @@ export function CalendarScreen({
   // first and the chip joins them.
   const [beforeAgenda, setBeforeAgenda] = useState<Entries | null>(null);
   const [held, setHeld] = useState<Drawn | null>(null);
+  // A read holds a period when it covers its days: the read of the period
+  // before or after a step holds the new one too (design D154).
   const fresh =
     !agenda &&
     read !== null &&
     read !== beforeAgenda &&
-    read.from === from &&
-    read.to === to &&
+    holds(read, days) &&
     (read.undoneCurrent || held === null);
   if (fresh && (held?.read !== read || held.view !== view || held.anchor !== anchor)) {
     setHeld({ view, days, anchor, read });
@@ -180,11 +188,17 @@ export function CalendarScreen({
     setHeld(null);
     setBeforeAgenda(read);
   }
-  const drawn = fresh ? { view, days, anchor, read } : held;
+  // A step to a period the read drawn holds lands at once from it, even
+  // while a newer read goes on: a swipe's neighbour was drawn from it
+  // (design D154), and the step does not snap back to wait.
+  const kept =
+    !agenda && !fresh && held !== null && held.view === view && holds(held.read, days)
+      ? { view, days, anchor, read: held.read }
+      : null;
+  const drawn = fresh ? { view, days, anchor, read } : (kept ?? held);
   // What the view waits for while it keeps what it drew: its days' read, or
   // its chip's (a data hook the tests wait on).
-  const waiting =
-    agenda || fresh ? undefined : read?.from === from && read.to === to ? "chip" : "days";
+  const waiting = agenda || fresh ? undefined : read && holds(read, days) ? "chip" : "days";
   const drawnRead = drawn?.read;
   // Drawn before its chip's tasks are read (on open): no chip yet.
   const data = drawnRead
@@ -200,17 +214,60 @@ export function CalendarScreen({
   const colorOfCalendar = (id: string) => calendarColor.get(id) ?? DEFAULT_COLOR;
   const colorOf = (entry: Entry) =>
     validColor(entry.occurrence.item.color) ?? colorOfCalendar(entry.calendarId);
-  const layoutContext = { today, timeZone, undone: data.undone.length };
   const undoneColor = (task: UndoneTask) => colorOfCalendar(task.object.calendarId);
-  // "Hide completed" hides completed tasks' chips on every view, not the undone chip (D51).
-  const entries = hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries;
+  // The period drawn and, on a touch screen, those beside it whose items are
+  // read, each laid out once for what it draws (design D154).
+  const undoneCount = data.undone.length;
+  const drawnView = drawn?.view ?? null;
+  const drawnAnchor = drawn?.anchor ?? null;
+  const pages = useMemo(() => {
+    if (!drawnView || !drawnAnchor || !drawnRead) return null;
+    // "Hide completed" hides completed tasks' chips on every view, not the undone chip (D51).
+    const entries = hideCompleted
+      ? drawnRead.entries.filter((entry) => !entry.done)
+      : drawnRead.entries;
+    const context = { today, timeZone, undone: undoneCount };
+    const page = (pageAnchor: string, pageDays: readonly string[]): Shown => ({
+      key: `${drawnView}:${pageDays[0]}`,
+      days: pageDays,
+      anchor: pageAnchor,
+      month: titleRange(drawnView, pageDays, pageAnchor)[0],
+      layout:
+        drawnView === "month"
+          ? { view: "month", weeks: layoutMonth(entries, pageDays, context) }
+          : { view: "grid", range: layoutRange(entries, pageDays, context) },
+    });
+    const beside = (direction: 1 | -1) => {
+      if (!coarse) return null;
+      const besideAnchor = stepAnchor(drawnView, drawnAnchor, direction);
+      const besideDays = periodOf(drawnView, besideAnchor, settings.weekStart);
+      return holds(drawnRead, besideDays) ? page(besideAnchor, besideDays) : null;
+    };
+    return {
+      current: page(drawnAnchor, periodOf(drawnView, drawnAnchor, settings.weekStart)),
+      previous: beside(-1),
+      next: beside(1),
+    };
+  }, [
+    drawnView,
+    drawnAnchor,
+    drawnRead,
+    hideCompleted,
+    today,
+    timeZone,
+    undoneCount,
+    coarse,
+    settings.weekStart,
+  ]);
+  // Where the time grid is scrolled, kept for the next period's and view's grid.
+  const gridScroll = useRef<number | null>(null);
   const foundId = found?.anchor === anchor ? found.objectId : null;
 
   // A search's item is scrolled to once it is drawn.
   const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
     if (!foundId || scrolledTo.current === `${foundId}/${anchor}`) return;
-    const element = document.querySelector("main [data-found]");
+    const element = document.querySelector("main [data-current] [data-found]");
     if (!element) return;
     element.scrollIntoView({ block: "center" });
     scrolledTo.current = `${foundId}/${anchor}`;
@@ -505,28 +562,39 @@ export function CalendarScreen({
                     onVisibleDay={setAnchor}
                     hideCompleted={hideCompleted}
                   />
-                ) : !drawn ? null : drawn.view === "month" ? (
-                  <MonthView
-                    month={titleRange(drawn.view, drawn.days, drawn.anchor)[0]}
-                    weeks={layoutMonth(entries, drawn.days, layoutContext)}
-                    today={today}
-                    undone={data.undone}
-                    undoneColor={undoneColor}
-                    onOpenDay={openDay}
-                    onSwipe={go}
-                  />
-                ) : (
-                  <TimeGrid
-                    days={drawn.days}
-                    layout={layoutRange(entries, drawn.days, layoutContext)}
-                    today={today}
-                    minutes={minutes}
-                    undone={data.undone}
-                    undoneColor={undoneColor}
-                    expanded={expanded}
-                    onExpandedChange={setExpanded}
-                    onSwipe={go}
-                    floating={!sidebar}
+                ) : !drawn || !pages ? null : (
+                  <Pager
+                    view={drawn.view}
+                    current={pages.current}
+                    previous={pages.previous}
+                    next={pages.next}
+                    onStep={go}
+                    render={(page, current) =>
+                      page.layout.view === "month" ? (
+                        <MonthView
+                          month={page.month}
+                          weeks={page.layout.weeks}
+                          today={today}
+                          undone={data.undone}
+                          undoneColor={undoneColor}
+                          onOpenDay={openDay}
+                        />
+                      ) : (
+                        <TimeGrid
+                          days={page.days}
+                          layout={page.layout.range}
+                          today={today}
+                          minutes={minutes}
+                          undone={data.undone}
+                          undoneColor={undoneColor}
+                          expanded={expanded}
+                          onExpandedChange={setExpanded}
+                          floating={!sidebar}
+                          current={current}
+                          scroll={gridScroll}
+                        />
+                      )
+                    }
                   />
                 )}
                 {/* Material 3's margins: 16 px on a phone, 24 px from 640 px (D132). */}
@@ -608,6 +676,20 @@ export function CalendarScreen({
       </EditingContext.Provider>
     </CalendarContext.Provider>
   );
+}
+
+/** Whether `read` holds the items of every one of `days`. */
+const holds = (read: Entries, days: readonly string[]) =>
+  read.from <= days[0]! && addDays(days.at(-1)!, 1) <= read.to;
+
+/** A period the pager draws, laid out. */
+interface Shown extends Page {
+  readonly anchor: string;
+  /** The first day of the month the top bar names for it. */
+  readonly month: string;
+  readonly layout:
+    | { readonly view: "month"; readonly weeks: MonthWeek[] }
+    | { readonly view: "grid"; readonly range: RangeLayout };
 }
 
 /** A period of the views but the Agenda, as drawn: its view, its days and what was read of them. */

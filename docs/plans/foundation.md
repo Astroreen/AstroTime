@@ -52,7 +52,11 @@ logic worth borrowing.
   everything in `VEVENT`, `VTODO`, `VALARM` and `VTIMEZONE`, including
   properties and parameters it does not understand (`X-*`, other clients'
   extensions such as `X-APPLE-SORT-ORDER`, `X-OC-HIDESUBTASKS`). An item is
-  written back unchanged except for what the user changed. The UI exposes a
+  written back unchanged except for what the user changed. Unchanged means
+  unchanged in meaning, not byte for byte: a line keeps its name, value and
+  parameters, but ical.js may write the parameters in another order, quote
+  or fold it otherwise, none of which carries meaning (RFC 5545 §3.1, §3.2);
+  the round-trip tests compare lines so (`canonicalLine`). The UI exposes a
   subset that grows over time ([D9](#D9), [D10](#D10)).
 - **D8. ical.js for iCalendar.** Parsing, time zones and recurrence
   expansion use Mozilla's `ical.js` (also used by Nextcloud Calendar),
@@ -474,7 +478,8 @@ Decided while building PR 7.
     `CSPProvider`. `style` attributes React and Floating UI set go through
     the CSSOM, which the policy allows;
   - `connect-src 'self'`: the wasm, and every CalDAV request through
-    `/dav-proxy/` ([D39](#D39));
+    `/dav-proxy/` ([D39](#D39)); and the place search's Photon
+    ([D178](#D178));
   - `worker-src 'self'`: the store's worker, a file of the app's own;
   - `base-uri 'none'`, `form-action 'none'` (no form is ever submitted to
     a URL), `frame-ancestors 'none'` (no other site frames the app).
@@ -634,7 +639,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
 Decided while building PR 5a.
 
 - **D54. The views read the store through live queries.** `Store.subscribe`
-  calls its listeners after every write, another tab's too ([D98](#D98)); a
+  calls its listeners after every write that changed something
+  ([D181](#D181)), another tab's too ([D98](#D98)); a
   view's query runs again when the
   store changes, and a burst of writes during a run costs one more run, not
   one per write (`liveQuery`), so a sync writing while the app is open shows
@@ -1938,12 +1944,131 @@ The owner's feedback after v0.3.0, tried on a phone and a computer.
   `packages/core/src/colors.ts`, some 1.5 KiB of the first visit
   ([D145](#D145)).
 
+**Places on the map** (feedback 8: "I want Location to search real places
+on a map, connected to a map. That also gives a nice place card when viewing
+an event or a task"). How the UI does it is [design D175](design.md#D175)
+and [D177](design.md#D177); what reaches a server, and which:
+
+- **D176. A place is its text, with its point beside it.**
+  - **`LOCATION` stays the text** every client shows: "name, address", as
+    Google writes it (`placeText` in `@astrotime/core`); "Brandenburg
+    Gate, Pariser Platz 1, 10117 Berlin, Germany".
+  - **A place picked on the map adds its point** in the two forms clients
+    read: RFC 5545's `GEO` (latitude;longitude, six places, a tenth of a
+    metre), and Apple's `X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=…;
+    X-ADDRESS=…;X-APPLE-RADIUS=70:geo:lat,lon`, which Apple's clients draw
+    their map from and read no `GEO` without (as `apple-event-attendees.ics`
+    shows Apple writing it, `LOCATION` "name\naddress" and no `GEO`).
+    Nextcloud's web Calendar writes `LOCATION` alone
+    (`nextcloud-web-event-timed.ics`). RFC 9073's `VLOCATION` no client
+    AstroTime has seen writes or reads: not written ([Deferred](#deferred)).
+  - **The old point goes with the old place.** Any change of the place,
+    free text typed or the field emptied, removes `GEO` and Apple's
+    structured location: they would place the new text on the old point.
+    Free text typed and not picked has no point. An edit that leaves the
+    place alone keeps every line of it ([D7](#D7)): this is D7's one
+    exception, a property tied to a field the user changed. Text changed
+    and changed back is no change: nothing is written. A place picked,
+    or an item copied, writes Apple's structured location in AstroTime's
+    shape (its `X-APPLE-RADIUS` 70), not another client's.
+  - **A geocoder's text goes on one line**: newlines and runs of spaces in
+    a name or an address become one space, in `LOCATION` and in Apple's
+    parameters alike, where a `"` goes as RFC 6868's `^'` (ical.js writes
+    and reads it).
+  - **Reading** (`Item.geo`): Apple's point, else `GEO`. Apple's names the
+    place it is for (`X-TITLE`); when `LOCATION` no longer holds that name,
+    case and runs of spaces aside, another client changed the place and
+    kept the old point, so the item has none, `GEO` neither. AstroTime
+    writes both, so its own places are guarded the same way; a `GEO` alone
+    from another client is trusted. The guard's limit: a new text that
+    still holds the old name ("Cafe Roma Nuovo" over "Cafe Roma") keeps
+    the old point, and one that drops it ("the café" for "Cafe Roma") loses
+    a point that was still right; a word-for-word match would lose more
+    points re-worded by other clients than it saves.
+  - **A place merges as one field** ([D6](#D6)): `LOCATION`, `GEO` and
+    Apple's structured location are one in `mergeObjects`, as a time's
+    properties are, so a place changed on both sides is a conflict that
+    keeps the server's place whole, never one side's text with the other's
+    point.
+  - **The Conflicts list** words the place as the location ([D107](#D107)).
+- **D178. Places come from OpenStreetMap, from the page itself.**
+  - **The search is Photon's** (`photon.komoot.io`, komoot's public
+    instance over OpenStreetMap), not Nominatim's, whose usage policy
+    forbids autocomplete ("you must not implement such a service on the
+    client side"). Photon's terms ask for fair use and nothing else
+    ("extensive usage will be throttled"); it answers with `Access-Control-Allow-Origin: *`, so the page asks it
+    directly, never through the DAV proxy ([D39](#D39)), which stays
+    CalDAV's alone. How often it is asked: [design D175](design.md#D175).
+  - **The map is OpenStreetMap's raster tiles**
+    (`tile.openstreetmap.org/{z}/{x}/{y}.png`), a few per place card shown,
+    lazy-loaded, credited "© OpenStreetMap" on the map with a link to
+    `openstreetmap.org/copyright`, as its tile policy asks. The policy asks
+    a browser to send a `Referer`, which the page's `Referrer-Policy:
+    same-origin` ([D110](#D110)) withholds: each tile asks for one of its
+    own (`referrerpolicy="strict-origin-when-cross-origin"`, the app's
+    origin alone). No map library: the tiles are placed by the slippy map
+    formula (`tilesAround`), and the bundle grows by some 4 KiB gzipped at
+    once ([D145](#D145)), the search's list loading with the edit dialog.
+  - **A deployment names its Photon, or none**: `ASTROTIME_PLACES_URL` on
+    the image and the dev server, beside the preset ([D123](#D123)):
+    unset, the public Photon; a self-hosted Photon's `/api/` address; or
+    `off`. Anything else stops the server, as a mistyped server address
+    does. The page says it only when it is not the public one, as a
+    `<meta name="astrotime-places">` in the preset's block, which the
+    service worker keeps with the preset ([D124](#D124)).
+  - **The policy names exactly those origins** ([D110](#D110)):
+    `connect-src` adds the Photon's origin, `img-src` adds
+    `https://tile.openstreetmap.org`; with `off`, neither.
+  - **Where**: the web and Android (`Platform.places`; Android's WebView
+    has no policy and asks the same services, and opens a place in the
+    user's maps app by a `geo:` URI). The desktop's page reaches no network
+    itself ([desktop D72](desktop.md#D72)): its Location stays a text and
+    its card has no map ([Deferred](#deferred)).
+
+**An idle tab does no work.** The owner's Month tab on the demo data kept a
+core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
+
+- **D181. Only a write that changed something is heard; an equal result
+  draws nothing.** The calendar on this device, holding an item beside a
+  server's calendars ([D122](#D122)), was asked to step aside on every store
+  change; it stayed, but `Store.exclusive` told the listeners anyway, so the
+  query that asked ran again, and asked again: measured in Chromium, 82 % of
+  a core, 821 messages to the store's worker and 175 React commits a second,
+  for as long as the tab was open.
+  - **The store tells only a real write.** A store operation counts the
+    rows its transaction changed (`total_changes()`, which inside it only
+    its own statements move, [D99](#D99)); one that changed none ends with
+    ROLLBACK, not COMMIT, and calls no listener: here none, and in another
+    tab none either, since only a commit is announced ([D98](#D98)). A
+    failed one calls none; a COMMIT in doubt does, as it may have written.
+    Two more statements per write, none per read.
+  - **A live query reports a result only when it differs from the last one
+    it reported** ([D54](#D54)): arrays and plain objects by what they hold,
+    anything else (a parsed object the cache keeps) by identity. A sync
+    that wrote a sync token, or a write elsewhere in the store, draws no
+    view whose rows did not change. After an error the next result is
+    reported whatever it is. A query whose `onResult` writes, and must act
+    on every run (its write may have failed, or decides on more than the
+    query reads: the calendar on this device made or stepped aside), gives
+    `everyRun`.
+  - Proved by `idle.spec.ts`: the Month view beside a calendar on this
+    device that stays draws a handful of commits for a change another tab
+    makes, 294 before.
+
 ## Deferred
 
 - **A fixture of Nextcloud's custom colour** — what Nextcloud Calendar
   writes for a colour of its picker ([D174](#D174) reads its source:
   the nearest CSS3 name); `scripts/record-nextcloud-fixtures.ts` can record
   one on its disposable Nextcloud.
+- **The desktop's places** — its page reaches no network itself
+  ([desktop D72](desktop.md#D72)): the place search would go through the
+  main process's HTTP, and the map's tiles through `app://` or a policy
+  of its own ([D178](#D178)).
+- **RFC 9073's `VLOCATION`** — written by no client AstroTime has seen
+  ([D176](#D176)); `GEO` and Apple's structured location carry the point.
+- **A self-hosted tile server** — the deployment names its own Photon, not
+  its own tiles ([D178](#D178)).
 - **An `RDATE` period's own length** — an occurrence from an `RDATE` of a
   period lasts as long as the series, not the period ([D141](#D141)); no
   client AstroTime has seen writes one.

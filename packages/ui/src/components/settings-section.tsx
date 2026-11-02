@@ -2,9 +2,9 @@
 // dialog from 640 px, in groups: general (theme, language), the views (week
 // start, clock, "hide completed", week numbers), the accounts with how each
 // syncs, whether it syncs at all (foundation D171), its menu and its
-// calendars, each shown or not (D137), reminders (foundation D101) and, on
-// the desktop, whether closing the window quits (desktop D75). Each applies
-// at once and is kept on this device.
+// calendars, each shown or not (D137), reminders (foundation D101), places on
+// the map (D175) and, on the desktop, whether closing the window quits
+// (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
@@ -194,6 +194,19 @@ function SettingsGroups({
           <AddAccountButton onLeave={onLeave} />
         </div>
       </Group>
+      {platform.places ? (
+        <Group title={t("settings.places")}>
+          <Toggle
+            label={t("settings.places.search")}
+            checked={settings.places}
+            onChange={(places) => change({ places })}
+            hint={t("settings.places.hint", {
+              search: new URL(platform.places.photon).host,
+              tiles: new URL(platform.places.tiles).host,
+            })}
+          />
+        </Group>
+      ) : null}
       <Group title={t("settings.notifications")}>
         <RemindersSwitch />
       </Group>

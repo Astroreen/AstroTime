@@ -1,6 +1,6 @@
 // The web app: its platform (`platform.ts`) and the browser's languages
 // around the shared UI (docs/plans/foundation.md#D22).
-import { PRESET_META, type Preset } from "@astrotime/caldav";
+import { PLACES, PLACES_OFF, PRESET_META, type Preset } from "@astrotime/caldav";
 import { Store } from "@astrotime/storage";
 import { webDriver } from "@astrotime/storage/web";
 import { AstroTime } from "@astrotime/ui";
@@ -26,6 +26,10 @@ const presetServer = meta(PRESET_META.server);
 const preset: Preset | undefined = presetServer
   ? { server: presetServer, username: meta(PRESET_META.username) }
   : undefined;
+// The place search the deployment names: its own Photon, "off", or none
+// said, the public one (docs/plans/foundation.md#D178).
+const photon = meta(PRESET_META.places) ?? PLACES.photon;
+const places = photon === PLACES_OFF ? undefined : { photon, tiles: PLACES.tiles };
 
 /** The web store's name on OPFS. */
 const STORE = "astrotime";
@@ -55,7 +59,11 @@ void updates?.register();
 createRoot(root).render(
   <StrictMode>
     <AstroTime
-      platform={{ ...webPlatform(openStore(), STORE, preset), ...(updates ? { updates } : {}) }}
+      platform={{
+        ...webPlatform(openStore(), STORE, preset),
+        ...(updates ? { updates } : {}),
+        ...(places ? { places } : {}),
+      }}
       languages={languages}
       timeZone={timeZone}
       {...(nonce ? { nonce } : {})}

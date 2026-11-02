@@ -8,7 +8,11 @@ export const PRESET_MARK = {
   start: "<!-- astrotime-preset -->",
   end: "<!-- /astrotime-preset -->",
 } as const;
-export const PRESET_META = { server: "astrotime-server", username: "astrotime-username" } as const;
+export const PRESET_META = {
+  server: "astrotime-server",
+  username: "astrotime-username",
+  places: "astrotime-places",
+} as const;
 
 const escaped = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
@@ -16,7 +20,7 @@ const escaped = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\/]/g, "\\$&"
 const BLOCK = new RegExp(`${escaped(PRESET_MARK.start)}[\\s\\S]*?${escaped(PRESET_MARK.end)}`, "g");
 /** A preset tag wherever it is and however it is written: any attribute order, quotes, closing. */
 const TAG = new RegExp(
-  `<meta\\b(?=[^>]*\\bname\\s*=\\s*["']?(?:${escaped(PRESET_META.server)}|${escaped(PRESET_META.username)})["'\\s/>])[^>]*>`,
+  `<meta\\b(?=[^>]*\\bname\\s*=\\s*["']?(?:${Object.values(PRESET_META).map(escaped).join("|")})["'\\s/>])[^>]*>`,
   "gi",
 );
 

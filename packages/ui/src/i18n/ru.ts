@@ -280,6 +280,10 @@ export const ru = {
   "settings.keepRunning": "Работать в фоне после закрытия окна",
   "settings.keepRunning.hint":
     "AstroTime продолжает синхронизировать и напоминать; выйти можно из трея или меню.",
+  "settings.places": "Места",
+  "settings.places.search": "Искать места на карте",
+  "settings.places.hint":
+    "То, что вы вводите в поле «Место», отправляется на {{search}} для поиска мест, а карты мест загружаются с {{tiles}}.",
   "shell.open": "Открыть AstroTime",
   "shell.closeWindow": "Закрыть окно",
   "shell.quit": "Выйти из AstroTime",
@@ -340,6 +344,13 @@ export const ru = {
   "edit.color": "Цвет",
   "edit.colorDefault": "Цвет календаря",
   "edit.location": "Место",
+  "places.results": "Места",
+  "places.credit": "Места: © участники OpenStreetMap",
+  "places.map": "Карта: {{place}}",
+  "places.attribution": "© OpenStreetMap",
+  "places.open": "Открыть на карте",
+  "places.copy": "Копировать адрес",
+  "places.copied": "Скопировано",
   "edit.description": "Описание",
   "edit.save": "Сохранить",
   "edit.close": "Закрыть без сохранения",
@@ -361,6 +372,7 @@ export const ru = {
   "notice.deleteInDoubt":
     "Неясно, удалено ли это. Проверьте календарь и удалите ещё раз, если запись осталась.",
   "notice.deleteFailed": "Не удалось удалить. Попробуйте ещё раз.",
+  "notice.copyFailed": "Не удалось скопировать адрес.",
   "notice.close": "Закрыть",
 
   "color.tomato": "Красный",

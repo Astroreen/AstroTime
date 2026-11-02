@@ -20,10 +20,11 @@ export interface SelectOption {
 const button =
   "flex cursor-default items-center gap-2 text-left text-input text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent data-popup-open:ring-2 data-popup-open:ring-accent";
 
-const popup =
+/** The popup's look, which Location's place list shares (design D175). */
+export const popup =
   "max-h-[min(var(--available-height),24rem)] max-w-[var(--available-width)] min-w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-y-auto overscroll-contain rounded-xl bg-raised p-1 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 outline-none data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0";
 
-const row =
+export const row =
   "flex min-h-10 cursor-default items-center gap-3 rounded-lg py-1 pr-4 pl-2 text-body outline-none select-none pointer-coarse:min-h-12 data-highlighted:bg-raised-hover";
 
 /**
