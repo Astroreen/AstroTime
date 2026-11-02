@@ -979,39 +979,87 @@ Settings, the colours and the lists controls open.
   (56 to 120 px) or a flick of 24 px on at 0.4 px/ms, and back otherwise
   (`swipeOutcome`); the step lands in the same frame as the settle ends (and
   a step that changed no period gives the track back, so a swipe never stays
-  stuck on a neighbour), the periods drawn in time order so none is moved in
-  the page and each keeps its scroll. A vertical move is the grid's scroll,
-  a long press the drag's ([D111](#D111)), a tap (no move past the 8 px) no
-  swipe at all: none moves the period or starts a settle. A step to a period
-  the read already drawn holds lands from it at once, even while a newer
-  read of another range goes on (a swipe's neighbour was drawn from it), so
-  a step never snaps back to wait for its read. A step by the arrows, the
-  keys, Today, the month picker or a day opened slides the new period in
-  from the side it comes from (40 px and a fade, 220 ms), on every screen;
-  another view fades in (160 ms); the Agenda slides a picked day in from
-  above or below (24 px). Only `transform` and `opacity` move, with the Web
-  Animations API, on the compositor. `prefers-reduced-motion` swaps at once:
-  no slide, no fade, no follow. The time grid's scroll is kept from period
-  to period and view to view (it was kept by its one grid; each period now
-  has its own). A double click's second click on the grid creates nothing
-  when it lands on the slot its first took, or when its first was not on
-  that grid: the second click of a double click on the month picker's day
-  passes the closing picker ([D136](#D136)) to the grid, and with the period
-  drawn at once it can land on an empty hour, where the old week's taller
-  strip had taken it before; a second click on another slot of the same grid
-  is a click of its own. A grid that has had no click of its own takes a
-  double click's second click as the picker's: a first click on something
-  drawn over the grid (a menu, a popover) makes the second create nothing
-  there either, which is the same case. Tested in
-  `apps/web/e2e/motion.spec.ts` from the page's own calls to `animate`, so
-  no test waits for an animation: the slide's side, the fade, nothing with
-  reduced motion, the track under the finger and its settle, a short swipe
-  going back, a vertical scroll moving nothing; in
-  `packages/ui/test/pager.browser.test.tsx`, a step that changed no period
-  freeing the swipe and a swipe with nothing beside stepping at once; in
-  `drag.spec.ts`, a double click on an empty hour making one new event
-  there. Year view and a swipe between the Agenda's days are not part of it;
-  three periods are drawn on a touch screen only, as a desktop has no swipe.
+  stuck on a neighbour; a settle ends only on its own step, the period it
+  went to in the view it began in: a key, Today or another view pressed
+  meanwhile ends the settle and moves as it would, sliding or fading in),
+  the periods drawn in time order so none is moved in the page and each
+  keeps its scroll. A vertical move is the grid's scroll, a long press the
+  drag's ([D111](#D111)), a tap (no move past the 8 px) no swipe at all:
+  none moves the period or starts a settle. A step to a period the read
+  already drawn holds lands from it at once, even while a newer read of
+  another range goes on (a swipe's neighbour was drawn from it), so a step
+  never snaps back to wait for its read. A step by the arrows, the keys,
+  Today, the month picker or a day opened slides the new period in from the
+  side it comes from (40 px and a fade, 220 ms), on every screen; another
+  view fades in (160 ms); the Agenda slides a picked day in from above or
+  below (24 px), the same day picked again after a scroll too. Only
+  `transform` and `opacity` move, with the Web Animations API, on the
+  compositor. `prefers-reduced-motion` swaps at once: no slide, no fade, no
+  follow. The time grid's scroll is kept from period to period and view to
+  view (it was kept by its one grid; each period now has its own). A double
+  click's second click on the grid creates nothing when it lands on the slot
+  its first took, or when its first was not on that grid: the second click
+  of a double click on the month picker's day passes the closing picker
+  ([D136](#D136)) to the grid, and with the period drawn at once it can land
+  on an empty hour, where the old week's taller strip had taken it before; a
+  second click on another slot of the same grid is a click of its own. Where
+  the first click went is read from the grid's own presses (an empty slot,
+  or an item), not from the clicks it handled: a second click after a press
+  on an item of the grid, or on another slot, creates; one whose first press
+  was not on the grid within a second (the closing picker's, or a menu's
+  drawn over it) creates nothing. Tested in `apps/web/e2e/motion.spec.ts`
+  from the page's own calls to `animate`, so no test waits for an animation:
+  the slide's side, the fade, nothing with reduced motion, the track under
+  the finger and its settle, a short swipe going back, a vertical scroll
+  moving nothing; in `packages/ui/test/pager.browser.test.tsx`, a step that
+  changed no period freeing the swipe and a swipe with nothing beside
+  stepping at once; in `drag.spec.ts`, a double click on an empty hour
+  making one new event there. Year view and a swipe between the Agenda's
+  days are not part of it; three periods are drawn on a touch screen only,
+  as a desktop has no swipe.
+- **D155. The item being made is drawn behind its dialog** (the owner's
+  feedback 5 on v0.3.0: "I want to see a preview of the item in the
+  background while I make it. When I create an event or a task, a modal
+  opens and I still see the background. If the item lands on a day or days
+  shown behind it, it should always be shown there as a preview."). While
+  the edit dialog is open, the views draw its **draft**: the item as the
+  form says now, on its days and times, under its title, in its colour and
+  calendar, as an event or a task, following every change of a field. A new
+  item is the object the form would save (`createItem` on the form's
+  changes, as saving makes it), so a series is drawn on each of its days; an
+  edited one is its occurrence at the form's times (`timesOfForm`,
+  `ghostOf`), drawn instead of the occurrence where it was, done as it is,
+  the series' other occurrences kept: the scope (this, this and following,
+  all) is asked only at saving ([D108](#D108)), so while the dialog is open
+  the one occurrence it edits is what is known to move, and a changed rule's
+  new occurrences are not drawn ([Deferred](#deferred)). It is laid out with
+  the others ([D153](#D153)), raised over them with a shadow (`data-draft`),
+  and brought into sight where the view scrolls when its day or time changes
+  (not with each letter of its title); it goes with the dialog, and a saved
+  item is then drawn from the store. The editor makes it, in its own chunk
+  (`useDraft` in `draft-aside.ts`, on `calendar/draft.ts`'s `draftOf` and
+  `withDraft`), so nothing of it is in the first load ([foundation
+  D145](foundation.md#D145)), and hands the views what it does to their
+  entries (`DrawnDraft`: `apply`, `when`) through `useEditingState`'s
+  `draft`; the form's fields are not touched. It is made anew only when
+  where or how it is drawn changes (`placementOf`: kind, times, rule,
+  colour, calendar): a new title renames it without making, parsing or
+  expanding it again (a new item's occurrences are kept for each range a
+  view asked for), and the description, the place or a reminder change
+  nothing, so typing on a phone stays light. From 1024 px, where a dialog
+  and a day of a week fit side by side, the dialog stands at the side of the
+  screen away from the draft (`useDraftAside`), and its backdrop dims less
+  (20%), as Google Calendar's web app keeps its draft beside its dialog;
+  narrower, it stays in the middle (on a phone it is the whole screen). The
+  Agenda draws it too. Tested: `packages/ui/test/draft.test.ts` (a new
+  event, a new series, an edited event and an edited occurrence of a series,
+  a form with no date, which draws nothing and tells nothing; a fault other
+  than an item that cannot be made yet, which is told on the console; a done
+  task drawn done; a new item outside the days asked; a new title renaming
+  the draft without expanding it again) and `apps/web/e2e/draft.spec.ts` (a
+  new event that follows its form, all day into the strip, the dialog beside
+  it; an edited event at its new place and back at its old one when the
+  dialog goes; a task in the Month; the phone).
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
@@ -1228,6 +1276,20 @@ Settings, the colours and the lists controls open.
 
 ## Deferred
 
+- **The draft beside the dialog in the Day view and the Agenda**
+  ([D155](#D155)): there the draft is as wide as the view, so the dialog,
+  standing at one side, still covers part of it; a dialog placed by the
+  draft's height, or the view scrolled to its free half, would keep it
+  whole.
+- **The draft over the Agenda's sticky day headers** ([D155](#D155)): its
+  `z-index` raises it over the other items and the now line; in the Agenda
+  it would pass over a day's sticky header while the list scrolls under an
+  open dialog, which the dialog covers in practice.
+- **A changed rule's occurrences in the draft** ([D155](#D155)): an edited
+  series' draft moves the one occurrence the dialog edits; a new rule's
+  other days, and a scope's (this and following, all) are drawn once saved.
+  Drawing them needs the scope before Save (D108 asks after), or the rule
+  applied to the whole series for the preview alone.
 - **A series copied whole** — "Make a copy" and "Copy to…" copy the
   occurrence tapped as an item that does not repeat ([D164](#D164)); a
   choice to copy the whole series, its rule and exceptions with it, would

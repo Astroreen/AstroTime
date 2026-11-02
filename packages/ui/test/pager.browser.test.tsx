@@ -15,28 +15,30 @@ const page = (day: string): Page => ({ key: day, days: [day] });
 
 /** A pager over three days, 400 px wide, whose steps go to `onStep`. */
 function render(options: { next: Page | null; onStep: (direction: 1 | -1) => void }) {
+  const draw = (current: string, view = "day") => (
+    <Pager
+      view={view}
+      current={page(current)}
+      previous={page("2026-11-03")}
+      next={options.next}
+      render={(shown) => <p>{shown.days[0]}</p>}
+      onStep={options.onStep}
+    />
+  );
   const host = document.createElement("div");
   host.style.cssText = "width: 400px; height: 300px; display: flex;";
   document.body.append(host);
   const root = createRoot(host);
-  flushSync(() =>
-    root.render(
-      <Pager
-        view="day"
-        current={page("2026-11-04")}
-        previous={page("2026-11-03")}
-        next={options.next}
-        render={(shown) => <p>{shown.days[0]}</p>}
-        onStep={options.onStep}
-      />,
-    ),
-  );
+  flushSync(() => root.render(draw("2026-11-04")));
   cleanups.push(() => {
     root.unmount();
     host.remove();
   });
   const track = host.querySelector<HTMLElement>("[data-track]")!;
-  return { track, viewport: track.parentElement! };
+  /** Draws another period, as a key or Today would. */
+  const show = (current: string, view?: string) =>
+    flushSync(() => root.render(draw(current, view)));
+  return { track, viewport: track.parentElement!, show };
 }
 
 /** A finger's swipe of `dx` pixels to the right over `element`, in moves of 20 px. */
@@ -119,4 +121,34 @@ test("a tap is no swipe: nothing settles, and a swipe right after follows the fi
   at("pointermove", 170, 5);
   at("pointermove", 140, 5);
   expect(track.style.transform).toBe("translateX(-60px)");
+});
+
+test("a period that comes during a settle, not the swipe's own, ends the settle and slides in", () => {
+  const onStep = vi.fn();
+  const { track, viewport, show } = render({ next: page("2026-11-05"), onStep });
+  swipe(viewport, -200);
+  expect(track.getAnimations()).toHaveLength(1);
+  // Today pressed while the track still settles on the 5th.
+  show("2026-11-01");
+  expect(track.getAnimations()).toEqual([]);
+  expect(track.style.transform).toBe("");
+  const shown = track.querySelector<HTMLElement>("[data-current]")!;
+  const [slide] = shown.getAnimations() as CSSAnimation[];
+  expect((slide!.effect as KeyframeEffect).getKeyframes()[0]!["transform"]).toBe(
+    "translateX(-40px)",
+  );
+  expect(onStep).not.toHaveBeenCalled();
+});
+
+test("another view during a settle fades in, the settle given up", () => {
+  const { track, viewport, show } = render({ next: page("2026-11-05"), onStep: vi.fn() });
+  swipe(viewport, -200);
+  show("2026-11-04", "week");
+  expect(track.getAnimations()).toEqual([]);
+  const shown = track.querySelector<HTMLElement>("[data-current]")!;
+  expect(
+    shown
+      .getAnimations()
+      .map((animation) => (animation.effect as KeyframeEffect).getKeyframes()[0]!["opacity"]),
+  ).toEqual(["0"]);
 });

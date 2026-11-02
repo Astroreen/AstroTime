@@ -45,6 +45,7 @@ import {
   type Target,
 } from "../calendar/editing.ts";
 import { liveQuery, whileShown } from "../calendar/live.ts";
+import type { DrawnDraft } from "../calendar/query.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { ChangeNotice, CopyNotice } from "./change-notice.tsx";
@@ -158,6 +159,9 @@ export function useEditingState({
 }) {
   const { t } = useTranslation();
   const [details, setDetails] = useState<Target | null>(null);
+  // The edit dialog's item as its form says now, which the editor makes in
+  // its own chunk and the views draw (design D155).
+  const [draft, setDraft] = useState<DrawnDraft | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [asking, setAsking] = useState<ScopeRequest | null>(null);
   const [related, setRelated] = useState<{ parent: string | null; subtasks: string[] }>({
@@ -469,7 +473,9 @@ export function useEditingState({
   const dialogs = (
     <>
       <ItemDetails
-        target={details}
+        // Hidden while its item is edited, so the draft behind shows (design
+        // D155); back when the edit dialog goes.
+        target={editing ? null : details}
         calendar={calendar}
         color={details ? colorOf(details) : ""}
         related={related}
@@ -485,8 +491,10 @@ export function useEditingState({
       />
       <ItemEditor
         state={shownState}
+        target={editing?.target ?? null}
         calendars={shownCalendars}
         onChange={change}
+        onDraft={setDraft}
         onSave={save}
         onClose={() => setEditing(null)}
       />
@@ -502,5 +510,6 @@ export function useEditingState({
       />
     </>
   );
-  return { value, dialogs };
+  // Gone with the dialog, whether or not the editor said so yet.
+  return { value, dialogs, draft: editing ? draft : null };
 }

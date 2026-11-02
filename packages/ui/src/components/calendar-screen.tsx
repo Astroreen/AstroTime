@@ -33,7 +33,6 @@ import { KEYS, readHidden, usePreference, type Preferences } from "../preference
 import { defaultColorOf, useSettings } from "../settings.ts";
 import { AccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
-import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
 import { DrawerContent } from "./drawer.tsx";
 import { EditingContext, targetOf, useEditingState } from "./editing.tsx";
@@ -51,7 +50,7 @@ import { MonthView } from "./month-view.tsx";
 import { Pager, type Page } from "./pager.tsx";
 import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
-import { SettingsScreen } from "./lazy.tsx";
+import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
@@ -216,52 +215,6 @@ export function CalendarScreen({
   const colorOf = (entry: Entry) =>
     validColor(entry.occurrence.item.color) ?? colorOfCalendar(entry.calendarId);
   const undoneColor = (task: UndoneTask) => colorOfCalendar(task.object.calendarId);
-  // The period drawn and, on a touch screen, those beside it whose items are
-  // read, each laid out once for what it draws (design D154).
-  const undoneCount = data.undone.length;
-  const drawnView = drawn?.view ?? null;
-  const drawnAnchor = drawn?.anchor ?? null;
-  const pages = useMemo(() => {
-    if (!drawnView || !drawnAnchor || !drawnRead) return null;
-    // "Hide completed" hides completed tasks' chips on every view, not the undone chip (D51).
-    const entries = hideCompleted
-      ? drawnRead.entries.filter((entry) => !entry.done)
-      : drawnRead.entries;
-    const context = { today, timeZone, undone: undoneCount };
-    const page = (pageAnchor: string, pageDays: readonly string[]): Shown => ({
-      key: `${drawnView}:${pageDays[0]}`,
-      days: pageDays,
-      anchor: pageAnchor,
-      month: titleRange(drawnView, pageDays, pageAnchor)[0],
-      layout:
-        drawnView === "month"
-          ? { view: "month", weeks: layoutMonth(entries, pageDays, context) }
-          : { view: "grid", range: layoutRange(entries, pageDays, context) },
-    });
-    const beside = (direction: 1 | -1) => {
-      if (!coarse) return null;
-      const besideAnchor = stepAnchor(drawnView, drawnAnchor, direction);
-      const besideDays = periodOf(drawnView, besideAnchor, settings.weekStart);
-      return holds(drawnRead, besideDays) ? page(besideAnchor, besideDays) : null;
-    };
-    return {
-      current: page(drawnAnchor, periodOf(drawnView, drawnAnchor, settings.weekStart)),
-      previous: beside(-1),
-      next: beside(1),
-    };
-  }, [
-    drawnView,
-    drawnAnchor,
-    drawnRead,
-    hideCompleted,
-    today,
-    timeZone,
-    undoneCount,
-    coarse,
-    settings.weekStart,
-  ]);
-  // Where the time grid is scrolled, kept for the next period's and view's grid.
-  const gridScroll = useRef<number | null>(null);
   const foundId = found?.anchor === anchor ? found.objectId : null;
 
   // A search's item is scrolled to once it is drawn.
@@ -292,6 +245,60 @@ export function CalendarScreen({
     },
     onChanged: () => scheduler.changed(),
   });
+  // The period drawn and, on a touch screen, those beside it whose items are
+  // read, each laid out once for what it draws (design D154).
+  const undoneCount = data.undone.length;
+  const draft = editing.draft;
+  const drawnView = drawn?.view ?? null;
+  const drawnAnchor = drawn?.anchor ?? null;
+  const pages = useMemo(() => {
+    if (!drawnView || !drawnAnchor || !drawnRead) return null;
+    // "Hide completed" hides completed tasks' chips on every view, not the
+    // undone chip (D51); the edit dialog's item is drawn as its form says
+    // (design D155).
+    const shown = hideCompleted
+      ? drawnRead.entries.filter((entry) => !entry.done)
+      : drawnRead.entries;
+    const context = { today, timeZone, undone: undoneCount };
+    const page = (pageAnchor: string, pageDays: readonly string[]): Shown => {
+      const range = { from: pageDays[0]!, to: addDays(pageDays.at(-1)!, 1), timeZone };
+      const entries = draft ? draft.apply(shown, range) : shown;
+      return {
+        key: `${drawnView}:${pageDays[0]}`,
+        days: pageDays,
+        anchor: pageAnchor,
+        month: titleRange(drawnView, pageDays, pageAnchor)[0],
+        layout:
+          drawnView === "month"
+            ? { view: "month", weeks: layoutMonth(entries, pageDays, context) }
+            : { view: "grid", range: layoutRange(entries, pageDays, context) },
+      };
+    };
+    const beside = (direction: 1 | -1) => {
+      if (!coarse) return null;
+      const besideAnchor = stepAnchor(drawnView, drawnAnchor, direction);
+      const besideDays = periodOf(drawnView, besideAnchor, settings.weekStart);
+      return holds(drawnRead, besideDays) ? page(besideAnchor, besideDays) : null;
+    };
+    return {
+      current: page(drawnAnchor, periodOf(drawnView, drawnAnchor, settings.weekStart)),
+      previous: beside(-1),
+      next: beside(1),
+    };
+  }, [
+    drawnView,
+    drawnAnchor,
+    drawnRead,
+    hideCompleted,
+    today,
+    timeZone,
+    undoneCount,
+    coarse,
+    settings.weekStart,
+    draft,
+  ]);
+  // Where the time grid is scrolled, kept for the next period's and view's grid.
+  const gridScroll = useRef<number | null>(null);
   const pick = (result: SearchResult) => {
     setSearching(false);
     setQuery("");
@@ -565,7 +572,10 @@ export function CalendarScreen({
                     today={today}
                     undoneColor={undoneColor}
                     onVisibleDay={setAnchor}
+                    draft={editing.draft}
                     hideCompleted={hideCompleted}
+                    // Its code did not arrive, and the notice was closed: the Week.
+                    onClose={() => setView("week")}
                   />
                 ) : !drawn || !pages ? null : (
                   <Pager
