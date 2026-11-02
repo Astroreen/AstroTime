@@ -743,7 +743,7 @@ function ScreenSwitch({ tasks, onTasks }: { tasks: boolean; onTasks: (tasks: boo
         aria-label={t("topBar.tasks")}
         title={t("topBar.tasks")}
         aria-pressed={tasks}
-        onClick={() => onTasks(!tasks)}
+        onClick={() => onTasks(true)}
       >
         <CheckCircleIcon className="size-5" />
       </button>

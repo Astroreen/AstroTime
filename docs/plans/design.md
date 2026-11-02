@@ -1359,7 +1359,11 @@ bar, the sidebar and the accounts panel.
   goes: Google opens it from a rail on the right AstroTime does not have,
   and a switch whose two halves were both shown would say nothing
   ([Deferred](#deferred)). On a phone the single tasks button stays, its
-  screen covering the calendar.
+  screen covering the calendar; a view's key closes it there too, as a
+  view asked for is the calendar's. The switch selects, as a segmented
+  button does: pressing the half already shown changes nothing. The tasks
+  stay open across a resize: from a wide screen to a phone's they cover the
+  calendar, and back.
 - **D228. The shell's motion, calmer** (the owner's 13: "more
   animations… and much more you can think of", the shell's part). The
   phone's drawer slides in over 300 ms with Material 3's emphasized

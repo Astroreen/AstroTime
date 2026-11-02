@@ -1,7 +1,8 @@
 // The tasks screen (design D52), as Google Tasks: a tab per task list with
 // its count of undone tasks, a card with the list's tasks to complete and
-// star in the order picked, and "Completed (N)" folded below. A screen on a
-// phone, a panel beside the calendar on a wide screen. Completing and
+// star in the order picked, and "Completed (N)" folded below. A screen over
+// the calendar on a phone, in the view's place on a wide screen (design
+// D227). Completing and
 // starring write the task to the local store; the sync engine uploads it (D5).
 import { completeTask, starTask, wallClockOf, type ItemTime } from "@astrotime/core";
 import type { Calendar, Store } from "@astrotime/storage";
@@ -70,7 +71,7 @@ export function TasksScreen({
   today: string;
   /** The wall clock now, for what is overdue. */
   now: string;
-  /** A panel beside the calendar, else a screen of its own. */
+  /** In the view's place on a wide screen (design D227), else a screen over the calendar. */
   wide: boolean;
   focus: TaskFocus | null;
   onClose: () => void;

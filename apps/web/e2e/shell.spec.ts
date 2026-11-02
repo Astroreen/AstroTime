@@ -1,8 +1,9 @@
-// The app shell on a wide screen (design D227): the top bar's calendar |
-// tasks switch shows one or the other, the tasks in the view's place.
+// The app shell (design D227): on a wide screen the top bar's calendar |
+// tasks switch shows one or the other, the tasks in the view's place; on a
+// phone the tasks cover the calendar.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -59,4 +60,44 @@ test("a view's key or a view picked in the sidebar brings the calendar back", as
   await expect(tasks(page)).toHaveCount(0);
   await expect(header(page, "Wednesday, November 4")).toBeVisible();
   await expect(calendar).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the switch selects: the half shown pressed again changes nothing", async ({ page }) => {
+  await openDemo(page, "week");
+  const tasksButton = switchTo(page).getByRole("button", { name: "Tasks" });
+  await tasksButton.click();
+  await expect(tasks(page)).toBeVisible();
+  await tasksButton.click();
+  await expect(tasks(page)).toBeVisible();
+  await expect(tasksButton).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the tasks stay open across a resize, over the calendar on a phone and in its place when wide", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page.setViewportSize(PHONE);
+  // A phone's screen: a back arrow, the calendar under it.
+  await expect(tasks(page).getByRole("button", { name: "Back to the calendar" })).toBeVisible();
+  await page.setViewportSize(WIDE);
+  await expect(switchTo(page).getByRole("button", { name: "Tasks" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("main")).toBeHidden();
+});
+
+test("on a phone a view's key closes the tasks screen too", async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect(tasks(page)).toBeVisible();
+  await page.keyboard.press("m");
+  await expect(tasks(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
 });
