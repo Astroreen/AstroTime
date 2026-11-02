@@ -1329,12 +1329,41 @@ whole row".
   details the calendar, is its icon and its name alone; a screen reader
   hears what it is from the row's term ("List", "Calendar"), and every
   other row has its term too ("Repeat", "Description", "Tags", "Subtasks"
-  were an icon alone, an empty term). The rows are a `<dl>`, so a later row (an
-  attachments list) takes its place among them as one more `Row`
+  were an icon alone, an empty term), and a row says its name once: an
+  event's tags are their names alone, as the list is. The rows are a
+  `<dl>`, so a later
+  row (an attachments list) takes its place among them as one more `Row`
   (`apps/web/e2e/editing.spec.ts`). The tasks screen's row is proved
   further for D195: three tab stops (the checkbox, the title, the star),
   its hover background differs from its card's in both themes, and a
   finger leaves none behind (`apps/web/e2e/tasks.spec.ts`).
+- **D197. A task completed moves to "Completed"** (the owner's item 13: "a
+  smooth move from 'not done' to 'done'"). Checked, its box is checked and
+  its title struck through at once, before the store has it, and the tick is
+  drawn in (160 ms); the box lets go of that state once its write is in the
+  store and read back (so the two are drawn together), or did not land, or
+  changed nothing. Then, after that tick, the screen moves from where it was
+  to where it is: each row and card is measured before the store's new read
+  is drawn and slides from there (FLIP), the rows below closing the gap;
+  with "Completed" open the row itself slides down into it, and back up when
+  it is not completed again; with it folded the row goes on drawn where it
+  was, over the list, and fades out going down to "Completed", whose count
+  ticks over. A card that changed height is stretched from the one it had:
+  its background is apart from its rows, so the rows are not stretched with
+  it. A change the user did not make (a sync, the details' "Mark completed",
+  another tab) moves the same way, without the wait for a tick: only the
+  read that carries the user's completion (its row changed or left) waits
+  for its tick, not a sync's read that came first; a new row comes in from
+  above; more than 40 rows moving at once (a sync's batch) change in place.
+  A row leaving goes on leaving through the next change, never measured or
+  moved again, so tasks completed one after another each leave once; its
+  layer is `inert` and hidden from a screen reader. The count is its own
+  box, cut out of the one translated string ("Completed ({{n}})"). Only
+  `transform` and `opacity` move, with the Web Animations API, as
+  [D154](#D154) has it; `prefers-reduced-motion` changes everything in
+  place. The code that moves them (`components/task-motion.ts`) is loaded
+  with the tasks screen's first showing, not with the app (D145), and never
+  when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
 
 ### Decided in round 4: the calendar views
 

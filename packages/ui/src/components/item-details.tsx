@@ -3,9 +3,10 @@
 // and how it repeats, where, its description with its links, its
 // attachments (design D230), its reminders,
 // its guests (shown, never invited: no iTIP), its calendar; a task's due and
-// subtasks, with complete and, beside Edit, star (no status, priority, progress or tags,
-// design D162). Edit shows only where the calendar can be written; Delete,
-// "Make a copy" and "Copy to" are in a "⋯" menu (design D163).
+// subtasks, with complete and, beside Edit, star (no status, priority,
+// progress or tags, design D162). Edit shows only where the calendar can be
+// written; Delete, "Make a copy" and "Copy to" are in a "⋯" menu (design
+// D163).
 import { isDone, repeatOf, timesOf, type ItemTime, type Participant } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
@@ -167,6 +168,8 @@ function Body({
           <button
             type="button"
             className={dialogIcon}
+            // One name, its state pressed or not (a toggle's name does not
+            // change); the tooltip, for a pointer, says what a press does.
             aria-label={t("details.star")}
             aria-pressed={starred}
             title={t(starred ? "details.unstar" : "details.star")}
@@ -286,7 +289,7 @@ function Body({
           )}
           {!task && item.categories.length > 0 && (
             <Row icon={<NotesIcon className="size-5" />} label={t("details.tags")}>
-              {t("details.categories", { categories: item.categories.join(", ") })}
+              {item.categories.join(", ")}
             </Row>
           )}
           {task && (related.parent || related.subtasks.length > 0) && (

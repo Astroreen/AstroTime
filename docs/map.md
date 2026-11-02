@@ -207,7 +207,9 @@ When you add a package, app or module, add its line here in the same PR.
       `plans/foundation.md#D123`, `plans/design.md#D137`
     - `tasks-screen.tsx` — the tasks screen, in the view's place on a wide
       screen, from the top bar's calendar | tasks switch.
-      → `plans/design.md#D95`, `plans/design.md#D227`
+      → `plans/design.md#D95`, `plans/design.md#D227`; `task-motion.ts`,
+      its tasks sliding to where they are when they change, loaded with it.
+      → `plans/design.md#D197`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
     - `empty-state.tsx` — what a screen shows with nothing to list.
