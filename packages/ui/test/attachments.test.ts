@@ -111,16 +111,23 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   expect(typedLink("report.pdf")).toBeNull();
   expect(typedLink("archive.zip")).toBeNull();
   expect(typedLink("notes.md")).toBeNull();
-  expect(typedLink("example.org")).toBeNull();
+  // A site's name typed alone is a link, the most common thing typed.
+  expect(typedLink("example.org")).toBe("https://example.org/");
+  expect(typedLink("google.com")).toBe("https://google.com/");
   // A query or a fragment says it is a link.
   expect(typedLink("example.org?x=1")).toBe("https://example.org/?x=1");
   expect(typedLink("example.org#top")).toBe("https://example.org/#top");
-  expect([
-    bareName("report.pdf"),
-    bareName(" notes.md "),
-    bareName("1234"),
-    bareName("a.b.c"),
-  ]).toEqual([true, true, false, false]);
+  const names = ["report.pdf", " notes.md ", "data.JSON", "a.7z", "example.org", "google.com"];
+  expect([...names, "1234", "a.b.pdf"].map(bareName)).toEqual([
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+  ]);
   expect(typedLink("a@b.com")).toBeNull();
   expect(typedLink("https://user@example.org/")).toBeNull();
   expect(typedLink("example.org/report.pdf")).toBe("https://example.org/report.pdf");

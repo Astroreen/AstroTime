@@ -1813,16 +1813,20 @@ bar, the sidebar and the accounts panel.
   item's attachments as the details do (the same mark and words), each
   with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
   a web link (typed with `http://` or `https://`, or with neither, which is
-  `https://`; its host has a dot (`docs.example.org`, `example.org/plan`,
-  `example.org?x=1`), is `localhost`, or is a name with its port,
-  `nas:8080/files`; a number, `1234`, a time, `12:30`, a bare word, one word
-  and an ending alone, `report.pdf` or `example.org` (a file's name as
-  likely as a site), or a mail address, `a@b.com`, is none; another scheme,
-  `javascript:` or `mailto:`, never is). "Add" waits until it is one, and
-  once the user tried to add a bare name (Enter, or leaving the field) the
-  field says "Not a web link yet: put https:// before it", not before and
-  not for anything else. It is added with Enter or "Add", Escape leaving it;
-  Enter there adds the link and does not save the dialog. The form keeps
+  `https://`; its host has a dot (`example.org`, `google.com`,
+  `docs.example.org`, `example.org/plan`, `example.org?x=1`), is
+  `localhost`, or is a name with its port, `nas:8080/files`; a number,
+  `1234`, a time, `12:30`, a bare word, or a mail address, `a@b.com`, is
+  none, nor a file's name typed alone, one word and a common file's ending
+  (`report.pdf`, `notes.md`, `archive.zip`: pdf, doc(x), xls(x), ppt(x),
+  odt, ods, odp, txt, csv, jpg, jpeg, png, gif, heic, webp, mp3, mp4, zip,
+  rar, 7z, tar, gz, md, json); another scheme, `javascript:` or `mailto:`,
+  never is). "Add" waits until it is one, and once the user tried to add a
+  file's name (Enter, or leaving the field) the field says "Not a web link
+  yet: put https:// before it", in a polite live region the field names as
+  its description, not before and not for anything else. It is added with
+  Enter or "Add", Escape leaving it; Enter there adds the link and does
+  not save the dialog. The form keeps
   them as reminders are kept (`AttachmentChoice`: one the item has,
   by its index among its `ATTACH`es, or a new one), and the save writes
   only what changed: those taken off by their index, found again in the

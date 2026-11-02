@@ -295,7 +295,7 @@ test("an item moved to another account while its file uploads: not attached, sai
   await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
   answer();
   await expect(edit.getByRole("alert")).toHaveText(
-    "minutes.txt was uploaded, but is not attached while the item is in another account's calendar: move it back to attach it.",
+    "minutes.txt was uploaded to the Calendar folder of your files, but is not attached while the item is in another account's calendar: move it back to attach it.",
   );
   await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
   // Back in the account the file went to: attached after all, the alert gone.
@@ -337,8 +337,14 @@ test("a bare name.ext is no link: tried, the field says to put https:// before i
   // Tried: Enter says what makes it a link.
   await link.press("Enter");
   await expect(hint).toBeVisible();
+  // Said to the field: its description, in a live region.
+  await expect(link).toHaveAccessibleDescription("Not a web link yet: put https:// before it.");
+  await expect(hint).toHaveAttribute("aria-live", "polite");
   await link.fill("https://example.org/report.pdf");
-  await expect(edit.getByText("Not a web link yet: put https:// before it.")).toHaveCount(0);
+  await expect(hint).toHaveCount(0);
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
+  // A site's name alone is a link.
+  await link.fill("example.org");
   await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
 });
 

@@ -116,12 +116,16 @@ export function attachmentText(
 }
 
 /**
- * Whether what was typed is one word, a dot and another, with nothing
- * after it (`report.pdf`, `notes.md`, `example.org`): as likely a file's
- * name as a site, so no link until it says so, with `https://`, a path, a
- * query or a fragment (`example.org/plan`, `example.org?x=1`).
+ * Whether what was typed is a file's name alone: one word and a common
+ * file's ending, with nothing after it (`report.pdf`, `notes.md`,
+ * `archive.zip`), no link until it says so with `https://`, a path, a query
+ * or a fragment. A site's name typed alone (`example.org`, `google.com`)
+ * is a link.
  */
-export const bareName = (typed: string) => /^[^.\s/:?#@]+\.[^.\s/:?#@]+$/.test(typed.trim());
+export const bareName = (typed: string) =>
+  /^[^.\s/:?#@]+\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|jpe?g|png|gif|heic|webp|mp3|mp4|zip|rar|7z|tar|gz|md|json)$/i.test(
+    typed.trim(),
+  );
 
 /**
  * A web link typed: with `http://` or `https://`, else `https://` before it.

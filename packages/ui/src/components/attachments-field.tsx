@@ -82,16 +82,14 @@ export function AttachmentsField({
   const [uploading, setUploading] = useState<
     | { readonly state: "sending"; readonly name: string }
     | { readonly state: "failed"; readonly name: string; readonly tooBig: boolean }
-    // Uploaded, but the item's calendar moved to another account meanwhile:
-    // held, attached if it comes back to the account it was uploaded to.
-    | {
-        readonly state: "moved";
-        readonly name: string;
-        readonly from: string;
-        readonly attachment: NewAttachment;
-      }
     | null
   >(null);
+  // Files uploaded while the item's calendar moved to another account: held,
+  // each with its alert, attached if the item comes back to the account it
+  // went to; none is dropped by the next upload (foundation D232).
+  const [held, setHeld] = useState<
+    readonly { readonly name: string; readonly from: string; readonly attachment: NewAttachment }[]
+  >([]);
   const picker = useRef<HTMLInputElement>(null);
   // The form as it is now, read when an upload ends (it takes a while, and
   // what the user changed meanwhile stays); null once the dialog closed,
@@ -138,7 +136,9 @@ export function AttachmentsField({
       // The item moved to another account's calendar meanwhile: a link to
       // this account's file would not open there. Not attached, and said so.
       if (now.calendar?.accountId !== from) {
-        setUploading({ state: "moved", name: sent.name, from, attachment: sent.attachment });
+        const { attachment } = sent;
+        setHeld((list) => [...list, { name: sent.name, from, attachment }]);
+        setUploading(null);
         return;
       }
       attach(sent.attachment, now.calendar.url);
@@ -151,16 +151,18 @@ export function AttachmentsField({
   // The item back in the account the file went to: attached after all, and
   // the alert gone. Another calendar of another account changes nothing.
   useEffect(() => {
-    if (uploading?.state !== "moved" || calendar?.accountId !== uploading.from) return;
-    attach(uploading.attachment, calendar.url);
-    setUploading(null);
-  }, [uploading, calendar]);
+    const back = held.filter((file) => file.from === calendar?.accountId);
+    if (back.length === 0) return;
+    for (const file of back) attach(file.attachment, calendar?.url);
+    setHeld((list) => list.filter((file) => !back.includes(file)));
+  }, [held, calendar]);
   const [adding, setAdding] = useState(false);
   const [link, setLink] = useState("");
   // The user tried to add what they typed (Enter, or left the field): only
   // then does a bare name say what makes it a link (design D233).
   const [tried, setTried] = useState(false);
   const inputId = useId();
+  const hintId = useId();
   const typed = typedLink(link);
   const add = () => {
     if (!typed) {
@@ -215,6 +217,7 @@ export function AttachmentsField({
               setTried(false);
             }}
             onBlur={() => setTried(true)}
+            aria-describedby={hintId}
             onKeyDown={(event) => {
               // Enter adds the link here, not the dialog's save; Escape leaves it.
               if (event.key === "Enter") {
@@ -267,10 +270,15 @@ export function AttachmentsField({
           )}
         </div>
       )}
-      {adding && tried && bareName(link) && (
-        // Not a web link yet: what makes it one (design D233).
-        <p className="text-note text-ink-muted">{t("attachments.notLink")}</p>
-      )}
+      {/* Not a web link yet: what makes it one, said to the field it describes (design D233). */}
+      <p id={hintId} aria-live="polite" className="text-note text-ink-muted empty:hidden">
+        {adding && tried && bareName(link) ? t("attachments.notLink") : ""}
+      </p>
+      {held.map((file) => (
+        <p key={file.attachment.uri} role="alert" className="text-note text-danger">
+          {t("attachments.moved", { name: file.name })}
+        </p>
+      ))}
       {uploading && (
         <p
           role={uploading.state === "sending" ? "status" : "alert"}
@@ -278,11 +286,9 @@ export function AttachmentsField({
         >
           {uploading.state === "sending"
             ? t("attachments.uploading", { name: uploading.name })
-            : uploading.state === "moved"
-              ? t("attachments.moved", { name: uploading.name })
-              : uploading.tooBig
-                ? t("attachments.tooBig", { name: uploading.name })
-                : t("attachments.uploadFailed", { name: uploading.name })}
+            : uploading.tooBig
+              ? t("attachments.tooBig", { name: uploading.name })
+              : t("attachments.uploadFailed", { name: uploading.name })}
         </p>
       )}
       {account && (
