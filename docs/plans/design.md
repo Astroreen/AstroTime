@@ -1091,7 +1091,9 @@ Settings, the colours and the lists controls open.
   Settings' defaults. Its entries, each a dot drawn as an item of the colour
   is ([D120](#D120)) left of its name: "The calendar's colour" first (its
   dot the calendar's; in Settings, where there is no one calendar, a ring),
-  the palette's nine CSS names, the user's own colours ([D173](#D173)), and
+  the palette's nine CSS names, the user's own colours ([D173](#D173)),
+  each an entry of its own even when two share a hex (an item keeps only
+  the colour, so it shows by the first of them), and
   an item's own colour that is none of them (from another client, or one
   since deleted) by its generated name ([D170](#D170)), a CSS name by its
   hex's (`colorNameHex`), "Its own colour" only for what is no colour. A calendar's colour stays the server's: AstroTime does
@@ -1117,7 +1119,7 @@ Settings, the colours and the lists controls open.
   "Тёмно-синий", "Глубокий бирюзовый".
   - **The rule:** an own colour's name is `null` while generated, so it
     follows every change of the colour, and the language spoken. Typing in
-    the name makes it the user's, as typed: it stays through changes of
+    the name makes it the user's, as typed (kept trimmed): it stays through changes of
     the colour until they press "Name it from the colour", or save it
     blank.
 - **D172. Default colours for new items** (feedback 10): "Colour of new
@@ -1126,9 +1128,13 @@ Settings, the colours and the lists controls open.
   item's own `COLOR`, written when it is saved, as if chosen in its dialog:
   [D47](#D47) holds, an item's own colour before its calendar's. The dialog
   opens on the kind's default; switched to the other kind while still in
-  it, the colour follows.
+  it, the colour follows, unless the user chose a colour in the dialog,
+  even the default's own: then it stays.
   - **An own colour is a default by its id** (`own:<id>`), so recolouring
-    it moves the default; deleted, the default is the calendar's again.
+    it moves the default; deleted, the default is the calendar's again,
+    and a stored id that names no own colour is the calendar's where it is
+    used (`defaultColorOf`, the dropdown), not on reading the settings,
+    whose code loads at once ([foundation D145](foundation.md#D145)).
   - **Read leniently:** a stored default that is no colour `editItem`
     takes ([foundation D174](foundation.md#D174)) reads as the calendar's,
     so it never refuses a new item's save.

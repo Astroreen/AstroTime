@@ -200,7 +200,7 @@ function ColorForm({
         event.preventDefault();
         // A name left blank is the generated one (design D170).
         if (valid)
-          onSave({ id: color?.id ?? crypto.randomUUID(), hex, name: name?.trim() ? name : null });
+          onSave({ id: color?.id ?? crypto.randomUUID(), hex, name: name?.trim() || null });
       }}
       className="flex flex-col gap-4"
     >

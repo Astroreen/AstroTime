@@ -97,3 +97,30 @@ test("an item's own CSS name outside the palette is named from its hex, in the U
   expect(options.elements().map((option) => option.textContent)).toContain("The calendar's colour");
   await userEvent.keyboard("{Escape}");
 });
+
+test("a default naming an own colour that is gone reads as the calendar's colour (D172)", async () => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    defaultColors: { event: "own:gone", task: null },
+    colors: [{ id: "kept", hex: "#00585e", name: "Sea" }],
+  };
+  render(
+    <SettingsContext.Provider value={{ settings, change: () => {} }}>
+      <ColorSelect
+        label="Colour of new events"
+        value={settings.defaultColors.event}
+        onChange={() => {}}
+        calendarColor={null}
+        ownById
+      />
+    </SettingsContext.Provider>,
+  );
+  const field = page.getByRole("combobox", { name: "Colour of new events" });
+  await expect.element(field).toHaveTextContent("The calendar's colour");
+  await field.click();
+  const options = page.getByRole("listbox").getByRole("option");
+  // The own colour still there is offered; nothing stands for the one gone.
+  await expect.element(options.last()).toHaveTextContent("Sea");
+  expect(options.elements().map((option) => option.textContent)).not.toContain("Its own colour");
+  await userEvent.keyboard("{Escape}");
+});

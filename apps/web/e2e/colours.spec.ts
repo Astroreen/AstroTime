@@ -139,3 +139,45 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   await page.getByRole("button", { name: "Create" }).click();
   await expect(dialog.getByRole("combobox", { name: "Colour" })).toHaveText("Deep teal");
 });
+
+test("a colour chosen in the dialog stays through a switch of kind, the default's own too; two own colours of one hex are two entries (D168, D172)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const settings = await openSettings(page);
+  for (const name of ["Rose one", "Rose two"]) {
+    await settings.getByRole("button", { name: "Add a colour" }).click();
+    const editor = page.getByRole("dialog", { name: "New colour" });
+    await editor.getByRole("textbox", { name: "Hex code" }).fill("#c48b9f");
+    // Spaces around a hand-written name are not kept (design D170).
+    await editor.getByRole("textbox", { name: "Name" }).fill(`  ${name} `);
+    await editor.getByRole("button", { name: "Save" }).click();
+    await expect(editor).toHaveCount(0);
+  }
+  // Stored without the spaces typed around them.
+  const stored = await page.evaluate(() =>
+    (
+      JSON.parse(localStorage.getItem("astrotime.settings") ?? "{}") as {
+        colors?: { name: string | null }[];
+      }
+    ).colors?.map((color) => color.name),
+  );
+  expect(stored).toEqual(["Rose one", "Rose two"]);
+  await choose(settings.getByRole("combobox", { name: "Colour of new events" }), "Rose one");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Create" }).click();
+  const dialog = page.getByRole("dialog", { name: /^New (event|task)$/ });
+  const colour = dialog.getByRole("combobox", { name: "Colour" });
+  await expect(colour).toHaveText("Rose one");
+  await colour.click();
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect(options.filter({ hasText: /^Rose (one|two)$/ })).toHaveText([
+    "Rose one",
+    "Rose two",
+  ]);
+  // Chosen by hand, the very colour the default gave: a switch of kind keeps it.
+  await page.getByRole("option", { name: "Rose one", exact: true }).click();
+  await dialog.getByRole("radio", { name: "Task" }).click();
+  await expect(colour).toHaveText("Rose one");
+});

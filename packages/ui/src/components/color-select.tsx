@@ -85,26 +85,40 @@ export function ColorSelect({
       leading: <Dot color={color} />,
     })),
   ];
+  // Each own colour an entry of its own, by its id: two of one hex are two
+  // entries. An item keeps only the colour, so it shows by the first of them.
   for (const color of settings.colors) {
-    const own = ownById ? `${OWN}${color.id}` : color.hex;
-    if (options.some((option) => option.value === own)) continue;
-    options.push({ value: own, label: nameOf(color), leading: <Dot color={color.hex} /> });
-  }
-  // The item's own colour, from another client or a colour since deleted.
-  if (value && !options.some((option) => option.value === value)) {
     options.push({
-      value,
+      value: `${OWN}${color.id}`,
+      label: nameOf(color),
+      leading: <Dot color={color.hex} />,
+    });
+  }
+  const hexOf = (own: string) =>
+    settings.colors.find((color) => `${OWN}${color.id}` === own)?.hex ?? null;
+  const first = value ? settings.colors.find((color) => color.hex === value) : undefined;
+  // An own colour that is gone is the calendar's colour (design D172).
+  const dangling = value?.startsWith(OWN) && !hexOf(value);
+  const shown = !ownById && first ? `${OWN}${first.id}` : dangling ? "" : (value ?? "");
+  // The item's own colour, from another client, a colour since deleted, or
+  // a default whose own colour is gone: by its name, never blank.
+  if (shown && !options.some((option) => option.value === shown)) {
+    const hex = shown.startsWith(OWN) ? null : (colorNameHex(shown) ?? shown);
+    options.push({
+      value: shown,
       // A CSS name (Nextcloud writes one) is named from its hex too (D168).
-      label: colorName(colorNameHex(value) ?? value, language) ?? t("edit.colorCustom"),
-      leading: <Dot color={value} />,
+      label: (hex && colorName(hex, language)) ?? t("edit.colorCustom"),
+      leading: <Dot color={hex} />,
     });
   }
   return (
     <Select
       label={label}
       {...(labelClassName === undefined ? {} : { labelClassName })}
-      value={value ?? ""}
-      onChange={(next) => onChange(next === "" ? null : next)}
+      value={shown}
+      onChange={(next) =>
+        onChange(next === "" ? null : !ownById && next.startsWith(OWN) ? hexOf(next) : next)
+      }
       options={options}
       {...(className === undefined ? {} : { className })}
     />

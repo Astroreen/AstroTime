@@ -37,7 +37,7 @@ import {
 } from "../calendar/editing.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
 import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
-import { defaultColorOf, useSettings, type DefaultColors } from "../settings.ts";
+import { defaultColorOf, useSettings } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -202,6 +202,9 @@ function Fields({
     event: defaultColorOf(settings, "event"),
     task: defaultColorOf(settings, "task"),
   };
+  // Whether the user chose the colour here: then a switch of kind keeps it,
+  // even when it is the default's (design D172).
+  const [colorChosen, setColorChosen] = useState(false);
   const set = (changes: Partial<Form>) => onChange({ ...form, ...changes });
   const event = form.kind === "event";
   return (
@@ -214,7 +217,10 @@ function Fields({
               type="button"
               role="radio"
               aria-checked={form.kind === kind}
-              onClick={() => onChange(withKindColor(form, switchKind(form, kind), defaults))}
+              onClick={() => {
+                const next = switchKind(form, kind);
+                onChange(colorChosen ? next : { ...next, color: defaults[kind] });
+              }}
               className="rounded-full px-4 py-1.5 text-body font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-accent aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t(`edit.kind.${kind}`)}
@@ -325,7 +331,10 @@ function Fields({
             labelClassName={fieldLabel}
             value={form.color}
             calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
-            onChange={(color) => set({ color })}
+            onChange={(color) => {
+              setColorChosen(true);
+              set({ color });
+            }}
             className={fieldButton}
           />
         </div>
@@ -352,11 +361,6 @@ function Fields({
       </Section>
     </div>
   );
-}
-
-/** Switched kind, a new item still in its kind's default colour takes the other's (design D172). */
-function withKindColor(form: Form, next: Form, defaults: DefaultColors): Form {
-  return form.color === defaults[form.kind] ? { ...next, color: defaults[next.kind] } : next;
 }
 
 function Section({ icon, children }: { icon: ReactNode; children: ReactNode }) {
