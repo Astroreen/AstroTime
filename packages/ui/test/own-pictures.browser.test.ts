@@ -78,3 +78,10 @@ test("with no OffscreenCanvas the page's own canvas makes it smaller", async () 
   expect([bitmap.width, bitmap.height]).toEqual([1600, 533]);
   await removePicture(id);
 });
+
+test("an SVG with no size of its own is refused as no picture", async () => {
+  const svg = new Blob(['<svg xmlns="http://www.w3.org/2000/svg"></svg>'], {
+    type: "image/svg+xml",
+  });
+  await expect(addPicture(svg)).rejects.toBeInstanceOf(NotAPictureError);
+});

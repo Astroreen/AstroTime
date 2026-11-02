@@ -65,6 +65,8 @@ async function smaller(file: Blob): Promise<Blob> {
     throw new NotAPictureError(error);
   }
   try {
+    // An SVG with no size of its own decodes to nothing to draw.
+    if (bitmap.width === 0 || bitmap.height === 0) throw new NotAPictureError("no size");
     const { width, height } = keptSize(bitmap.width, bitmap.height);
     const canvas = canvasOf(width, height);
     const context = canvas?.getContext("2d") as
@@ -76,7 +78,12 @@ async function smaller(file: Blob): Promise<Blob> {
     if (!canvas || !context) return file;
     context.drawImage(bitmap, 0, 0, width, height);
     const webp = await blobOf(canvas, "image/webp");
-    return webp?.type === "image/webp" ? webp : ((await blobOf(canvas, "image/jpeg")) ?? file);
+    if (webp?.type === "image/webp") return webp;
+    // JPEG has no transparency: what was clear is white, not black.
+    context.globalCompositeOperation = "destination-over";
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    return (await blobOf(canvas, "image/jpeg")) ?? file;
   } finally {
     bitmap.close();
   }
