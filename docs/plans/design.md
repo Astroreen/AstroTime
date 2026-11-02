@@ -1246,12 +1246,16 @@ Settings, the colours and the lists controls open.
   `rightsOf`): Delete as [D108](#D108) said; "Make a copy" when the item's
   calendar takes new items; "Copy to…" when any calendar takes one of its
   kind, so a read-only calendar's item can still be copied elsewhere. The
-  menu shows only with one action in it. Edit stays a button of its own.
+  menu shows only when it has at least one action. Edit stays a button of its own.
 - **D164. What a copy is** (`copyItem` in `@astrotime/core`):
   - **"Make a copy"** saves the copy at once in the item's calendar, closes
     the details and says "Copy made" ("Копия создана"), with Open, which
     opens the copy's details; the notice goes by itself after 8 seconds,
-    as a snackbar does. **"Copy to…"** opens the edit dialog as a new
+    as a snackbar does, but not while a pointer is over it or the focus is
+    in it (WCAG 2.2.1, [D119](#D119)): its 8 seconds start again once they
+    leave, and the next copy's notice starts unheld, though the last one
+    went from under the pointer. "Copy to…"'s dialog opens only while the
+    details it was chosen in are still that item's. **"Copy to…"** opens the edit dialog as a new
     item, every field filled from this one, the calendar too (the first
     that takes it, when its own takes no new items); its kind cannot be
     switched; Save makes it wherever the dialog says, the copy with the
@@ -1276,12 +1280,24 @@ Settings, the colours and the lists controls open.
     (AstroTime does not invite, [D108](#D108)); a task is not done in its
     copy (`STATUS:NEEDS-ACTION`, no `COMPLETED`, `PERCENT-COMPLETE:0` when
     it had one); its reminders keep their times, without their `UID` and
-    their `ACKNOWLEDGED`, and the item without Thunderbird's
-    `X-MOZ-LASTACK`: those say the original's reminders were seen, which
-    the copy's were not.
+    their `ACKNOWLEDGED` and Apple's `X-WR-ALARMUID`, and the item without
+    Thunderbird's `X-MOZ-LASTACK` and `X-MOZ-SNOOZE-TIME*`, and without a
+    snooze `VALARM` (RFC 9074 §7: `RELATED-TO;RELTYPE=SNOOZE`; an alarm
+    related to another in another way stays; a known gap: no recorded
+    fixture shows how Apple's apps write a snooze, so one written with a
+    `RELATED-TO` and no `RELTYPE` would be kept): those say the
+    original's reminders were seen or put off, which the copy's were not.
+    A subtask's `RELATED-TO` stays: copied into another list, its parent
+    is not there, so the tasks screen shows it at the top and its details
+    name no parent.
 
 ## Deferred
 
+- **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
+  RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no
+  recorded fixture shows how Apple's apps write one, so one with a
+  `RELATED-TO` and no `RELTYPE` is still copied, a stray one-off reminder.
+  A fixture recorded from Apple's Calendar settles it.
 - **The draft beside the dialog in the Day view and the Agenda**
   ([D155](#D155)): there the draft is as wide as the view, so the dialog,
   standing at one side, still covers part of it; a dialog placed by the

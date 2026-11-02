@@ -3,8 +3,6 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   CalendarObject,
-  copyItem,
-  createFromCopy,
   createItem,
   deleteItem,
   editItem,
@@ -18,6 +16,7 @@ import {
   type Repeat,
   type Task,
 } from "../src/index.ts";
+import { copyItem, createFromCopy } from "../src/copy.ts";
 import { movedRule } from "../src/repeat.ts";
 import { canonicalLine, contentLines, fixture, load } from "./support.ts";
 
@@ -1788,9 +1787,11 @@ describe("a copy of an item (design D164)", () => {
 
   test("is the same item under a new UID, its own revision, every other line kept", () => {
     const meeting = object(
-      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nCREATED:20261001T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nLOCATION:Room 4\r\nGEO:54.687;25.279\r\nX-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279\r\nX-OTHER:kept\r\nX-MOZ-LASTACK:20261105T084500Z\r\nORGANIZER:mailto:me@example.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:you@example.com\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER:-PT15M\r\nACKNOWLEDGED:20261105T084500Z\r\nEND:VALARM\r\nEND:VEVENT\r\n",
+      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nCREATED:20261001T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nLOCATION:Room 4\r\nGEO:54.687;25.279\r\nX-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279\r\nX-OTHER:kept\r\nX-MOZ-LASTACK:20261105T084500Z\r\nX-MOZ-SNOOZE-TIME:20261105T090000Z\r\nX-MOZ-SNOOZE-TIME-1762329600:20261105T090000Z\r\nORGANIZER:mailto:me@example.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:you@example.com\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nX-WR-ALARMUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER:-PT15M\r\nACKNOWLEDGED:20261105T084500Z\r\nEND:VALARM\r\nBEGIN:VALARM\r\nUID:snooze-1\r\nRELATED-TO;RELTYPE=SNOOZE:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER;VALUE=DATE-TIME:20261105T090500Z\r\nEND:VALARM\r\nEND:VEVENT\r\n",
     );
     const copy = copyItem(meeting, null, { now: NOW, uid: "copy" });
+    // The reminder stays, its snooze goes whole.
+    expect(CalendarObject.parse(copy).master?.alarms).toHaveLength(1);
     const parsed = CalendarObject.parse(copy);
     expect(parsed.master).toMatchObject({
       uid: "copy",
@@ -1820,6 +1821,10 @@ describe("a copy of an item (design D164)", () => {
       "UID:alarm-1",
       "ACKNOWLEDGED",
       "X-MOZ-LASTACK",
+      "X-MOZ-SNOOZE-TIME",
+      "X-WR-ALARMUID",
+      "RELATED-TO",
+      "20261105T090500Z",
       "ATTENDEE",
       "ORGANIZER",
       "-//Other//EN",
@@ -1883,6 +1888,36 @@ describe("a copy of an item (design D164)", () => {
     expect(copy).toContain("TZID:America/New_York\r\n");
   });
 
+  test("of an event that lasts by DURATION keeps its length; of a series by RDATE alone, that date", () => {
+    const talk = object(
+      "BEGIN:VEVENT\r\nUID:talk\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Talk\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDURATION:PT45M\r\nRDATE;TZID=Europe/Vilnius:20261112T140000\r\nEND:VEVENT\r\n",
+    );
+    const second = CalendarObject.parse(
+      copyItem(talk, vilnius("2026-11-12T14:00:00"), { now: NOW, uid: "c" }),
+    );
+    expect(second.master).toMatchObject({
+      recurring: false,
+      start: vilnius("2026-11-12T14:00:00"),
+      end: vilnius("2026-11-12T14:45:00"),
+    });
+    expect(second.serialize()).not.toContain("RDATE");
+  });
+
+  test("of an occurrence of a recurring task is that one task, due as far after its start", () => {
+    const bins = object(
+      "BEGIN:VTODO\r\nUID:bins\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Bins\r\nDTSTART;TZID=Europe/Vilnius:20261102T080000\r\nDUE;TZID=Europe/Vilnius:20261102T090000\r\nRRULE:FREQ=WEEKLY\r\nEND:VTODO\r\n",
+    );
+    const copy = CalendarObject.parse(
+      copyItem(bins, vilnius("2026-11-16T08:00:00"), { now: NOW, uid: "c" }),
+    );
+    expect(copy.master).toMatchObject({
+      kind: "task",
+      recurring: false,
+      start: vilnius("2026-11-16T08:00:00"),
+      due: vilnius("2026-11-16T09:00:00"),
+    });
+  });
+
   test("Copy to: its changes made on the copy, its first revision whatever they were", () => {
     const meeting = object(
       "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nX-OTHER:kept\r\nEND:VEVENT\r\n",
@@ -1903,6 +1938,33 @@ describe("a copy of an item (design D164)", () => {
       start: vilnius("2026-11-06T10:00:00"),
     });
     expect(made).toContain("X-OTHER:kept\r\n");
+  });
+
+  test("of a subtask keeps its own RELATED-TO, while a snooze alarm's goes with the snooze", () => {
+    const sub = object(
+      "BEGIN:VTODO\r\nUID:draft\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Draft\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nRELATED-TO:report\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Draft\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nBEGIN:VALARM\r\nUID:snooze-1\r\nRELATED-TO;RELTYPE=SNOOZE:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Draft\r\nTRIGGER;VALUE=DATE-TIME:20261105T085000Z\r\nEND:VALARM\r\nEND:VTODO\r\n",
+    );
+    const copy = copyItem(sub, null, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({ parentUid: "report" });
+    // An alarm related to another in another way than a snooze stays.
+    const related = object(
+      "BEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nBEGIN:VALARM\r\nUID:a\r\nACTION:DISPLAY\r\nDESCRIPTION:T\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nBEGIN:VALARM\r\nUID:b\r\nRELATED-TO;RELTYPE=SIBLING:a\r\nACTION:DISPLAY\r\nDESCRIPTION:T\r\nTRIGGER:-PT5M\r\nEND:VALARM\r\nEND:VTODO\r\n",
+    );
+    expect(
+      CalendarObject.parse(copyItem(related, null, { now: NOW, uid: "c" })).master?.alarms,
+    ).toHaveLength(2);
+    expect(CalendarObject.parse(copy).master?.alarms).toHaveLength(1);
+    const lines = contentLines(copy);
+    expect(lines).toContain("RELATED-TO:report");
+    expect(lines.filter((line) => line.startsWith("RELATED-TO"))).toEqual(["RELATED-TO:report"]);
+  });
+
+  test("of Apple's event: its reminder fresh, Apple's own alarm lines otherwise kept", () => {
+    const copy = copyItem(load("apple-event-attendees.ics"), null, { now: NOW, uid: "c" });
+    const lines = contentLines(copy);
+    expect(lines).toContain("X-APPLE-DEFAULT-ALARM:TRUE");
+    expect(lines).toContain("TRIGGER:-PT15M");
+    expect(lines.some((line) => /^(X-WR-ALARMUID|ACKNOWLEDGED)[:;]/.test(line))).toBe(false);
   });
 
   test("of a completed task is a task to do, its start, due, star and parent kept", () => {

@@ -39,7 +39,7 @@ import {
 import type { Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { targetOf, useEditing, type Rescheduled } from "./editing.tsx";
-import { whenText } from "./item-details.tsx";
+import { whenText } from "../calendar/when.ts";
 import { textButton } from "./sign-in-dialog.tsx";
 
 /** What a view tells a drag: the spot under a point, and what scrolls. */

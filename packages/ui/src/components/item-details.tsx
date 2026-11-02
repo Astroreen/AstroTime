@@ -5,24 +5,14 @@
 // subtasks, with complete and star (no status, priority, progress or tags,
 // design D162). Edit shows only where the calendar can be written; Delete,
 // "Make a copy" and "Copy to" are in a "⋯" menu (design D163).
-import {
-  isDone,
-  repeatOf,
-  timesOf,
-  wallClockOf,
-  type ItemTime,
-  type Participant,
-  type Task,
-} from "@astrotime/core";
+import { isDone, repeatOf, timesOf, type ItemTime, type Participant } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
-import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { addDays } from "../calendar/dates.ts";
 import { deleteScopes, type Target } from "../calendar/editing.ts";
-import type { Formats } from "../calendar/format.ts";
+import { whenText } from "../calendar/when.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
@@ -43,14 +33,7 @@ import {
 import { PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
-
-export const dialogIcon =
-  "grid size-10 shrink-0 place-items-center rounded-full text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
-
-/** The popup of the details and edit dialogs: the whole screen on a phone, a card on a wide one. */
-export const sheet =
-  "fixed inset-0 flex flex-col overflow-hidden bg-raised text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:max-h-[min(44rem,calc(100dvh-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl data-ending-style:sm:scale-95 data-starting-style:sm:scale-95";
+import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 export function ItemDetails({
   target,
@@ -362,48 +345,6 @@ const partstat = (status: string) => PARTSTATS.find((s) => s === status.toUpperC
 function zoneNote(time: ItemTime | null, timeZone: string): string | null {
   if (time?.type !== "zoned" || time.timeZone === "UTC" || time.timeZone === timeZone) return null;
   return time.timeZone;
-}
-
-const dayIn = (time: ItemTime, timeZone: string) =>
-  time.type === "date" ? time.date : wallClockOf(time, timeZone).slice(0, 10);
-
-/**
- * "Wednesday, November 4 · 10:00 – 11:30", "November 4 – 6", a task's
- * "Wednesday, November 4, 15:00 · Due Thursday, November 5" (its start as
- * the calendar shows it, design D159): the details' line, and what a move
- * announces (design D112).
- */
-export function whenText(
-  task: Task | null,
-  times: { start: ItemTime | null; end: ItemTime | null },
-  allDay: boolean,
-  { t, formats, timeZone }: { t: TFunction; formats: Formats; timeZone: string },
-): string {
-  const year = new Date().getFullYear().toString();
-  // A task's due follows "Due": not capitalized.
-  const at = (time: ItemTime, capital = true) =>
-    time.type === "date"
-      ? formats.longDate(time.date, year, capital)
-      : `${formats.longDate(dayIn(time, timeZone), year, capital)}, ${formats.time(time, timeZone)}`;
-  if (task) {
-    const parts = [];
-    if (times.start) parts.push(at(times.start));
-    if (times.end) parts.push(t("details.due", { time: at(times.end, false) }));
-    return parts.join(" · ");
-  }
-  const { start, end } = times;
-  if (!start) return "";
-  if (allDay) {
-    const last = end?.type === "date" ? addDays(end.date, -1) : dayIn(start, timeZone);
-    const first = dayIn(start, timeZone);
-    return last <= first ? formats.longDate(first, year) : formats.dateRange(first, last);
-  }
-  if (!end || dayIn(start, timeZone) !== dayIn(end, timeZone)) {
-    return end
-      ? formats.timeRange(start, end, timeZone)
-      : `${formats.longDate(dayIn(start, timeZone), year)}, ${formats.time(start, timeZone)}`;
-  }
-  return `${formats.longDate(dayIn(start, timeZone), year)} · ${formats.timeRange(start, end, timeZone)}`;
 }
 
 const LINK = /(https?:\/\/[^\s<>"]+|mailto:[^\s<>"]+)/g;

@@ -25,6 +25,9 @@ interface Closable {
   readonly onClose: () => void;
 }
 
+/** How long a deferred part's code waits for the page to be idle before it is fetched anyway. */
+const IDLE_AT_MOST_MS = 2000;
+
 export function deferred<P extends Closable, M = unknown>(
   load: () => Promise<M>,
   pick: (module: M) => ComponentType<P>,
@@ -73,7 +76,9 @@ export function deferred<P extends Closable, M = unknown>(
       // A failure here is met again, and said, at the opening.
       const fetch = () => void preload().catch(() => {});
       if (typeof requestIdleCallback === "function") {
-        const id = requestIdleCallback(fetch);
+        // A page that is never idle (a busy phone) still fetches it, at most
+        // this long after, so its first opening need not wait (D145).
+        const id = requestIdleCallback(fetch, { timeout: IDLE_AT_MOST_MS });
         return () => cancelIdleCallback(id);
       }
       const id = setTimeout(fetch);
@@ -214,4 +219,16 @@ export const AgendaView = deferred(
   (
     _props: ComponentProps<typeof import("./agenda-view.tsx").AgendaView> & { onClose: () => void },
   ) => true,
+);
+
+export const CopyNotice = deferred(
+  () => import("./copy-notice.tsx"),
+  (module) => module.CopyNotice,
+  (props: ComponentProps<typeof import("./copy-notice.tsx").CopyNotice>) => props.copied !== null,
+);
+
+export const ItemDetails = deferred(
+  () => import("./item-details.tsx"),
+  (module) => module.ItemDetails,
+  (props: ComponentProps<typeof import("./item-details.tsx").ItemDetails>) => props.target !== null,
 );

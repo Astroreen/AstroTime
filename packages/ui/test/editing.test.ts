@@ -32,8 +32,6 @@ import {
   NowhereError,
   problemOf,
   RefusedError,
-  copyOf,
-  saveCopy,
   rewriteTarget,
   saveForm,
   scopesFor,
@@ -48,6 +46,7 @@ import {
   type Form,
   type Target,
 } from "../src/calendar/editing.ts";
+import { copyOf, copyToForm, saveCopy } from "../src/calendar/copy.ts";
 import { Formats } from "../src/calendar/format.ts";
 import { alarmOptions, alarmWords, repeatWords } from "../src/calendar/words.ts";
 import { valueOf } from "../src/components/conflicts-dialog.tsx";
@@ -1226,6 +1225,43 @@ describe("copies (design D164)", () => {
     } satisfies Target;
     await expect(saveCopy(store, target, { now: NOW, uid: () => "nope" })).rejects.toThrow(
       RefusedError,
+    );
+  });
+
+  test("Copy to starts in the item's calendar, or the first that takes new items when it takes none", async () => {
+    const { store, byName } = await demo();
+    const calendars = await store.calendars();
+    const holidays = byName("Holidays");
+    const [row] = await store.objectsBetween([holidays.id], {
+      from: "2026-10-01",
+      to: "2027-01-01",
+      timeZone,
+    });
+    const object = CalendarObject.parse(row!.ics);
+    const festival = {
+      objectId: row!.id,
+      calendarId: holidays.id,
+      object,
+      recurrenceId: null,
+      item: object.master!,
+    } satisfies Target;
+    const options = { timeZone, today: TODAY, writes: { now: NOW, uid: () => "c" } };
+    const first = firstCalendarFor(calendars, "event")!;
+    expect(copyToForm(festival, calendars, new Set(), options).form.calendarId).toBe(first.id);
+    // The first visible one: a hidden calendar is passed over, as for any new item.
+    const visible = firstCalendarFor(calendars, "event", new Set([first.id]))!;
+    expect(visible.id).not.toBe(first.id);
+    expect(copyToForm(festival, calendars, new Set([first.id]), options).form.calendarId).toBe(
+      visible.id,
+    );
+    // Its own calendar while it takes new items.
+    const review = await targetOn(
+      store,
+      await store.objectAt(byName("Work").id, "demo-review.ics").then((r) => r!),
+      "2026-11-04",
+    );
+    expect(copyToForm(review, calendars, new Set(), options).form.calendarId).toBe(
+      byName("Work").id,
     );
   });
 

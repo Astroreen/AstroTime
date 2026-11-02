@@ -1809,7 +1809,11 @@ optimization is lacking").
   - **Dialogs with their first opening**: the edit dialog, Settings and the
     Conflicts list (`components/lazy.tsx`), each a stand-in with its props
     that draws nothing until first open, stays drawn after, and fetches its
-    code once the page is idle. Code that does not arrive (offline before
+    code once the page is idle, or at most 2 seconds after it is drawn:
+    a product decision, since a page that is never idle (a busy phone)
+    would otherwise never fetch it, and its first opening would wait for
+    the network. No test depends on the 2 seconds: the tests wait for the
+    chunk's load or the dialog itself. Code that does not arrive (offline before
     the service worker kept it, [D124](#D124), or a release that replaced
     it) is no blank app: in the dialog's place AstroTime says it could not
     load that part, with "Try again", "Reload" and "Close"; a failed load is
@@ -1819,6 +1823,11 @@ optimization is lacking").
     the same way, it still asks for under the old one, which fails again:
     so once trying again has failed, Reload is the dialog's first action,
     "Reload AstroTime to finish updating" ([D146](#D146)).
+    _Since round 3:_ the details load the same way, with the copy's notice;
+    the copy's code itself ([design D164](design.md#D164)) loads with the
+    menu's choice (`calendar/copy.ts`, `@astrotime/core/copy`); after #78
+    AstroTime's own code at once was 130.3 KiB, past the budget, and it is
+    123.5 KiB with them out of the first load.
     Signing in and the sync stack stay in the first load
     ([Deferred](#deferred)). _Since [design D155](design.md#D155):_ the
     Agenda loads the same way, with its first showing (its notice's "Close"

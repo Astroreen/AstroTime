@@ -16,9 +16,8 @@ import { rightsOf } from "../calendar/rights.ts";
 import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
-import { dialogIcon, sheet } from "./item-details.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 /** The fields worded in the list; any other is "other details". */
 const NAMED = new Set([

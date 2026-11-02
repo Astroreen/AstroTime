@@ -143,8 +143,8 @@ export function createItem(
   return serialize(root);
 }
 
-/** A VCALENDAR as `CalendarObject.serialize` writes it. */
-function serialize(root: ICAL.Component): string {
+/** @internal A VCALENDAR as `CalendarObject.serialize` writes it. */
+export function serialize(root: ICAL.Component): string {
   return CalendarObject.parse(`${root.toString()}\r\n`).serialize();
 }
 
@@ -159,7 +159,8 @@ export function timesOf(object: CalendarObject, recurrenceId: ItemTime | null): 
   return { start: item.start, end: item.due };
 }
 
-function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | null) {
+/** @internal The component of one occurrence: its exception, or the master moved to it. */
+export function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | null) {
   const { master, exceptions } = object.components;
   if (recurrenceId !== null) {
     const existing = exceptions.find((component) => {
@@ -172,74 +173,6 @@ function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | nu
   const component = master ?? exceptions[0];
   if (!component) throw new CalendarObjectError("The calendar object has no item.");
   return component;
-}
-
-/**
- * A copy of one occurrence as a new item of its own (design D164): the
- * occurrence as it shows (its exception, or the master moved to it), with
- * every property kept (D7) but what makes it another item: a new `UID`,
- * `DTSTAMP`, `CREATED` and `LAST-MODIFIED` at `now`, `SEQUENCE:0`; no
- * recurrence (`RRULE`, `RDATE`, `EXDATE`, `RECURRENCE-ID`), so a copy of an
- * occurrence of a series is that one occurrence; no `ORGANIZER` or
- * `ATTENDEE`, so a server that schedules sends no invitation for it and
- * nobody's answer is copied; a task not done (`STATUS:NEEDS-ACTION`, no
- * `COMPLETED`, `PERCENT-COMPLETE:0` when it had one); its reminders without
- * their `UID` and `ACKNOWLEDGED`, and no `X-MOZ-LASTACK` (Thunderbird's):
- * the original's reminders were seen, not the copy's. The calendar's other components and
- * properties (its `VTIMEZONE`s) come along. Returns the iCalendar text.
- */
-export function copyItem(
-  object: CalendarObject,
-  recurrenceId: ItemTime | null,
-  options: { readonly now: number; readonly uid: string },
-): string {
-  const component = new ICAL.Component(copyOf(occurrenceComponent(object, recurrenceId).toJSON()));
-  const root = new ICAL.Component(copyOf(object.root.toJSON()));
-  for (const name of ["vevent", "vtodo"]) root.removeAllSubcomponents(name);
-  root.updatePropertyWithValue("prodid", PRODID);
-  root.addSubcomponent(component);
-  for (const name of ["rrule", "rdate", "exdate", "recurrence-id", "organizer", "attendee"]) {
-    component.removeAllProperties(name);
-  }
-  component.removeAllProperties("x-moz-lastack");
-  if (component.name === "vtodo") {
-    component.removeAllProperties("completed");
-    if (component.hasProperty("status")) {
-      component.updatePropertyWithValue("status", "NEEDS-ACTION");
-    }
-    if (component.hasProperty("percent-complete")) {
-      component.updatePropertyWithValue("percent-complete", 0);
-    }
-  }
-  for (const alarm of component.getAllSubcomponents("valarm")) {
-    alarm.removeAllProperties("uid");
-    alarm.removeAllProperties("acknowledged");
-  }
-  const now = utc(options.now);
-  component.updatePropertyWithValue("uid", options.uid);
-  component.updatePropertyWithValue("dtstamp", now.clone());
-  component.updatePropertyWithValue("created", now.clone());
-  component.updatePropertyWithValue("last-modified", now.clone());
-  component.updatePropertyWithValue("sequence", 0);
-  return serialize(root);
-}
-
-/**
- * A new item from a copy (`copyItem`) with what the user changed: "Copy
- * to…" (design D164). Its first revision, `SEQUENCE:0`, as a new UID's is,
- * however many changes it took. Returns the iCalendar text.
- */
-export function createFromCopy(
-  copy: string,
-  changes: ItemChanges,
-  options: { readonly now: number },
-): string {
-  const object = CalendarObject.parse(editItem(CalendarObject.parse(copy), changes, options).ics);
-  const { master, exceptions } = object.components;
-  for (const component of [master, ...exceptions]) {
-    component?.updatePropertyWithValue("sequence", 0);
-  }
-  return object.serialize();
 }
 
 /**

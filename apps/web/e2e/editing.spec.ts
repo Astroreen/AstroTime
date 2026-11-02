@@ -287,6 +287,17 @@ test("Copy to opens a new item filled from this one, in another calendar if chos
   await expect(item(page, "Thursday, November 5", /^Cinema, /)).toBeVisible();
 });
 
+test("Copy to clears the copy's notice, so its Open cannot leave the dialog", async ({ page }) => {
+  await openDemo(page, "week");
+  await opener(page, "Tuesday, November 3", /^Cinema, /).click();
+  await act(page.getByRole("dialog", { name: "Cinema" }), "Make a copy");
+  await expect(page.getByRole("status").filter({ hasText: "Copy made" })).toBeVisible();
+  await opener(page, "Thursday, November 5", /^Dentist, /).click();
+  await act(page.getByRole("dialog", { name: "Dentist" }), "Copy to…");
+  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Copy made" })).toHaveCount(0);
+});
+
 test("an occurrence of a series is copied alone, as an item that does not repeat", async ({
   page,
 }) => {

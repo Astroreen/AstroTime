@@ -15,10 +15,9 @@ import { AddPersonIcon, MoreIcon, SyncIcon } from "./account-icons.tsx";
 import { useAccounts, type AccountsValue } from "./accounts-context.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
 import { CloseIcon } from "./icons.tsx";
-import { dialogIcon } from "./item-details.tsx";
 import { ConflictsDialog } from "./lazy.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
 
