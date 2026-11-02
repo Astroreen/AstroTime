@@ -230,6 +230,7 @@ describe("the edit dialog's place (D176)", () => {
     const form = formOf(
       { objectId: "o", calendarId: "c", object, recurrenceId: null, item: object.master! },
       "Europe/Berlin",
+      "2026-11-04",
     );
     expect(form.place).toEqual(gate);
     expect(changesOf(form, form, "R")).toEqual({});

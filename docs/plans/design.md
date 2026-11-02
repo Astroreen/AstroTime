@@ -892,8 +892,8 @@ an event or a task." What is written and which services are asked:
     the list's foot, as OpenStreetMap asks of a geocoder's users. Picking
     one fills the field with "name, address" and keeps its point; typing
     over it after makes it text again. The list is Base UI's Autocomplete
-    with the theme's tokens, over the edit dialog, until the app's own
-    dropdowns (feedback 14) take its place.
+    in the popup and rows of the app's own dropdowns ([D167](#D167)), over
+    the edit dialog; it is a text field with suggestions, not a `Select`.
   - **Asked sparingly**, as Photon's fair use asks: a query of three
     letters or more, once typing pauses (350 ms), one request at a time
     (the one before aborted), each answer kept for the session per query,

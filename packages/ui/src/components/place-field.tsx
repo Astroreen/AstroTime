@@ -14,6 +14,7 @@ import { KEYS } from "../preferences.ts";
 import { useSettings } from "../settings.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { PlaceIcon } from "./icons.tsx";
+import { popup, row } from "./select.tsx";
 
 /** How long typing pauses before a search goes: one request per pause, not per letter. */
 const PAUSE_MS = 350;
@@ -152,17 +153,18 @@ function Search({
     >
       <Autocomplete.Input aria-label={label} placeholder={label} className={className} />
       <Autocomplete.Portal>
-        {/* Over the edit dialog (z 130). */}
-        <Autocomplete.Positioner sideOffset={4} align="start" className="z-[140] outline-none">
-          <Autocomplete.Popup className="max-h-[min(20rem,var(--available-height))] w-[var(--anchor-width)] overflow-y-auto overscroll-contain rounded-xl bg-raised py-1 text-ink shadow-xl ring-1 ring-line transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-none">
+        {/* Over the edit dialog, as every dropdown's popup (design D167). */}
+        <Autocomplete.Positioner
+          sideOffset={4}
+          align="start"
+          collisionPadding={8}
+          className="z-[200] outline-none"
+        >
+          <Autocomplete.Popup className={`${popup} w-[var(--anchor-width)]`}>
             <Autocomplete.List aria-label={t("places.results")}>
               {(place: Place) => (
-                <Autocomplete.Item
-                  key={placeText(place)}
-                  value={place}
-                  className="flex min-h-12 cursor-pointer items-start gap-3 px-3 py-2 outline-none select-none data-highlighted:bg-raised-hover"
-                >
-                  <PlaceIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ink-muted" />
+                <Autocomplete.Item key={placeText(place)} value={place} className={row}>
+                  <PlaceIcon aria-hidden="true" className="size-5 shrink-0 text-ink-muted" />
                   <span className="flex min-w-0 flex-col">
                     <span className="text-row break-words">{place.name || place.address}</span>
                     {place.name && place.address && (
@@ -172,7 +174,7 @@ function Search({
                 </Autocomplete.Item>
               )}
             </Autocomplete.List>
-            <p className="px-3 pt-1 pb-1.5 text-note text-ink-muted">{t("places.credit")}</p>
+            <p className="px-2 pt-1 pb-1 text-note text-ink-muted">{t("places.credit")}</p>
           </Autocomplete.Popup>
         </Autocomplete.Positioner>
       </Autocomplete.Portal>
