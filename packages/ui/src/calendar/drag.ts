@@ -75,6 +75,22 @@ export function columnAt(
 }
 
 /**
+ * `count` columns side by side over `width` from `left`: the all-day strip's
+ * days, measured on its content box (`clientWidth`), so a scrollbar beside
+ * them is no part of the last day (design D188).
+ */
+export function evenColumns(
+  left: number,
+  width: number,
+  count: number,
+): { readonly left: number; readonly right: number }[] {
+  return Array.from({ length: count }, (_, index) => ({
+    left: left + (width * index) / count,
+    right: left + (width * (index + 1)) / count,
+  }));
+}
+
+/**
  * How far the time grid scrolls in a frame while a drag at `y` is near its
  * top (negative) or bottom edge, faster nearer the edge, fastest below it:
  * only once the drag has moved that way from `startY`, so an item picked up
