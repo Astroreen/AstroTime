@@ -1968,9 +1968,22 @@ and [D177](design.md#D177); what reaches a server, and which:
     Free text typed and not picked has no point. An edit that leaves the
     place alone keeps every line of it ([D7](#D7)): this is D7's one
     exception, a property tied to a field the user changed. Text changed
-    and changed back is no change: nothing is written. A place picked,
-    or an item copied, writes Apple's structured location in AstroTime's
-    shape (its `X-APPLE-RADIUS` 70), not another client's.
+    and changed back is no change: nothing is written; and the core holds
+    to it too: a `LOCATION` written with the text it already has keeps its
+    point and every parameter of Apple's. A place picked, or an item
+    copied, writes Apple's structured location in AstroTime's shape (its
+    `X-APPLE-RADIUS` 70), not another client's; a copy keeps the text the
+    point was read with (Apple's lines too, `Place.text`), so it keeps the
+    point. The edit dialog compares places by their text and point, not as
+    objects, so a form made again from the same item writes nothing.
+  - **A point off the globe is none**: a place whose point is not a number,
+    is out of range or is exactly 0,0 (which some clients write for "no
+    coordinates") is written as text alone, and read as no point.
+  - **A series' place**: a new place for every occurrence reaches the
+    exceptions that had the series' place, text and point alike; one with a
+    place of its own keeps it, as an exception's own title stays
+    ([D105](#D105)). Each component's place is its own: a change removes
+    the old point from the component changed and from no other.
   - **A geocoder's text goes on one line**: newlines and runs of spaces in
     a name or an address become one space, in `LOCATION` and in Apple's
     parameters alike, where a `"` goes as RFC 6868's `^'` (ical.js writes
@@ -1979,8 +1992,14 @@ and [D177](design.md#D177); what reaches a server, and which:
     place it is for (`X-TITLE`); when `LOCATION` no longer holds that name,
     case and runs of spaces aside, another client changed the place and
     kept the old point, so the item has none, `GEO` neither. AstroTime
-    writes both, so its own places are guarded the same way; a `GEO` alone
-    from another client is trusted. The guard's limit: a new text that
+    writes both, so its own places are guarded the same way. **A `GEO`
+    alone is trusted**, even under a text changed since: the clients that
+    write a bare `GEO` change it with their text, AstroTime's own points
+    carry Apple's guard, and a point dropped on a guess would hide a right
+    map more often than it hides a wrong one; a test pins it. A `GEO`
+    another parser wrote as text ("lat;lon") reads the same. Apple's name
+    and address of the point (`Item.placeLabel`) name the place on its
+    card ([design D177](design.md#D177)). The guard's limit: a new text that
     still holds the old name ("Cafe Roma Nuovo" over "Cafe Roma") keeps
     the old point, and one that drops it ("the café" for "Cafe Roma") loses
     a point that was still right; a word-for-word match would lose more

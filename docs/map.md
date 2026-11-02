@@ -68,7 +68,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
-  - `Item.geo`, `Place`, `placeText` — a place's point, read from `GEO` or
+  - `Item.geo`, `Item.placeLabel`, `Place`, `placeText` — a place's point
+    (and Apple's name for it), read from `GEO` or
     Apple's structured location and written with a place picked on the
     map. → `plans/foundation.md#D176`
 

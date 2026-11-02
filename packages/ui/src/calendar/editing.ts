@@ -176,7 +176,14 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     repeat: rule ? (rule.exact ? rule.repeat : "kept") : null,
     alarms: item.alarms.map((alarm, index) => ({ kind: "existing", index, alarm })),
     location: item.location ?? "",
-    place: item.geo ? { ...nameAndAddress(item.location ?? ""), geo: item.geo } : null,
+    // The point with the very text it belongs to, so a copy writes both (D176).
+    place: item.geo
+      ? {
+          ...nameAndAddress(item.location ?? "", item.placeLabel),
+          geo: item.geo,
+          text: item.location ?? "",
+        }
+      : null,
     description: item.description ?? "",
     color: item.color,
   };
@@ -457,6 +464,15 @@ function ruleChanged(initial: Form, form: Form): boolean {
   return !sameRepeat(moved, form.repeat);
 }
 
+/** Two places alike: the same text on the same point, however each form was made. */
+const samePlace = (a: Place | null, b: Place | null) =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    placeText(a) === placeText(b) &&
+    a.geo.lat === b.geo.lat &&
+    a.geo.lon === b.geo.lon);
+
 /**
  * What the user changed from `initial` to `form`; for a new item, everything
  * it holds. `untitled` is what a reminder added to an item without a title
@@ -467,7 +483,10 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   const was = initial;
   const differs = <K extends keyof Form>(key: K) => !was || was[key] !== form[key];
   if (differs("summary") && (was || form.summary.trim())) changes.summary = form.summary.trim();
-  if ((differs("location") || differs("place")) && (was || form.location.trim())) {
+  if (
+    (differs("location") || !samePlace(was?.place ?? null, form.place)) &&
+    (was || form.location.trim())
+  ) {
     // A place picked is written with its point while its text stays as picked (D176).
     const text = form.location.trim();
     changes.location = form.place && placeText(form.place) === text ? form.place : text;

@@ -741,6 +741,44 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     ]);
   });
 
+  test("all: a new place reaches the occurrences that had the series' place; one with its own stays (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const withOwn = editItem(
+      series(),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(withOwn),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const places = Object.fromEntries(
+      occurrencesBetween(CalendarObject.parse(ics), {
+        from: "2026-11-01",
+        to: "2027-01-01",
+        timeZone,
+      }).map((o) => [
+        o.start.type === "zoned" ? o.start.local.slice(0, 10) : "",
+        [o.item.location, o.item.geo?.lat],
+      ]),
+    );
+    expect(places).toEqual({
+      "2026-11-23": ["Gate, Berlin", 52.5],
+      "2026-11-30": ["Gate, Berlin", 52.5],
+      "2026-12-14": ["Gate, Berlin", 52.5],
+      "2026-12-21": ["Mill, Berlin", 52.1],
+      "2026-12-28": ["Gate, Berlin", 52.5],
+    });
+    // Each component holds one point of its own: none is written twice.
+    for (const component of CalendarObject.parse(ics).root.getAllSubcomponents("vevent"))
+      expect(component.getAllProperties("geo").length).toBeLessThanOrEqual(1);
+  });
+
   test("all: a new title reaches an exception that had the series' title, not one renamed on its own", () => {
     const withCopy = editItem(
       series(),

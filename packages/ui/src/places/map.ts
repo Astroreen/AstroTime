@@ -59,10 +59,15 @@ export function mapsLink(text: string, geo: Geo | null, links: MapLinks): string
 }
 
 /**
- * A place's name and address from its `LOCATION`: Apple writes them on two
- * lines, AstroTime and Google as "name, address".
+ * A place's name and address: Apple's own (`X-TITLE`, `X-ADDRESS`) when it
+ * names them, else from its `LOCATION`, where Apple writes them on lines of
+ * their own, AstroTime and Google as "name, address".
  */
-export function nameAndAddress(location: string): { name: string; address: string } {
+export function nameAndAddress(
+  location: string,
+  label: { readonly name: string; readonly address: string } | null = null,
+): { name: string; address: string } {
+  if (label) return label;
   const text = location.trim();
   const at = text.includes("\n") ? text.indexOf("\n") : text.indexOf(", ");
   if (at < 0) return { name: text, address: "" };

@@ -9,7 +9,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { hexColor, nearestColorName } from "./colors.ts";
-import { readItem, X_COLOR, type Geo } from "./item.ts";
+import { point, readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
@@ -80,6 +80,11 @@ export interface Place {
   readonly name: string;
   readonly address: string;
   readonly geo: Geo;
+  /**
+   * The text `LOCATION` holds for it when another client wrote it (Apple's
+   * lines), kept as written; without, `placeText` makes "name, address".
+   */
+  readonly text?: string;
 }
 
 /** A geocoder's text on one line: no newline or run of spaces reaches a parameter or the text. */
@@ -87,6 +92,7 @@ const oneLine = (text: string) => text.replaceAll(/\s+/g, " ").trim();
 
 /** A place as `LOCATION` holds it, so every client shows it: "name, address", as Google writes it. */
 export function placeText(place: Place): string {
+  if (place.text?.trim()) return place.text.trim();
   const name = oneLine(place.name);
   const address = oneLine(place.address);
   if (!name || !address) return name || address;
@@ -343,6 +349,16 @@ const degrees = (value: number) => Math.round(value * 1e6) / 1e6;
  * no `GEO`. The old point goes with the old place; free text has none.
  */
 function setPlace(component: ICAL.Component, location: string | Place): void {
+  // The same text is no change of the place: its point stays (D7).
+  const was = component.getFirstPropertyValue("location");
+  if (typeof location === "string" && location === (typeof was === "string" ? was : "")) {
+    setText(component, "location", location);
+    return;
+  }
+  // A point off the globe is no point: the place is written as text (D176).
+  if (typeof location !== "string" && !point(location.geo.lat, location.geo.lon)) {
+    location = placeText(location);
+  }
   component.removeAllProperties("geo");
   component.removeAllProperties("x-apple-structured-location");
   if (typeof location === "string") {
@@ -881,6 +897,9 @@ function editSeries(
       if (changes[key] !== undefined && (own[key] ?? "") === (before[key] ?? ""))
         follow[key] = changes[key];
     }
+    // A place is its text and its point: an exception with a point of its own keeps its place (D176).
+    if (follow["location"] !== undefined && JSON.stringify(own.geo) !== JSON.stringify(before.geo))
+      delete follow["location"];
     if (changes.categories && own.categories.join() === before.categories.join()) {
       follow["categories"] = changes.categories;
     }
