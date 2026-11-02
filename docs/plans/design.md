@@ -1396,15 +1396,20 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     its tile's first row while its dialog is open, and goes back to its
     place among the timed items once saved;
   - **the dialog stands beside it where there is room**: wherever it
-    floats (from 40 rem, Tailwind's `sm`, 640 px at the usual font), on
+    floats (from 40 rem, Tailwind's `sm`, 640 px at the usual font: a
+    media query counts rem from the browser's font size, and the page sets
+    no root size of its own, so it is the root's too), on
     the side with more room, as wide as that room up to its 36 rem, down to
     360 px, a phone's width, which the form is made for (`besideOf`, with
     its place and width in `asideStyle`, one source for both). It is
     worked out again on every render and whenever the view changes size
-    (a window resized, the drawer opened: a `ResizeObserver` on `main`); a
-    scroll moves the draft up or down only, which leaves the aside as it
-    is. The dialog says the draft's edges it stands beside
-    (`data-aside-for`). The backdrop dims less (20%) whenever it stands
+    (a window resized, the drawer opened: a `ResizeObserver` on `main`).
+    Nothing moves the draft sideways while the dialog is open: the views
+    behind it are inert (no swipe, no keys) and none scrolls sideways; a
+    scroll moves it up or down only, which leaves the aside as it is. The
+    dialog says the draft's edges it stands beside (`data-aside-for`).
+    Closing, it fades where it stood: the aside is not worked out again
+    once the dialog is closed, as its draft is gone already. The backdrop dims less (20%) whenever it stands
     aside. **Where there is no such room it stays in the middle and can
     still cover the draft**: on a phone, where it is the whole screen
     (the draft is drawn behind it, as D155 has it); in the Day view, whose
@@ -1419,7 +1424,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     today's tasks, beside the dialog; a draft on Monday with the dialog on
     its right; a window narrowed to 700 px moving the dialog to the middle;
     a task's draft on a full today in the Month), each failing before the
-    change.
+    change, and a wheel sideways over the views moving neither the draft
+    nor the dialog; `packages/ui/test/draft-aside.browser.test.tsx` (a
+    closing dialog keeps its aside, failing before).
 
 ### Decided in round 4: the editor
 
