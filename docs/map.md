@@ -210,6 +210,9 @@ When you add a package, app or module, add its line here in the same PR.
       (`reschedule`); the details (`item-details.tsx`), the edit
       dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
       → `plans/design.md#D108`
+    - `pager.tsx` — `Pager`: how a view moves from one period to the
+      next, a swipe's periods side by side under the finger, a step's
+      slide, a view's fade. → `plans/design.md#D154`
     - `drag.tsx` — `useDrag`: a view's drag and resize by pointer, a
       finger's long press, Escape, the edges that scroll, the keys that
       move a focused item and what a move announces; the view says what is
@@ -253,7 +256,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D175`, `plans/foundation.md#D178`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
-    `plans/design.md#D152`), `useNow`, `useMediaQuery`.
+    `plans/design.md#D152`; `swipeOutcome`, where one let go goes,
+    `plans/design.md#D154`), `useNow`, `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
     localStorage, the web's and the desktop's.
   - `settings.ts` — the settings, kept in the preferences and
