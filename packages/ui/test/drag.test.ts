@@ -20,6 +20,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   columnAt,
+  evenColumns,
   dropped,
   edgeScroll,
   ghostOf,
@@ -587,5 +588,18 @@ describe("a drop saved (foundation D113)", () => {
     expect(timesOf(series, null).start).toEqual(
       standUp.object.master && timesOf(standUp.object, null).start,
     );
+  });
+});
+
+describe("the all-day strip's days (design D188)", () => {
+  test("its content box in even columns: a scrollbar beside it is no part of the last day", () => {
+    // 700 px of days from 100, a 15 px scrollbar after them.
+    const days = evenColumns(100, 700, 7);
+    expect(days[0]).toEqual({ left: 100, right: 200 });
+    expect(days[6]).toEqual({ left: 700, right: 800 });
+    expect(columnAt(150, days)).toBe(0);
+    expect(columnAt(799, days)).toBe(6);
+    // Over the scrollbar: still the last day, never past it.
+    expect(columnAt(810, days)).toBe(6);
   });
 });

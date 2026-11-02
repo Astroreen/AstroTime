@@ -276,6 +276,20 @@ test.describe("the screens and dialogs", () => {
         await audit(page, "the scope dialog");
       });
 
+      test("the details with attachments: a file by link, a web link, a file to save (design D230)", async ({
+        page,
+      }) => {
+        await page.setViewportSize(WIDE);
+        await openDemo(page, "day");
+        await page
+          .getByRole("list", { name: "Wednesday, November 4" })
+          .getByRole("button", { name: /^Budget planning, / })
+          .click();
+        const details = page.getByRole("dialog", { name: "Budget planning" });
+        await expect(details.getByRole("button", { name: /^Save figures\.txt / })).toBeVisible();
+        await audit(page, "the details with attachments");
+      });
+
       test("a task's details and its edit dialog", async ({ page }) => {
         await page.setViewportSize(PHONE);
         await openDemo(page, "day");

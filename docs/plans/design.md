@@ -1397,15 +1397,20 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     its tile's first row while its dialog is open, and goes back to its
     place among the timed items once saved;
   - **the dialog stands beside it where there is room**: wherever it
-    floats (from 40 rem, Tailwind's `sm`, 640 px at the usual font), on
+    floats (from 40 rem, Tailwind's `sm`, 640 px at the usual font: a
+    media query counts rem from the browser's font size, and the page sets
+    no root size of its own, so it is the root's too), on
     the side with more room, as wide as that room up to its 36 rem, down to
     360 px, a phone's width, which the form is made for (`besideOf`, with
     its place and width in `asideStyle`, one source for both). It is
     worked out again on every render and whenever the view changes size
-    (a window resized, the drawer opened: a `ResizeObserver` on `main`); a
-    scroll moves the draft up or down only, which leaves the aside as it
-    is. The dialog says the draft's edges it stands beside
-    (`data-aside-for`). The backdrop dims less (20%) whenever it stands
+    (a window resized, the drawer opened: a `ResizeObserver` on `main`).
+    Nothing moves the draft sideways while the dialog is open: the views
+    behind it are inert (no swipe, no keys) and none scrolls sideways; a
+    scroll moves it up or down only, which leaves the aside as it is. The
+    dialog says the draft's edges it stands beside (`data-aside-for`).
+    Closing, it fades where it stood: the aside is not worked out again
+    once the dialog is closed, as its draft is gone already. The backdrop dims less (20%) whenever it stands
     aside. **Where there is no such room it stays in the middle and can
     still cover the draft**: on a phone, where it is the whole screen
     (the draft is drawn behind it, as D155 has it); in the Day view, whose
@@ -1420,7 +1425,33 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     today's tasks, beside the dialog; a draft on Monday with the dialog on
     its right; a window narrowed to 700 px moving the dialog to the middle;
     a task's draft on a full today in the Month), each failing before the
-    change.
+    change, and a wheel sideways over the views moving neither the draft
+    nor the dialog; `packages/ui/test/draft-aside.browser.test.tsx` (a
+    closing dialog keeps its aside, failing before).
+
+- **D188. A tap on an empty spot of the all-day strip creates there,
+  all day** (the owner's feedback 4: "tapping the top island where all-day
+  events live, in the views from Week to Day, I cannot create a task or
+  event with 'All day' already on"). In Day, 3 days and Week a tap (a
+  click) on the strip where no item is opens the edit dialog for that
+  day with "All day" on, as a tap on an empty slot of the grid opens it
+  at the slot's time ([D108](#D108)): an event first, "Task" one tap away,
+  keeping the day and "All day" ([D159](#D159)). A press that began on
+  an item, moved, or is a double click's second click creates nothing,
+  so an item held and let go beside it (a read-only one, which does not
+  drag) opens nothing new. An empty strip keeps one row's height (24 px,
+  it was 4 px), so the tap has somewhere to land, as Google Calendar's web
+  app keeps its all-day row. A press dragged across the strip's days to
+  make an event over several days, as a press dragged down the grid sizes
+  one, is [Deferred](#deferred): the grid's drag-create sizes by time in
+  one column, and the strip's would be a gesture of its own. Tested:
+  `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
+  task made from it, an item tapped opens its details; a press from an
+  item to an empty spot, a press moved 12 px, and a double click opening
+  one item, the first two failing without the check; a phone's Day view
+  with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
+  strip's height), `drag.spec.ts` (a read-only item held and let go in the
+  strip opens no new item).
 
 ### Decided in round 4: the editor
 
@@ -1646,7 +1677,11 @@ bar, the sidebar and the accounts panel.
   menu button shows and hides the sidebar at once ([D228](#D228)); a
   slide would resize the time grid on every frame, so it waits for a way
   that moves only `transform`.
-
+- **A drag across the all-day strip's days creating an event over them**
+  ([D188](#D188)): a tap on the strip creates on its day; a press dragged
+  across days, as Google Calendar's web app sizes an all-day event, needs
+  a ghost of its own in the strip (`useDrag`'s create ghost sizes by time
+  in one column) and an end day in `create`'s options.
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user
   adds some there. Counting from the store's alarms (the user's own items

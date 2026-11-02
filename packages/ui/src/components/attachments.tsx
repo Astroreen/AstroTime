@@ -92,7 +92,6 @@ export function AttachmentList({
                 <button
                   type="button"
                   className={row}
-                  aria-label={t("attachments.save", { name })}
                   onClick={() => {
                     const file = inlineFile(target.object, target.recurrenceId, index);
                     if (!file) return;
@@ -103,6 +102,8 @@ export function AttachmentList({
                     });
                   }}
                 >
+                  {/* Its name is what it shows, after what it does: "Save figures.txt TXT · 22 B" (WCAG 2.5.3). */}
+                  <span className="sr-only">{t("attachments.save")} </span>
                   {content}
                 </button>
               ) : (
