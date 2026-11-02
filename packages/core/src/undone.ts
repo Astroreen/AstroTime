@@ -1,7 +1,7 @@
 // Which tasks are done, and which undone ones roll over to today
 // (docs/plans/foundation.md#D16, design D51): an undone task whose due is
-// before the start of today leaves its own day for one "N undone tasks"
-// chip on today.
+// before the start of today counts in one "N undone tasks" chip on today,
+// and stays on its own day too (design D185).
 import type { CalendarObject } from "./calendar-object.ts";
 import type { Item } from "./item.ts";
 import { firstDay, occurrencesBetween, shiftDate, type Occurrence } from "./occurrences.ts";

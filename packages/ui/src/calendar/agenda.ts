@@ -5,7 +5,7 @@
 import { dayRange, layoutDay, type Occurrence } from "@astrotime/core";
 
 import { addDays, daysBetween } from "./dates.ts";
-import { shownOn, type Entry, type LayoutContext } from "./query.ts";
+import { byOccurrence, type Entry, type LayoutContext } from "./query.ts";
 
 interface AgendaItem {
   readonly entry: Entry;
@@ -29,10 +29,10 @@ export function agendaDays(
   options: LayoutContext,
 ): AgendaDay[] {
   const { today, timeZone, undone } = options;
-  const byOccurrence = shownOn(entries, today, timeZone);
+  const shown = byOccurrence(entries);
   const byDay = new Map<string, Occurrence[]>();
   const spans = new Map<Occurrence, { first: string; total: number }>();
-  for (const occurrence of byOccurrence.keys()) {
+  for (const occurrence of shown.keys()) {
     const { first, last } = dayRange(occurrence, timeZone);
     spans.set(occurrence, { first, total: daysBetween(first, last) + 1 });
     for (let day = first < from ? from : first; day <= last && day < to; day = addDays(day, 1)) {
@@ -48,13 +48,13 @@ export function agendaDays(
       ...allDay.map((occurrence) => {
         const { first, total } = spans.get(occurrence)!;
         return {
-          entry: byOccurrence.get(occurrence)!,
+          entry: shown.get(occurrence)!,
           allDay: true,
           part: total > 1 ? { index: daysBetween(first, day) + 1, total } : null,
         };
       }),
       ...timed.map(({ occurrence }) => ({
-        entry: byOccurrence.get(occurrence)!,
+        entry: shown.get(occurrence)!,
         allDay: false,
         part: null,
       })),

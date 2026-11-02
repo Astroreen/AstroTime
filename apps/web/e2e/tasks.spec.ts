@@ -129,6 +129,80 @@ test("on a phone the tasks are a screen of their own; back returns to the calend
   await expect(page.getByRole("main", { name: "November" })).toBeVisible();
 });
 
+/** A point on a task's own row right of its title: left of the star (40 px at its end), level with the checkbox. */
+const rightOfTitle = async (item: Locator) => {
+  const row = (await item.locator("> div").boundingBox())!;
+  const checkbox = (await item.getByRole("checkbox").first().boundingBox())!;
+  return { x: row.x + row.width - 60, y: checkbox.y + checkbox.height / 2 };
+};
+
+/** A point on a task's due line. */
+const onDue = async (item: Locator) => {
+  const due = (await item.locator("> div > div > span").first().boundingBox())!;
+  return { x: due.x + 4, y: due.y + due.height / 2 };
+};
+
+test.describe("the whole row opens a task (design D195)", () => {
+  for (const [name, options] of [
+    ["a mouse", { viewport: WIDE }],
+    ["a finger", { viewport: PHONE, hasTouch: true, isMobile: true }],
+  ] as const) {
+    test.describe(`with ${name}`, () => {
+      test.use(options);
+
+      test("the space right of the title and the due line open it; the checkbox and the star do not", async ({
+        page,
+      }) => {
+        await openDemo(page, "week");
+        await page.getByRole("button", { name: "Tasks", exact: true }).click();
+        const panel = tasks(page);
+        await panel.getByRole("tab", { name: /^Tasks/ }).click();
+        const press = (point: { x: number; y: number }) =>
+          options.viewport === PHONE
+            ? page.touchscreen.tap(point.x, point.y)
+            : page.mouse.click(point.x, point.y);
+        const details = (title: string) => page.getByRole("dialog", { name: title });
+        const close = async (title: string) => {
+          await details(title).getByRole("button", { name: "Close" }).click();
+          await expect(details(title)).toHaveCount(0);
+        };
+
+        const report = panel.getByRole("listitem", { name: "Send the report" });
+        await press(await rightOfTitle(report));
+        await expect(details("Send the report")).toBeVisible();
+        await close("Send the report");
+        await press(await onDue(report));
+        await expect(details("Send the report")).toBeVisible();
+        await close("Send the report");
+
+        // A subtask's row opens the subtask, not its parent.
+        const figures = panel.getByRole("listitem", { name: "Collect the figures" });
+        await press(await rightOfTitle(figures));
+        await expect(details("Collect the figures")).toBeVisible();
+        await close("Collect the figures");
+
+        // A completed task's row too.
+        await panel.getByRole("button", { name: /^Completed/ }).click();
+        const completed = panel.getByRole("list", { name: "Completed tasks" });
+        const done = completed.getByRole("listitem").first();
+        const doneTitle = (await done.getAttribute("aria-label"))!;
+        const doneRow = (await done.locator("> div").boundingBox())!;
+        await press({ x: doneRow.x + doneRow.width - 20, y: doneRow.y + doneRow.height / 2 });
+        await expect(details(doneTitle)).toBeVisible();
+        await close(doneTitle);
+
+        // The star and the checkbox keep their own actions.
+        const star = panel.getByRole("button", { name: "Star: Send the report" });
+        await star.click();
+        await expect(star).toHaveAttribute("aria-pressed", "true");
+        await report.getByRole("checkbox", { name: "Send the report" }).click();
+        await expect(completed.getByRole("checkbox", { name: "Send the report" })).toBeChecked();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+      });
+    });
+  }
+});
+
 test.describe("in Russian", () => {
   test.use({ locale: "ru-RU", viewport: PHONE });
 

@@ -283,11 +283,11 @@ const CALENDARS: readonly DemoCalendar[] = [
         task("demo-bank", t("Call the bank", "Позвонить в банк"), { DUE: date(day(0)), ...done }),
         task("demo-plants", t("Water the plants", "Полить цветы"), { DUE: date(day(2)) }),
         task("demo-desk", t("Tidy the desk", "Разобрать стол"), { DUE: date(day(-2)), ...done }),
-        // Undone and due before today: they roll over to today's chip (D51).
+        // Undone and due before today: on their day, and in today's chip (design D185).
         task("demo-reply", t("Reply to Olga", "Ответить Ольге"), {
           DUE: at(zone, day(-2), "09:00"),
         }),
-        // A recurring task, weekly; its last undone occurrence before today rolls over.
+        // A recurring task, weekly; its last undone occurrence before today counts in the chip.
         task("demo-recycling", t("Take out the recycling", "Вынести вторсырьё"), {
           DUE: date(day(-10)),
           RRULE: "FREQ=WEEKLY",

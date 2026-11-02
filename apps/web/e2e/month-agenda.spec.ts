@@ -36,10 +36,10 @@ test.describe("Month", () => {
     await expect(
       today.getByRole("listitem", { name: "Completed task: Pay the rent, All day" }),
     ).toBeVisible();
-    // Rolled over to today's chip, no longer on the day it was due (D51).
+    // Counted in today's chip, and still on the day it was due (D185).
     await expect(
       day(page, "Monday, November 2").getByRole("listitem", { name: /Reply to Olga/ }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     // More than the tile fits: "+N" opens the day.
     await today.getByRole("button", { name: "+6 more items on Wednesday, November 4" }).click();
     await expect(header(page, "Wednesday, November 4")).toBeVisible();
