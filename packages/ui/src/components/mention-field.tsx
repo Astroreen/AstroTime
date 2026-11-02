@@ -25,10 +25,23 @@ interface Query {
   readonly end: number;
 }
 
+/**
+ * An e-mail as a link's address: what would end it or break it (a space,
+ * brackets, "%", "<", ">", a quote) percent-encoded; the rest as written,
+ * so it reads in other clients.
+ */
+export function addressOf(email: string): string {
+  return email.replace(/[\s%()<>"[\]\\]/g, (char) =>
+    [...new TextEncoder().encode(char)]
+      .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
+      .join(""),
+  );
+}
+
 /** How a person picked is written into the description. */
 function mentionOf(person: Person): string {
   const name = person.name.replace(/[[\]\\]/g, "\\$&");
-  return person.email ? `[@${name}](mailto:${person.email})` : `@${name}`;
+  return person.email ? `[@${name}](mailto:${addressOf(person.email)})` : `@${name}`;
 }
 
 export function MentionField({
@@ -75,8 +88,9 @@ export function MentionField({
     const timer = setTimeout(() => {
       void peopleOf({ store, secrets: platform.secrets, connect }, accountId, text).then(
         (people) => {
-          known.set(key, people);
-          if (live) setFound({ text, people });
+          // Only an answer is kept: a search that failed is asked again.
+          if (people) known.set(key, people);
+          if (live) setFound({ text, people: people ?? [] });
         },
       );
     }, REST_MS);

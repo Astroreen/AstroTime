@@ -112,6 +112,40 @@ test("typing @ offers the server's people; a pick writes a mailto link (design D
   );
 });
 
+test("a search that failed is asked again; an answer is kept (design D208)", async ({
+  page,
+  radicale,
+}) => {
+  const asked: string[] = [];
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (!isSearch(request.method(), request.postData())) return route.fallback();
+    asked.push(/<d:match>([^<]*)<\/d:match>/.exec(request.postData()!)![1]!);
+    // The first search fails on the server; the others answer.
+    if (asked.length === 1) return route.fulfill({ status: 500, body: "" });
+    await route.fulfill({ status: 207, contentType: "application/xml", body: PEOPLE });
+  });
+  const dialog = await signedIn(page, radicale);
+  const description = dialog.getByRole("textbox", { name: "Description" });
+  const people = dialog.getByRole("listbox", { name: "People" });
+  const failed = page.waitForResponse((response) => response.status() === 500);
+  await description.pressSequentially("@ann");
+  await failed;
+  await expect(people).toHaveCount(0);
+  // "anna" is answered (the served answer is the same for any query).
+  await description.pressSequentially("a");
+  await expect(people.getByRole("option")).toHaveCount(2);
+  // Back to "ann", which failed before: asked again, and answered now.
+  const again = page.waitForRequest((request) => isSearch(request.method(), request.postData()));
+  await description.press("Backspace");
+  await again;
+  await expect(people.getByRole("option")).toHaveCount(2);
+  // "anna" was answered: kept, not asked again.
+  await description.pressSequentially("a");
+  await expect(people.getByRole("option")).toHaveCount(2);
+  expect(asked).toEqual(["ann", "anna", "ann"]);
+});
+
 test("Radicale finds nobody: no list, and the text is what was typed", async ({
   page,
   radicale,

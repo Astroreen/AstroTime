@@ -1716,7 +1716,8 @@ reminders, its description and mentions in it.
   - **Typing:** in the edit dialog's description, "@" at a word's start
     and two letters or more ask the server of the item's calendar for
     people whose name or e-mail holds them, once typing rests (250 ms), at
-    most 8, each query asked once while the dialog is open. A list under
+    most 8, each query answered kept while the dialog is open (a search
+    that failed is asked again). A list under
     the field offers each with their e-mail; arrows move, Enter or Tab or a
     tap picks, Escape closes the list (not the dialog). The calendar on
     this device and the demo offer no one.
@@ -1736,8 +1737,10 @@ reminders, its description and mentions in it.
     Radicale with Nextcloud's answer served for that one report.
   - **What is written:** a Markdown link to the person's e-mail,
     `[@Anna Berg](mailto:anna@example.com)`, which reads as plain text in
-    Nextcloud's apps and others and keeps who was meant; someone with no
-    e-mail is written `@Name`. A mention invites no one and sends nothing:
+    Nextcloud's apps and others and keeps who was meant (in the address a
+    space, a bracket, `%`, `<`, `>`, a quote or a backslash percent-encoded,
+    so the link stays whole; read back decoded, or as written when it does
+    not decode); someone with no e-mail is written `@Name`. A mention invites no one and sends nothing:
     no `ATTENDEE` is written ([D108](#D108): AstroTime does not invite).
   - **Read:** the details ([D207](#D207)) draw such a link as a chip with
     the name; a tap shows the e-mail, as a link to write to them.

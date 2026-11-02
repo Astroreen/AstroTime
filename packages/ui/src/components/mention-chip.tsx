@@ -12,7 +12,16 @@ export function mentionIn(
   if (words.length !== 1 || typeof only !== "string" || !only.startsWith("@")) return null;
   const email = /^mailto:([^?]+)/i.exec(href)?.[1];
   const name = only.slice(1).trim();
-  return email && name ? { name, email: decodeURIComponent(email) } : null;
+  return email && name ? { name, email: decoded(email) } : null;
+}
+
+/** An address as written, decoded; one that does not decode (a stray "%") as it is. */
+function decoded(address: string): string {
+  try {
+    return decodeURIComponent(address);
+  } catch {
+    return address;
+  }
 }
 
 export function MentionChip({ name, email }: { name: string; email: string }) {

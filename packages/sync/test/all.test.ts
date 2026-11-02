@@ -756,10 +756,11 @@ test("people for a mention come from the account's provider with its credentials
   // A provider without people, refused credentials, none saved, no server.
   const b = (await add("b.example")).account;
   expect(await peopleOf(context, b.id, "ann")).toEqual([]);
+  // Refused: no answer (`null`), which the editor does not keep.
   a.people = async () => {
     throw new AuthError("refused");
   };
-  expect(await peopleOf(context, account.id, "ann")).toEqual([]);
+  expect(await peopleOf(context, account.id, "ann")).toBeNull();
   await context.secrets.delete(`account:${account.id}`);
   expect(await peopleOf(context, account.id, "ann")).toEqual([]);
   const local = await store.addAccount({
