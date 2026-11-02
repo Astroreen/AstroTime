@@ -1,5 +1,6 @@
 // The settings (design D53, D131): this device's theme, language, week
-// start and clock, whether completed tasks show on the views (D51), and
+// start and clock, whether completed tasks show on the views (D51), whether
+// the week numbers do (D169), and
 // whether reminders notify (foundation D101). Kept in the app's preferences
 // as one value and applied at once.
 import { createContext, useContext } from "react";
@@ -21,6 +22,8 @@ export interface Settings {
   readonly weekStart: "locale" | (typeof WEEK_STARTS)[number];
   readonly clock: "locale" | (typeof CLOCKS)[number];
   readonly hideCompleted: boolean;
+  /** The week numbers on the views (D49, D86): on unless turned off (design D169). */
+  readonly weekNumbers: boolean;
   /** On unless turned off; they show once the platform may notify (foundation D101). */
   readonly reminders: boolean;
   /**
@@ -36,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   weekStart: "locale",
   clock: "locale",
   hideCompleted: false,
+  weekNumbers: true,
   reminders: true,
   keepRunning: true,
 };
@@ -59,6 +63,7 @@ export function readSettings(stored: string | null): Settings {
     weekStart: oneOf(["locale", ...WEEK_STARTS] as const, value.weekStart, d.weekStart),
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),
     hideCompleted: value.hideCompleted === true,
+    weekNumbers: value.weekNumbers !== false,
     reminders: value.reminders !== false,
     keepRunning: value.keepRunning !== false,
   };

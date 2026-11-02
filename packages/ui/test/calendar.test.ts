@@ -196,6 +196,7 @@ describe("the drawer's settings override the locale (D53)", () => {
       weekStart: 6,
       clock: 24,
       hideCompleted: true,
+      weekNumbers: false,
       reminders: false,
       keepRunning: false,
     };
@@ -204,6 +205,8 @@ describe("the drawer's settings override the locale (D53)", () => {
     // keeping the desktop app running with its window closed (desktop D75).
     expect(readSettings('{"reminders":"no"}').reminders).toBe(true);
     expect(readSettings('{"keepRunning":0}').keepRunning).toBe(true);
+    // The week numbers show unless turned off (design D169).
+    expect(readSettings('{"weekNumbers":"no"}').weekNumbers).toBe(true);
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(

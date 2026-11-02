@@ -42,7 +42,7 @@ export interface MonthViewProps {
 
 export function MonthView(props: MonthViewProps) {
   const { weeks, today, onSwipe } = props;
-  const { formats } = useCalendar();
+  const { formats, weekNumbers = true } = useCalendar();
   const body = useRef<HTMLDivElement>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
   // How many rows of chips a tile fits: every tile is as tall, so the
@@ -97,7 +97,10 @@ export function MonthView(props: MonthViewProps) {
       <div
         ref={root}
         data-view="month"
-        className="flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 [--weeks:1.75rem] lg:[--weeks:2.25rem]"
+        // Without week numbers (design D169) their column takes no room.
+        className={`flex min-h-0 flex-1 touch-pan-y flex-col px-1.5 pb-1.5 ${
+          weekNumbers ? "[--weeks:1.75rem] lg:[--weeks:2.25rem]" : "[--weeks:0px]"
+        }`}
       >
         <div aria-hidden="true" className="grid shrink-0 pb-1" style={columns}>
           <span />
@@ -149,7 +152,7 @@ function Week({
   ghost: Ghost | null;
   tile: (day: string) => (element: HTMLElement | null) => void;
 }) {
-  const { t, formats, timeZone, colorOf } = useCalendar();
+  const { t, formats, timeZone, colorOf, weekNumbers = true } = useCalendar();
   const { shown, more } = foldWeek(week.spans, capacity);
   const number = formats.weekNumber(week.days);
   // A drag's ghost over the days of this week it goes to, on the first row.
@@ -159,13 +162,15 @@ function Week({
     : [];
   return (
     <div className="grid min-h-0" style={columns}>
-      <div
-        className="flex justify-center rounded-full bg-pill pt-1.5 text-note font-medium text-ink-muted tabular-nums"
-        style={{ gridColumn: 1, gridRow: 1 }}
-      >
-        <span aria-hidden="true">{number}</span>
-        <span className="sr-only">{t("grid.week", { number })}</span>
-      </div>
+      {weekNumbers && (
+        <div
+          className="flex justify-center rounded-full bg-pill pt-1.5 text-note font-medium text-ink-muted tabular-nums"
+          style={{ gridColumn: 1, gridRow: 1 }}
+        >
+          <span aria-hidden="true">{number}</span>
+          <span className="sr-only">{t("grid.week", { number })}</span>
+        </div>
+      )}
       {week.days.map((day, index) => (
         <DayTile
           key={day}

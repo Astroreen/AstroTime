@@ -46,7 +46,7 @@ export interface TimeGridProps {
 
 export function TimeGrid(props: TimeGridProps) {
   const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe, floating } = props;
-  const { t, formats } = useCalendar();
+  const { t, formats, weekNumbers = true } = useCalendar();
   const single = days.length === 1;
   const compact = days.length > 3;
   const columns: CSSProperties = {
@@ -129,13 +129,16 @@ export function TimeGrid(props: TimeGridProps) {
             </div>
           ) : (
             <>
+              {/* The week's number, unless the user turned it off (design D169). */}
               <div className="flex items-end justify-center pb-1.5">
-                <span className="rounded-full bg-pill px-2 py-1 text-note font-medium text-ink-muted">
-                  <span aria-hidden="true">{formats.weekNumber(days)}</span>
-                  <span className="sr-only">
-                    {t("grid.week", { number: formats.weekNumber(days) })}
+                {weekNumbers && (
+                  <span className="rounded-full bg-pill px-2 py-1 text-note font-medium text-ink-muted">
+                    <span aria-hidden="true">{formats.weekNumber(days)}</span>
+                    <span className="sr-only">
+                      {t("grid.week", { number: formats.weekNumber(days) })}
+                    </span>
                   </span>
-                </span>
+                )}
               </div>
               {days.map((day) => (
                 <DayHeader key={day} day={day} today={today} />
