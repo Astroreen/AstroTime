@@ -1,6 +1,7 @@
 import {
   CalDavProvider,
   HttpError,
+  keepsFiles,
   ProxyRefusedError,
   revokeAppPassword,
   type Credentials,
@@ -333,8 +334,19 @@ function holdBack(
 
 const keyOf = (accountId: string) => `account:${accountId}`;
 
+/**
+ * Whether an account may have files beside its calendars (foundation D231):
+ * one that syncs, whose server keeps them. Asks nothing; its files are
+ * opened by `accountFiles` (`@astrotime/sync/files`).
+ */
+export const hasFiles = (account: Account) =>
+  account.provider === "caldav" &&
+  !account.syncOff &&
+  !!account.homeUrl &&
+  keepsFiles(account.homeUrl);
+
 /** The credentials kept for an account, and whether Login Flow v2 gave its password. */
-async function readSecret(
+export async function readSecret(
   secrets: SecretStore,
   accountId: string,
 ): Promise<{ readonly credentials: Credentials; readonly loginFlow: boolean } | null> {

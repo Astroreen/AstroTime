@@ -2,7 +2,13 @@
 import type { Attachment } from "@astrotime/core";
 import { describe, expect, test } from "vite-plus/test";
 
-import { attachmentHref, attachmentText, kindOf, sizeText } from "../src/calendar/attachments.ts";
+import {
+  attachmentHref,
+  attachmentText,
+  kindOf,
+  sizeText,
+  typedLink,
+} from "../src/calendar/attachments.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
 const en = createI18n("en").t;
@@ -86,4 +92,13 @@ describe("a size", () => {
       about: "3 B",
     });
   });
+});
+
+test("a link typed: with its scheme or https:// before it, a web one with a host and a dot", () => {
+  expect(typedLink("example.org/minutes")).toBe("https://example.org/minutes");
+  expect(typedLink("  http://example.org  ")).toBe("http://example.org/");
+  expect(typedLink("not a link")).toBeNull();
+  expect(typedLink("localhost")).toBeNull();
+  expect(typedLink("javascript:alert(1)")).toBeNull();
+  expect(typedLink("")).toBeNull();
 });

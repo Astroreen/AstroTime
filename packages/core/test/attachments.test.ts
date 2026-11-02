@@ -182,6 +182,8 @@ describe("reading, every client's way", () => {
 
   test("a SIZE that is no size: an inline file counts its own, a link has none", () => {
     expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY;SIZE=-5:QUJD").size).toBe(3);
+    // An inline file's own bytes, whatever SIZE says.
+    expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY;SIZE=99999:QUJD").size).toBe(3);
     expect(first("ATTACH;SIZE=big:https://x.org/1").size).toBeNull();
     expect(first("ATTACH;SIZE=1.5:https://x.org/1").size).toBeNull();
   });

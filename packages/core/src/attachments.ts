@@ -22,7 +22,7 @@ export interface Attachment {
   readonly name: string | null;
   /** `FMTTYPE`: its media type. */
   readonly type: string | null;
-  /** Its size in bytes: `SIZE` (RFC 8607), or an inline file's own; null when not known. */
+  /** Its size in bytes: an inline file's own, else `SIZE` (RFC 8607); null when not known. */
   readonly size: number | null;
   /** Whether it holds its file, inline; a link that is empty is neither (`uri` null too). */
   readonly inline: boolean;
@@ -67,12 +67,12 @@ export function attachment(property: ICAL.Property): Attachment {
     uri: inline ? null : textOf(property).trim() || null,
     name: named ? lastPart(named) : null,
     type: parameter("fmttype"),
-    size:
-      Number.isSafeInteger(size) && size >= 0 && parameter("size") !== null
+    // An inline file's own size, whatever its `SIZE` says: the bytes are there to count.
+    size: inline
+      ? base64Size(textOf(property))
+      : Number.isSafeInteger(size) && size >= 0 && parameter("size") !== null
         ? size
-        : inline
-          ? base64Size(textOf(property))
-          : null,
+        : null,
     inline,
   };
 }

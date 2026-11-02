@@ -104,3 +104,18 @@ export function attachmentText(
     .join(" · ");
   return { name, about };
 }
+
+/** A web link typed: with its scheme, or `https://` before it; null when it is none. */
+export function typedLink(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withScheme);
+    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".")
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}

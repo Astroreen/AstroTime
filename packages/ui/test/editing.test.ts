@@ -258,6 +258,29 @@ describe("the form", () => {
     expect(changesOf(due, dueOnly, "Reminder")).not.toHaveProperty("time");
   });
 
+  test("attachments: one taken off by its index, a link added, the rest left as written (design D233)", async () => {
+    const { store, rowOf } = await demo();
+    const budget = await rowOf("Work", "demo-budget");
+    const form = formOf(await targetOn(store, budget, "2026-11-04"), timeZone, TODAY);
+    expect(form.attachments?.map((a) => a.kind === "existing" && a.attachment.name)).toEqual([
+      "Budget 2027.pdf",
+      null,
+      "figures.txt",
+    ]);
+    const changed: Form = {
+      ...form,
+      attachments: [
+        ...form.attachments!.filter((a) => a.kind === "existing" && a.index !== 1),
+        { kind: "new", attachment: { uri: "https://example.org/minutes" } },
+      ],
+    };
+    expect(changesOf(form, changed, "Reminder")).toEqual({
+      attachments: { remove: [1], add: [{ uri: "https://example.org/minutes" }] },
+    });
+    // Nothing changed: nothing written.
+    expect(changesOf(form, form, "Reminder")).toEqual({});
+  });
+
   test("an item opens with its own times in its zone; a UTC time in the user's, kept UTC", async () => {
     const { store, rowOf } = await demo();
     const review = await rowOf("Work", "demo-review");
