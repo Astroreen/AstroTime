@@ -39,8 +39,9 @@ export function addressOf(email: string): string {
 }
 
 /** How a person picked is written into the description. */
-function mentionOf(person: Person): string {
-  const name = person.name.replace(/[[\]\\]/g, "\\$&");
+export function mentionOf(person: Person): string {
+  // Every mark Markdown reads in a link's words is escaped: the name reads as written.
+  const name = person.name.replace(/[\\`*_{}[\]()#+\-.!~<>|]/g, "\\$&");
   return person.email ? `[@${name}](mailto:${addressOf(person.email)})` : `@${name}`;
 }
 
@@ -63,10 +64,13 @@ export function MentionField({
   const listId = useId();
   const field = useRef<HTMLTextAreaElement>(null);
   const [query, setQuery] = useState<Query | null>(null);
-  const [found, setFound] = useState<{ readonly text: string; readonly people: Person[] }>({
-    text: "",
-    people: [],
-  });
+  // What a search found, and for which account and words: another account's
+  // people are never offered for this one's.
+  const [found, setFound] = useState<{
+    readonly accountId: string | null;
+    readonly text: string;
+    readonly people: Person[];
+  }>({ accountId: null, text: "", people: [] });
   const [active, setActive] = useState(0);
   // What each query found, while the dialog is open: typing back asks nothing again.
   const [known] = useState(() => new Map<string, Person[]>());
@@ -80,7 +84,7 @@ export function MentionField({
     const key = `${accountId} ${text.toLowerCase()}`;
     const cached = known.get(key);
     if (cached) {
-      setFound({ text, people: cached });
+      setFound({ accountId, text, people: cached });
       return;
     }
     let live = true;
@@ -90,7 +94,7 @@ export function MentionField({
         (people) => {
           // Only an answer is kept: a search that failed is asked again.
           if (people) known.set(key, people);
-          if (live) setFound({ text, people: people ?? [] });
+          if (live) setFound({ accountId, text, people: people ?? [] });
         },
       );
     }, REST_MS);
@@ -106,7 +110,7 @@ export function MentionField({
     caret.current = null;
   }, [value]);
 
-  const people = text && found.text === text ? found.people : [];
+  const people = text && found.text === text && found.accountId === accountId ? found.people : [];
   const open = people.length > 0;
   const shown = Math.min(active, people.length - 1);
 
@@ -148,7 +152,8 @@ export function MentionField({
           if (move !== undefined) {
             e.preventDefault();
             setActive((shown + move + people.length) % people.length);
-          } else if (e.key === "Enter" || e.key === "Tab") {
+          } else if (e.key === "Enter") {
+            // Enter picks; Tab leaves the field as anywhere (WAI-ARIA's combobox).
             e.preventDefault();
             pick(people[shown]!);
           } else if (e.key === "Escape") {

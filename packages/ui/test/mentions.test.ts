@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import { parseMarkdown } from "../src/calendar/markdown.ts";
 import { mentionIn } from "../src/components/mention-chip.tsx";
-import { addressOf } from "../src/components/mention-field.tsx";
+import { addressOf, mentionOf } from "../src/components/mention-field.tsx";
 
 test("a mailto link named @Name is a mention, its address decoded", () => {
   expect(mentionIn("mailto:anna@example.com", ["@Anna Berg"])).toEqual({
@@ -46,4 +46,15 @@ test("an e-mail written as a link's address keeps the Markdown whole and reads b
   };
   expect(link.href).toBe(`mailto:${address}`);
   expect(mentionIn(link.href, link.children)).toEqual({ name: "Odd", email });
+});
+
+test("a name with Markdown's marks is written escaped and reads back as it is", () => {
+  const person = { name: "A*b_c `d` ~~e~~ <f> [g] \\h #1.", email: "a@example.com" };
+  const [paragraph] = parseMarkdown(`Ask ${mentionOf(person)}`);
+  const link = (paragraph as unknown as { children: unknown[] }).children[1] as {
+    href: string;
+    children: unknown[];
+  };
+  expect(link.children).toEqual([`@${person.name}`]);
+  expect(mentionIn(link.href, link.children)).toEqual(person);
 });

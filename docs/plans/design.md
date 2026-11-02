@@ -1718,8 +1718,11 @@ reminders, its description and mentions in it.
     people whose name or e-mail holds them, once typing rests (250 ms), at
     most 8, each query answered kept while the dialog is open (a search
     that failed is asked again). A list under
-    the field offers each with their e-mail; arrows move, Enter or Tab or a
-    tap picks, Escape closes the list (not the dialog). The calendar on
+    the field offers each with their e-mail; arrows move, Enter or a tap
+    picks, Escape closes the list (not the dialog), Tab leaves the field
+    and picks nothing (WAI-ARIA's combobox). The people offered are those
+    of the account of the item's calendar now: switched to another
+    account's calendar, the first's go at once. The calendar on
     this device and the demo offer no one.
   - **Where people come from** (AGENTS.md rule 4): `Provider.people`, which
     only `@astrotime/caldav` knows as a request: RFC 3744's
@@ -1736,7 +1739,9 @@ reminders, its description and mentions in it.
     Radicale 3.8 (`packages/caldav/test/fixtures`), and end to end on
     Radicale with Nextcloud's answer served for that one report.
   - **What is written:** a Markdown link to the person's e-mail,
-    `[@Anna Berg](mailto:anna@example.com)`, which reads as plain text in
+    `[@Anna Berg](mailto:anna@example.com)` (every mark Markdown reads in
+    a link's words escaped in the name, so it reads back as it is), which
+    reads as plain text in
     Nextcloud's apps and others and keeps who was meant (in the address a
     space, a bracket, `%`, `<`, `>`, a quote or a backslash percent-encoded,
     so the link stays whole; read back decoded, or as written when it does
