@@ -972,7 +972,6 @@ For the items' editor and details:
 - **A date picker of our own** — the edit dialog's dates are still the
   browser's date field; its calendar is no list, so [D167](#D167) left it.
   The month picker's grid is the natural start.
-
 - **A task's due on the calendar** — since [D159](#D159) a task shows at
   its start only, and its due, however far, shows in its details alone;
   a mark on the due's day (Google's deadline flag) would show that a

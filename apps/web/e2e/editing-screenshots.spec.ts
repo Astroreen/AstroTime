@@ -47,7 +47,6 @@ const WORDS = {
     addDue: "Add due",
     dueDate: "Due date",
     startDate: "Start date",
-    startTime: "Start time",
     pack: "Pack the bags",
   },
   ru: {
@@ -80,7 +79,6 @@ const WORDS = {
     addDue: "Добавить срок",
     dueDate: "Дата срока",
     startDate: "Дата начала",
-    startTime: "Время начала",
     pack: "Собрать вещи",
   },
 } as const;
