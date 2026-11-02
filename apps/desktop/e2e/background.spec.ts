@@ -27,7 +27,10 @@ async function signedIn(radicale: CalDavServer, options: { realClock?: boolean }
   await signInByPassword(page, radicale);
   await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   return { app, page, userData, work };
 }

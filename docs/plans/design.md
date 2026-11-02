@@ -277,7 +277,9 @@ the project.
     calendar's, disabled until PR 6 (_since PR 6a_ it makes a task in the
     list shown, [D109](#D109));
   - on a phone the screen covers the calendar, with a back arrow; from
-    1024 px it is a 360 px panel right of the view, its toggle pressed.
+    1024 px it is a 360 px panel right of the view, its toggle pressed
+    (_since [D227](#D227): in the view's place, from the top bar's
+    calendar | tasks switch_).
 - **D96. The settings, in detail** (D53): one value in the app's
   preferences (`astrotime.settings`), read leniently (anything unknown is
   the default) and applied at once. The theme sets `data-theme` (D58) or
@@ -601,7 +603,8 @@ are its decisions.
   under its name, so nothing scrolls sideways at 320 px. Each still applies
   at once ([D96](#D96)). **Reached by** a gear in the top bar on a wide
   screen (Google's web app) and by "Settings", the drawer's last row, on a
-  phone (Google's Android app). A gear beside the account in the phone's top
+  phone (Google's Android app) (_since [D226](#D226): the drawer's foot on
+  every screen, no gear in the top bar_). A gear beside the account in the phone's top
   bar was weighed and left out: the bar already holds five buttons, and at
   360 px a sixth leaves the title some 90 px, too little for "October –
   November"; at 320 px less. Its switches show their off state by an
@@ -619,7 +622,9 @@ are its decisions.
   below midnight, as the Agenda and the tasks list already did, so it never
   hides the last hour for good; under a sidebar's Create the grid ends at
   midnight.
-- **D133. The top bar on a wide screen is in Google's web order**: the menu,
+- **D133. The top bar on a wide screen is in Google's web order** (_since
+  [D226](#D226), [D227](#D227): no Settings, and the tasks toggle is a
+  calendar | tasks switch_): the menu,
   "Today" as a word in an outlined pill, previous and next, then the period
   they move (the month picker's button); search, Settings, the tasks toggle
   and the account at the right. The arrows sat at the far right, away from
@@ -748,7 +753,8 @@ are its decisions.
     does. The conflicts stay in the accounts dialog, where the account
     button's dot leads.
   - The accounts dialog is closed by ✕ before its title, as every other
-    dialog, not by a word at its other end.
+    dialog, not by a word at its other end. (_Since [D225](#D225), the
+    owner's word: ✕ at the right of its title._)
   - [D134](#D134)'s scale now holds everywhere: the accounts dialog,
     sign-in, removing an account, the keyring question and the store's
     error screen took its roles, and Tailwind's own sizes left in the UI
@@ -1413,7 +1419,76 @@ reminders.
     as the user's choice. A new device starts from the defaults
     ([Deferred](#deferred)).
 
+### Decided in round 4: the app shell
+
+The owner's feedback 14c–14e and his part of 13 after round 3, for the top
+bar, the sidebar and the accounts panel.
+
+- **D225. The accounts panel hangs under the top bar** (the owner: "the
+  Accounts panel I'd put a bit further left, so the account button I
+  pressed stays visible, and the ✕ on the right"). It opened at the top of
+  the screen, over the account button that opened it. Now its top is the
+  top bar's bottom on every screen: on a wide screen (from 1024 px) at the
+  bar's right, 8 px in, growing from its top right corner as Google's
+  account popover does; on a phone centred as before, from its top. A line
+  of `line` around it sets it apart from the page, which is not dimmed:
+  nested in the drawer's dialog root, Base UI draws no backdrop for it, as
+  before. Its title is first and ✕ at the right of its header, on every
+  screen: the owner's word over [D137](#D137)'s "✕ before its title, as
+  every other dialog", for this panel only; the other dialogs keep ✕
+  first.
+- **D226. Settings at the sidebar's foot** (the owner: "bottom left in the
+  sidebar I'd like a settings icon, to remove it from the top bar"). The
+  gear leaves the wide top bar ([D133](#D133)); "Settings", a gear and its
+  word (a row, as the drawer's others, so it names itself), is the drawer's
+  last row on every screen, pinned to its bottom with a line above it, so
+  it stays in reach while the calendars scroll. On a phone it was the
+  drawer's last row already ([D131](#D131)): two taps, as before. On a
+  wide screen with the sidebar closed, the menu button opens it first.
+- **D227. A calendar | tasks switch; the tasks screen in the view's place**
+  (the owner: "instead of a single tasks button, on a big screen I'd like
+  a switch: calendar / tasks"). From 1024 px the top bar's tasks toggle
+  becomes Google Calendar web's segmented switch, two icon buttons in one
+  outlined pill (a group named "Calendar or tasks", each button pressed
+  when its screen is shown), whose indicator slides to the one pressed
+  (250 ms, Material's emphasized easing). "Tasks" shows the tasks screen
+  in the view's place, a column of at most 640 px in the middle (Google
+  Calendar web's full tasks view; one line, `max-w-[40rem]`, that a wider
+  layout of lists side by side can widen), fading up into place; the
+  sidebar stays, and a view picked there, or a view's key, brings the
+  calendar back, as do a search's result with a date and a tapped reminder.
+  Today, the arrows and the period hide while the tasks are shown, and the
+  keys that step a period or go to today do nothing: they would move a
+  calendar nobody sees. The 360 px panel right of the calendar ([D95](#D95))
+  goes: Google opens it from a rail on the right AstroTime does not have,
+  and a switch whose two halves were both shown would say nothing
+  ([Deferred](#deferred)). On a phone the single tasks button stays, its
+  screen covering the calendar; a view's key closes it there too, as a
+  view asked for is the calendar's. The switch selects, as a segmented
+  button does: pressing the half already shown changes nothing. The tasks
+  stay open across a resize: from a wide screen to a phone's they cover the
+  calendar, and back.
+- **D228. The shell's motion, calmer** (the owner's 13: "more
+  animations… and much more you can think of", the shell's part). The
+  phone's drawer slides in over 300 ms with Material 3's emphasized
+  decelerate and out over 200 ms with its emphasized accelerate (it was
+  200 ms ease-out both ways), its scrim fading with it; the accounts panel
+  grows from where it hangs over 200 ms; the switch's indicator slides;
+  the tasks screen fades up 8 px as it takes the view's place. Only
+  `transform` and `opacity` move; asked for less motion, all of it is at
+  once ([D119](#D119)).
+
 ## Deferred
+
+- **The tasks beside the calendar on a wide screen** — [D227](#D227)
+  shows the tasks in the view's place; Google Calendar web also shows a
+  list beside the calendar, opened from a rail on its right. It comes back
+  with a place to open it from, best with tasks dragged from it onto the
+  grid.
+- **The sidebar opening and closing with motion** — on a wide screen the
+  menu button shows and hides the sidebar at once ([D228](#D228)); a
+  slide would resize the time grid on every frame, so it waits for a way
+  that moves only `transform`.
 
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user

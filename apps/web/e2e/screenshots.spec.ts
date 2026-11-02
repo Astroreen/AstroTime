@@ -126,9 +126,12 @@ test("the tasks screen, its panel, the settings and search (design D52, D53)", a
       wide.getByRole("region", { name: tasks }).getByRole("checkbox").first(),
     ).toBeVisible();
     await shot(wide, `tasks-panel-${language === "en" ? "dark" : "light"}-${language}-wide`);
-    // Settings on a wide screen: the top bar's button, a dialog (design D131).
+    // Settings on a wide screen: the sidebar's foot (design D226), a dialog (design D131).
     const name = language === "en" ? "Settings" : "Настройки";
-    await wide.getByRole("banner").getByRole("button", { name }).click();
+    await wide
+      .getByRole("navigation", { name: language === "en" ? "Main menu" : "Главное меню" })
+      .getByRole("button", { name })
+      .click();
     await expect(wide.getByRole("dialog", { name })).toBeVisible();
     await shot(wide, `settings-${language === "en" ? "dark" : "light"}-${language}-wide`);
     await wide.context().close();

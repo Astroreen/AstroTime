@@ -140,6 +140,8 @@ export const en = {
   "topBar.period": "{{period}}, choose a date",
   "topBar.search": "Search",
   "topBar.tasks": "Tasks",
+  "topBar.calendar": "Calendar",
+  "topBar.switch": "Calendar or tasks",
 
   "nav.previous.day": "Previous day",
   "nav.previous.3days": "Previous 3 days",

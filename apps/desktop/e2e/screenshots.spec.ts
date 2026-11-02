@@ -74,7 +74,10 @@ test("Settings with the desktop's keep-running switch, English dark and Russian 
   await signInByPassword(page, radicale);
   await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   const settings = page.getByRole("dialog", { name: "Settings" });
   await settings.getByRole("switch", { name: "Keep running when the window is closed" }).focus();
   await page.screenshot({ path: join(directory!, "desktop-settings-keep-running-dark-en.png") });

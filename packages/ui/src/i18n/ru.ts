@@ -147,6 +147,8 @@ export const ru = {
   "topBar.period": "{{period}}, выбрать дату",
   "topBar.search": "Поиск",
   "topBar.tasks": "Задачи",
+  "topBar.calendar": "Календарь",
+  "topBar.switch": "Календарь или задачи",
 
   "nav.previous.day": "Предыдущий день",
   "nav.previous.3days": "Предыдущие 3 дня",

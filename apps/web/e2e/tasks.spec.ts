@@ -6,11 +6,22 @@ import { openDemo, PHONE, WIDE } from "./support.ts";
 
 const tasks = (page: Page) => page.getByRole("region", { name: "Tasks" });
 
-test("the tasks panel beside the calendar: lists, counts, completing and starring", async ({
+/** The wide top bar's calendar | tasks switch (design D227): shows one or the other. */
+const show = (page: Page, screen: "Calendar" | "Tasks") =>
+  page
+    .getByRole("group", { name: "Calendar or tasks" })
+    .getByRole("button", { name: screen, exact: true })
+    .click();
+
+test("the tasks screen in the calendar's place: lists, counts, completing and starring", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
+  const chip = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("listitem", { name: /Send the report, 3:00 PM$/ });
+  await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -33,16 +44,22 @@ test("the tasks panel beside the calendar: lists, counts, completing and starrin
       .getByRole("listitem", { name: "Write the proposal" })
       .getByRole("listitem", { name: "Collect the figures" }),
   ).toBeVisible();
-  const chip = page
-    .getByRole("list", { name: "Wednesday, November 4" })
-    .getByRole("listitem", { name: /Send the report, 3:00 PM$/ });
-  await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
+  // The calendar is not drawn beside it: the screen took its place.
+  await expect(chip).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Today, / })).toHaveCount(0);
 
   // Completed: it moves to "Completed", the count drops, the calendar strikes it through.
   await report.click();
   await expect(panel.getByRole("tab", { name: "Tasks, 6 undone tasks" })).toBeVisible();
   await expect(list.getByRole("checkbox", { name: "Send the report" })).toHaveCount(0);
+  await show(page, "Calendar");
+  await expect(page.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await expect(chip).toHaveAccessibleName("Completed task: Send the report, 3:00 PM");
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: "Tasks, 6 undone tasks" }).click();
   await panel.getByRole("button", { name: "Completed (4)" }).click();
   const completed = panel.getByRole("list", { name: "Completed tasks" });
   await expect(completed.getByRole("checkbox", { name: "Send the report" })).toBeChecked();
@@ -52,7 +69,10 @@ test("the tasks panel beside the calendar: lists, counts, completing and starrin
   await expect(list.getByRole("checkbox", { name: "Send the report" })).not.toBeChecked();
   await expect(panel.getByRole("button", { name: "Completed (3)" })).toBeVisible();
   await expect(panel.getByRole("tab", { name: "Tasks, 7 undone tasks" })).toBeVisible();
+  await show(page, "Calendar");
   await expect(chip).toHaveAccessibleName("Task: Send the report, 3:00 PM");
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: "Tasks, 7 undone tasks" }).click();
 
   // Starred, and sorted with the starred first.
   const star = panel.getByRole("button", { name: "Star: Write the proposal" });
@@ -85,9 +105,13 @@ test("a series is completed one occurrence at a time, the earliest first", async
   await expect(panel.getByRole("button", { name: "Completed (3)" })).toBeVisible();
   // Its latest occurrence before today is still undone: still counted on today.
   const strip = page.getByRole("list", { name: "All day" });
+  await show(page, "Calendar");
   await expect(strip.getByRole("button", { name: "3 undone tasks" })).toBeVisible();
+  await show(page, "Tasks");
+  await panel.getByRole("tab", { name: /^Tasks/ }).click();
   await recycling.getByRole("checkbox").click();
   await expect(recycling).toContainText("Sun, Nov 8");
+  await show(page, "Calendar");
   await expect(strip.getByRole("button", { name: "2 undone tasks" })).toBeVisible();
 });
 
@@ -198,7 +222,9 @@ test.describe("in Russian", () => {
 });
 
 test.describe("the tab strip wider than the panel (design D135)", () => {
-  test.use({ locale: "ru-RU", viewport: WIDE });
+  // A phone's tasks screen 360 px wide, as the wide screen's panel was
+  // before the tasks took the calendar's place (design D227).
+  test.use({ locale: "ru-RU", viewport: { width: 360, height: 800 } });
 
   /** A real click on a tab's part that shows, `x` px in from its right edge: it scrolls nothing itself. */
   const clickShown = async (page: Page, tab: Locator, x = 12) => {
@@ -217,7 +243,7 @@ test.describe("the tab strip wider than the panel (design D135)", () => {
     const second = panel.getByRole("tab", { name: /^Личное/ });
     const fadesStart = /^linear-gradient\(to right, rgba\(0, 0, 0, 0\),.*, rgb\(0, 0, 0\)\)$/;
     const fadesEnd = /^linear-gradient\(to right, rgb\(0, 0, 0\),.*rgba\(0, 0, 0, 0\)\)$/;
-    // "+ Создать список" goes past the 360 px panel: the end fades, the start does not.
+    // "+ Создать список" goes past the phone's screen: the end fades, the start does not.
     await expect(strip).toHaveCSS("mask-image", fadesEnd);
 
     // Scrolled to the end, the open first tab is under the start's fade.
