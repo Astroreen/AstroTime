@@ -345,6 +345,27 @@ function Strip({
   ghost,
 }: TimeGridProps & { collapsed: boolean; ghost: Ghost | null }) {
   const { t, formats, timeZone, colorOf } = useCalendar();
+  const editing = useEditing();
+  // A tap on an empty spot of a day creates on it, all day, as a slot of the
+  // grid creates at its time (design D188); an item or "+N" is its own.
+  // Where the last press began, if on an empty spot: a press on an item
+  // that ends beside it is no tap there (a read-only item held and let go).
+  const pressed = useRef<{ readonly x: number; readonly y: number } | null>(null);
+  const onItem = (target: EventTarget) =>
+    target instanceof Element && target.closest("[role=listitem], button") !== null;
+  const press = (event: PointerEvent<HTMLDivElement>) => {
+    pressed.current = onItem(event.target) ? null : { x: event.clientX, y: event.clientY };
+  };
+  const createAt = (event: MouseEvent<HTMLDivElement>) => {
+    const from = pressed.current;
+    pressed.current = null;
+    const still = from && Math.hypot(event.clientX - from.x, event.clientY - from.y) < 8;
+    if (!editing.canCreate || event.detail > 1 || !still || onItem(event.target)) return;
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    const index = Math.floor(((event.clientX - left) / width) * days.length);
+    const day = days[Math.max(0, Math.min(days.length - 1, index))]!;
+    editing.create("event", { day, allDay: true });
+  };
   // A drag's ghost over the days it goes to, on the first row.
   const over =
     ghost?.kind === "item" && isAllDay(ghost.occurrence, timeZone)
@@ -362,12 +383,15 @@ function Strip({
     <div
       role="list"
       aria-label={t("grid.allDay")}
+      onPointerDown={press}
+      onClick={createAt}
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] touch-pan-y overflow-y-auto"}`}
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
         // `repeat(0, …)` is no value: the strip would keep the rows it had.
         gridTemplateRows: rows === 0 ? "none" : `repeat(${rows}, 24px)`,
-        minHeight: rows === 0 ? 4 : undefined,
+        // One row's height when empty, so a tap finds it (design D188).
+        minHeight: rows === 0 ? 24 : undefined,
       }}
     >
       {shown.map(({ span, entry }) => (

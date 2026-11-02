@@ -226,7 +226,8 @@ test("the all-day strip is as tall as the days shown need, on every period (D151
   await page.locator("body").press("n");
   await expect(header(page, "Tuesday, November 10")).toBeVisible();
   await expect(strip(page).getByRole("listitem")).toHaveCount(0);
-  await expect(strip(page)).toHaveCSS("height", "4px");
+  // Empty, it keeps one row, for a tap to create there (design D188).
+  await expect(strip(page)).toHaveCSS("height", "24px");
 });
 
 test("the time grid is drawn where it stays: the strip's items do not push it down as they arrive", async ({

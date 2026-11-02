@@ -266,6 +266,54 @@ test("Enter in the title saves; a tap on an empty slot of the grid creates there
   ).toBeVisible();
 });
 
+test("a tap on an empty spot of the all-day strip creates on that day, all day; a task keeps it (design D188)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const strip = page.getByRole("list", { name: "All day" });
+  const box = (await strip.boundingBox())!;
+  // Tuesday, the third of seven columns, has nothing all day.
+  await strip.click({ position: { x: (box.width / 7) * 2.5, y: box.height - 6 } });
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();
+  await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
+  await dialog.getByRole("radio", { name: "Task" }).click();
+  const task = page.getByRole("dialog", { name: "New task" });
+  await expect(task.getByRole("switch", { name: "All day" })).toBeChecked();
+  await expect(task.getByLabel("Start date")).toHaveValue("2026-11-03");
+  await task.getByRole("textbox", { name: "Title" }).fill("Pick up the parcel");
+  await task.getByRole("button", { name: "Save" }).click();
+  await expect(task).toHaveCount(0);
+  await expect(
+    strip.getByRole("listitem", { name: "Task: Pick up the parcel, All day" }),
+  ).toBeVisible();
+  // A tap on an item opens it, not a new one.
+  await strip.getByRole("button", { name: "Task: Pick up the parcel, All day" }).click();
+  await expect(page.getByRole("dialog", { name: "Pick up the parcel" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
+});
+
+test.describe("on a phone, the all-day strip (design D188)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("an empty strip is a row tall, and a tap there creates all day in the Day view", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    // Tuesday, November 10, has nothing all day.
+    await expect(page.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
+    for (let step = 0; step < 6; step++) await page.keyboard.press("n");
+    await expect(page.getByRole("heading", { name: "Tuesday, November 10" })).toBeVisible();
+    const strip = page.getByRole("list", { name: "All day" });
+    const box = (await strip.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(24);
+    await strip.tap({ position: { x: box.width / 2, y: box.height / 2 } });
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();
+    await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-10");
+  });
+});
+
 test("an end before the start is refused, in words; Escape closes without saving", async ({
   page,
 }) => {
