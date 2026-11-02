@@ -141,7 +141,11 @@ export function TimeGrid(props: TimeGridProps) {
     const [before, now] = presses.current.slice(-2);
     const first = before && now && now.at - before.at < DOUBLE_CLICK ? before.spot : null;
     if (event.detail > 1 && (first === null || first === spot)) return;
-    editing.create("event", { day, at: Math.max(0, Math.min(slot, 23 * 60 + 30)) });
+    editing.create("event", {
+      day,
+      at: Math.max(0, Math.min(slot, 23 * 60 + 30)),
+      press: pressOf(event),
+    });
   };
 
   return (
@@ -284,6 +288,14 @@ function ColumnGhost({ ghost, day, compact }: { ghost: Ghost; day: string; compa
   );
 }
 
+/** A click as the edit dialog remembers what opened it (design D190). */
+const pressOf = (event: MouseEvent) => ({
+  x: event.clientX,
+  y: event.clientY,
+  detail: event.detail,
+  at: event.timeStamp,
+});
+
 const titleOf = (entry: Entry, untitled: string) =>
   entry.occurrence.item.summary?.trim() || untitled;
 
@@ -370,7 +382,7 @@ function Strip({
     const strip = event.currentTarget;
     const left = strip.getBoundingClientRect().left + strip.clientLeft;
     const day = days[columnAt(event.clientX, evenColumns(left, strip.clientWidth, days.length))]!;
-    editing.create("event", { day, allDay: true });
+    editing.create("event", { day, allDay: true, press: pressOf(event) });
   };
   // A drag's ghost over the days it goes to, on the first row.
   const over =

@@ -1500,6 +1500,28 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   marked `data-day-number`, and the strip in the Week on a wide screen and
   3 days on a phone, failing before the change; 8 px between the strip
   and the hours in the Day view).
+- **D190. A double click on an empty slot keeps the dialog it opened.**
+  The first click of a double click on an empty slot of the grid (or the
+  all-day strip, [D188](#D188)) opens the new item's dialog; once the
+  editor's chunk is loaded, the dialog is there before the second press,
+  which lands on its backdrop and closed it again, so nothing stayed open
+  ([D154](#D154) had a double click make one event only on a first load).
+  A click on the backdrop no longer closes the edit dialog when it is the
+  second of the double click whose first click opened it. The grid and the
+  strip, which create from a click, hand that click to the dialog
+  (`create`'s `press`, the dialog's `opener`: where, its count, when); a
+  key, a button or a copy hands none. The dialog then lets pass only its
+  first click outside, if its count (`detail`) is one more, within 8 px
+  and 500 ms (`useSecondPress` in `item-editor.tsx`). Base UI closes a
+  dialog that has a backdrop on a `click`, by mouse or by touch, whose
+  `detail` counts the clicks or taps. Any other click there still closes
+  it ([D136](#D136)), one the browser counts as a second click too (after
+  a click elsewhere). Found while testing D188. Tested:
+  `apps/web/e2e/drag.spec.ts` (a double click on an empty hour with the
+  editor's chunk loaded first, then a single click on the backdrop
+  closing it; a double tap by touch on a wide screen; a dialog opened by a
+  single click closing on a backdrop click counted as a second elsewhere,
+  which `detail` alone kept open; each failing before its change).
 - **D191. Scrollbars are thin, rounded and in the theme** (the owner's
   feedback 14b: "redo the design of the overflow scrollbars"). Every
   scroller had the platform's classic scrollbar, a 15 px grey bar on
@@ -1743,8 +1765,10 @@ bar, the sidebar and the accounts panel.
   description's links open, a new tab or the system's browser (the
   desktop's `setWindowOpenHandler`, Android's WebView); a link of another
   kind (`javascript:`, `data:`, `ftp:`) is shown as written and not
-  followed. A file inline in the object is a button, "Save figures.txt":
-  decoded then, and saved under its name, by each platform its own way:
+  followed. A file inline in the object is a button named by what it
+  shows after a hidden "Save" ("Save figures.txt TXT · 22 B", so its name
+  holds its visible words, WCAG 2.5.3; an `aria-label` "Save figures.txt"
+  did not, until #101): decoded then, and saved under its name, by each platform its own way:
   the web downloads it (a link of its bytes attached to the page for its
   click; the link's URL let go when the list closes, not on a timer); the
   desktop's Electron asks where to save it, as for any download
@@ -1759,6 +1783,43 @@ bar, the sidebar and the accounts panel.
   user backed out of says nothing. The rows are
   AstroTime's own drawings ([D43](#D43)), loaded with the details. The
   demo's "Budget planning" carries one of each.
+- **D233. The edit dialog's attachments** (the owner's 9, its files part):
+  a row after the description, under the details' paperclip, listing the
+  item's attachments as the details do (the same mark and words), each
+  with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
+  a web link (typed with `http://` or `https://`, or with neither, which
+  is `https://`; its host has a dot, is `localhost`, or is a name with its
+  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, or a bare
+  word is none, and "Add" waits until it is one; another scheme,
+  `javascript:` or `mailto:`, never is), added with Enter or "Add", Escape leaving
+  it; Enter there adds the link and does not save the dialog. The form
+  keeps them as reminders are kept (`AttachmentChoice`: one the item has,
+  by its index among its `ATTACH`es, or a new one), and the save writes
+  only what changed: those taken off by their index, found again in the
+  item as stored now if another device changed it meanwhile, by what each
+  is as written (every parameter, an inline file's bytes: two that read
+  alike are two files), and the new
+  ones added after the rest ([foundation D229](foundation.md#D229)); an
+  attachment left alone stays byte for byte, and a form that says nothing
+  of attachments (one made without them) changes none. A file picked
+  twice, or one there already under Nextcloud Calendar's relative link,
+  is attached once: links are compared as they resolve.
+- **D234. "From your files"** (the owner's 9): for an item in a calendar
+  whose account has files ([foundation D231](foundation.md#D231),
+  Nextcloud's), a second action beside "Add a link" opens a file picker
+  over the edit dialog (the whole screen on a phone, a dialog on a wide
+  screen, titled "Choose a file"): "Your files" first, a folder at a time,
+  its folders (a folder mark, AstroTime's own) and then its files with the
+  details' mark, kind and size; a folder opens, "Up a folder" goes back,
+  a file is attached as the `ATTACH` its server's calendar app writes and
+  the picker closes; one attached already is not attached twice. While a
+  folder is read it says "Loading…", an empty one "Nothing here", one that
+  cannot be reached says so with "Try again", which opens the files anew
+  and asks the server again (a signed-out account's
+  too). Asking whether an account has files makes no request (its
+  calendar home says); the picker's code, the files' with it, loads with
+  its first opening.
+  Uploading a file from the device is [Deferred](foundation.md#deferred).
 
 ### Decided in round 4: pictures
 

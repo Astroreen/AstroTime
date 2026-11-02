@@ -12,6 +12,7 @@ import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
+import { accountFiles } from "../src/files.ts";
 import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
 
@@ -697,5 +698,44 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     await syncAll(context);
     await syncAll(context);
     expect(tries()).toBe(2);
+  });
+});
+
+describe("an account's files (foundation D231)", () => {
+  const listing =
+    '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/remote.php/dav/files/astro/a.txt</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>';
+  const asked: string[] = [];
+  const http: HttpClient = async (request) => {
+    asked.push(`${request.method} ${request.url} ${request.headers["Authorization"]}`);
+    return { status: 207, url: request.url, header: () => null, body: listing };
+  };
+
+  test("opened with the account's saved credentials; none without, none while its sync is off, none on this device", async () => {
+    const { secrets, context } = await setup();
+    const { account } = await saveAccount(context, {
+      name: "astro@cloud.example",
+      serverUrl: "https://cloud.example/",
+      homeUrl: "https://cloud.example/remote.php/dav/calendars/astro/",
+      credentials: { username: "astro", password: "right" },
+    });
+    const files = await accountFiles({ http, secrets }, account);
+    expect(asked).toEqual([]);
+    expect((await files!.list("/")).map((file) => file.name)).toEqual(["a.txt"]);
+    expect(asked).toEqual([
+      `PROPFIND https://cloud.example/remote.php/dav/files/astro/ Basic ${btoa("astro:right")}`,
+    ]);
+    // Its sync off: no request goes to its server.
+    expect(await accountFiles({ http, secrets }, { ...account, syncOff: true })).toBeNull();
+    // The calendar on this device has no server.
+    expect(await accountFiles({ http, secrets }, { ...account, provider: "local" })).toBeNull();
+    // Signed out: no credentials saved.
+    await secrets.delete(`account:${account.id}`);
+    expect(await accountFiles({ http, secrets }, account)).toBeNull();
+  });
+
+  test("a server that is not Nextcloud has none", async () => {
+    const { secrets, add } = await setup();
+    const { account } = await add("a.example");
+    expect(await accountFiles({ http, secrets }, account)).toBeNull();
   });
 });

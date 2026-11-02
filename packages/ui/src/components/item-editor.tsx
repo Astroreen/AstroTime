@@ -2,7 +2,8 @@
 // the whole screen on a phone, a dialog on a wide screen. Event or task when
 // creating; title; all day; start and end (a task's start and its optional
 // due, design D159); the zone when it is not the user's; repeat presets and a
-// custom rule; reminders; the calendar; colour; location; description (a task
+// custom rule; reminders; the calendar; colour; location; description;
+// attachments (design D233) (a task
 // has no status, priority, progress or tags here, design D162). Enter in a
 // field saves, Escape closes.
 import {
@@ -48,6 +49,8 @@ import {
 import { alarmWords, repeatWords } from "../calendar/words.ts";
 import { KEYS } from "../preferences.ts";
 import { defaultColorOf, useSettings } from "../settings.ts";
+import { AttachmentsField } from "./attachments-field.tsx";
+import { AttachmentsIcon } from "./attachments.tsx";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -67,9 +70,21 @@ import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 
+/** The click on an empty slot that opened a new item's dialog (design D190). */
+export interface Press {
+  readonly x: number;
+  readonly y: number;
+  /** The click's count: 1 for a single click, 2 for a double click's second. */
+  readonly detail: number;
+  /** Its `timeStamp`. */
+  readonly at: number;
+}
+
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
   readonly existing: boolean;
+  /** The click that opened it, on an empty slot; none for a key, a button or a copy (design D190). */
+  readonly opener?: Press;
   /** A new item filled from another ("Copy to", design D164): its kind stays. */
   readonly copy?: boolean;
   readonly form: Form;
@@ -117,6 +132,7 @@ export function ItemEditor({
   const formId = useId();
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
+  const secondPress = useSecondPress(state?.opener);
   useAlarmCount(state);
   // Beside the item it makes, where there is room (design D155, D187).
   const aside = useDraftAside(state !== null);
@@ -132,7 +148,19 @@ export function ItemEditor({
       )
     : "";
   return (
-    <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root
+      open={state !== null}
+      onOpenChange={(open, details) => {
+        // A double click on an empty slot opens the dialog with its first
+        // click; its second press lands on the backdrop and is no "close"
+        // (design D190).
+        if (!open && details.reason === "outside-press" && secondPress(details.event)) {
+          details.cancel();
+          return;
+        }
+        if (!open) onClose();
+      }}
+    >
       <Dialog.Portal>
         <DialogBackdrop
           className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "sm:bg-black/20" : ""}`}
@@ -396,6 +424,15 @@ function Fields({
           rows={4}
           onChange={(e) => set({ description: e.target.value })}
           className={`${field} h-auto py-2`}
+        />
+      </Section>
+
+      <Section icon={<AttachmentsIcon className="size-5" />}>
+        <AttachmentsField
+          value={form.attachments ?? []}
+          calendar={calendars.find((c) => c.id === form.calendarId)}
+          onChange={(attachments) => set({ attachments })}
+          field={field}
         />
       </Section>
     </div>
@@ -1009,4 +1046,32 @@ function CustomReminder({
       </div>
     </div>
   );
+}
+
+/** How far apart, in px and ms, two presses are still one double click's. */
+const SAME_SPOT = 8;
+const DOUBLE_CLICK_MS = 500;
+
+/**
+ * Whether a click outside the dialog (its backdrop's, as Base UI closes a
+ * dialog with a backdrop on a `click`, by mouse or touch) is the second of
+ * the double click whose first click opened it (design D190): the first
+ * click outside since it opened, one more in the click count, at about the
+ * same spot, soon after. Any other is a click of its own.
+ */
+function useSecondPress(opener: Press | undefined): (event: Event) => boolean {
+  // Each opening's first click outside is the only one that may be its second.
+  const asked = useRef<Press | undefined>(undefined);
+  return (event) => {
+    const first = opener && asked.current !== opener ? opener : undefined;
+    asked.current = opener;
+    return (
+      first !== undefined &&
+      event instanceof MouseEvent &&
+      event.detail === first.detail + 1 &&
+      Math.abs(event.clientX - first.x) < SAME_SPOT &&
+      Math.abs(event.clientY - first.y) < SAME_SPOT &&
+      event.timeStamp - first.at < DOUBLE_CLICK_MS
+    );
+  };
 }

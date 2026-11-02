@@ -1,6 +1,7 @@
 // The interface every provider implements (docs/plans/foundation.md#D4) and
 // the sync engine (`@astrotime/sync`) drives. CalDAV is the first; nothing
 // in it is WebDAV-shaped.
+import type { NewAttachment } from "./attachments.ts";
 
 /** A calendar as the server describes it. */
 export interface RemoteCalendar {
@@ -83,6 +84,25 @@ export interface Provider {
   update(href: string, ics: string, etag: string | null): Promise<WriteResult>;
   /** Removes the object if the server still has `etag`. */
   remove(href: string, etag: string | null): Promise<WriteResult>;
+}
+
+/** A file or a folder of the account's files (docs/plans/foundation.md#D231). */
+export interface RemoteFile {
+  /** Its path in the user's files, `/Calendar/Q3.pdf`. */
+  readonly path: string;
+  readonly name: string;
+  readonly folder: boolean;
+  /** Its media type, as the server says it. */
+  readonly type: string | null;
+  readonly size: number | null;
+  /** The `ATTACH` it becomes on an item, as the server's own calendar app writes it; none for a folder. */
+  readonly attachment: NewAttachment | null;
+}
+
+/** An account's files, as the edit dialog browses them (docs/plans/foundation.md#D231). */
+export interface FileStore {
+  /** What a folder holds, folders first, each by name; `/` is the top. */
+  list(path: string): Promise<RemoteFile[]>;
 }
 
 /** A provider could not reach its server; local changes wait for the next sync. */
