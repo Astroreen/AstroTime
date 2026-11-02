@@ -4,6 +4,14 @@ import { createContext, useContext } from "react";
 import type { Formats } from "../calendar/format.ts";
 import type { Entry } from "../calendar/query.ts";
 
+/** An occurrence by its item's UID and where it starts on its own wall clock: a day, or a day and a time. */
+export interface Landed {
+  readonly uid: string;
+  readonly at: string;
+  /** The zone `at` is in, the form's; `null`: floating, in the view's zone. */
+  readonly zone: string | null;
+}
+
 export interface CalendarContextValue {
   /**
    * The UI's words, the view's own: every item drawn asks for them, and
@@ -17,6 +25,8 @@ export interface CalendarContextValue {
   readonly colorOf: (entry: Entry) => string;
   /** Whether the views show the week numbers (design D169). */
   readonly weekNumbers: boolean;
+  /** The occurrence just saved from the edit dialog, which lands with motion once (design D193). */
+  readonly landed?: Landed | null;
   /** Pixels per hour of the time grid, as last pinched on this device (design D192). */
   readonly hour: number;
   /** The stored object a search jumped to, marked on the views (design D53). */

@@ -50,6 +50,7 @@ import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
 import type { EditorState, Press } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor } from "./lazy.tsx";
+import type { Landed } from "./context.ts";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
 interface CreateOptions {
@@ -126,6 +127,22 @@ function refreshed(row: StoredObject, target: Target): Target | null {
   return { ...target, calendarId: row.calendarId, object, item };
 }
 
+/**
+ * UIDs made for a save, and the first of them: a new item's own (design
+ * D193). Out here, so the hook that saves keeps the React Compiler's memos.
+ */
+function madeUids(): { next: () => string; first: () => string | null } {
+  const all: string[] = [];
+  return {
+    next: () => {
+      const uid = crypto.randomUUID();
+      all.push(uid);
+      return uid;
+    },
+    first: () => all[0] ?? null,
+  };
+}
+
 /** The copy's code, loaded with the details' menu, not with the app (foundation D145). */
 const copying = () => import("../calendar/copy.ts");
 
@@ -166,6 +183,8 @@ export function useEditingState({
   // The edit dialog's item as its form says now, which the editor makes in
   // its own chunk and the views draw (design D155).
   const [draft, setDraft] = useState<DrawnDraft | null>(null);
+  // The item the edit dialog last saved, by UID: it lands where it goes (design D193).
+  const [landed, setLanded] = useState<Landed | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [asking, setAsking] = useState<ScopeRequest | null>(null);
   const [related, setRelated] = useState<{ parent: string | null; subtasks: string[] }>({
@@ -355,6 +374,8 @@ export function useEditingState({
     }
     const run = (scope: "this" | "following" | "all") => {
       setEditing((current) => current && { ...current, state: { ...current.state, saving: true } });
+      // A new item's UID is made as it is saved: the first one made is its own.
+      const made = madeUids();
       saveForm(
         store,
         {
@@ -368,10 +389,17 @@ export function useEditingState({
         },
         {
           now: Date.now(),
-          uid: () => crypto.randomUUID(),
+          uid: made.next,
         },
       ).then(
         () => {
+          // The occurrence saved: where the form put it, in the series it is
+          // in now (a split's "this and following" is a new one).
+          const uid = !target || scope === "following" ? made.first() : target.item.uid;
+          const { allDay, startDate, startTime, zone } = state.form;
+          setLanded(
+            uid ? { uid, at: allDay ? startDate : `${startDate}T${startTime}`, zone } : null,
+          );
           setEditing(null);
           setDetails(null);
           onChanged();
@@ -561,5 +589,11 @@ export function useEditingState({
     </>
   );
   // Gone with the dialog, whether or not the editor said so yet.
-  return { value, dialogs, draft: editing ? draft : null };
+  return {
+    value,
+    dialogs,
+    draft: editing ? draft : null,
+    landed,
+    onLanded: () => setLanded(null),
+  };
 }
