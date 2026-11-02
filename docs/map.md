@@ -237,8 +237,10 @@ When you add a package, app or module, add its line here in the same PR.
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
     (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery` (`live.ts`,
-    a result equal to the last one is not reported; `everyRun`).
-    → `plans/foundation.md#D54`, `plans/foundation.md#D181`
+    a result equal to the last one is not reported; `everyRun`; `whileShown`,
+    what is drawn hears the store only while the page is shown).
+    → `plans/foundation.md#D54`, `plans/foundation.md#D181`,
+    `plans/foundation.md#D182`
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
@@ -263,7 +265,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
     `plans/design.md#D152`; `swipeOutcome`, where one let go goes,
-    `plans/design.md#D154`), `useNow`, `useMediaQuery`.
+    `plans/design.md#D154`), `useNow` (stopped while the page is hidden,
+    `plans/foundation.md#D182`), `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
     localStorage, the web's and the desktop's.
   - `settings.ts` — the settings, kept in the preferences and
@@ -325,7 +328,8 @@ When you add a package, app or module, add its line here in the same PR.
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
     `idle.spec.ts` counts React commits in the Month view across another
-    tab's change: an idle tab does no work. → `plans/foundation.md#D181`
+    tab's change: an idle tab does no work, a hidden one waits.
+    → `plans/foundation.md#D181`, `plans/foundation.md#D182`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`;
     `offline.spec.ts` reloads it with the network gone, updates it, and

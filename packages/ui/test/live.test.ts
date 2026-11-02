@@ -4,7 +4,7 @@
 import type { Store } from "@astrotime/storage";
 import { expect, test } from "vite-plus/test";
 
-import { everyRun, liveQuery } from "../src/calendar/live.ts";
+import { everyRun, liveQuery, whileShown, type PageVisibility } from "../src/calendar/live.ts";
 
 /** A store that only tells its listeners, when the test says it changed. */
 function changingStore() {
@@ -40,8 +40,12 @@ function answered<T>() {
       await run.promise.catch(() => {});
     },
   });
+  let started = 0;
   return {
+    /** How many runs have started. */
+    started: () => started,
     run: () => {
+      started++;
       const run = Promise.withResolvers<T>();
       const next = waiting.shift();
       if (next) next(run);
@@ -124,4 +128,68 @@ test("`everyRun` reports every run, equal or not", async () => {
   changed();
   await query.asked();
   expect(reports).toBe(2);
+});
+
+/** A page the test shows and hides. */
+function fakePage() {
+  let shown = true;
+  const listeners = new Set<() => void>();
+  const page: PageVisibility = {
+    shown: () => shown,
+    onChange(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  const set = (value: boolean) => {
+    shown = value;
+    for (const listener of listeners) listener();
+  };
+  return { page, show: () => set(true), hide: () => set(false), listeners };
+}
+
+test("while the page is hidden the store's changes wait, and come as one when it is shown (D182)", () => {
+  const { store, changed } = changingStore();
+  const { page, show, hide, listeners } = fakePage();
+  let heard = 0;
+  const stop = whileShown(store, page).subscribe(() => heard++);
+  changed();
+  expect(heard).toBe(1);
+  hide();
+  changed();
+  changed();
+  expect(heard).toBe(1);
+  show();
+  expect(heard).toBe(2);
+  // Hidden and shown again with no change: nothing to read.
+  hide();
+  show();
+  expect(heard).toBe(2);
+  stop();
+  changed();
+  show();
+  expect([heard, listeners.size]).toEqual([2, 0]);
+});
+
+test("a live query on `whileShown` reads once when the page is shown, whatever changed while hidden (D182)", async () => {
+  const { store, changed } = changingStore();
+  const { page, show, hide } = fakePage();
+  const query = answered<number>();
+  const reported: number[] = [];
+  liveQuery(whileShown(store, page), query.run, (result) => reported.push(result));
+  await (await query.asked()).answer(1);
+  hide();
+  changed();
+  changed();
+  changed();
+  // Hidden: no read.
+  expect(query.started()).toBe(1);
+  show();
+  expect(query.started()).toBe(2);
+  await (await query.asked()).answer(2);
+  expect(reported).toEqual([1, 2]);
+  // Shown again with nothing changed: no read.
+  hide();
+  show();
+  expect(query.started()).toBe(2);
 });

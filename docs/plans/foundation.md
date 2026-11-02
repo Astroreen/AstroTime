@@ -2062,9 +2062,52 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
   - Proved by `idle.spec.ts`: the Month view beside a calendar on this
     device that stays draws a handful of commits for a change another tab
     makes, 294 before.
+- **D182. A hidden tab does no work but what must not wait.** A tab behind
+  another, or a window minimised, spends nothing on what nobody sees.
+  - **Keeps running:** the sync, by its own rules ([D91](#D91),
+    [D129](#D129): its timer only while visible, once on coming back,
+    after a local change and when the network returns, held back by a
+    server's refusal, [D128](#D128)); the reminders ([D101](#D101): the
+    planner still follows the store, and the platform's timers fire); the
+    store itself, which a leader tab serves to the others ([D98](#D98));
+    the writes the UI makes of itself (the calendar on this device made or
+    stepped aside, [D122](#D122)), whose queries in `accounts-context.tsx`
+    hear the store itself; and the preset's sign-in, which opens by itself
+    at most once per page, on its first read ([D123](#D123)): a tab opened
+    behind another has it open when the user comes to it.
+  - **Waits for `visibilitychange`:** every live query of what is drawn
+    (the views' range and undone tasks, the calendars' lists, the tasks
+    screen, search, an item's details, the conflicts), and the question
+    whether to keep the data ([D121](#D121): Firefox asks it in the tab),
+    hears the store
+    through `whileShown`: the changes made while the page is hidden wait,
+    and come as one when it is shown, so the views read once and draw what
+    changed. A live query still reads once when it starts, shown or not: a
+    tab loaded behind another reads its views once, and may ask whether to
+    keep the data at that load, as a shown one would. The clock (`useNow`, the now-line and today) stops and ticks
+    at once when shown. Measuring (`ResizeObserver`) waits by itself: a
+    hidden page lays nothing out.
+  - Along the way, a render asks the browser less: the month asks whether
+    there is a mouse once, not in each of its tiles, and `useMediaQuery`
+    keeps one `MediaQueryList` per query instead of calling `matchMedia` on
+    every render (2 % of the owner's profile, [D181](#D181)).
+  - Proved by `idle.spec.ts`: a hidden Month tab draws nothing for another
+    tab's event and draws it once shown; ten minutes of a hidden tab's
+    timers do not move the now-line, which moves at once when shown; and by
+    `live.test.ts` (one read on show) and `now.browser.test.tsx` (no timer
+    while hidden).
 
 ## Deferred
 
+- **A tab loaded hidden** still reads its live queries once at the load,
+  and can ask whether to keep the data then ([D182](#D182)); starting them
+  only when first shown would save that read.
+- **`useMediaQuery`'s lists** are kept for the page's life, one per query
+  ([D182](#D182)): a test that replaces `matchMedia` after the first ask
+  would get the old list. No test does; none covers the cache either.
+- **`useNow`'s visibility** is the document's (`documentVisibility`), not
+  injected as `whileShown`'s is ([D182](#D182)); its test fakes the
+  document instead.
 - **A fixture of Nextcloud's custom colour** — what Nextcloud Calendar
   writes for a colour of its picker ([D174](#D174) reads its source:
   the nearest CSS3 name); `scripts/record-nextcloud-fixtures.ts` can record

@@ -42,7 +42,7 @@ import {
   type Notice,
   type Target,
 } from "../calendar/editing.ts";
-import { liveQuery } from "../calendar/live.ts";
+import { liveQuery, whileShown } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { ChangeNotice } from "./change-notice.tsx";
@@ -166,7 +166,7 @@ export function useEditingState({
   useEffect(() => {
     if (!detailsId) return;
     return liveQuery(
-      store,
+      whileShown(store),
       async () => {
         const row = await store.object(detailsId);
         const others = row?.kind === "task" ? await store.tasks([row.calendarId]) : [];

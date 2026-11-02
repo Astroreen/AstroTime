@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
-import { everyRun, liveQuery } from "../calendar/live.ts";
+import { everyRun, liveQuery, whileShown } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
 import { KEYS } from "../preferences.ts";
@@ -95,7 +95,7 @@ export function AccountsProvider({
 
   const [conflicts, setConflicts] = useState(0);
   useEffect(
-    () => liveQuery(store, async () => (await store.conflicts()).length, setConflicts),
+    () => liveQuery(whileShown(store), async () => (await store.conflicts()).length, setConflicts),
     [store],
   );
 
@@ -255,13 +255,15 @@ export function AccountsProvider({
   // item on the calendar on this device; not the empty calendar a first run
   // makes), the browser is asked to keep its data rather than evict it under
   // pressure, once on this device: its answer is kept, granted or refused
-  // (D121). Firefox asks the user, so never on a first visit's load.
+  // (D121). Firefox asks the user, so never on a first visit's load. Once
+  // loaded, a change heard while the tab is hidden waits until it is shown
+  // (D182); the read at the load is made hidden or not, as every live query's.
   useEffect(() => {
     const { keepData } = platform;
     if (!keepData || preferences.get(KEYS.keepData) !== null) return;
     let asked = false;
     return liveQuery(
-      store,
+      whileShown(store),
       async () => {
         const accounts = await store.accounts();
         if (accounts.some((account) => account.provider === "caldav")) return true;

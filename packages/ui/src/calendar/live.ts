@@ -5,11 +5,16 @@
 // changed nothing this query reads costs no render (docs/plans/foundation.md#D181).
 // A read that failed because the web store's leader tab went is not
 // reported: the store tells every subscriber once the next leader serves,
-// and the query runs again (docs/plans/foundation.md#D98).
+// and the query runs again (docs/plans/foundation.md#D98). What is drawn
+// hears the store through `whileShown`: a hidden page's views wait
+// (docs/plans/foundation.md#D182).
 import { handOverIn, type Store } from "@astrotime/storage";
 
+/** What a live query hears the store's changes through: the store, or `whileShown` of it. */
+export type Changes = Pick<Store, "subscribe">;
+
 export function liveQuery<T>(
-  store: Store,
+  store: Changes,
   run: () => Promise<T>,
   onResult: (result: T) => void,
   onError: (error: unknown) => void = (error) => console.error(error),
@@ -92,4 +97,47 @@ function sameResult(a: unknown, b: unknown): boolean {
 function isPlain(value: object): boolean {
   const prototype: unknown = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+/** Whether the page is shown, and when that changes; the document's by default, a fake in tests. */
+export interface PageVisibility {
+  shown(): boolean;
+  /** Calls `listener` when the page is shown or hidden; returns the function that stops it. */
+  onChange(listener: () => void): () => void;
+}
+
+export const documentVisibility: PageVisibility = {
+  // No document (a headless run, a test in Node): always shown.
+  shown: () => typeof document === "undefined" || document.visibilityState !== "hidden",
+  onChange(listener) {
+    if (typeof document === "undefined") return () => {};
+    document.addEventListener("visibilitychange", listener);
+    return () => document.removeEventListener("visibilitychange", listener);
+  },
+};
+
+/**
+ * The store's changes as something drawn hears them (docs/plans/foundation.md#D182):
+ * while the page is hidden they wait, and come as one when it is shown again,
+ * so a hidden tab reads and draws nothing for another tab's or a sync's writes.
+ */
+export function whileShown(changes: Changes, page: PageVisibility = documentVisibility): Changes {
+  return {
+    subscribe(listener) {
+      let missed = false;
+      const stopChanges = changes.subscribe(() => {
+        if (page.shown()) listener();
+        else missed = true;
+      });
+      const stopPage = page.onChange(() => {
+        if (!missed || !page.shown()) return;
+        missed = false;
+        listener();
+      });
+      return () => {
+        stopChanges();
+        stopPage();
+      };
+    },
+  };
 }
