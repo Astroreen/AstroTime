@@ -779,10 +779,12 @@ function TaskItem({
             aria-pressed={row.starred}
             aria-label={t("tasks.star", { title })}
             onClick={(event) => {
-              // Its star pops when it lights, after this press (design D200).
-              event.currentTarget.dataset["pop"] = "";
+              // Its star pops when it lights after this press, once: the
+              // mark goes when the pop ends (design D200).
+              if (!row.starred) event.currentTarget.dataset["pop"] = "";
               actions.star(row);
             }}
+            onAnimationEnd={(event) => delete event.currentTarget.dataset["pop"]}
             className={`${roundButton} relative z-10 ${row.starred ? "text-accent" : "text-ink-muted"}`}
           >
             <StarIcon filled={row.starred} className="size-[22px]" />
