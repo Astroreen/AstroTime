@@ -74,7 +74,7 @@ export const everyRun = (): boolean => false;
  * them) by what they hold, anything else (a parsed object, kept by a cache
  * while its iCalendar is unchanged) by identity.
  */
-function sameResult(a: unknown, b: unknown): boolean {
+export function sameResult(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
   if (Array.isArray(a)) {

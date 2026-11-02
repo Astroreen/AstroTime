@@ -104,6 +104,13 @@ const today = (page: Page) => page.getByRole("list", { name: /Wednesday, Novembe
 async function show(page: Page, view: "day" | "3days" | "week" | "month" | "agenda") {
   const key = { day: "d", "3days": "x", week: "w", month: "m", agenda: "a" }[view];
   await page.locator("body").press(key);
+  // The new view itself, not today's items of the one before (still drawn
+  // until it commits): the audit then waits for the new view's fade (D154).
+  const shown = page.locator("main [data-current]");
+  const days = shown.getByRole("list", { name: /day, November \d+$/ });
+  if (view === "month") await expect(shown.locator('[data-view="month"]')).toBeVisible();
+  else if (view === "agenda") await expect(page.locator("main [data-agenda]")).toBeVisible();
+  else if (view !== "day") await expect(days).toHaveCount(view === "week" ? 7 : 3);
   await expect(today(page).getByRole("listitem").first()).toBeVisible();
 }
 
@@ -265,6 +272,20 @@ test.describe("the screens and dialogs", () => {
         await edit.getByRole("button", { name: "Save" }).click();
         await expect(page.getByRole("alertdialog", { name: "Edit recurring event" })).toBeVisible();
         await audit(page, "the scope dialog");
+      });
+
+      test("the details with attachments: a file by link, a web link, a file to save (design D230)", async ({
+        page,
+      }) => {
+        await page.setViewportSize(WIDE);
+        await openDemo(page, "day");
+        await page
+          .getByRole("list", { name: "Wednesday, November 4" })
+          .getByRole("button", { name: /^Budget planning, / })
+          .click();
+        const details = page.getByRole("dialog", { name: "Budget planning" });
+        await expect(details.getByRole("button", { name: /^Save figures\.txt / })).toBeVisible();
+        await audit(page, "the details with attachments");
       });
 
       test("a task's details and its edit dialog", async ({ page }) => {
