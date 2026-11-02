@@ -215,3 +215,15 @@ export const AgendaView = deferred(
     _props: ComponentProps<typeof import("./agenda-view.tsx").AgendaView> & { onClose: () => void },
   ) => true,
 );
+
+export const CopyNotice = deferred(
+  () => import("./copy-notice.tsx"),
+  (module) => module.CopyNotice,
+  (props: ComponentProps<typeof import("./copy-notice.tsx").CopyNotice>) => props.copied !== null,
+);
+
+export const ItemDetails = deferred(
+  () => import("./item-details.tsx"),
+  (module) => module.ItemDetails,
+  (props: ComponentProps<typeof import("./item-details.tsx").ItemDetails>) => props.target !== null,
+);

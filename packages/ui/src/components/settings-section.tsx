@@ -20,10 +20,9 @@ import { CalendarRow } from "./calendar-row.tsx";
 import { ColorSettings } from "./color-settings.tsx";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
-import { dialogIcon, sheet } from "./item-details.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 import { Select } from "./select.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 /** A language's name in itself: "English", "Русский". */
 const nativeName = (language: string) => {

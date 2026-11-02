@@ -48,9 +48,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `remindersOf`, `soonestReminders` — the times an object's alarms fire,
     and the reminder set a platform is handed; `ReminderScheduler`, how a
     platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
-  - `copyItem` (`edits.ts`) — an occurrence as a new item of its own: a
-    new UID, no recurrence, no guests, every other line kept.
-    → `plans/design.md#D164`
+  - `copyItem`, `createFromCopy` (`copy.ts`, `@astrotime/core/copy`) — an
+    occurrence as a new item of its own: a new UID, no recurrence, no
+    guests, fresh reminders, every other line kept; a subpath of its own,
+    so the web app loads it later. → `plans/design.md#D164`
   - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
     other edit: only the fields changed, in a scope for an occurrence of a
     series (this, this and following, all), a series moved as its
@@ -198,7 +199,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `empty-state.tsx` — what a screen shows with nothing to list.
       → `plans/design.md#D134`
     - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
-      press through while they close. → `plans/design.md#D136`
+      press through while they close, and their looks (`sheet`,
+      `dialogIcon`). → `plans/design.md#D136`
     - `color-select.tsx`, `color-settings.tsx` — the colour dropdown with
       a dot left of each name; the default colours and the user's own in
       Settings, each in a dialog of its own. → `plans/design.md#D168`,
@@ -211,8 +213,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
       screen), from the top bar's gear or the drawer's last row.
       → `plans/design.md#D131`, `plans/design.md#D96`
-    - `lazy.tsx` — dialogs that load with their first opening: the edit
-      dialog, Settings, the Conflicts list; and the Agenda with its first
+    - `lazy.tsx` — dialogs that load with their first opening: the
+      details, the edit dialog, Settings, the Conflicts list, and the
+      copy's notice (`copy-notice.tsx`); and the Agenda with its first
       showing. → `plans/foundation.md#D145`
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
@@ -262,8 +265,10 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D155`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
-      (`saveChanges`, a drag's too; `saveCopy` and `copyOf`, design D164);
-      `words.ts` — rules and reminders in
+      (`saveChanges`, a drag's too); `copy.ts` — "Make a copy" and "Copy
+      to…" (`saveCopy`, `copyToForm`, design D164), loaded with the menu;
+      `when.ts` — when an item is, in words (the details' line, a move's
+      announcement); `words.ts` — rules and reminders in
       words; `conflicts.ts` — the Conflicts list's two ways out.
       → `plans/foundation.md#D103`, `plans/foundation.md#D107`
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,

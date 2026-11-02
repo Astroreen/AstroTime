@@ -1819,6 +1819,11 @@ optimization is lacking").
     the same way, it still asks for under the old one, which fails again:
     so once trying again has failed, Reload is the dialog's first action,
     "Reload AstroTime to finish updating" ([D146](#D146)).
+    _Since round 3:_ the details load the same way, with the copy's notice;
+    the copy's code itself ([design D164](design.md#D164)) loads with the
+    menu's choice (`calendar/copy.ts`, `@astrotime/core/copy`); after #78
+    AstroTime's own code at once was 130.3 KiB, past the budget, and it is
+    123.5 KiB with them out of the first load.
     Signing in and the sync stack stay in the first load
     ([Deferred](#deferred)). _Since [design D155](design.md#D155):_ the
     Agenda loads the same way, with its first showing (its notice's "Close"

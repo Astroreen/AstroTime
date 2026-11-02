@@ -10,9 +10,8 @@ import { colorName } from "../calendar/color-names.ts";
 import { OWN, useSettings, type OwnColor } from "../settings.ts";
 import { ColorSelect, Dot, useColorLanguage, useOwnColorName } from "./color-select.tsx";
 import { CloseIcon, PlusIcon, RepeatIcon } from "./icons.tsx";
-import { dialogIcon } from "./item-details.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
 const pad = (n: number) =>
   Math.round(n * 255)

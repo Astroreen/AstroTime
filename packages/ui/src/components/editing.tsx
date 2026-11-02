@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   calendarsFor,
-  copyOf,
   deleteScopes,
   deleteTarget,
   firstCalendarFor,
@@ -36,7 +35,6 @@ import {
   RefusedError,
   rewriteTarget,
   saveChanges,
-  saveCopy,
   saveForm,
   scopesFor,
   scopesForTimes,
@@ -48,10 +46,9 @@ import { liveQuery, whileShown } from "../calendar/live.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
-import { ChangeNotice, CopyNotice } from "./change-notice.tsx";
-import { ItemDetails } from "./item-details.tsx";
+import { ChangeNotice } from "./change-notice.tsx";
 import type { EditorState } from "./item-editor.tsx";
-import { ItemEditor } from "./lazy.tsx";
+import { CopyNotice, ItemDetails, ItemEditor } from "./lazy.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
 interface CreateOptions {
@@ -124,6 +121,9 @@ function refreshed(row: StoredObject, target: Target): Target | null {
   if (!item) return null;
   return { ...target, calendarId: row.calendarId, object, item };
 }
+
+/** The copy's code, loaded with the details' menu, not with the app (foundation D145). */
+const copying = () => import("../calendar/copy.ts");
 
 interface Editing {
   readonly target: Target | null;
@@ -393,33 +393,48 @@ export function useEditingState({
     const target = details;
     setDetails(null);
     setNotice(null);
-    saveCopy(store, target, writes()).then(
-      (made) => {
-        setCopied(made);
-        onChanged();
-      },
-      (error: unknown) => {
-        const told = noticeOf(error, "change");
-        if (told === "failed") console.error(error);
-        setCopied(null);
-        setNotice(told);
-      },
-    );
+    copying()
+      .then(({ saveCopy }) => saveCopy(store, target, writes()))
+      .then(
+        (made) => {
+          setCopied(made);
+          onChanged();
+        },
+        (error: unknown) => {
+          const told = noticeOf(error, "change");
+          if (told === "failed") console.error(error);
+          setCopied(null);
+          setNotice(told);
+        },
+      );
   };
 
   /** "Copy to" (design D164): the edit dialog for a new item, every field this one's. */
   const copyTo = () => {
     if (!details) return;
-    const { ics, target } = copyOf(details, writes());
-    const own = writable(target.item.kind).some((c) => c.id === target.calendarId);
-    const form = formOf(target, timeZone, today);
-    const initial = own ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
-    setEditing({
-      target: null,
-      initial,
-      base: ics,
-      state: { existing: false, copy: true, form: initial, problem: null, saving: false },
-    });
+    // One notice at a time, and none over the dialog: its Open would leave it.
+    setNotice(null);
+    setCopied(null);
+    const target = details;
+    copying().then(
+      ({ copyToForm }) => {
+        const { ics, form: initial } = copyToForm(target, calendars, hidden, {
+          timeZone,
+          today,
+          writes: writes(),
+        });
+        setEditing({
+          target: null,
+          initial,
+          base: ics,
+          state: { existing: false, copy: true, form: initial, problem: null, saving: false },
+        });
+      },
+      (error: unknown) => {
+        console.error(error);
+        setNotice("failed");
+      },
+    );
   };
 
   const remove = () => {

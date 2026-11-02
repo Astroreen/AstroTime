@@ -49,12 +49,11 @@ import {
   PlaceIcon,
   RepeatIcon,
 } from "./icons.tsx";
-import { dialogIcon, sheet } from "./item-details.tsx";
 import { ColorSelect } from "./color-select.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { useDraft, useDraftAside } from "./draft-aside.ts";
 
 export interface EditorState {
