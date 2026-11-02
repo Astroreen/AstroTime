@@ -16,6 +16,7 @@ import { EditingContext, type EditingValue } from "../src/components/editing.tsx
 import { TasksScreen } from "../src/components/tasks-screen.tsx";
 import { createI18n } from "../src/i18n/index.ts";
 import { memoryPreferences } from "../src/preferences.ts";
+import { DEFAULT_SETTINGS, SettingsContext } from "../src/settings.ts";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -68,28 +69,30 @@ test("a box checked by a write that changed nothing lets go of its check once th
   await act(async () =>
     root.render(
       <I18nextProvider i18n={i18n}>
-        <CalendarContext.Provider
-          value={{
-            t: i18n.t,
-            formats: new Formats({ language: "en", locale: "en-US", hour12: true, weekStart: 7 }),
-            timeZone: "Europe/Vilnius",
-            colorOf: () => "#3367d6",
-            weekNumbers: true,
-          }}
-        >
-          <EditingContext.Provider value={editing}>
-            <TasksScreen
-              store={store}
-              preferences={memoryPreferences()}
-              lists={[list]}
-              today="2026-11-04"
-              now="2026-11-04T10:40"
-              wide
-              focus={null}
-              onClose={() => {}}
-            />
-          </EditingContext.Provider>
-        </CalendarContext.Provider>
+        <SettingsContext.Provider value={{ settings: DEFAULT_SETTINGS, change: () => {} }}>
+          <CalendarContext.Provider
+            value={{
+              t: i18n.t,
+              formats: new Formats({ language: "en", locale: "en-US", hour12: true, weekStart: 7 }),
+              timeZone: "Europe/Vilnius",
+              colorOf: () => "#3367d6",
+              weekNumbers: true,
+            }}
+          >
+            <EditingContext.Provider value={editing}>
+              <TasksScreen
+                store={store}
+                preferences={memoryPreferences()}
+                lists={[list]}
+                today="2026-11-04"
+                now="2026-11-04T10:40"
+                wide
+                focus={null}
+                onClose={() => {}}
+              />
+            </EditingContext.Provider>
+          </CalendarContext.Provider>
+        </SettingsContext.Provider>
       </I18nextProvider>,
     ),
   );
