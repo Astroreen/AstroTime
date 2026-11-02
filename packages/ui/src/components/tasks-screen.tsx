@@ -396,6 +396,7 @@ export function TasksScreen({
                       key={list.id}
                       value={list.id}
                       id={tabId(list.id)}
+                      aria-controls={list.id === selected ? `${tabId(list.id)}-panel` : undefined}
                       aria-label={
                         count > 0
                           ? t("tasks.tab", { list: list.name, undone: t("undone", { count }) })
@@ -467,7 +468,10 @@ export function TasksScreen({
                   <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
                     <div
                       role={current ? "tabpanel" : undefined}
+                      id={current ? `${tabId(list.id)}-panel` : undefined}
                       aria-labelledby={current ? tabId(list.id) : undefined}
+                      // Reached by Tab from its tab, as a tab panel is.
+                      tabIndex={current ? 0 : undefined}
                       className="flex flex-col gap-3 rounded-xl"
                     >
                       {cards}
