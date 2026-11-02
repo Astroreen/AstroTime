@@ -19,6 +19,9 @@ export const ru = {
   "lazy.retry": "Повторить",
   "lazy.reload": "Перезагрузить",
   "lazy.close": "Закрыть",
+  "lazy.failedAgain":
+    "Эта часть AstroTime так и не загрузилась. Перезагрузите AstroTime, чтобы завершить обновление.",
+  "lazy.reloadToUpdate": "Перезагрузить AstroTime",
 
   "secrets.unprotected.title": "Нет связки ключей, чтобы защитить пароль",
   "secrets.unprotected.body":

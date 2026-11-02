@@ -133,6 +133,104 @@ test("a period whose items cannot be read is drawn all the same, empty, not held
   expect(errors).toHaveBeenCalled();
 });
 
+test("the day draws before the undone chip's tasks are read; the chip joins them (D146)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  // The chip's read waits until the test lets it through.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const slow = Object.assign(Object.create(store) as Store, {
+    undoneTasksBefore: async (...args: Parameters<Store["undoneTasksBefore"]>) => {
+      await held;
+      return store.undoneTasksBefore(...args);
+    },
+  });
+  render(Promise.resolve(slow), ["en-US"]);
+  await expect
+    .element(
+      page
+        .getByRole("list", { name: "Wednesday, November 4" })
+        .getByRole("listitem", { name: /^Design review, / }),
+    )
+    .toBeInTheDocument();
+  const chip = page.getByRole("list", { name: "All day" }).getByRole("button", {
+    name: "3 undone tasks",
+  });
+  expect(chip.elements()).toEqual([]);
+  release();
+  await expect.element(chip).toBeInTheDocument();
+});
+
+test("a calendar hidden keeps the view as drawn, chip and all, until both its reads land (D146, design D59)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  const tasks = (await store.calendars()).find((calendar) => calendar.name === "Tasks")!;
+  // Without the Tasks list the chip's read waits until the test lets it
+  // through; the days' read is told when it has been answered.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let daysRead!: () => void;
+  const daysAnswered = new Promise<void>((resolve) => (daysRead = resolve));
+  const slow = Object.assign(Object.create(store) as Store, {
+    objectsBetween: async (...args: Parameters<Store["objectsBetween"]>) => {
+      const rows = await store.objectsBetween(...args);
+      if (!args[0].includes(tasks.id)) daysRead();
+      return rows;
+    },
+    undoneTasksBefore: async (...args: Parameters<Store["undoneTasksBefore"]>) => {
+      if (!args[0].includes(tasks.id)) await held;
+      return store.undoneTasksBefore(...args);
+    },
+  });
+  render(Promise.resolve(slow), ["en-US"]);
+  const strip = page.getByRole("list", { name: "All day" });
+  await expect.element(strip.getByRole("button", { name: "3 undone tasks" })).toBeInTheDocument();
+  // How tall the strip is: its rows push the grid down.
+  const height = strip.element().getBoundingClientRect().height;
+  await userEvent.click(page.getByRole("button", { name: "Main menu" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Tasks" }));
+  await userEvent.keyboard("{Escape}");
+  // The days are read for the new calendars and handled, the chip's tasks
+  // not yet: the view stays as drawn, its chip with it, waiting for the chip.
+  await daysAnswered;
+  await expect.element(page.getByRole("main")).toHaveAttribute("data-waiting", "chip");
+  await expect.element(strip.getByRole("button", { name: "3 undone tasks" })).toBeInTheDocument();
+  expect(strip.element().getBoundingClientRect().height).toBe(height);
+  release();
+  await expect.element(strip.getByRole("button", { name: "1 undone task" })).toBeInTheDocument();
+  await expect.element(page.getByRole("main")).not.toHaveAttribute("data-waiting");
+  // The strip kept its rows: the grid below it did not move.
+  expect(strip.element().getBoundingClientRect().height).toBe(height);
+});
+
+test("the undone tasks that cannot be read hold no view: it draws, and moves on, with no chip (D146)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(() => errors.mockRestore());
+  const store = await demoStore(["en-US"]);
+  const broken = Object.assign(Object.create(store) as Store, {
+    undoneTasksBefore: () => Promise.reject(new Error("The disk is gone.")),
+  });
+  render(Promise.resolve(broken), ["en-US"]);
+  await expect
+    .element(
+      page
+        .getByRole("list", { name: "Wednesday, November 4" })
+        .getByRole("listitem", { name: /^Design review, / }),
+    )
+    .toBeInTheDocument();
+  await userEvent.keyboard("n");
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5" }))
+    .toBeInTheDocument();
+  await expect.element(page.getByRole("main")).not.toHaveAttribute("data-waiting");
+  expect(page.getByRole("button", { name: /undone task/ }).elements()).toEqual([]);
+  expect(errors).toHaveBeenCalled();
+});
+
 test("back from the Agenda, the day is drawn as the store has it now, not as read before (design D59)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);

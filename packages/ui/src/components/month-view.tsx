@@ -9,7 +9,6 @@
 import { dayRange, isAllDay } from "@astrotime/core";
 import type { UndoneTask } from "@astrotime/storage";
 import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
-import { useTranslation } from "react-i18next";
 
 import { weekdayOf } from "../calendar/dates.ts";
 import { foldWeek, type MonthWeek } from "../calendar/month.ts";
@@ -151,8 +150,7 @@ function Week({
   ghost: Ghost | null;
   tile: (day: string) => (element: HTMLElement | null) => void;
 }) {
-  const { t } = useTranslation();
-  const { formats, timeZone, colorOf } = useCalendar();
+  const { t, formats, timeZone, colorOf } = useCalendar();
   const { shown, more } = foldWeek(week.spans, capacity);
   const number = formats.weekNumber(week.days);
   // A drag's ghost over the days of this week it goes to, on the first row.
@@ -235,8 +233,7 @@ function DayTile({
   more: number;
   moreRow: number;
 }) {
-  const { t } = useTranslation();
-  const { formats, timeZone } = useCalendar();
+  const { t, formats, timeZone } = useCalendar();
   // With no mouse or pen a tap on a chip opens the day under it: the chips
   // are no buttons. A device with one keeps them, a touch laptop too.
   const touch = !useMediaQuery("(any-pointer: fine)");

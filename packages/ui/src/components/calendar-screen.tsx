@@ -160,10 +160,20 @@ export function CalendarScreen({
   // which reads its own) draws none. A read that fails comes back empty.
   // The read kept from before the Agenda is not one: the store may have
   // changed meanwhile, and its live query starts again.
+  // The undone chip's tasks are a read of their own (foundation D146): a
+  // view drawn before keeps its chip too until they are read for its
+  // calendars and day, so the chip neither shows a hidden calendar's tasks
+  // nor goes and comes back; on open, with nothing drawn yet, the days draw
+  // first and the chip joins them.
   const [beforeAgenda, setBeforeAgenda] = useState<Entries | null>(null);
-  const fresh =
-    !agenda && read !== null && read !== beforeAgenda && read.from === from && read.to === to;
   const [held, setHeld] = useState<Drawn | null>(null);
+  const fresh =
+    !agenda &&
+    read !== null &&
+    read !== beforeAgenda &&
+    read.from === from &&
+    read.to === to &&
+    (read.undoneCurrent || held === null);
   if (fresh && (held?.read !== read || held.view !== view || held.anchor !== anchor)) {
     setHeld({ view, days, anchor, read });
   } else if (agenda && (held || beforeAgenda !== read)) {
@@ -171,7 +181,15 @@ export function CalendarScreen({
     setBeforeAgenda(read);
   }
   const drawn = fresh ? { view, days, anchor, read } : held;
-  const data = drawn?.read ?? { entries: [], undone: [] };
+  // What the view waits for while it keeps what it drew: its days' read, or
+  // its chip's (a data hook the tests wait on).
+  const waiting =
+    agenda || fresh ? undefined : read?.from === from && read.to === to ? "chip" : "days";
+  const drawnRead = drawn?.read;
+  // Drawn before its chip's tasks are read (on open): no chip yet.
+  const data = drawnRead
+    ? { entries: drawnRead.entries, undone: drawnRead.undoneCurrent ? drawnRead.undone : [] }
+    : { entries: [], undone: [] };
 
   const calendarColor = new Map(
     (lists?.calendars ?? []).map((calendar) => [
@@ -350,7 +368,7 @@ export function CalendarScreen({
   );
 
   return (
-    <CalendarContext.Provider value={{ formats, timeZone, colorOf, found: foundId }}>
+    <CalendarContext.Provider value={{ t, formats, timeZone, colorOf, found: foundId }}>
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
           <div className="relative isolate flex h-dvh flex-col bg-canvas pt-(--inset-top) pr-(--inset-right) pb-(--inset-bottom) pl-(--inset-left) text-ink [--gutter:3.25rem] lg:[--gutter:4rem]">
@@ -465,7 +483,12 @@ export function CalendarScreen({
                   {drawer}
                 </nav>
               )}
-              <main aria-label={title} className="relative flex min-w-0 flex-1 flex-col">
+              <main
+                aria-label={title}
+                aria-busy={waiting ? true : undefined}
+                data-waiting={waiting}
+                className="relative flex min-w-0 flex-1 flex-col"
+              >
                 {/* The period shown, the page's heading; the top bar shows it as the month picker's button. */}
                 <h1 className="sr-only">{title}</h1>
                 {view === "agenda" ? (
