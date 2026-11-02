@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" width="360" height="120" preserveAspectRatio="xMidYMid slice">
+  <rect width="360" height="120" fill="#2f4a7a"/>
+  <circle cx="40" cy="18" r="70" fill="#365285"/>
+  <circle cx="326" cy="24" r="12" fill="#f6d98b"/>
+  <circle cx="331" cy="20" r="11" fill="#2f4a7a"/>
+  <path d="M150 8q45 20 90 0t90 4" fill="none" stroke="#1f2a44" stroke-width="1.5"/>
+  <circle cx="168" cy="15" r="3" fill="#f6d98b"/>
+  <circle cx="190" cy="19" r="3" fill="#e2725b"/>
+  <circle cx="214" cy="17" r="3" fill="#9fd8c8"/>
+  <circle cx="262" cy="8" r="3" fill="#f6d98b"/>
+  <circle cx="288" cy="5" r="3" fill="#e2725b"/>
+  <circle cx="312" cy="7" r="3" fill="#9fd8c8"/>
+  <path d="M0 92c80-6 200-8 360-4v32H0z" fill="#dae5fa"/>
+  <path d="M0 100c90-4 240-4 360 0v20H0z" fill="#c8d7f2"/>
+  <rect x="246" y="78" width="10" height="16" fill="#5e3b26"/>
+  <path d="M251 50l-34 32h68z" fill="#2f8f87"/>
+  <path d="M251 34l-26 26h52z" fill="#2f8f87"/>
+  <path d="M251 18l-18 22h36z" fill="#2f8f87"/>
+  <path d="M251 50l34 32h-34zM251 34l26 26h-26zM251 18l18 22h-18z" fill="#267a73"/>
+  <path d="M233 40c6-3 12 0 18-1 6 1 12-2 18 1l-3-4h-30zM225 60c8-3 17 0 26-1 9 1 18-2 26 1l-4-4h-44zM217 82c10-3 22 0 34-1 12 1 24-2 34 1l-4-4h-60z" fill="#dae5fa"/>
+  <circle cx="251" cy="17" r="4" fill="#f6d98b"/>
+  <circle cx="242" cy="48" r="2.5" fill="#f6d98b"/>
+  <circle cx="258" cy="51" r="2.5" fill="#e2725b"/>
+  <circle cx="234" cy="70" r="2.5" fill="#e2725b"/>
+  <circle cx="250" cy="73" r="2.5" fill="#f6d98b"/>
+  <circle cx="267" cy="70" r="2.5" fill="#9fd8c8"/>
+  <rect x="196" y="76" width="26" height="22" rx="2" fill="#e2725b"/>
+  <rect x="206" y="76" width="6" height="22" fill="#f6d98b"/>
+  <rect x="194" y="74" width="30" height="6" rx="2" fill="#c95f4a"/>
+  <path d="M209 74c-6-8-12-4-8 0zM209 74c6-8 12-4 8 0z" fill="#f6d98b"/>
+  <rect x="274" y="82" width="22" height="16" rx="2" fill="#e6b54a"/>
+  <rect x="274" y="88" width="22" height="4" fill="#e2725b"/>
+  <rect x="282" y="82" width="4" height="16" fill="#e2725b"/>
+  <rect x="296" y="72" width="22" height="26" rx="2" fill="#c6b3e6"/>
+  <rect x="296" y="72" width="22" height="5" fill="#a891cf"/>
+  <rect x="305" y="72" width="4" height="26" fill="#2f8f87"/>
+  <path d="M307 72c-6-7-11-3-7 0zM307 72c6-7 11-3 7 0z" fill="#2f8f87"/>
+  <g fill="#ffffff" opacity=".7">
+    <circle cx="160" cy="40" r="2"/><circle cx="186" cy="60" r="1.5"/><circle cx="202" cy="36" r="2"/>
+    <circle cx="296" cy="44" r="2"/><circle cx="320" cy="56" r="1.5"/><circle cx="342" cy="44" r="2"/>
+    <circle cx="96" cy="30" r="1.5"/><circle cx="120" cy="56" r="1.5"/><circle cx="60" cy="48" r="1.5"/>
+  </g>
+</svg>

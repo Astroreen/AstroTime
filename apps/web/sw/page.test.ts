@@ -85,7 +85,9 @@ test("the preset is kept apart and given back to the kept page as the network pa
 test("what the worker does with a request, at the root and under a base path (D124)", () => {
   for (const base of ["/", "/calendar/"]) {
     const listed = new Set([base, `${base}assets/index-a1.js`, `${base}manifest.webmanifest`]);
-    const route = (path: string, navigation = false) => routeOf(path, navigation, base, listed);
+    const pictures = new Set([`${base}assets/pictures/meal-a1.svg`]);
+    const route = (path: string, navigation = false) =>
+      routeOf(path, navigation, base, listed, pictures);
     // A navigation: the app's pages get the page; the proxy and files go to the network.
     expect(route(base, true)).toBe("page");
     expect(route(`${base}day/2026-11-04`, true)).toBe("page");
@@ -98,6 +100,9 @@ test("what the worker does with a request, at the root and under a base path (D1
     expect(route(`${base}assets/index-a1.js`)).toBe("file");
     expect(route(`${base}manifest.webmanifest`)).toBe("file");
     expect(route(`${base}assets/lazy-old.js`)).toBe("older");
+    // A picture this version lists, kept as it is first shown (design D219).
+    expect(route(`${base}assets/pictures/meal-a1.svg`)).toBe("picture");
+    expect(route(`${base}assets/pictures/meal-a0.svg`)).toBe("older");
     expect(route(`${base}dav-proxy/x/`)).toBeNull();
   }
   // Under a base, the root's paths are not the app's.

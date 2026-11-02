@@ -4,6 +4,7 @@
 // files the worker kept and the store on the device. The worker keeps
 // neither CalDAV (/dav-proxy/) nor the deployment's preset (D123), and a
 // newer version is offered quietly, then runs once the user reloads into it.
+// A picture (design D219) is kept as it is first shown, not on install.
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -189,6 +190,70 @@ test("with the network gone, a reload shows the calendar with its data; CalDAV i
     expect((await stalled).fromServiceWorker()).toBe(true);
     await expect(planning(page)).toBeVisible();
     expect(violations).toEqual([]);
+  } finally {
+    await close(server);
+  }
+});
+
+test("a picture is kept as it is first shown, not on install, and shows with no network (design D219)", async ({
+  page,
+  context,
+  radicale,
+}) => {
+  const work = await radicale.mkcalendar("work");
+  const put = await fetch(`${work}lunch.ics`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}`,
+      "Content-Type": "text/calendar",
+    },
+    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:lunch\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T130000\r\nDTEND;TZID=Europe/Vilnius:20261104T140000\r\nSUMMARY:Lunch with Radicale\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+  });
+  expect(put.status).toBe(201);
+  const { server, port } = await serve(DIST, radicale, 0, true);
+  const keptPictures = () =>
+    page.evaluate(async () => {
+      const name = (await caches.keys()).find((key) => key !== "astrotime-versions");
+      const cache = await caches.open(name!);
+      return (await cache.keys())
+        .map((request) => new URL(request.url).pathname)
+        .filter((path) => path.startsWith("/assets/pictures/"));
+    });
+  const lunch = page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("listitem", { name: /^Lunch with Radicale, / });
+  const shown = () =>
+    lunch
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => img.decode().then(() => img.naturalWidth > 0));
+  try {
+    await page.clock.setFixedTime(NOW);
+    await page.goto(`http://127.0.0.1:${port}/`);
+    const signIn = page.getByRole("dialog", { name: /^Sign in to / });
+    await signIn.getByLabel("Password").fill(radicale.password);
+    await signIn.getByRole("button", { name: "Sign in" }).click();
+    await expect(lunch).toBeVisible();
+    await activated(page);
+    // Installed: the app's files, no picture.
+    expect(await keptPictures()).toEqual([]);
+
+    // The Agenda draws the lunch over its picture: kept as it is shown.
+    await page.evaluate(() => localStorage.setItem("astrotime.view", "agenda"));
+    await page.reload();
+    await expect(lunch.locator("img")).toHaveAttribute("src", /\/assets\/pictures\/meal-/);
+    expect(await shown()).toBe(true);
+
+    // No network: the Agenda again, the picture from the worker, which kept
+    // it as it was shown, and only what was shown: it and a month's banner.
+    await context.setOffline(true);
+    const picture = page.waitForResponse((answer) => answer.url().includes("/assets/pictures/"));
+    await page.reload();
+    expect((await picture).fromServiceWorker()).toBe(true);
+    expect(await shown()).toBe(true);
+    const kept = await keptPictures();
+    expect(kept).toContainEqual(expect.stringMatching(/^\/assets\/pictures\/meal-.+\.svg$/));
+    expect(kept.filter((path) => !/\/(meal|month-\d\d)-/.test(path))).toEqual([]);
+    await context.setOffline(false);
   } finally {
     await close(server);
   }

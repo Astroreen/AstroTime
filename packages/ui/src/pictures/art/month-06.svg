@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200" preserveAspectRatio="xMidYMid slice">
+  <rect width="800" height="200" fill="#a4c6f8"/>
+  <circle cx="660" cy="48" r="54" fill="#b9d2fb"/>
+  <path d="M660 6v-8M660 98v-8M618 48h-8M710 48h-8M630 18l-6-6M690 18l6-6M630 78l-6 6M690 78l6 6" stroke="#f6d98b" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="660" cy="48" r="28" fill="#f6d98b"/>
+  <circle cx="660" cy="48" r="20" fill="#fbe7a8"/>
+  <path d="M736 104q2-10 14-8 6-8 16-4 12-2 14 6 8 2 6 6z" fill="#e6eefc"/>
+  <path d="M0 126c80-20 170-22 250-8s160 6 250-8 200-10 300 12v40H0z" fill="#5f9a5f"/>
+  <path d="M0 136c130-14 270-12 400-6s270 2 400-8v78H0z" fill="#7fb168"/>
+  <path d="M600 136q100-8 200-6v18q-90 4-190-2-20-6-10-10z" fill="#4f86cf"/>
+  <path d="M640 140h40M700 144h50M660 148h20" stroke="#a8c7fa" stroke-width="2" stroke-linecap="round"/>
+  <path d="M608 150h56v4h-56z" fill="#8a5a3c"/>
+  <path d="M612 154v8M640 154v8M660 154v6" stroke="#5e3b26" stroke-width="3" stroke-linecap="round"/>
+  <path d="M0 166c150-10 280-6 400-2s260-2 400-8v44H0z" fill="#6fa35c"/>
+  <path d="M396 116h70v30h-70z" fill="#f7ead7"/>
+  <path d="M440 116h26v30h-26z" fill="#e8d2b0"/>
+  <path d="M446 90h10v20h-10z" fill="#8a5a3c"/>
+  <path d="M386 120l45-32 45 32z" fill="#c98f63"/>
+  <path d="M431 88l45 32h-14l-31-22z" fill="#a8714a"/>
+  <path d="M406 124h16v12h-16z" fill="#2f4a7a"/>
+  <path d="M403 124h4v14h-4zM421 124h4v14h-4z" fill="#e2725b"/>
+  <path d="M446 124h12v22h-12z" fill="#5e3b26"/>
+  <path d="M398 148q4-10 12-8 8-6 12 2 6 0 6 6zM466 148q2-8 10-7 8-4 10 7z" fill="#4a8549"/>
+  <g fill="#e2725b"><circle cx="406" cy="142" r="2"/><circle cx="416" cy="140" r="2"/><circle cx="476" cy="143" r="2"/></g>
+  <g transform="translate(70 39) scale(.75)">
+  <path d="M216 156l3-56h8l3 56zM326 156l3-52h8l3 52z" fill="#5e3b26"/>
+  <g fill="#3f7a46"><circle cx="202" cy="94" r="22"/><circle cx="224" cy="72" r="26"/><circle cx="248" cy="96" r="22"/><circle cx="314" cy="96" r="22"/><circle cx="334" cy="74" r="26"/><circle cx="356" cy="98" r="20"/></g>
+  <g fill="#5d9b5a"><circle cx="210" cy="86" r="16"/><circle cx="228" cy="64" r="18"/><circle cx="246" cy="86" r="14"/><circle cx="322" cy="88" r="16"/><circle cx="338" cy="66" r="18"/><circle cx="354" cy="90" r="13"/></g>
+  <g fill="#7fb86e"><circle cx="222" cy="56" r="8"/><circle cx="244" cy="76" r="6"/><circle cx="332" cy="58" r="8"/><circle cx="352" cy="80" r="6"/></g>
+  <path d="M228 120q50 26 98 0" fill="none" stroke="#8a5a3c" stroke-width="2" stroke-linecap="round"/>
+  <path d="M236 124q42 28 84 0l-2 6q-40 22-80 0z" fill="#e2725b"/>
+  <path d="M244 132q34 14 68 0l-1 4q-33 12-66 0z" fill="#f6d98b"/>
+  </g>
+  <ellipse cx="278" cy="158" rx="70" ry="5" fill="#6aa058"/>
+  <path d="M500 40l14 18-14 22-14-22z" fill="#e2725b"/>
+  <path d="M500 40l14 18h-28z" fill="#f4b393"/>
+  <path d="M500 80q-6 10 4 18t-2 18M500 80q30 40 44 66" fill="none" stroke="#1f2a44" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M499 92l-6-3v6zM505 104l6-3v6z" fill="#e6b54a"/>
+  <g transform="translate(0 -8)">
+  <path d="M540 172l2-12h4l2 12zM550 172l2-12h4l2 12z" fill="#2f4a7a"/>
+  <path d="M538 162q0-18 10-18t10 18z" fill="#e6b54a"/>
+  <path d="M556 150l-12 4" stroke="#e6b54a" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="548" cy="138" r="7" fill="#c98f63"/>
+  </g>
+  <g stroke="#4a8549" stroke-width="2" stroke-linecap="round"><path d="M20 190l-4-12M26 190v-14M32 190l4-12M160 186l-4-12M166 186v-14M172 186l4-12M640 190l-4-12M646 190v-14M652 190l4-12M760 186l-4-12M766 186v-14M772 186l4-12M300 194l-4-10M306 194v-12M312 194l4-10"/></g>
+  <g fill="#f6d98b"><circle cx="90" cy="180" r="4"/><circle cx="110" cy="186" r="4"/><circle cx="380" cy="184" r="4"/><circle cx="460" cy="188" r="4"/><circle cx="700" cy="182" r="4"/><circle cx="720" cy="190" r="4"/><circle cx="590" cy="186" r="4"/></g>
+  <g fill="#fff"><circle cx="130" cy="174" r="3"/><circle cx="420" cy="178" r="3"/><circle cx="740" cy="176" r="3"/><circle cx="240" cy="184" r="3"/></g>
+</svg>

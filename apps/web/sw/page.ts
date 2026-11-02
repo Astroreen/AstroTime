@@ -66,19 +66,23 @@ export function withPresetBack(html: string, preset: string): string {
 /**
  * What the worker does with a GET of the app's origin, under its scope `base`
  * (D124): a navigation to one of the app's pages gets the `page`; a file this
- * version lists, its own (`file`); another file under `assets/`, the version
- * before's for a tab still on it (`older`); everything else, the page's own
- * path and the kept preset included, goes to the network untouched (`null`).
+ * version lists, its own (`file`); a picture it lists to keep as it is first
+ * shown (design D219), kept then (`picture`); another file under `assets/`,
+ * the version before's for a tab still on it (`older`); everything else, the
+ * page's own path and the kept preset included, goes to the network
+ * untouched (`null`).
  */
 export function routeOf(
   pathname: string,
   navigation: boolean,
   base: string,
   listed: ReadonlySet<string>,
-): "page" | "file" | "older" | null {
+  pictures: ReadonlySet<string> = new Set(),
+): "page" | "file" | "picture" | "older" | null {
   if (navigation) return isAppPage(pathname, base) ? "page" : null;
   if (pathname === base || pathname === presetKey(base)) return null;
   if (listed.has(pathname)) return "file";
+  if (pictures.has(pathname)) return "picture";
   return pathname.startsWith(`${base}assets/`) ? "older" : null;
 }
 

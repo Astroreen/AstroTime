@@ -1,7 +1,8 @@
 // The settings (design D53, D131): this device's theme, language, week
 // start and clock, whether completed tasks (D51) and the week numbers
 // (D169) show on the views, the colours new items start with and the
-// user's own (D172, D173), and whether reminders notify (foundation D101).
+// user's own (D172, D173), whether reminders notify (foundation D101), and
+// the pictures the Agenda and the details are drawn with (D217).
 // Kept in the app's preferences as one value and applied at once.
 import { isColorName } from "@astrotime/core";
 import { createContext, useContext } from "react";
@@ -56,6 +57,10 @@ export interface Settings {
    * where the platform has them (design D175); off, neither asks anything.
    */
   readonly places: boolean;
+  /** The Agenda's cards and the details drawn over a picture by their title's words (design D217). */
+  readonly illustrations: boolean;
+  /** A picture of the season above each month of the Agenda (design D218). */
+  readonly monthBanners: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -70,6 +75,8 @@ export const DEFAULT_SETTINGS: Settings = {
   reminders: true,
   keepRunning: true,
   places: true,
+  illustrations: true,
+  monthBanners: true,
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -97,6 +104,8 @@ export function readSettings(stored: string | null): Settings {
     reminders: value.reminders !== false,
     keepRunning: value.keepRunning !== false,
     places: value.places !== false,
+    illustrations: value.illustrations !== false,
+    monthBanners: value.monthBanners !== false,
   };
 }
 

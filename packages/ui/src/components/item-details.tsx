@@ -30,6 +30,7 @@ import {
   StarIcon,
   SubtasksIcon,
 } from "./icons.tsx";
+import { DetailsPicture } from "./item-picture.tsx";
 import { PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
@@ -159,30 +160,33 @@ function Body({
 
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
-        {rights.edit && (
-          <button
-            type="button"
-            className={dialogIcon}
-            aria-label={t("details.edit")}
-            title={t("details.edit")}
-            onClick={onEdit}
-          >
-            <EditIcon className="size-5" />
-          </button>
-        )}
-        {actions.length > 0 && (
-          <MenuButton
-            label={t("details.more")}
-            icon={<MoreIcon className="size-5" />}
-            className={dialogIcon}
-            options={actions}
-            onChoose={(action) =>
-              action === "delete" ? onDelete() : action === "copy" ? onCopy() : onCopyTo()
-            }
-          />
-        )}
-      </div>
+      {/* Over the item's picture, when its title gives one (design D216). */}
+      <DetailsPicture title={item.summary}>
+        <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
+          {rights.edit && (
+            <button
+              type="button"
+              className={dialogIcon}
+              aria-label={t("details.edit")}
+              title={t("details.edit")}
+              onClick={onEdit}
+            >
+              <EditIcon className="size-5" />
+            </button>
+          )}
+          {actions.length > 0 && (
+            <MenuButton
+              label={t("details.more")}
+              icon={<MoreIcon className="size-5" />}
+              className={dialogIcon}
+              options={actions}
+              onChoose={(action) =>
+                action === "delete" ? onDelete() : action === "copy" ? onCopy() : onCopyTo()
+              }
+            />
+          )}
+        </div>
+      </DetailsPicture>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
         <div className="flex items-start gap-4">
           <span

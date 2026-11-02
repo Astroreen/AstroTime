@@ -180,6 +180,89 @@
   .item-time {
     font-weight: 400;
   }
+  /*
+   * An illustrated card of the Agenda (design D216): the picture's own
+   * ground behind it, which fills a card wider than the picture, its left
+   * edge fading into that ground; a scrim under the white text, darkest at
+   * the bottom where the text is, a little darker in the dark theme; the
+   * picture fades in once decoded, and a done task's is muted.
+   */
+  .picture-card {
+    background: var(--ground);
+  }
+  .picture-card > img {
+    mask-image: linear-gradient(to right, transparent, #000 3rem);
+    transition: opacity 200ms ease-out;
+  }
+  .picture-card > img:not([data-shown]) {
+    opacity: 0;
+  }
+  .picture-card[data-done] > img {
+    filter: grayscale(0.7);
+    opacity: 0.55;
+  }
+  .picture-scrim {
+    background: linear-gradient(
+      to top,
+      rgb(0 0 0 / 0.64),
+      rgb(0 0 0 / 0.3) 50%,
+      light-dark(rgb(0 0 0 / 0), rgb(0 0 0 / 0.16)) 85%
+    );
+  }
+  /* A dark edge round each letter as well as a shadow: the text reads
+   * where the picture is light (as dark as white text needs, D120). */
+  .picture-text {
+    text-shadow:
+      0 0 2px rgb(0 0 0 / 0.9),
+      0 1px 3px rgb(0 0 0 / 0.6);
+  }
+  /*
+   * The Agenda's month banner (design D218): its ground until the picture
+   * comes, a scrim under its name at the top left, and the picture drifting
+   * a little slower than the list as the banner passes, on the compositor
+   * (a scroll-driven animation), where the browser has them and motion is
+   * welcome.
+   */
+  .month-banner {
+    background: var(--ground);
+  }
+  .month-banner-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 0.42),
+      rgb(0 0 0 / 0.12) 45%,
+      light-dark(rgb(0 0 0 / 0), rgb(0 0 0 / 0.14))
+    );
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .month-banner > img {
+        animation: banner-drift linear both;
+        animation-timeline: view();
+      }
+    }
+  }
+  @keyframes banner-drift {
+    from {
+      translate: 0 -6%;
+    }
+    to {
+      translate: 0 6%;
+    }
+  }
+  /* The details' bar over the item's picture, and its close beside it (design D216). */
+  .details-picture {
+    background: var(--ground);
+  }
+  .details-picture button,
+  .details-picture ~ button {
+    background: rgb(0 0 0 / 0.42);
+    color: #ffffff;
+  }
+  .details-picture button:hover,
+  .details-picture ~ button:hover {
+    background: rgb(0 0 0 / 0.58);
+  }
   /* The item a search jumped to (design D53). */
   [data-found] {
     box-shadow:

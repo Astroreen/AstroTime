@@ -54,6 +54,8 @@ async function audit(page: Page, what: string): Promise<void> {
       document
         .getAnimations()
         .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        // One that follows a scroll (a month banner's drift, design D218) never ends.
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
         // One cancelled meanwhile (a popup unmounted) rejects: it is over all the same.
         .map((animation) => animation.finished.catch(() => undefined)),
     ),

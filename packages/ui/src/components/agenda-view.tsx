@@ -11,8 +11,9 @@ import { addDays } from "../calendar/dates.ts";
 import type { DrawnDraft, ObjectCache } from "../calendar/query.ts";
 import { useEntries } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
-import { AgendaCard } from "./items.tsx";
 import { reducedMotion, SLIDE, SLIDE_MS } from "./pager.tsx";
+import { MonthBanner } from "./month-banner.tsx";
+import { AgendaItem } from "./picture-card.tsx";
 import { DayHeader } from "./time-grid.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
@@ -231,9 +232,9 @@ export function AgendaView({
           return (
             <div key={day}>
               {newMonth && (
-                <h2 className="px-4 pt-4 pb-1 text-row font-medium">
+                <MonthBanner month={Number(day.slice(5, 7))} timeZone={timeZone}>
                   {formats.period(day, day, year)}
-                </h2>
+                </MonthBanner>
               )}
               <section data-day={day} className="flex gap-1 py-1 pr-2">
                 <div className="sticky top-0 w-[var(--gutter)] shrink-0 self-start">
@@ -250,7 +251,7 @@ export function AgendaView({
                     </div>
                   )}
                   {items.map((item) => (
-                    <AgendaCard key={item.entry.key} {...item} />
+                    <AgendaItem key={item.entry.key} {...item} />
                   ))}
                   {items.length === 0 && !undone && (
                     <p

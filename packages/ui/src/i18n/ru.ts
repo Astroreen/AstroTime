@@ -280,6 +280,11 @@ export const ru = {
   "settings.keepRunning": "Работать в фоне после закрытия окна",
   "settings.keepRunning.hint":
     "AstroTime продолжает синхронизировать и напоминать; выйти можно из трея или меню.",
+  "settings.pictures": "Картинки",
+  "settings.pictures.illustrations": "Иллюстрации",
+  "settings.pictures.illustrations.hint":
+    "Мероприятия и задачи, в названии которых есть обед, день рождения, перелёт и тому подобное, показываются с картинкой в расписании и в подробностях.",
+  "settings.pictures.banners": "Картинки месяцев в расписании",
   "settings.places": "Места",
   "settings.places.search": "Искать места на карте",
   "settings.places.hint":

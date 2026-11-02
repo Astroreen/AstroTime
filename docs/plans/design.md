@@ -1413,15 +1413,116 @@ reminders.
     as the user's choice. A new device starts from the defaults
     ([Deferred](#deferred)).
 
+### Decided in round 4: pictures
+
+Feedback 7, 8 and 10 of round 4: "drawings when a certain word is detected
+in the title of an event or task, shown in the Schedule too; if there is no
+such word but a place is set, a photo of that place. Like Google does";
+"extra pictures in the Schedule at the change to another month"; "the
+picture banners — it would be good to make your own too". Google Calendar
+for Android is the reference for how they behave and how the text stays
+readable over them, never for what is drawn: every picture is AstroTime's
+own (below).
+
+- **D215. A title's words give an item its theme.** `themeOf`
+  (`pictures/themes.ts`), a pure function of the title: its words, folded
+  as search folds them (case and diacritics aside, `ё` as `е`,
+  [D97](#D97)'s `foldForSearch`), against each theme's words in English and
+  Russian. A word is the word itself (`бег`), the start of a word with its
+  endings (`обед*`: обед, обеда, обеденный, and `пообеда*` for
+  пообедать), several in a row (`new year*`, `новым годом`), or exactly as
+  written where folding would make it another (`=ДР`, not "и др."). Prefixes
+  are chosen not to reach other words (`завтрак*` is not "завтра",
+  `репетиц*` not "репетитор", `йога` is not "йогурт"; "run" alone is not
+  sport, as in "grocery run"). A title with two themes' words gets the more
+  specific: the themes are tried in order, birthday, winter holidays,
+  travel, doctor, study, cinema, music, sport, walk, shopping, meal,
+  coffee ("Birthday dinner" is a birthday, "Coffee at the airport" a
+  trip). Twelve themes now, each drawn with care; more are
+  [Deferred](#deferred). The Day, 3 days, Week and Month views are as they
+  were: pictures are the Agenda's and the details'.
+- **D216. The Agenda's card and the details' header over the picture.**
+  - **A card with a theme** (`picture-card.tsx`) is 104 px high, not
+    44: the picture fills it from the right at its own 3:1 (312 px), and a
+    card wider than that (a wide screen) is filled on its left with the
+    picture's own ground, the picture's left edge fading into it, so it is
+    never cropped to a strip. The title (`text-row`, one line) and the time
+    sit at the bottom left in white over a scrim darkest where the text
+    is, each letter with a dark edge and a shadow (axe's contrast over
+    the text's shadow, as [D119](#D119) audits it); the item's colour is a 4 px band along the
+    bottom, as Google's card has one; a task keeps its check-circle, a done
+    one is struck through and its picture greyed. Its height is known
+    before the picture comes (no shift), the picture fades in once decoded
+    (at once with reduced motion). The same card drags and opens as the
+    plain one does: only how it is drawn changed, inside the Agenda's own
+    rendering. The edit dialog's draft (D155) gets its picture as its title
+    is typed.
+  - **The details** (`item-picture.tsx`): the picture 160 px high across
+    the top, the dialog's bar (close, edit, the menu) over it, its buttons
+    on dark discs (white on black at 42 %) so they read over any picture.
+  - **Dark theme**: the pictures are the same, the scrim a little darker
+    at the top. Each picture is drawn on a mid-tone ground, never white or
+    black, so it sits on both themes.
+- **D217. Settings → Pictures.** A group of its own after Colours:
+  "Illustrations", on by default, with what it does under it; off, every
+  card and the details are plain; and "Month banners in the Agenda"
+  ([D218](#D218)). They are kept with the other settings on this device
+  (D96).
+- **D218. A banner above each month of the Agenda** (`month-banner.tsx`),
+  in place of the month's name over its first day (D87): a picture of the
+  month's season across the list, 144 px high on a phone (edge to edge),
+  176 px from 1024 px (rounded, inset as the cards are), the month's name
+  at its top left in white (`text-title`) over a scrim; the box has its
+  size and the picture's ground before the picture comes. Twelve banners,
+  one a month, each a season and never a holiday (no decorated tree, no
+  pumpkin), so that **south of the equator** a month gets the one six
+  months on (July in Sydney is January's snow): `bannerOf`
+  (`pictures/months.ts`) reads the hemisphere from the user's time zone
+  alone, a list of the southern zones with seasons (Australia, New
+  Zealand, Argentina, Chile, southern Brazil, southern Africa, …), and
+  asks nothing; a zone in the tropics keeps the northern months.
+  **A calm parallax**: the picture drifts 12 % of its height, slower than
+  the list, as the banner passes, a scroll-driven CSS animation
+  (`animation-timeline: view()`) on the compositor, so a phone's scroll
+  does no work for it; none with reduced motion, and none where the
+  browser has no scroll timelines (Firefox, older WebViews), where the
+  picture stands still. Settings → Pictures, "Month banners in the
+  Agenda", on by default; off, the month's name as before.
+- **D219. Pictures weigh nothing at the first load.**
+  - **Each a file of its own** (`pictures/art/*.svg`, imported with
+    `?no-inline`, so Vite never inlines one into a script, D145): the
+    scripts hold only their URLs. The build writes them under
+    `assets/pictures/` (`apps/web/vite.config.ts`).
+  - **Fetched as a card nears the screen** (`loading="lazy"`, the
+    browser's margin around the Agenda's scroller), decoded off the main
+    thread (`decoding="async"`), in a box of fixed size.
+  - **Kept by the service worker as each is first shown**, not with the
+    app (foundation [D124](foundation.md#D124)): the build lists them
+    apart (`ASTROTIME_PICTURES`), the worker answers one from this
+    version's cache or the network's, and keeps it; a new version takes
+    over the pictures the one before kept under the same hashed name.
+    Offline and never shown before, a card is drawn on its ground alone.
+  - **Our own, hand-written SVG** under the repository's licence (AGPL-3.0),
+    drawn for AstroTime in a flat style of its palette (no outlines, two or
+    three tones a colour, no faces, no text); no artwork of Google's or
+    anyone else's is copied or traced. One SVG serves a phone and a wide
+    screen alike, so no `srcset` is needed. The twenty-four (twelve themes,
+    twelve months) are 78 KB, 24.8 KB gzipped, together; the largest, May's
+    meadow, 2.3 KB gzipped.
+
 ## Deferred
 
+- **More illustrated themes** ([D215](#D215)): meetings and calls,
+  haircut, code, cleaning, the car, a wedding, the beach and holidays,
+  Halloween; and words in languages other than English and Russian. Each
+  needs its picture drawn to the same standard first; a theme's words are
+  one line of `themes.ts` once it has one.
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user
   adds some there. Counting from the store's alarms (the user's own items
   only, made or edited in AstroTime) would follow the user everywhere; it
   needs a cheap read of the alarms (a column or table filled as objects are
   saved) so the edit dialog does not parse every object.
-
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
   RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no
   recorded fixture shows how Apple's apps write one, so one with a
