@@ -34,6 +34,25 @@ export function hexColor(value: string): string | null {
   return rgb ? `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}` : null;
 }
 
+/** CSS3's other spellings of colours the table names once. */
+const TWINS = new Set([
+  "cyan",
+  "magenta",
+  "grey",
+  "darkgrey",
+  "darkslategrey",
+  "dimgrey",
+  "lightgrey",
+  "lightslategrey",
+  "slategrey",
+]);
+
+/** Whether `value` is one of CSS3's colour names, in any case. */
+export function isColorName(value: string): boolean {
+  const name = value.trim().toLowerCase();
+  return TWINS.has(name) || named().some(([n]) => n === name);
+}
+
 /** The CSS3 colour name nearest a hex colour, by distance in RGB; `null` for no hex. */
 export function nearestColorName(hex: string): string | null {
   const rgb = rgbOf(hex);

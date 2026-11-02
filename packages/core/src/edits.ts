@@ -8,7 +8,7 @@
 import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
-import { hexColor, nearestColorName } from "./colors.ts";
+import { hexColor, isColorName, nearestColorName } from "./colors.ts";
 import { readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
@@ -321,10 +321,12 @@ function withoutRepeat(changes: ItemChanges): ItemChanges {
 /**
  * `COLOR` takes a CSS colour name: a hex is written as its nearest, as
  * Nextcloud Calendar writes one, and kept exactly in `X-ASTROTIME-COLOR`
- * (D174). A name or none drops the hex.
+ * (D174). A name or none drops the hex; anything else is refused.
  */
 function setColor(component: ICAL.Component, color: string | null): void {
   const exact = hexColor(color ?? "");
+  if (!exact && color && !isColorName(color))
+    throw new RangeError(`Not a CSS3 colour name or a hex: ${color}`);
   setText(component, "color", exact ? nearestColorName(exact)! : (color ?? ""));
   setText(component, X_COLOR, exact ?? "");
 }

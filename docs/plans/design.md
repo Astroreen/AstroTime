@@ -55,7 +55,8 @@ the project.
   colour is drawn visibly darker, a yellow such as `#f6bf26` as a dark
   olive, a pale cyan as a slate teal, as Google's own palette is dark
   enough for white. The colour itself, stored and written back, stays the
-  server's.
+  server's. _Since [D172](#D172):_ a default colour other than the calendar's
+  is a new item's own `COLOR`.
 
 ### Read from the reference
 
@@ -294,7 +295,9 @@ the project.
   (the `Platform`'s `shell`), "Keep running when the window is closed",
   on unless turned off, with a line saying how to quit while it is on
   ([desktop D75](desktop.md#D75)). _Since [D169](#D169):_ "Show week
-  numbers", after "Hide completed tasks".
+  numbers", after "Hide completed tasks". _Since [D172](#D172),
+  [D173](#D173):_ the default colours and the user's own, in a "Colours"
+  group.
 - **D97. Search, in detail** (D53): `Store.search` finds the objects whose
   title holds the text, in the visible calendars, at most 50, the latest
   start first. Migration 6 adds a `titles` column: every component's
@@ -1027,6 +1030,19 @@ Settings, the colours and the lists controls open.
     time list and its reminder menu open, in both themes.
   - A choice may carry something before its name (`leading`), drawn in the
     list and on the button: the colour dropdown's dot.
+  - A value no option has (a calendar gone meanwhile) reads "Not chosen" on
+    the button, never a blank one.
+- **D168. The colour dropdown** (feedback 13: "a dropdown of colours, with
+  a dot of the colour left of its name"), instead of the circles: one
+  `ColorSelect` (`components/color-select.tsx`) in the edit dialog and for
+  Settings' defaults. Its entries, each a dot drawn as an item of the colour
+  is ([D120](#D120)) left of its name: "The calendar's colour" first (its
+  dot the calendar's; in Settings, where there is no one calendar, a ring),
+  the palette's nine CSS names, the user's own colours ([D173](#D173)), and
+  an item's own colour that is none of them (from another client, or one
+  since deleted) by its generated name ([D170](#D170)), or "Its own colour"
+  for a CSS name. A calendar's colour stays the server's: AstroTime does
+  not change it (Deferred).
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group
   after "Hide completed tasks", on unless turned off: today's look stays
@@ -1034,6 +1050,39 @@ Settings, the colours and the lists controls open.
   the week views' pill above the hour labels goes ([D49](#D49)) and the
   Month's column of pills goes, its gap too ([D86](#D86)), so the days
   start at the edge. One value with the other settings ([D96](#D96)).
+- **D170. A colour's generated name** (feedback 10: "a name generator that
+  names the colour from the colour chosen"): a pure function
+  (`calendar/color-names.ts`, in the dialogs' chunks), the same name for
+  the same colour. The hue's family (eighteen, by HSL hue: red, coral,
+  orange, amber, yellow, lime, green, emerald, teal, cyan, azure, blue,
+  indigo, violet, purple, magenta, rose) with one modifier by lightness and
+  saturation: deep, dark, light, pale, dusty or bright. A dark orange is
+  brown, a dark yellow olive, a dark magenta purple, a soft light orange
+  beige, a light red pink; with no saturation it is grey, black or white.
+  English says "Dusty rose", "Deep teal"; Russian names a colour by its
+  adjective, the modifier a prefix of it: "Пыльно-розовый",
+  "Тёмно-синий", "Глубокий бирюзовый".
+  - **The rule:** an own colour's name is `null` while generated, so it
+    follows every change of the colour, and the language spoken. Typing in
+    the name makes it the user's: it stays through changes of the colour
+    until they press "Name it from the colour", or clear the field.
+- **D172. Default colours for new items** (feedback 10): "Colour of new
+  events" and "Colour of new tasks" in Settings' "Colours" group, "The
+  calendar's colour" by default. A default other than that is the new
+  item's own `COLOR`, written when it is saved, as if chosen in its dialog:
+  [D47](#D47) holds, an item's own colour before its calendar's. The dialog
+  opens on the kind's default; switched to the other kind while still in
+  it, the colour follows. An own colour deleted that was a default gives
+  the default back to the calendar's.
+- **D173. The user's own colours** (feedback 10: "make my own colours with
+  their own names"): made, renamed, recoloured and deleted in Settings, in
+  a dialog of their own: a palette (thirteen hues in three tones and three
+  greys, drawn as items of them are) and a hex code, the name generated
+  ([D170](#D170)). They are this device's, with the other settings
+  ([D96](#D96)): Nextcloud keeps no list of a user's colours a client could
+  share, so travelling with the account is Deferred. An item given one
+  keeps its exact hex beside the nearest CSS name
+  ([foundation D174](foundation.md#D174)).
 
 **The items' editor and details.**
 
@@ -1127,6 +1176,13 @@ Settings, the colours and the lists controls open.
   completing changes the first and the third.
 
 ## Deferred
+
+- **Own colours with the account** — the user's colours are this device's
+  ([D173](#D173)); with no place for them on a CalDAV server, a second
+  device starts without them.
+- **A calendar's colour changed here** — the colour dropdown offers it, as
+  the server gives it ([D168](#D168)); setting it is a `PROPPATCH` of
+  `calendar-color` the provider does not do yet.
 
 - **A date picker of our own** — the edit dialog's dates are still the
   browser's date field; its calendar is no list, so [D167](#D167) left it.

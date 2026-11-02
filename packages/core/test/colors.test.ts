@@ -71,3 +71,14 @@ test("another client's COLOR wins over a hex it no longer names; the hex stays i
   // Another case of the same name still names it.
   expect(colorOf(written.replace("COLOR:rosybrown", "COLOR:RosyBrown"))).toBe("#c48b9f");
 });
+
+test("a colour that is neither a CSS3 name nor a hex is refused, nothing written", () => {
+  const object = CalendarObject.parse(fixture("nextcloud-web-event-timed.ics"));
+  for (const color of ["not-a-colour", "#12345", "rgb(1, 2, 3)", "rebeccapurple"]) {
+    expect(() => editItem(object, { color }, { now: NOW })).toThrow(RangeError);
+  }
+  // Every CSS3 spelling is a name: grey as gray, cyan as aqua, in any case.
+  for (const color of ["Grey", "cyan", "LightSlateGrey"]) {
+    expect(editItem(object, { color }, { now: NOW }).ics).toContain(`COLOR:${color}\r\n`);
+  }
+});

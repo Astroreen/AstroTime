@@ -49,6 +49,25 @@ test('"+" creates an event on the day shown from the next half hour; it shows in
   await expect(item(page, "Sunday, November 1", "Haircut, 5:00 – 6:00 PM")).toBeAttached();
 });
 
+test("a reminder picked from the menu is saved with the item and shown in its details (design D167)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await dialog.getByRole("textbox", { name: "Title" }).fill("Call the bank");
+  await dialog.getByRole("button", { name: "Add a reminder" }).click();
+  await page.getByRole("menuitem", { name: "10 minutes before" }).click();
+  await expect(dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem")).toHaveText([
+    "10 minutes before",
+  ]);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await opener(page, "Wednesday, November 4", /^Call the bank, /).click();
+  const details = page.getByRole("dialog", { name: "Call the bank" });
+  await expect(details.getByText("10 minutes before", { exact: true })).toBeVisible();
+});
+
 test("Enter in the title saves; a tap on an empty slot of the grid creates there", async ({
   page,
 }) => {

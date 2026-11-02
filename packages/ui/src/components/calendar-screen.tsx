@@ -81,7 +81,7 @@ export function CalendarScreen({
   const formats = useMemo(() => new Formats(settings), [settings]);
   const { today, minutes } = useNow(timeZone);
   const wide = useMediaQuery("(min-width: 1024px)");
-  const { hideCompleted, weekNumbers } = useSettings().settings;
+  const { hideCompleted, weekNumbers, defaultColors } = useSettings().settings;
 
   const [view, setView] = usePreference<View>(
     preferences,
@@ -285,6 +285,7 @@ export function CalendarScreen({
     today,
     minutes,
     colorOf: (target) => validColor(target.item.color) ?? colorOfCalendar(target.calendarId),
+    defaultColors,
     onChanged: () => scheduler.changed(),
   });
   const pick = (result: SearchResult) => {
