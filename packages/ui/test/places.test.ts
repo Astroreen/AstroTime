@@ -11,6 +11,10 @@ import { changesOf, formOf, newForm } from "../src/calendar/editing.ts";
 import { mapsLink, nameAndAddress, tilesAround } from "../src/places/map.ts";
 import { photon, placesOf } from "../src/places/photon.ts";
 
+/** A calendar object of core's fixtures, as each client writes it. */
+const fixture = (name: string) =>
+  readFileSync(new URL(`../../core/test/fixtures/${name}`, import.meta.url), "utf8");
+
 const recorded = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`fixtures/photon-${name}.json`, import.meta.url), "utf8"));
 
@@ -105,6 +109,11 @@ describe("the search", () => {
     expect(asked).toHaveLength(2);
   });
 
+  test("a language Photon refuses (its recorded 400) rejects the search", async () => {
+    const { search } = fakePhoton(recorded("ru-refused"), 400);
+    await expect(search("Красная площадь", { language: "en", near: null })).rejects.toThrow(/400/);
+  });
+
   test("an answer that is no JSON (a captive portal's page) rejects, and is not kept", async () => {
     const asked: string[] = [];
     const fetch = (async (input: string | URL | Request) => {
@@ -184,6 +193,17 @@ describe("the place card", () => {
       address: "Pariser Platz 1, Berlin",
     });
     expect(nameAndAddress("Café")).toEqual({ name: "Café", address: "" });
+    // Apple's own name and address, when it names them, over any comma.
+    expect(
+      nameAndAddress("Room 5, Building B, Main St", {
+        name: "Room 5, Building B",
+        address: "Main St",
+      }),
+    ).toEqual({ name: "Room 5, Building B", address: "Main St" });
+    // Apple's name with no X-ADDRESS: the address its text holds.
+    expect(
+      nameAndAddress("Apple Park\nOne Apple Park Way", { name: "Apple Park", address: "" }),
+    ).toEqual({ name: "Apple Park", address: "One Apple Park Way" });
   });
 });
 
@@ -232,8 +252,36 @@ describe("the edit dialog's place (D176)", () => {
       "Europe/Berlin",
       "2026-11-04",
     );
-    expect(form.place).toEqual(gate);
+    expect(form.place).toEqual({
+      ...gate,
+      written: { text, name: gate.name, address: gate.address },
+    });
     expect(changesOf(form, form, "R")).toEqual({});
     expect(changesOf(form, { ...form, location: "Café" }, "R").location).toBe("Café");
+    // A form made again from the same item is the same place: nothing to write.
+    const again = formOf(
+      { objectId: "o", calendarId: "c", object, recurrenceId: null, item: object.master! },
+      "Europe/Berlin",
+      "2026-11-04",
+    );
+    expect(again.place).not.toBe(form.place);
+    expect(changesOf(form, again, "R")).toEqual({});
+  });
+
+  test("a copy of Apple's place keeps its lines and its point", () => {
+    const object = CalendarObject.parse(fixture("apple-event-attendees.ics"));
+    const form = formOf(
+      { objectId: "o", calendarId: "c", object, recurrenceId: null, item: object.master! },
+      "America/New_York",
+      "2026-11-04",
+    );
+    // A new item from that form, as "Copy to" makes one: everything it holds.
+    const location = changesOf(null, form, "R").location;
+    expect(location).toMatchObject({
+      name: "Apple Park",
+      address: "One Apple Park Way, Cupertino, CA 95014",
+      geo: { lat: 37.334682, lon: -122.008944 },
+      written: { text: "Apple Park\nOne Apple Park Way, Cupertino" },
+    });
   });
 });

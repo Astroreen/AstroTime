@@ -202,7 +202,12 @@ function Body({
           )}
           {item.location && (
             <Row icon={<PlaceIcon className="size-5" />} label={t("edit.location")}>
-              <PlaceCard location={item.location} geo={item.geo} onCopyFailed={onCopyFailed} />
+              <PlaceCard
+                location={item.location}
+                geo={item.geo}
+                label={item.placeLabel}
+                onCopyFailed={onCopyFailed}
+              />
             </Row>
           )}
           {item.description && (

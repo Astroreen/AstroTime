@@ -74,6 +74,79 @@ describe("reading a place's point", () => {
     expect(master(apple("Cafe Roma Nuovo")).geo).toEqual({ lat: 41.9, lon: 12.5 });
   });
 
+  test("a lone GEO is trusted, even under a text another client changed (D176)", () => {
+    // No client writes GEO without changing it with its text; AstroTime's own
+    // places carry Apple's guard. Pinned, so a change here is a decision.
+    expect(master(event("LOCATION:Somewhere else", "GEO:52.5;13.4")).geo).toEqual({
+      lat: 52.5,
+      lon: 13.4,
+    });
+  });
+
+  test("0,0 is no point: some clients write it for none", () => {
+    expect(master(event("LOCATION:Room 4", "GEO:0;0")).geo).toBeNull();
+    expect(
+      master(
+        event("LOCATION:Room 4", "X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:0,0"),
+      ).geo,
+    ).toBeNull();
+  });
+
+  test("a GEO another parser wrote as text is read as its two numbers", () => {
+    expect(master(event("LOCATION:Somewhere", "GEO;VALUE=TEXT:37.5;-122.1")).geo).toEqual({
+      lat: 37.5,
+      lon: -122.1,
+    });
+  });
+
+  test("Apple's geo: URI as RFC 5870 writes it: an altitude and parameters after the point", () => {
+    const apple = (uri: string) =>
+      master(
+        event(
+          "LOCATION:Apple Park",
+          `X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Apple Park:${uri}`,
+        ),
+      ).geo;
+    expect(apple("geo:52.5,13.4;u=10")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(apple("geo:52.5,13.4,35")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(apple("geo:52.5,13.4,35;crs=wgs84;u=10")).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(master(fixture("apple-event-attendees.ics")).geo).toEqual({
+      lat: 37.334682,
+      lon: -122.008944,
+    });
+  });
+
+  test("GEO's parts are split at its semicolon alone: a decimal comma is no separator", () => {
+    expect(master(event("LOCATION:Somewhere", "GEO;VALUE=TEXT:52,5;13,4")).geo).toBeNull();
+  });
+
+  test("a cut-off GEO is no point", () => {
+    for (const value of ["52.5;", ";13.4", ";", "52.5"])
+      expect(master(event("LOCATION:Somewhere", `GEO;VALUE=TEXT:${value}`)).geo, value).toBeNull();
+    expect(
+      master(event("LOCATION:Somewhere", "X-APPLE-STRUCTURED-LOCATION;VALUE=URI:geo:52.5,")).geo,
+    ).toBeNull();
+  });
+
+  test("Apple's name never goes with a GEO read in its point's stead", () => {
+    const item = master(
+      event(
+        "LOCATION:Apple Park",
+        "GEO:37.3;-122",
+        "X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Apple Park:geo:,",
+      ),
+    );
+    expect([item.geo, item.placeLabel]).toEqual([{ lat: 37.3, lon: -122 }, null]);
+  });
+
+  test("Apple's name and address of the point, beside it", () => {
+    expect(master(fixture("apple-event-attendees.ics")).placeLabel).toEqual({
+      name: "Apple Park",
+      address: "One Apple Park Way, Cupertino, CA 95014",
+    });
+    expect(master(event("LOCATION:Somewhere", "GEO:37.5;-122.1")).placeLabel).toBeNull();
+  });
+
   test("none for a point off the globe, or none at all", () => {
     expect(master(event("LOCATION:Nowhere", "GEO:123;456")).geo).toBeNull();
     expect(master(event("LOCATION:Room 4")).geo).toBeNull();
@@ -136,6 +209,78 @@ describe("writing a place", () => {
     const { ics } = editItem(CalendarObject.parse(placed), { location: "Café" }, { now: NOW });
     expect(ics).not.toMatch(/^(GEO|X-APPLE-STRUCTURED-LOCATION)[:;]/m);
     expect(master(ics)).toMatchObject({ location: "Café", geo: null });
+  });
+
+  test("the same text written again is no change: the point and Apple's every parameter stay (D7)", () => {
+    const source = fixture("apple-event-attendees.ics");
+    const same = master(source).location!;
+    const { ics } = editItem(CalendarObject.parse(source), { location: same }, { now: NOW });
+    const place = (text: string) =>
+      contentLines(text)
+        .filter((line) => /^(LOCATION|GEO|X-APPLE-STRUCTURED-LOCATION)[:;]/.test(line))
+        .map(canonicalLine);
+    expect(place(ics)).toEqual(place(source));
+    expect(place(ics).join()).toContain("X-APPLE-RADIUS=141.17");
+  });
+
+  test("a point off the globe is written as text alone", () => {
+    for (const geo of [
+      { lat: Number.NaN, lon: 13 },
+      { lat: 91, lon: 13 },
+      { lat: 52, lon: Number.POSITIVE_INFINITY },
+    ]) {
+      const { ics } = editItem(
+        CalendarObject.parse(event()),
+        { location: { ...GATE, geo } },
+        { now: NOW },
+      );
+      expect(ics).not.toMatch(/^(GEO|X-APPLE-STRUCTURED-LOCATION)[:;]/m);
+      expect(master(ics)).toMatchObject({ location: placeText(GATE), geo: null });
+    }
+  });
+
+  test("a place with another client's text keeps that text, with its point", () => {
+    const text = "Apple Park\nOne Apple Park Way\nCupertino";
+    const park = {
+      name: "Apple Park",
+      address: "One Apple Park Way",
+      geo: { lat: 37.3, lon: -122 },
+    };
+    const written = { text, name: park.name, address: park.address };
+    const { ics } = editItem(
+      CalendarObject.parse(event()),
+      { location: { ...park, written } },
+      { now: NOW },
+    );
+    expect(master(ics)).toMatchObject({ location: text, geo: { lat: 37.3, lon: -122 } });
+    // A name or an address changed since makes "name, address" again: the old text never hides it.
+    expect(placeText({ ...park, name: "Apple Park Visitor Center", written })).toBe(
+      "Apple Park Visitor Center, One Apple Park Way",
+    );
+    expect(placeText({ ...park, address: "10600 N Tantau Ave", written })).toBe(
+      "Apple Park, 10600 N Tantau Ave",
+    );
+  });
+
+  test("the same place picked again is no change: Apple's every parameter stays (D7)", () => {
+    const source = fixture("apple-event-attendees.ics");
+    const { location, geo } = master(source);
+    const same = {
+      name: "Apple Park",
+      address: "One Apple Park Way, Cupertino",
+      geo: geo!,
+      written: { text: location!, name: "Apple Park", address: "One Apple Park Way, Cupertino" },
+    };
+    const { ics } = editItem(CalendarObject.parse(source), { location: same }, { now: NOW });
+    expect(contentLines(ics).join()).toContain("X-APPLE-RADIUS=141.17");
+    // Its text on another point is a change.
+    const moved = editItem(
+      CalendarObject.parse(source),
+      { location: { ...same, geo: { lat: 37.4, lon: -122 } } },
+      { now: NOW },
+    ).ics;
+    expect(contentLines(moved).join()).not.toContain("X-APPLE-RADIUS=141.17");
+    expect(master(moved).geo).toEqual({ lat: 37.4, lon: -122 });
   });
 
   test("the place removed: no LOCATION and no point", () => {
