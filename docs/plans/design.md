@@ -1842,10 +1842,14 @@ own (below).
   free photos only (`pilicense=free`); a search, not a geosearch, so a
   redirect finds "Brandenburg Gate" for "Brandenburger Tor" and a name in
   Russian its article. **Only the place itself**: an article is taken only
-  when its title shares a telling word with the name (five letters alike,
-  "площадь", "park", "cafe" and the like never enough), so a café with no
-  article of its own gets nothing, not its neighbour's; a photo whose
-  licence Commons does not name is not shown. With none, the plain card.
+  when at least half of the telling words of its title are words of the
+  place's name and half of the name's are the title's (alike in five
+  letters, a shorter word whole: "Tor" is not "Tower"; a word many places
+  share, "площадь", "park", "cafe", "station", never counts, nor the
+  title's note in brackets), so a café with no article of its own gets
+  nothing, not its neighbour's, and a café named after its town ("Café
+  Berlin") is not the town's station; a photo whose licence Commons does
+  not name is not shown. With none, the plain card.
   Wikimedia Commons' geosearch was rejected (random photos near a point,
   not of the place), and Wikidata's (it answered "too busy" when tried).
   **When**: a card asks once it nears the screen (an intersection with the
@@ -1858,14 +1862,17 @@ own (below).
 - **D221. A place's photo is credited, kept and can be turned off.**
   - **Credit** at the foot of the details' header: "Photo: author,
     licence · Wikipedia", the author linking to the photo's Commons page,
-    the licence to its text, "Wikipedia" to the article, as Commons'
-    licences (CC BY, CC BY-SA) ask of a reuse; the Agenda's card, a
+    the licence to its text (only an https address: Commons' metadata is
+    anyone's to edit, so a `javascript:` one is no link), "Wikipedia" to
+    the article, as Commons' licences (CC BY, CC BY-SA) ask of a reuse;
+    the author as text, its HTML's tags gone and its entities read; the Agenda's card, a
     thumbnail that opens the details, does not repeat it.
   - **Kept on this device**, in the preferences (`astrotime.placePhotos`),
     each place by its language, name and rounded point: its photo, or that
     it has none (asked again after 30 days, an article may come), the 300
     latest; the photos themselves as the browser keeps any image. A failed
-    request keeps nothing.
+    request keeps nothing; an entry of another shape (another version's, a
+    hand's) is dropped as it is read, never drawn.
   - **Settings → Pictures, "Photos of places"**, on by default as places
     are (D175), saying what goes where: "A place's name and point (to
     about 100 m) go to en.wikipedia.org for its photo" (ru.wikipedia.org in

@@ -96,22 +96,28 @@ const GENERIC = new Set(
   ].map((word) => foldForSearch(word)),
 );
 
+/** Whether two words are one: alike in their first five letters, or whole when one is shorter. */
+const alike = (a: string, b: string) =>
+  a.length < 5 || b.length < 5 ? a === b : a.slice(0, 5) === b.slice(0, 5);
+
 /**
- * Whether an article's title names the place: a word of each that begins
- * alike, five letters or the whole shorter word ("Brandenburg Gate" for
+ * Whether an article's title names the place: at least half of the
+ * telling words of each are words of the other ("Brandenburg Gate" for
  * "Brandenburger Tor", by a redirect's search; "Красная площадь" for
- * itself), never a word many places share ("площадь", "park"), so a nearby
- * article on something else is not taken for it.
+ * itself). A word many places share ("площадь", "park", "cafe") never
+ * counts, nor the article's note in brackets ("(Москва)"), so a nearby
+ * article on something else is not taken for it: a café named after its
+ * town ("Café Berlin") is not the town's station ("Berlin Brandenburger
+ * Tor station"), whose other words it lacks.
  */
 export function namesPlace(title: string, name: string): boolean {
-  const theirs = wordsOf(title);
-  const telling = wordsOf(name).filter((word) => !GENERIC.has(word));
-  return telling.some((word) =>
-    theirs.some((other) => {
-      const length = Math.min(5, word.length, other.length);
-      return word.slice(0, length) === other.slice(0, length);
-    }),
-  );
+  const telling = (text: string) => wordsOf(text).filter((word) => !GENERIC.has(word));
+  const theirs = telling(title.replace(/\([^)]*\)/g, " "));
+  const ours = telling(name);
+  if (theirs.length === 0 || ours.length === 0) return false;
+  const shared = (of: readonly string[], among: readonly string[]) =>
+    of.filter((word) => among.some((other) => alike(word, other))).length;
+  return shared(ours, theirs) * 2 >= ours.length && shared(theirs, ours) * 2 >= theirs.length;
 }
 
 /** The keys a place is kept under: its language, name and point rounded as asked. */
@@ -138,7 +144,12 @@ export function wikipediaPhotos(
     if (stored) return stored;
     try {
       const value: unknown = JSON.parse(preferences.get(KEY) ?? "{}");
-      stored = value && typeof value === "object" ? (value as Record<string, Kept>) : {};
+      // What another version or a hand left there is read with care: an
+      // entry of any other shape is dropped, so no card draws from it.
+      stored =
+        value && typeof value === "object"
+          ? Object.fromEntries(Object.entries(value).filter(([, kept]) => isKept(kept)))
+          : {};
     } catch {
       stored = {};
     }
@@ -244,8 +255,39 @@ async function ask(
     source: `https://commons.wikimedia.org/wiki/${encodeURIComponent(file.replaceAll(" ", "_"))}`,
     author: author === "" ? null : author,
     licence,
-    licenceUrl: metadata?.LicenseUrl?.value?.trim() || null,
+    licenceUrl: httpsOf(metadata?.LicenseUrl?.value),
   };
+}
+
+const isText = (value: unknown): value is string => typeof value === "string";
+const isTextOrNull = (value: unknown) => value === null || isText(value);
+
+/** Whether what was stored for a place is a `Kept`: a photo of every field, or none. */
+export function isKept(value: unknown): value is Kept {
+  if (!value || typeof value !== "object") return false;
+  const { photo, at } = value as { photo?: unknown; at?: unknown };
+  if (typeof at !== "number") return false;
+  if (photo === null) return true;
+  if (!photo || typeof photo !== "object") return false;
+  const p = photo as Record<keyof PlacePhoto, unknown>;
+  return (
+    [p.url, p.small, p.article, p.source, p.licence].every(isText) &&
+    isTextOrNull(p.author) &&
+    isTextOrNull(p.licenceUrl) &&
+    [p.url, p.small, p.article, p.source].every((url) => httpsOf(url as string) !== null) &&
+    (p.licenceUrl === null || httpsOf(p.licenceUrl as string) !== null)
+  );
+}
+
+/** A web address to link to, only an https one: Commons' metadata is anyone's to edit. */
+export function httpsOf(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 async function query(
@@ -261,13 +303,29 @@ async function query(
   return answer.json();
 }
 
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" };
+const ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
 
-/** Commons' HTML credit as text: its tags gone, its entities read, its spaces one. */
+/** Commons' HTML credit as text: its tags gone, its entities read (named and numbered), its spaces one. */
 export function textOf(html: string): string {
   return html
     .replaceAll(/<[^>]*>/g, " ")
-    .replaceAll(/&(amp|lt|gt|quot|#39);/g, (_, entity: string) => ENTITIES[entity]!)
+    .replaceAll(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
+      if (name.startsWith("#")) {
+        const code =
+          name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : Number(name.slice(1));
+        return Number.isFinite(code) && code > 0 && code <= 0x10ffff
+          ? String.fromCodePoint(code)
+          : entity;
+      }
+      return ENTITIES[name.toLowerCase()] ?? entity;
+    })
     .replaceAll(/\s+/g, " ")
     .replace(/\s+,/g, ",")
     .trim();

@@ -31,14 +31,12 @@ export function contentSecurityPolicy(
   // Places on the map (D178): the Photon Location searches, the tiles of
   // the place card's map, and the Wikipedias and Wikimedia a place's photo
   // comes from (design D221); none when the deployment turned places off.
-  const photon =
-    places === null
-      ? ""
-      : ` ${[places, ...Object.values(PLACES.wikipedias)].map((url) => new URL(url).origin).join(" ")}`;
-  const tiles =
-    places === null
-      ? ""
-      : ` ${[PLACES.tiles, ...PLACES.photos].map((url) => new URL(url).origin).join(" ")}`;
+  const origins = (urls: readonly string[]) =>
+    places === null ? "" : ` ${urls.map((url) => new URL(url).origin).join(" ")}`;
+  // What the page asks: the place search, and the Wikipedias a photo is looked up in.
+  const connect = origins(places === null ? [] : [places, ...Object.values(PLACES.wikipedias)]);
+  // What it draws: the map's tiles, and Wikimedia's photos.
+  const images = origins([PLACES.tiles, ...PLACES.photos]);
   return [
     // Nothing the app does not ask for below: no frames, objects, fonts or media.
     "default-src 'none'",
@@ -48,13 +46,13 @@ export function contentSecurityPolicy(
     nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
     // SQLite's wasm, every CalDAV request through /dav-proxy/ (D39), and
     // the place search and a place photo's lookup, which never go through the proxy (D178).
-    `connect-src 'self'${photon}`,
+    `connect-src 'self'${connect}`,
     // The store's worker (packages/storage/src/web), and the service worker
     // that keeps the app's files for starting offline (D124).
     "worker-src 'self'",
     // The web app manifest and its icons, the page's icon among them (D124).
     "manifest-src 'self'",
-    `img-src 'self'${tiles}`,
+    `img-src 'self'${images}`,
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",

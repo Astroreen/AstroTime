@@ -118,7 +118,6 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "study session",
       "study group",
       "studying",
-      "studying",
       "homework",
       "seminar*",
       "tutor*",

@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { namesPlace, textOf, wikipediaPhotos } from "../src/places/photos.ts";
+import { httpsOf, isKept, namesPlace, textOf, wikipediaPhotos } from "../src/places/photos.ts";
 import { memoryPreferences } from "../src/preferences.ts";
 
 const recorded = (name: string): unknown =>
@@ -107,6 +107,44 @@ describe("a place's photo from Wikipedia", () => {
     expect(await wikipediaPhotos(memoryPreferences(), fetch).find(GATE, "en")).toBeNull();
   });
 
+  test("a licence's link that is no https address is not linked: Commons' metadata is anyone's to edit", async () => {
+    const info = recorded("en-imageinfo") as {
+      query: { pages: { imageinfo: { extmetadata: { LicenseUrl: { value: string } } }[] }[] };
+    };
+    info.query.pages[0]!.imageinfo[0]!.extmetadata.LicenseUrl.value = "javascript:alert(1)";
+    const { fetch } = fakeWikipedia(recorded("en-search"), info);
+    const photo = await wikipediaPhotos(memoryPreferences(), fetch).find(GATE, "en");
+    expect(photo?.licence).toBe("CC BY-SA 3.0");
+    expect(photo?.licenceUrl).toBeNull();
+    expect(httpsOf("http://creativecommons.org/")).toBeNull();
+    expect(httpsOf(" https://creativecommons.org/licenses/by/4.0 ")).toBe(
+      "https://creativecommons.org/licenses/by/4.0",
+    );
+  });
+
+  test("what is kept of another shape is dropped as it is read, never drawn", async () => {
+    const { fetch } = fakeWikipedia();
+    const good = await wikipediaPhotos(memoryPreferences(), fetch).find(GATE, "en");
+    const key = (name: string) => `en|${name}|52.517,13.381`;
+    const preferences = memoryPreferences({
+      "astrotime.placePhotos": JSON.stringify({
+        [key("brandenburger tor")]: { photo: good, at: 1 },
+        [key("a")]: { photo: "not a photo", at: 1 },
+        [key("b")]: { photo: { ...good, url: "javascript:alert(1)" }, at: 1 },
+        [key("c")]: "garbage",
+        [key("d")]: { photo: null },
+      }),
+    });
+    const photos = wikipediaPhotos(preferences, fetch);
+    expect(photos.known(GATE, "en")).toEqual(good);
+    for (const name of ["a", "b", "c", "d"])
+      expect(photos.known({ name, geo: GATE.geo }, "en"), name).toBeUndefined();
+    expect(isKept({ photo: null, at: 0 })).toBe(true);
+    // Unreadable as a whole: nothing kept.
+    const broken = wikipediaPhotos(memoryPreferences({ "astrotime.placePhotos": "{" }), fetch);
+    expect(broken.known(GATE, "en")).toBeUndefined();
+  });
+
   test("a service that fails rejects, and nothing is kept, so it is asked again", async () => {
     const preferences = memoryPreferences();
     const failing = (async () => new Response("", { status: 503 })) as typeof globalThis.fetch;
@@ -122,6 +160,13 @@ describe("whether a title names the place", () => {
     ["Vilnius", "Vilnius, Lithuania", true],
     ["Berlin Hauptbahnhof", "Café Einstein", false],
     ["DZ Bank Building", "Brandenburger Tor", false],
+    // A café named after its town is not the town's station: most of
+    // each side's words must be the other's.
+    ["Berlin Brandenburger Tor station", "Café Berlin", false],
+    ["Berlin Brandenburger Tor station", "Hotel Mitte", false],
+    // A short word is the same word only whole: "Tor" is not "Tower".
+    ["Tower Bridge", "Tor", false],
+    ["Vilnius", "Vilnius", true],
     // A word many places share is not enough.
     ["Площадь Революции (Москва)", "Красная площадь", false],
     ["Central Park", "Gorky Park", false],
@@ -135,4 +180,6 @@ test("Commons' HTML credit as text", () => {
     "Thomas Wolf, www.foto-tw.de",
   );
   expect(textOf("Ann &amp; Bo &lt;3")).toBe("Ann & Bo <3");
+  expect(textOf("Jos&#233;&nbsp;Ruiz &#x2014; &apos;Pepe&apos;")).toBe("José Ruiz — 'Pepe'");
+  expect(textOf("&unknown; stays")).toBe("&unknown; stays");
 });
