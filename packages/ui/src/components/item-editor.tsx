@@ -2,7 +2,8 @@
 // the whole screen on a phone, a dialog on a wide screen. Event or task when
 // creating; title; all day; start and end (a task's start and its optional
 // due, design D159); the zone when it is not the user's; repeat presets and a
-// custom rule; reminders; the calendar; colour; location; description (a task
+// custom rule; reminders; the calendar; colour; location; description;
+// attachments (design D233) (a task
 // has no status, priority, progress or tags here, design D162). Enter in a
 // field saves, Escape closes.
 import {
@@ -48,6 +49,8 @@ import {
 import { alarmWords, repeatWords } from "../calendar/words.ts";
 import { KEYS } from "../preferences.ts";
 import { defaultColorOf, useSettings } from "../settings.ts";
+import { AttachmentsField } from "./attachments-field.tsx";
+import { AttachmentsIcon } from "./attachments.tsx";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -396,6 +399,15 @@ function Fields({
           rows={4}
           onChange={(e) => set({ description: e.target.value })}
           className={`${field} h-auto py-2`}
+        />
+      </Section>
+
+      <Section icon={<AttachmentsIcon className="size-5" />}>
+        <AttachmentsField
+          value={form.attachments ?? []}
+          calendar={calendars.find((c) => c.id === form.calendarId)}
+          onChange={(attachments) => set({ attachments })}
+          field={field}
         />
       </Section>
     </div>

@@ -1,8 +1,8 @@
 // The built app under its Content Security Policy (docs/plans/foundation.md#D110),
 // served by the web image's own server: the store opens (wasm in a worker, on
 // OPFS), an account is added through /dav-proxy/, its event's details (with
-// its place's map, D178, and its photo, design D220) and edit dialog (with
-// Location's search) open, and
+// its place's map, D178, its photo, design D220, and an inline attachment
+// saved, design D230) and edit dialog (with Location's search) open, and
 // the browser reports not one violation. The
 // production build has no demo data (D57), so the app starts on its
 // first-run screen, which shows only once the store is open.
@@ -73,7 +73,7 @@ test("the built app opens its store, adds an account through the proxy, and brea
       Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}`,
       "Content-Type": "text/calendar",
     },
-    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nDESCRIPTION:Notes: https://example.com/plan. Not a link: javascript:alert(1)\r\nLOCATION:Brandenburg Gate\\, Pariser Platz 1\\, Berlin\r\nGEO:52.51627;13.377703\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nDESCRIPTION:Notes: https://example.com/plan. Not a link: javascript:alert(1)\r\nLOCATION:Brandenburg Gate\\, Pariser Platz 1\\, Berlin\r\nGEO:52.51627;13.377703\r\nATTACH;ENCODING=BASE64;VALUE=BINARY;FMTTYPE=text/plain;FILENAME=agenda.txt:MS4gQnVkZ2V0Cg==\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
   });
   expect(response.status).toBe(201);
 
@@ -200,6 +200,14 @@ test("the built app opens its store, adds an account through the proxy, and brea
   );
   await expect(details.getByRole("link", { name: "CC BY-SA 3.0" })).toBeVisible();
   expect(photos.length).toBeGreaterThan(0);
+  // An inline attachment saved: a download link of its bytes (a `blob:`
+  // URL), clicked under the policy (design D230).
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    details.getByRole("button", { name: /^Save agenda\.txt / }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("agenda.txt");
+  expect(readFileSync(await download.path(), "utf8")).toBe("1. Budget\n");
   await details.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog", { name: "Edit event" });
   await expect(edit).toBeVisible();

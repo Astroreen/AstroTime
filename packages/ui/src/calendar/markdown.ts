@@ -31,11 +31,16 @@ export type Block =
   | { readonly type: "rule" };
 
 /**
- * The parser's steps, counted where it walks the text: a test reads it to
+ * A parse's steps, counted where it walks the text: a test reads them to
  * see that twice the text costs about twice the work (design D207), with
  * no clock.
  */
-export const work = { steps: 0 };
+export interface ParseStats {
+  steps: number;
+}
+
+/** The stats of the parse running now: each parse has its own (parsing never waits). */
+let work: ParseStats = { steps: 0 };
 
 /** How deep quotes and lists nest before the rest reads as text. */
 const DEEPEST = 8;
@@ -49,18 +54,46 @@ const ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])([ \t]+|$)/;
 const BLANK = /^[ \t]*$/;
 
 /** The description as blocks. */
-export function parseMarkdown(text: string): readonly Block[] {
+export function parseMarkdown(text: string, stats: ParseStats = { steps: 0 }): readonly Block[] {
+  work = stats;
   work.steps += text.length;
-  return blocks(text.replace(/\r\n?/g, "\n").split("\n").map(expandIndent), 0);
+  return blocks(text.replace(/\r\n?/g, "\n").split("\n"), 0);
 }
 
-/** A line's leading tabs as spaces to the next stop of 4, so indents count and cut in columns. */
-function expandIndent(line: string): string {
-  const lead = /^[ \t]*/.exec(line)![0];
-  if (!lead.includes("\t")) return line;
+/** A line's indent in columns, a tab to the next stop of 4. */
+function indentOf(line: string): number {
   let columns = 0;
-  for (const char of lead) columns = char === "\t" ? columns + 4 - (columns % 4) : columns + 1;
-  return " ".repeat(columns) + line.slice(lead.length);
+  for (const char of line) {
+    if (char === " ") columns++;
+    else if (char === "\t") columns += 4 - (columns % 4);
+    else break;
+  }
+  return columns;
+}
+
+/**
+ * The line without `count` columns of its indent: a tab that reaches past
+ * them leaves its remaining columns as spaces. Only the indent is touched; a
+ * tab in a code block's text stays a tab.
+ */
+function dropColumns(line: string, count: number): string {
+  let columns = 0;
+  let at = 0;
+  while (at < line.length && columns < count) {
+    const char = line[at]!;
+    if (char === " ") columns++;
+    else if (char === "\t") columns += 4 - (columns % 4);
+    else break;
+    at++;
+  }
+  return " ".repeat(Math.max(0, columns - count)) + line.slice(at);
+}
+
+/** A heading's level and words; none without words: a lone "#" is text. */
+function headingOf(line: string): { level: number; words: string } | null {
+  const heading = HEADING.exec(line);
+  const words = heading ? headingWords(heading[2] ?? "") : "";
+  return heading && words ? { level: heading[1]!.length, words } : null;
 }
 
 /**
@@ -70,7 +103,7 @@ function expandIndent(line: string): string {
  */
 const interrupts = (line: string) =>
   FENCE.test(line) ||
-  HEADING.test(line) ||
+  headingOf(line) !== null ||
   RULE.test(line) ||
   QUOTE.test(line) ||
   /^ {0,3}(?:[-*+]|1[.)])[ \t]+\S/.test(line);
@@ -106,13 +139,9 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       out.push({ type: "code", text: body.join("\n") });
       continue;
     }
-    const heading = HEADING.exec(line);
+    const heading = headingOf(line);
     if (heading) {
-      out.push({
-        type: "heading",
-        level: heading[1]!.length,
-        children: inline(headingWords(heading[2] ?? "")),
-      });
+      out.push({ type: "heading", level: heading.level, children: inline(heading.words) });
       i++;
       continue;
     }
@@ -147,7 +176,8 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       !BLANK.test(lines[i]!) &&
       (body.length === 0 || !interrupts(lines[i]!))
     ) {
-      body.push(lines[i++]!.trim());
+      // Its spaces kept as typed: a plain description reads as it was written.
+      body.push(lines[i++]!.trimEnd());
     }
     out.push({ type: "paragraph", children: inline(body.join("\n")) });
   }
@@ -165,26 +195,28 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // "* * *" or "- - -" after an item is a rule that ends the list, not an item.
     if (!marker || RULE.test(lines[i]!) || /\d/.test(marker[2]!) !== ordered) break;
     // What follows the marker; the lines under it are indented at least this far.
-    const indent = marker[0].length;
-    const body = [lines[i]!.slice(indent)];
+    // Its content's column, its marker's indent and width included (as
+    // CommonMark's): a line under it belongs to it from this column on.
+    const indent = indentOf(marker[0].replace(/\S/g, " ") + "x");
+    const body = [lines[i]!.slice(marker[0].length)];
     i++;
     while (i < lines.length) {
       const next = lines[i]!;
       if (BLANK.test(next)) {
         // A blank line ends the item unless what follows is still indented under it.
         const after = lines[i + 1];
-        if (after !== undefined && !BLANK.test(after) && indentOf(after) >= Math.min(indent, 2)) {
+        if (after !== undefined && !BLANK.test(after) && indentOf(after) >= indent) {
           body.push("");
           i++;
           continue;
         }
         break;
       }
-      if (indentOf(next) >= Math.min(indent, 2))
-        body.push(next.slice(Math.min(indent, indentOf(next))));
+      if (indentOf(next) >= indent) body.push(dropColumns(next, indent));
       else if (ITEM.test(next) || interrupts(next)) break;
-      // A lazy line carries the item's paragraph on.
-      else body.push(next);
+      // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
+      else if (body.at(-1)?.trim()) body.push(next);
+      else break;
       i++;
     }
     const task = /^\[([ xX])\](?:[ \t]+|$)/.exec(body[0]!);
@@ -198,9 +230,6 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
   }
   return [{ type: "list", start: ordered ? Number.parseInt(first[2]!, 10) : null, items }, i];
 }
-
-/** A line's indent in columns: its tabs were made spaces (`expandIndent`). */
-const indentOf = (line: string) => /^ */.exec(line)![0].length;
 
 /** The schemes a link may have: the web, mail and the phone. */
 export function safeHref(href: string): string | null {
@@ -230,8 +259,10 @@ type Mark = (typeof DELIMITERS)[number][0];
  */
 function closersOf(text: string): Record<Mark, number[]> {
   const found = { "**": [], __: [], "~~": [], "*": [], _: [] } as Record<Mark, number[]>;
+  const hidden = hiddenIn(text);
   work.steps += text.length;
   for (let at = 1; at < text.length; at++) {
+    if (hidden[at]) continue;
     const before = text[at - 1]!;
     if (/\s/.test(before) || before === "\\") continue;
     for (const [mark] of DELIMITERS) {
@@ -243,6 +274,48 @@ function closersOf(text: string): Record<Mark, number[]> {
     }
   }
   return found;
+}
+
+const BARE_ANYWHERE = /(?:https?:\/\/|mailto:)[^\s<>"]+/gi;
+
+/**
+ * Where no mark closes: inside a code span (it wins over emphasis,
+ * `*a `b*` c`), and inside a bare link, but for the marks after it that may
+ * close emphasis opened before it.
+ */
+function hiddenIn(text: string): Uint8Array {
+  const hidden = new Uint8Array(text.length);
+  const unclosed = new Set<number>();
+  for (let at = 0; at < text.length;) {
+    work.steps++;
+    if (text[at] === "\\") {
+      at += 2;
+      continue;
+    }
+    if (text[at] !== "`") {
+      at++;
+      continue;
+    }
+    let length = 1;
+    while (text[at + length] === "`") length++;
+    const end = unclosed.has(length) ? -1 : text.indexOf("`".repeat(length), at + length);
+    if (end < 0) {
+      unclosed.add(length);
+      at += length;
+      continue;
+    }
+    work.steps += end - at;
+    hidden.fill(1, at, end + length);
+    at = end + length;
+  }
+  BARE_ANYWHERE.lastIndex = 0;
+  for (let link = BARE_ANYWHERE.exec(text); link; link = BARE_ANYWHERE.exec(text)) {
+    work.steps += link[0].length;
+    if (!WORD.test(text[link.index - 1] ?? "")) {
+      hidden.fill(1, link.index, link.index + linkOf(link[0], "*_~").length);
+    }
+  }
+  return hidden;
 }
 
 /** The first of `sorted` at or after `from`, by halves. */
@@ -339,7 +412,9 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       const link = linkAt(text, i + (image ? 1 : 0), brackets.get(i + (image ? 1 : 0)));
       if (link) {
         const href = safeHref(link.href);
-        const children = inline(link.text, false, depth + 1);
+        const words = inline(link.text, false, depth + 1);
+        // A link with no words is named by where it goes, so it can be seen and pressed.
+        const children = words.length > 0 ? words : [href ?? link.href];
         if (href) push({ type: "link", href, children });
         else {
           // Not a link it may follow: its words, as written.
@@ -437,7 +512,8 @@ function linkAt(
       else if (code === 40) open++; // "("
       else if (code === 41 && open-- === 0) break; // ")"
     }
-    href = text.slice(start, at);
+    // Its escapes taken out: `\)` is a ")" of the address.
+    href = text.slice(start, at).replace(/\\([!-/:-@[-`{-~])/g, "$1");
   }
   skip();
   if (text[at] === '"') {

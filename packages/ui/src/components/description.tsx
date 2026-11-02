@@ -2,6 +2,7 @@
 // React elements from `parseMarkdown`'s tree: nothing is read as HTML, and a
 // link opens elsewhere, without the page that opened it.
 import { useId, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon } from "./icons.tsx";
 import { parseMarkdown, type Block, type Inline, type ListItem } from "../calendar/markdown.ts";
@@ -17,7 +18,12 @@ const HEADINGS = ["text-title", "text-row font-semibold", "text-body font-semibo
 function block(node: Block, key: number): ReactNode {
   switch (node.type) {
     case "paragraph":
-      return <p key={key}>{node.children.map(inline)}</p>;
+      // Spaces as typed, as the plain text it is in other clients.
+      return (
+        <p key={key} className="whitespace-pre-wrap">
+          {node.children.map(inline)}
+        </p>
+      );
     case "heading": {
       const Tag = `h${Math.min(6, node.level + 2)}` as "h3";
       return (
@@ -27,14 +33,7 @@ function block(node: Block, key: number): ReactNode {
       );
     }
     case "code":
-      return (
-        <pre
-          key={key}
-          className="overflow-x-auto rounded-lg bg-canvas p-3 font-mono text-small whitespace-pre"
-        >
-          <code>{node.text}</code>
-        </pre>
-      );
+      return <Code key={key} text={node.text} />;
     case "quote":
       return (
         <blockquote
@@ -67,11 +66,27 @@ function block(node: Block, key: number): ReactNode {
   }
 }
 
+/** A code block, which scrolls sideways: a keyboard reaches it too. */
+function Code({ text }: { text: string }) {
+  const { t } = useTranslation();
+  return (
+    <pre
+      tabIndex={0}
+      role="group"
+      aria-label={t("description.code")}
+      className="overflow-x-auto rounded-lg bg-canvas p-3 font-mono text-small whitespace-pre focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <code>{text}</code>
+    </pre>
+  );
+}
+
 /**
  * A list's item; a checklist's with its box where a bullet would be, drawn
  * as it is written: read-only, not ticked here (the text stays the user's).
  */
 function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
+  const { t } = useTranslation();
   const id = useId();
   const body = <div className="flex flex-col gap-1">{item.children.map(block)}</div>;
   if (item.checked === null) return <li>{body}</li>;
@@ -82,7 +97,8 @@ function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
         role="checkbox"
         aria-checked={item.checked}
         aria-readonly="true"
-        aria-labelledby={id}
+        // An item with no words is still named.
+        {...(first ? { "aria-labelledby": id } : { "aria-label": t("description.emptyItem") })}
         className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded ${item.checked ? "bg-accent text-on-accent" : "ring-1 ring-ink-muted ring-inset"}`}
       >
         {item.checked && <CheckIcon className="size-3.5" />}
