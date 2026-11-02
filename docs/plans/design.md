@@ -1141,7 +1141,10 @@ Settings, the colours and the lists controls open.
     as a snackbar does. **"Copy to…"** opens the edit dialog as a new
     item, every field filled from this one, the calendar too (the first
     that takes it, when its own takes no new items); its kind cannot be
-    switched; Save makes it wherever the dialog says.
+    switched; Save makes it wherever the dialog says, the copy with the
+    user's changes, its first revision (`SEQUENCE:0`, `createFromCopy`).
+    One notice shows at a time: a copy's replaces a failed change's, and
+    the other way round.
   - **An occurrence of a series is copied alone**, as an item that does
     not repeat, at that occurrence's time and with its exception's fields:
     the copy is what the user tapped. Google's own help does not say, and a

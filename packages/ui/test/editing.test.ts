@@ -1261,6 +1261,8 @@ describe("copies (design D164)", () => {
     expect(row.ics).toContain("LOCATION:Pool\r\n");
     expect(row.ics).toContain("X-OTHER-CLIENT:kept\r\n");
     expect(row.ics).toContain("UID:swim-copy\r\n");
+    // A new item, its first revision, however many changes it took.
+    expect(row.ics).toContain("SEQUENCE:0\r\n");
     // The original stays where it was.
     expect((await store.objectAt(personal.id, "swim.ics"))!.ics).toBe(stored.ics);
   });

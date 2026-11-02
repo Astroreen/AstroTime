@@ -208,9 +208,13 @@ export function useEditingState({
     current.target ? byId(current.initial?.calendarId) : undefined;
 
   const [notice, setNotice] = useState<Notice | null>(null);
+  /** The copy "Make a copy" made, whose notice opens it (design D164). */
+  const [copied, setCopied] = useState<Target | null>(null);
   /** A change made outside the edit dialog; the user is told when it did not land (D99). */
   const write = (work: Promise<unknown>, action: "change" | "delete" = "change") => {
+    // One notice at a time, in one place: the newest replaces the other.
     setNotice(null);
+    setCopied(null);
     void work.then(onChanged, (error: unknown) => {
       const told = noticeOf(error, action);
       if (told === null) return onChanged();
@@ -370,7 +374,6 @@ export function useEditingState({
   };
 
   const writes = () => ({ now: Date.now(), uid: () => crypto.randomUUID() });
-  const [copied, setCopied] = useState<Target | null>(null);
 
   /** "Make a copy" (design D164): saved at once, then a notice that opens it. */
   const copy = () => {
@@ -386,6 +389,7 @@ export function useEditingState({
       (error: unknown) => {
         const told = noticeOf(error, "change");
         if (told === "failed") console.error(error);
+        setCopied(null);
         setNotice(told);
       },
     );

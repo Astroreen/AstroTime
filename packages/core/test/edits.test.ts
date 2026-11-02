@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   CalendarObject,
   copyItem,
+  createFromCopy,
   createItem,
   deleteItem,
   editItem,
@@ -1697,6 +1698,55 @@ describe("a copy of an item (design D164)", () => {
       summary: "Long stand-up",
       start: vilnius("2026-11-05T10:00:00"),
     });
+  });
+
+  test("of an all-day occurrence is that day, all day, a day long", () => {
+    const market = object(
+      "BEGIN:VEVENT\r\nUID:market\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Market\r\nDTSTART;VALUE=DATE:20261103\r\nDTEND;VALUE=DATE:20261104\r\nRRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\n",
+    );
+    const copy = copyItem(market, { type: "date", date: "2026-11-17" }, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({
+      start: { type: "date", date: "2026-11-17" },
+      end: { type: "date", date: "2026-11-18" },
+      recurring: false,
+    });
+    expect(copy).toContain("DTSTART;VALUE=DATE:20261117\r\n");
+  });
+
+  test("of a timed occurrence in another zone keeps that zone and its definition", () => {
+    const york = CalendarObject.parse(
+      "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Other//EN\r\nBEGIN:VTIMEZONE\r\nTZID:America/New_York\r\nBEGIN:STANDARD\r\nDTSTART:19701101T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\nEND:STANDARD\r\nBEGIN:DAYLIGHT\r\nDTSTART:19700308T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\nTZOFFSETFROM:-0500\r\nTZOFFSETTO:-0400\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nUID:call\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Call\r\nDTSTART;TZID=America/New_York:20261102T090000\r\nDTEND;TZID=America/New_York:20261102T093000\r\nRRULE:FREQ=DAILY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    );
+    const at = zonedTime("2026-11-04T09:00:00", "America/New_York");
+    const copy = copyItem(york, at, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({
+      start: at,
+      end: zonedTime("2026-11-04T09:30:00", "America/New_York"),
+    });
+    expect(copy).toContain("DTSTART;TZID=America/New_York:20261104T090000\r\n");
+    expect(copy).toContain("TZID:America/New_York\r\n");
+  });
+
+  test("Copy to: its changes made on the copy, its first revision whatever they were", () => {
+    const meeting = object(
+      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nX-OTHER:kept\r\nEND:VEVENT\r\n",
+    );
+    const copy = copyItem(meeting, null, { now: NOW, uid: "copy" });
+    const made = createFromCopy(
+      copy,
+      {
+        summary: "Planning 2",
+        time: { start: vilnius("2026-11-06T10:00:00"), end: vilnius("2026-11-06T11:00:00") },
+      },
+      { now: NOW },
+    );
+    expect(CalendarObject.parse(made).master).toMatchObject({
+      uid: "copy",
+      summary: "Planning 2",
+      sequence: 0,
+      start: vilnius("2026-11-06T10:00:00"),
+    });
+    expect(made).toContain("X-OTHER:kept\r\n");
   });
 
   test("of a completed task is a task to do, its start, due, star and parent kept", () => {

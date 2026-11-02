@@ -7,6 +7,7 @@ import {
   ALL_RIGHTS,
   CalendarObject,
   copyItem,
+  createFromCopy,
   createItem,
   deleteItem,
   editItem,
@@ -813,9 +814,7 @@ export async function saveForm(
   const { target, initial, form, untitled } = request;
   if (!target || !initial) {
     const ics = request.base
-      ? editItem(CalendarObject.parse(request.base), changesOf(initial, form, untitled), {
-          now: writes.now,
-        }).ics
+      ? createFromCopy(request.base, changesOf(initial, form, untitled), { now: writes.now })
       : createItem(form.kind, changesOf(null, form, untitled), {
           now: writes.now,
           uid: writes.uid(),

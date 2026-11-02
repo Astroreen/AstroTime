@@ -209,6 +209,24 @@ export function copyItem(
 }
 
 /**
+ * A new item from a copy (`copyItem`) with what the user changed: "Copy
+ * to…" (design D164). Its first revision, `SEQUENCE:0`, as a new UID's is,
+ * however many changes it took. Returns the iCalendar text.
+ */
+export function createFromCopy(
+  copy: string,
+  changes: ItemChanges,
+  options: { readonly now: number },
+): string {
+  const object = CalendarObject.parse(editItem(CalendarObject.parse(copy), changes, options).ics);
+  const { master, exceptions } = object.components;
+  for (const component of [master, ...exceptions]) {
+    component?.updatePropertyWithValue("sequence", 0);
+  }
+  return object.serialize();
+}
+
+/**
  * The object with `changes` made in `scope` (all occurrences by default).
  * "This and following" ends the series before the occurrence and returns
  * the rest as a new series, `split`, under `newUid`; from the first
