@@ -200,8 +200,8 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // Five spaces or more after the marker start an indented line of the
     // item: its column is then one past the marker.
     const marked = indentOf(marker[1]! + marker[2]!.replace(/./g, " ") + "x");
-    const after = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
-    const indent = after >= 5 ? marked + 1 : marked + after;
+    const spaces = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
+    const indent = spaces >= 5 ? marked + 1 : marked + spaces;
     const body = [lines[i]!.slice(marker[0].length)];
     i++;
     while (i < lines.length) {
