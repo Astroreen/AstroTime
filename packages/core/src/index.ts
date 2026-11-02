@@ -1,6 +1,8 @@
 export { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 export type { Alarm, Event, Geo, Item, Participant, Task } from "./item.ts";
 export { colorNameHex, isColorName } from "./colors.ts";
+export type { Attachment, NewAttachment } from "./attachments.ts";
+export { inlineFile, type InlineFile } from "./inline-file.ts";
 export {
   boundsOf,
   ExpansionLimitError,

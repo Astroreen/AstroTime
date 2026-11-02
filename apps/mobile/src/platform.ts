@@ -4,7 +4,8 @@
 // back button (D68), preferences in the WebView's localStorage, reminders
 // as local notifications (D66), the Web Locks it shares with background
 // sync's WebView (D67), and places on the map, searched from the WebView and
-// opened in the user's maps app by a `geo:` URI (foundation D178).
+// opened in the user's maps app by a `geo:` URI (foundation D178); a file
+// saved through the shell's "Save to" picker (design D230).
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { PLACES } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
@@ -19,11 +20,11 @@ import { remindersLock, syncLock } from "./locks.ts";
 import { preferences } from "./preferences.ts";
 import { androidReminders } from "./reminders.ts";
 import { keystoreSecrets } from "./secrets.ts";
-import { backButton } from "./shell.ts";
+import { backButton, saveFile, type NativeShell } from "./shell.ts";
 
 const http = registerPlugin<NativeHttp>("AstroTimeHttp");
 
-export function mobilePlatform(store: Promise<Store>): Platform {
+export function mobilePlatform(store: Promise<Store>, shell: NativeShell): Platform {
   const signingIn = new SigningIn();
   const secrets = keystoreSecrets(SecureStorage);
   return {
@@ -41,6 +42,9 @@ export function mobilePlatform(store: Promise<Store>): Platform {
     // No Custom Tab or browser to open it: the system's own handling of the link.
     openExternal: (url) => void Browser.open({ url }).catch(() => window.open(url, "_blank")),
     signingInTo: (server) => signingIn.begin(server),
+    // An inline attachment saved where the user picks (design D230): the
+    // WebView downloads no `blob:` link.
+    saveFile: saveFile(shell),
     onBack: backButton(App),
     preferences,
     places: { photon: PLACES.photon, tiles: PLACES.tiles, links: "geo" },

@@ -1,5 +1,6 @@
 import ICAL from "ical.js";
 
+import { attachmentsOf, type Attachment } from "./attachments.ts";
 import { hexColor, nearestColorName } from "./colors.ts";
 import { fromIcalTime, keepTzid, type ItemTime } from "./time.ts";
 
@@ -84,6 +85,8 @@ interface ItemFields {
   /** Whether the item has `RRULE` or `RDATE`. */
   readonly recurring: boolean;
   readonly alarms: readonly Alarm[];
+  /** `ATTACH`: links and inline files (foundation D229). */
+  readonly attachments: readonly Attachment[];
 }
 
 /** A `VEVENT` (GLOSSARY.md: Event). */
@@ -271,6 +274,7 @@ function fields(component: ICAL.Component): ItemFields {
     alarms: component
       .getAllSubcomponents("valarm")
       .map((valarm) => alarm(valarm, utcTime(component, "x-moz-lastack"))),
+    attachments: attachmentsOf(component),
   };
 }
 

@@ -19,7 +19,8 @@ const languages = navigator.languages.length > 0 ? navigator.languages : [naviga
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // The system bars follow the theme the app shows (D68).
-followTheme(registerPlugin<NativeShell>("AstroTimeShell"));
+const shell = registerPlugin<NativeShell>("AstroTimeShell");
+followTheme(shell);
 
 async function openStore(): Promise<Store> {
   // Too old for the store: the UI says to update the WebView (D61).
@@ -39,6 +40,10 @@ async function openStore(): Promise<Store> {
 
 createRoot(root).render(
   <StrictMode>
-    <AstroTime platform={mobilePlatform(openStore())} languages={languages} timeZone={timeZone} />
+    <AstroTime
+      platform={mobilePlatform(openStore(), shell)}
+      languages={languages}
+      timeZone={timeZone}
+    />
   </StrictMode>,
 );

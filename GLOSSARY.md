@@ -48,6 +48,11 @@ One word per concept. Use these terms in code, docs, commits and UI.
   address") with its **point** (`GEO`, and Apple's structured location).
   Text typed and not picked is a location with no point (foundation D176).
   `Place` in code; `Item.geo` is the point.
+- **Attachment** — an item's `ATTACH`: a link to a file (on the account's
+  server, as Nextcloud writes its users' files, or anywhere on the web) or
+  a file inline in the object, with its name, kind and size where its
+  client wrote them (foundation D229, design D230). Never "file" alone: a
+  file is what an attachment points to or holds.
 - **Due** — a task's `DUE`, the time it must be done by; optional. A task
   is **overdue** when its due has passed (its start, without a due) and it
   is not completed (design D161).
