@@ -1370,18 +1370,20 @@ whole row".
   with the views' `Pager` ([D154](#D154)), each list a page in the order of
   the tabs: a list chosen by its tab, the arrow keys and Enter, slides in
   from the side it comes from (40 px and a fade, 220 ms); on a touch screen
-  (`any-pointer: coarse`) the lists before and after the one shown are
-  drawn beside it, `inert` and hidden from a screen reader, and a sideways
-  swipe carries them under the finger and settles on the next or previous
-  list past a quarter of the width or a flick, as a period's swipe does
-  ([D152](#D152)); a vertical move scrolls the list. The tab strip follows
+  (`any-pointer: coarse`) the lists before and after the one shown are drawn
+  beside it, `inert` and hidden from a screen reader, and a sideways swipe
+  carries them under the finger and settles on the next or previous list
+  past a quarter of the width or a flick, as a period's swipe does
+  ([D152](#D152)); a vertical move scrolls the list. A task's motion
+  ([D197](#D197)) measures and moves the list shown alone, never the lists
+  drawn beside it, whose cards have the same names. The tab strip follows
   the list chosen, its indicator sliding as before. `prefers-reduced-motion`
   swaps lists at once. On a wide screen the lists stay one at a time under
   their tabs, in the column the calendar | tasks switch shows them in
   ([D227](#D227)); Google Tasks web's lists side by side as columns are
   [deferred](#deferred): with few lists the tabs carry the counts the
-  columns would not, and columns ask for dragging tasks between lists,
-  which AstroTime does not have yet (`apps/web/e2e/tasks-lists.spec.ts`).
+  columns would not, and columns ask for dragging tasks between lists, which
+  AstroTime does not have yet (`apps/web/e2e/tasks-lists.spec.ts`).
 
 ### Decided in round 4: the calendar views
 

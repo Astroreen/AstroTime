@@ -114,6 +114,47 @@ test.describe("on a touch screen", () => {
     await expect(track.locator(":scope > [inert][aria-hidden=true]")).toHaveCount(1);
   });
 
+  test("a task completed with the lists beside drawn moves only the list shown (design D197)", async ({
+    page,
+  }) => {
+    // Every animation on a task's row or card, and whether it is in a list drawn beside.
+    await page.addInitScript(() => {
+      const moved: { beside: boolean; task: string }[] = [];
+      Object.assign(window, { moved });
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (this: Element, frames, options) {
+        const row = this.closest("[data-task], [data-card], [data-completed-count]");
+        if (row && !this.closest("[data-motion-layer]")) {
+          moved.push({
+            beside: this.closest("[inert]") !== null,
+            task:
+              (row as HTMLElement).dataset["task"] ??
+              (row.hasAttribute("data-completed-count") ? "count" : "card"),
+          });
+        }
+        return animate.call(this, frames, options);
+      };
+    });
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    await panel.getByRole("tab", { name: /^Tasks/ }).click();
+    // The list before it is drawn beside it, with rows and checkboxes of its own.
+    await expect(panel.locator("[data-track] > [inert] [data-task]").first()).toBeAttached();
+    await expect(panel.locator("[data-moves]")).toHaveCount(1);
+    await panel.getByRole("checkbox", { name: "Send the report" }).click();
+    await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+    const moved = await page.evaluate(
+      () => (window as unknown as { moved: { beside: boolean; task: string }[] }).moved,
+    );
+    expect(moved.length).toBeGreaterThan(0);
+    expect(moved.filter((each) => each.beside)).toEqual([]);
+    // "Completed"'s count that ticks is the list shown's.
+    expect(moved.filter((each) => each.task === "count")).toEqual([
+      { beside: false, task: "count" },
+    ]);
+  });
+
   test("a vertical scroll of a list moves to no other list", async ({ page }) => {
     await openDemo(page, "day");
     await page.getByRole("button", { name: "Tasks", exact: true }).click();

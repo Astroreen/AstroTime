@@ -42,7 +42,14 @@ const COUNT = "[data-completed-count]";
  * goes on leaving through the next change, never measured or moved again.
  */
 const rowsOf = (root: HTMLElement) =>
-  [...root.querySelectorAll<HTMLElement>(ROW)].filter((row) => !row.closest(LAYER));
+  [...shown(root).querySelectorAll<HTMLElement>(ROW)].filter((row) => !row.closest(LAYER));
+
+/**
+ * The list shown: on a touch screen the lists beside it are drawn too
+ * (design D199), inert, with rows of their own that never move here.
+ */
+const shown = (root: HTMLElement): HTMLElement =>
+  root.querySelector<HTMLElement>("[data-current]") ?? root;
 
 /** Where each row and card of `root` is now. */
 export function measure(root: HTMLElement): Snapshot {
@@ -51,10 +58,10 @@ export function measure(root: HTMLElement): Snapshot {
     rows.set(element.dataset["task"]!, { rect: element.getBoundingClientRect(), element });
   }
   const cards = new Map<string, DOMRect>();
-  for (const element of root.querySelectorAll<HTMLElement>(CARD)) {
+  for (const element of shown(root).querySelectorAll<HTMLElement>(CARD)) {
     cards.set(element.dataset["card"]!, element.getBoundingClientRect());
   }
-  return { rows, cards, count: root.querySelector(COUNT)?.textContent ?? null };
+  return { rows, cards, count: shown(root).querySelector(COUNT)?.textContent ?? null };
 }
 
 /**
@@ -72,14 +79,14 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
   const slide = (element: Element, frames: Keyframe[], options = timing) =>
     element.animate(frames, options);
   const rows = rowsOf(root);
-  const cards = [...root.querySelectorAll<HTMLElement>(CARD)];
+  const cards = [...shown(root).querySelectorAll<HTMLElement>(CARD)];
   // Where everything is now, measured before anything moves: a move still
   // running ends here (`before` saw it where it was drawn), and a card's own
   // move must not count in its rows'.
   for (const element of [
     ...rows,
     ...cards,
-    ...root.querySelectorAll(`${COUNT}, [data-card-background]`),
+    ...shown(root).querySelectorAll(`${COUNT}, [data-card-background]`),
   ]) {
     for (const running of element.getAnimations()) running.cancel();
   }
@@ -137,7 +144,7 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
   // Rows that left: drawn on over the list where they were, they leave
   // toward "Completed" when its count rose, else fade where they are.
   const layer = root.querySelector<HTMLElement>(LAYER);
-  const count = root.querySelector<HTMLElement>(COUNT);
+  const count = shown(root).querySelector<HTMLElement>(COUNT);
   const counted = Number(count?.textContent ?? 0);
   const rose = counted > Number(before.count ?? 0);
   const room = root.getBoundingClientRect();
