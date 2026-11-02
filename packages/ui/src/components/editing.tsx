@@ -46,6 +46,7 @@ import { liveQuery, whileShown } from "../calendar/live.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
+import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor } from "./lazy.tsx";
@@ -216,6 +217,7 @@ export function useEditingState({
   const fromOf = (current: Editing) =>
     current.target ? byId(current.initial?.calendarId) : undefined;
 
+  const celebrate = useCelebrate();
   const [notice, setNotice] = useState<Notice | null>(null);
   /** The copy "Make a copy" made, whose notice opens it (design D164). */
   const [copied, setCopied] = useState<Target | null>(null);
@@ -475,11 +477,12 @@ export function useEditingState({
     });
   };
 
-  const complete = () => {
+  const complete = (from: Element) => {
     if (!details || details.item.kind !== "task") return;
     const { object, recurrenceId, item } = details;
     const seriesDone = object.master !== null && isDone(object.master);
     const done = seriesDone || isDone(item);
+    if (!done) celebrate(from);
     rewrite(details, (current) =>
       completeTask(current, !done, {
         now: Date.now(),

@@ -266,6 +266,8 @@ export const en = {
   "settings.clock.24": "24-hour",
   "settings.hideCompleted": "Hide completed tasks",
   "settings.weekNumbers": "Show week numbers",
+  "settings.celebrate": "Celebrate a completed task",
+  "settings.celebrate.hint": "A burst of shapes when you complete a task.",
   "settings.keepRunning": "Keep running when the window is closed",
   "settings.keepRunning.hint":
     "AstroTime goes on syncing and reminding; quit it from the tray or the menu.",

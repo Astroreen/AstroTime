@@ -68,7 +68,8 @@ export function ItemDetails({
   onCopyTo: () => void;
   /** Whether any calendar takes a new item of this kind, for "Copy to" (D37). */
   canCopyTo: boolean;
-  onComplete: () => void;
+  /** From the button pressed, where a completion's burst starts (design D198). */
+  onComplete: (from: Element) => void;
   onStar: () => void;
   /** A place's address could not be copied: the notice says so (design D177). */
   onCopyFailed: () => void;
@@ -133,7 +134,7 @@ function Body({
   onCopyTo: () => void;
   /** Whether any calendar takes a new item of this kind, for "Copy to" (D37). */
   canCopyTo: boolean;
-  onComplete: () => void;
+  onComplete: (from: Element) => void;
   onStar: () => void;
   onCopyFailed: () => void;
 }) {
@@ -328,7 +329,7 @@ function Body({
             <button
               type="button"
               className={`${primaryButton} flex items-center gap-2`}
-              onClick={onComplete}
+              onClick={(event) => onComplete(event.currentTarget)}
             >
               <CheckIcon className="size-4" />
               {t(done ? "details.uncomplete" : "details.complete")}

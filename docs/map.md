@@ -201,6 +201,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D95`, `plans/design.md#D227`; `task-motion.ts`,
       its tasks sliding to where they are when they change, loaded with it.
       → `plans/design.md#D197`
+    - `celebration.ts` — `useCelebrate`: whether a completion throws a
+      burst; `celebrate.ts`, the burst, loaded with the first.
+      → `plans/design.md#D198`
     - `search.tsx` — the search field and its results.
       → `plans/design.md#D97`
     - `empty-state.tsx` — what a screen shows with nothing to list.

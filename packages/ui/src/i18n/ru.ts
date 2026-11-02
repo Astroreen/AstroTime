@@ -279,6 +279,8 @@ export const ru = {
   "settings.clock.24": "24-часовой",
   "settings.hideCompleted": "Скрывать выполненные задачи",
   "settings.weekNumbers": "Показывать номера недель",
+  "settings.celebrate": "Праздновать выполненную задачу",
+  "settings.celebrate.hint": "Россыпь фигур, когда вы выполняете задачу.",
   "settings.keepRunning": "Работать в фоне после закрытия окна",
   "settings.keepRunning.hint":
     "AstroTime продолжает синхронизировать и напоминать; выйти можно из трея или меню.",

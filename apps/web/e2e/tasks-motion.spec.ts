@@ -154,6 +154,33 @@ test("two tasks completed quickly: each leaves once, the first still leaving thr
   ).toEqual(["paused"]);
 });
 
+test("one task checked and unchecked at once ends as the store has it, nothing left leaving", async ({
+  page,
+}) => {
+  const panel = await openTasks(page);
+  const box = panel.getByRole("checkbox", { name: "Send the report" });
+  // Two presses before either write lands, each its own: the second after
+  // React has drawn the first (its microtasks), as a second tap would be.
+  await box.evaluate(async (element) => {
+    (element as HTMLElement).click();
+    for (let turn = 0; turn < 3; turn++) await Promise.resolve();
+    (element as HTMLElement).click();
+  });
+  const list = panel.getByRole("list", { name: "Tasks", exact: true });
+  // A third write after them, seen once it is read: the two before it are written by then.
+  const star = panel.getByRole("button", { name: "Star: Water the plants" });
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await expect(list.getByRole("checkbox", { name: "Send the report" })).not.toBeChecked();
+  await expect(panel.getByRole("button", { name: "Completed (3)" })).toBeVisible();
+  // A new load without the demo reads the store: the same.
+  await page.goto("/");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await panel.getByRole("tab", { name: /^Tasks/ }).click();
+  await expect(list.getByRole("checkbox", { name: "Send the report" })).not.toBeChecked();
+  await expect(page.locator("[data-motion-layer] [data-task]")).toHaveCount(0);
+});
+
 test("with Completed open, a task completed moves down into it, and back up when not completed", async ({
   page,
 }) => {
