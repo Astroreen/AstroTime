@@ -1,7 +1,8 @@
 // The evidence for the accounts and sync PR (docs/plans/foundation.md#pr-5--calendar-grid):
 // the first run on the calendar on this device (D122), the add-account dialog, Login Flow's waiting step (Nextcloud
 // mocked at the proxy), an error, and an account synced from a real Radicale
-// in the drawer, the Week view and the accounts dialog. Runs only when
+// in the drawer, the Week view and the accounts dialog; an account whose sync
+// is off in Settings (D171), on a phone and a wide screen. Runs only when
 // ASTROTIME_SCREENSHOTS names a directory:
 //
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e accounts-screenshots
@@ -27,6 +28,9 @@ const TEXT = {
     continue: "Continue",
     accounts: /^Accounts/,
     menu: "Main menu",
+    settings: "Settings",
+    sync: "Sync",
+    off: "Sync is off",
     calendars: { work: "Work", personal: "Personal", tasks: "Tasks" },
     events: ["Planning", "Lunch with Marta", "Code review", "Dentist", "Release notes"],
     task: "Renew the domain",
@@ -40,6 +44,9 @@ const TEXT = {
     continue: "Продолжить",
     accounts: /^Аккаунты/,
     menu: "Главное меню",
+    settings: "Настройки",
+    sync: "Синхронизация",
+    off: "Синхронизация выключена",
     calendars: { work: "Работа", personal: "Личное", tasks: "Задачи" },
     events: ["Планирование", "Обед с Мартой", "Ревью кода", "Стоматолог", "Заметки к релизу"],
     task: "Продлить домен",
@@ -206,6 +213,36 @@ for (const language of ["en", "ru"] as const) {
     await expect(phone.getByRole("dialog")).toBeVisible();
     await shot(phone, `drawer-account-dark-${language}-phone`);
     await phone.context().close();
+    await server.stop();
+  });
+}
+
+for (const language of ["en", "ru"] as const) {
+  test(`an account whose sync is off, in Settings, ${language} (D171)`, async ({ browser }) => {
+    const text = TEXT[language];
+    const server = await seeded(language);
+    for (const theme of ["dark", "light"] as const) {
+      for (const [size, viewport] of [
+        ["wide", WIDE],
+        ["phone", PHONE],
+      ] as const) {
+        const page = await open(browser, { language, theme, size: viewport });
+        await signIn(page, language, server);
+        if (size === "wide") {
+          await page.getByRole("banner").getByRole("button", { name: text.settings }).click();
+        } else {
+          await page.getByRole("button", { name: text.menu }).click();
+          await page.getByRole("dialog").getByRole("button", { name: text.settings }).click();
+        }
+        const settings = page.getByRole("dialog", { name: text.settings });
+        const account = settings.getByRole("region", { name: new RegExp(`^${server.username}@`) });
+        await account.getByRole("switch", { name: text.sync }).click();
+        await expect(account.getByText(text.off)).toBeVisible();
+        await account.getByRole("switch", { name: text.sync }).scrollIntoViewIfNeeded();
+        await shot(page, `settings-sync-off-${theme}-${language}-${size}`);
+        await page.context().close();
+      }
+    }
     await server.stop();
   });
 }

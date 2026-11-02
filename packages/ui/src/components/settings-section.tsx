@@ -1,8 +1,9 @@
 // The Settings screen (design D53, D131): the whole screen on a phone, a
 // dialog from 640 px, in groups: general (theme, language), the views (week
-// start, clock, "hide completed"), the accounts with how each syncs, its
-// menu and its calendars, each shown or not (D137), reminders (foundation D101) and, on the desktop, whether closing the
-// window quits (desktop D75). Each applies at once and is kept on this device.
+// start, clock, "hide completed"), the accounts with how each syncs, whether
+// it syncs at all (foundation D171), its menu and its calendars, each shown
+// or not (D137), reminders (foundation D101) and, on the desktop, whether
+// closing the window quits (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
@@ -94,7 +95,7 @@ function SettingsGroups({
   const { t } = useTranslation();
   const { formats } = useCalendar();
   const { settings, change } = useSettings();
-  const { platform } = useAccounts();
+  const { platform, setSyncing } = useAccounts();
   return (
     <>
       <Group title={t("settings.general")}>
@@ -157,6 +158,15 @@ function SettingsGroups({
               <div className="px-4 py-2">
                 <AccountRow account={account} onLeave={onLeave} />
               </div>
+              {/* Whether it syncs at all (foundation D171); off, its calendars stay. */}
+              {account.provider === "caldav" && (
+                <Toggle
+                  label={t("accounts.sync")}
+                  checked={!account.syncOff}
+                  onChange={(on) => void setSyncing(account, on).catch(console.error)}
+                  {...(account.syncOff ? { hint: t("accounts.sync.hint") } : {})}
+                />
+              )}
               {own.length === 0 && (
                 <p className="px-4 pb-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>
               )}

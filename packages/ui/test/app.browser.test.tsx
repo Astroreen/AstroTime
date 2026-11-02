@@ -668,6 +668,46 @@ test("removing a Login Flow account offline: removed here, and the app password 
   await expect.element(told).not.toBeInTheDocument();
 });
 
+test("an account's sync turned off in Settings says so calmly; on again, it syncs at once (foundation D171)", async () => {
+  const store = await emptyStore();
+  const secrets = memorySecrets();
+  const name = "astro@cloud.example.com";
+  const { account } = await saveAccount(
+    { store, secrets },
+    {
+      name,
+      serverUrl: `${SERVER}/`,
+      homeUrl: `${SERVER}/remote.php/dav/calendars/astro/`,
+      credentials: { username: "astro", password: "right" },
+    },
+  );
+  await store.updateAccount(account.id, { syncOff: true });
+  const server = nextcloud({ password: "right" });
+  render(Promise.resolve(store), ["en-US"], { http: server.http, secrets });
+  await page.getByRole("button", { name: "Main menu" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const section = settings.getByRole("region", { name });
+  const toggle = section.getByRole("switch", { name: "Sync" });
+  await expect.element(toggle).not.toBeChecked();
+  await expect.element(section.getByText("Sync is off")).toBeInTheDocument();
+  await expect
+    .element(section.getByText(/^Nothing goes to this server or comes from it/))
+    .toBeInTheDocument();
+  // Off from the start: the app's syncs asked nothing of the server.
+  expect(server.requests).toEqual([]);
+
+  // These tests load no CSS: the label takes the tap.
+  await section.getByText("Sync", { exact: true }).click();
+  await expect.element(toggle).toBeChecked();
+  // One sync at once: this fake has no calendars for it, so it fails, but it asked.
+  await expect
+    .element(section.getByText("The last sync failed; it is tried again later"))
+    .toBeInTheDocument();
+  expect(server.requests.length).toBeGreaterThan(0);
+  expect((await store.accounts()).find((a) => a.id === account.id)?.syncOff).toBe(false);
+});
+
 test("a sync that comes to need the user is said once, not again after each sync while it does (design D120)", async () => {
   const store = await emptyStore();
   const secrets = memorySecrets();

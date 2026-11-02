@@ -114,6 +114,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   (the **sync lock**, D91). The UI calls it on its
   **sync triggers** (start, back in front, a timer, the network back, a
   local change: D91).
+- **Sync off** — an account the user stopped syncing in Settings: no
+  request goes to its server, its calendars stay, its changes wait
+  (D171).
 - **Sync status** — how an account's last sync went, as the UI shows it:
   syncing, synced at a time, offline, signed out, refused, failed, with
   the items it could not handle.
