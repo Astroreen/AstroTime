@@ -5,23 +5,20 @@
 // While it goes, only `--hour` on the view and the grid's scroll change, no
 // React render; once it stops, the height is handed back and kept. Loaded
 // after the view is drawn, in a chunk of its own (foundation D145).
-import { HOUR } from "./items.tsx";
+import { HOUR, hourIn } from "./items.tsx";
 
-const MIN_HOUR = 24;
-const MAX_HOUR = 240;
 /** How much a key step changes the height. */
 const STEP = 1.25;
 /** How long after a wheel's last turn the zoom counts as ended. */
 const SETTLE_MS = 250;
 
-const clamp = (hour: number) => Math.min(MAX_HOUR, Math.max(MIN_HOUR, hour));
-
-/** Whether a key's target is somewhere typing or a dialog's, where keys are its own. */
-function typing(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false;
+/** Whether a key's target is a field, a dialog or a widget with keys of its own. */
+function owned(target: EventTarget | null): boolean {
   return (
-    target.closest("input, textarea, select, [contenteditable], [role=dialog]") !== null ||
-    target.closest("[role=listbox], [role=menu]") !== null
+    target instanceof Element &&
+    target.closest(
+      "input, textarea, select, [contenteditable], [role=dialog], [role=listbox], [role=menu], [role=combobox], [role=tablist], [role=slider], [role=search]",
+    ) !== null
   );
 }
 
@@ -36,14 +33,17 @@ export function zoomable(
 ): () => void {
   let live: number | null = null;
   let settle: ReturnType<typeof setTimeout> | undefined;
-  const current = () => live ?? hour();
+  // What is drawn: `--hour` on the view, set here while a zoom goes and by
+  // React once it is kept, which may render after the next key or wheel.
+  const current = () =>
+    live ?? (Number.parseFloat(main.style.getPropertyValue("--hour")) || hour());
   const scrollerOf = (target: EventTarget | null) =>
     target instanceof Element ? target.closest<HTMLElement>("[data-scroller]") : null;
 
   /** Draws `next` px an hour, keeping the time at `y` (a viewport's y) where it is. */
   const zoomTo = (next: number, scroller: HTMLElement, y: number) => {
     const from = current();
-    const to = clamp(next);
+    const to = hourIn(next);
     if (to === from) return;
     const offset = y - scroller.getBoundingClientRect().top;
     const hours = (scroller.scrollTop + offset) / from;
@@ -83,8 +83,17 @@ export function zoomable(
   };
   const touchMove = (event: TouchEvent) => {
     if (!pinch || event.touches.length !== 2) return;
-    // The two fingers zoom the grid; they neither scroll it nor zoom the page.
-    if (event.cancelable) event.preventDefault();
+    // A second finger on a grid already scrolling: the browser keeps that
+    // touch as its scroll (the move cannot be cancelled), so it is no
+    // pinch, rather than a zoom fighting the scroll. Otherwise the two
+    // fingers zoom the grid and do not scroll it; the page never zooms
+    // there (the grid's `touch-action` is `pan-y`).
+    if (!event.cancelable) {
+      pinch = null;
+      end();
+      return;
+    }
+    event.preventDefault();
     const middle = (event.touches[0]!.clientY + event.touches[1]!.clientY) / 2;
     zoomTo(
       (pinch.hour * spreadOf(event.touches)) / Math.max(1, pinch.spread),
@@ -101,7 +110,8 @@ export function zoomable(
   // "+" and "-" step the height, "0" brings back the usual one: on the
   // grid shown, about its middle, as the view's other keys (design D88).
   const key = (event: KeyboardEvent) => {
-    if (event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) return;
+    if (main.hidden || event.defaultPrevented) return;
+    if (event.ctrlKey || event.metaKey || event.altKey || owned(event.target)) return;
     const scale =
       event.key === "+" || event.key === "="
         ? STEP
@@ -111,7 +121,7 @@ export function zoomable(
             ? 0
             : null;
     const scroller = main.querySelector<HTMLElement>("[data-current] [data-scroller]");
-    if (scale === null || !scroller || main.hidden) return;
+    if (scale === null || !scroller) return;
     event.preventDefault();
     const { top, height } = scroller.getBoundingClientRect();
     zoomTo(scale === 0 ? HOUR : current() * scale, scroller, top + height / 2);

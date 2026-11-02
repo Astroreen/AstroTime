@@ -227,6 +227,9 @@ export function AgendaCard({
  */
 export const HOUR = 56;
 
+/** An hour's height as the user may pinch it, 24 to 240 px (design D192). */
+export const hourIn = (px: number) => Math.min(240, Math.max(24, px));
+
 /** `minutes` down the grid, plus `px`, at the hour's height as drawn now (`--hour`). */
 export const down = (minutes: number, px = 0) => `calc(var(--hour) * ${minutes / 60} + ${px}px)`;
 

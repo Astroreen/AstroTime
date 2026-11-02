@@ -108,4 +108,33 @@ test.describe("on a phone", () => {
     expect(Math.abs((await hoursAt()) - before)).toBeLessThan(0.02);
     await expect(page.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
   });
+
+  test("two fingers closing shrink it, never under 24 px; the Day view's grid follows", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    const box = (await grid(page).boundingBox())!;
+    const x = box.x + box.width / 2;
+    const middle = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: "touchStart" | "touchMove" | "touchEnd", spread: number) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints:
+          type === "touchEnd"
+            ? []
+            : [
+                { x, y: middle - spread / 2, id: 0 },
+                { x, y: middle + spread / 2, id: 1 },
+              ],
+      });
+    await touch("touchStart", 300);
+    for (const spread of [250, 200, 150, 100, 60, 30]) await touch("touchMove", spread);
+    await touch("touchEnd", 30);
+    // A tenth as far apart would be 5.6 px: held at 24, the whole day 576 px tall.
+    await expect(main(page)).toHaveCSS("--hour", "24px");
+    const day = (await page.getByRole("list", { name: "Wednesday, November 4" }).boundingBox())!;
+    expect(Math.round(day.height)).toBe(24 * 24);
+  });
 });

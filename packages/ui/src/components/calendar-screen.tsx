@@ -53,7 +53,7 @@ import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
 import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
-import { HOUR } from "./items.tsx";
+import { HOUR, hourIn } from "./items.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
@@ -98,7 +98,7 @@ export function CalendarScreen({
   const [hour, setHour] = usePreference(
     preferences,
     KEYS.hour,
-    (stored) => Math.min(240, Math.max(24, Number(stored) || HOUR)),
+    (stored) => hourIn(Number(stored) || HOUR),
     String,
   );
   const mainRef = useRef<HTMLElement>(null);
