@@ -1,5 +1,5 @@
-// Settings (design D53, D131): a dialog from the top bar's button on a wide
-// screen, a screen from the drawer on a phone; each setting applies at once
+// Settings (design D53, D131): a dialog from the sidebar's foot on a wide
+// screen (D226), a screen from the drawer on a phone; each setting applies at once
 // and is kept.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -8,10 +8,10 @@ import { choose, openApp, openDemo, PHONE, WIDE } from "./support.ts";
 const header = (page: Page, name: string) => page.getByRole("heading", { name });
 const day = (page: Page, name: string) => page.getByRole("list", { name });
 
-/** Opens Settings from the top bar, does what `change` does in it, and closes it. */
+/** Opens Settings from the sidebar's foot (design D226), does what `change` does in it, and closes it. */
 async function inSettings(page: Page, change: (settings: Locator) => Promise<void>) {
   await page
-    .getByRole("banner")
+    .getByRole("navigation", { name: /^(Main menu|Главное меню)$/ })
     .getByRole("button", { name: /^(Settings|Настройки)$/ })
     .click();
   const settings = page.getByRole("dialog", { name: /^(Settings|Настройки)$/ });
@@ -161,7 +161,10 @@ test("Settings lists the accounts, each with how it syncs, its menu and its cale
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   const settings = page.getByRole("dialog", { name: "Settings" });
   const accounts = settings.getByRole("region", { name: "Accounts" });
   const demo = accounts.getByRole("region", { name: "Demo" });
@@ -182,7 +185,10 @@ test("Settings lists the accounts, each with how it syncs, its menu and its cale
 test("the calendar on this device is named so in Settings (design D137)", async ({ page }) => {
   await page.setViewportSize(WIDE);
   await openApp(page);
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   const accounts = page
     .getByRole("dialog", { name: "Settings" })
     .getByRole("region", { name: "Accounts" });
@@ -220,7 +226,10 @@ test("a closing dialog takes no pointer events, backdrop and popup alike (design
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
   // A Dialog: Settings, its backdrop and popup.
-  await page.getByRole("banner").getByRole("button", { name: "Settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   await slowClosing(page);
   await page.getByRole("button", { name: "Close settings" }).click();
