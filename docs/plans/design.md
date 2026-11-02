@@ -1485,7 +1485,7 @@ bar, the sidebar and the accounts panel.
   description, under a paperclip: each a row with a mark (a sheet for a
   file, by link or inline; a chain for a bare link), its name (or, for a
   link with none, its host and path), and under it its kind and size. The
-  kind is the name's extension ("DOCX"), else a known type's usual one
+  kind is the name's extension ("DOCX"; one with a letter, so "v1.2" names none), else a known type's usual one
   (`text/plain` "TXT", `application/pdf` "PDF", Office's and
   OpenDocument's), else what the type says in words ("Image", "Audio",
   "Video", "Text"), else none: a subtype such as `plain` or `vnd.…` says
