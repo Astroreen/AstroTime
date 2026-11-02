@@ -5,7 +5,7 @@
 // neither CalDAV (/dav-proxy/) nor the deployment's preset (D123), and a
 // newer version is offered quietly, then runs once the user reloads into it.
 // A picture (design D219) is kept as it is first shown, not on install.
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -334,6 +334,15 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
       (cache) => cache !== "astrotime-versions",
     );
     const version = name!.slice("astrotime-".length);
+    // A picture this version showed (design D219), kept as the worker keeps one.
+    const meal = (await readdir(join(first, "assets", "pictures"))).find((file) =>
+      file.startsWith("meal-"),
+    );
+    const picture = `/assets/pictures/${meal!}`;
+    await page.evaluate(
+      async ([cache, path]) => (await caches.open(cache!)).put(path!, await fetch(path!)),
+      [name, picture],
+    );
     const worker = await readFile(join(second, "sw.js"), "utf8");
     expect(worker).toContain(version);
     await writeFile(join(second, "sw.js"), worker.replaceAll(version, "newer-version-00"));
@@ -384,6 +393,13 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
       [`astrotime-${version}`, "astrotime-newer-version-00", "astrotime-versions"].toSorted(),
     );
     await expect(notice).toHaveCount(0);
+    // The newer version starts with the picture the older one showed.
+    expect(
+      await page.evaluate(
+        async (path) => (await caches.open("astrotime-newer-version-00")).match(path) !== undefined,
+        picture,
+      ),
+    ).toBe(true);
     // The tab on the older page asks for a file only its version has, which
     // the server no longer has: it comes from the older version's cache. A
     // tab on the newer page is not given it, and a file neither version has

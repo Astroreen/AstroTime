@@ -109,6 +109,19 @@ describe("a month's banner", () => {
     expect(bannerOf(12, "America/Argentina/Buenos_Aires")).toBe(6);
     expect(bannerOf(6, "Africa/Johannesburg")).toBe(12);
     expect(isSouthern("America/Sao_Paulo")).toBe(true);
+    // The old names a system may still report (the tz database's links).
+    for (const zone of [
+      "America/Cordoba",
+      "America/Mendoza",
+      "America/Buenos_Aires",
+      "Brazil/East",
+      "Australia/ACT",
+      "Australia/NSW",
+      "NZ",
+      "NZ-CHAT",
+      "Chile/Continental",
+    ])
+      expect(isSouthern(zone), zone).toBe(true);
     // The tropics north of the equator, and zones that only sound southern, are not.
     expect(isSouthern("America/Bogota")).toBe(false);
     expect(isSouthern("Asia/Singapore")).toBe(false);

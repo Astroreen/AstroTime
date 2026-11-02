@@ -1479,8 +1479,9 @@ own (below).
   months on (July in Sydney is January's snow): `bannerOf`
   (`pictures/months.ts`) reads the hemisphere from the user's time zone
   alone, a list of the southern zones with seasons (Australia, New
-  Zealand, Argentina, Chile, southern Brazil, southern Africa, …), and
-  asks nothing; a zone in the tropics keeps the northern months.
+  Zealand, Argentina, Chile, southern and central Brazil, southern Africa,
+  …) with the old names the tz database keeps for them (`Brazil/East`,
+  `America/Cordoba`, `NZ`), and asks nothing; a zone in the tropics keeps the northern months.
   **A calm parallax**: the picture drifts 12 % of its height, slower than
   the list, as the banner passes, a scroll-driven CSS animation
   (`animation-timeline: view()`) on the compositor, so a phone's scroll
@@ -1500,7 +1501,8 @@ own (below).
     app (foundation [D124](foundation.md#D124)): the build lists them
     apart (`ASTROTIME_PICTURES`), the worker answers one from this
     version's cache or the network's, and keeps it; a new version takes
-    over the pictures the one before kept under the same hashed name.
+    over the pictures a kept version showed under the same hashed name,
+    looked up at once, not one after another, as it installs.
     Offline and never shown before, a card is drawn on its ground alone.
   - **Our own, hand-written SVG** under the repository's licence (AGPL-3.0),
     drawn for AstroTime in a flat style of its palette (no outlines, two or
@@ -1517,6 +1519,11 @@ own (below).
   Halloween; and words in languages other than English and Russian. Each
   needs its picture drawn to the same standard first; a theme's words are
   one line of `themes.ts` once it has one.
+- **A place's photo** (feedback 7's second half: "if there is no such
+  word but a place is set, a photo of that place"): not in D215–D219,
+  which draw our own pictures only; it asks a photo service and needs its
+  privacy notes and setting, so it is its own change, thread M's next
+  (D220, D221).
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user
   adds some there. Counting from the store's alarms (the user's own items

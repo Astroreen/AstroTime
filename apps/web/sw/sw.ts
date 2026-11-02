@@ -99,11 +99,17 @@ self.addEventListener("install", (event) => {
       try {
         // Hashed names never change their content: whatever answers is this version's.
         await cache.addAll([...FILES].filter((path) => path !== BASE));
-        // A picture an older version kept, under the same hashed name, is the same picture.
-        for (const path of PICTURES) {
-          const before = await caches.match(path);
-          if (before) await cache.put(path, before);
-        }
+        // A picture a kept version showed, under the same hashed name, is the
+        // same picture: this version starts with it (design D219).
+        const before = (await kept()).versions.filter((name) => name !== CACHE);
+        await Promise.all(
+          [...PICTURES].map(async (path) => {
+            for (const cacheName of before) {
+              const shown = await caches.match(path, { cacheName });
+              if (shown) return cache.put(path, shown);
+            }
+          }),
+        );
         const page = await fetch(BASE, { cache: "no-store" });
         if (!keepable(page))
           throw new Error(`The app's page is not one to keep (${page.status}, ${page.type}).`);
@@ -203,7 +209,8 @@ async function navigate(event: FetchEvent): Promise<Response> {
 
 /** The versions kept and the tabs on the one before, as the last activation left them. */
 async function kept(): Promise<Kept> {
-  const listed = await (await caches.open(VERSIONS)).match(BASE);
+  // Read without opening it: an install that fails leaves no cache behind.
+  const listed = await caches.match(BASE, { cacheName: VERSIONS });
   const value = listed ? ((await listed.json()) as Partial<Kept>) : {};
   return { versions: value.versions ?? [], older: value.older ?? [] };
 }

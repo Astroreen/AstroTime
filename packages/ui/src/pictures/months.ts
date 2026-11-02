@@ -4,9 +4,29 @@
 // January's). Where the user is is read from their time zone alone, never
 // asked: a zone wholly or mostly south of the equator, seasons and all.
 
-/** Zones south of the equator with seasons: whole areas, then single zones. */
+/**
+ * Zones south of the equator with seasons: whole areas, then single zones,
+ * each with the old names the tz database keeps for it as links (`backward`),
+ * since a system set to one may report it.
+ */
 const SOUTH_AREAS = ["Antarctica/", "Australia/", "America/Argentina/"];
 const SOUTH_ZONES = new Set([
+  // Argentina's old names, outside `America/Argentina/`.
+  "America/Catamarca",
+  "America/Cordoba",
+  "America/Jujuy",
+  "America/Mendoza",
+  "America/Rosario",
+  // Southern and central Brazil (São Paulo's zone is Curitiba's and Porto Alegre's too).
+  "America/Campo_Grande",
+  "America/Cuiaba",
+  "Brazil/East",
+  // Chile's and New Zealand's.
+  "Chile/EasterIsland",
+  "NZ-CHAT",
+  "Pacific/Easter",
+  "Antarctica/McMurdo",
+  "Antarctica/South_Pole",
   "Africa/Gaborone",
   "Africa/Harare",
   "Africa/Johannesburg",
