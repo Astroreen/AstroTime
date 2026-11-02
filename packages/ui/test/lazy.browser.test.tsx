@@ -4,7 +4,7 @@
 import { useState, type ComponentType } from "react";
 import { I18nextProvider } from "react-i18next";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser/context";
 
 import { deferred } from "../src/components/lazy.tsx";
@@ -128,5 +128,62 @@ test("tried again and failed again, Reload comes first: a shared file only a rel
   await expect.element(again.getByRole("button", { name: "Reload AstroTime" })).toHaveFocus();
   // Trying again still works, once what failed arrives.
   await userEvent.click(again.getByRole("button", { name: "Try again" }));
+  await expect.element(page.getByRole("button", { name: "The dialog" })).toBeVisible();
+});
+
+test("arrived after Reload came first, a later failure starts with Try again again", async () => {
+  // The dialog's code fails three times, then arrives; drawn, it throws
+  // until the test mends it.
+  let loads = 0;
+  let broken = true;
+  function Throws(props: Props) {
+    if (props.open && broken) throw new Error("A dialog that broke while drawing.");
+    return <Dialog {...props} />;
+  }
+  const Deferred = deferred<Props, ComponentType<Props>>(
+    async () => {
+      loads++;
+      if (loads <= 3) throw new TypeError("Failed to fetch dynamically imported module");
+      return Throws;
+    },
+    (component) => component,
+    (props) => props.open,
+  );
+  function Host() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open
+        </button>
+        <Deferred open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  root.render(
+    <I18nextProvider i18n={createI18n("en")}>
+      <Host />
+    </I18nextProvider>,
+  );
+  cleanups.push(() => {
+    root.unmount();
+    container.remove();
+  });
+  // A React error logged for the throw below is expected.
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(() => errors.mockRestore());
+  await userEvent.click(page.getByRole("button", { name: "Open" }));
+  const failed = page.getByRole("alertdialog", { name: /Could not load this part/ });
+  await userEvent.click(failed.getByRole("button", { name: "Try again" }));
+  const again = page.getByRole("alertdialog", { name: /Reload AstroTime to finish updating/ });
+  await userEvent.click(again.getByRole("button", { name: "Try again" }));
+  // Arrived; drawing it fails once: a new failure, said as the first one is.
+  await expect.element(failed).toBeVisible();
+  await expect.element(failed.getByRole("button", { name: "Try again" })).toHaveFocus();
+  broken = false;
+  await userEvent.click(failed.getByRole("button", { name: "Try again" }));
   await expect.element(page.getByRole("button", { name: "The dialog" })).toBeVisible();
 });

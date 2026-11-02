@@ -81,6 +81,11 @@ export function deferred<P extends Closable, M = unknown>(
       setLoaded(attempt);
       setFailed(false);
       setRetried(true);
+      // Arrived, a later failure is a new one: "Try again" first again.
+      void preload().then(
+        () => setRetried(false),
+        () => {},
+      );
     };
     if (failed) return <LoadFailed again={retried} onRetry={retry} onClose={props.onClose} />;
     return (

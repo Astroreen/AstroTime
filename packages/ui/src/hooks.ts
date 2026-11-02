@@ -43,6 +43,8 @@ export function useNow(timeZone: string): { today: string; minutes: number } {
   return now;
 }
 
+const NONE: readonly UndoneTask[] = [];
+
 /** The occurrences of a range of days, and today's undone tasks, as last read. */
 export interface Entries {
   readonly from: string;
@@ -80,7 +82,13 @@ export function useEntries(
   // the query already runs again on every write.
   const idsKey = query.ids?.join(",") ?? null;
   const [read, setRead] = useState<Omit<Entries, "undone"> | null>(null);
-  const [undone, setUndone] = useState<readonly UndoneTask[]>([]);
+  // The undone tasks with what they were read for: another set of calendars,
+  // day or zone draws none until its own read lands, as the range does.
+  const undoneKey = `${idsKey}|${today}|${timeZone}`;
+  const [undone, setUndone] = useState<{
+    readonly key: string;
+    readonly tasks: readonly UndoneTask[];
+  } | null>(null);
   useEffect(() => {
     if (idsKey === null || from === null || to === null) return;
     const ids = idsKey === "" ? [] : idsKey.split(",");
@@ -110,9 +118,15 @@ export function useEntries(
   useEffect(() => {
     if (idsKey === null || !reading) return;
     const ids = idsKey === "" ? [] : idsKey.split(",");
-    return liveQuery(store, () => store.undoneTasksBefore(ids, today, timeZone), setUndone);
+    const key = `${idsKey}|${today}|${timeZone}`;
+    return liveQuery(
+      store,
+      () => store.undoneTasksBefore(ids, today, timeZone),
+      (tasks) => setUndone({ key, tasks }),
+    );
   }, [store, idsKey, reading, today, timeZone]);
-  return useMemo(() => (read ? { ...read, undone } : null), [read, undone]);
+  const tasks = undone?.key === undoneKey ? undone.tasks : NONE;
+  return useMemo(() => (read ? { ...read, undone: tasks } : null), [read, tasks]);
 }
 
 /** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period (design D59). */
