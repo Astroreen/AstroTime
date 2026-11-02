@@ -66,7 +66,14 @@ test("a row's star that popped once, lit later from elsewhere, does not pop agai
       },
       true,
     );
-    addEventListener("animationend", () => ended(), true);
+    // The star's pop's own end, not any other animation's on the page.
+    addEventListener(
+      "animationend",
+      (event) => {
+        if (event.animationName === "star-pop") ended();
+      },
+      true,
+    );
   });
   const pops = () =>
     page.evaluate(() =>
