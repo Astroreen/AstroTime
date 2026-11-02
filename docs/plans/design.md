@@ -1505,8 +1505,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
   task made from it, an item tapped opens its details; a press from an
   item to an empty spot, a press moved 12 px, a press that leaves the
-  strip and comes back, and a double click opening one item, the first
-  three failing without the check; a phone's Day view
+  strip and comes back, a press the browser cancels for a scroll, and a
+  double click opening one item, the first four failing without the
+  check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
@@ -1553,30 +1554,35 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   Linux and Windows, the same in light and dark. Now, in `styles.css`:
   Chromium (and so Electron and Android's WebView) and WebKit draw
   `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
-  ink colour at 52% on a clear track, 3:1 or more against every surface a
-  scroller sits on in light and dark (WCAG 1.4.11, as [D120](#D120) holds
-  the items to AA; it was 22%, 1.6:1), 66% while the pointer is anywhere
-  over what scrolls (`:hover` on the scroller, so a scroller holding
-  another lights too while the pointer is over the inner one; on purpose:
-  both scroll under it), 6 px wide under the pointer and 80% while
-  dragged; Firefox has
-  only the standard properties, `scrollbar-width: thin` in the same
-  colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
-  the standard ones win over it). Light and dark come with the ink
-  colour. Nothing about scrolling changes: the wheel, the keys, a finger
-  and dragging the thumb work as they did; `scrollbar-gutter: stable`
-  still keeps the day headers over their columns, now 10 px wide on both;
-  a phone's scrollbars are the system's overlay ones, drawn only while
-  scrolling, and Firefox on Linux draws its own overlay ones too. The
-  thumb shows at rest rather than only while scrolling: telling
-  "scrolling now" apart needs a script on every scroller. Checked in Chromium and Firefox (headed,
-  light and dark); WebKit does not start on the development machine, and
-  draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
-  `packages/ui/test/scrollbar-colors.test.ts` (the thumb's contrast at
-  rest, under the pointer and dragged, over the canvas, a tile, a raised
-  surface and its hover, light and dark, read from `styles.css`; failing
-  at 22%), `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
-  Saturday's header ends where its column does; failing before at 15 px:
+  ink colour at 52% on a clear track: 3:1 or more against the theme's
+  surfaces a scroller sits on (the canvas, a tile, a raised surface such
+  as a dialog or a popover, and a raised surface's hover), light and dark
+  (WCAG 1.4.11, as [D120](#D120) holds the items to AA; it was 22%,
+  1.6:1). It is 66% while the pointer is anywhere over what scrolls
+  (`:hover` on the scroller, so a scroller holding another lights too
+  while the pointer is over the inner one; on purpose: both scroll under
+  it), 6 px wide under the pointer and 80% while dragged. Firefox has only
+  the standard properties, `scrollbar-width: thin` in the same colours,
+  set only where `::-webkit-scrollbar` is unknown (Chromium lets the
+  standard ones win over it); its stronger colour comes with `:hover` and
+  with `:focus-visible`, which, as `:hover` does, holds for every scroller
+  around the focus too. In forced colours (Windows' high contrast) none of
+  this applies: the system draws its own scrollbars in the colours the
+  user chose. Nothing about scrolling changes: the wheel, the keys, a
+  finger and dragging the thumb work as they did; `scrollbar-gutter:
+  stable` still keeps the day headers over their columns, now 10 px wide
+  on both; a phone's scrollbars are the system's overlay ones, drawn only
+  while scrolling, and Firefox on Linux draws its own overlay ones too.
+  The thumb shows at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller. Checked in
+  Chromium and Firefox (headed, light and dark); WebKit does not start on
+  the development machine, and draws the same `::-webkit-scrollbar` rules
+  as Chromium. Tested: `packages/ui/test/scrollbar-colors.test.ts` (the
+  thumb's contrast at rest, under the pointer and dragged, over those
+  four surfaces, light and dark, read from `styles.css`; failing at 22%),
+  `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, 15 px
+  again in forced colours, and Saturday's header ends where its column
+  does; failing before at 15 px and at 10 px in forced colours:
   Playwright's headless Chromium hides scrollbars from the screen but
   keeps their width in the layout, which is what this measures). The
   thumb's colours under the pointer and while dragged, Firefox's

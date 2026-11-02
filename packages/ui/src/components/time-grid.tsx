@@ -408,7 +408,9 @@ function Strip({
       onPointerLeave={(event) => {
         if (event.buttons !== 0) pressed.current = null;
       }}
-      onPointerCancel={() => (pressed.current = null)}
+      onPointerCancel={() => {
+        pressed.current = null;
+      }}
       onClick={createAt}
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] touch-pan-y overflow-y-auto"}`}
       style={{
