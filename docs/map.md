@@ -48,6 +48,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `remindersOf`, `soonestReminders` — the times an object's alarms fire,
     and the reminder set a platform is handed; `ReminderScheduler`, how a
     platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
+  - `copyItem` (`edits.ts`) — an occurrence as a new item of its own: a
+    new UID, no recurrence, no guests, every other line kept.
+    → `plans/design.md#D164`
   - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
     other edit: only the fields changed, in a scope for an occurrence of a
     series (this, this and following, all), a series moved as its
@@ -243,7 +246,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/foundation.md#D37`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
-      (`saveChanges`, a drag's too); `words.ts` — rules and reminders in
+      (`saveChanges`, a drag's too; `saveCopy` and `copyOf`, design D164);
+      `words.ts` — rules and reminders in
       words; `conflicts.ts` — the Conflicts list's two ways out.
       → `plans/foundation.md#D103`, `plans/foundation.md#D107`
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,

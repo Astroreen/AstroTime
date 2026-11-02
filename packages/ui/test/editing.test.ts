@@ -6,6 +6,7 @@ import {
   ALL_RIGHTS,
   CalendarObject,
   occurrencesBetween,
+  timesOf,
   zonedTime,
   starTask,
   type Event,
@@ -31,6 +32,8 @@ import {
   NowhereError,
   problemOf,
   RefusedError,
+  copyOf,
+  saveCopy,
   rewriteTarget,
   saveForm,
   scopesFor,
@@ -1182,6 +1185,84 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(updated.ics).toContain("EXDATE;TZID=Europe/Vilnius:20261105T090000");
     await deleteTarget(store, await targetOn(store, updated, "2026-11-06"), "all", NOW);
     expect(await rowOf("Work", "demo-standup")).toMatchObject({ pending: "delete" });
+  });
+});
+
+describe("copies (design D164)", () => {
+  test("Make a copy saves the occurrence at once in its calendar, a new item that does not repeat", async () => {
+    const { store, rowOf, byName } = await demo();
+    const before = await rowOf("Work", "demo-standup");
+    const target = await targetOn(store, before, "2026-11-05");
+    const copy = await saveCopy(store, target, { now: NOW, uid: () => "standup-copy" });
+    expect(copy).toMatchObject({ calendarId: byName("Work").id, recurrenceId: null });
+    const row = (await store.objectAt(byName("Work").id, "standup-copy.ics"))!;
+    expect(row).toMatchObject({ id: copy.objectId, pending: "create" });
+    const object = CalendarObject.parse(row.ics);
+    expect(object.master).toMatchObject({
+      uid: "standup-copy",
+      summary: target.item.summary,
+      recurring: false,
+      start: timesOf(target.object, target.recurrenceId).start,
+    });
+    // The series itself is not touched.
+    expect((await rowOf("Work", "demo-standup")).ics).toBe(before.ics);
+  });
+
+  test("Make a copy is refused in a calendar that takes no new items", async () => {
+    const { store, byName } = await demo();
+    const holidays = byName("Holidays");
+    const [row] = await store.objectsBetween([holidays.id], {
+      from: "2026-10-01",
+      to: "2027-01-01",
+      timeZone,
+    });
+    const object = CalendarObject.parse(row!.ics);
+    const target = {
+      objectId: row!.id,
+      calendarId: holidays.id,
+      object,
+      recurrenceId: null,
+      item: object.master!,
+    } satisfies Target;
+    await expect(saveCopy(store, target, { now: NOW, uid: () => "nope" })).rejects.toThrow(
+      RefusedError,
+    );
+  });
+
+  test("Copy to: the dialog's new item is the copy with what the user changed, its other lines kept", async () => {
+    const { store, byName } = await demo();
+    const personal = byName("Personal");
+    const stored = await store.saveFromServer(personal.id, {
+      href: "swim.ics",
+      etag: '"1"',
+      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VEVENT\r\nUID:swim\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T180000\r\nDTEND;TZID=Europe/Vilnius:20261105T190000\r\nSUMMARY:Swim\r\nLOCATION:Pool\r\nX-OTHER-CLIENT:kept\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    });
+    const original = await targetOn(store, stored, "2026-11-05");
+    const { ics, target } = copyOf(original, { now: NOW, uid: () => "swim-copy" });
+    const initial = formOf(target, timeZone, TODAY);
+    expect(initial).toMatchObject({
+      kind: "event",
+      calendarId: personal.id,
+      summary: "Swim",
+      location: "Pool",
+      startDate: "2026-11-05",
+      startTime: "18:00",
+    });
+    const work = byName("Work");
+    const form = { ...initial, calendarId: work.id, summary: "Swim with Ana" };
+    await saveForm(
+      store,
+      { target: null, initial, form, scope: "all", untitled: "Reminder", base: ics },
+      { now: NOW, uid: () => "unused" },
+    );
+    const row = (await store.objectAt(work.id, "swim-copy.ics"))!;
+    expect(row).toMatchObject({ pending: "create" });
+    expect(row.ics).toContain("SUMMARY:Swim with Ana\r\n");
+    expect(row.ics).toContain("LOCATION:Pool\r\n");
+    expect(row.ics).toContain("X-OTHER-CLIENT:kept\r\n");
+    expect(row.ics).toContain("UID:swim-copy\r\n");
+    // The original stays where it was.
+    expect((await store.objectAt(personal.id, "swim.ics"))!.ics).toBe(stored.ics);
   });
 });
 

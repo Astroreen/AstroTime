@@ -259,3 +259,52 @@ for (const language of ["en", "ru"] as const) {
     });
   }
 }
+
+const MENU = {
+  en: { more: "More actions", copy: "Make a copy", copyTo: "Copy to…", newEvent: "New event" },
+  ru: {
+    more: "Ещё",
+    copy: "Сделать копию",
+    copyTo: "Копировать в…",
+    newEvent: "Новое мероприятие",
+  },
+} as const;
+
+for (const language of ["en", "ru"] as const) {
+  for (const theme of ["dark", "light"] as const) {
+    test(`the actions menu (design D163, D164), ${language}, ${theme}`, async ({ browser }) => {
+      const w = WORDS[language];
+      const m = MENU[language];
+      const name = (what: string, size: string) => `${what}-${theme}-${language}-${size}`;
+
+      // On a phone: the menu open, then the copy's notice.
+      const phone = await open(browser, { language, theme, size: TOUCH_PHONE, touch: true }, "day");
+      await phone
+        .getByRole("list", { name: w.today })
+        .getByRole("button", { name: new RegExp(`^${w.review}, `) })
+        .click();
+      const details = phone.getByRole("dialog", { name: w.review });
+      await details.getByRole("button", { name: m.more }).click();
+      await expect(phone.getByRole("menuitem", { name: m.copy })).toBeVisible();
+      await shot(phone, name("menu", "phone"));
+      await phone.getByRole("menuitem", { name: m.copy }).click();
+      await expect(phone.getByRole("status").getByRole("button").first()).toBeVisible();
+      await shot(phone, name("copied", "phone"));
+      await phone.context().close();
+
+      // On a wide screen: "Copy to…", the dialog filled from the item.
+      const wide = await open(browser, { language, theme, size: WIDE }, "week");
+      await wide
+        .getByRole("list", { name: w.today })
+        .getByRole("button", { name: new RegExp(`^${w.review}, `) })
+        .click();
+      const wideDetails = wide.getByRole("dialog", { name: w.review });
+      await wideDetails.getByRole("button", { name: m.more }).click();
+      await shot(wide, name("menu", "wide"));
+      await wide.getByRole("menuitem", { name: m.copyTo }).click();
+      await expect(wide.getByRole("dialog", { name: m.newEvent })).toBeVisible();
+      await shot(wide, name("copy-to", "wide"));
+      await wide.context().close();
+    });
+  }
+}
