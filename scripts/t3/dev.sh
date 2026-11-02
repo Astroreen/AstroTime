@@ -133,7 +133,14 @@ htpasswd_encryption = plain
 [storage]
 filesystem_folder = $dav/collections
 CONFIG
-  start_until "Radicale server ready" radicale --config "$dav/config"
+  # Radicale logs every request at INFO. T3 Code looks for local servers to
+  # preview by asking every listening port for / about every 15 s, so those
+  # lines filled the terminal. Requests that went well, and their logins, stay
+  # out of it; refusals, failures and Radicale's own messages stay in.
+  quiet_requests() {
+    "$@" 2>&1 | grep --line-buffered -v -E '] \[INFO\] ([A-Z]+ (request for|response status for) |Successful login: )'
+  }
+  start_until "Radicale server ready" quiet_requests radicale --config "$dav/config"
   # A first calendar for a fresh dev directory; 405 or 409 mean it is there already.
   made="$(curl -s --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' -u astro:astro -X MKCALENDAR "http://127.0.0.1:$ASTROTIME_DAV_PORT/astro/personal/")"
   case "$made" in

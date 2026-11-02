@@ -1306,6 +1306,24 @@ whole row".
   row shows it is one target: a hover background, and the focus ring drawn
   around the row, not the title (`apps/web/e2e/tasks.spec.ts`).
 
+### Decided in round 4: the editor
+
+The owner's feedback after round 3 on the edit dialog: its icons.
+
+- **D205. Each row's icon is level with the middle of its control** (the
+  owner's feedback 12 after round 3: "Some icons are not centred with their
+  input field"). The edit dialog's rows (`Section` in `item-editor.tsx`)
+  put their icon beside their first control, a 40 px field or a 40 px row
+  (the "All day" switch, a reminder in the list), its middle on the
+  field's middle. A row whose field has its label above it (Repeat,
+  Calendar, Colour) moves its icon down by the label's line (20 px, the
+  label's `leading-5`) and the 4 px under it, so the icon sits by the field
+  and not by its label, as in Google Calendar's edit screen; a row of a
+  description keeps its icon by its first line. _Until round 4_ every icon
+  stood 10 px from its row's top, beside the label of a labelled field.
+  `editing.spec.ts` measures each icon against its control on a phone and a
+  wide screen.
+
 ## Deferred
 
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as

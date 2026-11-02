@@ -85,8 +85,8 @@ const ASIDE = {
   right: "lg:right-6 lg:left-auto lg:translate-x-0",
   left: "lg:left-6 lg:translate-x-0",
 } as const;
-/** A dropdown's label above it. */
-const fieldLabel = "text-small text-ink-muted";
+/** A dropdown's label above it: one 20 px line, which `Section` counts on. */
+const fieldLabel = "text-small leading-5 text-ink-muted";
 
 export function ItemEditor({
   state,
@@ -305,7 +305,7 @@ function Fields({
         )}
       </Section>
 
-      <Section icon={<RepeatIcon className="size-5" />}>
+      <Section icon={<RepeatIcon className="size-5" />} labelled>
         <RepeatField form={form} onChange={(repeat) => set({ repeat })} />
       </Section>
 
@@ -313,7 +313,7 @@ function Fields({
         <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
       </Section>
 
-      <Section icon={<CalendarIcon className="size-5" />}>
+      <Section icon={<CalendarIcon className="size-5" />} labelled>
         <Select
           label={t(event ? "edit.calendar" : "edit.list")}
           value={form.calendarId}
@@ -323,7 +323,7 @@ function Fields({
         {calendars.length === 0 && <p className="text-small text-danger">{t("edit.noCalendar")}</p>}
       </Section>
 
-      <Section icon={<PaletteIcon className="size-5" />}>
+      <Section icon={<PaletteIcon className="size-5" />} labelled>
         <div className="flex flex-col gap-1">
           <ColorSelect
             label={t("edit.color")}
@@ -362,10 +362,28 @@ function Fields({
   );
 }
 
-function Section({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+/**
+ * A row of the form: its icon level with the middle of its first control, a
+ * 40 px field (design D205), below its label when it has one (`labelled`:
+ * the label's 20 px line, `fieldLabel`'s `leading-5`, and the 4 px under it,
+ * the `gap-1` of the column that holds the label and its dropdown in
+ * `Select`, `RepeatField` and the Colour row; `editing.spec.ts` measures it).
+ */
+function Section({
+  icon,
+  labelled = false,
+  children,
+}: {
+  icon: ReactNode;
+  labelled?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-start gap-3">
-      <span aria-hidden="true" className="mt-2.5 shrink-0 text-ink-muted">
+      <span
+        aria-hidden="true"
+        className={`${labelled ? "mt-[2.125rem]" : "mt-2.5"} shrink-0 text-ink-muted`}
+      >
         {icon}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">{children}</div>
@@ -788,7 +806,7 @@ function Reminders({
       {form.alarms.length > 0 && (
         <ul aria-label={t("edit.reminders")} className="flex flex-col gap-1">
           {form.alarms.map((choice, index) => (
-            <li key={index} className="flex min-h-9 items-center gap-2 text-body">
+            <li key={index} className="flex min-h-10 items-center gap-2 text-body">
               <span className="min-w-0 flex-1">{wordsOf(choice)}</span>
               <button
                 type="button"
