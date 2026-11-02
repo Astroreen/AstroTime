@@ -25,7 +25,6 @@ import {
   type NewAlarm,
   type Repeat,
   type Scope,
-  type TaskStatus,
 } from "@astrotime/core";
 import {
   CommitInDoubtError,
@@ -82,6 +81,12 @@ export interface Form {
   /** An event's last day (inclusive) or end date; a task's due date, `""` for none. */
   readonly endDate: string;
   readonly endTime: string;
+  /**
+   * A task's due of another kind than its start, as another client wrote it
+   * (a date after a timed start, or a time after a date start): it stays so
+   * until "All day" is switched (design D160, foundation D7).
+   */
+  readonly dueKind?: "date" | "time";
   /** The IANA zone the times are in; `null` for a floating item. */
   readonly zone: string | null;
   /** A time written in UTC (as Nextcloud Tasks writes) stays UTC, though edited in `zone`. */
@@ -92,11 +97,6 @@ export interface Form {
   readonly description: string;
   /** RFC 7986 `COLOR`; `null` for the calendar's. */
   readonly color: string | null;
-  readonly status: TaskStatus;
-  readonly priority: number | null;
-  readonly percent: number | null;
-  /** The categories, comma-separated. */
-  readonly categories: string;
   /**
    * While creating, an event switched to a task: how many days after its
    * start it ended, and at what time; switched back, it has them again.
@@ -110,8 +110,6 @@ function split(time: ItemTime, zone: string | null): { date: string; time: strin
   const local = time.type === "zoned" && zone ? wallClockIn(time.epochMs, zone) : time.local;
   return { date: local.slice(0, 10), time: local.slice(11, 16) };
 }
-
-const STATUSES: readonly TaskStatus[] = ["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"];
 
 /** The zone an item's times are edited in: its own, or the user's for UTC and dates. */
 function zoneOf(times: ItemTimes, timeZone: string): { zone: string | null; utc: boolean } {
@@ -151,6 +149,8 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
   const rule = repeatOf(object);
   const task = item.kind === "task" ? item : null;
   const from = task && !start.date ? (end.date ? end : { date: today, time: "" }) : start;
+  const due = task && start.date ? times.end : null;
+  const dueKind = due && (due.type === "date") !== allDay ? (allDay ? "time" : "date") : null;
   return {
     kind: item.kind,
     calendarId: target.calendarId,
@@ -161,6 +161,7 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     ...(task && !start.date ? { startless: true } : {}),
     endDate: end.date,
     endTime: end.time || "10:00",
+    ...(dueKind ? { dueKind } : {}),
     zone,
     utc,
     repeat: rule ? (rule.exact ? rule.repeat : "kept") : null,
@@ -168,10 +169,6 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     location: item.location ?? "",
     description: item.description ?? "",
     color: item.color,
-    status: STATUSES.find((s) => s === task?.status?.toUpperCase()) ?? "NEEDS-ACTION",
-    priority: task?.priority ?? null,
-    percent: task?.percentComplete ?? null,
-    categories: item.categories.join(", "),
   };
 }
 
@@ -220,10 +217,6 @@ export function newForm(
     location: "",
     description: "",
     color: null,
-    status: "NEEDS-ACTION",
-    priority: null,
-    percent: null,
-    categories: "",
   };
 }
 
@@ -301,7 +294,10 @@ export function withStartDate(given: Form, startDate: string): Form {
  */
 export function withDue(form: Form, due: boolean): Form {
   // A task without a start keeps the one shown once its due goes: it needs a time.
-  if (!due) return { ...started(form), endDate: "" };
+  if (!due) {
+    const { dueKind: _, ...rest } = started(form);
+    return { ...rest, endDate: "" };
+  }
   if (form.allDay) return withDueAt(form, { endDate: form.startDate });
   const end = minutesOf(form.startTime) + 60;
   return withDueAt(form, {
@@ -330,9 +326,15 @@ export function withAlarms(form: Form, alarms: readonly AlarmChoice[]): Form {
   return { ...(added && timeless ? started(form) : form), alarms };
 }
 
+/** Whether a task's due is a date: as its start, unless another client wrote it otherwise. */
+export function dueIsDate(form: Form): boolean {
+  return form.dueKind ? form.dueKind === "date" : form.allDay;
+}
+
 /** All day or not, the start's and the due's alike: the start shown is written from then on (design D160). */
 export function withAllDay(form: Form, allDay: boolean): Form {
-  return { ...started(form), allDay };
+  const { dueKind: _, ...both } = started(form);
+  return { ...both, allDay };
 }
 
 /** The form with its start set by the user: written from now on (design D160). */
@@ -364,8 +366,8 @@ export function followed(previous: Form, next: Form): Form {
 }
 
 /** A form's date and time as an `ItemTime` in its zone (UTC when it was). */
-function timeOf(form: Form, date: string, time: string): ItemTime {
-  if (form.allDay) return { type: "date", date };
+function timeOf(form: Form, date: string, time: string, allDay = form.allDay): ItemTime {
+  if (allDay) return { type: "date", date };
   const local = `${date}T${time}:00`;
   if (form.zone === null) return { type: "floating", local };
   const zoned = zonedTime(local, form.zone);
@@ -384,7 +386,7 @@ export function timesOfForm(form: Form): ItemTimes {
   }
   return {
     start: form.startDate && !form.startless ? timeOf(form, form.startDate, form.startTime) : null,
-    end: form.endDate ? timeOf(form, form.endDate, form.endTime) : null,
+    end: form.endDate ? timeOf(form, form.endDate, form.endTime, dueIsDate(form)) : null,
   };
 }
 
@@ -441,12 +443,6 @@ function ruleChanged(initial: Form, form: Form): boolean {
   return !sameRepeat(moved, form.repeat);
 }
 
-const categoriesOf = (text: string) =>
-  text
-    .split(",")
-    .map((category) => category.trim())
-    .filter(Boolean);
-
 /**
  * What the user changed from `initial` to `form`; for a new item, everything
  * it holds. `untitled` is what a reminder added to an item without a title
@@ -467,7 +463,9 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
       Boolean(was.startless) !== Boolean(form.startless) ||
       was.startDate !== form.startDate ||
       was.endDate !== form.endDate ||
-      (!form.allDay && (was.startTime !== form.startTime || was.endTime !== form.endTime))
+      was.dueKind !== form.dueKind ||
+      (!form.allDay && was.startTime !== form.startTime) ||
+      (!dueIsDate(form) && was.endTime !== form.endTime)
     : true;
   if (timeChanged) changes.time = timesOfForm(form);
   // A rule only moved with the item's day is the core's to move (D105).
@@ -483,16 +481,6 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   );
   if (remove.length > 0 || add.length > 0) changes.alarms = { remove, add, untitled };
   if (differs("color") && (was || form.color)) changes.color = form.color;
-  if (form.kind === "task") {
-    if (was ? was.status !== form.status : form.status !== "NEEDS-ACTION")
-      changes.status = form.status;
-    if (differs("priority") && (was || form.priority !== null)) changes.priority = form.priority;
-    if (differs("percent") && (was || form.percent !== null))
-      changes.percentComplete = form.percent;
-    if ((was ? categoriesOf(was.categories).join() : "") !== categoriesOf(form.categories).join()) {
-      changes.categories = categoriesOf(form.categories);
-    }
-  }
   return changes;
 }
 

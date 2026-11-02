@@ -70,7 +70,9 @@ logic worth borrowing.
   the Nextcloud/Apple extensions for ordering and hidden subtasks. _Built in
   PR 6a:_ the edit dialog writes a task's summary, description, start, due,
   recurrence, reminders, status, `PERCENT-COMPLETE`, `PRIORITY` and
-  `CATEGORIES` ([D103](#D103), [design D109](design.md#D109)); subtasks and
+  `CATEGORIES` ([D103](#D103), [design D109](design.md#D109)); _since round
+  3 ([design D162](design.md#D162)) it writes none of the last four, kept
+  as written_; subtasks and
   the parent are shown, not set, and `CLASS` and the ordering extensions are
   kept, not edited ([Deferred](#deferred)).
 - **D11. Editing an occurrence asks the scope**, as Google does: "This

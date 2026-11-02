@@ -375,9 +375,10 @@ the project.
     give it back to what opened them.
 - **D109. Tasks in the dialogs** (D52, foundation [D10](foundation.md#D10)):
   a task's details show its due ("Due Wednesday, November 4, 3:00 PM"),
-  its status and progress, its priority, its tags, its parent and its
-  subtasks' titles, with "Mark completed" (an occurrence of a series in its
-  exception, as D94 completes it) and the star. The edit dialog adds the
+  its parent and its subtasks' titles, with "Mark completed" (an
+  occurrence of a series in its exception, as D94 completes it) and the
+  star. _Until round 3 ([D162](#D162)):_ the details showed its status and
+  progress, its priority and its tags, and the edit dialog added the
   status (not started, in progress, completed, cancelled), the priority as
   Nextcloud Tasks offers it (none; high, medium, low written as 1, 5, 9;
   read 1–4, 5, 6–9), the progress in percent and the tags, comma-separated
@@ -912,7 +913,7 @@ I make it"; "sometimes an item's text is covered by another event".
   Month's column of pills goes, its gap too ([D86](#D86)), so the days
   start at the edge. One value with the other settings ([D96](#D96)).
 
-For the items' editor and details:
+**The items' editor and details.**
 
 - **D159. A task is at its start** (the owner's feedback 4 and 7: "a task
   is a fixed time; on the calendar it shows as a task exactly 30 minutes
@@ -969,16 +970,20 @@ For the items' editor and details:
   reminder before the due.
   "All day" is one switch for both ends: a task another client wrote
   with a date start and a timed due (or the other way round) opens as the
-  start is, and its due is written that way only when its times change. A
-  due date after a timed start shows at the start's time on its day, so a
-  new start moves it by whole days.
+  start is. Its due keeps its own kind (`dueKind`) until "All day" is
+  switched: a due date after a timed start stays a date, its day alone in
+  the dialog, and a new start moves it by whole days; a timed due after a
+  date start keeps its time (foundation [D7](foundation.md#D7)).
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
   - A task is **overdue**, and rolls over to today's "N undone tasks"
     ([D51](#D51)), when its due is before today, or, without a due, its
     start is (`isUndoneBefore`, unchanged: the occurrence ends at its due,
-    else at its start). A task started before today and due after it is
-    not overdue: it stays on its start's day.
+    else at its start). So a task with no due goes overdue on the day after
+    its start, whatever time it started: one made at 15:00 today is not
+    overdue tonight, and is in tomorrow's "N undone tasks". A task started
+    before today and due after it is not overdue: it stays on its start's
+    day.
   - The tasks screen's "Add a task" ([D109](#D109)) opens a task on today,
     all day, in that list, no longer an undated one. The owner's model has
     no undated task: a start "always has to be chosen", and a task with no
@@ -986,6 +991,17 @@ For the items' editor and details:
     Tasks' list item with no date is what the owner moved away from; today
     all day is the least the list asks of the user, and the dialog changes
     it.
+- **D162. A task has no status, priority, progress or tags in the
+  dialogs** (the owner's feedback 9: "for tasks remove status, priority,
+  completed and tags. None of that is needed"). It changes [D109](#D109).
+  The edit dialog no longer has a task's status, priority, progress in
+  percent or tags, and the details no longer show them; an event's tags
+  still show in its details. Completing stays where it was: the check on
+  the item and the tasks screen, and "Mark completed" in the details
+  ([D94](#D94)). The fields go from the UI, never from the data: a
+  task's `STATUS`, `PRIORITY`, `PERCENT-COMPLETE` and `CATEGORIES` are
+  written back as they were (foundation [D7](foundation.md#D7)), and only
+  completing changes the first and the third.
 
 ## Deferred
 

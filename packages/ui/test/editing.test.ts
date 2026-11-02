@@ -6,6 +6,7 @@ import {
   ALL_RIGHTS,
   CalendarObject,
   occurrencesBetween,
+  zonedTime,
   starTask,
   type Event,
 } from "@astrotime/core";
@@ -199,9 +200,14 @@ describe("the form", () => {
     expect(changesOf(mixed, { ...mixed, summary: "Call" }, "Reminder")).toEqual({
       summary: "Call",
     });
-    expect(timesOfForm(mixed).end).toEqual({ type: "date", date: "2026-11-21" });
-    // A timed start with a due date: the due shows at the start's time on its
-    // day, and a new start moves it by whole days, not by an invented length.
+    // Its due keeps its time, though the dialog's "All day" is the start's (D7).
+    expect(mixed).toMatchObject({ dueKind: "time", endTime: "15:00" });
+    expect(timesOfForm(withStartDate(mixed, "2026-11-19")).end).toMatchObject({
+      type: "zoned",
+      local: "2026-11-20T15:00:00",
+    });
+    // A timed start with a due date: the due stays a date, its day alone, and
+    // a new start moves it by whole days, not by an invented length (D7).
     const timedStart = parse(
       "DTSTART;TZID=Europe/Vilnius:20261120T090000\r\nDUE;VALUE=DATE:20261122\r\n",
     );
@@ -209,10 +215,17 @@ describe("the form", () => {
     expect(changesOf(timedStart, { ...timedStart, summary: "Call" }, "Reminder")).toEqual({
       summary: "Call",
     });
-    expect(withStartTime(timedStart, "10:30")).toMatchObject({
-      endDate: "2026-11-22",
-      endTime: "10:30",
+    expect(withStartTime(timedStart, "10:30")).toMatchObject({ endDate: "2026-11-22" });
+    expect(timedStart).toMatchObject({ dueKind: "date" });
+    expect(changesOf(timedStart, withStartTime(timedStart, "10:30"), "Reminder").time).toEqual({
+      start: zonedTime("2026-11-20T10:30:00", timeZone),
+      end: { type: "date", date: "2026-11-22" },
     });
+    expect(
+      changesOf(timedStart, withStartDate(timedStart, "2026-11-21"), "Reminder").time?.end,
+    ).toEqual({ type: "date", date: "2026-11-23" });
+    // "All day" switched is both ends alike again.
+    expect(withAllDay(timedStart, true)).not.toHaveProperty("dueKind");
     // A reminder added to a task with no time writes the start it counts from;
     // one with only a due keeps its due alone, the reminder before the due.
     const reminder = { kind: "new" as const, relatedTo: "start" as const, offsetSeconds: -900 };
@@ -770,7 +783,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const stored = await store.saveFromServer(list.id, {
       href: "essay.ics",
       etag: '"1"',
-      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:essay\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSUMMARY:Essay\r\nX-OTHER-CLIENT:kept\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Essay\r\nTRIGGER;RELATED=END:-PT1H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+      ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:essay\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSUMMARY:Essay\r\nSTATUS:IN-PROCESS\r\nPERCENT-COMPLETE:40\r\nPRIORITY:1\r\nCATEGORIES:School,Writing\r\nX-OTHER-CLIENT:kept\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Essay\r\nTRIGGER;RELATED=END:-PT1H\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
     });
     const target = await targetOn(store, stored, "2026-11-05");
     const initial = formOf(target, timeZone, TODAY);
@@ -791,6 +804,15 @@ describe("saving writes pending changes through the store (D5)", () => {
     const { ics } = (await store.objectAt(list.id, "essay.ics"))!;
     expect(ics).toContain("SUMMARY:Essay draft\r\n");
     expect(ics).toContain("X-OTHER-CLIENT:kept\r\n");
+    // The fields the dialog no longer has are kept as written (design D162).
+    for (const line of [
+      "STATUS:IN-PROCESS",
+      "PERCENT-COMPLETE:40",
+      "PRIORITY:1",
+      "CATEGORIES:School,Writing",
+    ]) {
+      expect(ics).toContain(`${line}\r\n`);
+    }
     expect(ics).toContain("TRIGGER;RELATED=END:-PT1H\r\n");
     expect(ics).toContain("TRIGGER:-PT15M\r\n");
     expect(ics).toContain("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n");

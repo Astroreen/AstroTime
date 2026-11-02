@@ -350,6 +350,22 @@ test("an all-day task shows in the strip on its day; its due can be cleared (des
   ).toBeVisible();
 });
 
+test("a task has no status, priority, progress or tags in its details or its edit dialog (design D162)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await opener(page, "Wednesday, November 4", "Task: Send the report, 3:00 PM").click();
+  const details = page.getByRole("dialog", { name: "Send the report" });
+  await expect(details.getByText("Not started")).toHaveCount(0);
+  await expect(details.getByRole("button", { name: "Mark completed" })).toBeVisible();
+  await details.getByRole("button", { name: "Edit" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit task" });
+  await expect(dialog.getByRole("textbox", { name: "Title" })).toHaveValue("Send the report");
+  for (const name of ["Status", "Priority", "Progress, %", "Tags, separated by commas"]) {
+    await expect(dialog.getByLabel(name, { exact: true })).toHaveCount(0);
+  }
+});
+
 test("a task's details complete it and star it", async ({ page }) => {
   await openDemo(page, "week");
   await opener(page, "Wednesday, November 4", "Task: Send the report, 3:00 PM").click();
