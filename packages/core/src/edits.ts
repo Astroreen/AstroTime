@@ -8,7 +8,8 @@
 import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
-import { readItem } from "./item.ts";
+import { hexColor, nearestColorName } from "./colors.ts";
+import { readItem, X_COLOR } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
@@ -57,7 +58,11 @@ export interface ItemChanges {
      */
     readonly untitled: string;
   };
-  /** RFC 7986 `COLOR`, a CSS colour name; `null` takes the calendar's. */
+  /**
+   * The item's own colour: a CSS colour name, written as RFC 7986 `COLOR`,
+   * or a hex, written as its nearest name with the hex beside it (D174);
+   * `null` takes the calendar's.
+   */
   readonly color?: string | null;
   readonly status?: TaskStatus;
   readonly percentComplete?: number | null;
@@ -258,7 +263,7 @@ function apply(
     setText(component, "description", changes.description);
     component.getFirstProperty("description")?.removeParameter("altrep");
   }
-  if (changes.color !== undefined) setText(component, "color", changes.color ?? "");
+  if (changes.color !== undefined) setColor(component, changes.color);
   if (changes.categories !== undefined) {
     const params = component.getFirstProperty("categories")?.toJSON()[1] ?? {};
     component.removeAllProperties("categories");
@@ -289,6 +294,17 @@ function withoutRepeat(changes: ItemChanges): ItemChanges {
   const { repeat, ...rest } = changes;
   void repeat;
   return rest;
+}
+
+/**
+ * `COLOR` takes a CSS colour name: a hex is written as its nearest, as
+ * Nextcloud Calendar writes one, and kept exactly in `X-ASTROTIME-COLOR`
+ * (D174). A name or none drops the hex.
+ */
+function setColor(component: ICAL.Component, color: string | null): void {
+  const exact = hexColor(color ?? "");
+  setText(component, "color", exact ? nearestColorName(exact)! : (color ?? ""));
+  setText(component, X_COLOR, exact ?? "");
 }
 
 function setText(component: ICAL.Component, name: string, value: string): void {

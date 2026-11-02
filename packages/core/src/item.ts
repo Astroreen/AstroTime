@@ -1,5 +1,6 @@
 import ICAL from "ical.js";
 
+import { hexColor, nearestColorName } from "./colors.ts";
 import { fromIcalTime, keepTzid, type ItemTime } from "./time.ts";
 
 /** A reminder (`VALARM`). */
@@ -53,7 +54,11 @@ interface ItemFields {
   readonly categories: readonly string[];
   /** `CLASS`: PUBLIC, PRIVATE, CONFIDENTIAL. */
   readonly classification: string | null;
-  /** RFC 7986 `COLOR`, a CSS colour name. */
+  /**
+   * The item's own colour: AstroTime's exact one (`X-ASTROTIME-COLOR`, a
+   * hex) while RFC 7986 `COLOR` is still its nearest name, else `COLOR`, a
+   * CSS colour name (D174).
+   */
   readonly color: string | null;
   readonly url: string | null;
   readonly sequence: number;
@@ -102,6 +107,17 @@ function text(component: ICAL.Component, name: string): string | null {
   const value = component.getFirstPropertyValue(name);
   return typeof value === "string" ? value : null;
 }
+
+/** The exact colour while `COLOR` still names it (D174), else `COLOR`. */
+function colorOf(component: ICAL.Component): string | null {
+  const named = text(component, "color");
+  const exact = hexColor(text(component, X_COLOR) ?? "");
+  if (exact && named?.trim().toLowerCase() === nearestColorName(exact)) return exact;
+  return named;
+}
+
+/** AstroTime's exact colour of an item, beside its `COLOR` (D174). */
+export const X_COLOR = "x-astrotime-color";
 
 function integer(component: ICAL.Component, name: string): number | null {
   const value = component.getFirstPropertyValue(name);
@@ -228,7 +244,7 @@ function fields(component: ICAL.Component): ItemFields {
       .getAllProperties("categories")
       .flatMap((property) => property.getValues().map(String)),
     classification: text(component, "class"),
-    color: text(component, "color"),
+    color: colorOf(component),
     url: text(component, "url"),
     sequence: integer(component, "sequence") ?? 0,
     created: time(component, "created"),
