@@ -61,6 +61,14 @@
   /* Every field that takes text or a choice: a browser zooms the page into
    * one under 16 px when it gets the focus (iOS Safari), so none is smaller. */
   --text-input: 16px;
+  /* A screen shown in another's place, the calendar's or the tasks' (design D227). */
+  --animate-screen-in: screen-in 180ms cubic-bezier(0.2, 0, 0, 1);
+  @keyframes screen-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }
 
 @layer base {

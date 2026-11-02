@@ -81,8 +81,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   share the column's width (D15).
 - **Title room** — the minutes at the top of a timed item two lines of its
   title need (45); no item is drawn over them (design D153).
-- **Tasks screen** — the task lists, as in Google Tasks: a screen on a
-  phone, a panel beside the calendar on a wide screen (design D52).
+- **Tasks screen** — the task lists, as in Google Tasks: a screen over the
+  calendar on a phone, in the view's place on a wide screen, from the top
+  bar's calendar | tasks switch (design D52, D227).
 - **Task list** — a calendar that holds tasks (its components include
   `VTODO`), a tab of the tasks screen. Never "todo list".
 - **Star** — a task marked as important on the tasks screen,

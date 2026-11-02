@@ -10,7 +10,7 @@ test.use({ viewport: WIDE });
 
 async function openSettings(page: Page): Promise<Locator> {
   await page
-    .getByRole("banner")
+    .getByRole("navigation", { name: /^(Main menu|Главное меню)$/ })
     .getByRole("button", { name: /^(Settings|Настройки)$/ })
     .click();
   return page.getByRole("dialog", { name: /^(Settings|Настройки)$/ });
