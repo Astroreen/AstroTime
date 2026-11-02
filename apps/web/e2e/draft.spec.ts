@@ -180,6 +180,23 @@ test.describe("on a screen under 1024 px (design D187)", () => {
     expect(left).toBeGreaterThanOrEqual(drawn.x + drawn.width);
   });
 
+  test("a wheel sideways over the views behind the dialog moves neither the draft nor the dialog", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    const drawn = (await draft(page).boundingBox())!;
+    const edges = `${Math.round(drawn.x)},${Math.round(drawn.x + drawn.width)}`;
+    await expect(dialog).toHaveAttribute("data-aside-for", edges);
+    await page.mouse.move(900, 400);
+    await page.mouse.wheel(400, 0);
+    await page.mouse.move(drawn.x + drawn.width / 2, drawn.y + 4);
+    await page.mouse.wheel(-400, 0);
+    expect((await draft(page).boundingBox())!.x).toBe(drawn.x);
+    await expect(dialog).toHaveAttribute("data-aside-for", edges);
+  });
+
   test("a narrower window moves the dialog to the middle, with no render of its own", async ({
     page,
   }) => {
