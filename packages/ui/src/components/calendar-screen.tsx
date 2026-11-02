@@ -160,10 +160,20 @@ export function CalendarScreen({
   // which reads its own) draws none. A read that fails comes back empty.
   // The read kept from before the Agenda is not one: the store may have
   // changed meanwhile, and its live query starts again.
+  // The undone chip's tasks are a read of their own (foundation D146): a
+  // view drawn before keeps its chip too until they are read for its
+  // calendars and day, so the chip neither shows a hidden calendar's tasks
+  // nor goes and comes back; on open, with nothing drawn yet, the days draw
+  // first and the chip joins them.
   const [beforeAgenda, setBeforeAgenda] = useState<Entries | null>(null);
-  const fresh =
-    !agenda && read !== null && read !== beforeAgenda && read.from === from && read.to === to;
   const [held, setHeld] = useState<Drawn | null>(null);
+  const fresh =
+    !agenda &&
+    read !== null &&
+    read !== beforeAgenda &&
+    read.from === from &&
+    read.to === to &&
+    (read.undoneCurrent || held === null);
   if (fresh && (held?.read !== read || held.view !== view || held.anchor !== anchor)) {
     setHeld({ view, days, anchor, read });
   } else if (agenda && (held || beforeAgenda !== read)) {
@@ -171,7 +181,11 @@ export function CalendarScreen({
     setBeforeAgenda(read);
   }
   const drawn = fresh ? { view, days, anchor, read } : held;
-  const data = drawn?.read ?? { entries: [], undone: [] };
+  const drawnRead = drawn?.read;
+  // Drawn before its chip's tasks are read (on open): no chip yet.
+  const data = drawnRead
+    ? { entries: drawnRead.entries, undone: drawnRead.undoneCurrent ? drawnRead.undone : [] }
+    : { entries: [], undone: [] };
 
   const calendarColor = new Map(
     (lists?.calendars ?? []).map((calendar) => [

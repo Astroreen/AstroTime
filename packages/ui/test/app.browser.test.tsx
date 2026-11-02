@@ -162,15 +162,23 @@ test("the day draws before the undone chip's tasks are read; the chip joins them
   await expect.element(chip).toBeInTheDocument();
 });
 
-test("a calendar hidden takes its undone tasks off the chip at once, not once the chip is read again (D146)", async () => {
+test("a calendar hidden keeps the view as drawn, chip and all, until both its reads land (D146, design D59)", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   const store = await demoStore(["en-US"]);
   const tasks = (await store.calendars()).find((calendar) => calendar.name === "Tasks")!;
-  // Without the Tasks list the chip's read waits until the test lets it through.
+  // Without the Tasks list the chip's read waits until the test lets it
+  // through; the days' read is told when it has been answered.
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
+  let daysRead!: () => void;
+  const daysAnswered = new Promise<void>((resolve) => (daysRead = resolve));
   const slow = Object.assign(Object.create(store) as Store, {
+    objectsBetween: async (...args: Parameters<Store["objectsBetween"]>) => {
+      const rows = await store.objectsBetween(...args);
+      if (!args[0].includes(tasks.id)) daysRead();
+      return rows;
+    },
     undoneTasksBefore: async (...args: Parameters<Store["undoneTasksBefore"]>) => {
       if (!args[0].includes(tasks.id)) await held;
       return store.undoneTasksBefore(...args);
@@ -179,16 +187,20 @@ test("a calendar hidden takes its undone tasks off the chip at once, not once th
   render(Promise.resolve(slow), ["en-US"]);
   const strip = page.getByRole("list", { name: "All day" });
   await expect.element(strip.getByRole("button", { name: "3 undone tasks" })).toBeInTheDocument();
+  // How tall the strip is: its rows push the grid down.
+  const height = strip.element().getBoundingClientRect().height;
   await userEvent.click(page.getByRole("button", { name: "Main menu" }));
   await userEvent.click(page.getByRole("checkbox", { name: "Tasks" }));
   await userEvent.keyboard("{Escape}");
-  // The Tasks list's two are not drawn while the chip's new read is held.
-  await expect
-    .element(strip.getByRole("button", { name: "3 undone tasks" }))
-    .not.toBeInTheDocument();
-  expect(strip.getByRole("button", { name: /undone task/ }).elements()).toEqual([]);
+  // The days are read for the new calendars, the chip's tasks not yet: the
+  // view stays as drawn, its chip with it.
+  await daysAnswered;
+  await expect.element(strip.getByRole("button", { name: "3 undone tasks" })).toBeInTheDocument();
+  expect(strip.element().getBoundingClientRect().height).toBe(height);
   release();
   await expect.element(strip.getByRole("button", { name: "1 undone task" })).toBeInTheDocument();
+  // The strip kept its rows: the grid below it did not move.
+  expect(strip.element().getBoundingClientRect().height).toBe(height);
 });
 
 test("back from the Agenda, the day is drawn as the store has it now, not as read before (design D59)", async () => {

@@ -51,6 +51,12 @@ export interface Entries {
   readonly to: string;
   readonly entries: readonly Entry[];
   readonly undone: readonly UndoneTask[];
+  /**
+   * Whether `undone` was read for these calendars, today and this zone; if
+   * not, it is the last read, for a view to keep drawn until its own lands
+   * (design D59).
+   */
+  readonly undoneCurrent: boolean;
 }
 
 /**
@@ -60,11 +66,12 @@ export interface Entries {
  * are not read yet) or `from` is null; the last result stays meanwhile. A
  * range whose read fails comes back empty.
  *
- * The undone tasks are a read of their own, after the range's: a view draws
- * its days as soon as they are read, and the "N undone tasks" chip joins it
- * when its tasks are, every one of them parsed to find its latest undone
- * occurrence (docs/plans/foundation.md#D146). Until then the chip is not
- * drawn.
+ * The undone tasks are a read of their own, sent after the range's: on first
+ * open a view draws its days as soon as they are read, and the "N undone
+ * tasks" chip joins it when its tasks are, every one of them parsed to find
+ * its latest undone occurrence (docs/plans/foundation.md#D146). Read for
+ * other calendars, another day or zone, they come with `undoneCurrent`
+ * false, so a view keeps what it drew until both reads are its own.
  */
 export function useEntries(
   store: Store,
@@ -81,9 +88,8 @@ export function useEntries(
   // The ids by value: the calendars' list is new on every store write, and
   // the query already runs again on every write.
   const idsKey = query.ids?.join(",") ?? null;
-  const [read, setRead] = useState<Omit<Entries, "undone"> | null>(null);
-  // The undone tasks with what they were read for: another set of calendars,
-  // day or zone draws none until its own read lands, as the range does.
+  const [read, setRead] = useState<Omit<Entries, "undone" | "undoneCurrent"> | null>(null);
+  // The undone tasks with what they were read for.
   const undoneKey = `${idsKey}|${today}|${timeZone}`;
   const [undone, setUndone] = useState<{
     readonly key: string;
@@ -125,8 +131,12 @@ export function useEntries(
       (tasks) => setUndone({ key, tasks }),
     );
   }, [store, idsKey, reading, today, timeZone]);
-  const tasks = undone?.key === undoneKey ? undone.tasks : NONE;
-  return useMemo(() => (read ? { ...read, undone: tasks } : null), [read, tasks]);
+  const tasks = undone?.tasks ?? NONE;
+  const undoneCurrent = undone?.key === undoneKey;
+  return useMemo(
+    () => (read ? { ...read, undone: tasks, undoneCurrent } : null),
+    [read, tasks, undoneCurrent],
+  );
 }
 
 /** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period (design D59). */

@@ -97,7 +97,7 @@ export function AgendaView({
             {
               today,
               timeZone,
-              undone: data.undone.length,
+              undone: data.undoneCurrent ? data.undone.length : 0,
             },
           )
         : [],

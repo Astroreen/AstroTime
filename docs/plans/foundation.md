@@ -1835,18 +1835,24 @@ the built web app (`scripts/bench-cold-start.ts`).
 
 - **D146. The week draws before what it can wait for.**
   - **The undone chip after the days** (`useEntries`, `hooks.ts`): its
-    tasks are a read of their own, asked after the range's, so the store's
-    worker answers the range first and the view draws its days; the chip
-    joins when its tasks are read, each parsed for its latest undone
-    occurrence (some 660 of D118's calendar). It is not drawn until then;
-    the strip may grow by its row once ([design D59](design.md#D59) keeps
-    the period's own items from arriving under a press).
+    tasks are a read of their own, sent after the range's, so on open the
+    view draws its days when they are read, and the chip joins them when
+    its tasks are, each parsed for its latest undone occurrence (some 660
+    of D118's calendar). After that, as [design D59](design.md#D59) holds
+    a period: a view keeps what it drew, chip and all, until both reads are
+    its own (the calendars shown, today, the zone); so a calendar hidden, or
+    midnight, shows no stale chip, and none that goes and comes back to move
+    the strip's rows. The two reads are two live queries: during a sync they
+    may each show the store a write apart, until the next run of each.
   - **One `t` for the calendar** (`CalendarContext`): every item drawn asked
     `useTranslation`, which made a copy of i18next's instance per item; the
     views' items take the screen's.
   - **Reload first once trying again failed** ([D145](#D145)): a dialog
     whose code did not arrive after "Try again" either says "Reload
-    AstroTime to finish updating", Reload its first action.
+    AstroTime to finish updating", Reload its first action; once it does
+    arrive, a later failure starts with "Try again" again. Offline it says
+    the same, the cause not told apart (a reload offline shows the version
+    the service worker kept).
   - **Measured** (`scripts/bench-cold-start.ts`, i7-14700KF; the
     phone-class run with Chrome's "Fast 4G" and a CPU four times slower;
     both on main at 8be35a2), the median of five new tabs:
