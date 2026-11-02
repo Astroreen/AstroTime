@@ -627,7 +627,8 @@ Decided while building the layout engine, ahead of PR 5's screens.
 Decided while building PR 5a.
 
 - **D54. The views read the store through live queries.** `Store.subscribe`
-  calls its listeners after every write, another tab's too ([D98](#D98)); a
+  calls its listeners after every write that changed something
+  ([D181](#D181)), another tab's too ([D98](#D98)); a
   view's query runs again when the
   store changes, and a burst of writes during a run costs one more run, not
   one per write (`liveQuery`), so a sync writing while the app is open shows
@@ -1924,6 +1925,36 @@ The owner's feedback after v0.3.0, tried on a phone and a computer.
   clients show the nearest name; nothing else is lost. The names live in
   `packages/core/src/colors.ts`, some 1.5 KiB of the first visit
   ([D145](#D145)).
+
+**An idle tab does no work.** The owner's Month tab on the demo data kept a
+core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
+
+- **D181. Only a write that changed something is heard; an equal result
+  draws nothing.** The calendar on this device, holding an item beside a
+  server's calendars ([D122](#D122)), was asked to step aside on every store
+  change; it stayed, but `Store.exclusive` told the listeners anyway, so the
+  query that asked ran again, and asked again: measured in Chromium, 82 % of
+  a core, 821 messages to the store's worker and 175 React commits a second,
+  for as long as the tab was open.
+  - **The store tells only a real write.** A store operation counts the
+    rows its transaction changed (`total_changes()`, which inside it only
+    its own statements move, [D99](#D99)); one that changed none ends with
+    ROLLBACK, not COMMIT, and calls no listener: here none, and in another
+    tab none either, since only a commit is announced ([D98](#D98)). A
+    failed one calls none; a COMMIT in doubt does, as it may have written.
+    Two more statements per write, none per read.
+  - **A live query reports a result only when it differs from the last one
+    it reported** ([D54](#D54)): arrays and plain objects by what they hold,
+    anything else (a parsed object the cache keeps) by identity. A sync
+    that wrote a sync token, or a write elsewhere in the store, draws no
+    view whose rows did not change. After an error the next result is
+    reported whatever it is. A query whose `onResult` writes, and must act
+    on every run (its write may have failed, or decides on more than the
+    query reads: the calendar on this device made or stepped aside), gives
+    `everyRun`.
+  - Proved by `idle.spec.ts`: the Month view beside a calendar on this
+    device that stays draws a handful of commits for a change another tab
+    makes, 294 before.
 
 ## Deferred
 

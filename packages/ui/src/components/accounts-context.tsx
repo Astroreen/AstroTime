@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
-import { liveQuery } from "../calendar/live.ts";
+import { everyRun, liveQuery } from "../calendar/live.ts";
 import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
 import { KEYS } from "../preferences.ts";
@@ -121,6 +121,8 @@ export function AccountsProvider({
             .addLocalCalendarIfEmpty({ ...localNames, color: LOCAL_COLOR })
             .catch((error: unknown) => console.error(error));
         },
+        undefined,
+        everyRun,
       ),
     [store, localNames],
   );
@@ -221,6 +223,10 @@ export function AccountsProvider({
           if (ready)
             store.removeLocalCalendarIfUnused().catch((error: unknown) => console.error(error));
         },
+        // Whether it is unused is the store's to tell, in its transaction:
+        // asked again on every change (one that removes nothing tells no one, D181).
+        undefined,
+        everyRun,
       ),
     [store],
   );

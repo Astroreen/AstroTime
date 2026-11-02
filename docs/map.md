@@ -78,8 +78,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
       → `plans/foundation.md#D122`
-    - `subscribe` — hears every write, for live queries.
-      → `plans/foundation.md#D54`
+    - `subscribe` — hears every write that changed a row, for live
+      queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`
     - `undoneTasksBefore` — the undone tasks due before today.
       → `plans/foundation.md#D55`
     - `tasks` — every task of some calendars: the tasks screen's lists.
@@ -222,8 +222,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `calendar/` — the views and their keys (`views.ts`), days, the locale's
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
-    (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery`.
-    → `plans/foundation.md#D54`
+    (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery` (`live.ts`,
+    a result equal to the last one is not reported; `everyRun`).
+    → `plans/foundation.md#D54`, `plans/foundation.md#D181`
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
@@ -297,7 +298,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
     phone's system bars. → `plans/android.md#D68`; `a11y.spec.ts` audits
     every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
-    landmarks, reflow and reduced motion. → `plans/design.md#D119`
+    landmarks, reflow and reduced motion. → `plans/design.md#D119`; `idle.spec.ts`
+    counts React commits in the Month view across another tab's change: an
+    idle tab does no work. → `plans/foundation.md#D181`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`;
     `offline.spec.ts` reloads it with the network gone, updates it, and
