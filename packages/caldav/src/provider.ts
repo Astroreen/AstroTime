@@ -54,6 +54,12 @@ const MULTIGET_BATCH = 100;
 /** Truncated sync-collection answers followed before falling back to a full listing. */
 const MAX_SYNC_PAGES = 50;
 
+/** Where Nextcloud keeps a calendar home: its server's root, and the user's name in the path. */
+export const NEXTCLOUD_HOME = /^(.*)\/remote\.php\/dav\/calendars\/([^/]+)\/?$/;
+
+/** Whether a calendar home's server keeps the user's files beside it (Nextcloud's, foundation D231). */
+export const keepsFiles = (homeUrl: string) => NEXTCLOUD_HOME.test(homeUrl);
+
 /** The `Authorization` header of HTTP Basic for these credentials. */
 export function basic({ username, password }: Credentials): string {
   const bytes = new TextEncoder().encode(`${username}:${password}`);
@@ -452,7 +458,7 @@ export class CalDavProvider implements Provider {
   }
 }
 
-async function send(
+export async function send(
   http: HttpClient,
   authorization: string,
   request: HttpRequest,

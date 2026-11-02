@@ -17,6 +17,16 @@ export function attachmentHref(uri: string, base: string | undefined): string | 
   }
 }
 
+/**
+ * Whether two attachments' links go to one place: as they resolve against
+ * the calendar's server, so Nextcloud Calendar's relative `/index.php/f/<id>`
+ * and AstroTime's absolute one are the same file.
+ */
+export function sameLink(a: string | null, b: string | null, base: string | undefined): boolean {
+  if (a === null || b === null) return false;
+  return (attachmentHref(a, base) ?? a) === (attachmentHref(b, base) ?? b);
+}
+
 /** Formats known by their media type, named as their files' usual extension. */
 const FORMATS: Readonly<Record<string, string>> = {
   "application/pdf": "PDF",
@@ -103,4 +113,32 @@ export function attachmentText(
     .filter(Boolean)
     .join(" · ");
   return { name, about };
+}
+
+/**
+ * A web link typed: with `http://` or `https://`, else `https://` before it.
+ * Its host has a dot (`example.org`, `192.168.1.10`), is `localhost`, or is
+ * a name with its port (`nas:8080`); a number (`1234`), a time (`12:30`)
+ * or a bare word is not one, nor another scheme (`javascript:`,
+ * `mailto:`) or text with a space.
+ */
+export function typedLink(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  // A scheme is a name, a colon and no port's digit after it.
+  const scheme = /^([a-z][a-z0-9+.-]*):(?!\d)/i.exec(trimmed)?.[1]?.toLowerCase();
+  if (scheme && scheme !== "http" && scheme !== "https") return null;
+  const host = /^(?:https?:\/\/)?([^/:?#]*)/i.exec(trimmed)?.[1] ?? "";
+  // Digits and dots: an address only as four numbers (no "1.5" read as 1.0.0.5).
+  if (/^[\d.]+$/.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
+  try {
+    const url = new URL(scheme ? trimmed : `https://${trimmed}`);
+    const named =
+      url.hostname.includes(".") ||
+      url.hostname === "localhost" ||
+      (url.port !== "" && /[a-z]/i.test(host));
+    return named ? url.href : null;
+  } catch {
+    return null;
+  }
 }

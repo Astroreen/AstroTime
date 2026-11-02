@@ -65,7 +65,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `mergeObjects` — the three-way merge of a refused write;
     `differences`, the fields two versions differ in.
     → `plans/foundation.md#D6`, `plans/foundation.md#D107`
-  - `Provider` — the interface every provider implements;
+  - `Provider` — the interface every provider implements (and
+    `FileStore`, `RemoteFile`: an account's files where its server keeps
+    them, `plans/foundation.md#D231`);
     `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a
     calendar. → `plans/foundation.md#D37`
   - `SecretStore` — where a platform keeps credentials, never the store.
@@ -146,6 +148,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
+  - `filesOf` (`files.ts`, `@astrotime/caldav/files`) — an account's
+    Nextcloud files beside its calendars (`keepsFiles`, whether its home
+    has them): a folder listed, each file with the `ATTACH` Nextcloud
+    Calendar writes. → `plans/foundation.md#D231`
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
   - `CertificateError` — a server certificate the platform refused (Android's
     plugin tells it apart). → `plans/android.md#D62`
@@ -161,7 +167,10 @@ When you add a package, app or module, add its line here in the same PR.
     a running sync, waits for another tab's (`SyncLock`, D91);
     `connectCalDav` opens an account's provider; `saveAccount`,
     `removeAccount` keep an account with its credentials.
-    → `plans/foundation.md#D90`
+    → `plans/foundation.md#D90`; `hasFiles`, whether an account has files,
+    and `accountFiles` (`files.ts`, `@astrotime/sync/files`, loaded with
+    the file picker), them opened with its saved credentials.
+    → `plans/foundation.md#D231`
   - `test/budget.test.ts` — the requests each action costs a server, held
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
@@ -258,6 +267,10 @@ When you add a package, app or module, add its line here in the same PR.
     - `attachments.tsx` — an item's attachments in its details: links
       that open, inline files saved on demand (`Platform.saveFile` where
       the platform saves files). → `plans/design.md#D230`
+    - `attachments-field.tsx` — the edit dialog's attachments: each
+      taken off, a link added. → `plans/design.md#D233`
+    - `file-picker.tsx` — the account's files, a folder at a time, to
+      attach one. → `plans/design.md#D234`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
       map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
@@ -378,6 +391,8 @@ When you add a package, app or module, add its line here in the same PR.
     saves an inline one. → `plans/design.md#D230`;
     `shell.spec.ts` drives the wide calendar | tasks switch and what
     brings the calendar back. → `plans/design.md#D227`;
+    `files.spec.ts` attaches a file from a faked Nextcloud's files and
+    sees the `ATTACH` it uploads. → `plans/design.md#D234`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

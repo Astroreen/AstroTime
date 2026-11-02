@@ -2157,9 +2157,11 @@ task?"
   (Nextcloud Calendar's and RFC 8607's), else Outlook's `X-FILENAME`,
   Apple's `X-APPLE-FILENAME` or Oracle's `X-ORACLE-FILENAME`, its last
   path part (Nextcloud's `FILENAME` is the file's path in the user's
-  files, `/Calendar/report.pdf`); the type is `FMTTYPE`; the size is
-  `SIZE` (RFC 8607), else an inline file's own, counted from its base64
-  without decoding it, so a list of attachments never holds their bytes.
+  files, `/Calendar/report.pdf`); the type is `FMTTYPE`; the size is an
+  inline file's own, counted from its base64 without decoding it (so a
+  list of attachments never holds their bytes; _since round 4's D233 PR_
+  whatever its `SIZE` says, the bytes being there to count), else a
+  link's `SIZE` (RFC 8607).
   An inline file is decoded only when the user saves it (`inlineFile`,
   through ical.js's own base64, the core having no `atob`). An alarm's
   `ATTACH` (Apple's sound) is the alarm's, not the item's. A link may be
@@ -2187,8 +2189,51 @@ task?"
   `outlook-event-inline-attachment.ics` (base64 inline) are written by
   hand in each client's shape.
 
+- **D231. An account's files, behind the provider** (the owner's 9: "if
+  we connect WebDAV and files are stored there, why not attach them"). A
+  provider's server may keep files beside its calendars: a `FileStore`
+  (`@astrotime/core`) lists a folder, each `RemoteFile` with its path,
+  name, type, size, and the `ATTACH` it becomes on an item; nothing
+  outside `@astrotime/caldav` knows they are WebDAV (AGENTS.md rule 4).
+  The CalDAV provider's (`filesOf`, `@astrotime/caldav/files`) are there
+  where its calendar home is Nextcloud's
+  (`/remote.php/dav/calendars/<user>/`): its files at
+  `/remote.php/dav/files/<user>/`, listed with one `PROPFIND` (`Depth: 1`:
+  type, `getcontentlength`, `oc:fileid`, `oc:share-types`,
+  `nc:has-preview`), folders first, then files, each by name, and with
+  the same credentials as its calendars, so an app password from Login
+  Flow v2 opens them too. Whether an account has them (`hasFiles`,
+  `keepsFiles`) asks nothing; opening them (`accountFiles`,
+  `@astrotime/sync/files`, with the account's saved credentials) and
+  listing them is code of its own, loaded with the file picker and not
+  with the app ([D145](#D145): a `Provider.files()` that loaded it from
+  the provider cost the first load 1.4 KiB in the split it made of the
+  shared chunks). A file becomes the `ATTACH`
+  Nextcloud Calendar 5.5 writes for one picked from Files (its
+  `addAttachmentWithProperty`): the file's link by its id,
+  `/index.php/f/<id>`, written absolute so other clients open it too
+  (Nextcloud's own resolves either), `FILENAME` its path in the user's
+  files (`/Calendar/Q3.pdf`), `FMTTYPE`, `X-NC-FILE-ID`,
+  `X-NC-HAS-PREVIEW`, `X-NC-SHARED-TYPES` when it is shared, and `SIZE`
+  ([D229](#D229)). Like Nextcloud Calendar, picking a file shares
+  nothing: the link opens for the user and whoever the file is shared
+  with (AstroTime invites no one, design D108). An account has none on
+  this device, nor while its sync is off ([D171](#D171): no request goes
+  to its server); signed out, its files cannot be opened. The requests go only to the account's own server, as its
+  calendars' do. Recorded from the test user on Nextcloud 34.0.5
+  (`packages/caldav/test/fixtures/nextcloud-files-*.xml`).
+
 ## Deferred
 
+- **Uploading a file from the device to the account's files** ([D231](#D231))
+  — Nextcloud Calendar's "Upload from device" puts it in the user's
+  attachments folder (`/Calendar` unless the user chose another in its
+  settings, which AstroTime does not read) and links it; it needs a
+  request body of bytes through every platform's HTTP (the web's proxy,
+  the desktop's and Android's own clients carry text today).
+- **Files on other servers** — only Nextcloud's calendar home says where
+  its files are ([D231](#D231)); a WebDAV server of files named by the
+  user is not offered.
 - **Apple's managed attachments, written** — RFC 8607's `MANAGED-ID`
   attachments (iCloud, Apple's servers, `POST ?action=attachment-add`) are
   read, shown and kept ([D229](#D229)), but AstroTime adds none that way:

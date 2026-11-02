@@ -18,6 +18,7 @@ export {
 export {
   CalDavProvider,
   canonicalHref,
+  keepsFiles,
   NoCalendarHomeError,
   type Credentials,
   type Discovery,

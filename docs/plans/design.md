@@ -1732,8 +1732,10 @@ bar, the sidebar and the accounts panel.
   description's links open, a new tab or the system's browser (the
   desktop's `setWindowOpenHandler`, Android's WebView); a link of another
   kind (`javascript:`, `data:`, `ftp:`) is shown as written and not
-  followed. A file inline in the object is a button, "Save figures.txt":
-  decoded then, and saved under its name, by each platform its own way:
+  followed. A file inline in the object is a button named by what it
+  shows after a hidden "Save" ("Save figures.txt TXT · 22 B", so its name
+  holds its visible words, WCAG 2.5.3; an `aria-label` "Save figures.txt"
+  did not, until #101): decoded then, and saved under its name, by each platform its own way:
   the web downloads it (a link of its bytes attached to the page for its
   click; the link's URL let go when the list closes, not on a timer); the
   desktop's Electron asks where to save it, as for any download
@@ -1748,6 +1750,43 @@ bar, the sidebar and the accounts panel.
   user backed out of says nothing. The rows are
   AstroTime's own drawings ([D43](#D43)), loaded with the details. The
   demo's "Budget planning" carries one of each.
+- **D233. The edit dialog's attachments** (the owner's 9, its files part):
+  a row after the description, under the details' paperclip, listing the
+  item's attachments as the details do (the same mark and words), each
+  with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
+  a web link (typed with `http://` or `https://`, or with neither, which
+  is `https://`; its host has a dot, is `localhost`, or is a name with its
+  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, or a bare
+  word is none, and "Add" waits until it is one; another scheme,
+  `javascript:` or `mailto:`, never is), added with Enter or "Add", Escape leaving
+  it; Enter there adds the link and does not save the dialog. The form
+  keeps them as reminders are kept (`AttachmentChoice`: one the item has,
+  by its index among its `ATTACH`es, or a new one), and the save writes
+  only what changed: those taken off by their index, found again in the
+  item as stored now if another device changed it meanwhile, by what each
+  is as written (every parameter, an inline file's bytes: two that read
+  alike are two files), and the new
+  ones added after the rest ([foundation D229](foundation.md#D229)); an
+  attachment left alone stays byte for byte, and a form that says nothing
+  of attachments (one made without them) changes none. A file picked
+  twice, or one there already under Nextcloud Calendar's relative link,
+  is attached once: links are compared as they resolve.
+- **D234. "From your files"** (the owner's 9): for an item in a calendar
+  whose account has files ([foundation D231](foundation.md#D231),
+  Nextcloud's), a second action beside "Add a link" opens a file picker
+  over the edit dialog (the whole screen on a phone, a dialog on a wide
+  screen, titled "Choose a file"): "Your files" first, a folder at a time,
+  its folders (a folder mark, AstroTime's own) and then its files with the
+  details' mark, kind and size; a folder opens, "Up a folder" goes back,
+  a file is attached as the `ATTACH` its server's calendar app writes and
+  the picker closes; one attached already is not attached twice. While a
+  folder is read it says "Loading…", an empty one "Nothing here", one that
+  cannot be reached says so with "Try again", which opens the files anew
+  and asks the server again (a signed-out account's
+  too). Asking whether an account has files makes no request (its
+  calendar home says); the picker's code, the files' with it, loads with
+  its first opening.
+  Uploading a file from the device is [Deferred](foundation.md#deferred).
 
 ### Decided in round 4: pictures
 

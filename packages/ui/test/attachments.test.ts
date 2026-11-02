@@ -2,7 +2,14 @@
 import type { Attachment } from "@astrotime/core";
 import { describe, expect, test } from "vite-plus/test";
 
-import { attachmentHref, attachmentText, kindOf, sizeText } from "../src/calendar/attachments.ts";
+import {
+  attachmentHref,
+  attachmentText,
+  kindOf,
+  sameLink,
+  sizeText,
+  typedLink,
+} from "../src/calendar/attachments.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
 const en = createI18n("en").t;
@@ -86,4 +93,30 @@ describe("a size", () => {
       about: "3 B",
     });
   });
+});
+
+test("a link typed: a host with a dot, localhost, or a name with its port; never a number or a time", () => {
+  expect(typedLink("example.org/minutes")).toBe("https://example.org/minutes");
+  expect(typedLink("  http://example.org  ")).toBe("http://example.org/");
+  expect(typedLink("nas:8080/files/a.pdf")).toBe("https://nas:8080/files/a.pdf");
+  expect(typedLink("localhost")).toBe("https://localhost/");
+  expect(typedLink("192.168.1.10/share")).toBe("https://192.168.1.10/share");
+  expect(typedLink("1234")).toBeNull();
+  expect(typedLink("12:30")).toBeNull();
+  expect(typedLink("1.5")).toBeNull();
+  expect(typedLink("nas")).toBeNull();
+  expect(typedLink("not a link")).toBeNull();
+  expect(typedLink("javascript:alert(1)")).toBeNull();
+  expect(typedLink("mailto:me@example.org")).toBeNull();
+  expect(typedLink("ftp://example.org/f")).toBeNull();
+  expect(typedLink("")).toBeNull();
+});
+
+test("two links are one file as they resolve: Nextcloud Calendar's relative form and the absolute one", () => {
+  const base = "https://cloud.example.com/remote.php/dav/calendars/astro/work/";
+  expect(sameLink("/index.php/f/241", "https://cloud.example.com/index.php/f/241", base)).toBe(
+    true,
+  );
+  expect(sameLink("/index.php/f/241", "/index.php/f/242", base)).toBe(false);
+  expect(sameLink(null, null, base)).toBe(false);
 });

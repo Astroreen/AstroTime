@@ -1,6 +1,7 @@
 import {
   CalDavProvider,
   HttpError,
+  keepsFiles,
   ProxyRefusedError,
   revokeAppPassword,
   type Credentials,
@@ -15,6 +16,7 @@ import {
 } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
 
+import { keyOf, parseSecret, readSecret } from "./secret.ts";
 import { syncAccount, type SyncReport } from "./sync.ts";
 
 /**
@@ -327,41 +329,18 @@ function holdBack(
   });
 }
 
-// Accounts and their credentials. The credentials are the platform's
-// (`SecretStore`), never the store's (foundation D36); the key and the JSON
-// are spelled here only.
+// Accounts and their credentials: `secret.ts` spells the key and the JSON.
 
-const keyOf = (accountId: string) => `account:${accountId}`;
-
-/** The credentials kept for an account, and whether Login Flow v2 gave its password. */
-async function readSecret(
-  secrets: SecretStore,
-  accountId: string,
-): Promise<{ readonly credentials: Credentials; readonly loginFlow: boolean } | null> {
-  return parseSecret(await secrets.get(keyOf(accountId)));
-}
-
-function parseSecret(
-  value: string | null,
-): { readonly credentials: Credentials; readonly loginFlow: boolean } | null {
-  if (value === null) return null;
-  try {
-    const parsed = JSON.parse(value) as {
-      username?: unknown;
-      password?: unknown;
-      loginFlow?: unknown;
-    };
-    if (typeof parsed.username === "string" && typeof parsed.password === "string") {
-      return {
-        credentials: { username: parsed.username, password: parsed.password },
-        loginFlow: parsed.loginFlow === true,
-      };
-    }
-  } catch {
-    // Unreadable: as if none were saved, so the user signs in again.
-  }
-  return null;
-}
+/**
+ * Whether an account may have files beside its calendars (foundation D231):
+ * one that syncs, whose server keeps them. Asks nothing; its files are
+ * opened by `accountFiles` (`@astrotime/sync/files`).
+ */
+export const hasFiles = (account: Account) =>
+  account.provider === "caldav" &&
+  !account.syncOff &&
+  !!account.homeUrl &&
+  keepsFiles(account.homeUrl);
 
 /**
  * Keeps an account the user signed in to: the account in the store, its

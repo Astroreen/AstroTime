@@ -18,7 +18,9 @@ import {
   wallClockIn,
   WEEKDAYS,
   zonedTime,
+  attachLines,
   type Alarm,
+  type Attachment,
   type CalendarRights,
   type Place,
   type Geo,
@@ -27,6 +29,7 @@ import {
   type ItemTime,
   type ItemTimes,
   type NewAlarm,
+  type NewAttachment,
   type Repeat,
   type Scope,
 } from "@astrotime/core";
@@ -57,6 +60,14 @@ export interface Target {
 export type AlarmChoice =
   | { readonly kind: "existing"; readonly index: number; readonly alarm: Alarm }
   | ({ readonly kind: "new" } & NewAlarm);
+
+/**
+ * An attachment in the form: one the item has (by its index among its
+ * `ATTACH`es), kept as written, or a new one (design D233).
+ */
+export type AttachmentChoice =
+  | { readonly kind: "existing"; readonly index: number; readonly attachment: Attachment }
+  | { readonly kind: "new"; readonly attachment: NewAttachment };
 
 /**
  * How the item repeats in the form: a `Repeat`, `null` for not at all, or
@@ -98,6 +109,8 @@ export interface Form {
   readonly utc: boolean;
   readonly repeat: RepeatChoice;
   readonly alarms: readonly AlarmChoice[];
+  /** Its attachments; none when left out (design D233). */
+  readonly attachments?: readonly AttachmentChoice[];
   readonly location: string;
   /**
    * The place `location` names on the map: picked from the place search, or
@@ -177,6 +190,11 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     utc,
     repeat: rule ? (rule.exact ? rule.repeat : "kept") : null,
     alarms: item.alarms.map((alarm, index) => ({ kind: "existing", index, alarm })),
+    attachments: item.attachments.map((attachment, index) => ({
+      kind: "existing",
+      index,
+      attachment,
+    })),
     location: item.location ?? "",
     // The point with the very text it belongs to, so a copy writes both (D176).
     place: item.geo ? placeOfItem(item.location ?? "", item.geo, item.placeLabel) : null,
@@ -514,6 +532,22 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
     a.kind === "new" ? [{ relatedTo: a.relatedTo, offsetSeconds: a.offsetSeconds }] : [],
   );
   if (remove.length > 0 || add.length > 0) changes.alarms = { remove, add, untitled };
+  // Attachments as reminders: those taken out by their index, the new ones
+  // added (design D233). A form with none said (`undefined`) changes none:
+  // never read as "all taken off".
+  if (form.attachments !== undefined) {
+    const keptFiles = new Set(
+      (form.attachments ?? []).flatMap((a) => (a.kind === "existing" ? [a.index] : [])),
+    );
+    const removeFiles = (was?.attachments ?? []).flatMap((a) =>
+      a.kind === "existing" && !keptFiles.has(a.index) ? [a.index] : [],
+    );
+    const addFiles = (form.attachments ?? []).flatMap((a) =>
+      a.kind === "new" ? [a.attachment] : [],
+    );
+    if (removeFiles.length > 0 || addFiles.length > 0)
+      changes.attachments = { remove: removeFiles, add: addFiles };
+  }
   if (differs("color") && (was || form.color)) changes.color = form.color;
   return changes;
 }
@@ -778,22 +812,44 @@ export function itemOf(object: CalendarObject, recurrenceId: ItemTime | null): I
 }
 
 /**
- * The changes with the reminders removed found again, by what they are, in
+ * The changes with the reminders and attachments removed found again, by what they are, in
  * the item as the store holds it now: one another device took away meanwhile
  * is no longer there to remove, and the others may sit elsewhere in the list.
  */
 function againstCurrent(changes: ItemChanges, target: Target, object: CalendarObject) {
-  if (!changes.alarms || changes.alarms.remove.length === 0) return changes;
-  const now = (itemOf(object, target.recurrenceId)?.alarms ?? []).map((a) => JSON.stringify(a));
-  const taken = new Set<number>();
-  const remove = changes.alarms.remove.flatMap((index) => {
-    const alarm = JSON.stringify(target.item.alarms[index]);
-    const at = now.findIndex((other, i) => !taken.has(i) && other === alarm);
-    if (at < 0) return [];
-    taken.add(at);
-    return [at];
-  });
-  return { ...changes, alarms: { ...changes.alarms, remove } };
+  const held = itemOf(object, target.recurrenceId);
+  /** The indexes `remove` named in what was opened, found in what is stored now. */
+  const found = (
+    remove: readonly number[],
+    opened: readonly unknown[],
+    now: readonly unknown[],
+  ) => {
+    const stored = now.map((value) => JSON.stringify(value));
+    const taken = new Set<number>();
+    return remove.flatMap((index) => {
+      const value = JSON.stringify(opened[index]);
+      const at = stored.findIndex((other, i) => !taken.has(i) && other === value);
+      if (at < 0) return [];
+      taken.add(at);
+      return [at];
+    });
+  };
+  let result = changes;
+  if (changes.alarms && changes.alarms.remove.length > 0) {
+    const remove = found(changes.alarms.remove, target.item.alarms, held?.alarms ?? []);
+    result = { ...result, alarms: { ...changes.alarms, remove } };
+  }
+  // The same for attachments, by what each is as written, every parameter
+  // and an inline file's bytes: two that read alike are two files (design D233).
+  if (changes.attachments && changes.attachments.remove.length > 0) {
+    const remove = found(
+      changes.attachments.remove,
+      attachLines(target.object, target.recurrenceId),
+      attachLines(object, target.recurrenceId),
+    );
+    result = { ...result, attachments: { ...changes.attachments, remove } };
+  }
+  return result;
 }
 
 /**

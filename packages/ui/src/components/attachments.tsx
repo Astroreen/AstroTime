@@ -5,7 +5,7 @@
 // the platform saves files (`Platform.saveFile`, Android's), else as the
 // browser downloads them (the web's and the desktop's). Loaded with the
 // details.
-import { inlineFile, type InlineFile } from "@astrotime/core";
+import { inlineFile, type Attachment, type InlineFile } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,6 +42,32 @@ async function save(
   link.remove();
 }
 
+/** A row's mark and words, the details' and the edit dialog's (design D230, D233). */
+export function AttachmentBody({
+  attachment,
+  name,
+  about,
+}: {
+  attachment: Attachment;
+  name: string;
+  about: string;
+}) {
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-ink-muted"
+      >
+        {attachment.uri && !attachment.name ? <LinkMark /> : <FileMark />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{name}</span>
+        {about && <span className="block truncate text-note text-ink-muted">{about}</span>}
+      </span>
+    </>
+  );
+}
+
 const row =
   "flex w-full min-w-0 items-center gap-3 rounded-xl px-2 py-1.5 text-left -outline-offset-2 hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 
@@ -68,20 +94,7 @@ export function AttachmentList({
         {target.item.attachments.map((attachment, index) => {
           const href = attachment.uri ? attachmentHref(attachment.uri, calendar?.url) : null;
           const { name, about } = attachmentText(attachment, href, t, i18n.language);
-          const content = (
-            <>
-              <span
-                aria-hidden="true"
-                className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-ink-muted"
-              >
-                {attachment.uri && !attachment.name ? <LinkMark /> : <FileMark />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">{name}</span>
-                {about && <span className="block truncate text-note text-ink-muted">{about}</span>}
-              </span>
-            </>
-          );
+          const content = <AttachmentBody attachment={attachment} name={name} about={about} />;
           return (
             <li key={index}>
               {href ? (
