@@ -1329,7 +1329,9 @@ whole row".
   details the calendar, is its icon and its name alone; a screen reader
   hears what it is from the row's term ("List", "Calendar"), and every
   other row has its term too ("Repeat", "Description", "Tags", "Subtasks"
-  were an icon alone, an empty term). The rows are a `<dl>`, so a later
+  were an icon alone, an empty term), and a row says its name once: an
+  event's tags are their names alone, as the list is. The rows are a
+  `<dl>`, so a later
   row (an attachments list) takes its place among them as one more `Row`
   (`apps/web/e2e/editing.spec.ts`). The tasks screen's row is proved
   further for D195: three tab stops (the checkbox, the title, the star),

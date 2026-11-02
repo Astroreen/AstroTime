@@ -425,13 +425,13 @@ for (const colorScheme of ["dark", "light"] as const) {
     const item = panel.getByRole("listitem", { name: "Send the report" });
     const row = item.locator("> div");
     // The row lies on its list's card: nothing of its own until the mouse is over it.
-    const card = await item.evaluate((element) => {
-      let parent = element.parentElement;
-      while (parent && getComputedStyle(parent).backgroundColor === "rgba(0, 0, 0, 0)") {
-        parent = parent.parentElement;
-      }
-      return getComputedStyle(parent!).backgroundColor;
-    });
+    // Its card's background is a layer of its own (design D197).
+    const card = await item.evaluate(
+      (element) =>
+        getComputedStyle(
+          element.closest("[data-card]")!.querySelector(":scope > [data-card-background]")!,
+        ).backgroundColor,
+    );
     await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     const box = (await row.boundingBox())!;
     await page.mouse.move(box.x + box.width - 60, box.y + box.height / 2);

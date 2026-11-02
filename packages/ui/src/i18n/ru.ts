@@ -315,7 +315,6 @@ export const ru = {
   "details.guestsNote": "AstroTime показывает гостей, но не рассылает приглашения.",
   "details.due": "Срок: {{time}}",
   "details.zone": "Задано в часовом поясе {{zone}}",
-  "details.categories": "Метки: {{categories}}",
   "details.tags": "Метки",
   "details.parent": "Подзадача задачи «{{title}}»",
   "details.subtasks": "Подзадачи",
