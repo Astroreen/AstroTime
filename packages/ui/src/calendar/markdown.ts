@@ -153,7 +153,8 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
   let i = from;
   while (i < lines.length) {
     const marker = ITEM.exec(lines[i]!);
-    if (!marker || /\d/.test(marker[2]!) !== ordered) break;
+    // "* * *" or "- - -" after an item is a rule that ends the list, not an item.
+    if (!marker || RULE.test(lines[i]!) || /\d/.test(marker[2]!) !== ordered) break;
     // What follows the marker; the lines under it are indented at least this far.
     const indent = marker[0].length;
     const body = [lines[i]!.slice(indent)];

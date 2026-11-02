@@ -240,6 +240,21 @@ describe("what the review found (design D207)", () => {
     ]);
   });
 
+  test("a rule right after a list item ends the list; it is no nested item", () => {
+    const list = {
+      type: "list",
+      start: null,
+      items: [{ checked: null, children: [paragraph("a")] }],
+    };
+    for (const rule of ["* * *", "- - -", "---", "***"]) {
+      expect(parseMarkdown(`- a\n${rule}\nafter`)).toEqual([
+        list,
+        { type: "rule" },
+        paragraph("after"),
+      ]);
+    }
+  });
+
   test("emphasis nested deeper than eight reads as text", () => {
     const deep = "*_".repeat(20) + "x" + "_*".repeat(20);
     expect(() => parseMarkdown(deep)).not.toThrow();

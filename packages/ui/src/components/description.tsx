@@ -75,6 +75,7 @@ function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
   const id = useId();
   const body = <div className="flex flex-col gap-1">{item.children.map(block)}</div>;
   if (item.checked === null) return <li>{body}</li>;
+  const [first, ...rest] = item.children;
   return (
     <li className={`flex list-none items-start gap-2 ${bulleted ? "-ml-5" : ""}`}>
       <span
@@ -86,11 +87,12 @@ function Item({ item, bulleted }: { item: ListItem; bulleted: boolean }) {
       >
         {item.checked && <CheckIcon className="size-3.5" />}
       </span>
-      <div
-        id={id}
-        className={`min-w-0 flex-1 ${item.checked ? "text-ink-muted line-through" : ""}`}
-      >
-        {body}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {/* Named by its own first line, not by what is nested under it. */}
+        <div id={id} className={item.checked ? "text-ink-muted line-through" : ""}>
+          {first && block(first, 0)}
+        </div>
+        {rest.map((child, index) => block(child, index + 1))}
       </div>
     </li>
   );
