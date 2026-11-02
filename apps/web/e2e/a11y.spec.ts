@@ -230,6 +230,17 @@ test.describe("the screens and dialogs", () => {
         await audit(page, "search with results");
       });
 
+      test("a description in Markdown (design D207)", async ({ page }) => {
+        await page.setViewportSize(PHONE);
+        await openDemo(page, "day");
+        await today(page)
+          .getByRole("button", { name: /^Budget planning, / })
+          .click();
+        const details = page.getByRole("dialog", { name: "Budget planning" });
+        await expect(details.getByRole("link", { name: "The sheet" })).toBeVisible();
+        await audit(page, "a description in Markdown");
+      });
+
       test("the details, the edit dialog and the scope dialog", async ({ page }) => {
         await page.setViewportSize(WIDE);
         await openDemo(page, "week");
