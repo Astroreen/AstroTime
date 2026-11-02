@@ -1506,8 +1506,10 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   Linux and Windows, the same in light and dark. Now, in `styles.css`:
   Chromium (and so Electron and Android's WebView) and WebKit draw
   `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
-  ink colour at 22% on a clear track, 42% while the pointer is over what
-  scrolls, 6 px wide under the pointer and 58% while dragged; Firefox has
+  ink colour at 22% on a clear track, 42% while the pointer is anywhere
+  over what scrolls (`:hover` on the scroller, so a scroller holding
+  another lights too while the pointer is over the inner one; on purpose:
+  both scroll under it), 6 px wide under the pointer and 58% while dragged; Firefox has
   only the standard properties, `scrollbar-width: thin` in the same
   colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
   the standard ones win over it). Light and dark come with the ink
@@ -1522,7 +1524,11 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   light and dark); WebKit does not start on the development machine, and
   draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
   `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
-  Saturday's header ends where its column does; failing before at 15 px).
+  Saturday's header ends where its column does; failing before at 15 px:
+  Playwright's headless Chromium hides scrollbars from the screen but
+  keeps their width in the layout, which is what this measures). The
+  thumb's colours under the pointer and while dragged, Firefox's
+  `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
 
 ### Decided in round 4: the editor
 
@@ -1854,6 +1860,12 @@ own (below).
 
 ## Deferred
 
+- **The scrollbars' untested parts** ([D191](#D191)): the thumb's
+  colour under the pointer and while dragged, Firefox's `scrollbar-width`
+  branch, and a WebKit run (Playwright's WebKit does not start on the
+  development machine) were looked at by eye or not at all; a check per
+  engine needs headed runs in CI. A thumb hidden until the user scrolls,
+  as macOS and Android draw theirs, needs a script on every scroller.
 - **More illustrated subjects** ([D215](#D215)): meetings and calls,
   haircut, code, cleaning, the car, a wedding, the beach and holidays,
   Halloween; and words in languages other than English and Russian. Each

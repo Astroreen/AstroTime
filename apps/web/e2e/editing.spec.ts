@@ -400,6 +400,9 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
 test.describe("on a phone, the all-day strip (design D188)", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
+  // A finger's release fires `pointerleave` before its click: this tap is
+  // also the case for the strip's `buttons` check (design D188), and failed
+  // while the strip forgot any press that left it.
   test("an empty strip is a row tall, and a tap there creates all day in the Day view", async ({
     page,
   }) => {
