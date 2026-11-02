@@ -129,6 +129,9 @@ function formTimes(kind: "event" | "task", times: ItemTimes, zone: string | null
   const allDay = first ? first.type === "date" : kind === "task";
   const start = times.start ? split(times.start, zone) : { date: "", time: "" };
   let end = times.end ? split(times.end, zone) : { date: "", time: "" };
+  // A task's due date after a timed start (another client's) shows at the
+  // start's time on its day, so a new start moves it by whole days (design D160).
+  if (kind === "task" && !allDay && end.date && !end.time) end = { ...end, time: start.time };
   // An all-day event's DTEND is the day after its last; the form shows the last.
   if (kind === "event" && allDay && times.end) end = { date: addDays(end.date, -1), time: "" };
   return { allDay, start, end };
@@ -316,6 +319,17 @@ export function withDueAt(form: Form, due: { endDate?: string; endTime?: string 
   return next.startless ? { ...next, startDate: next.endDate, startTime: next.endTime } : next;
 }
 
+/**
+ * The reminders changed. A task with no time written gets its start shown
+ * written with a new reminder, which counts from it (RFC 5545 §3.6.6 wants
+ * a `DTSTART` for `RELATED=START`; design D160).
+ */
+export function withAlarms(form: Form, alarms: readonly AlarmChoice[]): Form {
+  const added = alarms.some((alarm) => alarm.kind === "new");
+  const timeless = form.startless && !form.endDate;
+  return { ...(added && timeless ? started(form) : form), alarms };
+}
+
 /** All day or not, the start's and the due's alike: the start shown is written from then on (design D160). */
 export function withAllDay(form: Form, allDay: boolean): Form {
   return { ...started(form), allDay };
@@ -449,6 +463,8 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   // The clock matters only for a timed item; a new item always has a start (design D159).
   const timeChanged = was
     ? was.allDay !== form.allDay ||
+      // A start shown, now to be written (design D160).
+      Boolean(was.startless) !== Boolean(form.startless) ||
       was.startDate !== form.startDate ||
       was.endDate !== form.endDate ||
       (!form.allDay && (was.startTime !== form.startTime || was.endTime !== form.endTime))

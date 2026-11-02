@@ -35,6 +35,7 @@ import {
   scopesFor,
   switchKind,
   timesOfForm,
+  withAlarms,
   withAllDay,
   withDue,
   withDueAt,
@@ -199,6 +200,31 @@ describe("the form", () => {
       summary: "Call",
     });
     expect(timesOfForm(mixed).end).toEqual({ type: "date", date: "2026-11-21" });
+    // A timed start with a due date: the due shows at the start's time on its
+    // day, and a new start moves it by whole days, not by an invented length.
+    const timedStart = parse(
+      "DTSTART;TZID=Europe/Vilnius:20261120T090000\r\nDUE;VALUE=DATE:20261122\r\n",
+    );
+    expect(timedStart).toMatchObject({ allDay: false, endDate: "2026-11-22", endTime: "09:00" });
+    expect(changesOf(timedStart, { ...timedStart, summary: "Call" }, "Reminder")).toEqual({
+      summary: "Call",
+    });
+    expect(withStartTime(timedStart, "10:30")).toMatchObject({
+      endDate: "2026-11-22",
+      endTime: "10:30",
+    });
+    // A reminder added to a task with no time writes the start it counts from;
+    // one with only a due keeps its due alone, the reminder before the due.
+    const reminder = { kind: "new" as const, relatedTo: "start" as const, offsetSeconds: -900 };
+    const reminded = withAlarms(undated, [reminder]);
+    expect(reminded).not.toHaveProperty("startless");
+    expect(changesOf(undated, reminded, "Reminder").time).toEqual({
+      start: { type: "date", date: TODAY },
+      end: null,
+    });
+    const dueOnly = withAlarms(due, [{ ...reminder, relatedTo: "end" }]);
+    expect(dueOnly).toMatchObject({ startless: true });
+    expect(changesOf(due, dueOnly, "Reminder")).not.toHaveProperty("time");
   });
 
   test("an item opens with its own times in its zone; a UTC time in the user's, kept UTC", async () => {

@@ -1443,7 +1443,8 @@ Decided while building PR 6b.
     the other and within its own day (an end at most the next midnight).
   - **Into the all-day strip** an event becomes all day on that day (its
     `DTEND` the day after) and a task starts on that day, due as many days
-    after it as before (_until round 3:_ due that day too);
+    after it as before (_until round 3:_ due that day too), its due's time
+    of day gone with its start's ([design Deferred](design.md#deferred));
     **out of it onto the grid**, an all-day item starts at the slot in the
     user's zone, an hour long (a task starts there, due as many days after
     at that time; one with only a due is due there), and a timed item over

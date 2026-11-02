@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   switchKind,
+  withAlarms,
   withAllDay,
   withDue,
   withDueAt,
@@ -280,7 +281,7 @@ function Fields({
       </Section>
 
       <Section icon={<BellIcon className="size-5" />}>
-        <Reminders form={form} onChange={(alarms) => set({ alarms })} />
+        <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
       </Section>
 
       <Section icon={<CalendarIcon className="size-5" />}>

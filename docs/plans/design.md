@@ -943,9 +943,15 @@ For the items' editor and details:
   writes the title. Once the user sets the start, or turns "All day" on or
   off (the times change with a start shown), it is written; and when the
   due is cleared, the start shown is written, as a task needs a time.
+  A reminder added to a task with no time at all writes the start shown
+  too, as the reminder counts from it (RFC 5545 §3.6.6 wants a `DTSTART`
+  for `RELATED=START`); one with only a due keeps its due alone, the
+  reminder before the due.
   "All day" is one switch for both ends: a task another client wrote
   with a date start and a timed due (or the other way round) opens as the
-  start is, and its due is written that way only when its times change.
+  start is, and its due is written that way only when its times change. A
+  due date after a timed start shows at the start's time on its day, so a
+  new start moves it by whole days.
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
   - A task is **overdue**, and rolls over to today's "N undone tasks"
@@ -970,7 +976,13 @@ For the items' editor and details:
 - **A task's due on the calendar** — since [D159](#D159) a task shows at
   its start only, and its due, however far, shows in its details alone;
   a mark on the due's day (Google's deadline flag) would show that a
-  task is still open there.
+  task is still open there. Until then a task started before today and due
+  after it shows on its past start day only, in no "N undone tasks"
+  ([D161](#D161)).
+- **A task's due time through the all-day strip** — a timed task dragged
+  into the strip becomes all day, its due a date ([D159](#D159): one "All
+  day" for both ends), so dragged back onto the grid its due takes the
+  slot's time, as many days after; the time it had is not kept.
 - **Year view** ([D48](#D48)).
 - **A long press in the Month view to create** — as Google's Android app
   does; a tap keeps opening the day ([D108](#D108)).
