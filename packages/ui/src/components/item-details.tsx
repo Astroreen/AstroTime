@@ -1,11 +1,12 @@
 // An item's details (docs/plans/foundation.md#D14, D9, D10), as Google
 // Calendar shows them when an item is tapped: its colour, title, when it is
-// and how it repeats, where, its description with its links, its
+// and how it repeats, where, its description as Markdown (design D207), its
 // attachments (design D230), its reminders,
 // its guests (shown, never invited: no iTIP), its calendar; a task's due and
-// subtasks, with complete and, beside Edit, star (no status, priority, progress or tags,
-// design D162). Edit shows only where the calendar can be written; Delete,
-// "Make a copy" and "Copy to" are in a "⋯" menu (design D163).
+// subtasks, with complete and, beside Edit, star (no status, priority,
+// progress or tags, design D162). Edit shows only where the calendar can be
+// written; Delete, "Make a copy" and "Copy to" are in a "⋯" menu (design
+// D163).
 import { isDone, repeatOf, timesOf, type ItemTime, type Participant } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
@@ -17,6 +18,7 @@ import { whenText } from "../calendar/when.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import { alarmOptions, alarmWords, repeatWords } from "../calendar/words.ts";
 import { useCalendar } from "./context.ts";
+import { Description } from "./description.tsx";
 import {
   BellIcon,
   CalendarIcon,
@@ -167,6 +169,8 @@ function Body({
           <button
             type="button"
             className={dialogIcon}
+            // One name, its state pressed or not (a toggle's name does not
+            // change); the tooltip, for a pointer, says what a press does.
             aria-label={t("details.star")}
             aria-pressed={starred}
             title={t(starred ? "details.unstar" : "details.star")}
@@ -239,7 +243,7 @@ function Body({
           )}
           {item.description && (
             <Row icon={<NotesIcon className="size-5" />} label={t("edit.description")}>
-              <span className="break-words whitespace-pre-wrap">{linkify(item.description)}</span>
+              <Description text={item.description} />
             </Row>
           )}
           {item.attachments.length > 0 && (
@@ -286,7 +290,7 @@ function Body({
           )}
           {!task && item.categories.length > 0 && (
             <Row icon={<NotesIcon className="size-5" />} label={t("details.tags")}>
-              {t("details.categories", { categories: item.categories.join(", ") })}
+              {item.categories.join(", ")}
             </Row>
           )}
           {task && (related.parent || related.subtasks.length > 0) && (
@@ -361,49 +365,4 @@ const partstat = (status: string) => PARTSTATS.find((s) => s === status.toUpperC
 function zoneNote(time: ItemTime | null, timeZone: string): string | null {
   if (time?.type !== "zoned" || time.timeZone === "UTC" || time.timeZone === timeZone) return null;
   return time.timeZone;
-}
-
-const LINK = /(https?:\/\/[^\s<>"]+|mailto:[^\s<>"]+)/g;
-
-/**
- * A link as found in text, without what ends the sentence after it: a full
- * stop, a comma, or a closing bracket the link did not open
- * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own).
- */
-export function linkOf(found: string): string {
-  let url = found;
-  for (;;) {
-    url = url.replace(/[.,;:!?]+$/, "");
-    const last = url.at(-1);
-    const open = last === ")" ? "(" : last === "]" ? "[" : null;
-    if (!last || !open || count(url, open) >= count(url, last)) return url;
-    url = url.slice(0, -1);
-  }
-}
-
-const count = (text: string, char: string) => text.split(char).length - 1;
-
-/** The text with its web and mail links as links that open elsewhere; nothing else is markup. */
-function linkify(text: string): ReactNode[] {
-  const parts: ReactNode[] = [];
-  let last = 0;
-  for (const match of text.matchAll(LINK)) {
-    const url = linkOf(match[0]);
-    const start = match.index;
-    if (start > last) parts.push(text.slice(last, start));
-    parts.push(
-      <a
-        key={start}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-accent underline underline-offset-2"
-      >
-        {url}
-      </a>,
-    );
-    last = start + url.length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts;
 }

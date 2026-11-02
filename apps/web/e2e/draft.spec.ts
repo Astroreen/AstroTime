@@ -189,10 +189,18 @@ test.describe("on a screen under 1024 px (design D187)", () => {
     const drawn = (await draft(page).boundingBox())!;
     const edges = `${Math.round(drawn.x)},${Math.round(drawn.x + drawn.width)}`;
     await expect(dialog).toHaveAttribute("data-aside-for", edges);
+    // A regression guard: nothing scrolls sideways now, so there is no
+    // scroll event to wait for. Two frames let a wheel's scroll land, then
+    // nothing in the views has scrolled sideways and the draft is where it was.
     await page.mouse.move(900, 400);
     await page.mouse.wheel(400, 0);
     await page.mouse.move(drawn.x + drawn.width / 2, drawn.y + 4);
     await page.mouse.wheel(-400, 0);
+    const scrolled = await page.evaluate(async () => {
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+      return [...document.querySelectorAll("main *")].some((element) => element.scrollLeft !== 0);
+    });
+    expect(scrolled).toBe(false);
     expect((await draft(page).boundingBox())!.x).toBe(drawn.x);
     await expect(dialog).toHaveAttribute("data-aside-for", edges);
   });

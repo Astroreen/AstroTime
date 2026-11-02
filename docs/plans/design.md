@@ -326,7 +326,8 @@ the project.
     the user's zone (and the zone it was set in, when another), how it
     repeats in words ("Every 2 weeks on Monday, Wednesday", "Каждые 2
     недели в понедельник, среду"), where, its description with its web and
-    mail links opening in a new tab (`noopener`; nothing else is markup),
+    mail links opening in a new tab (`noopener`; _since round 4_ as
+    Markdown, [D207](#D207)),
     its reminders in words ("15 minutes before", "1 day before at 9:00"
     for an all-day item), its guests with their answers and a note that
     AstroTime does not invite, its calendar. Each action shows only where
@@ -1329,12 +1330,41 @@ whole row".
   details the calendar, is its icon and its name alone; a screen reader
   hears what it is from the row's term ("List", "Calendar"), and every
   other row has its term too ("Repeat", "Description", "Tags", "Subtasks"
-  were an icon alone, an empty term). The rows are a `<dl>`, so a later row (an
-  attachments list) takes its place among them as one more `Row`
+  were an icon alone, an empty term), and a row says its name once: an
+  event's tags are their names alone, as the list is. The rows are a
+  `<dl>`, so a later
+  row (an attachments list) takes its place among them as one more `Row`
   (`apps/web/e2e/editing.spec.ts`). The tasks screen's row is proved
   further for D195: three tab stops (the checkbox, the title, the star),
   its hover background differs from its card's in both themes, and a
   finger leaves none behind (`apps/web/e2e/tasks.spec.ts`).
+- **D197. A task completed moves to "Completed"** (the owner's item 13: "a
+  smooth move from 'not done' to 'done'"). Checked, its box is checked and
+  its title struck through at once, before the store has it, and the tick is
+  drawn in (160 ms); the box lets go of that state once its write is in the
+  store and read back (so the two are drawn together), or did not land, or
+  changed nothing. Then, after that tick, the screen moves from where it was
+  to where it is: each row and card is measured before the store's new read
+  is drawn and slides from there (FLIP), the rows below closing the gap;
+  with "Completed" open the row itself slides down into it, and back up when
+  it is not completed again; with it folded the row goes on drawn where it
+  was, over the list, and fades out going down to "Completed", whose count
+  ticks over. A card that changed height is stretched from the one it had:
+  its background is apart from its rows, so the rows are not stretched with
+  it. A change the user did not make (a sync, the details' "Mark completed",
+  another tab) moves the same way, without the wait for a tick: only the
+  read that carries the user's completion (its row changed or left) waits
+  for its tick, not a sync's read that came first; a new row comes in from
+  above; more than 40 rows moving at once (a sync's batch) change in place.
+  A row leaving goes on leaving through the next change, never measured or
+  moved again, so tasks completed one after another each leave once; its
+  layer is `inert` and hidden from a screen reader. The count is its own
+  box, cut out of the one translated string ("Completed ({{n}})"). Only
+  `transform` and `opacity` move, with the Web Animations API, as
+  [D154](#D154) has it; `prefers-reduced-motion` changes everything in
+  place. The code that moves them (`components/task-motion.ts`) is loaded
+  with the tasks screen's first showing, not with the app (D145), and never
+  when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
 
 ### Decided in round 4: the calendar views
 
@@ -1409,9 +1439,10 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     scroll moves it up or down only, which leaves the aside as it is. The
     dialog says the draft's edges it stands beside (`data-aside-for`).
     Closing, it fades where it stood: the aside is not worked out again
-    once the dialog is closed, as its draft is gone already. The backdrop dims less (20%) whenever it stands
-    aside. **Where there is no such room it stays in the middle and can
-    still cover the draft**: on a phone, where it is the whole screen
+    once the dialog is closed, as its draft is gone already. The backdrop
+    dims less (20%) whenever it stands aside. **Where there is no such
+    room it stays in the middle and can still cover the draft**: on a
+    phone, where it is the whole screen
     (the draft is drawn behind it, as D155 has it); in the Day view, whose
     one column leaves less than 360 px on either side at any width; and on
     a window under about 800 px for a day in the middle of a week.
@@ -1425,8 +1456,10 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     its right; a window narrowed to 700 px moving the dialog to the middle;
     a task's draft on a full today in the Month), each failing before the
     change, and a wheel sideways over the views moving neither the draft
-    nor the dialog; `packages/ui/test/draft-aside.browser.test.tsx` (a
-    closing dialog keeps its aside, failing before).
+    nor the dialog (a regression guard: it waits two frames, then finds
+    nothing in `main` scrolled sideways);
+    `packages/ui/test/draft-aside.browser.test.tsx` (a closing dialog
+    keeps its aside, failing before).
 - **D188. A tap on an empty spot of the all-day strip creates there,
   all day** (the owner's feedback 4: "tapping the top island where all-day
   events live, in the views from Week to Day, I cannot create a task or
@@ -1450,6 +1483,21 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
+- **D189. Today's circle stands clear of the all-day items** (the owner's
+  feedback 14a: "the active day's number, the circle around it, sits too
+  close to the events"). In 3 days and Week the all-day strip began right
+  under the day headers, so today's filled circle ([D49](#D49)) touched
+  the first row of items. The strip now starts 8 px under the headers, the
+  chevron that folds it moving down with it, and the time grid starts 8 px
+  under the strip (it was 4 px), so the header reads in even steps:
+  weekday, number, a gap, the items, a gap, the hours, as Google Calendar's
+  web app spaces its own. The Day view's header stands beside the strip,
+  not over it, so its strip keeps its top; its time grid starts 8 px under
+  the strip too, the same calm step in every view with a grid. Tested:
+  `apps/web/e2e/calendar.spec.ts` (8 px or more between today's circle,
+  marked `data-day-number`, and the strip in the Week on a wide screen and
+  3 days on a phone, failing before the change; 8 px between the strip
+  and the hours in the Day view).
 - **D190. A double click on an empty slot keeps the dialog it opened.**
   The first click of a double click on an empty slot of the grid (or the
   all-day strip, [D188](#D188)) opens the new item's dialog; once the
@@ -1471,7 +1519,7 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
 ### Decided in round 4: the editor
 
 The owner's feedback after round 3 on the edit dialog: its icons and its
-reminders.
+reminders and its description.
 
 - **D205. Each row's icon is level with the middle of its control** (the
   owner's feedback 12 after round 3: "Some icons are not centred with their
@@ -1532,6 +1580,55 @@ reminders.
     count what other clients add by default (Nextcloud's, Thunderbird's)
     as the user's choice. A new device starts from the defaults
     ([Deferred](#deferred)).
+
+- **D207. The description reads as Markdown** (the owner's feedback 11
+  after round 3: "I want markdown to be parsed in the description"). The
+  details ([D108](#D108)) draw an item's `DESCRIPTION` as Markdown:
+  paragraphs, a line break as a break (as it was typed: a description is
+  written as plain text, in Nextcloud and here), `**strong**`, `*emphasis*`
+  and `_emphasis_` (not inside a word: `snake_case` stays), `~~struck~~`,
+  `` `code` `` and fenced code blocks, headings (`#` to `######`, drawn two
+  levels under the dialog's title), bullets and numbers (from their first
+  number), nested by indent, checklists (`- [ ]`, `- [x]`), quotes, a rule,
+  links written `[words](https://…)`, in angle brackets or bare.
+  - **Safe by construction:** `calendar/markdown.ts` parses into a tree
+    and `components/description.tsx` draws it as React elements; no HTML
+    is read or made (a tag in the text stays text, `dangerouslySetInnerHTML`
+    is not used). A link is one only to `http(s)`, `mailto` or `tel`;
+    another (`javascript:`, `data:`, a relative path) shows its words, as
+    text. Links open in a new tab with `rel="noopener noreferrer"`. No
+    link inside a link's words. Quotes, lists and marks nested deeper than
+    eight read as text.
+  - **Untrusted text, read in time to its length:** a description comes
+    from any client, so where marks may close and which brackets pair are
+    found once per text, a run of backticks with no closer is not looked
+    for again, and a link's target is read 2 KiB ahead at most; random text
+    never throws (a seeded fuzz in `markdown.test.ts`), and the parser's
+    counted steps grow with the text, not with its square. A bare link
+    keeps a trailing `*`, `_` or `~` unless it closes emphasis opened
+    before it (`https://example.com/a_`).
+  - **As CommonMark where text is plain:** only a bullet or a list from 1
+    cuts a paragraph short, so a wrapped line "2019. was a good year" stays
+    words; a backtick fence has no backtick after it on its line ("Run
+    `npm i` now" is inline code) and closes only on a fence of its own
+    character, as long or longer; a tab indents to the next stop of 4; a
+    written link's target keeps balanced parentheses
+    (`…/wiki/Foo_(bar)`).
+  - **A checklist's box** is drawn where a bullet would be, read-only
+    (`role="checkbox"`, `aria-readonly`, named by its text): ticking one
+    would rewrite the user's text; a ticked item is struck and muted, as
+    in Google Keep.
+  - **What is stored does not change** ([foundation D7](foundation.md#D7)):
+    `DESCRIPTION` stays what the user typed, and the edit dialog edits it as
+    plain text. Another client's HTML twin (`X-ALT-DESC`, `ALTREP`) is not
+    read and stays as it is until the description is edited (foundation
+    [D103](foundation.md#D103) drops it then).
+  - **Our own, not a library:** CommonMark's libraries are 20–40 KiB
+    (marked, micromark) or make an HTML string to put in the page
+    (snarkdown); this subset is a few KiB in the details' lazy chunk
+    ([foundation D145](foundation.md#D145)), and it makes no HTML.
+    _Until round 4_ the details linked bare web and mail links and nothing
+    else was markup.
 
 ### Decided in round 4: the app shell
 
@@ -1654,7 +1751,12 @@ bar, the sidebar and the accounts panel.
   only, made or edited in AstroTime) would follow the user everywhere; it
   needs a cheap read of the alarms (a column or table filled as objects are
   saved) so the edit dialog does not parse every object.
-
+- **The description's preview in the editor, and Markdown's rarer parts**
+  — [D207](#D207) draws Markdown in the details only; the edit dialog
+  stays plain text with no preview toggle. Tables, footnotes, reference
+  links (`[words][ref]`) and a heading underlined with `===` are read as
+  text; an image (`![words](https://…)`) is a link to it named by its words,
+  since a remote picture would load from a server the user did not pick.
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
   RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no
   recorded fixture shows how Apple's apps write one, so one with a

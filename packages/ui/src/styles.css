@@ -188,6 +188,16 @@
   .item-time {
     font-weight: 400;
   }
+  /* A tick the user checked is drawn in, before its task moves (design D197). */
+  .tick-draw path {
+    stroke-dasharray: 1;
+    animation: tick-draw 160ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+  @keyframes tick-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
   /* The item a search jumped to (design D53). */
   [data-found] {
     box-shadow:
