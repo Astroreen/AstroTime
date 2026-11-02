@@ -58,3 +58,25 @@ const withoutBlock = (html: string) => html.replace(BLOCK, "");
 export function withPresetBack(html: string, preset: string): string {
   return preset === "" ? html : html.replace("</head>", () => `${preset}</head>`);
 }
+
+/**
+ * What the worker does with a GET of the app's origin, under its scope `base`
+ * (D124): a navigation to one of the app's pages gets the `page`; a file this
+ * version lists, its own (`file`); another file under `assets/`, the version
+ * before's for a tab still on it (`older`); everything else, the page's own
+ * path and the kept preset included, goes to the network untouched (`null`).
+ */
+export function routeOf(
+  pathname: string,
+  navigation: boolean,
+  base: string,
+  listed: ReadonlySet<string>,
+): "page" | "file" | "older" | null {
+  if (navigation) return isAppPage(pathname, base) ? "page" : null;
+  if (pathname === base || pathname === presetKey(base)) return null;
+  if (listed.has(pathname)) return "file";
+  return pathname.startsWith(`${base}assets/`) ? "older" : null;
+}
+
+/** Where the preset of the latest network page is kept, beside the page. */
+export const presetKey = (base: string) => `${base}.astrotime-preset`;

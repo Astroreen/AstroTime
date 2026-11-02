@@ -38,7 +38,7 @@ class FakeRegistration extends EventTarget {
 }
 
 class FakeContainer extends EventTarget {
-  readonly registration = new FakeRegistration();
+  registration: FakeRegistration | undefined = new FakeRegistration();
   registered: { url: string; scope: string | undefined } | null = null;
   controller: object | null;
   constructor(controller: object | null) {
@@ -98,7 +98,7 @@ test("the worker is registered at the app's base, its scope the app's", async ()
 test("a first install offers nothing and reloads nothing", async () => {
   const first = setup(false);
   await first.updates.register();
-  first.container.registration.found().to("installed");
+  first.container.registration!.found().to("installed");
   first.container.dispatchEvent(new Event("controllerchange"));
   expect([first.updates.waiting, first.heard, first.reloads]).toEqual([false, 0, 0]);
 });
@@ -108,10 +108,10 @@ test("a newer version, installed: offered once; Reload hands over, and the tab r
   // Reload before the registration is known does nothing.
   tab.updates.apply();
   await tab.updates.register();
-  const newer = tab.container.registration.found();
+  const newer = tab.container.registration!.found();
   expect(tab.updates.waiting).toBe(false);
   newer.to("installed");
-  tab.container.registration.waiting = newer;
+  tab.container.registration!.waiting = newer;
   expect([tab.updates.waiting, tab.heard]).toEqual([true, 1]);
   tab.updates.apply();
   expect(newer.messages).toEqual(["astrotime-update"]);
@@ -122,7 +122,7 @@ test("a newer version, installed: offered once; Reload hands over, and the tab r
 
 test("a version waiting already when the page registers is offered", async () => {
   const tab = setup(true);
-  tab.container.registration.waiting = new FakeWorker("installed");
+  tab.container.registration!.waiting = new FakeWorker("installed");
   await tab.updates.register();
   expect([tab.updates.waiting, tab.heard]).toEqual([true, 1]);
 });
@@ -130,11 +130,11 @@ test("a version waiting already when the page registers is offered", async () =>
 test("another tab's Reload: this one, taken over, does not reload; after Later too, its own Reload loads it", async () => {
   const tab = setup(true);
   await tab.updates.register();
-  const newer = tab.container.registration.found();
+  const newer = tab.container.registration!.found();
   newer.to("installed");
-  tab.container.registration.waiting = newer;
+  tab.container.registration!.waiting = newer;
   // Later is the UI's: it hides the notice, nothing here changes.
-  tab.container.registration.waiting = null;
+  tab.container.registration!.waiting = null;
   tab.container.dispatchEvent(new Event("controllerchange"));
   expect([tab.reloads, tab.updates.waiting]).toEqual([0, true]);
   tab.updates.apply();
@@ -152,7 +152,7 @@ test("a tab taken over that had heard of nothing is offered the version now runn
 test("a tab in front asks for a newer version at most once an hour", async () => {
   const tab = setup(true);
   await tab.updates.register();
-  const { registration } = tab.container;
+  const registration = tab.container.registration!;
   tab.page.show("hidden");
   tab.page.show("visible");
   expect(registration.updates).toBe(0);
@@ -164,4 +164,14 @@ test("a tab in front asks for a newer version at most once an hour", async () =>
   tab.advance(30 * 60_000);
   tab.page.show("visible");
   expect(registration.updates).toBe(1);
+});
+
+test("a browser that blocks workers answers with no registration: nothing breaks, nothing is offered", async () => {
+  const tab = setup(true);
+  tab.container.registration = undefined;
+  await tab.updates.register();
+  tab.updates.apply();
+  tab.advance(2 * 60 * 60_000);
+  tab.page.show("visible");
+  expect([tab.updates.waiting, tab.heard, tab.reloads]).toEqual([false, 0, 0]);
 });

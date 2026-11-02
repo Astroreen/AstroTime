@@ -84,6 +84,9 @@ export function serviceWorkerUpdates(
         console.error(error);
         return;
       }
+      // A browser that blocks workers (Playwright's `serviceWorkers: "block"`,
+      // some embedders) answers with none: the app runs as it would without.
+      if (!registration) return;
       const current = registration;
       if (current.waiting) found();
       watch(current.installing);

@@ -264,6 +264,12 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
     const worker = await readFile(join(second, "sw.js"), "utf8");
     expect(worker).toContain(version);
     await writeFile(join(second, "sw.js"), worker.replaceAll(version, "newer-version-00"));
+    // The newer page says so, to tell which version's page a load gets.
+    const page2 = await readFile(join(second, "index.html"), "utf8");
+    await writeFile(
+      join(second, "index.html"),
+      page2.replace("<title>AstroTime</title>", "<title>AstroTime</title><!-- the newer page -->"),
+    );
     // The page this worker runs; the first install offers nothing.
     await page.reload();
     await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
@@ -297,14 +303,26 @@ test("a newer version is offered quietly; the tab whose user asks reloads into i
       "astrotime-versions",
     ]);
     await expect(notice).toHaveCount(0);
-    // That tab asks for a file only its version has, which the server no
-    // longer has: it comes from the older version's cache.
-    expect(
-      await other.evaluate(async () => {
-        const answer = await fetch("/assets/lazy-old.js");
-        return [answer.status, await answer.text()];
-      }),
-    ).toEqual([200, "export const old = true;\n"]);
+    // The tab on the older page asks for a file only its version has, which
+    // the server no longer has: it comes from the older version's cache. A
+    // tab on the newer page is not given it, and a file neither version has
+    // is the network's 404, for either.
+    // Past the browser's own HTTP cache, where the install's fetch left the
+    // older file (immutable, as every hashed file is): only the worker answers.
+    const get = (tab: Page, path: string) =>
+      tab.evaluate(async (url) => {
+        const answer = await fetch(url, { cache: "no-store" });
+        return [answer.status, answer.ok ? await answer.text() : ""];
+      }, path);
+    expect(await get(other, "/assets/lazy-old.js")).toEqual([200, "export const old = true;\n"]);
+    expect(await get(page, "/assets/lazy-old.js")).toEqual([404, ""]);
+    expect(await get(other, "/assets/nowhere.js")).toEqual([404, ""]);
+    // With no network the page comes from the newer version's cache, never
+    // the older's, which still holds its own.
+    await context.setOffline(true);
+    await page.reload();
+    expect(await page.content()).toContain("<!-- the newer page -->");
+    await context.setOffline(false);
 
     // The other tab did not reload by itself: it offers the version that now
     // runs it, and loads it when its user asks.

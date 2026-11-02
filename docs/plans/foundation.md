@@ -528,8 +528,10 @@ Decided while building PR 7.
     answers is a server error (a reverse proxy's 502, 503 or 504 while the
     container is down), or when the network has not begun to answer within three
     seconds (a connection that stalls, lie-fi, may settle only after tens
-    of seconds; a page may set the bound, which the tests do, so none waits
-    on time passing). The network's page, when it comes, refreshes the kept
+    of seconds). In a build for the tests (`ASTROTIME_SW_TEST_HOOKS=1`, a
+    define the image's build leaves `false`, so its worker has none of it),
+    a page may set the bound, finite and at most ten seconds, so no test
+    waits on time passing. The network's page, when it comes, refreshes the kept
     one in the background. Only the server's own page is ever kept: an `ok`,
     `basic`, HTML answer that was not redirected (a sign-on's login page, a
     slash added); a version whose page is not one fails its install and
@@ -537,10 +539,15 @@ Decided while building PR 7.
     its scope: a route of the single-page app, never `/dav-proxy/`, the
     health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
     of the app's origin, never a file it does not list, and the page only to
-    a navigation. Activated, it keeps its own cache and the version
-    before's (`astrotime-versions` lists them), for a tab that still runs
-    the older page and asks for its files (a lazily loaded chunk); older
-    ones go. The proxy's static serving stays as
+    a navigation. Every path is under the app's base, the scope the worker
+    is registered at (Vite's `base`), `/` or a sub-path alike. Activated, it
+    keeps its own cache and the version before's (`astrotime-versions` lists
+    them, and the tabs that were open when the user asked for this version):
+    a file this version does not list comes from the older version's cache
+    only for one of those tabs, which still runs the older page and may ask
+    for its files (a lazily loaded chunk); any other tab, or a file neither
+    has, goes to the network. This version's files and page come from its
+    own cache only, never the older's. Older versions go. The proxy's static serving stays as
     [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
     manifest, icons) revalidated, so the browser's check of the worker costs
     a 304.

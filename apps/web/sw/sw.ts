@@ -4,28 +4,40 @@
 // /sw.js as one classic script (its import is bundled in); the build fills in
 // the two constants below (apps/web/service-worker.ts). CalDAV through
 // /dav-proxy/ and anything else that is not the app's is never touched.
-import { isAppPage, namedFiles, presetOf, withoutPreset, withPresetBack } from "./page.ts";
+import { namedFiles, presetKey, presetOf, routeOf, withoutPreset, withPresetBack } from "./page.ts";
 
 declare const self: ServiceWorkerGlobalScope;
-/** Every file of this version, by path; `/` is the page. */
+/** Every file of this version, by path under the app's base; the base itself is the page. */
 declare const ASTROTIME_PRECACHE: readonly string[];
 /** This version: a hash of its files. */
 declare const ASTROTIME_VERSION: string;
+/** A build for the tests (`ASTROTIME_SW_TEST_HOOKS=1`), which lets a page set the navigation bound. */
+declare const ASTROTIME_TEST_HOOKS: boolean;
 
 const PREFIX = "astrotime-";
 const CACHE = `${PREFIX}${ASTROTIME_VERSION}`;
 const FILES = new Set(ASTROTIME_PRECACHE);
-/** The versions kept, newest last: this one and the one before, for pages it still runs. */
+/** The versions kept, newest last, and the tabs that run the one before (`Kept`). */
 const VERSIONS = `${PREFIX}versions`;
+/** The app's base path, from the worker's scope; the page's own path. */
+const BASE = new URL(self.registration.scope).pathname;
 /** Where the preset of the latest network page is kept, beside the page, in this version's cache. */
-const PRESET = "/.astrotime-preset";
+const PRESET = presetKey(BASE);
+
+/** What `VERSIONS` holds: the versions' caches, newest last, and the tabs open as this one activated. */
+interface Kept {
+  readonly versions: string[];
+  readonly older: string[];
+}
 
 /**
  * How long a navigation waits for the network's answer to begin before the
  * kept page answers: on a connection that stalls (lie-fi), a fetch may
  * settle only after tens of seconds. The network's answer, when it comes,
- * still refreshes the cache. A page may set it (`astrotime-navigation-bound`),
- * which the tests do so that none waits on time passing.
+ * still refreshes the cache. In a build for the tests a page may set it
+ * (`astrotime-navigation-bound`), so that none waits on time passing; the
+ * value lives in the worker's memory, so it holds until the browser stops
+ * the idle worker, which a test that sets it right before a reload outruns.
  */
 let navigationBound = 3_000;
 
@@ -61,14 +73,14 @@ async function keep(cache: Cache, answer: Response): Promise<void> {
     throw new Error(`The page names files this version does not have: ${missing.join(", ")}`);
   const headers = new Headers(answer.headers);
   headers.delete("Content-Length");
-  await cache.put("/", new Response(html, { status: answer.status, headers }));
+  await cache.put(BASE, new Response(html, { status: answer.status, headers }));
   await cache.put(PRESET, new Response(presetOf(text)));
 }
 
 /** The kept page, with the preset the latest network page had; none before the install kept one. */
 async function keptPage(): Promise<Response | undefined> {
   const cache = await caches.open(CACHE);
-  const [page, preset] = await Promise.all([cache.match("/"), cache.match(PRESET)]);
+  const [page, preset] = await Promise.all([cache.match(BASE), cache.match(PRESET)]);
   if (!page) return undefined;
   const html = withPresetBack(await page.text(), preset ? await preset.text() : "");
   return new Response(html, { status: page.status, headers: page.headers });
@@ -80,8 +92,8 @@ self.addEventListener("install", (event) => {
       const cache = await caches.open(CACHE);
       try {
         // Hashed names never change their content: whatever answers is this version's.
-        await cache.addAll([...FILES].filter((path) => path !== "/"));
-        const page = await fetch("/", { cache: "no-store" });
+        await cache.addAll([...FILES].filter((path) => path !== BASE));
+        const page = await fetch(BASE, { cache: "no-store" });
         if (!keepable(page))
           throw new Error(`The app's page is not one to keep (${page.status}, ${page.type}).`);
         await keep(cache, page);
@@ -96,29 +108,46 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   // This version and the one before stay: a tab its user has not reloaded
-  // runs the older page, and may still ask for its files. Older ones go.
+  // runs the older page, and may still ask for its files. Those tabs are the
+  // ones open when the user asked for this version (`olderTabs`); one that
+  // reloads is a new tab. Activated on its own, with every tab closed, there
+  // are none. Older versions go.
   event.waitUntil(
     (async () => {
+      const before = await kept();
+      const versions = [...before.versions.filter((name) => name !== CACHE), CACHE].slice(-2);
       const store = await caches.open(VERSIONS);
-      const listed = await store.match("/");
-      const before = listed ? ((await listed.json()) as string[]) : [];
-      const kept = [...before.filter((name) => name !== CACHE), CACHE].slice(-2);
-      await store.put("/", Response.json(kept));
+      await store.put(BASE, Response.json({ versions, older: olderTabs } satisfies Kept));
       for (const name of await caches.keys())
-        if (name.startsWith(PREFIX) && name !== VERSIONS && !kept.includes(name))
+        if (name.startsWith(PREFIX) && name !== VERSIONS && !versions.includes(name))
           await caches.delete(name);
     })(),
   );
 });
 
+/** The tabs open when the user asked for this version: they run the older page. */
+let olderTabs: string[] = [];
+
 self.addEventListener("message", (event) => {
-  // The user chose to reload into the version waiting (D124).
-  if (event.data === "astrotime-update") void self.skipWaiting();
-  const data = event.data as { type?: unknown; ms?: unknown } | null;
-  if (data?.type === "astrotime-navigation-bound" && typeof data.ms === "number") {
-    navigationBound = data.ms;
-    event.ports[0]?.postMessage("set");
+  // The user chose to reload into the version waiting (D124): the tabs open
+  // now are on the older page, taken before this version takes them over.
+  if (event.data === "astrotime-update") {
+    event.waitUntil(
+      (async () => {
+        const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        olderTabs = open.map((client) => client.id);
+        await self.skipWaiting();
+      })(),
+    );
+    return;
   }
+  if (!ASTROTIME_TEST_HOOKS) return;
+  const data = event.data as { type?: unknown; ms?: unknown } | null;
+  const { ms } = data ?? {};
+  if (data?.type !== "astrotime-navigation-bound" || typeof ms !== "number") return;
+  if (!Number.isFinite(ms) || ms < 0) return;
+  navigationBound = Math.min(ms, 10_000);
+  event.ports[0]?.postMessage("set");
 });
 
 /** A navigation: the network's page if it begins to answer within the bound, else the kept one. */
@@ -156,28 +185,44 @@ async function navigate(event: FetchEvent): Promise<Response> {
   return answer.status >= 500 ? ((await keptPage()) ?? answer) : answer;
 }
 
+/** The versions kept and the tabs on the one before, as the last activation left them. */
+async function kept(): Promise<Kept> {
+  const listed = await (await caches.open(VERSIONS)).match(BASE);
+  const value = listed ? ((await listed.json()) as Partial<Kept>) : {};
+  return { versions: value.versions ?? [], older: value.older ?? [] };
+}
+
+/**
+ * A file this version does not list: the version before's, only for a tab
+ * still on it (open when this version activated) and only from that
+ * version's cache; anything else, or what it does not have, from the network.
+ */
+async function olderFile(event: FetchEvent, pathname: string): Promise<Response> {
+  const { versions, older } = await kept();
+  const before = versions.find((name) => name !== CACHE);
+  if (before && older.includes(event.clientId)) {
+    const file = await caches.match(pathname, { cacheName: before });
+    if (file) return file;
+  }
+  return fetch(event.request);
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  const base = new URL(self.registration.scope).pathname;
-  if (request.mode === "navigate") {
-    // Only the app's own pages; CalDAV's proxy and anything else go to the network untouched.
-    if (isAppPage(url.pathname, base)) event.respondWith(navigate(event));
-    return;
-  }
-  // The page answers navigations only; a script's fetch of it goes to the server.
-  if (url.pathname === "/" || url.pathname === PRESET) return;
-  if (FILES.has(url.pathname)) {
-    event.respondWith(
-      caches.match(url.pathname, { cacheName: CACHE }).then((kept) => kept ?? fetch(request)),
-    );
-    return;
-  }
-  // A file of the version before, for a tab that still runs its page: from
-  // its cache while it is kept, else from the network.
-  if (url.pathname.startsWith(`${base}assets/`)) {
-    event.respondWith(caches.match(url.pathname).then((kept) => kept ?? fetch(request)));
+  switch (routeOf(url.pathname, request.mode === "navigate", BASE, FILES)) {
+    case "page":
+      return event.respondWith(navigate(event));
+    case "file":
+      // This version's own file, from its own cache only.
+      return event.respondWith(
+        caches.match(url.pathname, { cacheName: CACHE }).then((file) => file ?? fetch(request)),
+      );
+    case "older":
+      return event.respondWith(olderFile(event, url.pathname));
+    default:
+    // The CalDAV proxy, the page's own path to a script, anything else: the network's.
   }
 });
