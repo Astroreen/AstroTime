@@ -1438,7 +1438,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   one, is [Deferred](#deferred): the grid's drag-create sizes by time in
   one column, and the strip's would be a gesture of its own. Tested:
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
-  task made from it, an item tapped opens its details; a phone's Day view
+  task made from it, an item tapped opens its details; a press from an
+  item to an empty spot, a press moved 12 px, and a double click opening
+  one item, the first two failing without the check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).

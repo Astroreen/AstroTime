@@ -293,6 +293,68 @@ test("a tap on an empty spot of the all-day strip creates on that day, all day; 
   await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
 });
 
+test.describe("what in the all-day strip is no tap there (design D188)", () => {
+  /**
+   * Opens and closes a new item's dialog, so its chunk is loaded: a dialog
+   * a press would open is then in the page as soon as the press is done,
+   * and "no dialog" says no dialog was opened, not one still loading.
+   */
+  async function loadEditor(page: Page) {
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+
+  /** A point in the Week's strip over Tuesday, which has nothing all day. */
+  async function tuesday(page: Page) {
+    const box = (await page.getByRole("list", { name: "All day" }).boundingBox())!;
+    return { x: box.x + (box.width / 7) * 2.5, y: box.y + box.height - 6 };
+  }
+
+  test("a press that starts on an item and ends on an empty spot creates nothing", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await loadEditor(page);
+    await page.getByRole("button", { name: "Next week" }).click();
+    // A read-only calendar's item, which does not drag.
+    const festival = page
+      .getByRole("list", { name: "All day" })
+      .getByRole("listitem", { name: "Town festival, All day" });
+    const box = (await festival.boundingBox())!;
+    const spot = await tuesday(page);
+    await page.mouse.move(box.x + 10, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(spot.x, box.y + box.height / 2, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("a press moved 8 px or more on an empty spot creates nothing", async ({ page }) => {
+    await openDemo(page, "week");
+    await loadEditor(page);
+    const spot = await tuesday(page);
+    await page.mouse.move(spot.x, spot.y);
+    await page.mouse.down();
+    await page.mouse.move(spot.x + 12, spot.y, { steps: 3 });
+    await page.mouse.up();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    // Unmoved, the same spot creates.
+    await page.mouse.click(spot.x, spot.y);
+    await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(1);
+  });
+
+  test("a double click opens one new item, with its first click", async ({ page }) => {
+    await openDemo(page, "week");
+    const spot = await tuesday(page);
+    await page.mouse.dblclick(spot.x, spot.y);
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog).toHaveCount(1);
+    await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
+  });
+});
+
 test.describe("on a phone, the all-day strip (design D188)", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
