@@ -122,7 +122,6 @@ function SettingsGroups({
           label={t("settings.celebrate")}
           checked={settings.celebrate}
           onChange={(celebrate) => change({ celebrate })}
-          hint={t("settings.celebrate.hint")}
         />
       </Group>
       <Group title={t("settings.views")}>
