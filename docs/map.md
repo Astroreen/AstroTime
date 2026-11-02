@@ -196,6 +196,10 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D134`
     - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
       press through while they close. → `plans/design.md#D136`
+    - `color-select.tsx`, `color-settings.tsx` — the colour dropdown with
+      a dot left of each name; the default colours and the user's own in
+      Settings, each in a dialog of its own. → `plans/design.md#D168`,
+      `plans/design.md#D172`, `plans/design.md#D173`
     - `select.tsx` — AstroTime's own dropdowns: `Select` (one value from
       a list) and `MenuButton` (one action from a list); no `<select>`.
       → `plans/design.md#D167`
@@ -239,6 +243,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
+    - `color-names.ts` — `colorName`: a colour's generated name, in
+      English and Russian. → `plans/design.md#D170`
     - `rights.ts` — `rightsOf`: what the user may do in a calendar, the
       one check of whether an item can be created, edited or deleted.
       → `plans/foundation.md#D37`

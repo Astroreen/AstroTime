@@ -1,7 +1,9 @@
 // The settings (design D53, D131): this device's theme, language, week
 // start and clock, whether completed tasks (D51) and the week numbers
-// (D169) show on the views, and whether reminders notify (foundation D101).
+// (D169) show on the views, the colours new items start with and the
+// user's own (D172, D173), and whether reminders notify (foundation D101).
 // Kept in the app's preferences as one value and applied at once.
+import { isColorName } from "@astrotime/core";
 import { createContext, useContext } from "react";
 
 import type { LocaleSettings } from "./calendar/locale.ts";
@@ -15,6 +17,17 @@ export type Theme = (typeof THEMES)[number];
 export const WEEK_STARTS = [1, 7, 6] as const;
 export const CLOCKS = [12, 24] as const;
 
+/**
+ * A colour of the user's own (design D173): its hex and its name, `null`
+ * while the name is the one generated from the colour (D170).
+ */
+export interface OwnColor {
+  readonly id: string;
+  /** `#rrggbb`. */
+  readonly hex: string;
+  readonly name: string | null;
+}
+
 export interface Settings {
   readonly theme: Theme;
   readonly language: "system" | Language;
@@ -23,6 +36,14 @@ export interface Settings {
   readonly hideCompleted: boolean;
   /** The week numbers on the views (D49, D86): on unless turned off (design D169). */
   readonly weekNumbers: boolean;
+  /**
+   * The colour a new event or task starts with (design D172): `null`, its
+   * calendar's; an own colour by its id (`own:<id>`), so recolouring it
+   * moves the default; else a CSS name or a hex. See `defaultColorOf`.
+   */
+  readonly defaultColors: { readonly event: string | null; readonly task: string | null };
+  /** The user's own colours, on this device (design D173). */
+  readonly colors: readonly OwnColor[];
   /** On unless turned off; they show once the platform may notify (foundation D101). */
   readonly reminders: boolean;
   /**
@@ -44,6 +65,8 @@ export const DEFAULT_SETTINGS: Settings = {
   clock: "locale",
   hideCompleted: false,
   weekNumbers: true,
+  defaultColors: { event: null, task: null },
+  colors: [],
   reminders: true,
   keepRunning: true,
   places: true,
@@ -69,10 +92,50 @@ export function readSettings(stored: string | null): Settings {
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),
     hideCompleted: value.hideCompleted === true,
     weekNumbers: value.weekNumbers !== false,
+    defaultColors: readDefaults(value.defaultColors),
+    colors: readColors(value.colors),
     reminders: value.reminders !== false,
     keepRunning: value.keepRunning !== false,
     places: value.places !== false,
   };
+}
+
+const HEX = /^#[0-9a-f]{6}$/;
+/** An own colour as a default names it: by its id. */
+export const OWN = "own:";
+/**
+ * A default as settings keep it: an own colour's id, a hex in lower case,
+ * or a CSS3 name, which `editItem` takes (foundation D174); anything else
+ * is the calendar's colour, so no new item's save is refused for it.
+ */
+const colorValue = (value: unknown): string | null =>
+  typeof value === "string" && (value.startsWith(OWN) || HEX.test(value) || isColorName(value))
+    ? value
+    : null;
+
+/** The colours new items start with, resolved: a CSS name or a hex, or `null` for the calendar's. */
+export type DefaultColors = Readonly<Record<"event" | "task", string | null>>;
+
+/** The colour a new item of `kind` starts with (design D172); `null`, its calendar's. */
+export function defaultColorOf(settings: Settings, kind: "event" | "task"): string | null {
+  const value = settings.defaultColors[kind];
+  if (!value?.startsWith(OWN)) return value;
+  const id = value.slice(OWN.length);
+  return settings.colors.find((color) => color.id === id)?.hex ?? null;
+}
+
+function readDefaults(value: unknown): Settings["defaultColors"] {
+  const read = (value ?? {}) as { event?: unknown; task?: unknown };
+  return { event: colorValue(read.event), task: colorValue(read.task) };
+}
+
+function readColors(value: unknown): readonly OwnColor[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry: unknown) => {
+    const { id, hex, name } = (entry ?? {}) as Partial<Record<keyof OwnColor, unknown>>;
+    if (typeof id !== "string" || typeof hex !== "string" || !HEX.test(hex)) return [];
+    return [{ id, hex, name: typeof name === "string" && name.trim() !== "" ? name : null }];
+  });
 }
 
 /** The locale's week start and clock, or the ones chosen in settings (design D45). */
