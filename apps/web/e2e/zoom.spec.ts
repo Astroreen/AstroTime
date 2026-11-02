@@ -5,7 +5,7 @@
 // step waits for what it draws.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE } from "./support.ts";
 
 const grid = (page: Page) => page.locator("main [data-current] [data-scroller]");
 const standUp = (page: Page) =>
@@ -17,6 +17,14 @@ const lunch = (page: Page) =>
     .getByRole("list", { name: "Wednesday, November 4" })
     .getByRole("listitem", { name: "Lunch with Marta, 1:00 – 2:00 PM" });
 const main = (page: Page) => page.locator("main");
+/**
+ * Ready to zoom: the pinch's code loaded (`data-zoomable`), which may be
+ * before the period is drawn, and the grid it zooms drawn.
+ */
+async function zoomable(page: Page) {
+  await expect(main(page)).toHaveAttribute("data-zoomable", "");
+  await expect(grid(page)).toBeVisible();
+}
 
 test.describe("on a wide screen", () => {
   test.use({ viewport: WIDE });
@@ -30,7 +38,7 @@ test.describe("on a wide screen", () => {
     // A 30-minute block at 56 px an hour has no room for its time line.
     await expect(standUp(page).getByText("9:00 – 9:30 AM")).toHaveCount(0);
     // The pinch's code, loaded once the view is drawn.
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const before = (await lunch(page).boundingBox())!;
     // On 1:00 PM itself, the line Lunch's top is drawn a pixel under.
     await page.mouse.move(before.x + 10, before.y - 1);
@@ -54,7 +62,7 @@ test.describe("on a wide screen", () => {
     page,
   }) => {
     await openDemo(page, "week");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     await page.keyboard.press("+");
     await expect(main(page)).toHaveCSS("--hour", "70px");
     for (let step = 0; step < 12; step++) await page.keyboard.press("+");
@@ -73,7 +81,7 @@ test.describe("on a phone", () => {
     page,
   }) => {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const middle = box.y + box.height / 2;
@@ -113,7 +121,7 @@ test.describe("on a phone", () => {
     page,
   }) => {
     await openDemo(page, "day");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const middle = box.y + box.height / 2;
@@ -139,6 +147,48 @@ test.describe("on a phone", () => {
   });
 });
 
+test.describe("a pinch begun sideways (design D192)", () => {
+  test.use({ viewport: PHONE, hasTouch: true });
+
+  test("a first finger that moves sideways, then a second, pinch: no swipe to other days", async ({
+    page,
+  }) => {
+    await openDemo(page, "3days");
+    await zoomable(page);
+    const box = (await grid(page).boundingBox())!;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    // Chromium's touch input, its moves 50 ms apart by their own times.
+    let time = Date.now() / 1000;
+    const touch = (
+      type: "touchStart" | "touchMove" | "touchEnd",
+      points: { x: number; y: number }[],
+    ) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: points.map((point, id) => ({ ...point, id })),
+        timestamp: (time += 0.05),
+      });
+    // The first finger alone, sideways: a swipe to the next days begins.
+    await touch("touchStart", [{ x: 330, y }]);
+    for (let step = 1; step <= 6; step++) await touch("touchMove", [{ x: 330 - step * 18, y }]);
+    await expect(page.locator("[data-track]")).toHaveAttribute("style", /translateX/);
+    // A second finger lands, and the two spread apart.
+    for (const spread of [40, 80, 120, 160, 200]) {
+      await touch(spread === 40 ? "touchStart" : "touchMove", [
+        { x: 222, y: y - spread / 2 },
+        { x: 222, y: y + spread / 2 },
+      ]);
+    }
+    await touch("touchEnd", []);
+    // Zoomed, on the same days, the swipe gone back.
+    await expect(main(page)).not.toHaveCSS("--hour", "56px");
+    await expect(page.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
+    await expect(page.locator("[data-track]")).not.toHaveAttribute("style", /translateX/);
+    await expect(page.getByRole("heading", { name: "Saturday, November 7" })).toHaveCount(0);
+  });
+});
+
 test.describe("what is no zoom, and what ends one (design D192)", () => {
   test.use({ viewport: WIDE });
 
@@ -146,7 +196,7 @@ test.describe("what is no zoom, and what ends one (design D192)", () => {
     page,
   }) => {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     await page.getByRole("button", { name: "Create" }).click();
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).press("+");
@@ -197,7 +247,7 @@ test.describe("fingers on a phone (design D192)", () => {
 
   async function setUp(page: Page) {
     await openDemo(page, "3days");
-    await expect(main(page)).toHaveAttribute("data-zoomable", "");
+    await zoomable(page);
     const box = (await grid(page).boundingBox())!;
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
