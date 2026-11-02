@@ -168,7 +168,8 @@ function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | nu
  * `ATTENDEE`, so a server that schedules sends no invitation for it and
  * nobody's answer is copied; a task not done (`STATUS:NEEDS-ACTION`, no
  * `COMPLETED`, `PERCENT-COMPLETE:0` when it had one); its reminders without
- * their `UID` and acknowledgement. The calendar's other components and
+ * their `UID` and `ACKNOWLEDGED`, and no `X-MOZ-LASTACK` (Thunderbird's):
+ * the original's reminders were seen, not the copy's. The calendar's other components and
  * properties (its `VTIMEZONE`s) come along. Returns the iCalendar text.
  */
 export function copyItem(

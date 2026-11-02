@@ -5,7 +5,7 @@
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 import type { Notice, Target } from "../calendar/editing.ts";
 import { CloseIcon } from "./icons.tsx";
@@ -61,11 +61,13 @@ export function CopyNotice({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  // The latest `onClose`, so a parent's render does not start the time again.
+  const close = useEffectEvent(() => onClose());
   useEffect(() => {
     if (!copied) return;
-    const timer = setTimeout(onClose, COPIED_MS);
+    const timer = setTimeout(close, COPIED_MS);
     return () => clearTimeout(timer);
-  }, [copied, onClose]);
+  }, [copied]);
   if (!copied) return null;
   return (
     <div

@@ -1631,7 +1631,7 @@ describe("a copy of an item (design D164)", () => {
 
   test("is the same item under a new UID, its own revision, every other line kept", () => {
     const meeting = object(
-      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nCREATED:20261001T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nLOCATION:Room 4\r\nGEO:54.687;25.279\r\nX-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279\r\nX-OTHER:kept\r\nORGANIZER:mailto:me@example.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:you@example.com\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER:-PT15M\r\nACKNOWLEDGED:20261105T084500Z\r\nEND:VALARM\r\nEND:VEVENT\r\n",
+      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nCREATED:20261001T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nLOCATION:Room 4\r\nGEO:54.687;25.279\r\nX-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279\r\nX-OTHER:kept\r\nX-MOZ-LASTACK:20261105T084500Z\r\nORGANIZER:mailto:me@example.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:you@example.com\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER:-PT15M\r\nACKNOWLEDGED:20261105T084500Z\r\nEND:VALARM\r\nEND:VEVENT\r\n",
     );
     const copy = copyItem(meeting, null, { now: NOW, uid: "copy" });
     const parsed = CalendarObject.parse(copy);
@@ -1659,7 +1659,14 @@ describe("a copy of an item (design D164)", () => {
       // The same in meaning: folding and parameter order aside (D7).
       expect(contentLines(copy).map(canonicalLine)).toContain(canonicalLine(line));
     }
-    for (const gone of ["UID:alarm-1", "ACKNOWLEDGED", "ATTENDEE", "ORGANIZER", "-//Other//EN"]) {
+    for (const gone of [
+      "UID:alarm-1",
+      "ACKNOWLEDGED",
+      "X-MOZ-LASTACK",
+      "ATTENDEE",
+      "ORGANIZER",
+      "-//Other//EN",
+    ]) {
       expect(copy).not.toContain(gone);
     }
     // The original is untouched.

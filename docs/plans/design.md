@@ -1160,7 +1160,9 @@ Settings, the colours and the lists controls open.
     (AstroTime does not invite, [D108](#D108)); a task is not done in its
     copy (`STATUS:NEEDS-ACTION`, no `COMPLETED`, `PERCENT-COMPLETE:0` when
     it had one); its reminders keep their times, without their `UID` and
-    acknowledgement.
+    their `ACKNOWLEDGED`, and the item without Thunderbird's
+    `X-MOZ-LASTACK`: those say the original's reminders were seen, which
+    the copy's were not.
 
 ## Deferred
 
