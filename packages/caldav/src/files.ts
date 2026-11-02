@@ -108,7 +108,8 @@ export function safeName(name: string): string {
   // By code points, so no character is cut in half.
   const stem = Array.from(cleaned.slice(0, cleaned.length - extension.length));
   while (stem.length > 1 && bytes(stem.join("") + extension) > MAX_NAME_BYTES) stem.pop();
-  return ends(stem.join("") + extension) || "file";
+  // The stem's end trimmed too: a cut may leave "name ." before ".pdf".
+  return ends(stem.join("").replace(/[\s.]+$/, "") + extension) || "file";
 }
 
 /** Nextcloud Calendar's attachments folder, where it uploads a file from the device (its `attachmentsFolder` setting's default). */
