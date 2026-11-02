@@ -83,8 +83,8 @@ the project.
   [D161](#D161)) is before the
   start of today, in the user's zone, collapse into one chip on today,
   "N undone tasks", which opens them; it shows only on today, in every view
-  that has today, and the days they were due no longer show them
-  (_changed in round 4, [D185](#D185): they stay on their days too_). This is
+  that has today, and each also stays on the day it was due ([D185](#D185);
+  _until round 4 the days they were due no longer showed them_). This is
   D16's roll-over, drawn as one chip, even for a single
   task (Google shows "1 undone task" too). It counts undone tasks only, so
   "hide completed" does not change it. A task with neither stays on the
@@ -1325,7 +1325,11 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   [D86](#D86)): only a day with more than three gives its third row to
   "+N"; any other day keeps its three. The fold, the chevron and the
   expanded strip stay as D51 and [D151](#D151) have them. Tested:
-  `apps/web/e2e/calendar.spec.ts` (Friday's three items in a folded week).
+  `packages/ui/test/month-agenda.test.ts` (the fold at the strip's three
+  rows, a span over two days in the third), `apps/web/e2e/calendar.spec.ts`
+  (on a phone: today's tasks under the chip a tap on "+N" away in the Day
+  view; a Friday with three items kept whole in 3 days, failing before the
+  change).
 
 ## Deferred
 

@@ -120,6 +120,19 @@ describe("a week folded to the rows its tiles fit", () => {
       { index: 2, count: 1 },
     ]);
   });
+
+  test("the all-day strip's fold (design D186): a span in the third row folds where a day has more, a day with three keeps them", () => {
+    const long = span(0, 1, 2);
+    const spans = [span(0, 0, 0), span(0, 0, 1), long, span(0, 0, 3), span(1, 1, 0), span(2, 2, 0)];
+    spans.push(span(2, 2, 1), span(2, 2, 2));
+    const { shown, more } = foldWeek(spans, 3);
+    // Monday overflows, so the span over Monday and Tuesday goes, and Tuesday says "+1".
+    expect(shown).toEqual([spans[0], spans[1], spans[4], spans[5], spans[6], spans[7]]);
+    expect(more).toEqual([
+      { index: 0, count: 2 },
+      { index: 1, count: 1 },
+    ]);
+  });
 });
 
 describe("the Agenda (design D87)", () => {

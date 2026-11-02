@@ -324,17 +324,53 @@ test("the all-day strip folds past three rows, a day with more giving its last t
   await expect(rent).toHaveCount(0);
 });
 
-test("a folded strip draws a day's one item past two rows instead of +1 (D186)", async ({
-  page,
-}) => {
-  await page.setViewportSize(WIDE);
-  await openDemo(page, "week");
-  // Today folds; Friday has three, and keeps them all.
-  await expect(strip(page).getByRole("button", { name: /more on Wednesday/ })).toBeVisible();
-  await expect(
-    strip(page).getByRole("listitem", { name: "Task: Water the plants, All day" }),
-  ).toBeVisible();
-  await expect(strip(page).getByRole("button", { name: /more on Friday/ })).toHaveCount(0);
+test.describe("a folded strip on a phone (D186)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("today's tasks under the undone chip are a tap on +N away in the Day view", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await expect(
+      strip(page).getByRole("listitem", { name: "Mom's birthday, All day" }),
+    ).toBeVisible();
+    await expect(strip(page).getByRole("button", { name: "3 undone tasks" })).toBeVisible();
+    const gift = strip(page).getByRole("listitem", { name: "Task: Buy a gift, All day" });
+    await expect(gift).toHaveCount(0);
+    await strip(page).getByRole("button", { name: "3 more on Wednesday, November 4" }).tap();
+    await expect(gift).toBeVisible();
+    await expect(
+      strip(page).getByRole("listitem", { name: "Completed task: Pay the rent, All day" }),
+    ).toBeVisible();
+  });
+
+  test("a day with three items keeps them all while today folds, no +1", async ({ page }) => {
+    await openDemo(page, "3days");
+    await page.getByRole("button", { name: "Create" }).tap();
+    await page
+      .getByRole("dialog", { name: "New event" })
+      .getByRole("radio", { name: "Task" })
+      .tap();
+    const task = page.getByRole("dialog", { name: "New task" });
+    await task.getByRole("textbox", { name: "Title" }).fill("Pack the bags");
+    await task.getByRole("switch", { name: "All day" }).tap();
+    await task.getByLabel("Start date").fill("2026-11-06");
+    await task.getByRole("button", { name: "Save" }).tap();
+    await expect(task).toHaveCount(0);
+    // Today folds…
+    await expect(
+      strip(page).getByRole("button", { name: "3 more on Wednesday, November 4" }),
+    ).toBeVisible();
+    // …and Friday, with the conference, the plants and the new task, shows all three.
+    for (const name of [
+      "Developer conference, All day",
+      "Task: Water the plants, All day",
+      "Task: Pack the bags, All day",
+    ]) {
+      await expect(strip(page).getByRole("listitem", { name })).toBeVisible();
+    }
+    await expect(strip(page).getByRole("button", { name: /more on Friday/ })).toHaveCount(0);
+  });
 });
 
 test("an undone task due before today stays on its day and counts in today's chip (D51, D185)", async ({
