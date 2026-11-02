@@ -16,6 +16,9 @@ const allowedHosts = process.env["ASTROTIME_WEB_ALLOWED_HOSTS"]
   .map((s) => s.trim())
   .filter(Boolean);
 
+/** Rolldown's tag for a module the page loads at once. */
+const initial: "$initial"[] = ["$initial"];
+
 export default defineConfig({
   // The React Compiler memoizes components, as in Jhin and T3 Code.
   plugins: [
@@ -38,5 +41,33 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // What each chunk imports, for the budget (scripts/bundle-budget.ts).
+    manifest: true,
+    rolldownOptions: {
+      output: {
+        // Libraries in chunks of their own (docs/plans/foundation.md#D145): an
+        // update of AstroTime's own code leaves them in the browser's cache.
+        // Only what the page loads at once (`$initial`): a library only a
+        // dialog loaded later uses stays in that dialog's chunk.
+        codeSplitting: {
+          groups: [
+            {
+              name: "react",
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              tags: initial,
+            },
+            {
+              name: "base-ui",
+              test: /node_modules[\\/]@(base-ui|floating-ui)[\\/]/,
+              tags: initial,
+            },
+            { name: "ical", test: /node_modules[\\/]ical\.js[\\/]/, tags: initial },
+            { name: "drizzle", test: /node_modules[\\/]drizzle-orm[\\/]/, tags: initial },
+            { name: "i18n", test: /node_modules[\\/](i18next|react-i18next)[\\/]/ },
+            { name: "vendor", test: /node_modules[\\/]/, tags: initial },
+          ],
+        },
+      },
+    },
   },
 });

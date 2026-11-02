@@ -14,6 +14,11 @@ export const ru = {
   "store.outdated.body":
     "AstroTime хранит календарь на этом телефоне с помощью Android System WebView версии {{minimum}} или новее, а здесь версия {{version}}. Обновите Android System WebView в магазине приложений и откройте AstroTime снова.",
   "store.reload": "Обновить",
+  "lazy.failed":
+    "Не удалось загрузить эту часть AstroTime. Проверьте подключение и попробуйте ещё раз.",
+  "lazy.retry": "Повторить",
+  "lazy.reload": "Перезагрузить",
+  "lazy.close": "Закрыть",
 
   "secrets.unprotected.title": "Нет связки ключей, чтобы защитить пароль",
   "secrets.unprotected.body":

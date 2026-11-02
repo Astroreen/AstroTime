@@ -46,7 +46,8 @@ import { liveQuery } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import { ChangeNotice } from "./change-notice.tsx";
 import { ItemDetails } from "./item-details.tsx";
-import { ItemEditor, type EditorState } from "./item-editor.tsx";
+import type { EditorState } from "./item-editor.tsx";
+import { ItemEditor } from "./lazy.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
 interface CreateOptions {

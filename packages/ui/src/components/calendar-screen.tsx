@@ -50,7 +50,7 @@ import { MonthPicker } from "./month-picker.tsx";
 import { MonthView } from "./month-view.tsx";
 import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
-import { SettingsScreen } from "./settings-section.tsx";
+import { SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";

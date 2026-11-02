@@ -13,6 +13,10 @@ export const en = {
   "store.outdated.body":
     "AstroTime keeps your calendar on this phone with Android System WebView {{minimum}} or newer, and this one is {{version}}. Update Android System WebView in your app store, then open AstroTime again.",
   "store.reload": "Reload",
+  "lazy.failed": "Could not load this part of AstroTime. Check the connection and try again.",
+  "lazy.retry": "Try again",
+  "lazy.reload": "Reload",
+  "lazy.close": "Close",
 
   "secrets.unprotected.title": "No keyring to keep your password safe",
   "secrets.unprotected.body":
