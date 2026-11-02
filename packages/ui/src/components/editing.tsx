@@ -423,6 +423,7 @@ export function useEditingState({
         onDelete={remove}
         onComplete={complete}
         onStar={star}
+        onCopyFailed={() => setNotice("copyFailed")}
       />
       <ItemEditor
         state={shownState}

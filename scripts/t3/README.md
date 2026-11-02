@@ -58,6 +58,9 @@ over https, on the same port number, through one of two fronts:
 `ASTROTIME_USERNAME=astro`, makes the dev server's page name that server and
 user, so signing in asks for the password alone, and puts the server on the
 proxy's list (`docs/plans/foundation.md#D123`). It holds no password.
+`ASTROTIME_PLACES_URL` there (or in the environment) names the Photon the
+place search asks, a self-hosted one's `/api/` address, or `off`
+(`docs/plans/foundation.md#D178`); unset, the public Photon.
 
 **One address, one store.** A browser keeps the app's store, accounts and
 passwords per origin, so `http://127.0.0.1:5180`, `https://100.x.y.z:5180`,

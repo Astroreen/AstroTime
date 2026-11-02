@@ -23,7 +23,47 @@ export const PRESET_MARK = {
 export const PRESET_META = {
   server: "astrotime-server",
   username: "astrotime-username",
+  places: "astrotime-places",
 } as const;
+
+/**
+ * Places on the map (docs/plans/foundation.md#D178): the Photon geocoder
+ * Location searches, the public one unless a deployment names its own, and
+ * OpenStreetMap's tiles the place card's map is drawn from. The deployment
+ * names them with the preset, since its server sends the page's policy too.
+ */
+export const PLACES = {
+  photon: "https://photon.komoot.io/api/",
+  tiles: "https://tile.openstreetmap.org/",
+} as const;
+
+/** What the page's `astrotime-places` tag says when the deployment turned places off. */
+export const PLACES_OFF = "off";
+
+/**
+ * The Photon Location searches, from `ASTROTIME_PLACES_URL`: unset, the
+ * public one; `off`, none (no search, and no map in the place card); else a
+ * self-hosted Photon's `/api/` address. Throws on one that is no web address.
+ */
+export function placesFrom(env: Record<string, string | undefined>): string | null {
+  const typed = env["ASTROTIME_PLACES_URL"]?.trim() ?? "";
+  if (typed === "") return PLACES.photon;
+  if (typed.toLowerCase() === PLACES_OFF) return null;
+  let url: URL;
+  try {
+    url = new URL(typed);
+  } catch {
+    url = new URL("invalid:");
+  }
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password) {
+    throw new Error(
+      `ASTROTIME_PLACES_URL: "${typed}" is not a Photon address like https://photon.example.com/api/, nor "off"`,
+    );
+  }
+  url.hash = "";
+  url.search = "";
+  return url.href;
+}
 
 /**
  * The preset from the environment: `ASTROTIME_SERVER_URL` (an http or https
@@ -62,21 +102,30 @@ const escape = (text: string) =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
-/** The preset as the page's <meta> tags, to go before `</head>`. */
-export function presetTags(preset: Preset): string {
+/**
+ * The preset as the page's <meta> tags, to go before `</head>`, with the
+ * place search when it is not the public Photon (`placesFrom`'s); empty
+ * when there is nothing to say.
+ */
+export function presetTags(preset: Preset | null, places: string | null = PLACES.photon): string {
   const tag = (name: string, value: string) => `<meta name="${name}" content="${escape(value)}" />`;
-  return [
-    PRESET_MARK.start,
-    tag(PRESET_META.server, preset.server),
-    ...(preset.username === null ? [] : [tag(PRESET_META.username, preset.username)]),
-    PRESET_MARK.end,
-  ].join("");
+  const tags = [
+    ...(preset ? [tag(PRESET_META.server, preset.server)] : []),
+    ...(preset && preset.username !== null ? [tag(PRESET_META.username, preset.username)] : []),
+    ...(places === PLACES.photon ? [] : [tag(PRESET_META.places, places ?? PLACES_OFF)]),
+  ];
+  return tags.length === 0 ? "" : [PRESET_MARK.start, ...tags, PRESET_MARK.end].join("");
 }
 
 /**
  * The page's HTML with the preset in its head; as it was without one. A
  * replacer function, so `$&`, `$'` and the like in a preset stay as written.
  */
-export function withPreset(html: string, preset: Preset | null): string {
-  return preset ? html.replace("</head>", () => `${presetTags(preset)}</head>`) : html;
+export function withPreset(
+  html: string,
+  preset: Preset | null,
+  places: string | null = PLACES.photon,
+): string {
+  const tags = presetTags(preset, places);
+  return tags ? html.replace("</head>", () => `${tags}</head>`) : html;
 }

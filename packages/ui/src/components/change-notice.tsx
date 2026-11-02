@@ -1,6 +1,8 @@
 // What the user is told when a change made outside the edit dialog (a
 // deletion, a task completed or starred) did not land: the item was gone,
-// it is unclear whether it was saved, or it failed (docs/plans/foundation.md#D103).
+// it is unclear whether it was saved, or it failed (docs/plans/foundation.md#D103);
+// and a place's address that could not be copied (docs/plans/design.md#D177).
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import type { Notice } from "../calendar/editing.ts";
@@ -12,12 +14,16 @@ const KEYS = {
   failed: "edit.failed",
   deleteInDoubt: "notice.deleteInDoubt",
   deleteFailed: "notice.deleteFailed",
+  copyFailed: "notice.copyFailed",
 } as const satisfies Record<Notice, string>;
 
 export function ChangeNotice({ notice, onClose }: { notice: Notice | null; onClose: () => void }) {
   const { t } = useTranslation();
   if (!notice) return null;
-  return (
+  // On the page's body, beside any dialog open: inside the app's root, an
+  // open dialog (the details, over which a copy can fail) hides it from
+  // assistive technology along with the rest of the page.
+  return createPortal(
     <div
       role="alert"
       className="fixed bottom-4 left-1/2 z-[120] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-2 rounded-2xl bg-danger-soft p-3 text-body text-danger shadow-lg"
@@ -31,6 +37,7 @@ export function ChangeNotice({ notice, onClose }: { notice: Notice | null; onClo
       >
         <CloseIcon className="size-4" />
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }

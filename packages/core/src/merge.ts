@@ -68,6 +68,23 @@ function itemsOf(object: CalendarObject): Map<string, ICAL.Component> {
 const TIME = new Set(["dtstart", "dtend", "duration", "due"]);
 const TIME_FIELD = "#time";
 
+/**
+ * A place is one field too (D176): its text and its point, `GEO` and
+ * Apple's, change together, and one side's text with the other's point
+ * would put a place where neither side chose.
+ */
+const PLACE = new Set(["location", "geo", "x-apple-structured-location"]);
+const PLACE_FIELD = "#place";
+
+/** The properties each field of several is made of. */
+const GROUPS = new Map([
+  [TIME_FIELD, TIME],
+  [PLACE_FIELD, PLACE],
+]);
+
+const fieldOf = (name: string) =>
+  TIME.has(name) ? TIME_FIELD : PLACE.has(name) ? PLACE_FIELD : name;
+
 /** Separates the values of one field; a content line never holds it. */
 const VALUE = "\u0000";
 
@@ -84,7 +101,7 @@ function fieldsOf(component: ICAL.Component): Fields {
     if (BOOKKEEPING.has(property.name)) continue;
     if (SETS.has(property.name))
       for (const single of singles(property)) add(property.name, line(single));
-    else add(TIME.has(property.name) ? TIME_FIELD : property.name, line(property));
+    else add(fieldOf(property.name), line(property));
   }
   for (const sub of component.getAllSubcomponents()) add(`@${sub.name}`, sub.toString());
   return new Map([...values].map(([name, list]) => [name, list.toSorted().join(VALUE)]));
@@ -98,8 +115,9 @@ function sameFields(a: ICAL.Component, b: ICAL.Component): boolean {
 
 /** Replaces a field of `target` with the one in `source` (or removes it). */
 function copyField(target: ICAL.Component, source: ICAL.Component | null, name: string) {
-  if (name === TIME_FIELD) {
-    for (const time of TIME) copyField(target, source, time);
+  const group = GROUPS.get(name);
+  if (group) {
+    for (const member of group) copyField(target, source, member);
     return;
   }
   if (name.startsWith("@")) {
@@ -317,6 +335,7 @@ export function sameObjects(a: string, b: string): boolean {
  * for the Conflicts list (D6): property names as ical.js reads them
  * (`summary`, `location`), `time` for the item's times, `alarms` for its
  * reminders, and `occurrences` when an exception differs, was added or went.
+ * A place's point is part of its `location` (D176).
  */
 export function differences(a: string, b: string): string[] {
   const ia = itemsOf(CalendarObject.parse(a));
@@ -333,7 +352,16 @@ export function differences(a: string, b: string): string[] {
     for (const name of new Set([...fa.keys(), ...fb.keys()])) {
       if (fa.get(name) === fb.get(name)) continue;
       if (exception) names.add("occurrences");
-      else names.add(name === TIME_FIELD ? "time" : name === "@valarm" ? "alarms" : name);
+      else
+        names.add(
+          name === TIME_FIELD
+            ? "time"
+            : name === PLACE_FIELD
+              ? "location"
+              : name === "@valarm"
+                ? "alarms"
+                : name,
+        );
     }
   }
   return [...names].toSorted();

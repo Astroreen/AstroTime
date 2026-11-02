@@ -206,6 +206,21 @@ export const PlaceIcon = (props: Props) => (
   </Icon>
 );
 
+export const CopyIcon = (props: Props) => (
+  <Icon {...props}>
+    <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+    <path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" />
+  </Icon>
+);
+
+/** Open in maps: a folded map. */
+export const MapIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z" />
+    <path d="M9 4v14M15 6v14" />
+  </Icon>
+);
+
 export const NotesIcon = (props: Props) => (
   <Icon {...props}>
     <path d="M4 6h16M4 11h16M4 16h10" />

@@ -9,7 +9,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { hexColor, nearestColorName } from "./colors.ts";
-import { readItem, X_COLOR } from "./item.ts";
+import { readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
@@ -44,7 +44,11 @@ export type TaskStatus = "NEEDS-ACTION" | "IN-PROCESS" | "COMPLETED" | "CANCELLE
 export interface ItemChanges {
   readonly summary?: string;
   readonly description?: string;
-  readonly location?: string;
+  /**
+   * `LOCATION`: free text, or a place picked on the map, written as its text
+   * with its point. The old point goes either way (foundation D176).
+   */
+  readonly location?: string | Place;
   readonly time?: ItemTimes;
   /** `null`: the item no longer repeats. */
   readonly repeat?: Repeat | null;
@@ -69,6 +73,24 @@ export interface ItemChanges {
   /** 1 (highest) to 9; `null` for none. */
   readonly priority?: number | null;
   readonly categories?: readonly string[];
+}
+
+/** A place picked on the map (foundation D176): its name, its address and where it is. */
+export interface Place {
+  readonly name: string;
+  readonly address: string;
+  readonly geo: Geo;
+}
+
+/** A geocoder's text on one line: no newline or run of spaces reaches a parameter or the text. */
+const oneLine = (text: string) => text.replaceAll(/\s+/g, " ").trim();
+
+/** A place as `LOCATION` holds it, so every client shows it: "name, address", as Google writes it. */
+export function placeText(place: Place): string {
+  const name = oneLine(place.name);
+  const address = oneLine(place.address);
+  if (!name || !address) return name || address;
+  return address.startsWith(name) ? address : `${name}, ${address}`;
 }
 
 /** The PRODID of a calendar object AstroTime makes (RFC 5545 §3.7.3). */
@@ -255,7 +277,7 @@ function apply(
   now: ICAL.Time,
 ): void {
   if (changes.summary !== undefined) setText(component, "summary", changes.summary);
-  if (changes.location !== undefined) setText(component, "location", changes.location);
+  if (changes.location !== undefined) setPlace(component, changes.location);
   if (changes.description !== undefined) {
     // The HTML twins of the old text (Thunderbird's ALTREP, Outlook's
     // X-ALT-DESC) would show instead of the new one: they go with it.
@@ -310,6 +332,37 @@ function setColor(component: ICAL.Component, color: string | null): void {
 function setText(component: ICAL.Component, name: string, value: string): void {
   if (value === "") component.removeAllProperties(name);
   else component.updatePropertyWithValue(name, value);
+}
+
+/** Degrees to six places, a tenth of a metre. */
+const degrees = (value: number) => Math.round(value * 1e6) / 1e6;
+
+/**
+ * `LOCATION`, and the point beside it: RFC 5545's `GEO`, and Apple's
+ * structured location, which Apple's clients show their map from and read
+ * no `GEO`. The old point goes with the old place; free text has none.
+ */
+function setPlace(component: ICAL.Component, location: string | Place): void {
+  component.removeAllProperties("geo");
+  component.removeAllProperties("x-apple-structured-location");
+  if (typeof location === "string") {
+    setText(component, "location", location);
+    return;
+  }
+  const text = placeText(location);
+  setText(component, "location", text);
+  if (!text) return;
+  const [lat, lon] = [degrees(location.geo.lat), degrees(location.geo.lon)];
+  component.addProperty(new ICAL.Property(["geo", {}, "float", [lat, lon]]));
+  // Apple's X-TITLE is how a reader tells the point is still this place's
+  // (item.ts). A `"` in a parameter goes as RFC 6868's `^'`, which ical.js
+  // writes and reads; newlines never get there (`oneLine`).
+  const params: Record<string, string> = { "x-apple-radius": "70" };
+  params["x-title"] = oneLine(location.name) || text;
+  if (oneLine(location.address)) params["x-address"] = oneLine(location.address);
+  component.addProperty(
+    new ICAL.Property(["x-apple-structured-location", params, "uri", `geo:${lat},${lon}`]),
+  );
 }
 
 /** A task's status, with what Nextcloud Tasks writes beside it (design D94). */

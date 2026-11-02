@@ -879,6 +879,68 @@ I make it"; "sometimes an item's text is covered by another event".
   (`apps/web/e2e/calendar.spec.ts`; on the phone's views it failed before).
   D15, D42's cascade and D50 point here.
 
+**Places on the map**, feedback 8: "I want 'Location' to search real places
+on a map, connected to a map. That also gives a nice place card when viewing
+an event or a task." What is written and which services are asked:
+[foundation D176](foundation.md#D176), [D178](foundation.md#D178).
+
+- **D175. Location searches places as the user types.**
+  - **The field stays a text field** (`place-field.tsx`): what is typed and
+    not picked is saved as typed, free text with no point. Below it, as
+    Google's suggestions, the places Photon finds: each with its name and
+    its address under it, "Places from © OpenStreetMap contributors" at
+    the list's foot, as OpenStreetMap asks of a geocoder's users. Picking
+    one fills the field with "name, address" and keeps its point; typing
+    over it after makes it text again. The list is Base UI's Autocomplete
+    in the popup and rows of the app's own dropdowns ([D167](#D167)), over
+    the edit dialog; it is a text field with suggestions, not a `Select`.
+  - **Asked sparingly**, as Photon's fair use asks: a query of three
+    letters or more, once typing pauses (350 ms), one request at a time
+    (the one before aborted), each answer kept for the session per query,
+    six places. The last answer stays shown until the next comes.
+  - **In the UI's language** where Photon has it (`en`, and `de`, `fr`);
+    the public Photon refuses others (`lang=ru`: 400, "Supported are:
+    default, de, en, fr"), so Russian asks for `default`, each place's own
+    name: Moscow's in Russian, Berlin's in German.
+  - **Near the user without asking where they are**: the search prefers
+    places near the item's own place, else near the last place picked on
+    this device, both rounded to a tenth of a degree (a town). No location
+    permission is asked: the page's policy refuses geolocation
+    (foundation [D110](foundation.md#D110)), and a town is enough.
+  - **A setting, on by default**: Settings → Places, "Search places on the
+    map", saying what it sends where: "What you type in Location goes to
+    photon.komoot.io to find places, and the maps of places come from
+    tile.openstreetmap.org" (the deployment's own Photon named instead,
+    when it has one). Off, Location is the plain text field and the place
+    card has no map: nothing is asked of either. Offline, or with Photon
+    failing, no list shows and the field is the text field it always was.
+- **D177. The place card.** In an item's details (`place-card.tsx`), a
+  place with a point shows its name, its address under it, and a map of
+  OpenStreetMap's tiles 144 px high across the card, the place in its
+  middle under a pin, "© OpenStreetMap" in its corner linking to the
+  copyright page; the tiles load as the card shows (`loading="lazy"`), and
+  one that does not come leaves the map's ground. Two actions under it:
+  - **Open in maps**: OpenStreetMap's page with a marker on the place
+    (`openstreetmap.org/?mlat=…&mlon=…#map=17/…`); on Android a `geo:` URI
+    with the point and its text (its parentheses escaped, as the label sits
+    in them), which opens the user's maps app. A text
+    with no point opens a search for it (`openstreetmap.org/search?query=…`,
+    `geo:0,0?q=…`).
+  - **Copy address**: the location's text, "Copied" for two seconds after;
+    refused by the clipboard, the change notice says "The address could not
+    be copied", on the page's body so the open details do not hide it from
+    a screen reader; with no clipboard at all (an insecure page, some
+    WebViews), no button.
+
+  A text with no point (another client's, or typed) shows as it always did,
+  with the same two actions. The name and the address come from the text:
+  Apple's two lines, or AstroTime's and Google's "name, address".
+
+### Decided in round 3: settings, colours, dropdowns, accounts
+
+The owner's feedback after v0.3.0, tried on a phone and a computer, for
+Settings, the colours and the lists controls open.
+
 **Settings, colours, dropdowns, accounts.**
 
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
@@ -1087,6 +1149,12 @@ For the items' editor and details:
   are worked out left to right; AstroTime speaks English and Russian
   (foundation [D17](foundation.md#D17)), so a right-to-left language
   brings their mirror ([D135](#D135)).
+- **A dark map** — the place card's map is OpenStreetMap's standard tiles
+  in both themes ([D177](#D177)); a dark style needs a tile server that has
+  one.
+- **Places from the address book** — Nextcloud's Calendar suggests
+  contacts' addresses for a location; AstroTime reads no contacts
+  ([D175](#D175)).
 - **A window over the Agenda** — the days it reads only grow while it is
   open, and every day read stays in the page; dropping far days, or drawing
   only the rows on screen, comes when long scrolls need it ([D87](#D87)).

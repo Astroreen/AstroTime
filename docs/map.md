@@ -68,6 +68,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
+  - `Item.geo`, `Place`, `placeText` — a place's point, read from `GEO` or
+    Apple's structured location and written with a place picked on the
+    map. → `plans/foundation.md#D176`
 
 - `packages/storage` (`@astrotime/storage`) — the local store.
   - `Store` — accounts (with the calendar home discovery found, migration 5;
@@ -129,7 +132,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/desktop.md#D72`, `plans/android.md#D62`
   - `presetFrom`, `withPreset` (`preset.ts`) — a single-user deployment's
     server and user name, from the environment into the page's `<meta>`
-    tags. → `plans/foundation.md#D123`
+    tags. → `plans/foundation.md#D123`; `placesFrom`, `PLACES`, the place
+    search's Photon and OpenStreetMap's tiles. → `plans/foundation.md#D178`
   - `proxyHandler`, `throughProxy` — the CORS proxy and its URL space; its
     own refusals come to the app as `ProxyRefusedError`.
     → `plans/foundation.md#D39`, `plans/foundation.md#D92`
@@ -216,6 +220,9 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+    - `place-field.tsx` — the edit dialog's Location, searching places as
+      the user types; `place-card.tsx`, a place in the details with its
+      map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
   - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
     the UI shows them, the calendar on this device named in the language
     spoken now. → `plans/foundation.md#D122`
@@ -239,6 +246,11 @@ When you add a package, app or module, add its line here in the same PR.
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
       `moved`, `keyMove`), the slot and column under a point, the ghost's
       occurrence, when a press is a drag. → `plans/foundation.md#D113`
+  - `places/` — `photon` (`photon.ts`), the place search and its answers
+    kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in
+    maps". `test/fixtures/`, Photon's recorded answers:
+    [`README.md`](../packages/ui/test/fixtures/README.md).
+    → `plans/design.md#D175`, `plans/foundation.md#D178`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
     `plans/design.md#D152`), `useNow`, `useMediaQuery`.
@@ -298,13 +310,18 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
     phone's system bars. → `plans/android.md#D68`; `a11y.spec.ts` audits
     every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
-    landmarks, reflow and reduced motion. → `plans/design.md#D119`; `idle.spec.ts`
-    counts React commits in the Month view across another tab's change: an
-    idle tab does no work. → `plans/foundation.md#D181`
+    landmarks, reflow and reduced motion. → `plans/design.md#D119`;
+    `places.spec.ts` searches and picks a place on a phone and a wide
+    screen with Photon and the tiles faked, `places-screenshots.spec.ts`
+    takes the places' evidence. → `plans/design.md#D175`;
+    `idle.spec.ts` counts React commits in the Month view across another
+    tab's change: an idle tab does no work. → `plans/foundation.md#D181`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`;
     `offline.spec.ts` reloads it with the network gone, updates it, and
-    reads its manifest. → `plans/foundation.md#D124`
+    reads its manifest. → `plans/foundation.md#D124`; `csp.spec.ts` also
+    opens a place's map and searches a place under the policy.
+    → `plans/foundation.md#D178`
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev

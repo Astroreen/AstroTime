@@ -1,0 +1,118 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "R",
+        "osm_id": 1577673,
+        "osm_key": "place",
+        "osm_value": "square",
+        "type": "locality",
+        "name": "Красная площадь",
+        "district": "Тверской",
+        "city": "Москва",
+        "state": "Москва",
+        "country": "Россия",
+        "countrycode": "RU",
+        "extent": [37.6179275, 55.7552155, 37.6232959, 55.7519945]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6215013, 55.7535908]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "R",
+        "osm_id": 1577673,
+        "osm_key": "place",
+        "osm_value": "square",
+        "type": "street",
+        "name": "Красная площадь",
+        "locality": "Китай-город",
+        "district": "Тверской",
+        "city": "Москва",
+        "state": "Москва",
+        "country": "Россия",
+        "postcode": "109012",
+        "countrycode": "RU",
+        "extent": [37.6179275, 55.7552155, 37.6232959, 55.7519945]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6215013, 55.7535908]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 536581113,
+        "osm_key": "highway",
+        "osm_value": "tertiary",
+        "type": "street",
+        "name": "Красная площадь",
+        "locality": "Китай-город",
+        "district": "Тверской",
+        "city": "Москва",
+        "state": "Москва",
+        "country": "Россия",
+        "postcode": "109012",
+        "countrycode": "RU",
+        "extent": [37.6224986, 55.7536435, 37.6225339, 55.7535184]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6224987, 55.753584]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 309913450,
+        "osm_key": "highway",
+        "osm_value": "tertiary",
+        "type": "street",
+        "name": "Красная площадь",
+        "locality": "Китай-город",
+        "district": "Тверской",
+        "city": "Москва",
+        "state": "Москва",
+        "country": "Россия",
+        "postcode": "109548",
+        "countrycode": "RU",
+        "extent": [37.6240152, 55.7523088, 37.6241552, 55.7520534]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6240984, 55.7521879]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "N",
+        "osm_id": 1277331973,
+        "osm_key": "highway",
+        "osm_value": "bus_stop",
+        "type": "house",
+        "name": "Красная площадь",
+        "street": "площадь Васильевский Спуск",
+        "locality": "Китай-город",
+        "district": "Тверской",
+        "city": "Москва",
+        "state": "Москва",
+        "country": "Россия",
+        "postcode": "109012",
+        "countrycode": "RU"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6239776, 55.7512384]
+      }
+    }
+  ]
+}

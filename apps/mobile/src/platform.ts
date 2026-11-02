@@ -2,9 +2,11 @@
 // the WebView (D63), HTTP through AstroTime's OkHttp plugin (D62), credentials
 // under a Keystore key (D64), Login Flow's page in a Custom Tab (D65), the
 // back button (D68), preferences in the WebView's localStorage, reminders
-// as local notifications (D66), and the Web Locks it shares with background
-// sync's WebView (D67).
+// as local notifications (D66), the Web Locks it shares with background
+// sync's WebView (D67), and places on the map, searched from the WebView and
+// opened in the user's maps app by a `geo:` URI (foundation D178).
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
+import { PLACES } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
 import type { Platform } from "@astrotime/ui";
 import { App } from "@capacitor/app";
@@ -41,6 +43,7 @@ export function mobilePlatform(store: Promise<Store>): Platform {
     signingInTo: (server) => signingIn.begin(server),
     onBack: backButton(App),
     preferences,
+    places: { photon: PLACES.photon, tiles: PLACES.tiles, links: "geo" },
     // Background sync opens the same store in a WebView of its own (D67).
     syncLock,
     reminders: androidReminders({

@@ -199,6 +199,7 @@ describe("the drawer's settings override the locale (D53)", () => {
       weekNumbers: false,
       reminders: false,
       keepRunning: false,
+      places: false,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
     // Reminders are on unless turned off (foundation D101), and so is
@@ -207,6 +208,8 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"keepRunning":0}').keepRunning).toBe(true);
     // The week numbers show unless turned off (design D169).
     expect(readSettings('{"weekNumbers":"no"}').weekNumbers).toBe(true);
+    // Places on the map too (design D175).
+    expect(readSettings('{"places":null}').places).toBe(true);
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(
