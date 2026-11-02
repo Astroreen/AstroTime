@@ -1468,7 +1468,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   day with "All day" on, as a tap on an empty slot of the grid opens it
   at the slot's time ([D108](#D108)): an event first, "Task" one tap away,
   keeping the day and "All day" ([D159](#D159)). A press that began on
-  an item, moved, or is a double click's second click creates nothing,
+  an item, moved, left the strip, was taken for a scroll
+  (`pointercancel`), or is a double click's second click creates nothing,
   so an item held and let go beside it (a read-only one, which does not
   drag) opens nothing new. An empty strip keeps one row's height (24 px,
   it was 4 px), so the tap has somewhere to land, as Google Calendar's web
@@ -1478,8 +1479,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   one column, and the strip's would be a gesture of its own. Tested:
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
   task made from it, an item tapped opens its details; a press from an
-  item to an empty spot, a press moved 12 px, and a double click opening
-  one item, the first two failing without the check; a phone's Day view
+  item to an empty spot, a press moved 12 px, a press that leaves the
+  strip and comes back, and a double click opening one item, the first
+  three failing without the check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
@@ -1498,6 +1500,29 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   marked `data-day-number`, and the strip in the Week on a wide screen and
   3 days on a phone, failing before the change; 8 px between the strip
   and the hours in the Day view).
+- **D191. Scrollbars are thin, rounded and in the theme** (the owner's
+  feedback 14b: "redo the design of the overflow scrollbars"). Every
+  scroller had the platform's classic scrollbar, a 15 px grey bar on
+  Linux and Windows, the same in light and dark. Now, in `styles.css`:
+  Chromium (and so Electron and Android's WebView) and WebKit draw
+  `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
+  ink colour at 22% on a clear track, 42% while the pointer is over what
+  scrolls, 6 px wide under the pointer and 58% while dragged; Firefox has
+  only the standard properties, `scrollbar-width: thin` in the same
+  colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
+  the standard ones win over it). Light and dark come with the ink
+  colour. Nothing about scrolling changes: the wheel, the keys, a finger
+  and dragging the thumb work as they did; `scrollbar-gutter: stable`
+  still keeps the day headers over their columns, now 10 px wide on both;
+  a phone's scrollbars are the system's overlay ones, drawn only while
+  scrolling, and Firefox on Linux draws its own overlay ones too. The
+  thumb shows faintly at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller, and a faint
+  thumb already reads as quiet. Checked in Chromium and Firefox (headed,
+  light and dark); WebKit does not start on the development machine, and
+  draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
+  `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
+  Saturday's header ends where its column does; failing before at 15 px).
 
 ### Decided in round 4: the editor
 

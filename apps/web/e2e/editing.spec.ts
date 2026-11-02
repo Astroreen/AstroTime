@@ -374,6 +374,19 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(1);
   });
 
+  test("a press that leaves the strip and comes back creates nothing", async ({ page }) => {
+    await openDemo(page, "week");
+    await loadEditor(page);
+    const spot = await tuesday(page);
+    await page.mouse.move(spot.x, spot.y);
+    await page.mouse.down();
+    // Out to the grid under the strip, and back to where it began.
+    await page.mouse.move(spot.x, spot.y + 120, { steps: 3 });
+    await page.mouse.move(spot.x, spot.y, { steps: 3 });
+    await page.mouse.up();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
   test("a double click opens one new item, with its first click", async ({ page }) => {
     await openDemo(page, "week");
     const spot = await tuesday(page);

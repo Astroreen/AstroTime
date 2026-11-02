@@ -592,8 +592,10 @@ describe("a drop saved (foundation D113)", () => {
 });
 
 describe("the all-day strip's days (design D188)", () => {
-  test("its content box in even columns: a scrollbar beside it is no part of the last day", () => {
-    // 700 px of days from 100, a 15 px scrollbar after them.
+  test("even columns over the width given, nothing past it: the strip gives its content box", () => {
+    // 700 px of days from 100, as a strip's `clientWidth` gives them with a
+    // 15 px scrollbar after them; that the strip gives `clientWidth`, not
+    // its box's width, is `time-grid.tsx`'s.
     const days = evenColumns(100, 700, 7);
     expect(days[0]).toEqual({ left: 100, right: 200 });
     expect(days[6]).toEqual({ left: 700, right: 800 });
