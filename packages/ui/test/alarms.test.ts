@@ -91,6 +91,18 @@ describe("the tally", () => {
     expect(tally.timed.map(([offset]) => offset)).not.toContain(-7 * MINUTE);
     expect(tally.timed).toHaveLength(24);
   });
+
+  test("a reminder added now is kept even when 24 others were added more often", () => {
+    const offsets = Array.from({ length: 24 }, (_, i) => -(i + 1) * MINUTE);
+    let tally = tallied(NONE, false, offsets);
+    tally = tallied(tally, false, offsets);
+    tally = tallied(tally, false, [-3 * HOUR]);
+    expect(tally.timed).toHaveLength(24);
+    expect(tally.timed.at(-1)).toEqual([-3 * HOUR, 1]);
+    // The least added (the oldest of those) went to make room.
+    expect(tally.timed.map(([offset]) => offset)).not.toContain(-MINUTE);
+    expect(offeredAlarms(tally, false, [])).toHaveLength(4);
+  });
 });
 
 describe("customOffset", () => {

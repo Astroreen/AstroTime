@@ -534,6 +534,7 @@ export const en = {
   "alarm.custom.cancel": "Cancel",
   "alarm.custom.add": "Add",
   "alarm.custom.had": "The item already has this reminder",
+  "alarm.custom.empty": "Type how many",
   "alarm.unit.minutes_one": "minute",
   "alarm.unit.minutes_other": "minutes",
   "alarm.unit.hours_one": "hour",

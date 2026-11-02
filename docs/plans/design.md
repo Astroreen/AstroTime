@@ -1374,19 +1374,21 @@ reminders.
     adds it with "Add" or Enter (Enter there does not save the item, nor
     one that ends an input method's composition), and closes with
     "Cancel". One the item has already is not added twice: the picker says
-    so and "Add" waits. In Russian it reads "Напомнить за [2] [недели]",
+    so and "Add" waits; so it does while the amount is empty (it can be
+    emptied to type another). 0 is the start itself, or the day. In Russian it reads "Напомнить за [2] [недели]",
     so the units are in the accusative. Several per item, as before.
   - **What is written:** a `VALARM` as [foundation D103](foundation.md#D103)
     writes one added, a relative `TRIGGER` (`-P2W`, `-P13DT15H` for two
     weeks before an all-day day at 9:00); the item's other alarms, another
     client's included, stay byte for byte ([foundation D7](foundation.md#D7)).
-  - **Where "most added" comes from: a tally on this device**
+  - **Where "most added" comes from: the reminder tally on this device**
     (`calendar/alarms.ts`, the preference `astrotime.alarmTally`): each
     reminder added in the edit dialog counts once the item is saved (the
     dialog closes from saving; a refusal leaves it open and counts
     nothing), under the kind of item it was added to (a timed reminder
     added before "All day" was switched on stays a timed one); the 24 most
-    added of each kind are kept. The dialog reads the tally as it opens. A
+    added of each kind are kept, and one added now always is: the least
+    added of the others makes room for it. The dialog reads the tally as it opens. A
     task's reminder before its due (`RELATED=END`, [D159](#D159)) counts
     with those before a start: the menu words both "… before" and adds
     them to the time the item counts from. Not the store's

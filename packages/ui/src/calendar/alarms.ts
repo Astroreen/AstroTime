@@ -14,7 +14,7 @@ const OFFERED = 4;
 /** How many offsets the tally keeps of each kind: the most added. */
 const KEPT = 24;
 
-/** What the user has added: offsets (negative, before) and how often, for timed and all-day items. */
+/** The reminder tally (GLOSSARY.md): what the user has added, offsets (negative, before) and how often, for timed and all-day items. */
 export interface AlarmTally {
   readonly timed: readonly (readonly [offset: number, count: number])[];
   readonly allDay: readonly (readonly [offset: number, count: number])[];
@@ -68,9 +68,14 @@ export function tallied(
     counts.delete(offset);
     counts.set(offset, count);
   }
+  // Those added now stay, however used the others are: the least added
+  // others go to make room for them.
+  const fresh = new Set(offsets);
+  let others = KEPT - fresh.size;
   const kept = [...counts]
     .toReversed()
     .toSorted((a, b) => b[1] - a[1])
+    .filter(([offset]) => fresh.has(offset) || others-- > 0)
     .slice(0, KEPT);
   return { ...tally, [kind]: kept };
 }

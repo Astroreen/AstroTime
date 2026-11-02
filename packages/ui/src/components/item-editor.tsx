@@ -932,15 +932,19 @@ function CustomReminder({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const [amount, setAmount] = useState(allDay ? 1 : 10);
+  // As typed, so it can be emptied to type another; read as a number to add.
+  const [typed, setTyped] = useState(allDay ? "1" : "10");
+  const amount =
+    typed.trim() === "" ? null : Math.min(MOST, Math.max(0, Math.round(Number(typed))));
   const [unit, setUnit] = useState<AlarmUnit>(allDay ? "days" : "minutes");
   const [time, setTime] = useState("09:00");
   const units = UNITS[allDay ? "allDay" : "timed"];
   // A switch of "All day" meanwhile leaves a unit it has not: its first.
   const shown = (units as readonly AlarmUnit[]).includes(unit) ? unit : units[0];
-  const offset = customOffset(amount, shown, allDay, time);
-  const had = taken.includes(offset);
-  const submit = () => !had && onAdd(offset);
+  const offset =
+    amount === null || Number.isNaN(amount) ? null : customOffset(amount, shown, allDay, time);
+  const had = offset !== null && taken.includes(offset);
+  const submit = () => offset !== null && !had && onAdd(offset);
   return (
     <div
       role="group"
@@ -956,11 +960,9 @@ function CustomReminder({
             min={0}
             max={MOST}
             aria-label={t("alarm.custom.amount")}
-            value={amount}
+            value={typed}
             autoFocus
-            onChange={(e) =>
-              setAmount(Math.min(MOST, Math.max(0, Math.round(Number(e.target.value) || 0))))
-            }
+            onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
               // Enter adds the reminder, not saves the item; not one that
               // ends an input method's composition.
@@ -979,7 +981,7 @@ function CustomReminder({
             onChange={(next) => setUnit(next as AlarmUnit)}
             options={units.map((u) => ({
               value: u,
-              label: t(`alarm.unit.${u}`, { count: amount }),
+              label: t(`alarm.unit.${u}`, { count: amount ?? 0 }),
             }))}
             className={fieldButton}
           />
@@ -992,14 +994,19 @@ function CustomReminder({
         </div>
       )}
       <p aria-live="polite" className="text-body">
-        {wordsOf(offset)}
+        {offset === null ? t("alarm.custom.empty") : wordsOf(offset)}
         {had && <span className="block text-small text-ink-muted">{t("alarm.custom.had")}</span>}
       </p>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={textButton}>
           {t("alarm.custom.cancel")}
         </button>
-        <button type="button" disabled={had} onClick={submit} className={primaryButton}>
+        <button
+          type="button"
+          disabled={offset === null || had}
+          onClick={submit}
+          className={primaryButton}
+        >
           {t("alarm.custom.add")}
         </button>
       </div>
