@@ -59,7 +59,7 @@ function store(failing = 0): FileStore & { readonly asked: string[] } {
   };
 }
 
-function render(files: FileStore) {
+function render(files: FileStore | (() => Promise<FileStore | null>)) {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -73,7 +73,7 @@ function render(files: FileStore) {
       <I18nextProvider i18n={createI18n("en")}>
         <FileBrowser
           open
-          files={Promise.resolve(files)}
+          files={typeof files === "function" ? files : async () => files}
           onPick={(a) => picked.push(a)}
           onClose={() => {}}
         />
@@ -117,4 +117,21 @@ test("files that cannot be reached say so; trying again lists them", async () =>
     .toBeInTheDocument();
   await userEvent.click(dialog.getByRole("button", { name: "Try again" }));
   await expect.element(dialog.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+});
+
+test("trying again opens the files anew: an opening that failed is not awaited again", async () => {
+  let openings = 0;
+  const files = store();
+  render(async () => {
+    openings += 1;
+    if (openings === 1) throw new Error("offline");
+    return files;
+  });
+  const dialog = page.getByRole("dialog", { name: "Choose a file" });
+  await expect
+    .element(dialog.getByRole("alert").getByText("Your files could not be reached."))
+    .toBeInTheDocument();
+  await userEvent.click(dialog.getByRole("button", { name: "Try again" }));
+  await expect.element(dialog.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+  expect(openings).toBe(2);
 });

@@ -5,6 +5,7 @@
 import {
   ALL_RIGHTS,
   CalendarObject,
+  inlineFile,
   occurrencesBetween,
   timesOf,
   zonedTime,
@@ -1052,6 +1053,43 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(saved.master).toMatchObject({ summary: "Design review, v2", location: "Room 7" });
     expect(saved.master!.alarms.map((alarm) => alarm.description)).toEqual(["Theirs"]);
     expect(saved.serialize()).toContain("X-OTHER-CLIENT:kept\r\n");
+  });
+
+  test("an attachment taken off is found again as written: of two that read alike, the one picked (design D233)", async () => {
+    const { store, byName, rowOf } = await demo();
+    const row = await rowOf("Work", "demo-review");
+    const twin = (data: string) =>
+      `ATTACH;ENCODING=BASE64;VALUE=BINARY;FMTTYPE=text/plain;FILENAME=a.txt:${data}`;
+    // "hi" and "ho": alike as read (a.txt, text, 2 bytes), two files.
+    const ours = row.ics.replace(
+      "BEGIN:VALARM",
+      `${twin("aGk=")}\r\n${twin("aG8=")}\r\nBEGIN:VALARM`,
+    );
+    await store.saveFromServer(byName("Work").id, { href: row.href, etag: '"2"', ics: ours });
+    const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
+    const initial = formOf(target, timeZone, TODAY);
+    // Meanwhile another client wrote them the other way round.
+    const theirs = row.ics.replace(
+      "BEGIN:VALARM",
+      `${twin("aG8=")}\r\n${twin("aGk=")}\r\nBEGIN:VALARM`,
+    );
+    await store.saveFromServer(byName("Work").id, { href: row.href, etag: '"3"', ics: theirs });
+    // The user takes off the first as opened: "hi".
+    await saveForm(
+      store,
+      {
+        target,
+        initial,
+        form: { ...initial, attachments: initial.attachments!.slice(1) },
+        scope: "all",
+        untitled: "Reminder",
+      },
+      { now: NOW, uid: uids },
+    );
+    const saved = CalendarObject.parse((await rowOf("Work", "demo-review")).ics);
+    const left = inlineFile(saved, null, 0)!;
+    expect(saved.master!.attachments).toHaveLength(1);
+    expect(new TextDecoder().decode(left.bytes)).toBe("ho");
   });
 
   test("reminders of the user's own are written as VALARMs, another client's kept as they were (design D206)", async () => {

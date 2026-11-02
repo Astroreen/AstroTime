@@ -1,12 +1,13 @@
 // The edit dialog's attachments (design D233): each with its name, kind and
 // size and a button that takes it off, then "Add a link" and, for an account
 // whose server keeps files (Nextcloud's), "From your files" (design D234).
-// The others stay as written (foundation D229). Loaded with the edit dialog;
-// the file picker with its first opening.
+// The others stay as written (foundation D229). Loaded with the edit dialog,
+// the file picker with it: a chunk of its own, loaded from the editor's,
+// split the app's first chunks and cost the first load 0.3 KiB.
 import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
-import { useEffect, useId, useState, type ComponentProps } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
@@ -14,7 +15,7 @@ import { attachmentHref, attachmentText, typedLink } from "../calendar/attachmen
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
-import { deferred } from "./lazy.tsx";
+import { FilePicker } from "./file-picker.tsx";
 import { textButton } from "./sign-in-dialog.tsx";
 
 /** A new attachment as a row shows it: its `FILENAME`'s last part. */
@@ -25,12 +26,6 @@ const shown = (attachment: NewAttachment): Attachment => ({
   size: attachment.size ?? null,
   inline: false,
 });
-
-const FilePicker = deferred(
-  () => import("./file-picker.tsx"),
-  (module) => module.FilePicker,
-  (props: ComponentProps<typeof import("./file-picker.tsx").FilePicker>) => props.open,
-);
 
 /**
  * The account a calendar is in, where it may have files (foundation D231):
@@ -136,7 +131,7 @@ export function AttachmentsField({
             className={field}
           />
           <button type="button" className={textButton} disabled={!typed} onClick={add}>
-            {t("attachments.add")}
+            {t("alarm.custom.add")}
           </button>
         </div>
       ) : (

@@ -8,7 +8,7 @@ import type { FileStore, NewAttachment, RemoteFile } from "@astrotime/core";
 import type { Account } from "@astrotime/storage";
 import { accountFiles } from "@astrotime/sync/files";
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { attachmentText } from "../calendar/attachments.ts";
@@ -32,7 +32,7 @@ export function FilePicker({
   ...props
 }: Omit<Parameters<typeof FileBrowser>[0], "files"> & { account: Account }) {
   const { platform } = useAccounts();
-  const files = useMemo(
+  const files = useCallback(
     () => accountFiles({ http: platform.http, secrets: platform.secrets }, account),
     [account, platform],
   );
@@ -47,8 +47,8 @@ export function FileBrowser({
   onClose,
 }: {
   open: boolean;
-  /** The files, once opened; none when they cannot be. */
-  files: Promise<FileStore | null>;
+  /** Opens the files, again at each try; none when they cannot be. */
+  files: () => Promise<FileStore | null>;
   onPick: (attachment: NewAttachment) => void;
   onClose: () => void;
 }) {
@@ -60,7 +60,8 @@ export function FileBrowser({
     if (!open) return;
     let current = true;
     setListing({ state: "loading" });
-    files
+    // Each listing, "Try again"'s too, opens the files anew and asks the server again.
+    files()
       .then((opened) => {
         if (!opened) throw new Error("These files cannot be opened.");
         return opened.list(path);
@@ -86,7 +87,7 @@ export function FileBrowser({
           className={`${sheet} z-[150] sm:h-[min(36rem,calc(100dvh-2rem))] sm:w-[min(28rem,calc(100vw-2rem))]`}
         >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
-            <Dialog.Close className={dialogIcon} aria-label={t("files.close")}>
+            <Dialog.Close className={dialogIcon} aria-label={t("lazy.close")}>
               <CloseIcon className="size-5" />
             </Dialog.Close>
             <Dialog.Title className="min-w-0 flex-1 truncate text-title font-medium">
@@ -120,7 +121,7 @@ export function FileBrowser({
                   className={`${textButton} -ml-4`}
                   onClick={() => setTries(tries + 1)}
                 >
-                  {t("files.retry")}
+                  {t("lazy.retry")}
                 </button>
               </div>
             ) : listing.state === "loading" ? (

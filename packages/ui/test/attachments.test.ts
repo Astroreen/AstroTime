@@ -94,11 +94,15 @@ describe("a size", () => {
   });
 });
 
-test("a link typed: with its scheme or https:// before it, a web one with a host and a dot", () => {
+test("a link typed: http(s) as written, else https:// before it, a host with a port or no dot too", () => {
   expect(typedLink("example.org/minutes")).toBe("https://example.org/minutes");
   expect(typedLink("  http://example.org  ")).toBe("http://example.org/");
+  expect(typedLink("nas:8080/files/a.pdf")).toBe("https://nas:8080/files/a.pdf");
+  expect(typedLink("localhost")).toBe("https://localhost/");
+  expect(typedLink("nas/share")).toBe("https://nas/share");
   expect(typedLink("not a link")).toBeNull();
-  expect(typedLink("localhost")).toBeNull();
   expect(typedLink("javascript:alert(1)")).toBeNull();
+  expect(typedLink("mailto:me@example.org")).toBeNull();
+  expect(typedLink("ftp://example.org/f")).toBeNull();
   expect(typedLink("")).toBeNull();
 });

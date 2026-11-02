@@ -7,7 +7,7 @@ import type { HttpClient } from "@astrotime/caldav";
 import type { FileStore, SecretStore } from "@astrotime/core";
 import type { Account } from "@astrotime/storage";
 
-import { readSecret } from "./all.ts";
+import { readSecret } from "./secret.ts";
 
 /**
  * An account's files, opened with its saved credentials; none for the

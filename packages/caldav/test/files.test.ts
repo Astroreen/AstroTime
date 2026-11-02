@@ -86,3 +86,15 @@ test("a calendar home that is not Nextcloud's has no files", async () => {
   const { files } = serving("nextcloud-files-root.xml", "https://dav.example.com/astro/");
   expect(files).toBeNull();
 });
+
+test("a name whose percent-encoding is broken is shown as it came, not dropped", async () => {
+  const body = `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:response><d:href>/remote.php/dav/files/astrotime-test/50%25%20off%E0%A4.txt</d:href><d:propstat><d:prop><d:resourcetype/><oc:fileid>7</oc:fileid></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
+  const http: HttpClient = async (request) => ({
+    status: 207,
+    url: request.url,
+    header: () => null,
+    body,
+  });
+  const list = await filesOf(http, { username: "u", password: "p" }, HOME)!.list("/");
+  expect(list.map((file) => file.name)).toEqual(["50%25%20off%E0%A4.txt"]);
+});

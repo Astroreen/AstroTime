@@ -59,7 +59,12 @@ export function filesOf(
 function fileOf(entry: DavResponse, base: URL, own: string, root: string): RemoteFile | null {
   const pathname = new URL(entry.href, base).pathname;
   if (!pathname.startsWith(own)) return null;
-  const path = `/${decodeURIComponent(pathname.slice(own.length)).replace(/\/$/, "")}`;
+  const path = `/${pathname
+    .slice(own.length)
+    .split("/")
+    .map(decoded)
+    .join("/")
+    .replace(/\/$/, "")}`;
   const folder = children(entry.props["resourcetype"]).includes("collection");
   const type = folder ? null : text(entry.props["getcontenttype"]);
   const sizeText = text(entry.props["getcontentlength"]) ?? text(entry.props["size"]);
@@ -88,6 +93,15 @@ function fileOf(entry: DavResponse, base: URL, own: string, root: string): Remot
     size: folder ? null : size,
     attachment,
   };
+}
+
+/** A path's part decoded; as it came when it is no percent-encoding (a stray `%`). */
+function decoded(part: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return part;
+  }
 }
 
 /** `<oc:share-types><oc:share-type>3</oc:share-type>…`: the types, comma-separated, as Nextcloud Calendar writes them. */

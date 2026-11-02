@@ -18,6 +18,7 @@ import {
   wallClockIn,
   WEEKDAYS,
   zonedTime,
+  attachLines,
   type Alarm,
   type Attachment,
   type CalendarRights,
@@ -834,12 +835,13 @@ function againstCurrent(changes: ItemChanges, target: Target, object: CalendarOb
     const remove = found(changes.alarms.remove, target.item.alarms, held?.alarms ?? []);
     result = { ...result, alarms: { ...changes.alarms, remove } };
   }
-  // The same for attachments (design D233).
+  // The same for attachments, by what each is as written, every parameter
+  // and an inline file's bytes: two that read alike are two files (design D233).
   if (changes.attachments && changes.attachments.remove.length > 0) {
     const remove = found(
       changes.attachments.remove,
-      target.item.attachments,
-      held?.attachments ?? [],
+      attachLines(target.object, target.recurrenceId),
+      attachLines(object, target.recurrenceId),
     );
     result = { ...result, attachments: { ...changes.attachments, remove } };
   }

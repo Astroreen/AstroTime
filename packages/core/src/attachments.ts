@@ -6,6 +6,9 @@
 // `X-NC-FILE-ID`); `inline-file.ts` decodes an inline one.
 import ICAL from "ical.js";
 
+import type { CalendarObject } from "./calendar-object.ts";
+import { fromIcalTime, type ItemTime } from "./time.ts";
+
 /** An item's `ATTACH`. */
 export interface Attachment {
   /**
@@ -150,3 +153,29 @@ export function setAttachments(
     component.addProperty(property);
   }
 }
+
+/** The component of the item at `recurrenceId`: its exception, else the series'. */
+export function componentAt(
+  object: CalendarObject,
+  recurrenceId: ItemTime | null,
+): ICAL.Component | undefined {
+  const { master, exceptions } = object.components;
+  const id = recurrenceId && JSON.stringify(recurrenceId);
+  const exception =
+    id &&
+    exceptions.find((component) => {
+      const value = component.getFirstPropertyValue("recurrence-id");
+      return value instanceof ICAL.Time && JSON.stringify(fromIcalTime(value)) === id;
+    });
+  return exception || master || exceptions[0];
+}
+
+/**
+ * The item's `ATTACH`es as written, every parameter and an inline file's
+ * bytes: what tells two that read alike apart (an edit's removal found
+ * again in the item as stored now, design D233).
+ */
+export const attachLines = (object: CalendarObject, recurrenceId: ItemTime | null): string[] =>
+  (componentAt(object, recurrenceId)?.getAllProperties("attach") ?? []).map((property) =>
+    property.toICALString(),
+  );

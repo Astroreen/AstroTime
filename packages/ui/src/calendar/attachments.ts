@@ -105,16 +105,21 @@ export function attachmentText(
   return { name, about };
 }
 
-/** A web link typed: with its scheme, or `https://` before it; null when it is none. */
+/**
+ * A web link typed: with `http://` or `https://`, else `https://` before it,
+ * so a host and port (`nas:8080/files`) or a name with no dot (`nas`,
+ * `localhost`) is a link too; none for another scheme (`javascript:`,
+ * `mailto:`) or text with a space.
+ */
 export function typedLink(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed || /\s/.test(trimmed)) return null;
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // A scheme is a name, a colon and no port's digit after it.
+  const scheme = /^([a-z][a-z0-9+.-]*):(?!\d)/i.exec(trimmed)?.[1]?.toLowerCase();
+  if (scheme && scheme !== "http" && scheme !== "https") return null;
   try {
-    const url = new URL(withScheme);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".")
-      ? url.href
-      : null;
+    const url = new URL(scheme ? trimmed : `https://${trimmed}`);
+    return url.hostname ? url.href : null;
   } catch {
     return null;
   }
