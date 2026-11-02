@@ -488,7 +488,6 @@ export function CalendarScreen({
         weekNumbers,
         hour,
         landed: editing.landed,
-        onLanded: editing.onLanded,
         found: foundId,
       }}
     >
@@ -625,6 +624,10 @@ export function CalendarScreen({
               )}
               <main
                 ref={mainRef}
+                // The saved item's landing ran: it lands no more when drawn again (design D193).
+                onAnimationEnd={(event) => {
+                  if (event.animationName === "item-land") editing.onLanded();
+                }}
                 style={{ "--hour": `${hour}px` } as CSSProperties}
                 hidden={wideTasks}
                 aria-label={title}

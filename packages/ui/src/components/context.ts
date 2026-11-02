@@ -25,8 +25,6 @@ export interface CalendarContextValue {
   readonly weekNumbers: boolean;
   /** The occurrence just saved from the edit dialog, which lands with motion once (design D193). */
   readonly landed?: Landed | null;
-  /** Its landing ran: it lands no more when drawn again. */
-  readonly onLanded?: () => void;
   /** Pixels per hour of the time grid, as last pinched on this device (design D192). */
   readonly hour: number;
   /** The stored object a search jumped to, marked on the views (design D53). */
