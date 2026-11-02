@@ -261,7 +261,7 @@ test("the place search a deployment names, or none, in the page and its policy (
     expect(() => placesFrom({ ASTROTIME_PLACES_URL: wrong })).toThrow(/not a Photon address/);
   }
   expect(contentSecurityPolicy(undefined, "https://photon.example.org:8443/api/")).toContain(
-    "connect-src 'self' https://photon.example.org:8443;",
+    "connect-src 'self' https://photon.example.org:8443 https://en.wikipedia.org https://ru.wikipedia.org;",
   );
   const off = contentSecurityPolicy(undefined, null);
   expect([off.includes("connect-src 'self';"), off.includes("img-src 'self';")]).toEqual([
@@ -557,15 +557,15 @@ describe("the Content Security Policy (D110)", () => {
     expect(new Set(nonces).size).toBe(nonces.length);
   });
 
-  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons, and the places' (D178)", () => {
+  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons, and the places' (D178) with their photos' (design D221)", () => {
     expect(contentSecurityPolicy("n0nce").split("; ")).toEqual([
       "default-src 'none'",
       "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'nonce-n0nce'",
-      "connect-src 'self' https://photon.komoot.io",
+      "connect-src 'self' https://photon.komoot.io https://en.wikipedia.org https://ru.wikipedia.org",
       "worker-src 'self'",
       "manifest-src 'self'",
-      "img-src 'self' https://tile.openstreetmap.org",
+      "img-src 'self' https://tile.openstreetmap.org https://upload.wikimedia.org https://thumb.wikimedia.org",
       "base-uri 'none'",
       "form-action 'none'",
       "frame-ancestors 'none'",

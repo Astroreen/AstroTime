@@ -257,6 +257,10 @@
   .picture-card > img:not([data-shown]) {
     opacity: 0;
   }
+  /* A place's photo fills the card whole (design D220). */
+  .picture-card[data-photo] > img {
+    mask-image: none;
+  }
   .picture-card[data-done] > img {
     filter: grayscale(0.7);
     opacity: 0.55;

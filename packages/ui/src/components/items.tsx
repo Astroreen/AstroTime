@@ -4,7 +4,7 @@
 // that can change drags, a block by its edges too (design D111), and the
 // ghost a drag draws looks like it.
 import { wallClockOf, type Placed } from "@astrotime/core";
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 
 import { DRAFT, type Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
@@ -188,10 +188,13 @@ export function AgendaCard({
   entry,
   allDay,
   part,
+  ref,
 }: {
   entry: Entry;
   allDay: boolean;
   part: { index: number; total: number } | null;
+  /** The card, for one that may yet be drawn over a place's photo (design D220). */
+  ref?: Ref<HTMLDivElement>;
 }) {
   const { t, colorOf } = useCalendar();
   const timeOf = useItemTime();
@@ -201,6 +204,7 @@ export function AgendaCard({
   const name = label(entry, allDay, time);
   return (
     <div
+      ref={ref}
       role="listitem"
       data-draft={entry.objectId === DRAFT || undefined}
       aria-label={name}

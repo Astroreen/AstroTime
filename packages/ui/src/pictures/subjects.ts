@@ -54,11 +54,15 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
     "travel",
     [
       "flight*",
-      "fly",
-      "flying",
       "airport*",
-      "train",
-      "trains",
+      // "Train" alone is also to teach ("Train the new hire"): only with a trip's words.
+      "train to",
+      "train from",
+      "by train",
+      "night train",
+      "train station",
+      "train ride",
+      "train ticket*",
       "trip",
       "trips",
       "travel*",
@@ -107,9 +111,12 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "exam*",
       "lecture*",
       "lesson*",
-      "class",
-      "classes",
-      "study",
+      // "Class" and "study" alone are also "First class", "Case study":
+      // only as a lesson.
+      "class at",
+      "class with",
+      "study session",
+      "study group",
       "studying",
       "homework",
       "seminar*",
@@ -127,12 +134,11 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "контрольн*",
     ],
   ],
-  ["cinema", ["cinema*", "movie*", "film", "films", "imax", "кино*", "фильм*"]],
+  ["cinema", ["cinema*", "movie*", "imax", "кино*", "фильм*"]],
   [
     "music",
     [
       "concert*",
-      "gig",
       "music*",
       "rehearsal*",
       "choir",
@@ -220,7 +226,10 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "hikes",
       "hiking",
       "stroll*",
-      "park",
+      // "Park" alone is also to park a car: only as a place.
+      "in the park",
+      "to the park",
+      "park walk",
       "прогулк*",
       "прогуля*",
       "погулять",
@@ -238,7 +247,6 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
   [
     "shopping",
     [
-      "shop",
       "shopping",
       "groceries",
       "grocery",
@@ -335,10 +343,24 @@ const fits = (part: Part, word: string, folded: string) => {
   return part.prefix ? text.startsWith(part.text) : text === part.text;
 };
 
+/** Titles already read, the oldest forgotten first: every card asks as it is drawn. */
+const READ = new Map<string, Subject | null>();
+const READ_LIMIT = 1000;
+
 /** The subject an item with this title is illustrated with, if any (design D215). */
 export function subjectOf(title: string | null | undefined): Subject | null {
   if (!title) return null;
-  const words = title.match(WORD) ?? [];
+  const known = READ.get(title);
+  if (known !== undefined) return known;
+  const subject = read(title);
+  if (READ.size >= READ_LIMIT) READ.delete(READ.keys().next().value!);
+  READ.set(title, subject);
+  return subject;
+}
+
+function read(title: string): Subject | null {
+  // Composed first: a decomposed «й» or «ё» (NFD) would split its word at the mark.
+  const words = title.normalize("NFC").match(WORD) ?? [];
   if (words.length === 0) return null;
   const folded = words.map(foldForSearch);
   for (const [subject, parts] of PATTERNS) {

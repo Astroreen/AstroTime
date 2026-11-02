@@ -15,6 +15,7 @@ import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LANGUAGES } from "../i18n/index.ts";
+import { wikipediaOf } from "../places/photos.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
 import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
@@ -97,7 +98,8 @@ function SettingsGroups({
   /** Closes Settings before an account's dialog opens over it. */
   onLeave: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const spoken = i18n.resolvedLanguage ?? i18n.language;
   const { formats } = useCalendar();
   const { settings, change } = useSettings();
   const { platform, setSyncing } = useAccounts();
@@ -175,6 +177,17 @@ function SettingsGroups({
           checked={settings.monthBanners}
           onChange={(monthBanners) => change({ monthBanners })}
         />
+        {/* Only where the page reaches the network, as places (design D221). */}
+        {platform.places ? (
+          <Toggle
+            label={t("settings.pictures.placePhotos")}
+            checked={settings.placePhotos}
+            onChange={(placePhotos) => change({ placePhotos })}
+            hint={t("settings.pictures.placePhotos.hint", {
+              host: new URL(wikipediaOf(spoken)).host,
+            })}
+          />
+        ) : null}
       </Group>
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}

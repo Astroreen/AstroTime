@@ -125,3 +125,12 @@ export async function carryPictures(
   );
   return carried.filter((path) => path !== null);
 }
+
+/**
+ * Whether an answer for a picture is one to keep (design D219): the app's
+ * own (`basic`), and whole (200): never a partial one (206), an error, or a
+ * redirect's end.
+ */
+export function keepsPicture(answer: Pick<Response, "status" | "type">): boolean {
+  return answer.status === 200 && answer.type === "basic";
+}

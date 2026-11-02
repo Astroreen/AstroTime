@@ -62,6 +62,8 @@ export interface Settings {
   readonly illustrations: boolean;
   /** A picture of the season above each month of the Agenda (design D218). */
   readonly monthBanners: boolean;
+  /** A photo of an item's place from Wikipedia, where the platform reaches the network (design D221). */
+  readonly placePhotos: boolean;
   /** A burst of shapes when the user completes a task: on unless turned off (design D198). */
   readonly celebrate: boolean;
 }
@@ -80,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   places: true,
   illustrations: true,
   monthBanners: true,
+  placePhotos: true,
   celebrate: true,
 };
 
@@ -110,6 +113,7 @@ export function readSettings(stored: string | null): Settings {
     places: value.places !== false,
     illustrations: value.illustrations !== false,
     monthBanners: value.monthBanners !== false,
+    placePhotos: value.placePhotos !== false,
     celebrate: value.celebrate !== false,
   };
 }

@@ -35,6 +35,10 @@ export const PRESET_META = {
 export const PLACES = {
   photon: "https://photon.komoot.io/api/",
   tiles: "https://tile.openstreetmap.org/",
+  /** The Wikipedias a place's photo is looked up in, by the UI's language (design D221). */
+  wikipedias: { en: "https://en.wikipedia.org", ru: "https://ru.wikipedia.org" },
+  /** Where Wikimedia serves those photos from. */
+  photos: ["https://upload.wikimedia.org", "https://thumb.wikimedia.org"],
 } as const;
 
 /** What the page's `astrotime-places` tag says when the deployment turned places off. */

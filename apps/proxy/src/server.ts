@@ -29,9 +29,14 @@ export function contentSecurityPolicy(
   places: string | null = PLACES.photon,
 ): string {
   // Places on the map (D178): the Photon Location searches, the tiles of
-  // the place card's map; neither when the deployment turned them off.
-  const photon = places === null ? "" : ` ${new URL(places).origin}`;
-  const tiles = places === null ? "" : ` ${new URL(PLACES.tiles).origin}`;
+  // the place card's map, and the Wikipedias and Wikimedia a place's photo
+  // comes from (design D221); none when the deployment turned places off.
+  const origins = (urls: readonly string[]) =>
+    places === null ? "" : ` ${urls.map((url) => new URL(url).origin).join(" ")}`;
+  // What the page asks: the place search, and the Wikipedias a photo is looked up in.
+  const connect = origins(places === null ? [] : [places, ...Object.values(PLACES.wikipedias)]);
+  // What it draws: the map's tiles, and Wikimedia's photos.
+  const images = origins([PLACES.tiles, ...PLACES.photos]);
   return [
     // Nothing the app does not ask for below: no frames, objects, fonts or media.
     "default-src 'none'",
@@ -40,14 +45,14 @@ export function contentSecurityPolicy(
     // The built stylesheet, and the <style> elements Base UI adds, which carry the nonce.
     nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
     // SQLite's wasm, every CalDAV request through /dav-proxy/ (D39), and
-    // the place search, which never goes through the proxy (D178).
-    `connect-src 'self'${photon}`,
+    // the place search and a place photo's lookup, which never go through the proxy (D178).
+    `connect-src 'self'${connect}`,
     // The store's worker (packages/storage/src/web), and the service worker
     // that keeps the app's files for starting offline (D124).
     "worker-src 'self'",
     // The web app manifest and its icons, the page's icon among them (D124).
     "manifest-src 'self'",
-    `img-src 'self'${tiles}`,
+    `img-src 'self'${images}`,
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",

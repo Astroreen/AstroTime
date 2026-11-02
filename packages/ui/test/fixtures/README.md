@@ -23,3 +23,20 @@ The search asks for six places (`limit=6`); these were recorded asking for
 five. Nothing read depends on how many come, and the tests hand the answer
 over whatever the request asked, so they were not recorded again: two more
 requests to a service whose fair use the app keeps.
+
+## Wikipedia
+
+Answers of Wikipedia's API for a place's photo (`../place-photos.test.ts`,
+`apps/web/e2e/pictures.spec.ts`, `apps/web/e2e/built/csp.spec.ts`;
+docs/plans/design.md#D220). Recorded on 2026-11-02 by hand with `curl`,
+four requests, with a User-Agent naming AstroTime; pretty-printed,
+otherwise as Wikipedia sent them. Each search asked `generator=search`,
+`gsrlimit=3`, `prop=pageimages|coordinates`, `piprop=thumbnail|name`,
+`pithumbsize=960`, `pilicense=free` (the app asks `prop=pageimages` only).
+
+| File                            | Request                                                                                |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| `wikipedia-en-search.json`      | en: `gsrsearch=Brandenburger Tor nearcoord:1km,52.517,13.381`                          |
+| `wikipedia-ru-search.json`      | ru: `gsrsearch=Красная площадь nearcoord:1km,55.754,37.622`                            |
+| `wikipedia-en-search-none.json` | en: `gsrsearch=Kavine Pas Jona nearcoord:1km,54.687,25.28` (no pages)                  |
+| `wikipedia-en-imageinfo.json`   | en: `titles=File:Brandenburger_Tor_abends.jpg`, `prop=imageinfo`, `iiprop=extmetadata` |

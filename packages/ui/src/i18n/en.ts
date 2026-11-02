@@ -273,6 +273,10 @@ export const en = {
   "settings.pictures": "Pictures",
   "settings.pictures.illustrations": "Illustrations by an item's title",
   "settings.pictures.banners": "Month banners in the Agenda",
+  "settings.pictures.placePhotos": "Photos of places",
+  "settings.pictures.placePhotos.hint":
+    "A place's name and point (to about 100 m) go to {{host}} for its photo",
+  "pictures.photoBy": "Photo:",
   "settings.places": "Places",
   "settings.places.search": "Search places on the map",
   "settings.places.hint":
