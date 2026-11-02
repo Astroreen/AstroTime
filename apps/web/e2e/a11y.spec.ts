@@ -102,6 +102,13 @@ const today = (page: Page) => page.getByRole("list", { name: /Wednesday, Novembe
 async function show(page: Page, view: "day" | "3days" | "week" | "month" | "agenda") {
   const key = { day: "d", "3days": "x", week: "w", month: "m", agenda: "a" }[view];
   await page.locator("body").press(key);
+  // The new view itself, not today's items of the one before (still drawn
+  // until it commits): the audit then waits for the new view's fade (D154).
+  const shown = page.locator("main [data-current]");
+  const days = shown.getByRole("list", { name: /day, November \d+$/ });
+  if (view === "month") await expect(shown.locator('[data-view="month"]')).toBeVisible();
+  else if (view === "agenda") await expect(page.locator("main [data-agenda]")).toBeVisible();
+  else if (view !== "day") await expect(days).toHaveCount(view === "week" ? 7 : 3);
   await expect(today(page).getByRole("listitem").first()).toBeVisible();
 }
 

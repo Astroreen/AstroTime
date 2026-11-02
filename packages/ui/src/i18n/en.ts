@@ -301,7 +301,6 @@ export const en = {
   "details.guestsNote": "AstroTime shows guests; it does not send invitations.",
   "details.due": "Due {{time}}",
   "details.zone": "Set in the {{zone}} time zone",
-  "details.categories": "Tags: {{categories}}",
   "details.tags": "Tags",
   "details.parent": "Subtask of {{title}}",
   "details.subtasks": "Subtasks",

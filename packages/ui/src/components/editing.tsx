@@ -84,9 +84,10 @@ export interface EditingValue {
   reschedule(target: Target, times: ItemTimes): Promise<Rescheduled>;
   /**
    * Writes one change of an item (a task completed or starred) onto what the
-   * store holds now, telling the user when it did not land.
+   * store holds now, telling the user when it did not land; resolves to
+   * whether it landed.
    */
-  rewrite(target: Target, ics: (object: CalendarObject) => string): void;
+  rewrite(target: Target, ics: (object: CalendarObject) => string): Promise<boolean>;
 }
 
 export const EditingContext = createContext<EditingValue | null>(null);
@@ -223,12 +224,22 @@ export function useEditingState({
     // One notice at a time, in one place: the newest replaces the other.
     setNotice(null);
     setCopied(null);
-    void work.then(onChanged, (error: unknown) => {
-      const told = noticeOf(error, action);
-      if (told === null) return onChanged();
-      if (told === "failed" || told === "deleteFailed") console.error(error);
-      setNotice(told);
-    });
+    return work.then(
+      () => {
+        onChanged();
+        return true;
+      },
+      (error: unknown) => {
+        const told = noticeOf(error, action);
+        if (told === null) {
+          onChanged();
+          return true;
+        }
+        if (told === "failed" || told === "deleteFailed") console.error(error);
+        setNotice(told);
+        return false;
+      },
+    );
   };
   const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
     write(rewriteTarget(store, target, ics));
