@@ -972,8 +972,9 @@ I make it"; "sometimes an item's text is covered by another event".
   with a date start and a timed due (or the other way round) opens as the
   start is. Its due keeps its own kind (`dueKind`) until "All day" is
   switched: a due date after a timed start stays a date, its day alone in
-  the dialog, and a new start moves it by whole days; a timed due after a
-  date start keeps its time (foundation [D7](foundation.md#D7)).
+  the dialog, and a new start day moves it by whole days, a new start
+  time not at all; a timed due after a date start keeps its time and its
+  own zone (foundation [D7](foundation.md#D7)).
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
   - A task is **overdue**, and rolls over to today's "N undone tasks"

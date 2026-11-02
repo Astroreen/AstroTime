@@ -113,7 +113,8 @@ function split(time: ItemTime, zone: string | null): { date: string; time: strin
 
 /** The zone an item's times are edited in: its own, or the user's for UTC and dates. */
 function zoneOf(times: ItemTimes, timeZone: string): { zone: string | null; utc: boolean } {
-  const time = times.start ?? times.end;
+  // The first time with a clock: a timed due after a date start keeps its own zone (D7).
+  const time = [times.start, times.end].find((t) => t && t.type !== "date") ?? null;
   if (!time || time.type === "date") return { zone: timeZone, utc: false };
   if (time.type === "floating") return { zone: null, utc: false };
   if (time.timeZone === "UTC") return { zone: timeZone, utc: true };
@@ -263,7 +264,10 @@ const clockOf = (minutes: number) =>
  */
 export function withStartTime(given: Form, startTime: string): Form {
   const form = started(given);
-  if (form.allDay || !form.startDate || !form.endDate) return { ...form, startTime };
+  // A due date stays on its day when only the start's clock changes (design D160).
+  if (form.allDay || !form.startDate || !form.endDate || dueIsDate(form)) {
+    return { ...form, startTime };
+  }
   const days = daysBetween(form.startDate, form.endDate);
   const length = days * 1440 + minutesOf(form.endTime) - minutesOf(form.startTime);
   // No length (no DTEND) is a length too: the end moves with the start.

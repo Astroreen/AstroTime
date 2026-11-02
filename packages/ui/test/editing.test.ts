@@ -224,6 +224,22 @@ describe("the form", () => {
     expect(
       changesOf(timedStart, withStartDate(timedStart, "2026-11-21"), "Reminder").time?.end,
     ).toEqual({ type: "date", date: "2026-11-23" });
+    // Only the start's clock changed, past midnight too: the due date keeps its day.
+    expect(withStartTime({ ...timedStart, endTime: "10:00" }, "23:30")).toMatchObject({
+      startTime: "23:30",
+      endDate: "2026-11-22",
+    });
+    expect(changesOf(timedStart, withStartTime(timedStart, "00:15"), "Reminder").time?.end).toEqual(
+      { type: "date", date: "2026-11-22" },
+    );
+    // A timed due after a date start keeps its own zone when the times change (D7).
+    const york = parse(
+      "DTSTART;VALUE=DATE:20261120\r\nDUE;TZID=America/New_York:20261121T090000\r\n",
+    );
+    expect(york).toMatchObject({ zone: "America/New_York", endTime: "09:00", dueKind: "time" });
+    expect(changesOf(york, withStartDate(york, "2026-11-19"), "Reminder").time?.end).toEqual(
+      zonedTime("2026-11-20T09:00:00", "America/New_York"),
+    );
     // "All day" switched is both ends alike again.
     expect(withAllDay(timedStart, true)).not.toHaveProperty("dueKind");
     // A reminder added to a task with no time writes the start it counts from;
