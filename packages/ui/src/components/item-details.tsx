@@ -3,7 +3,8 @@
 // and how it repeats, where, its description with its links, its reminders,
 // its guests (shown, never invited: no iTIP), its calendar; a task's due and
 // subtasks, with complete and star (no status, priority, progress or tags,
-// design D162). Edit and delete show only where the calendar can be written.
+// design D162). Edit shows only where the calendar can be written; Delete,
+// "Make a copy" and "Copy to" are in a "⋯" menu (design D163).
 import {
   isDone,
   repeatOf,
@@ -33,13 +34,14 @@ import {
   EditIcon,
   NotesIcon,
   PeopleIcon,
+  MoreIcon,
   PlaceIcon,
   RepeatIcon,
   StarIcon,
   SubtasksIcon,
-  TrashIcon,
 } from "./icons.tsx";
 import { PlaceCard } from "./place-card.tsx";
+import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
@@ -58,6 +60,9 @@ export function ItemDetails({
   onClose,
   onEdit,
   onDelete,
+  onCopy,
+  onCopyTo,
+  canCopyTo,
   onComplete,
   onStar,
   onCopyFailed,
@@ -70,6 +75,12 @@ export function ItemDetails({
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** "Make a copy": a copy saved at once in the item's calendar (design D164). */
+  onCopy: () => void;
+  /** "Copy to": the edit dialog with a new item filled from this one. */
+  onCopyTo: () => void;
+  /** Whether any calendar takes a new item of this kind, for "Copy to" (D37). */
+  canCopyTo: boolean;
   onComplete: () => void;
   onStar: () => void;
   /** A place's address could not be copied: the notice says so (design D177). */
@@ -89,6 +100,9 @@ export function ItemDetails({
               related={related}
               onEdit={onEdit}
               onDelete={onDelete}
+              onCopy={onCopy}
+              onCopyTo={onCopyTo}
+              canCopyTo={canCopyTo}
               onComplete={onComplete}
               onStar={onStar}
               onCopyFailed={onCopyFailed}
@@ -113,6 +127,9 @@ function Body({
   related,
   onEdit,
   onDelete,
+  onCopy,
+  onCopyTo,
+  canCopyTo,
   onComplete,
   onStar,
   onCopyFailed,
@@ -123,6 +140,12 @@ function Body({
   related: { readonly parent: string | null; readonly subtasks: readonly string[] };
   onEdit: () => void;
   onDelete: () => void;
+  /** "Make a copy": a copy saved at once in the item's calendar (design D164). */
+  onCopy: () => void;
+  /** "Copy to": the edit dialog with a new item filled from this one. */
+  onCopyTo: () => void;
+  /** Whether any calendar takes a new item of this kind, for "Copy to" (D37). */
+  canCopyTo: boolean;
   onComplete: () => void;
   onStar: () => void;
   onCopyFailed: () => void;
@@ -133,6 +156,12 @@ function Body({
   // Each action only where the calendar's rights allow it (D37).
   const rights = rightsOf(calendar);
   const canDelete = deleteScopes(target, rights).length > 0;
+  // The actions menu (design D163): each where the rights allow it (D37).
+  const actions = [
+    ...(canDelete ? [{ value: "delete", label: t("details.delete") }] : []),
+    ...(rights.create ? [{ value: "copy", label: t("details.copy") }] : []),
+    ...(canCopyTo ? [{ value: "copyTo", label: t("details.copyTo") }] : []),
+  ];
   const title = item.summary?.trim() || t("item.untitled");
   const times = timesOf(object, target.recurrenceId);
   const rule = repeatOf(object);
@@ -159,16 +188,16 @@ function Body({
             <EditIcon className="size-5" />
           </button>
         )}
-        {canDelete && (
-          <button
-            type="button"
+        {actions.length > 0 && (
+          <MenuButton
+            label={t("details.more")}
+            icon={<MoreIcon className="size-5" />}
             className={dialogIcon}
-            aria-label={t("details.delete")}
-            title={t("details.delete")}
-            onClick={onDelete}
-          >
-            <TrashIcon className="size-5" />
-          </button>
+            options={actions}
+            onChoose={(action) =>
+              action === "delete" ? onDelete() : action === "copy" ? onCopy() : onCopyTo()
+            }
+          />
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">

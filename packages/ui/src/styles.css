@@ -186,6 +186,13 @@
       0 0 0 2px var(--color-canvas),
       0 0 0 4px var(--color-accent);
   }
+  /* The edit dialog's item, as its form says, raised over the others (design D155). */
+  [data-draft] {
+    z-index: 60 !important;
+    box-shadow:
+      0 0 0 2px var(--color-canvas),
+      0 6px 18px rgb(0 0 0 / 0.4);
+  }
   /*
    * Dragging (design D111): an item that drags selects no text and opens no
    * menu on a long press; while it is held, it stays dimmed where it was, and

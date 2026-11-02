@@ -84,7 +84,27 @@ function parse(ics: string): CalendarObject | null {
   }
 }
 
-function expand(object: CalendarObject, row: StoredObject, range: Range): Entry[] {
+/** The stored object's id a draft's entries carry, which no stored object has (design D155). */
+export const DRAFT = "draft";
+
+/**
+ * The edit dialog's draft as the views take it: what it does to their
+ * entries, made in the editor's own chunk, so nothing of it loads before the
+ * dialog does (foundation D145).
+ */
+export interface DrawnDraft {
+  /** Its times, so a view brings it into sight when they change, not with each letter typed. */
+  readonly when: string;
+  /** The entries of `range` with the draft drawn in. */
+  readonly apply: (entries: readonly Entry[], range: Range) => readonly Entry[];
+}
+
+/** The entries of an object's occurrences in `range`, as the views draw them; none for a series too dense. */
+export function expand(
+  object: CalendarObject,
+  row: Pick<StoredObject, "id" | "calendarId">,
+  range: Range,
+): Entry[] {
   let occurrences: Occurrence[];
   try {
     occurrences = occurrencesBetween(object, range);

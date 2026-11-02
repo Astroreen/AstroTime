@@ -92,6 +92,21 @@ test.describe("on a wide screen", () => {
         .filter(({ where }) => where === "agenda")
         .map(({ frames }) => JSON.parse(frames)[0].transform),
     ).toEqual(["translateY(-24px)"]);
+    // Scrolled on, the same day picked again slides in again.
+    await page.locator("[data-agenda]").evaluate((list) => {
+      const scroller = list.parentElement!;
+      scroller.scrollTop += 2000;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    await expect(page.getByRole("main", { name: /December|November/ })).toBeVisible();
+    await page.getByRole("button", { name: /, choose a date$/ }).click();
+    await page.getByRole("button", { name: "Monday, November 2", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(
+      (await taken())
+        .filter(({ where }) => where === "agenda")
+        .map(({ frames }) => JSON.parse(frames)[0].transform),
+    ).toEqual(["translateY(-24px)"]);
   });
 
   test.describe("with reduced motion", () => {

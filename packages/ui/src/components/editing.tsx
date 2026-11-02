@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   calendarsFor,
+  copyOf,
   deleteScopes,
   deleteTarget,
   firstCalendarFor,
@@ -35,6 +36,7 @@ import {
   RefusedError,
   rewriteTarget,
   saveChanges,
+  saveCopy,
   saveForm,
   scopesFor,
   scopesForTimes,
@@ -43,9 +45,10 @@ import {
   type Target,
 } from "../calendar/editing.ts";
 import { liveQuery, whileShown } from "../calendar/live.ts";
+import type { DrawnDraft } from "../calendar/query.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
-import { ChangeNotice } from "./change-notice.tsx";
+import { ChangeNotice, CopyNotice } from "./change-notice.tsx";
 import { ItemDetails } from "./item-details.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { ItemEditor } from "./lazy.tsx";
@@ -126,6 +129,8 @@ interface Editing {
   readonly target: Target | null;
   readonly initial: Form | null;
   readonly state: EditorState;
+  /** "Copy to": the copy's iCalendar, which `initial` is the form of (design D164). */
+  readonly base?: string;
 }
 
 export function useEditingState({
@@ -154,6 +159,9 @@ export function useEditingState({
 }) {
   const { t } = useTranslation();
   const [details, setDetails] = useState<Target | null>(null);
+  // The edit dialog's item as its form says now, which the editor makes in
+  // its own chunk and the views draw (design D155).
+  const [draft, setDraft] = useState<DrawnDraft | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [asking, setAsking] = useState<ScopeRequest | null>(null);
   const [related, setRelated] = useState<{ parent: string | null; subtasks: string[] }>({
@@ -204,12 +212,17 @@ export function useEditingState({
   const firstFor = (kind: "event" | "task") =>
     firstCalendarFor(calendars, kind, hidden)?.id ?? null;
   /** The calendar the item being edited was in; none for a new item. */
-  const fromOf = (current: Editing) => byId(current.initial?.calendarId);
+  const fromOf = (current: Editing) =>
+    current.target ? byId(current.initial?.calendarId) : undefined;
 
   const [notice, setNotice] = useState<Notice | null>(null);
+  /** The copy "Make a copy" made, whose notice opens it (design D164). */
+  const [copied, setCopied] = useState<Target | null>(null);
   /** A change made outside the edit dialog; the user is told when it did not land (D99). */
   const write = (work: Promise<unknown>, action: "change" | "delete" = "change") => {
+    // One notice at a time, in one place: the newest replaces the other.
     setNotice(null);
+    setCopied(null);
     void work.then(onChanged, (error: unknown) => {
       const told = noticeOf(error, action);
       if (told === null) return onChanged();
@@ -330,6 +343,7 @@ export function useEditingState({
           scope,
           untitled: t("edit.untitledReminder"),
           hidden,
+          ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
           now: Date.now(),
@@ -368,6 +382,43 @@ export function useEditingState({
       target: details,
       initial: form,
       state: { existing: true, form, problem: null, saving: false },
+    });
+  };
+
+  const writes = () => ({ now: Date.now(), uid: () => crypto.randomUUID() });
+
+  /** "Make a copy" (design D164): saved at once, then a notice that opens it. */
+  const copy = () => {
+    if (!details) return;
+    const target = details;
+    setDetails(null);
+    setNotice(null);
+    saveCopy(store, target, writes()).then(
+      (made) => {
+        setCopied(made);
+        onChanged();
+      },
+      (error: unknown) => {
+        const told = noticeOf(error, "change");
+        if (told === "failed") console.error(error);
+        setCopied(null);
+        setNotice(told);
+      },
+    );
+  };
+
+  /** "Copy to" (design D164): the edit dialog for a new item, every field this one's. */
+  const copyTo = () => {
+    if (!details) return;
+    const { ics, target } = copyOf(details, writes());
+    const own = writable(target.item.kind).some((c) => c.id === target.calendarId);
+    const form = formOf(target, timeZone, today);
+    const initial = own ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
+    setEditing({
+      target: null,
+      initial,
+      base: ics,
+      state: { existing: false, copy: true, form: initial, problem: null, saving: false },
     });
   };
 
@@ -422,27 +473,43 @@ export function useEditingState({
   const dialogs = (
     <>
       <ItemDetails
-        target={details}
+        // Hidden while its item is edited, so the draft behind shows (design
+        // D155); back when the edit dialog goes.
+        target={editing ? null : details}
         calendar={calendar}
         color={details ? colorOf(details) : ""}
         related={related}
         onClose={() => setDetails(null)}
         onEdit={edit}
         onDelete={remove}
+        onCopy={copy}
+        onCopyTo={copyTo}
+        canCopyTo={details !== null && writable(details.item.kind).length > 0}
         onComplete={complete}
         onStar={star}
         onCopyFailed={() => setNotice("copyFailed")}
       />
       <ItemEditor
         state={shownState}
+        target={editing?.target ?? null}
         calendars={shownCalendars}
         onChange={change}
+        onDraft={setDraft}
         onSave={save}
         onClose={() => setEditing(null)}
       />
       <ScopeDialog request={asking} onClose={() => setAsking(null)} />
       <ChangeNotice notice={notice} onClose={() => setNotice(null)} />
+      <CopyNotice
+        copied={copied}
+        onOpen={(target) => {
+          setCopied(null);
+          setDetails(target);
+        }}
+        onClose={() => setCopied(null)}
+      />
     </>
   );
-  return { value, dialogs };
+  // Gone with the dialog, whether or not the editor said so yet.
+  return { value, dialogs, draft: editing ? draft : null };
 }

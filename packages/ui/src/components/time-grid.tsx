@@ -12,6 +12,7 @@ import {
   type CSSProperties,
   type RefObject,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
 } from "react";
 
@@ -27,6 +28,8 @@ import { UndoneChip } from "./undone-chip.tsx";
 
 /** Past this many rows the strip folds to two and "+N" (design D51). */
 const STRIP_ROWS = 3;
+/** Milliseconds within which two presses can be one double click. */
+const DOUBLE_CLICK = 1000;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 export interface TimeGridProps {
@@ -110,22 +113,33 @@ export function TimeGrid(props: TimeGridProps) {
   const ghost = drag.ghost;
   // A tap on an empty slot creates an event there, an hour long, from the
   // half hour tapped (Google); a press to size it comes with dragging.
-  // The slot this grid's last click was on, so a double click's second
-  // click makes nothing more than its first (design D154).
-  const clicked = useRef<string | null>(null);
+  // What this grid's last two presses were on: an empty slot (its day and
+  // half hour) or an item, so a double click's second click knows where its
+  // first one went (design D154).
+  const presses = useRef<{ readonly spot: string; readonly at: number }[]>([]);
+  const spotOf = (column: Element, y: number) =>
+    `${column.getAttribute("data-day")}/${Math.floor(((y - column.getBoundingClientRect().top) / HOUR) * 2) * 30}`;
+  const pressed = (event: PointerEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const column = target?.closest("[data-day]");
+    const spot =
+      !column || target?.closest("[role=listitem], button")
+        ? "item"
+        : spotOf(column, event.clientY);
+    presses.current = [...presses.current.slice(-1), { spot, at: event.timeStamp }];
+  };
   const createAt = (day: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!editing.canCreate || target?.closest("[role=listitem], button")) return;
-    const top = event.currentTarget.getBoundingClientRect().top;
-    const slot = Math.floor(((event.clientY - top) / HOUR) * 2) * 30;
-    const spot = `${day}/${slot}`;
-    const last = clicked.current;
-    clicked.current = spot;
+    const spot = spotOf(event.currentTarget, event.clientY);
+    const slot = Number(spot.slice(day.length + 1));
     // A double click's second click on the slot its first took, or after a
-    // first that was not on this grid (a closing month picker's day, whose
-    // period this grid is: design D136), creates nothing; one on another
-    // slot of this grid is a click of its own.
-    if (event.detail > 1 && (last === null || last === spot)) return;
+    // first press that was not on this grid at all (a closing month picker's
+    // day, whose period this grid is: design D136), creates nothing; one
+    // after a press on another slot or on an item is a click of its own.
+    const [before, now] = presses.current.slice(-2);
+    const first = before && now && now.at - before.at < DOUBLE_CLICK ? before.spot : null;
+    if (event.detail > 1 && (first === null || first === spot)) return;
     editing.create("event", { day, at: Math.max(0, Math.min(slot, 23 * 60 + 30)) });
   };
 
@@ -173,7 +187,11 @@ export function TimeGrid(props: TimeGridProps) {
           // Room under midnight, so the "+" button never hides the last hour (design D132).
           className={`relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable] ${floating ? "pb-20" : ""}`}
         >
-          <div className="grid" style={{ ...columns, height: 24 * HOUR }}>
+          <div
+            className="grid"
+            style={{ ...columns, height: 24 * HOUR }}
+            onPointerDownCapture={pressed}
+          >
             <div aria-hidden="true" className="relative">
               {HOURS.slice(1).map((hour) => (
                 <span
@@ -193,6 +211,7 @@ export function TimeGrid(props: TimeGridProps) {
                 }}
                 role="list"
                 aria-label={formats.fullDate(column.day)}
+                data-day={column.day}
                 className="relative"
                 onClick={createAt(column.day)}
                 onPointerDown={drag.pressEmpty(column.day)}

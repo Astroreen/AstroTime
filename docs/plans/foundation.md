@@ -1820,7 +1820,10 @@ optimization is lacking").
     so once trying again has failed, Reload is the dialog's first action,
     "Reload AstroTime to finish updating" ([D146](#D146)).
     Signing in and the sync stack stay in the first load
-    ([Deferred](#deferred)).
+    ([Deferred](#deferred)). _Since [design D155](design.md#D155):_ the
+    Agenda loads the same way, with its first showing (its notice's "Close"
+    leaves it for the Week), and the edit dialog's draft is made in the
+    editor's chunk, so neither is in the first load.
   - **A budget CI holds**: `scripts/bundle-budget.ts`, after the web build,
     reads Vite's manifest (`build.manifest`) for the chunks the page loads
     at once and fails when they pass 340 KiB gzipped (318 at D145) or

@@ -12,6 +12,8 @@ export {
 export { wallClockIn, wallClockOf, zonedTime, zonedToEpoch, type ItemTime } from "./time.ts";
 export { completeTask, starTask } from "./task-edits.ts";
 export {
+  copyItem,
+  createFromCopy,
   createItem,
   deleteItem,
   editItem,

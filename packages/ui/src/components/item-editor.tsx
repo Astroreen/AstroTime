@@ -33,7 +33,9 @@ import {
   type Form,
   type Problem,
   type RepeatChoice,
+  type Target,
 } from "../calendar/editing.ts";
+import type { DrawnDraft } from "../calendar/query.ts";
 import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
 import { defaultColorOf, useSettings, type DefaultColors } from "../settings.ts";
 import { useCalendar } from "./context.ts";
@@ -53,10 +55,13 @@ import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
+import { useDraft, useDraftAside } from "./draft-aside.ts";
 
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
   readonly existing: boolean;
+  /** A new item filled from another ("Copy to", design D164): its kind stays. */
+  readonly copy?: boolean;
   readonly form: Form;
   /** Why the form cannot be saved, or why saving it did not work. */
   readonly problem:
@@ -75,6 +80,12 @@ const field =
   "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 /** A dropdown's button in the form, as a field (design D167). */
 const fieldButton = "h-10 w-full min-w-0 rounded-lg bg-canvas pr-2 pl-3 ring-1 ring-line";
+/** Where the dialog stands: beside the draft on a wide screen, or in the middle (design D155). */
+const ASIDE = {
+  middle: "",
+  right: "lg:right-6 lg:left-auto lg:translate-x-0",
+  left: "lg:left-6 lg:translate-x-0",
+} as const;
 /** A dropdown's label above it. */
 const fieldLabel = "text-small text-ink-muted";
 
@@ -84,6 +95,8 @@ export function ItemEditor({
   onChange,
   onSave,
   onClose,
+  target,
+  onDraft,
 }: {
   state: EditorState | null;
   /** The calendars the item may be saved in. */
@@ -91,10 +104,17 @@ export function ItemEditor({
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
+  /** The item edited; `null` for a new one. */
+  target: Target | null;
+  /** The item as the form says now, for the views to draw (design D155). */
+  onDraft: (draft: DrawnDraft | null) => void;
 }) {
   const { t } = useTranslation();
   const formId = useId();
   const form = state?.form;
+  useDraft(target, form ?? null, onDraft);
+  // Beside the item it makes, on a wide screen (design D155).
+  const aside = useDraftAside(state !== null);
   const title = form
     ? t(
         state.existing
@@ -109,8 +129,12 @@ export function ItemEditor({
   return (
     <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <DialogBackdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}>
+        <DialogBackdrop
+          className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "lg:bg-black/20" : ""}`}
+        />
+        <DialogPopup
+          className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))] ${ASIDE[aside ?? "middle"]}`}
+        >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>
               <CloseIcon className="size-5" />
@@ -138,6 +162,7 @@ export function ItemEditor({
               <Fields
                 form={form}
                 existing={state.existing}
+                copy={state.copy ?? false}
                 calendars={calendars}
                 onChange={onChange}
               />
@@ -160,11 +185,13 @@ export function ItemEditor({
 function Fields({
   form,
   existing,
+  copy,
   calendars,
   onChange,
 }: {
   form: Form;
   existing: boolean;
+  copy: boolean;
   calendars: readonly Calendar[];
   onChange: (form: Form) => void;
 }) {
@@ -179,7 +206,7 @@ function Fields({
   const event = form.kind === "event";
   return (
     <div className="flex flex-col gap-4">
-      {!existing && (
+      {!existing && !copy && (
         <div role="radiogroup" aria-label={t("edit.kind")} className="flex gap-2">
           {(["event", "task"] as const).map((kind) => (
             <button

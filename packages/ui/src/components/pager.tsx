@@ -18,15 +18,16 @@ export interface Page {
 
 /** Material 3's emphasized decelerate: quick out of the gate, a soft landing. */
 const SETTLE = "cubic-bezier(0.05, 0.7, 0.1, 1)";
-const SLIDE = "cubic-bezier(0.2, 0, 0, 1)";
+export const SLIDE = "cubic-bezier(0.2, 0, 0, 1)";
 /** Milliseconds: a swipe let go settles in at most this, a step slides in, a view fades in. */
 const SETTLE_MS = 260;
-const SLIDE_MS = 220;
+export const SLIDE_MS = 220;
 const FADE_MS = 160;
 /** Pixels a stepped period slides in from. */
 const SLIDE_PX = 40;
 
-const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** `prefers-reduced-motion`: every move a swap. */
+export const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function Pager<P extends Page>({
   view,
@@ -48,8 +49,16 @@ export function Pager<P extends Page>({
   const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const shown = useRef<HTMLDivElement>(null);
-  /** The track's settling after a swipe, which a step it makes ends. */
-  const settling = useRef<{ animation: Animation; step: 1 | -1 | 0 } | null>(null);
+  /**
+   * The track's settling after a swipe, which only its own step ends: the
+   * period it goes to (`target`), in the view it began in.
+   */
+  const settling = useRef<{
+    animation: Animation;
+    step: 1 | -1 | 0;
+    target: string;
+    view: string;
+  } | null>(null);
   /** The finger's last offset, where a settle starts from. */
   const offset = useRef(0);
   const last = useRef<{ view: string; first: string } | null>(null);
@@ -62,13 +71,16 @@ export function Pager<P extends Page>({
     const first = current.days[0]!;
     last.current = { view, first };
     const swiped = settling.current;
-    if (swiped && swiped.step !== 0) {
+    if (swiped) {
       settling.current = null;
       swiped.animation.cancel();
-      return;
+      // The swipe's own step: the track is under it already.
+      if (swiped.step !== 0 && swiped.view === view && swiped.target === current.key) return;
+      // Anything else came meanwhile (a key, Today, another view): the
+      // settle gives way, and the change moves as it would.
     }
     const element = shown.current;
-    if (!was || !element || reduced()) return;
+    if (!was || !element || reducedMotion()) return;
     if (was.view !== view) {
       element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: "ease-out" });
     } else if (was.first !== first) {
@@ -95,7 +107,7 @@ export function Pager<P extends Page>({
     const element = track.current;
     const width = root.current?.clientWidth ?? 0;
     const neighbour = step === 1 ? next : step === -1 ? previous : null;
-    if (!element || (step !== 0 && !neighbour) || reduced()) {
+    if (!element || (step !== 0 && !neighbour) || reducedMotion()) {
       if (element) element.style.transform = "";
       if (step !== 0) onStep(step);
       return;
@@ -109,7 +121,7 @@ export function Pager<P extends Page>({
       easing: SETTLE,
       fill: "forwards",
     });
-    settling.current = { animation, step };
+    settling.current = { animation, step, target: (neighbour ?? current).key, view };
     animation.onfinish = () => {
       // The step drawn at once, so the track is back under the new period
       // in this frame; a step that changed no period (a parent that would
@@ -130,7 +142,7 @@ export function Pager<P extends Page>({
       if (top !== undefined) for (const scroller of scrollers) scroller.scrollTop = top;
     },
     onMove(dx) {
-      if (!settling.current && !reduced()) move(dx);
+      if (!settling.current && !reducedMotion()) move(dx);
     },
     onEnd(dx, dy, velocity) {
       if (settling.current) return;
