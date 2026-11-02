@@ -23,6 +23,17 @@ function owned(target: EventTarget | null): boolean {
 }
 
 /**
+ * An hour's height as drawn and kept: within the bounds, to a tenth of a
+ * pixel. Drawn as it is kept, so the time under the fingers does not move
+ * when the zoom ends.
+ */
+export const keptHour = (px: number) => Math.round(hourIn(px) * 10) / 10;
+
+/** The scroll that keeps the time `offset` px down the grid there, from `from` to `to` px an hour. */
+export const anchored = (scrollTop: number, offset: number, from: number, to: number) =>
+  ((scrollTop + offset) / from) * to - offset;
+
+/**
  * Lets the time grids in `main` be pinched; `hour` is the height drawn now,
  * `commit` keeps one a zoom ended on. Returns what detaches it.
  */
@@ -43,20 +54,19 @@ export function zoomable(
   /** Draws `next` px an hour, keeping the time at `y` (a viewport's y) where it is. */
   const zoomTo = (next: number, scroller: HTMLElement, y: number) => {
     const from = current();
-    const to = hourIn(next);
+    const to = keptHour(next);
     if (to === from) return;
     const offset = y - scroller.getBoundingClientRect().top;
-    const hours = (scroller.scrollTop + offset) / from;
     live = to;
     main.style.setProperty("--hour", `${to}px`);
-    scroller.scrollTop = hours * to - offset;
+    scroller.scrollTop = anchored(scroller.scrollTop, offset, from, to);
   };
   const end = () => {
     clearTimeout(settle);
     if (live === null) return;
     const ended = live;
     live = null;
-    commit(Math.round(ended * 10) / 10);
+    commit(ended);
   };
 
   const wheel = (event: WheelEvent) => {

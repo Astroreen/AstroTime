@@ -1615,7 +1615,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   change, with no React render: the grid, its hours, tiles, items, the
   current time and a drag's ghost are drawn with `calc(var(--hour) * …)`,
   and each step starts from the height drawn, not the one React last
-  rendered. When the fingers go, the keys are pressed or the wheel rests
+  rendered. It is drawn as it is kept, to a tenth of a pixel
+  (`keptHour`), so the time under the fingers does not move when the
+  zoom ends. When the fingers go, the keys are pressed or the wheel rests
   for a quarter of a second, the height is kept, and the views render once
   with it: what a block's text fits ([D153](#D153)), where a drag lands and
   where a tap creates follow it. The handling is a chunk of its own
@@ -1630,7 +1632,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   kept, the days not swiped; two fingers closing in the Day view, held at
   24 px, the day 576 px tall). Tried by hand on Android 16's Chrome in an
   emulator, a real two-finger pinch to twice the size: the hours twice as
-  tall about the pinch, the page not zoomed, no swipe.
+  tall about the pinch, the page not zoomed, no swipe;
+  `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
+  time under the fingers kept through steps and after).
 
 ### Decided in round 4: the editor
 
