@@ -285,7 +285,8 @@ export function TasksScreen({
   // page's first "day" carries, as the Pager compares them to slide.
   const coarse = useMediaQuery("(any-pointer: coarse)");
   const tabIds = useId();
-  const tabId = (list: string) => `${tabIds}${lists.findIndex((each) => each.id === list)}`;
+  // A calendar's id holds no space (the store's UUID), so it can be part of a tab's.
+  const tabId = (list: string) => tabIds + list;
   // Never -1 where it is used: `selected` is one of `lists` whenever it is
   // not null, and the Pager is drawn only then.
   const index = lists.findIndex((list) => list.id === selected);
