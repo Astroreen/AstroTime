@@ -200,7 +200,7 @@ const CALENDARS: readonly DemoCalendar[] = [
             RRULE: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
           },
         ),
-        // With Personal's call at 11:15, three that overlap and cascade (D15).
+        // With Personal's call at 11:15, three that overlap (D15, design D153).
         // With a place, a description with a link, guests and a reminder: the details show them all.
         event(
           "demo-review",

@@ -14,10 +14,16 @@ export interface LayoutOptions {
   readonly chipMinutes?: number;
   /** The shortest a block is drawn, so a 5-minute event can still be hit. */
   readonly minBlockMinutes?: number;
-  /** How far each cascaded item is shifted right, as a fraction of the column (D15). */
+  /** How far an item drawn over others is shifted in per item under it, as a fraction of its column (D15, design D153). */
   readonly cascadeStep?: number;
-  /** Past this many items at once, a cluster switches to equal columns (D15). */
+  /** How many items may be stacked over one another at once; one more takes a column of its own (design D153). */
   readonly maxCascade?: number;
+  /**
+   * The minutes at an item's top its title needs (two lines): an item drawn
+   * over another starts at least this late after it, or takes a column
+   * beside it (D15, design D153).
+   */
+  readonly titleMinutes?: number;
 }
 
 /** A timed item placed in one day's column. */
@@ -36,6 +42,12 @@ export interface Placed {
   readonly width: number;
   /** Paint order: higher is drawn on top. */
   readonly layer: number;
+  /**
+   * Minutes from its top that no item drawn over it covers: its whole
+   * length, or at least `titleMinutes` where another starts over it. Its
+   * text keeps to them (design D153).
+   */
+  readonly room: number;
 }
 
 export interface DayLayout {
@@ -154,9 +166,10 @@ export function layoutDay(
     minBlockMinutes = 15,
     cascadeStep = 0.15,
     maxCascade = 3,
+    titleMinutes = 45,
   } = options;
   const allDay: Occurrence[] = [];
-  const items: Omit<Placed, "left" | "width" | "layer">[] = [];
+  const items: Item[] = [];
 
   for (const occurrence of occurrences) {
     if (isAllDay(occurrence, timeZone)) {
@@ -199,7 +212,7 @@ export function layoutDay(
 
   return {
     allDay: sortAllDay(allDay, timeZone),
-    timed: placeOverlaps(items, cascadeStep, maxCascade),
+    timed: placeOverlaps(items, { step: cascadeStep, maxCascade, title: titleMinutes }),
   };
 }
 
@@ -238,24 +251,26 @@ function sortAllDay(occurrences: Occurrence[], timeZone: string): Occurrence[] {
   );
 }
 
+/** A timed item before its place across the column. */
+type Item = Omit<Placed, "left" | "width" | "layer" | "room">;
+
+interface Rules {
+  readonly step: number;
+  readonly maxCascade: number;
+  readonly title: number;
+}
+
 /**
- * D15: items that overlap, directly or through others, form a cluster. In a
- * cluster an item that starts later (or, starting together, is shorter) is
- * drawn on top, shifted right by one step per item under it that it
- * overlaps. When more than `maxCascade` items overlap at one moment the
- * cascade would hide too much, and the cluster switches to equal columns.
+ * D15 as design D153 has it: items that overlap, directly or through
+ * others, form a cluster, laid out so no item's title is covered.
  */
-function placeOverlaps(
-  items: Omit<Placed, "left" | "width" | "layer">[],
-  step: number,
-  maxCascade: number,
-): Placed[] {
+function placeOverlaps(items: Item[], rules: Rules): Placed[] {
   const sorted = items.toSorted((a, b) => a.top - b.top || b.bottom - b.top - (a.bottom - a.top));
   const placed: Placed[] = [];
   let cluster: typeof sorted = [];
   let clusterEnd = -1;
   const flush = () => {
-    if (cluster.length > 0) placed.push(...placeCluster(cluster, step, maxCascade));
+    if (cluster.length > 0) placed.push(...placeCluster(cluster, rules));
     cluster = [];
   };
   for (const item of sorted) {
@@ -271,39 +286,63 @@ function overlap(a: { top: number; bottom: number }, b: { top: number; bottom: n
   return a.top < b.bottom && b.top < a.bottom;
 }
 
-function placeCluster(
-  cluster: Omit<Placed, "left" | "width" | "layer">[],
-  step: number,
-  maxCascade: number,
-): Placed[] {
-  const depth: number[] = [];
-  for (const [i, item] of cluster.entries()) {
-    let d = 0;
-    for (let j = 0; j < i; j++) if (overlap(cluster[j]!, item)) d = Math.max(d, depth[j]! + 1);
-    depth.push(d);
-  }
-  // The most items at one moment: checked at every start.
-  const peak = Math.max(
-    ...cluster.map((a) => cluster.filter((b) => b.top <= a.top && a.top < b.bottom).length),
-  );
-  // Too many at once, or a chain so deep the cascade would run off the
-  // column and stack items on one another: equal columns instead.
-  if (peak > maxCascade || Math.max(...depth) * step > 1 - step) {
-    // Each item takes the first column free at its start.
-    const columns: number[] = [];
-    const column = cluster.map((item) => {
-      let index = columns.findIndex((bottom) => bottom <= item.top);
-      if (index < 0) index = columns.push(0) - 1;
-      columns[index] = item.bottom;
-      return index;
-    });
-    const width = 1 / columns.length;
-    return cluster.map((item, i) => ({ ...item, left: column[i]! * width, width, layer: i }));
-  }
+/** Rounded so a cascade of 0.15 steps reads 0.45, not 0.44999… */
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
+
+/**
+ * One cluster, in time order (the longer first when they start together),
+ * each item on top of those before it. An item takes, in this order:
+ * 1. the first column where nothing overlaps it;
+ * 2. else the first column where it starts at least `title` minutes after
+ *    every item it overlaps there, and fewer than `maxCascade` are stacked:
+ *    it is drawn over them, one `step` of the column further in per item
+ *    under it, so their titles show above it;
+ * 3. else a column of its own, beside the others.
+ * The columns share the width; an item then widens over the columns to its
+ * right while nothing in them overlaps it.
+ */
+function placeCluster(cluster: Item[], { step, maxCascade, title }: Rules): Placed[] {
+  const columns: { item: Item; depth: number }[][] = [];
+  const at = cluster.map((item) => {
+    const free = columns.findIndex((column) => column.every((p) => !overlap(p.item, item)));
+    if (free >= 0) {
+      columns[free]!.push({ item, depth: 0 });
+      return { column: free, depth: 0 };
+    }
+    for (const [index, column] of columns.entries()) {
+      const under = column.filter((p) => overlap(p.item, item));
+      const depth = Math.max(...under.map((p) => p.depth)) + 1;
+      if (depth < maxCascade && under.every((p) => item.top >= p.item.top + title)) {
+        column.push({ item, depth });
+        return { column: index, depth };
+      }
+    }
+    columns.push([{ item, depth: 0 }]);
+    return { column: columns.length - 1, depth: 0 };
+  });
+  const count = columns.length;
+  const boxes = cluster.map((item, i) => {
+    const { column, depth } = at[i]!;
+    let span = 1;
+    while (column + span < count && columns[column + span]!.every((p) => !overlap(p.item, item))) {
+      span++;
+    }
+    return {
+      left: round4((column + depth * step) / count),
+      right: round4((column + span) / count),
+    };
+  });
   return cluster.map((item, i) => {
-    // Rounded so a cascade of 0.15 steps reads 0.45, not 0.44999…
-    const left = Math.round(depth[i]! * step * 1e4) / 1e4;
-    return { ...item, left, width: 1 - left, layer: i };
+    const box = boxes[i]!;
+    // Its top until the first item drawn over it.
+    let room = item.bottom - item.top;
+    for (let j = i + 1; j < cluster.length; j++) {
+      const other = boxes[j]!;
+      if (overlap(cluster[j]!, item) && other.left < box.right && box.left < other.right) {
+        room = Math.min(room, cluster[j]!.top - item.top);
+      }
+    }
+    return { ...item, left: box.left, width: round4(box.right - box.left), layer: i, room };
   });
 }
 

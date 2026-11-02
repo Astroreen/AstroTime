@@ -66,12 +66,67 @@ test.describe("each view draws the demo data", () => {
     const today = day(page, "Wednesday, November 4");
     const review = await today.getByRole("listitem", { name: /^Design review, / }).boundingBox();
     const budget = await today.getByRole("listitem", { name: /^Budget planning, / }).boundingBox();
-    const call = await today.getByRole("listitem", { name: /^Call with Anna, / }).boundingBox();
-    // Each later item over an earlier one is shifted right (D15).
+    // An hour after the review, the budget is drawn over it, further in (D15, design D153).
     expect(budget!.x).toBeGreaterThan(review!.x);
-    expect(call!.x).toBeGreaterThan(budget!.x);
     await expect(today.locator("[data-now]")).toBeVisible();
   });
+});
+
+/**
+ * The boxes of every line of text in the day's items that an item drawn
+ * over it (a higher `z-index`) covers: none, where no title is covered.
+ */
+async function coveredText(page: Page, name: string) {
+  return day(page, name).evaluate((column) => {
+    const items = [...column.querySelectorAll<HTMLElement>(":scope > [role=listitem]")];
+    const layer = (item: HTMLElement) => Number(item.style.zIndex);
+    const meet = (a: DOMRect, b: DOMRect) =>
+      a.left < b.right - 0.5 &&
+      b.left < a.right - 0.5 &&
+      a.top < b.bottom - 0.5 &&
+      b.top < a.bottom - 0.5;
+    const found: string[] = [];
+    for (const item of items) {
+      const box = item.getBoundingClientRect();
+      for (const text of item.querySelectorAll<HTMLElement>(".item-title-wrap, .item-time")) {
+        // What of the text shows: its item, and a title cut to its lines, clip the rest.
+        const clip = text.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        for (const line of range.getClientRects()) {
+          const top = Math.max(box.top, clip.top);
+          const bottom = Math.min(box.bottom, clip.bottom);
+          if (line.top >= bottom - 0.5 || line.bottom <= top + 0.5) continue;
+          const over = items.find(
+            (other) => layer(other) > layer(item) && meet(line, other.getBoundingClientRect()),
+          );
+          if (over)
+            found.push(
+              `${item.getAttribute("aria-label")} under ${over.getAttribute("aria-label")}`,
+            );
+        }
+      }
+    }
+    return found;
+  });
+}
+
+test.describe("no item covers another's title (design D153)", () => {
+  for (const [size, viewport, view] of [
+    ["a phone's 3 days", PHONE, "3days"],
+    ["a phone's week", PHONE, "week"],
+    ["a wide week", WIDE, "week"],
+    ["a wide day", WIDE, "day"],
+  ] as const) {
+    test(`on ${size}, the demo's Wednesday`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await openDemo(page, view);
+      await expect(
+        day(page, "Wednesday, November 4").getByRole("listitem", { name: /^Call with Anna, / }),
+      ).toBeVisible();
+      expect(await coveredText(page, "Wednesday, November 4")).toEqual([]);
+    });
+  }
 });
 
 test("previous, next and today move by the view's period, by button and by key", async ({
