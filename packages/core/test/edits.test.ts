@@ -821,6 +821,36 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     expect([at("2026-12-21").location, at("2026-12-21").geo?.lat]).toEqual(["Mill, Berlin", 52.1]);
   });
 
+  test("all: an exception with a text of its own and no point keeps its text (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const placed = editItem(
+      series(),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    ).ics;
+    // Its own text, typed and not picked: no point.
+    const own = editItem(
+      CalendarObject.parse(placed),
+      { location: "Room 9" },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(own),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const at = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-12-21",
+      to: "2026-12-22",
+      timeZone,
+    })[0]!.item;
+    expect([at.location, at.geo]).toEqual(["Room 9", null]);
+  });
+
   test("all: a series with no point at all: a new text reaches every occurrence that had it", () => {
     const withCopy = editItem(
       series(),
