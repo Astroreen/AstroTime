@@ -293,6 +293,7 @@ export const en = {
   "attachments.kind.audio": "Audio",
   "attachments.kind.video": "Video",
   "attachments.kind.text": "Text",
+  "attachments.saveFailed": "{{name}} could not be saved.",
   "attachments.file": "File",
   "details.reminders": "Reminders",
   "details.guests": "Guests",

@@ -1439,8 +1439,11 @@ reminders.
   Android's WebView downloads no `blob:` link, so the platform saves it
   (`Platform.saveFile`): the shell plugin's `saveFile` opens the system's
   "Save to" picker (`ACTION_CREATE_DOCUMENT`, no storage permission) and
-  writes the bytes where the user picks (its TypeScript glue is unit
-  tested; the picker itself is not driven on a device in CI). The rows are
+  decodes and writes the bytes where the user picks on a thread of its
+  own, never the main one (its TypeScript glue is unit tested; the picker
+  itself is not driven on a device in CI). A save that fails is said under
+  the list at once ("figures.txt could not be saved.", an alert); one the
+  user backed out of says nothing. The rows are
   AstroTime's own drawings ([D43](#D43)), loaded with the details. The
   demo's "Budget planning" carries one of each.
 

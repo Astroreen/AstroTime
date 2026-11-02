@@ -306,6 +306,7 @@ export const ru = {
   "attachments.kind.audio": "Аудио",
   "attachments.kind.video": "Видео",
   "attachments.kind.text": "Текст",
+  "attachments.saveFailed": "Не удалось сохранить {{name}}.",
   "attachments.file": "Файл",
   "details.reminders": "Напоминания",
   "details.guests": "Гости",

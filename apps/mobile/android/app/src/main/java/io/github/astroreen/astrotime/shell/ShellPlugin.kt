@@ -17,6 +17,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import java.util.concurrent.Executors
 
 @CapacitorPlugin(name = "AstroTimeShell")
 class ShellPlugin : Plugin() {
@@ -58,16 +59,22 @@ class ShellPlugin : Plugin() {
             call.resolve(JSObject().put("saved", false))
             return
         }
-        try {
-            val bytes = Base64.decode(call.getString("data") ?: "", Base64.DEFAULT)
-            val stream = context.contentResolver.openOutputStream(target, "w")
-                ?: throw java.io.IOException("No stream for $target")
-            stream.use { it.write(bytes) }
-            call.resolve(JSObject().put("saved", true))
-        } catch (error: Exception) {
-            call.reject("The file could not be written.", "write", error)
+        // Decoded and written off the main thread: a big file must not stall the UI.
+        writer.execute {
+            try {
+                val bytes = Base64.decode(call.getString("data") ?: "", Base64.DEFAULT)
+                val stream = context.contentResolver.openOutputStream(target, "w")
+                    ?: throw java.io.IOException("No stream for $target")
+                stream.use { it.write(bytes) }
+                call.resolve(JSObject().put("saved", true))
+            } catch (error: Exception) {
+                call.reject("The file could not be written.", "write", error)
+            }
         }
     }
+
+    /** One file written at a time, in the background. */
+    private val writer = Executors.newSingleThreadExecutor()
 }
 
 /** The bars' style the app asked for last, kept to be put back after a configuration change. */

@@ -3,7 +3,13 @@
 // by an edit with nothing else touched.
 import { describe, expect, test } from "vite-plus/test";
 
-import { CalendarObject, editItem, inlineFile, zonedTime } from "../src/index.ts";
+import {
+  CalendarObject,
+  editItem,
+  inlineFile,
+  zonedTime,
+  type NewAttachment,
+} from "../src/index.ts";
 import { canonicalLine, contentLines, fixture, load } from "./support.ts";
 
 const NOW = Date.parse("2026-11-04T08:40:00Z");
@@ -259,4 +265,44 @@ test("a name with , ; : and a quote is quoted as RFC 6868 says and read back as 
   expect(CalendarObject.parse(after).master!.attachments.at(-1)!.name).toBe(
     'Q3; final, "really".pdf',
   );
+});
+
+describe("what is added is checked", () => {
+  const added = (attachment: NewAttachment) =>
+    attachLines(
+      editItem(
+        load("apple-event-attachments.ics"),
+        { attachments: { remove: [], add: [attachment] } },
+        { now: NOW },
+      ).ics,
+    ).at(-1);
+
+  test("a name with a quote, ; and : is quoted, a line break in it a space; a type that is none left out", () => {
+    expect(
+      added({
+        uri: "https://x.org/n",
+        name: 'Plan "A": v2;\r\nfinal',
+        type: "text/plain\r\nX-EVIL:1",
+        size: -1,
+      }),
+    ).toBe("ATTACH;FILENAME=Plan ^'A^': v2; final:https://x.org/n");
+  });
+
+  test("a parameter that is no token, or one the attachment writes itself, is refused; nothing written", () => {
+    const object = load("apple-event-attachments.ics");
+    const refused = (attachment: NewAttachment) => () =>
+      editItem(object, { attachments: { remove: [0], add: [attachment] } }, { now: NOW });
+    expect(refused({ uri: "https://x.org/n", parameters: { "BAD KEY": "1" } })).toThrow(RangeError);
+    expect(refused({ uri: "https://x.org/n", parameters: { "X-A;B": "1" } })).toThrow(RangeError);
+    expect(refused({ uri: "https://x.org/n", parameters: { VALUE: "BINARY" } })).toThrow(
+      RangeError,
+    );
+    expect(refused({ uri: "https://x.org/a b" })).toThrow(RangeError);
+    expect(refused({ uri: "https://x.org/n\r\nX-EVIL:1" })).toThrow(RangeError);
+    expect(object.master!.attachments).toHaveLength(2);
+    // A provider's own, cleaned of its control characters.
+    expect(added({ uri: "https://x.org/n", parameters: { "X-NC-FILE-ID": "7\n" } })).toBe(
+      "ATTACH;X-NC-FILE-ID=7:https://x.org/n",
+    );
+  });
 });

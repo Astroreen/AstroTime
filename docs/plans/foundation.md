@@ -2169,7 +2169,13 @@ task?"
   stay byte for byte through any other edit ([D7](#D7)); an edit removes
   one by its index among the item's `ATTACH`es and adds one with its
   `FILENAME`, `FMTTYPE`, `SIZE` and a provider's own parameters, written as
-  given (`ItemChanges.attachments`), and, as a reminder's change does, a
+  given (`ItemChanges.attachments`), checked before anything is written: a
+  link with a space or a control character, or a provider's parameter
+  whose name is no iana-token or x-name or is one the attachment writes
+  itself (`FILENAME`, `FMTTYPE`, `SIZE`, `VALUE`, `ENCODING`), is refused;
+  a name's or a value's control characters (a line break) become spaces,
+  ical.js quotes a `"`, `;`, `:` or `,` (RFC 6868), and a type that is no
+  media type is left out; and, as a reminder's change does, a
   change to the series reaches the exceptions that had the series'
   attachments. A copy keeps them (design [D164](design.md#D164)). The
   fixtures `nextcloud-calendar-event-attachments.ics` (Nextcloud

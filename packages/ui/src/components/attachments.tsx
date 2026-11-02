@@ -7,7 +7,7 @@
 // details.
 import { inlineFile, type InlineFile } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { attachmentHref, attachmentText } from "../calendar/attachments.ts";
@@ -54,6 +54,8 @@ export function AttachmentList({
 }) {
   const { t, i18n } = useTranslation();
   const { platform } = useAccounts();
+  // A file that could not be saved, said under the list (Android's write failed).
+  const [failed, setFailed] = useState<string | null>(null);
   // The download links made while the list is shown, let go with it.
   const links = useRef<string[]>([]);
   useEffect(() => {
@@ -61,50 +63,61 @@ export function AttachmentList({
     return () => made.forEach((link) => URL.revokeObjectURL(link));
   }, []);
   return (
-    <ul className="-mx-2 -my-1.5 flex flex-col">
-      {target.item.attachments.map((attachment, index) => {
-        const href = attachment.uri ? attachmentHref(attachment.uri, calendar?.url) : null;
-        const { name, about } = attachmentText(attachment, href, t, i18n.language);
-        const content = (
-          <>
-            <span
-              aria-hidden="true"
-              className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-ink-muted"
-            >
-              {attachment.uri && !attachment.name ? <LinkMark /> : <FileMark />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">{name}</span>
-              {about && <span className="block truncate text-note text-ink-muted">{about}</span>}
-            </span>
-          </>
-        );
-        return (
-          <li key={index}>
-            {href ? (
-              <a href={href} target="_blank" rel="noopener noreferrer" className={row}>
-                {content}
-              </a>
-            ) : attachment.uri === null ? (
-              <button
-                type="button"
-                className={row}
-                aria-label={t("attachments.save", { name })}
-                onClick={() => {
-                  const file = inlineFile(target.object, target.recurrenceId, index);
-                  if (file) void save(file, file.name ?? name, platform, links.current);
-                }}
+    <>
+      <ul className="-mx-2 -my-1.5 flex flex-col">
+        {target.item.attachments.map((attachment, index) => {
+          const href = attachment.uri ? attachmentHref(attachment.uri, calendar?.url) : null;
+          const { name, about } = attachmentText(attachment, href, t, i18n.language);
+          const content = (
+            <>
+              <span
+                aria-hidden="true"
+                className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-ink-muted"
               >
-                {content}
-              </button>
-            ) : (
-              // A link of another kind (not the web's) is shown, never followed.
-              <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">{content}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+                {attachment.uri && !attachment.name ? <LinkMark /> : <FileMark />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{name}</span>
+                {about && <span className="block truncate text-note text-ink-muted">{about}</span>}
+              </span>
+            </>
+          );
+          return (
+            <li key={index}>
+              {href ? (
+                <a href={href} target="_blank" rel="noopener noreferrer" className={row}>
+                  {content}
+                </a>
+              ) : attachment.uri === null ? (
+                <button
+                  type="button"
+                  className={row}
+                  aria-label={t("attachments.save", { name })}
+                  onClick={() => {
+                    const file = inlineFile(target.object, target.recurrenceId, index);
+                    if (!file) return;
+                    setFailed(null);
+                    save(file, file.name ?? name, platform, links.current).catch((error) => {
+                      console.error(error);
+                      setFailed(file.name ?? name);
+                    });
+                  }}
+                >
+                  {content}
+                </button>
+              ) : (
+                // A link of another kind (not the web's) is shown, never followed.
+                <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">{content}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {/* Said at once, with the list it is about (design D230). */}
+      <p role="alert" className="text-note text-danger empty:hidden">
+        {failed ? t("attachments.saveFailed", { name: failed }) : ""}
+      </p>
+    </>
   );
 }
 

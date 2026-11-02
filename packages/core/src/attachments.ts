@@ -91,11 +91,38 @@ export interface NewAttachment {
   readonly parameters?: Readonly<Record<string, string>>;
 }
 
-/** Removes the attachments at `remove` (their indexes before) and adds `add` after the rest. */
+/** Control characters, a line break among them: no parameter or value may hold one (RFC 5545 §3.1). */
+const CONTROL = /\p{Cc}+/gu;
+/** A media type, as `FMTTYPE` takes one (RFC 4288's names). */
+const MEDIA_TYPE = /^[a-z0-9][\w!#$&^.+-]*\/[a-z0-9][\w!#$&^.+-]*$/i;
+/** A parameter's name: an iana-token or an x-name (RFC 5545 §3.1). */
+const PARAMETER = /^[a-z0-9-]+$/i;
+/** The parameters this module writes itself, and those that would change what the value is. */
+const OWN = new Set(["filename", "fmttype", "size", "value", "encoding"]);
+
+/** Text for a parameter: no control character; a quote, `;`, `:` and `,` ical.js quotes (RFC 6868). */
+const clean = (text: string) => text.replaceAll(CONTROL, " ").trim();
+
+/**
+ * Removes the attachments at `remove` (their indexes before) and adds `add`
+ * after the rest. What is added is checked first, nothing written when it
+ * fails: a link with a control character or space, or a provider's
+ * parameter whose name is no token or one written here, is refused
+ * (`RangeError`); a name's or a value's control characters become spaces,
+ * and a type that is no media type is left out.
+ */
 export function setAttachments(
   component: ICAL.Component,
   changes: { readonly remove: readonly number[]; readonly add: readonly NewAttachment[] },
 ): void {
+  for (const add of changes.add) {
+    if (!add.uri || /[\s\p{Cc}]/u.test(add.uri))
+      throw new RangeError(`Not a link to attach: ${JSON.stringify(add.uri)}`);
+    for (const name of Object.keys(add.parameters ?? {})) {
+      if (!PARAMETER.test(name) || OWN.has(name.toLowerCase()))
+        throw new RangeError(`Not a parameter to write: ${JSON.stringify(name)}`);
+    }
+  }
   const existing = component.getAllProperties("attach");
   for (const index of changes.remove) {
     const property = existing[index];
@@ -104,12 +131,19 @@ export function setAttachments(
   for (const add of changes.add) {
     const property = new ICAL.Property("attach");
     property.setValue(add.uri);
-    if (add.type) property.setParameter("fmttype", add.type);
-    if (add.name) property.setParameter("filename", add.name);
-    if (add.size !== undefined && add.size !== null)
+    const type = add.type && clean(add.type);
+    if (type && MEDIA_TYPE.test(type)) property.setParameter("fmttype", type);
+    const name = add.name && clean(add.name);
+    if (name) property.setParameter("filename", name);
+    if (
+      add.size !== undefined &&
+      add.size !== null &&
+      Number.isSafeInteger(add.size) &&
+      add.size >= 0
+    )
       property.setParameter("size", String(add.size));
-    for (const [name, value] of Object.entries(add.parameters ?? {}))
-      property.setParameter(name.toLowerCase(), value);
+    for (const [key, value] of Object.entries(add.parameters ?? {}))
+      property.setParameter(key.toLowerCase(), clean(value));
     component.addProperty(property);
   }
 }
