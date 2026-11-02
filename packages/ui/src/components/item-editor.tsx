@@ -17,7 +17,7 @@ import {
 import type { Calendar } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -36,7 +36,17 @@ import {
   type Target,
 } from "../calendar/editing.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
-import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
+import {
+  countAlarms,
+  customOffset,
+  MOST,
+  offeredAlarms,
+  readTally,
+  UNITS,
+  type AlarmUnit,
+} from "../calendar/alarms.ts";
+import { alarmWords, repeatWords } from "../calendar/words.ts";
+import { KEYS } from "../preferences.ts";
 import { defaultColorOf, useSettings } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import {
@@ -52,7 +62,8 @@ import {
 import { ColorSelect } from "./color-select.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
-import { primaryButton } from "./sign-in-dialog.tsx";
+import { useAccounts } from "./accounts-context.tsx";
+import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { useDraft, useDraftAside } from "./draft-aside.ts";
 
@@ -112,6 +123,7 @@ export function ItemEditor({
   const formId = useId();
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
+  useAlarmCount(state);
   // Beside the item it makes, on a wide screen (design D155).
   const aside = useDraftAside(state !== null);
   const title = form
@@ -179,6 +191,37 @@ export function ItemEditor({
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+/**
+ * Whether the item was all day when each reminder was added to it: the
+ * kind it counts under (design D206), even if "All day" switched since.
+ */
+const addedAllDay = new WeakMap<AlarmChoice, boolean>();
+
+/**
+ * Counts the reminders added to an item once it is saved (design D206): the
+ * dialog closes from saving, not from a refusal, which leaves it open.
+ */
+function useAlarmCount(state: EditorState | null) {
+  const { platform } = useAccounts();
+  const saving = useRef<Form | null>(null);
+  useEffect(() => {
+    if (state?.saving) {
+      saving.current = state.form;
+      return;
+    }
+    const saved = saving.current;
+    saving.current = null;
+    if (state === null && saved) {
+      const added = saved.alarms.flatMap((a) =>
+        a.kind === "new"
+          ? [{ allDay: addedAllDay.get(a) ?? saved.allDay, offset: a.offsetSeconds }]
+          : [],
+      );
+      countAlarms(platform.preferences, added);
+    }
+  }, [state, platform]);
 }
 
 function Fields({
@@ -770,6 +813,16 @@ function addMonth(day: string): string {
 
 // Reminders
 
+/** The offsets of an item's reminders that count from it, as the menu compares them. */
+const offsetsOf = (alarms: readonly AlarmChoice[]) =>
+  alarms.flatMap((choice) =>
+    choice.kind === "new"
+      ? [choice.offsetSeconds]
+      : choice.alarm.trigger.type === "relative"
+        ? [choice.alarm.trigger.offsetSeconds]
+        : [],
+  );
+
 function Reminders({
   form,
   onChange,
@@ -779,6 +832,10 @@ function Reminders({
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
+  const { platform } = useAccounts();
+  const [custom, setCustom] = useState(false);
+  // What this device added, read as the dialog opens: it does not change while open.
+  const [tally] = useState(() => readTally(platform.preferences.get(KEYS.alarmTally)));
   const task = form.kind === "task";
   // A task is at its start, as the calendar shows it: its reminders count from
   // there (design D159); one with only a due, from its due (RFC 5545 §3.6.6).
@@ -800,7 +857,14 @@ function Reminders({
       formats,
       timeZone,
     );
-  const presets = alarmPresets(form.allDay);
+  const add = (offsetSeconds: number) => {
+    const choice = { kind: "new", relatedTo, offsetSeconds } as const;
+    addedAllDay.set(choice, form.allDay);
+    onChange([...form.alarms, choice]);
+  };
+  const taken = offsetsOf(form.alarms);
+  // The four most added on this device, then the defaults (design D206).
+  const offered = offeredAlarms(tally, form.allDay, taken);
   return (
     <>
       {form.alarms.length > 0 && (
@@ -822,15 +886,130 @@ function Reminders({
       )}
       <MenuButton
         label={t("edit.addReminder")}
-        options={presets.map((offset) => ({
-          value: String(offset),
-          label: wordsOf({ kind: "new", relatedTo, offsetSeconds: offset }),
-        }))}
-        onChoose={(offset) =>
-          onChange([...form.alarms, { kind: "new", relatedTo, offsetSeconds: Number(offset) }])
-        }
+        options={[
+          ...offered.map((offset) => ({
+            value: String(offset),
+            label: wordsOf({ kind: "new", relatedTo, offsetSeconds: offset }),
+          })),
+          { value: "custom", label: t("alarm.custom") },
+        ]}
+        onChoose={(value) => (value === "custom" ? setCustom(true) : add(Number(value)))}
         className={fieldButton}
       />
+      {custom && (
+        <CustomReminder
+          allDay={form.allDay}
+          wordsOf={(offsetSeconds) => wordsOf({ kind: "new", relatedTo, offsetSeconds })}
+          taken={taken}
+          onAdd={(offset) => {
+            setCustom(false);
+            add(offset);
+          }}
+          onCancel={() => setCustom(false)}
+        />
+      )}
     </>
+  );
+}
+
+/**
+ * A reminder of the user's own, as Google's custom notification: an amount
+ * of minutes, hours, days or weeks before a timed item, or of days or weeks
+ * before an all-day one at a time of the day (design D206).
+ */
+function CustomReminder({
+  allDay,
+  wordsOf,
+  taken,
+  onAdd,
+  onCancel,
+}: {
+  allDay: boolean;
+  wordsOf: (offsetSeconds: number) => string;
+  /** The item's reminders: one of them is not added twice, and says so. */
+  taken: readonly number[];
+  onAdd: (offsetSeconds: number) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+  // As typed, so it can be emptied to type another; read as a number to add.
+  const [typed, setTyped] = useState(allDay ? "1" : "10");
+  const amount =
+    typed.trim() === "" ? null : Math.min(MOST, Math.max(0, Math.round(Number(typed))));
+  const [unit, setUnit] = useState<AlarmUnit>(allDay ? "days" : "minutes");
+  const [time, setTime] = useState("09:00");
+  const units = UNITS[allDay ? "allDay" : "timed"];
+  // A switch of "All day" meanwhile leaves a unit it has not: its first.
+  const shown = (units as readonly AlarmUnit[]).includes(unit) ? unit : units[0];
+  const offset =
+    amount === null || Number.isNaN(amount) ? null : customOffset(amount, shown, allDay, time);
+  const had = offset !== null && taken.includes(offset);
+  const submit = () => offset !== null && !had && onAdd(offset);
+  return (
+    <div
+      role="group"
+      aria-label={t("alarm.custom.title")}
+      className="flex flex-col gap-3 rounded-2xl bg-canvas p-3"
+    >
+      <span className="text-small text-ink-muted">{t("alarm.custom.before")}</span>
+      <div className="flex gap-2">
+        <div className="w-24 shrink-0">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MOST}
+            aria-label={t("alarm.custom.amount")}
+            value={typed}
+            autoFocus
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter adds the reminder, not saves the item; not one that
+              // ends an input method's composition.
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            className={field}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <Dropdown
+            label={t("alarm.custom.unit")}
+            value={shown}
+            onChange={(next) => setUnit(next as AlarmUnit)}
+            options={units.map((u) => ({
+              value: u,
+              label: t(`alarm.unit.${u}`, { count: amount ?? 0 }),
+            }))}
+            className={fieldButton}
+          />
+        </div>
+      </div>
+      {allDay && (
+        <div className="flex items-center gap-2">
+          <span className="text-body text-ink-muted">{t("alarm.custom.at")}</span>
+          <TimeSelect label={t("alarm.custom.time")} value={time} onChange={setTime} />
+        </div>
+      )}
+      <p aria-live="polite" className="text-body">
+        {offset === null ? t("alarm.custom.empty") : wordsOf(offset)}
+        {had && <span className="block text-small text-ink-muted">{t("alarm.custom.had")}</span>}
+      </p>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className={textButton}>
+          {t("alarm.custom.cancel")}
+        </button>
+        <button
+          type="button"
+          disabled={offset === null || had}
+          onClick={submit}
+          className={primaryButton}
+        >
+          {t("alarm.custom.add")}
+        </button>
+      </div>
+    </div>
   );
 }

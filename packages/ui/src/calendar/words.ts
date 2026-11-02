@@ -174,21 +174,3 @@ export function alarmWords(
   if (trigger.relatedTo === "end" && offset > 0) return t("alarm.afterDue", { amount: words });
   return t(offset < 0 ? "alarm.before" : "alarm.after", { amount: words });
 }
-
-/** The reminders the edit dialog offers, as Google's: before a timed item, or on and before an all-day one. */
-export function alarmPresets(allDay: boolean): readonly number[] {
-  return allDay
-    ? [9 * HOUR, -15 * HOUR, -(DAY + 15 * HOUR), -(6 * DAY + 15 * HOUR)]
-    : [
-        0,
-        -5 * MINUTE,
-        -10 * MINUTE,
-        -15 * MINUTE,
-        -30 * MINUTE,
-        -HOUR,
-        -2 * HOUR,
-        -DAY,
-        -2 * DAY,
-        -WEEK,
-      ];
-}

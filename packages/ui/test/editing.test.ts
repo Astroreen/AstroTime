@@ -1031,6 +1031,47 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(saved.serialize()).toContain("X-OTHER-CLIENT:kept\r\n");
   });
 
+  test("reminders of the user's own are written as VALARMs, another client's kept as they were (design D206)", async () => {
+    const { store, byName, rowOf } = await demo();
+    const row = await rowOf("Work", "demo-review");
+    const theirs = row.ics.replace(
+      "BEGIN:VALARM",
+      "BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER:-PT2H\r\nX-OTHER-CLIENT:kept\r\nEND:VALARM\r\nBEGIN:VALARM",
+    );
+    await store.saveFromServer(byName("Work").id, { href: row.href, etag: '"2"', ics: theirs });
+    const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
+    const initial = formOf(target, timeZone, TODAY);
+    const custom = (offsetSeconds: number) =>
+      ({ kind: "new", relatedTo: "start", offsetSeconds }) as const;
+    await saveForm(
+      store,
+      {
+        target,
+        initial,
+        form: {
+          ...initial,
+          alarms: [...initial.alarms, custom(-14 * 86_400), custom(-4 * 86_400)],
+        },
+        scope: "all",
+        untitled: "Reminder",
+      },
+      { now: NOW, uid: uids },
+    );
+    const ics = (await rowOf("Work", "demo-review")).ics;
+    expect(ics).toContain(
+      "BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER:-PT2H\r\nX-OTHER-CLIENT:kept\r\nEND:VALARM\r\n",
+    );
+    expect(ics).toContain("TRIGGER:-P2W\r\n");
+    expect(ics).toContain("TRIGGER:-P4D\r\n");
+    const saved = CalendarObject.parse(ics).master!;
+    expect(saved.alarms.map((alarm) => alarm.trigger)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ relatedTo: "start", offsetSeconds: -14 * 86_400 }),
+        expect.objectContaining({ relatedTo: "start", offsetSeconds: -4 * 86_400 }),
+      ]),
+    );
+  });
+
   test("an item or an occurrence gone meanwhile: nothing is saved, and the user is told", async () => {
     const { store, rowOf } = await demo();
     const standup = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
