@@ -1651,8 +1651,9 @@ bar, the sidebar and the accounts panel.
   item's attachments as the details do (the same mark and words), each
   with ✕ to take it off ("Remove Q3.pdf"), then "Add a link": a field for
   a web link (typed with `http://` or `https://`, or with neither, which
-  is `https://`: a host with a port, `nas:8080/files`, or a name with no
-  dot, `nas`, too; "Add" waits until it is one, and another scheme,
+  is `https://`; its host has a dot, is `localhost`, or is a name with its
+  port, `nas:8080/files`; a number, `1234`, a time, `12:30`, or a bare
+  word is none, and "Add" waits until it is one; another scheme,
   `javascript:` or `mailto:`, never is), added with Enter or "Add", Escape leaving
   it; Enter there adds the link and does not save the dialog. The form
   keeps them as reminders are kept (`AttachmentChoice`: one the item has,
@@ -1662,7 +1663,10 @@ bar, the sidebar and the accounts panel.
   is as written (every parameter, an inline file's bytes: two that read
   alike are two files), and the new
   ones added after the rest ([foundation D229](foundation.md#D229)); an
-  attachment left alone stays byte for byte.
+  attachment left alone stays byte for byte, and a form that says nothing
+  of attachments (one made without them) changes none. A file picked
+  twice, or one there already under Nextcloud Calendar's relative link,
+  is attached once: links are compared as they resolve.
 - **D234. "From your files"** (the owner's 9): for an item in a calendar
   whose account has files ([foundation D231](foundation.md#D231),
   Nextcloud's), a second action beside "Add a link" opens a file picker

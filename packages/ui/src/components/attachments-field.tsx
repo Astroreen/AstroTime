@@ -11,7 +11,7 @@ import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
-import { attachmentHref, attachmentText, typedLink } from "../calendar/attachments.ts";
+import { attachmentHref, attachmentText, sameLink, typedLink } from "../calendar/attachments.ts";
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
@@ -153,8 +153,10 @@ export function AttachmentsField({
           onClose={() => setBrowsing(false)}
           onPick={(attachment) => {
             setBrowsing(false);
-            // A file attached already is not attached twice.
-            const there = value.some((choice) => choice.attachment.uri === attachment.uri);
+            // A file attached already is not attached twice, its link as it resolves.
+            const there = value.some((choice) =>
+              sameLink(choice.attachment.uri, attachment.uri, calendar?.url),
+            );
             if (!there) onChange([...value, { kind: "new", attachment }]);
           }}
         />

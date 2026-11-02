@@ -280,6 +280,12 @@ describe("the form", () => {
     });
     // Nothing changed: nothing written.
     expect(changesOf(form, form, "Reminder")).toEqual({});
+    // A form that says nothing of attachments changes none: never "all taken off".
+    const { attachments, ...silent } = form;
+    void attachments;
+    expect(changesOf(form, { ...silent, summary: "Budget, v2" }, "Reminder")).toEqual({
+      summary: "Budget, v2",
+    });
   });
 
   test("an item opens with its own times in its zone; a UTC time in the user's, kept UTC", async () => {

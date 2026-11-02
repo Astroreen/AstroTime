@@ -532,18 +532,22 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
     a.kind === "new" ? [{ relatedTo: a.relatedTo, offsetSeconds: a.offsetSeconds }] : [],
   );
   if (remove.length > 0 || add.length > 0) changes.alarms = { remove, add, untitled };
-  // Attachments as reminders: those taken out by their index, the new ones added (design D233).
-  const keptFiles = new Set(
-    (form.attachments ?? []).flatMap((a) => (a.kind === "existing" ? [a.index] : [])),
-  );
-  const removeFiles = (was?.attachments ?? []).flatMap((a) =>
-    a.kind === "existing" && !keptFiles.has(a.index) ? [a.index] : [],
-  );
-  const addFiles = (form.attachments ?? []).flatMap((a) =>
-    a.kind === "new" ? [a.attachment] : [],
-  );
-  if (removeFiles.length > 0 || addFiles.length > 0)
-    changes.attachments = { remove: removeFiles, add: addFiles };
+  // Attachments as reminders: those taken out by their index, the new ones
+  // added (design D233). A form with none said (`undefined`) changes none:
+  // never read as "all taken off".
+  if (form.attachments !== undefined) {
+    const keptFiles = new Set(
+      (form.attachments ?? []).flatMap((a) => (a.kind === "existing" ? [a.index] : [])),
+    );
+    const removeFiles = (was?.attachments ?? []).flatMap((a) =>
+      a.kind === "existing" && !keptFiles.has(a.index) ? [a.index] : [],
+    );
+    const addFiles = (form.attachments ?? []).flatMap((a) =>
+      a.kind === "new" ? [a.attachment] : [],
+    );
+    if (removeFiles.length > 0 || addFiles.length > 0)
+      changes.attachments = { remove: removeFiles, add: addFiles };
+  }
   if (differs("color") && (was || form.color)) changes.color = form.color;
   return changes;
 }
