@@ -830,6 +830,18 @@ I make it"; "sometimes an item's text is covered by another event".
   grid's scroll. Every top-bar button, the drawer's rows and the Agenda
   were checked after a swipe on a phone's viewport: each takes the first
   tap; the two `pan-y` views were the only ones it took.
+  _Fixed after it landed:_ the swipe's finger was kept inside its listeners,
+  attached by an effect after the view was drawn, and React's Strict Mode
+  (in development: the dev server CI's tests run on, and the one the owner
+  opens on a phone through `tailscale serve`) attaches them again just after
+  mounting: a swipe begun in that moment lost where it began and moved
+  nothing; the owner saw a swipe now and then go nowhere, and CI's two
+  `useSwipe` tests failed now and then; on a CPU slowed twelve times it
+  failed 5 runs in 5. The finger is now kept in a ref beside the listeners,
+  which are attached as the element is (a layout effect), and a test swipes
+  on that slowed CPU (it failed 2 runs in 3 before). The Month's test waited
+  for the month's name, which the top bar shows before its days are drawn;
+  it waits for a day now.
 - **D153. No item covers another's title** (the owner's feedback 6 on
   v0.3.0: "Sometimes an item's text is covered by another event. Text is
   what matters most. Maybe push the event further aside, or give it an extra

@@ -2,7 +2,9 @@ import type { Store, UndoneTask } from "@astrotime/storage";
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type RefObject,
@@ -164,36 +166,41 @@ export function useSwipe(
   onSwipe: (direction: 1 | -1) => void,
 ): void {
   const swiped = useEffectEvent(onSwipe);
-  useEffect(() => {
+  // The finger down now, kept apart from the listeners: they may be attached
+  // again while it is down (React's Strict Mode does so after mounting, in
+  // development), and a swipe would then lose where it began (design D152).
+  const finger = useRef<{ id: number; x: number; y: number; axis: "x" | "y" | null } | null>(null);
+  // Attached as the element is, before anything is painted or pressed.
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    let start: { id: number; x: number; y: number; axis: "x" | "y" | null } | null = null;
     const down = (event: globalThis.PointerEvent) => {
-      start =
+      finger.current =
         event.pointerType === "touch" && event.isPrimary
           ? { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null }
           : null;
     };
     const move = (event: globalThis.PointerEvent) => {
+      const start = finger.current;
       if (!start || event.pointerId !== start.id || start.axis) return;
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
       if (Math.hypot(dx, dy) >= SWIPE_SLOP) start.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
     };
     const touchMove = (event: TouchEvent) => {
-      if (start?.axis === "x" && event.cancelable) event.preventDefault();
+      if (finger.current?.axis === "x" && event.cancelable) event.preventDefault();
     };
     const up = (event: globalThis.PointerEvent) => {
-      const from = start;
+      const from = finger.current;
       if (!from || event.pointerId !== from.id) return;
-      start = null;
+      finger.current = null;
       if (from.axis === "y") return;
       const dx = event.clientX - from.x;
       const dy = event.clientY - from.y;
       if (Math.abs(dx) > SWIPE_DISTANCE && Math.abs(dx) > 2 * Math.abs(dy)) swiped(dx < 0 ? 1 : -1);
     };
     const cancel = () => {
-      start = null;
+      finger.current = null;
     };
     element.addEventListener("pointerdown", down);
     element.addEventListener("pointermove", move);
