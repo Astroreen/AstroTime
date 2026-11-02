@@ -154,6 +154,15 @@ test("a colour chosen in the dialog stays through a switch of kind, the default'
     await editor.getByRole("button", { name: "Save" }).click();
     await expect(editor).toHaveCount(0);
   }
+  // Stored without the spaces typed around them.
+  const stored = await page.evaluate(() =>
+    (
+      JSON.parse(localStorage.getItem("astrotime.settings") ?? "{}") as {
+        colors?: { name: string | null }[];
+      }
+    ).colors?.map((color) => color.name),
+  );
+  expect(stored).toEqual(["Rose one", "Rose two"]);
   await choose(settings.getByRole("combobox", { name: "Colour of new events" }), "Rose one");
   await page.keyboard.press("Escape");
 
