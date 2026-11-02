@@ -62,7 +62,13 @@ export function measure(root: HTMLElement): Snapshot {
  * milliseconds everything waits first, so a tick the user drew shows before
  * its row moves.
  */
-export function play(root: HTMLElement, before: Snapshot, hold: number): void {
+export function play(
+  root: HTMLElement,
+  before: Snapshot,
+  hold: number,
+  /** The tasks done now: only a row of these that left goes toward "Completed". */
+  done: ReadonlySet<string>,
+): void {
   const timing: KeyframeAnimationOptions = {
     duration: MOVE_MS,
     easing: SLIDE,
@@ -134,8 +140,8 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
     }
   }
 
-  // Rows that left: drawn on over the list where they were, they leave
-  // toward "Completed" when its count rose, else fade where they are.
+  // Rows that left: drawn on over the list where they were, a task now done
+  // leaves toward "Completed", any other (deleted, moved) fades where it is.
   const layer = root.querySelector<HTMLElement>(LAYER);
   const count = root.querySelector<HTMLElement>(COUNT);
   const counted = Number(count?.textContent ?? 0);
@@ -156,7 +162,9 @@ export function play(root: HTMLElement, before: Snapshot, hold: number): void {
     });
     layer.append(ghost);
     const dy =
-      rose && toward ? toward.top + toward.height / 2 - (was.rect.top + was.rect.height / 2) : 0;
+      done.has(key) && toward
+        ? toward.top + toward.height / 2 - (was.rect.top + was.rect.height / 2)
+        : 0;
     const leave = slide(
       ghost,
       // Gone before it reaches the count, so it crosses the rows faintly.

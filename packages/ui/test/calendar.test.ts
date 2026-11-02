@@ -208,6 +208,7 @@ describe("the drawer's settings override the locale (D53)", () => {
       illustrations: false,
       monthBanners: false,
       placePhotos: false,
+      celebrate: false,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
     // Reminders are on unless turned off (foundation D101), and so is
@@ -222,6 +223,8 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"illustrations":0}').illustrations).toBe(true);
     expect(readSettings("{}").monthBanners).toBe(true);
     expect(readSettings('{"placePhotos":"no"}').placePhotos).toBe(true);
+    // A completed task is celebrated too (design D198).
+    expect(readSettings('{"celebrate":"no"}').celebrate).toBe(true);
     // Colours that cannot be read are dropped; a blank name is the generated one (design D170).
     expect(
       readSettings(

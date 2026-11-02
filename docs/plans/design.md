@@ -1349,22 +1349,47 @@ whole row".
   with "Completed" open the row itself slides down into it, and back up when
   it is not completed again; with it folded the row goes on drawn where it
   was, over the list, and fades out going down to "Completed", whose count
-  ticks over. A card that changed height is stretched from the one it had:
-  its background is apart from its rows, so the rows are not stretched with
-  it. A change the user did not make (a sync, the details' "Mark completed",
-  another tab) moves the same way, without the wait for a tick: only the
-  read that carries the user's completion (its row changed or left) waits
-  for its tick, not a sync's read that came first; a new row comes in from
-  above; more than 40 rows moving at once (a sync's batch) change in place.
-  A row leaving goes on leaving through the next change, never measured or
-  moved again, so tasks completed one after another each leave once; its
-  layer is `inert` and hidden from a screen reader. The count is its own
-  box, cut out of the one translated string ("Completed ({{n}})"). Only
-  `transform` and `opacity` move, with the Web Animations API, as
-  [D154](#D154) has it; `prefers-reduced-motion` changes everything in
-  place. The code that moves them (`components/task-motion.ts`) is loaded
-  with the tasks screen's first showing, not with the app (D145), and never
-  when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
+  ticks over (only a task now done goes there: one deleted or moved by the
+  same read, a sync's, fades where it was). A card that changed height is
+  stretched from the one it had: its background is apart from its rows, so
+  the rows are not stretched with it. A change the user did not make (a
+  sync, the details' "Mark completed", another tab) moves the same way,
+  without the wait for a tick: only the read that carries the user's
+  completion (its row changed or left) waits for its tick, each press its
+  own (a second press on the same task is waited for by its own read), not a
+  sync's read that came first; a new row comes in from above; more than 40
+  rows moving at once (a sync's batch) change in place. A row leaving goes
+  on leaving through the next change, never measured or moved again, so
+  tasks completed one after another each leave once; its layer is `inert`
+  and hidden from a screen reader. The count is its own box, cut out of the
+  one translated string ("Completed ({{n}})"). Only `transform` and
+  `opacity` move, with the Web Animations API, as [D154](#D154) has it;
+  `prefers-reduced-motion` changes everything in place. The code that moves
+  them (`components/task-motion.ts`) is loaded with the tasks screen's first
+  showing, not with the app (D145), and never when less motion is asked for
+  (`apps/web/e2e/tasks-motion.spec.ts`).
+- **D198. Completing a task is celebrated** (the owner's item 13: "some
+  confetti or a burst of shapes on 'Mark completed', with a setting to turn
+  it off"). When the user completes a task, from its checkbox on the tasks
+  screen or with "Mark completed" in its details, 18 small shapes of
+  AstroTime's own (dots, squares, triangles, in the theme's accent and four
+  colours that read on both themes) are thrown out from the checkbox or the
+  button, all round and a little upwards, and fall away and fade in about
+  0.7 s, on a layer over everything that takes no press and that a screen
+  reader does not see. The burst starts from where the press was, measured
+  at the press, before its code arrives, and is thrown at once, as the tick
+  is drawn, before the write lands: a write that did not land is told by the
+  change notice (foundation D103). Not completing a task again throws
+  nothing; nor does a completion the user did not make here (a sync, another
+  tab, a series' occurrences rolled over): only the two presses throw one,
+  one occurrence at a time, as a series is completed (D94). "Celebrate a
+  completed task" in Settings' general group, with the theme, turns it off
+  (on by default, kept with the other settings); `prefers-reduced-motion`
+  turns it off too. Its code (`components/celebrate.ts`, 0.7 KiB) is our
+  own, no library: the Web Animations API on a few `<span>`s, `transform`
+  and `opacity` only ([D154](#D154)); it is loaded with the first
+  completion, not with the app (D145), and never while the setting is off or
+  less motion is asked for (`apps/web/e2e/celebrate.spec.ts`).
 
 ### Decided in round 4: the calendar views
 

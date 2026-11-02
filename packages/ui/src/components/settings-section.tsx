@@ -1,5 +1,6 @@
 // The Settings screen (design D53, D131): the whole screen on a phone, a
-// dialog from 640 px, in groups: general (theme, language), the views (week
+// dialog from 640 px, in groups: general (theme, language, the burst on a
+// completed task, D198), the views (week
 // start, clock, "hide completed", week numbers), the colours (D172, D173),
 // the pictures (D217),
 // the accounts with how each syncs, whether it syncs at all (foundation
@@ -119,6 +120,11 @@ function SettingsGroups({
             ["system", t("settings.language.system")],
             ...LANGUAGES.map((language) => [language, nativeName(language)] as const),
           ]}
+        />
+        <Toggle
+          label={t("settings.celebrate")}
+          checked={settings.celebrate}
+          onChange={(celebrate) => change({ celebrate })}
         />
       </Group>
       <Group title={t("settings.views")}>

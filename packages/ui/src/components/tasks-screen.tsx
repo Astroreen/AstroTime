@@ -25,6 +25,7 @@ import {
   type TaskRow,
 } from "../calendar/tasks.ts";
 import { KEYS, usePreference, type Preferences } from "../preferences.ts";
+import { useCelebrate } from "./celebration.ts";
 import { useCalendar } from "./context.ts";
 import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
@@ -172,7 +173,9 @@ export function TasksScreen({
     const row = rows.find((each) => each.stored.id === mine?.id);
     const carries = mine !== null && row?.stored.ics !== mine.ics;
     if (was && stage.current && motion.current) {
-      motion.current.play(stage.current, was, carries ? HOLD_MS : 0);
+      // Only a row now done leaves toward "Completed"; one gone fades where it was.
+      const done = new Set(rows.filter((each) => each.done).map((each) => each.stored.id));
+      motion.current.play(stage.current, was, carries ? HOLD_MS : 0, done);
     }
     // Done with once a read carried it (its row in "Completed" drawn with
     // this read), or once a read after its write did not: it changed nothing.
@@ -188,23 +191,26 @@ export function TasksScreen({
   });
 
   const editing = useEditing();
+  const celebrate = useCelebrate();
   const targetOfRow = (row: TaskRow) =>
     targetOf(row.stored, row.object, row.recurrenceId, row.task);
   // Onto what the store holds now; the user is told when it did not land, and
   // a local change goes up soon (docs/plans/foundation.md#D91, D99).
   const actions: Actions = {
-    complete: (row, done) => {
+    complete: (row, done, from) => {
+      if (done) celebrate(from);
       const id = row.stored.id;
-      pending.current = { id, ics: row.stored.ics, landed: false };
+      // This press's own: a second press on the same task makes another.
+      const mine = { id, ics: row.stored.ics, landed: false };
+      pending.current = mine;
       drawn.current = done ? id : null;
       return editing
         .rewrite(targetOfRow(row), (current) =>
           completeTask(current, done, { now: Date.now(), recurrenceId: row.recurrenceId }),
         )
         .then(async (landed) => {
-          const mine = pending.current;
-          if (mine?.id === id && landed) mine.landed = true;
-          else if (mine?.id === id) {
+          if (pending.current === mine && landed) mine.landed = true;
+          else if (pending.current === mine) {
             // Not written: nothing will move for it, and nothing is drawn.
             pending.current = null;
             drawn.current = null;
@@ -467,7 +473,8 @@ const COUNT_MARK = "\u2063";
 
 interface Actions {
   /** Resolves once the change is written and read, or did not land. */
-  readonly complete: (row: TaskRow, done: boolean) => Promise<void>;
+  /** `from`: its checkbox, where a completion's burst starts (design D198). */
+  readonly complete: (row: TaskRow, done: boolean, from: Element | null) => Promise<void>;
   readonly star: (row: TaskRow) => void;
   /** Its details (docs/plans/foundation.md#D14). */
   readonly open: (row: TaskRow) => void;
@@ -649,6 +656,7 @@ function TaskItem({
   const title = row.task.summary?.trim() || t("item.untitled");
   const found = row.stored.id === actions.found;
   const element = useRef<HTMLLIElement>(null);
+  const box = useRef<HTMLElement>(null);
   // Checked at once, before the store has it; its own state let go once the
   // store's read has it, or the write did not land (or changed nothing).
   const [checking, setChecking] = useState<boolean | null>(null);
@@ -683,13 +691,14 @@ function TaskItem({
         style={{ paddingLeft: 16 + depth * 32 }}
       >
         <Checkbox.Root
+          ref={box}
           checked={checked}
           disabled={readOnly}
           onCheckedChange={(done) => {
             setChecking(done);
             setDraw(done);
             // Once written and read (the row then shows it), or not written.
-            void actions.complete(row, done).then(() => setChecking(null));
+            void actions.complete(row, done, box.current).then(() => setChecking(null));
           }}
           aria-label={title}
           className="relative z-10 mt-2 grid size-[22px] shrink-0 place-items-center rounded-full border-2 border-ink-muted text-accent hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-checked:border-transparent"
