@@ -34,6 +34,7 @@ export function liveQuery<T>(
       try {
         const result = await run();
         if (!stopped && !stale && !(last && same(last.result, result))) {
+          // Kept as given: a consumer treats a result as read-only, as React does its state.
           last = { result };
           onResult(result);
         }

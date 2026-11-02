@@ -998,6 +998,7 @@ export class Store {
             before = await this.changedRows();
             return operation();
           },
+          // Should this read fail, the operation is rolled back and fails: whole or not at all (D99).
           async () => (wrote = (await this.changedRows()) !== before),
         );
         if (wrote) this.notify();
