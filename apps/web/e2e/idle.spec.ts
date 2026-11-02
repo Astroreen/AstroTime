@@ -34,7 +34,12 @@ async function countCommits(page: Page): Promise<() => Promise<number>> {
   return () => page.evaluate(() => (globalThis as unknown as { commits: number }).commits);
 }
 
-/** Hides or shows the page as the browser does when another tab comes to the front. */
+/**
+ * Hides or shows the page as the browser tells it when another tab comes to
+ * the front: `visibilityState`, `hidden` and `visibilitychange`, faked, as
+ * Playwright has no real hidden tab to give. What the page does with them is
+ * what is tested, not the browser's throttling of a hidden tab.
+ */
 async function setShown(page: Page, shown: boolean): Promise<void> {
   await page.evaluate((value) => {
     Object.defineProperty(document, "visibilityState", {
@@ -119,7 +124,10 @@ test("a hidden tab draws another tab's change once it is shown again (D182)", as
   const [hiddenCommits, hiddenReads] = [await commits(), await rangeReads()];
   // Heard on a channel made after the store's, so after the store's own
   // driver heard it, and after everything that ran at once on it: a view
-  // that followed the store would have sent its read by then.
+  // that followed the store would have sent its read by then. The HTML
+  // standard's `BroadcastChannel` `postMessage` steps sort the destinations
+  // "in creation order, oldest first" and queue each one's message event in
+  // that order (https://html.spec.whatwg.org/multipage/web-messaging.html#dom-broadcastchannel-postmessage).
   await page.evaluate(() => {
     const heard = new BroadcastChannel("astrotime-store:astrotime");
     (globalThis as unknown as { heard: Promise<void> }).heard = new Promise<void>((resolve) =>

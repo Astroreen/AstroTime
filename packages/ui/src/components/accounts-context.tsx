@@ -255,13 +255,14 @@ export function AccountsProvider({
   // item on the calendar on this device; not the empty calendar a first run
   // makes), the browser is asked to keep its data rather than evict it under
   // pressure, once on this device: its answer is kept, granted or refused
-  // (D121). Firefox asks the user, so never on a first visit's load.
+  // (D121). Firefox asks the user, so never on a first visit's load, and
+  // not in a hidden tab, where nobody sees the question (D182).
   useEffect(() => {
     const { keepData } = platform;
     if (!keepData || preferences.get(KEYS.keepData) !== null) return;
     let asked = false;
     return liveQuery(
-      store,
+      whileShown(store),
       async () => {
         const accounts = await store.accounts();
         if (accounts.some((account) => account.provider === "caldav")) return true;

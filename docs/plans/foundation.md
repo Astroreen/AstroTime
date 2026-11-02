@@ -2061,10 +2061,15 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
     planner still follows the store, and the platform's timers fire); the
     store itself, which a leader tab serves to the others ([D98](#D98));
     the writes the UI makes of itself (the calendar on this device made or
-    stepped aside, [D122](#D122)).
+    stepped aside, [D122](#D122)), whose queries in `accounts-context.tsx`
+    hear the store itself; and the preset's sign-in, which opens by itself
+    at most once per page, on its first read ([D123](#D123)): a tab opened
+    behind another has it open when the user comes to it.
   - **Waits for `visibilitychange`:** every live query of what is drawn
     (the views' range and undone tasks, the calendars' lists, the tasks
-    screen, search, an item's details, the conflicts) hears the store
+    screen, search, an item's details, the conflicts), and the question
+    whether to keep the data ([D121](#D121): Firefox asks it in the tab,
+    where a hidden one would ask nobody), hears the store
     through `whileShown`: the changes made while the page is hidden wait,
     and come as one when it is shown, so the views read once and draw what
     changed. The clock (`useNow`, the now-line and today) stops and ticks
