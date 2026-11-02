@@ -19,6 +19,7 @@ export {
   editItem,
   hasOccurrence,
   placeText,
+  sameGeo,
   PRODID,
   timesOf,
   type ItemChanges,

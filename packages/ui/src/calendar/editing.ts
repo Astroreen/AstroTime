@@ -14,6 +14,7 @@ import {
   hasOccurrence,
   movedRepeat,
   placeText,
+  sameGeo,
   repeatOf,
   timesOf,
   wallClockIn,
@@ -469,12 +470,7 @@ function placeOfItem(location: string, geo: Geo, label: Item["placeLabel"]): Pla
 
 /** Two places alike: the same text on the same point, however each form was made. */
 const samePlace = (a: Place | null, b: Place | null) =>
-  a === b ||
-  (a !== null &&
-    b !== null &&
-    placeText(a) === placeText(b) &&
-    a.geo.lat === b.geo.lat &&
-    a.geo.lon === b.geo.lon);
+  a === b || (a !== null && b !== null && placeText(a) === placeText(b) && sameGeo(a.geo, b.geo));
 
 /**
  * What the user changed from `initial` to `form`; for a new item, everything

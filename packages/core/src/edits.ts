@@ -424,7 +424,7 @@ function setText(component: ICAL.Component, name: string, value: string): void {
 const degrees = (value: number) => Math.round(value * 1e6) / 1e6;
 
 /** The same point, to the tenth of a metre a point is written to; or no point on both sides. */
-const sameGeo = (a: Geo | null, b: Geo | null) =>
+export const sameGeo = (a: Geo | null, b: Geo | null) =>
   a === b ||
   (a !== null &&
     b !== null &&
@@ -439,10 +439,19 @@ const sameGeo = (a: Geo | null, b: Geo | null) =>
 function setPlace(component: ICAL.Component, location: string | Place): void {
   // The same place is no change: the same text, and for a place picked the
   // same point too; its lines stay as they were, Apple's parameters and all (D7).
+  // Both texts trimmed, as placeText trims; a point that is no point (NaN,
+  // 91, 0,0) on the same text changes nothing either, the valid one stays.
   const was = readItem(component);
   const sameText =
-    (typeof location === "string" ? location : placeText(location)) === (was.location ?? "");
-  if (sameText && (typeof location === "string" || sameGeo(location.geo, was.geo))) return;
+    (typeof location === "string" ? location : placeText(location)).trim() ===
+    (was.location ?? "").trim();
+  if (
+    sameText &&
+    (typeof location === "string" ||
+      sameGeo(location.geo, was.geo) ||
+      !point(location.geo.lat, location.geo.lon))
+  )
+    return;
   // A point off the globe is no point: the place is written as text (D176).
   if (typeof location !== "string" && !point(location.geo.lat, location.geo.lon)) {
     location = placeText(location);
@@ -986,7 +995,8 @@ function editSeries(
         follow[key] = changes[key];
     }
     // A place is its text and its point: an exception with a point of its own keeps its place (D176).
-    if (follow["location"] !== undefined && !sameGeo(own.geo, before.geo))
+    // With the series' text and no point (another client dropped it), it is the series' place.
+    if (follow["location"] !== undefined && own.geo !== null && !sameGeo(own.geo, before.geo))
       delete follow["location"];
     if (changes.categories && own.categories.join() === before.categories.join()) {
       follow["categories"] = changes.categories;

@@ -781,7 +781,7 @@ describe("the scope of an edit of one occurrence (D11)", () => {
       expect(component.getAllProperties("geo").length).toBeLessThanOrEqual(1);
   });
 
-  test("all: an exception with the series' text but no point is a place of its own (D176)", () => {
+  test("all: an exception with the series' text but no point is the series' place, and follows it (D176)", () => {
     const place = (name: string, lat: number) => ({
       name,
       address: "Berlin",
@@ -819,7 +819,84 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     const at = (day: string) =>
       occurrences.find((o) => o.start.type === "zoned" && o.start.local.startsWith(day))!.item;
     expect([at("2026-11-23").location, at("2026-11-23").geo?.lat]).toEqual(["Mill, Berlin", 52.1]);
-    expect([at("2026-12-21").location, at("2026-12-21").geo]).toEqual(["Gate, Berlin", null]);
+    // Another client dropped its point, not its place: it moves with the series.
+    expect([at("2026-12-21").location, at("2026-12-21").geo?.lat]).toEqual(["Mill, Berlin", 52.1]);
+  });
+
+  test("all: an exception with a text of its own and no point keeps its text (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const placed = editItem(
+      series(),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    ).ics;
+    // Its own text, typed and not picked: no point.
+    const own = editItem(
+      CalendarObject.parse(placed),
+      { location: "Room 9" },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(own),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const at = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-12-21",
+      to: "2026-12-22",
+      timeZone,
+    })[0]!.item;
+    expect([at.location, at.geo]).toEqual(["Room 9", null]);
+  });
+
+  test("all: a series with no point at all: a new text reaches every occurrence that had it", () => {
+    const withCopy = editItem(
+      series(),
+      { summary: "Standup!" },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(withCopy),
+      { location: "Room 9" },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const places = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-11-01",
+      to: "2027-01-01",
+      timeZone,
+    }).map((o) => [o.item.location, o.item.geo]);
+    expect(new Set(places.map((p) => JSON.stringify(p)))).toEqual(
+      new Set([JSON.stringify(["Room 9", null])]),
+    );
+  });
+
+  test("all: an exception on the series' point under a text of its own keeps its text (D176)", () => {
+    const place = (name: string) => ({ name, address: "Berlin", geo: { lat: 52.5, lon: 13 } });
+    const placed = editItem(
+      series(),
+      { location: place("Gate") },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    ).ics;
+    const renamed = editItem(
+      CalendarObject.parse(placed),
+      { location: place("Brandenburg Gate") },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(renamed),
+      { location: { ...place("Mill"), geo: { lat: 52.1, lon: 13 } } },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const at = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-12-21",
+      to: "2026-12-22",
+      timeZone,
+    })[0]!.item;
+    expect([at.location, at.geo?.lat]).toEqual(["Brandenburg Gate, Berlin", 52.5]);
   });
 
   test("all: a new title reaches an exception that had the series' title, not one renamed on its own", () => {

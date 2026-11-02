@@ -37,7 +37,14 @@ export default defineConfig({
   // server sends no policy, so here it stays as it is.
   html: { cspNonce: "astrotime-csp-nonce" },
   // sqlite-wasm loads its .wasm next to itself; pre-bundling would move it.
-  optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
+  // Base UI's Autocomplete loads with the edit dialog (design D175): named
+  // here, the dev server bundles it at start, where it might otherwise find
+  // it when a test first opens the dialog and reload the page (the likely,
+  // not proven, cause of a places.spec failure seen once).
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+    include: ["@astrotime/ui > @base-ui/react/autocomplete"],
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
