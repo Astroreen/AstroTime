@@ -163,7 +163,6 @@ function SettingsGroups({
           label={t("settings.pictures.illustrations")}
           checked={settings.illustrations}
           onChange={(illustrations) => change({ illustrations })}
-          hint={t("settings.pictures.illustrations.hint")}
         />
         <Toggle
           label={t("settings.pictures.banners")}

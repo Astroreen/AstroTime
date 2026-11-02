@@ -270,9 +270,7 @@ export const en = {
   "settings.keepRunning.hint":
     "AstroTime goes on syncing and reminding; quit it from the tray or the menu.",
   "settings.pictures": "Pictures",
-  "settings.pictures.illustrations": "Illustrations",
-  "settings.pictures.illustrations.hint":
-    "Events and tasks whose title says lunch, a birthday, a flight and the like are drawn over a picture in the Agenda and in their details.",
+  "settings.pictures.illustrations": "Illustrations by an item's title",
   "settings.pictures.banners": "Month banners in the Agenda",
   "settings.places": "Places",
   "settings.places.search": "Search places on the map",

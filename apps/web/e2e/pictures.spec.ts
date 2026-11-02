@@ -68,7 +68,7 @@ test("Settings → Pictures → Illustrations off: every card and the details ar
     .getByRole("button", { name: "Settings" })
     .click();
   const settings = page.getByRole("dialog", { name: "Settings" });
-  const toggle = settings.getByRole("switch", { name: "Illustrations" });
+  const toggle = settings.getByRole("switch", { name: "Illustrations by an item's title" });
   await expect(toggle).toBeChecked();
   await toggle.click();
   await expect(toggle).not.toBeChecked();

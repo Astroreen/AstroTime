@@ -1598,7 +1598,7 @@ own (below).
     at the top. Each picture is drawn on a mid-tone ground, never white or
     black, so it sits on both the light and the dark theme.
 - **D217. Settings → Pictures.** A group of its own after Colours:
-  "Illustrations", on by default, with what it does under it; off, every
+  "Illustrations by an item's title", on by default; off, every
   card and the details are plain; and "Month banners in the Agenda"
   ([D218](#D218)). They are kept with the other settings on this device
   (D96).
