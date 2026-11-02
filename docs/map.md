@@ -48,6 +48,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `remindersOf`, `soonestReminders` — the times an object's alarms fire,
     and the reminder set a platform is handed; `ReminderScheduler`, how a
     platform shows them. → `plans/foundation.md#D100`, `plans/android.md#D60`
+  - `copyItem` (`edits.ts`) — an occurrence as a new item of its own: a
+    new UID, no recurrence, no guests, every other line kept.
+    → `plans/design.md#D164`
   - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
     other edit: only the fields changed, in a scope for an occurrence of a
     series (this, this and following, all), a series moved as its
@@ -68,7 +71,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
-  - `Item.geo`, `Place`, `placeText` — a place's point, read from `GEO` or
+  - `Item.geo`, `Item.placeLabel`, `Place`, `placeText` — a place's point
+    (and Apple's name for it), read from `GEO` or
     Apple's structured location and written with a place picked on the
     map. → `plans/foundation.md#D176`
 
@@ -239,8 +243,10 @@ When you add a package, app or module, add its line here in the same PR.
     week and clock (`locale.ts`), `Intl` formats, the query path to the
     layout (`query.ts`, `ObjectCache`), the month's weeks and their folding
     (`month.ts`), the Agenda's days (`agenda.ts`) and `liveQuery` (`live.ts`,
-    a result equal to the last one is not reported; `everyRun`).
-    → `plans/foundation.md#D54`, `plans/foundation.md#D181`
+    a result equal to the last one is not reported; `everyRun`; `whileShown`,
+    what is drawn hears the store only while the page is shown).
+    → `plans/foundation.md#D54`, `plans/foundation.md#D181`,
+    `plans/foundation.md#D182`
     - `tasks.ts` — the store's tasks as the tasks screen's lists: sorted,
       subtasks under parents, a series by its current occurrence.
       → `plans/design.md#D95`
@@ -254,7 +260,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D155`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
-      (`saveChanges`, a drag's too); `words.ts` — rules and reminders in
+      (`saveChanges`, a drag's too; `saveCopy` and `copyOf`, design D164);
+      `words.ts` — rules and reminders in
       words; `conflicts.ts` — the Conflicts list's two ways out.
       → `plans/foundation.md#D103`, `plans/foundation.md#D107`
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
@@ -268,7 +275,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
     `plans/design.md#D152`; `swipeOutcome`, where one let go goes,
-    `plans/design.md#D154`), `useNow`, `useMediaQuery`.
+    `plans/design.md#D154`), `useNow` (stopped while the page is hidden,
+    `plans/foundation.md#D182`), `useMediaQuery`.
   - `preferences.ts` — `Preferences`, and `localPreferences` in
     localStorage, the web's and the desktop's.
   - `settings.ts` — the settings, kept in the preferences and
@@ -330,7 +338,8 @@ When you add a package, app or module, add its line here in the same PR.
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
     `idle.spec.ts` counts React commits in the Month view across another
-    tab's change: an idle tab does no work. → `plans/foundation.md#D181`
+    tab's change: an idle tab does no work, a hidden one waits.
+    → `plans/foundation.md#D181`, `plans/foundation.md#D182`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`;
     `offline.spec.ts` reloads it with the network gone, updates it, and

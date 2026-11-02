@@ -62,6 +62,11 @@ interface ItemFields {
    * place and kept the old one's point (foundation D176).
    */
   readonly geo: Geo | null;
+  /**
+   * The place's name and address as Apple's structured location names them
+   * (`X-TITLE`, `X-ADDRESS`), beside its point; null without (D176).
+   */
+  readonly placeLabel: { readonly name: string; readonly address: string } | null;
   readonly status: string | null;
   readonly categories: readonly string[];
   /** `CLASS`: PUBLIC, PRIVATE, CONFIDENTIAL. */
@@ -251,7 +256,7 @@ function fields(component: ICAL.Component): ItemFields {
     summary: text(component, "summary"),
     description: text(component, "description"),
     location: text(component, "location"),
-    geo: geoOf(component),
+    ...placeOf(component),
     status: text(component, "status"),
     categories: component
       .getAllProperties("categories")
@@ -269,34 +274,64 @@ function fields(component: ICAL.Component): ItemFields {
   };
 }
 
-const point = (lat: unknown, lon: unknown): Geo | null => {
+/**
+ * A point on the globe, or none: off it, not a number, or exactly 0,0,
+ * which some clients write for "no coordinates" (D176).
+ */
+export const point = (lat: unknown, lon: unknown): Geo | null => {
   const [a, b] = [Number(lat), Number(lon)];
-  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180
-    ? { lat: a, lon: b }
-    : null;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180)
+    return null;
+  return a === 0 && b === 0 ? null : { lat: a, lon: b };
 };
 
 /** Text compared as a reader sees it: case and runs of spaces aside. */
 const loosely = (words: string) => words.replaceAll(/\s+/g, " ").trim().toLocaleLowerCase();
 
+/** A point's two parts as text: none when either is empty, as in a cut-off "52.5;". */
+const pointOf = (lat: string | undefined, lon: string | undefined): Geo | null =>
+  lat?.trim() && lon?.trim() ? point(lat, lon) : null;
+
 /**
- * The item's point (foundation D176). Apple's structured location names the
- * place it is for (`X-TITLE`): when `LOCATION` no longer holds that name,
- * case and spaces aside, another client changed the place and kept the old
- * point, so there is none, `GEO` neither (AstroTime writes both).
+ * The item's point and Apple's name for it (foundation D176). Apple's
+ * structured location names the place it is for (`X-TITLE`): when
+ * `LOCATION` no longer holds that name, case and spaces aside, another
+ * client changed the place and kept the old point, so there is none, `GEO`
+ * neither (AstroTime writes both). Apple's name and address go with Apple's
+ * point only, never with a `GEO` read in its stead.
  */
-function geoOf(component: ICAL.Component): Geo | null {
+function placeOf(component: ICAL.Component): Pick<Item, "geo" | "placeLabel"> {
   const apple = component.getFirstProperty("x-apple-structured-location");
   if (apple) {
     const title = apple.getParameter("x-title");
     const location = loosely(text(component, "location") ?? "");
     if (typeof title === "string" && loosely(title) && !location.includes(loosely(title)))
-      return null;
-    const uri = /^geo:([-+\d.]+),([-+\d.]+)/i.exec(String(apple.getFirstValue() ?? ""));
-    if (uri) return point(uri[1], uri[2]);
+      return { geo: null, placeLabel: null };
+    // RFC 5870: geo:lat,lon[,alt][;param…]; latitude and longitude alone count.
+    const uri = /^geo:([^,;]*),([^,;]*)(?:,[^;]*)?(?:;.*)?$/i.exec(
+      String(apple.getFirstValue() ?? ""),
+    );
+    const geo = uri ? pointOf(uri[1], uri[2]) : null;
+    if (geo) {
+      const address = apple.getParameter("x-address");
+      const placeLabel =
+        typeof title === "string" && title.trim()
+          ? { name: title.trim(), address: typeof address === "string" ? address.trim() : "" }
+          : null;
+      return { geo, placeLabel };
+    }
   }
+  // A lone GEO is trusted as it is (D176); ical.js reads it as two
+  // numbers, another value type as its text "lat;lon".
   const geo = component.getFirstPropertyValue("geo");
-  return Array.isArray(geo) ? point(geo[0], geo[1]) : null;
+  const part = (value: unknown) =>
+    typeof value === "number" || typeof value === "string" ? String(value) : undefined;
+  const [lat, lon] = Array.isArray(geo)
+    ? geo.map(part)
+    : typeof geo === "string"
+      ? geo.split(";")
+      : [];
+  return { geo: pointOf(lat, lon), placeLabel: null };
 }
 
 function parentUid(component: ICAL.Component): string | null {

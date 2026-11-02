@@ -936,6 +936,9 @@ an event or a task." What is written and which services are asked:
     in them), which opens the user's maps app. A text
     with no point opens a search for it (`openstreetmap.org/search?query=…`,
     `geo:0,0?q=…`).
+  - **Both actions stay with places off, and on the desktop**: they are
+    links the user taps, and nothing goes anywhere until they do; the
+    setting's "nothing is asked" is what the app asks on its own.
   - **Copy address**: the location's text, "Copied" for two seconds after;
     refused by the clipboard, the change notice says "The address could not
     be copied", on the page's body so the open details do not hide it from
@@ -943,8 +946,10 @@ an event or a task." What is written and which services are asked:
     WebViews), no button.
 
   A text with no point (another client's, or typed) shows as it always did,
-  with the same two actions. The name and the address come from the text:
-  Apple's two lines, or AstroTime's and Google's "name, address".
+  whole, commas and all, with the same two actions. A place with a point
+  is named by Apple's own name and address when its structured location
+  has them (foundation [D176](foundation.md#D176)), else from its text:
+  Apple's lines, or AstroTime's and Google's "name, address".
 
 ### Decided in round 3: settings, colours, dropdowns, accounts
 
@@ -1218,6 +1223,47 @@ Settings, the colours and the lists controls open.
   task's `STATUS`, `PRIORITY`, `PERCENT-COMPLETE` and `CATEGORIES` are
   written back as they were (foundation [D7](foundation.md#D7)), and only
   completing changes the first and the third.
+- **D163. Delete is in a "⋯" menu with "Make a copy" and "Copy to…"**
+  (the owner's feedback 11). The details' Delete button becomes "More
+  actions" (`MenuButton` with an icon, [D167](#D167)): Delete, "Make a
+  copy" ("Сделать копию"), "Copy to…" ("Копировать в…"), in that order,
+  each where the rights allow it (foundation [D37](foundation.md#D37),
+  `rightsOf`): Delete as [D108](#D108) said; "Make a copy" when the item's
+  calendar takes new items; "Copy to…" when any calendar takes one of its
+  kind, so a read-only calendar's item can still be copied elsewhere. The
+  menu shows only with one action in it. Edit stays a button of its own.
+- **D164. What a copy is** (`copyItem` in `@astrotime/core`):
+  - **"Make a copy"** saves the copy at once in the item's calendar, closes
+    the details and says "Copy made" ("Копия создана"), with Open, which
+    opens the copy's details; the notice goes by itself after 8 seconds,
+    as a snackbar does. **"Copy to…"** opens the edit dialog as a new
+    item, every field filled from this one, the calendar too (the first
+    that takes it, when its own takes no new items); its kind cannot be
+    switched; Save makes it wherever the dialog says, the copy with the
+    user's changes, its first revision (`SEQUENCE:0`, `createFromCopy`).
+    One notice shows at a time: a copy's replaces a failed change's, and
+    the other way round.
+  - **An occurrence of a series is copied alone**, as an item that does
+    not repeat, at that occurrence's time and with its exception's fields:
+    the copy is what the user tapped. Google's own help does not say, and a
+    report of its "copy to my calendar" copying one instance of a series
+    is the nearest evidence; a series copied whole is
+    [Deferred](#deferred).
+  - **What it keeps:** every line of the item, those AstroTime has no
+    field for included (`X-*`, `GEO`, `X-APPLE-STRUCTURED-LOCATION`,
+    `RELATED-TO`, the star; foundation [D7](foundation.md#D7)), and the
+    calendar's other components (its `VTIMEZONE`s). "Copy to…" saves the
+    copy with what the user changed, not a new item made of the fields.
+  - **What it does not:** a new `UID`, `DTSTAMP`, `CREATED` and
+    `LAST-MODIFIED`, `SEQUENCE:0`; no `RRULE`, `RDATE`, `EXDATE` or
+    `RECURRENCE-ID`; no `ORGANIZER` or `ATTENDEE`, so no server that
+    schedules sends an invitation for it and no guest's answer is copied
+    (AstroTime does not invite, [D108](#D108)); a task is not done in its
+    copy (`STATUS:NEEDS-ACTION`, no `COMPLETED`, `PERCENT-COMPLETE:0` when
+    it had one); its reminders keep their times, without their `UID` and
+    their `ACKNOWLEDGED`, and the item without Thunderbird's
+    `X-MOZ-LASTACK`: those say the original's reminders were seen, which
+    the copy's were not.
 
 ## Deferred
 
@@ -1226,6 +1272,10 @@ Settings, the colours and the lists controls open.
   other days, and a scope's (this and following, all) are drawn once saved.
   Drawing them needs the scope before Save (D108 asks after), or the rule
   applied to the whole series for the preview alone.
+- **A series copied whole** — "Make a copy" and "Copy to…" copy the
+  occurrence tapped as an item that does not repeat ([D164](#D164)); a
+  choice to copy the whole series, its rule and exceptions with it, would
+  be the scope question's.
 - **Own colours with the account** — the user's colours are this device's
   ([D173](#D173)); with no place for them on a CalDAV server, a second
   device starts without them.
@@ -1331,6 +1381,12 @@ Settings, the colours and the lists controls open.
   are worked out left to right; AstroTime speaks English and Russian
   (foundation [D17](foundation.md#D17)), so a right-to-left language
   brings their mirror ([D135](#D135)).
+- **The `geo:` link proven on an Android device** — "Open in maps" on
+  Android is a `geo:` link the WebView hands to the system
+  ([D177](#D177)); no device or emulator has opened it yet.
+- **A privacy page** — what the place search sends where is said in its
+  setting and in the README's self-hosting section ([D175](#D175)); the app
+  has no page that gathers what goes where.
 - **A dark map** — the place card's map is OpenStreetMap's standard tiles
   in both themes ([D177](#D177)); a dark style needs a tile server that has
   one.

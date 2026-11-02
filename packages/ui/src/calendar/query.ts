@@ -189,6 +189,7 @@ export function undoneChip(today: string): Occurrence {
     description: null,
     location: null,
     geo: null,
+    placeLabel: null,
     status: null,
     categories: [],
     classification: null,

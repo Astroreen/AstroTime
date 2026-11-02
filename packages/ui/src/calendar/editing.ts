@@ -6,6 +6,8 @@
 import {
   ALL_RIGHTS,
   CalendarObject,
+  copyItem,
+  createFromCopy,
   createItem,
   deleteItem,
   editItem,
@@ -20,6 +22,7 @@ import {
   type Alarm,
   type CalendarRights,
   type Place,
+  type Geo,
   type Item,
   type ItemChanges,
   type ItemTime,
@@ -176,7 +179,8 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     repeat: rule ? (rule.exact ? rule.repeat : "kept") : null,
     alarms: item.alarms.map((alarm, index) => ({ kind: "existing", index, alarm })),
     location: item.location ?? "",
-    place: item.geo ? { ...nameAndAddress(item.location ?? ""), geo: item.geo } : null,
+    // The point with the very text it belongs to, so a copy writes both (D176).
+    place: item.geo ? placeOfItem(item.location ?? "", item.geo, item.placeLabel) : null,
     description: item.description ?? "",
     color: item.color,
   };
@@ -457,6 +461,21 @@ function ruleChanged(initial: Form, form: Form): boolean {
   return !sameRepeat(moved, form.repeat);
 }
 
+/** An item's place: its name, address and point, with the text it was written as. */
+function placeOfItem(location: string, geo: Geo, label: Item["placeLabel"]): Place {
+  const { name, address } = nameAndAddress(location, label);
+  return { name, address, geo, written: { text: location, name, address } };
+}
+
+/** Two places alike: the same text on the same point, however each form was made. */
+const samePlace = (a: Place | null, b: Place | null) =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    placeText(a) === placeText(b) &&
+    a.geo.lat === b.geo.lat &&
+    a.geo.lon === b.geo.lon);
+
 /**
  * What the user changed from `initial` to `form`; for a new item, everything
  * it holds. `untitled` is what a reminder added to an item without a title
@@ -467,7 +486,10 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   const was = initial;
   const differs = <K extends keyof Form>(key: K) => !was || was[key] !== form[key];
   if (differs("summary") && (was || form.summary.trim())) changes.summary = form.summary.trim();
-  if ((differs("location") || differs("place")) && (was || form.location.trim())) {
+  if (
+    (differs("location") || !samePlace(was?.place ?? null, form.place)) &&
+    (was || form.location.trim())
+  ) {
     // A place picked is written with its point while its text stays as picked (D176).
     const text = form.location.trim();
     changes.location = form.place && placeText(form.place) === text ? form.place : text;
@@ -800,15 +822,23 @@ export async function saveForm(
     readonly untitled: string;
     /** The calendars hidden from the views, which a new item's fallback passes over first. */
     readonly hidden?: ReadonlySet<string>;
+    /**
+     * A copy's iCalendar ("Copy to", design D164), which `initial` is the
+     * form of: the new item is it with what the user changed, so the lines
+     * the dialog has no field for come along (D7).
+     */
+    readonly base?: string;
   },
   writes: Writes,
 ): Promise<void> {
   const { target, initial, form, untitled } = request;
   if (!target || !initial) {
-    const ics = createItem(form.kind, changesOf(null, form, untitled), {
-      now: writes.now,
-      uid: writes.uid(),
-    });
+    const ics = request.base
+      ? createFromCopy(request.base, changesOf(initial, form, untitled), { now: writes.now })
+      : createItem(form.kind, changesOf(null, form, untitled), {
+          now: writes.now,
+          uid: writes.uid(),
+        });
     await changeLocal(store, async (local) => {
       // The calendars as they are now, in this transaction: the screen's
       // list may not have caught up (foundation D122). Where it goes is what
@@ -875,6 +905,42 @@ export async function saveChanges(
     await local.save(stored.calendarId, ics, stored.href);
     if (rest) await local.save(stored.calendarId, rest);
   });
+}
+
+/**
+ * The item opened as a copy of its own (design D164), not yet saved: the
+ * occurrence with a new UID (`copyItem`), and the target it stands for, in
+ * the item's calendar ("Copy to" opens it in the edit dialog).
+ */
+export function copyOf(target: Target, writes: Writes): { ics: string; target: Target } {
+  const ics = copyItem(target.object, target.recurrenceId, { now: writes.now, uid: writes.uid() });
+  const object = CalendarObject.parse(ics);
+  const item = object.master!;
+  return {
+    ics,
+    target: { objectId: "", calendarId: target.calendarId, object, recurrenceId: null, item },
+  };
+}
+
+/**
+ * "Make a copy" (design D164): the copy saved at once, in the item's own
+ * calendar, as the store holds the item now; the copy's target, to open it.
+ * An item gone meanwhile is a `GoneError`, a calendar that no longer takes
+ * new items a `RefusedError`.
+ */
+export async function saveCopy(store: Store, target: Target, writes: Writes): Promise<Target> {
+  const saved: { target?: Target } = {};
+  await changeLocal(store, async (local) => {
+    const { object } = await current(local, target);
+    const calendar = (await local.calendars()).find((c) => c.id === target.calendarId);
+    if (!calendar || calendarsFor([calendar], target.item.kind).length === 0) {
+      throw new RefusedError("The calendar no longer takes new items.");
+    }
+    const copy = copyOf({ ...target, object }, writes);
+    const row = await local.save(target.calendarId, copy.ics);
+    saved.target = { ...copy.target, objectId: row.id };
+  });
+  return saved.target!;
 }
 
 /**

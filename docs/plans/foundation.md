@@ -1976,9 +1976,27 @@ and [D177](design.md#D177); what reaches a server, and which:
     Free text typed and not picked has no point. An edit that leaves the
     place alone keeps every line of it ([D7](#D7)): this is D7's one
     exception, a property tied to a field the user changed. Text changed
-    and changed back is no change: nothing is written. A place picked,
-    or an item copied, writes Apple's structured location in AstroTime's
-    shape (its `X-APPLE-RADIUS` 70), not another client's.
+    and changed back is no change: nothing is written; and the core holds
+    to it too: a `LOCATION` written with the text it already has, or a
+    place picked with the text and point it already has, keeps every line
+    of its place, Apple's parameters and all. A place picked, or an item
+    copied, writes Apple's structured location in AstroTime's shape (its
+    `X-APPLE-RADIUS` 70), not another client's; a copy keeps the text the
+    point was read with (Apple's lines too, `Place.written`), so it keeps
+    the point. That text holds only while the name and the address are
+    the ones it was read with: either changed, the place is written as
+    "name, address" again. The edit dialog compares places by their text and point, not as
+    objects, so a form made again from the same item writes nothing.
+  - **A point off the globe is none**: a place whose point is not a number,
+    is out of range, is cut off ("52.5;") or is exactly 0,0 (which some
+    clients write for "no coordinates") is written as text alone, and read
+    as no point.
+  - **A series' place**: a new place for every occurrence reaches the
+    exceptions that had the series' place, text and point alike; one with a
+    place of its own keeps it (the series' text with no point, as another
+    client may leave it, is a place of its own), as an exception's own title stays
+    ([D105](#D105)). Each component's place is its own: a change removes
+    the old point from the component changed and from no other.
   - **A geocoder's text goes on one line**: newlines and runs of spaces in
     a name or an address become one space, in `LOCATION` and in Apple's
     parameters alike, where a `"` goes as RFC 6868's `^'` (ical.js writes
@@ -1987,8 +2005,17 @@ and [D177](design.md#D177); what reaches a server, and which:
     place it is for (`X-TITLE`); when `LOCATION` no longer holds that name,
     case and runs of spaces aside, another client changed the place and
     kept the old point, so the item has none, `GEO` neither. AstroTime
-    writes both, so its own places are guarded the same way; a `GEO` alone
-    from another client is trusted. The guard's limit: a new text that
+    writes both, so its own places are guarded the same way. **A `GEO`
+    alone is trusted**, even under a text changed since: the clients that
+    write a bare `GEO` change it with their text, AstroTime's own points
+    carry Apple's guard, and a point dropped on a guess would hide a right
+    map more often than it hides a wrong one; a test pins it. A `GEO`
+    another parser wrote as text ("lat;lon", split at its semicolon alone,
+    so a decimal comma is never a separator) reads the same; Apple's `geo:`
+    URI is read as RFC 5870 writes it, an altitude and parameters after the
+    point (`geo:52.5,13.4,35;u=10`). Apple's name
+    and address of its own point (`Item.placeLabel`, never beside a `GEO`
+    read in its stead) name the place on its card ([design D177](design.md#D177)). The guard's limit: a new text that
     still holds the old name ("Cafe Roma Nuovo" over "Cafe Roma") keeps
     the old point, and one that drops it ("the café" for "Cafe Roma") loses
     a point that was still right; a word-for-word match would lose more
@@ -2062,9 +2089,52 @@ core busy for hours, hidden too (a CPU profile: 10 s of script in 10 s).
   - Proved by `idle.spec.ts`: the Month view beside a calendar on this
     device that stays draws a handful of commits for a change another tab
     makes, 294 before.
+- **D182. A hidden tab does no work but what must not wait.** A tab behind
+  another, or a window minimised, spends nothing on what nobody sees.
+  - **Keeps running:** the sync, by its own rules ([D91](#D91),
+    [D129](#D129): its timer only while visible, once on coming back,
+    after a local change and when the network returns, held back by a
+    server's refusal, [D128](#D128)); the reminders ([D101](#D101): the
+    planner still follows the store, and the platform's timers fire); the
+    store itself, which a leader tab serves to the others ([D98](#D98));
+    the writes the UI makes of itself (the calendar on this device made or
+    stepped aside, [D122](#D122)), whose queries in `accounts-context.tsx`
+    hear the store itself; and the preset's sign-in, which opens by itself
+    at most once per page, on its first read ([D123](#D123)): a tab opened
+    behind another has it open when the user comes to it.
+  - **Waits for `visibilitychange`:** every live query of what is drawn
+    (the views' range and undone tasks, the calendars' lists, the tasks
+    screen, search, an item's details, the conflicts), and the question
+    whether to keep the data ([D121](#D121): Firefox asks it in the tab),
+    hears the store
+    through `whileShown`: the changes made while the page is hidden wait,
+    and come as one when it is shown, so the views read once and draw what
+    changed. A live query still reads once when it starts, shown or not: a
+    tab loaded behind another reads its views once, and may ask whether to
+    keep the data at that load, as a shown one would. The clock (`useNow`, the now-line and today) stops and ticks
+    at once when shown. Measuring (`ResizeObserver`) waits by itself: a
+    hidden page lays nothing out.
+  - Along the way, a render asks the browser less: the month asks whether
+    there is a mouse once, not in each of its tiles, and `useMediaQuery`
+    keeps one `MediaQueryList` per query instead of calling `matchMedia` on
+    every render (2 % of the owner's profile, [D181](#D181)).
+  - Proved by `idle.spec.ts`: a hidden Month tab draws nothing for another
+    tab's event and draws it once shown; ten minutes of a hidden tab's
+    timers do not move the now-line, which moves at once when shown; and by
+    `live.test.ts` (one read on show) and `now.browser.test.tsx` (no timer
+    while hidden).
 
 ## Deferred
 
+- **A tab loaded hidden** still reads its live queries once at the load,
+  and can ask whether to keep the data then ([D182](#D182)); starting them
+  only when first shown would save that read.
+- **`useMediaQuery`'s lists** are kept for the page's life, one per query
+  ([D182](#D182)): a test that replaces `matchMedia` after the first ask
+  would get the old list. No test does; none covers the cache either.
+- **`useNow`'s visibility** is the document's (`documentVisibility`), not
+  injected as `whileShown`'s is ([D182](#D182)); its test fakes the
+  document instead.
 - **A fixture of Nextcloud's custom colour** — what Nextcloud Calendar
   writes for a colour of its picker ([D174](#D174) reads its source:
   the nearest CSS3 name); `scripts/record-nextcloud-fixtures.ts` can record

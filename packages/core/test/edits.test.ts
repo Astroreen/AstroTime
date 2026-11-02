@@ -3,6 +3,8 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   CalendarObject,
+  copyItem,
+  createFromCopy,
   createItem,
   deleteItem,
   editItem,
@@ -17,7 +19,7 @@ import {
   type Task,
 } from "../src/index.ts";
 import { movedRule } from "../src/repeat.ts";
-import { fixture, load } from "./support.ts";
+import { canonicalLine, contentLines, fixture, load } from "./support.ts";
 
 const NOW = Date.parse("2026-11-04T08:40:00Z");
 const STAMP = "20261104T084000Z";
@@ -739,6 +741,85 @@ describe("the scope of an edit of one occurrence (D11)", () => {
       "2026-12-21T10:00:00",
       "2026-12-28T10:00:00",
     ]);
+  });
+
+  test("all: a new place reaches the occurrences that had the series' place; one with its own stays (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const withOwn = editItem(
+      series(),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+    ).ics;
+    const { ics } = editItem(
+      CalendarObject.parse(withOwn),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const places = Object.fromEntries(
+      occurrencesBetween(CalendarObject.parse(ics), {
+        from: "2026-11-01",
+        to: "2027-01-01",
+        timeZone,
+      }).map((o) => [
+        o.start.type === "zoned" ? o.start.local.slice(0, 10) : "",
+        [o.item.location, o.item.geo?.lat],
+      ]),
+    );
+    expect(places).toEqual({
+      "2026-11-23": ["Gate, Berlin", 52.5],
+      "2026-11-30": ["Gate, Berlin", 52.5],
+      "2026-12-14": ["Gate, Berlin", 52.5],
+      "2026-12-21": ["Mill, Berlin", 52.1],
+      "2026-12-28": ["Gate, Berlin", 52.5],
+    });
+    // Each component holds one point of its own: none is written twice.
+    for (const component of CalendarObject.parse(ics).root.getAllSubcomponents("vevent"))
+      expect(component.getAllProperties("geo").length).toBeLessThanOrEqual(1);
+  });
+
+  test("all: an exception with the series' text but no point is a place of its own (D176)", () => {
+    const place = (name: string, lat: number) => ({
+      name,
+      address: "Berlin",
+      geo: { lat, lon: 13 },
+    });
+    const placed = editItem(
+      series(),
+      { location: place("Gate", 52.5) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    ).ics;
+    // Another client kept the text on one occurrence and dropped its point.
+    const exception = CalendarObject.parse(
+      editItem(
+        CalendarObject.parse(placed),
+        { summary: "Standup!" },
+        { now: NOW, scope: "this", recurrenceId: occurrence("2026-12-21T09:00:00") },
+      ).ics,
+    );
+    for (const component of exception.root.getAllSubcomponents("vevent")) {
+      if (!component.hasProperty("recurrence-id")) continue;
+      component.removeAllProperties("geo");
+      component.removeAllProperties("x-apple-structured-location");
+    }
+    const stripped = exception.serialize();
+    const { ics } = editItem(
+      CalendarObject.parse(stripped),
+      { location: place("Mill", 52.1) },
+      { now: NOW, scope: "all", recurrenceId: occurrence("2026-11-23T09:00:00") },
+    );
+    const occurrences = occurrencesBetween(CalendarObject.parse(ics), {
+      from: "2026-11-01",
+      to: "2027-01-01",
+      timeZone,
+    });
+    const at = (day: string) =>
+      occurrences.find((o) => o.start.type === "zoned" && o.start.local.startsWith(day))!.item;
+    expect([at("2026-11-23").location, at("2026-11-23").geo?.lat]).toEqual(["Mill, Berlin", 52.1]);
+    expect([at("2026-12-21").location, at("2026-12-21").geo]).toEqual(["Gate, Berlin", null]);
   });
 
   test("all: a new title reaches an exception that had the series' title, not one renamed on its own", () => {
@@ -1619,5 +1700,149 @@ describe("a series' corners (D142)", () => {
     );
     expect(ics).toContain("RDATE;VALUE=PERIOD:20261104T120000Z/PT2H\r\n");
     expect(ics).toContain("RDATE;TZID=Europe/Vilnius:20261106T100000\r\n");
+  });
+});
+
+describe("a copy of an item (design D164)", () => {
+  const object = (body: string) =>
+    CalendarObject.parse(
+      `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Other//EN\r\nX-WR-CALNAME:Kept\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/Vilnius\r\nBEGIN:STANDARD\r\nDTSTART:19701025T040000\r\nTZOFFSETFROM:+0300\r\nTZOFFSETTO:+0200\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n${body}END:VCALENDAR\r\n`,
+    );
+
+  test("is the same item under a new UID, its own revision, every other line kept", () => {
+    const meeting = object(
+      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nCREATED:20261001T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nLOCATION:Room 4\r\nGEO:54.687;25.279\r\nX-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279\r\nX-OTHER:kept\r\nX-MOZ-LASTACK:20261105T084500Z\r\nORGANIZER:mailto:me@example.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:you@example.com\r\nBEGIN:VALARM\r\nUID:alarm-1\r\nACTION:DISPLAY\r\nDESCRIPTION:Planning\r\nTRIGGER:-PT15M\r\nACKNOWLEDGED:20261105T084500Z\r\nEND:VALARM\r\nEND:VEVENT\r\n",
+    );
+    const copy = copyItem(meeting, null, { now: NOW, uid: "copy" });
+    const parsed = CalendarObject.parse(copy);
+    expect(parsed.master).toMatchObject({
+      uid: "copy",
+      summary: "Planning",
+      location: "Room 4",
+      sequence: 0,
+      start: vilnius("2026-11-05T10:00:00"),
+      end: vilnius("2026-11-05T11:00:00"),
+      attendees: [],
+      organizer: null,
+    });
+    for (const line of [
+      "X-OTHER:kept",
+      "GEO:54.687;25.279",
+      "X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Room 4:geo:54.687,25.279",
+      "X-WR-CALNAME:Kept",
+      "TZID:Europe/Vilnius",
+      "TRIGGER:-PT15M",
+      `DTSTAMP:${STAMP}`,
+      `CREATED:${STAMP}`,
+      `LAST-MODIFIED:${STAMP}`,
+    ]) {
+      // The same in meaning: folding and parameter order aside (D7).
+      expect(contentLines(copy).map(canonicalLine)).toContain(canonicalLine(line));
+    }
+    for (const gone of [
+      "UID:alarm-1",
+      "ACKNOWLEDGED",
+      "X-MOZ-LASTACK",
+      "ATTENDEE",
+      "ORGANIZER",
+      "-//Other//EN",
+    ]) {
+      expect(copy).not.toContain(gone);
+    }
+    // The original is untouched.
+    expect(meeting.master?.uid).toBe("meeting");
+  });
+
+  test("of an occurrence of a series is that one occurrence, not repeating, its exception's fields too", () => {
+    const series = object(
+      "BEGIN:VEVENT\r\nUID:standup\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Stand-up\r\nDTSTART;TZID=Europe/Vilnius:20261102T090000\r\nDTEND;TZID=Europe/Vilnius:20261102T093000\r\nRRULE:FREQ=DAILY\r\nEXDATE;TZID=Europe/Vilnius:20261103T090000\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:standup\r\nDTSTAMP:20261101T000000Z\r\nRECURRENCE-ID;TZID=Europe/Vilnius:20261105T090000\r\nSUMMARY:Long stand-up\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nEND:VEVENT\r\n",
+    );
+    const thursday = CalendarObject.parse(
+      copyItem(series, vilnius("2026-11-04T09:00:00"), { now: NOW, uid: "one" }),
+    );
+    expect(thursday.master).toMatchObject({
+      uid: "one",
+      summary: "Stand-up",
+      recurring: false,
+      recurrenceId: null,
+      start: vilnius("2026-11-04T09:00:00"),
+      end: vilnius("2026-11-04T09:30:00"),
+    });
+    expect(thursday.exceptions).toEqual([]);
+    expect(thursday.serialize()).not.toMatch(/RRULE|EXDATE|RECURRENCE-ID/);
+    const moved = CalendarObject.parse(
+      copyItem(series, vilnius("2026-11-05T09:00:00"), { now: NOW, uid: "two" }),
+    );
+    expect(moved.master).toMatchObject({
+      summary: "Long stand-up",
+      start: vilnius("2026-11-05T10:00:00"),
+    });
+  });
+
+  test("of an all-day occurrence is that day, all day, a day long", () => {
+    const market = object(
+      "BEGIN:VEVENT\r\nUID:market\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Market\r\nDTSTART;VALUE=DATE:20261103\r\nDTEND;VALUE=DATE:20261104\r\nRRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\n",
+    );
+    const copy = copyItem(market, { type: "date", date: "2026-11-17" }, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({
+      start: { type: "date", date: "2026-11-17" },
+      end: { type: "date", date: "2026-11-18" },
+      recurring: false,
+    });
+    expect(copy).toContain("DTSTART;VALUE=DATE:20261117\r\n");
+  });
+
+  test("of a timed occurrence in another zone keeps that zone and its definition", () => {
+    const york = CalendarObject.parse(
+      "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Other//EN\r\nBEGIN:VTIMEZONE\r\nTZID:America/New_York\r\nBEGIN:STANDARD\r\nDTSTART:19701101T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\nEND:STANDARD\r\nBEGIN:DAYLIGHT\r\nDTSTART:19700308T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\nTZOFFSETFROM:-0500\r\nTZOFFSETTO:-0400\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nUID:call\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Call\r\nDTSTART;TZID=America/New_York:20261102T090000\r\nDTEND;TZID=America/New_York:20261102T093000\r\nRRULE:FREQ=DAILY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    );
+    const at = zonedTime("2026-11-04T09:00:00", "America/New_York");
+    const copy = copyItem(york, at, { now: NOW, uid: "c" });
+    expect(CalendarObject.parse(copy).master).toMatchObject({
+      start: at,
+      end: zonedTime("2026-11-04T09:30:00", "America/New_York"),
+    });
+    expect(copy).toContain("DTSTART;TZID=America/New_York:20261104T090000\r\n");
+    expect(copy).toContain("TZID:America/New_York\r\n");
+  });
+
+  test("Copy to: its changes made on the copy, its first revision whatever they were", () => {
+    const meeting = object(
+      "BEGIN:VEVENT\r\nUID:meeting\r\nDTSTAMP:20261101T000000Z\r\nSEQUENCE:4\r\nSUMMARY:Planning\r\nDTSTART;TZID=Europe/Vilnius:20261105T100000\r\nDTEND;TZID=Europe/Vilnius:20261105T110000\r\nX-OTHER:kept\r\nEND:VEVENT\r\n",
+    );
+    const copy = copyItem(meeting, null, { now: NOW, uid: "copy" });
+    const made = createFromCopy(
+      copy,
+      {
+        summary: "Planning 2",
+        time: { start: vilnius("2026-11-06T10:00:00"), end: vilnius("2026-11-06T11:00:00") },
+      },
+      { now: NOW },
+    );
+    expect(CalendarObject.parse(made).master).toMatchObject({
+      uid: "copy",
+      summary: "Planning 2",
+      sequence: 0,
+      start: vilnius("2026-11-06T10:00:00"),
+    });
+    expect(made).toContain("X-OTHER:kept\r\n");
+  });
+
+  test("of a completed task is a task to do, its start, due, star and parent kept", () => {
+    const task = object(
+      "BEGIN:VTODO\r\nUID:report\r\nDTSTAMP:20261101T000000Z\r\nSUMMARY:Report\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nDUE;TZID=Europe/Vilnius:20261106T170000\r\nSTATUS:COMPLETED\r\nCOMPLETED:20261105T120000Z\r\nPERCENT-COMPLETE:100\r\nRELATED-TO:parent\r\nX-ASTROTIME-STARRED:TRUE\r\nEND:VTODO\r\n",
+    );
+    const copy = CalendarObject.parse(copyItem(task, null, { now: NOW, uid: "again" }));
+    expect(copy.master).toMatchObject({
+      kind: "task",
+      uid: "again",
+      status: "NEEDS-ACTION",
+      completed: null,
+      percentComplete: 0,
+      parentUid: "parent",
+      starred: true,
+      start: vilnius("2026-11-05T09:00:00"),
+      due: vilnius("2026-11-06T17:00:00"),
+    });
   });
 });

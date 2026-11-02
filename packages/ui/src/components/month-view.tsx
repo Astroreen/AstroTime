@@ -90,6 +90,10 @@ export function MonthView(props: MonthViewProps) {
     else tiles.current.delete(day);
   };
 
+  // With no mouse or pen a tap on a chip opens the day under it: the chips
+  // are no buttons. A device with one keeps them, a touch laptop too. Asked
+  // once for the month, not by each of its tiles (docs/plans/foundation.md#D182).
+  const touch = !useMediaQuery("(any-pointer: fine)");
   const todayShown = weeks.some((week) => week.days.includes(today));
   return (
     <DragContext.Provider value={drag.value}>
@@ -127,6 +131,7 @@ export function MonthView(props: MonthViewProps) {
                 capacity={capacity}
                 ghost={drag.ghost}
                 tile={tile}
+                touch={touch}
               />
             ))}
         </div>
@@ -147,6 +152,7 @@ function Week({
   capacity: number;
   ghost: Ghost | null;
   tile: (day: string) => (element: HTMLElement | null) => void;
+  touch: boolean;
 }) {
   const { t, formats, timeZone, colorOf, weekNumbers } = useCalendar();
   const { shown, more } = foldWeek(week.spans, capacity);
@@ -222,10 +228,13 @@ function DayTile({
   onOpenDay,
   column,
   tile,
+  touch,
 }: MonthViewProps & {
   /** Its column in the week's grid, placed so a drag's ghost over it moves no tile. */
   column: number;
   tile: (element: HTMLElement | null) => void;
+  /** No mouse or pen: the chips are no buttons. */
+  touch: boolean;
   day: string;
   /** The spans that start on this day (or, continued, at the week's start). */
   spans: readonly StripSpan[];
@@ -236,9 +245,6 @@ function DayTile({
   moreRow: number;
 }) {
   const { t, formats, timeZone } = useCalendar();
-  // With no mouse or pen a tap on a chip opens the day under it: the chips
-  // are no buttons. A device with one keeps them, a touch laptop too.
-  const touch = !useMediaQuery("(any-pointer: fine)");
   const outside = day.slice(0, 7) !== month.slice(0, 7);
   const isToday = day === today;
   const name = formats.fullDate(day);

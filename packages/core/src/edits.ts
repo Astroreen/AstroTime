@@ -9,7 +9,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { hexColor, isColorName, nearestColorName } from "./colors.ts";
-import { readItem, X_COLOR, type Geo } from "./item.ts";
+import { point, readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
@@ -86,6 +86,12 @@ export interface Place {
   readonly name: string;
   readonly address: string;
   readonly geo: Geo;
+  /**
+   * The text `LOCATION` held for this very name and address when another
+   * client wrote it (Apple's lines), kept as written while both stay as
+   * they were; a name or an address changed makes "name, address" again.
+   */
+  readonly written?: { readonly text: string; readonly name: string; readonly address: string };
 }
 
 /** A geocoder's text on one line: no newline or run of spaces reaches a parameter or the text. */
@@ -93,6 +99,9 @@ const oneLine = (text: string) => text.replaceAll(/\s+/g, " ").trim();
 
 /** A place as `LOCATION` holds it, so every client shows it: "name, address", as Google writes it. */
 export function placeText(place: Place): string {
+  const { written } = place;
+  if (written?.text.trim() && written.name === place.name && written.address === place.address)
+    return written.text.trim();
   const name = oneLine(place.name);
   const address = oneLine(place.address);
   if (!name || !address) return name || address;
@@ -163,6 +172,74 @@ function occurrenceComponent(object: CalendarObject, recurrenceId: ItemTime | nu
   const component = master ?? exceptions[0];
   if (!component) throw new CalendarObjectError("The calendar object has no item.");
   return component;
+}
+
+/**
+ * A copy of one occurrence as a new item of its own (design D164): the
+ * occurrence as it shows (its exception, or the master moved to it), with
+ * every property kept (D7) but what makes it another item: a new `UID`,
+ * `DTSTAMP`, `CREATED` and `LAST-MODIFIED` at `now`, `SEQUENCE:0`; no
+ * recurrence (`RRULE`, `RDATE`, `EXDATE`, `RECURRENCE-ID`), so a copy of an
+ * occurrence of a series is that one occurrence; no `ORGANIZER` or
+ * `ATTENDEE`, so a server that schedules sends no invitation for it and
+ * nobody's answer is copied; a task not done (`STATUS:NEEDS-ACTION`, no
+ * `COMPLETED`, `PERCENT-COMPLETE:0` when it had one); its reminders without
+ * their `UID` and `ACKNOWLEDGED`, and no `X-MOZ-LASTACK` (Thunderbird's):
+ * the original's reminders were seen, not the copy's. The calendar's other components and
+ * properties (its `VTIMEZONE`s) come along. Returns the iCalendar text.
+ */
+export function copyItem(
+  object: CalendarObject,
+  recurrenceId: ItemTime | null,
+  options: { readonly now: number; readonly uid: string },
+): string {
+  const component = new ICAL.Component(copyOf(occurrenceComponent(object, recurrenceId).toJSON()));
+  const root = new ICAL.Component(copyOf(object.root.toJSON()));
+  for (const name of ["vevent", "vtodo"]) root.removeAllSubcomponents(name);
+  root.updatePropertyWithValue("prodid", PRODID);
+  root.addSubcomponent(component);
+  for (const name of ["rrule", "rdate", "exdate", "recurrence-id", "organizer", "attendee"]) {
+    component.removeAllProperties(name);
+  }
+  component.removeAllProperties("x-moz-lastack");
+  if (component.name === "vtodo") {
+    component.removeAllProperties("completed");
+    if (component.hasProperty("status")) {
+      component.updatePropertyWithValue("status", "NEEDS-ACTION");
+    }
+    if (component.hasProperty("percent-complete")) {
+      component.updatePropertyWithValue("percent-complete", 0);
+    }
+  }
+  for (const alarm of component.getAllSubcomponents("valarm")) {
+    alarm.removeAllProperties("uid");
+    alarm.removeAllProperties("acknowledged");
+  }
+  const now = utc(options.now);
+  component.updatePropertyWithValue("uid", options.uid);
+  component.updatePropertyWithValue("dtstamp", now.clone());
+  component.updatePropertyWithValue("created", now.clone());
+  component.updatePropertyWithValue("last-modified", now.clone());
+  component.updatePropertyWithValue("sequence", 0);
+  return serialize(root);
+}
+
+/**
+ * A new item from a copy (`copyItem`) with what the user changed: "Copy
+ * to…" (design D164). Its first revision, `SEQUENCE:0`, as a new UID's is,
+ * however many changes it took. Returns the iCalendar text.
+ */
+export function createFromCopy(
+  copy: string,
+  changes: ItemChanges,
+  options: { readonly now: number },
+): string {
+  const object = CalendarObject.parse(editItem(CalendarObject.parse(copy), changes, options).ics);
+  const { master, exceptions } = object.components;
+  for (const component of [master, ...exceptions]) {
+    component?.updatePropertyWithValue("sequence", 0);
+  }
+  return object.serialize();
 }
 
 /**
@@ -346,12 +423,30 @@ function setText(component: ICAL.Component, name: string, value: string): void {
 /** Degrees to six places, a tenth of a metre. */
 const degrees = (value: number) => Math.round(value * 1e6) / 1e6;
 
+/** The same point, to the tenth of a metre a point is written to; or no point on both sides. */
+const sameGeo = (a: Geo | null, b: Geo | null) =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    degrees(a.lat) === degrees(b.lat) &&
+    degrees(a.lon) === degrees(b.lon));
+
 /**
  * `LOCATION`, and the point beside it: RFC 5545's `GEO`, and Apple's
  * structured location, which Apple's clients show their map from and read
  * no `GEO`. The old point goes with the old place; free text has none.
  */
 function setPlace(component: ICAL.Component, location: string | Place): void {
+  // The same place is no change: the same text, and for a place picked the
+  // same point too; its lines stay as they were, Apple's parameters and all (D7).
+  const was = readItem(component);
+  const sameText =
+    (typeof location === "string" ? location : placeText(location)) === (was.location ?? "");
+  if (sameText && (typeof location === "string" || sameGeo(location.geo, was.geo))) return;
+  // A point off the globe is no point: the place is written as text (D176).
+  if (typeof location !== "string" && !point(location.geo.lat, location.geo.lon)) {
+    location = placeText(location);
+  }
   component.removeAllProperties("geo");
   component.removeAllProperties("x-apple-structured-location");
   if (typeof location === "string") {
@@ -890,6 +985,9 @@ function editSeries(
       if (changes[key] !== undefined && (own[key] ?? "") === (before[key] ?? ""))
         follow[key] = changes[key];
     }
+    // A place is its text and its point: an exception with a point of its own keeps its place (D176).
+    if (follow["location"] !== undefined && !sameGeo(own.geo, before.geo))
+      delete follow["location"];
     if (changes.categories && own.categories.join() === before.categories.join()) {
       follow["categories"] = changes.categories;
     }

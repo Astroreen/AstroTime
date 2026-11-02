@@ -3,7 +3,7 @@
 // creating with "+" and on an empty slot, the details and edit dialogs, the
 // scope of an occurrence's edit and deletion (D11), tasks, a read-only
 // calendar, and the Conflicts list (D6).
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { choose, openDemo, PHONE, WIDE } from "./support.ts";
 
@@ -14,6 +14,12 @@ const item = (page: Page, dayName: string, name: string | RegExp) =>
   day(page, dayName).getByRole("listitem", { name });
 const opener = (page: Page, dayName: string, name: string | RegExp) =>
   day(page, dayName).getByRole("button", { name });
+
+/** Runs one action of the details' "More actions" menu (design D163). */
+async function act(details: Locator, action: string) {
+  await details.getByRole("button", { name: "More actions" }).click();
+  await details.page().getByRole("menuitem", { name: action }).click();
+}
 
 /** Opens an item's details, then its edit dialog. */
 async function editItem(page: Page, dayName: string, name: RegExp, title: string) {
@@ -188,10 +194,7 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   test("deleting asks too: this occurrence leaves the others", async ({ page }) => {
     await openDemo(page, "week");
     await opener(page, "Friday, November 6", /^Stand-up, /).click();
-    await page
-      .getByRole("dialog", { name: "Stand-up" })
-      .getByRole("button", { name: "Delete" })
-      .click();
+    await act(page.getByRole("dialog", { name: "Stand-up" }), "Delete");
     const scope = page.getByRole("alertdialog", { name: "Delete recurring event" });
     await scope.getByRole("button", { name: "Delete" }).click();
     await expect(item(page, "Friday, November 6", /^Stand-up/)).toHaveCount(0);
@@ -203,10 +206,7 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   }) => {
     await openDemo(page, "week");
     await opener(page, "Friday, November 6", /^Stand-up, /).click();
-    await page
-      .getByRole("dialog", { name: "Stand-up" })
-      .getByRole("button", { name: "Delete" })
-      .click();
+    await act(page.getByRole("dialog", { name: "Stand-up" }), "Delete");
     const scope = page.getByRole("alertdialog", { name: "Delete recurring event" });
     await expect(scope.getByRole("button", { name: "Delete" })).toBeFocused();
     await page.keyboard.press("m");
@@ -232,10 +232,7 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   test("deleting this and following ends the series", async ({ page }) => {
     await openDemo(page, "week");
     await opener(page, "Thursday, November 5", /^Stand-up, /).click();
-    await page
-      .getByRole("dialog", { name: "Stand-up" })
-      .getByRole("button", { name: "Delete" })
-      .click();
+    await act(page.getByRole("dialog", { name: "Stand-up" }), "Delete");
     const scope = page.getByRole("alertdialog", { name: "Delete recurring event" });
     await scope.getByRole("radio", { name: "This and following occurrences" }).check();
     await scope.getByRole("button", { name: "Delete" }).click();
@@ -248,16 +245,61 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
 test("an event that does not repeat is deleted once confirmed", async ({ page }) => {
   await openDemo(page, "week");
   await opener(page, "Tuesday, November 3", /^Cinema, /).click();
-  await page
-    .getByRole("dialog", { name: "Cinema" })
-    .getByRole("button", { name: "Delete" })
-    .click();
+  await act(page.getByRole("dialog", { name: "Cinema" }), "Delete");
   const confirm = page.getByRole("alertdialog", { name: "Delete this event?" });
   await confirm.getByRole("button", { name: "Delete" }).click();
   await expect(item(page, "Tuesday, November 3", /^Cinema/)).toHaveCount(0);
 });
 
-test("a read-only calendar's item opens without edit or delete", async ({ page }) => {
+test("the details' menu: Make a copy saves one at once and opens it from its notice (design D163, D164)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await opener(page, "Tuesday, November 3", /^Cinema, /).click();
+  const details = page.getByRole("dialog", { name: "Cinema" });
+  await details.getByRole("button", { name: "More actions" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Delete", "Make a copy", "Copy to…"]);
+  await page.getByRole("menuitem", { name: "Make a copy" }).click();
+  await expect(details).toHaveCount(0);
+  const notice = page.getByRole("status").filter({ hasText: "Copy made" });
+  await expect(notice).toBeVisible();
+  await expect(item(page, "Tuesday, November 3", /^Cinema, /)).toHaveCount(2);
+  await notice.getByRole("button", { name: "Open" }).click();
+  await expect(page.getByRole("dialog", { name: "Cinema" })).toBeVisible();
+});
+
+test("Copy to opens a new item filled from this one, in another calendar if chosen", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await opener(page, "Tuesday, November 3", /^Cinema, /).click();
+  await act(page.getByRole("dialog", { name: "Cinema" }), "Copy to…");
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog.getByRole("textbox", { name: "Title" })).toHaveValue("Cinema");
+  await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
+  // A copy keeps its kind.
+  await expect(dialog.getByRole("radio", { name: "Task" })).toHaveCount(0);
+  await choose(dialog.getByRole("combobox", { name: "Calendar" }), "Work");
+  await dialog.getByLabel("Start date").fill("2026-11-05");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(item(page, "Tuesday, November 3", /^Cinema, /)).toHaveCount(1);
+  await expect(item(page, "Thursday, November 5", /^Cinema, /)).toBeVisible();
+});
+
+test("an occurrence of a series is copied alone, as an item that does not repeat", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await opener(page, "Thursday, November 5", /^Stand-up, /).click();
+  await act(page.getByRole("dialog", { name: "Stand-up" }), "Make a copy");
+  await expect(item(page, "Thursday, November 5", /^Stand-up, /)).toHaveCount(2);
+  await expect(item(page, "Friday, November 6", /^Stand-up, /)).toHaveCount(1);
+});
+
+test("a read-only calendar's item opens without edit or delete; it can only be copied elsewhere", async ({
+  page,
+}) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Next week" }).click();
   await page
@@ -269,7 +311,8 @@ test("a read-only calendar's item opens without edit or delete", async ({ page }
     details.getByText("Holidays is read-only: this item cannot be changed here."),
   ).toBeVisible();
   await expect(details.getByRole("button", { name: "Edit" })).toHaveCount(0);
-  await expect(details.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  await details.getByRole("button", { name: "More actions" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Copy to…"]);
 });
 
 test("the tasks screen adds a task to its list, today, and completes it", async ({ page }) => {

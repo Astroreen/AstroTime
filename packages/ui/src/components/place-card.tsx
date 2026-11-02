@@ -25,10 +25,13 @@ const COPIED_MS = 2000;
 export function PlaceCard({
   location,
   geo,
+  label,
   onCopyFailed,
 }: {
   location: string;
   geo: Geo | null;
+  /** Apple's name and address of the point, when it names them. */
+  label: { readonly name: string; readonly address: string } | null;
   onCopyFailed: () => void;
 }) {
   const { t } = useTranslation();
@@ -36,7 +39,8 @@ export function PlaceCard({
   const { settings } = useSettings();
   const places = settings.places ? platform.places : undefined;
   const [copied, setCopied] = useState(false);
-  const { name, address } = geo ? nameAndAddress(location) : { name: location, address: "" };
+  // Only a place with a point is split: free text shows whole, commas and all.
+  const { name, address } = geo ? nameAndAddress(location, label) : { name: location, address: "" };
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(false), COPIED_MS);
