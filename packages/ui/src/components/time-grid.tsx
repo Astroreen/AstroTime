@@ -402,6 +402,13 @@ function Strip({
       role="list"
       aria-label={t("grid.allDay")}
       onPointerDown={press}
+      // A press that leaves the strip while held, or that the browser takes
+      // for a scroll, is no tap on it, wherever it ends. A finger leaves on
+      // its release too, before its click: held no longer, it stays a tap.
+      onPointerLeave={(event) => {
+        if (event.buttons !== 0) pressed.current = null;
+      }}
+      onPointerCancel={() => (pressed.current = null)}
       onClick={createAt}
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] touch-pan-y overflow-y-auto"}`}
       style={{

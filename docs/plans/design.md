@@ -1349,22 +1349,47 @@ whole row".
   with "Completed" open the row itself slides down into it, and back up when
   it is not completed again; with it folded the row goes on drawn where it
   was, over the list, and fades out going down to "Completed", whose count
-  ticks over. A card that changed height is stretched from the one it had:
-  its background is apart from its rows, so the rows are not stretched with
-  it. A change the user did not make (a sync, the details' "Mark completed",
-  another tab) moves the same way, without the wait for a tick: only the
-  read that carries the user's completion (its row changed or left) waits
-  for its tick, not a sync's read that came first; a new row comes in from
-  above; more than 40 rows moving at once (a sync's batch) change in place.
-  A row leaving goes on leaving through the next change, never measured or
-  moved again, so tasks completed one after another each leave once; its
-  layer is `inert` and hidden from a screen reader. The count is its own
-  box, cut out of the one translated string ("Completed ({{n}})"). Only
-  `transform` and `opacity` move, with the Web Animations API, as
-  [D154](#D154) has it; `prefers-reduced-motion` changes everything in
-  place. The code that moves them (`components/task-motion.ts`) is loaded
-  with the tasks screen's first showing, not with the app (D145), and never
-  when less motion is asked for (`apps/web/e2e/tasks-motion.spec.ts`).
+  ticks over (only a task now done goes there: one deleted or moved by the
+  same read, a sync's, fades where it was). A card that changed height is
+  stretched from the one it had: its background is apart from its rows, so
+  the rows are not stretched with it. A change the user did not make (a
+  sync, the details' "Mark completed", another tab) moves the same way,
+  without the wait for a tick: only the read that carries the user's
+  completion (its row changed or left) waits for its tick, each press its
+  own (a second press on the same task is waited for by its own read), not a
+  sync's read that came first; a new row comes in from above; more than 40
+  rows moving at once (a sync's batch) change in place. A row leaving goes
+  on leaving through the next change, never measured or moved again, so
+  tasks completed one after another each leave once; its layer is `inert`
+  and hidden from a screen reader. The count is its own box, cut out of the
+  one translated string ("Completed ({{n}})"). Only `transform` and
+  `opacity` move, with the Web Animations API, as [D154](#D154) has it;
+  `prefers-reduced-motion` changes everything in place. The code that moves
+  them (`components/task-motion.ts`) is loaded with the tasks screen's first
+  showing, not with the app (D145), and never when less motion is asked for
+  (`apps/web/e2e/tasks-motion.spec.ts`).
+- **D198. Completing a task is celebrated** (the owner's item 13: "some
+  confetti or a burst of shapes on 'Mark completed', with a setting to turn
+  it off"). When the user completes a task, from its checkbox on the tasks
+  screen or with "Mark completed" in its details, 18 small shapes of
+  AstroTime's own (dots, squares, triangles, in the theme's accent and four
+  colours that read on both themes) are thrown out from the checkbox or the
+  button, all round and a little upwards, and fall away and fade in about
+  0.7 s, on a layer over everything that takes no press and that a screen
+  reader does not see. The burst starts from where the press was, measured
+  at the press, before its code arrives, and is thrown at once, as the tick
+  is drawn, before the write lands: a write that did not land is told by the
+  change notice (foundation D103). Not completing a task again throws
+  nothing; nor does a completion the user did not make here (a sync, another
+  tab, a series' occurrences rolled over): only the two presses throw one,
+  one occurrence at a time, as a series is completed (D94). "Celebrate a
+  completed task" in Settings' general group, with the theme, turns it off
+  (on by default, kept with the other settings); `prefers-reduced-motion`
+  turns it off too. Its code (`components/celebrate.ts`, 0.7 KiB) is our
+  own, no library: the Web Animations API on a few `<span>`s, `transform`
+  and `opacity` only ([D154](#D154)); it is loaded with the first
+  completion, not with the app (D145), and never while the setting is off or
+  less motion is asked for (`apps/web/e2e/celebrate.spec.ts`).
 
 ### Decided in round 4: the calendar views
 
@@ -1468,7 +1493,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   day with "All day" on, as a tap on an empty slot of the grid opens it
   at the slot's time ([D108](#D108)): an event first, "Task" one tap away,
   keeping the day and "All day" ([D159](#D159)). A press that began on
-  an item, moved, or is a double click's second click creates nothing,
+  an item, moved, left the strip, was taken for a scroll
+  (`pointercancel`), or is a double click's second click creates nothing,
   so an item held and let go beside it (a read-only one, which does not
   drag) opens nothing new. An empty strip keeps one row's height (24 px,
   it was 4 px), so the tap has somewhere to land, as Google Calendar's web
@@ -1478,8 +1504,9 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   one column, and the strip's would be a gesture of its own. Tested:
   `apps/web/e2e/editing.spec.ts` (a tap on Tuesday in the Week's strip, a
   task made from it, an item tapped opens its details; a press from an
-  item to an empty spot, a press moved 12 px, and a double click opening
-  one item, the first two failing without the check; a phone's Day view
+  item to an empty spot, a press moved 12 px, a press that leaves the
+  strip and comes back, and a double click opening one item, the first
+  three failing without the check; a phone's Day view
   with an empty strip a row tall, tapped), `calendar.spec.ts` (the empty
   strip's height), `drag.spec.ts` (a read-only item held and let go in the
   strip opens no new item).
@@ -1522,6 +1549,40 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   which `detail` alone kept open; each failing before its change), and
   `editing.spec.ts` (a double click on the all-day strip with the chunk
   loaded, failing without the strip's `press`).
+- **D191. Scrollbars are thin, rounded and in the theme** (the owner's
+  feedback 14b: "redo the design of the overflow scrollbars"). Every
+  scroller had the platform's classic scrollbar, a 15 px grey bar on
+  Linux and Windows, the same in light and dark. Now, in `styles.css`:
+  Chromium (and so Electron and Android's WebView) and WebKit draw
+  `::-webkit-scrollbar`, a 10 px gutter with a rounded 4 px thumb in the
+  ink colour at 52% on a clear track, 3:1 or more against every surface a
+  scroller sits on in light and dark (WCAG 1.4.11, as [D120](#D120) holds
+  the items to AA; it was 22%, 1.6:1), 66% while the pointer is anywhere
+  over what scrolls (`:hover` on the scroller, so a scroller holding
+  another lights too while the pointer is over the inner one; on purpose:
+  both scroll under it), 6 px wide under the pointer and 80% while
+  dragged; Firefox has
+  only the standard properties, `scrollbar-width: thin` in the same
+  colours, set only where `::-webkit-scrollbar` is unknown (Chromium lets
+  the standard ones win over it). Light and dark come with the ink
+  colour. Nothing about scrolling changes: the wheel, the keys, a finger
+  and dragging the thumb work as they did; `scrollbar-gutter: stable`
+  still keeps the day headers over their columns, now 10 px wide on both;
+  a phone's scrollbars are the system's overlay ones, drawn only while
+  scrolling, and Firefox on Linux draws its own overlay ones too. The
+  thumb shows at rest rather than only while scrolling: telling
+  "scrolling now" apart needs a script on every scroller. Checked in Chromium and Firefox (headed,
+  light and dark); WebKit does not start on the development machine, and
+  draws the same `::-webkit-scrollbar` rules as Chromium. Tested:
+  `packages/ui/test/scrollbar-colors.test.ts` (the thumb's contrast at
+  rest, under the pointer and dragged, over the canvas, a tile, a raised
+  surface and its hover, light and dark, read from `styles.css`; failing
+  at 22%), `apps/web/e2e/calendar.spec.ts` (the grid's scrollbar is 10 px, and
+  Saturday's header ends where its column does; failing before at 15 px:
+  Playwright's headless Chromium hides scrollbars from the screen but
+  keeps their width in the layout, which is what this measures). The
+  thumb's colours under the pointer and while dragged, Firefox's
+  `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
 - **D192. The time grid's hours are as tall as the user pinches them**
   (the owner's feedback 15: "when the user pinches in/out, the distance
   between hours changes ... not fixed steps: any value"). The hour was
@@ -1944,6 +2005,13 @@ own (below).
   `gesturestart`/`gesturechange` rather than a wheel with Ctrl; the time
   grid's zoom hears only the second, so there Safari's trackpad pinch
   zooms the page.
+- **The scrollbars' untested parts** ([D191](#D191)): the thumb's
+  colours as an engine draws them (the shares are proven, not the
+  pixels), Firefox's `scrollbar-width`
+  branch, and a WebKit run (Playwright's WebKit does not start on the
+  development machine) were looked at by eye or not at all; a check per
+  engine needs headed runs in CI. A thumb hidden until the user scrolls,
+  as macOS and Android draw theirs, needs a script on every scroller.
 - **More illustrated subjects** ([D215](#D215)): meetings and calls,
   haircut, code, cleaning, the car, a wedding, the beach and holidays,
   Halloween; and words in languages other than English and Russian. Each
