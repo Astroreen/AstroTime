@@ -390,6 +390,7 @@ export const ru = {
   "edit.description": "Описание",
   "description.emptyItem": "Пустой пункт",
   "description.code": "Код",
+  "mention.people": "Люди",
   "edit.save": "Сохранить",
   "edit.close": "Закрыть без сохранения",
   "edit.noCalendar": "Здесь нет календаря, в котором можно это сохранить.",

@@ -6,6 +6,7 @@ import type { Item } from "@astrotime/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { addPictureStrings } from "../i18n/pictures.ts";
 import { nameAndAddress } from "../places/map.ts";
 import {
   isAddress,
@@ -52,8 +53,10 @@ function usePhotoPlace(
 export function usePlacePhoto(
   item: Item,
   wanted: boolean,
-  /** Whether a photo that arrives now may be drawn; else it waits for the next drawing. */
+  /** Whether a photo that arrives now may be drawn; else it waits for the next `attempt`. */
   welcome: () => boolean = () => true,
+  /** Changes each time the photo is wanted again (its card came near). */
+  attempt = 0,
 ): PlacePhoto | null | undefined {
   const asked = usePhotoPlace(item);
   const key =
@@ -78,13 +81,14 @@ export function usePlacePhoto(
       live = false;
     };
     // `asked` is new each render; its key says what it is.
-  }, [key, wanted, photo]);
+  }, [key, wanted, photo, attempt]);
   return asked ? photo : null;
 }
 
 /** "Photo: author, licence", each linked to its source, as Commons' licences ask (design D221). */
 export function PhotoCredit({ photo, className = "" }: { photo: PlacePhoto; className?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  addPictureStrings(i18n);
   const link = "underline underline-offset-2";
   // The author's name links to the photo's page; with none named, the licence does.
   const licence = photo.licenceUrl ? (
@@ -113,9 +117,8 @@ export function PhotoCredit({ photo, className = "" }: { photo: PlacePhoto; clas
         licence
       )}
       {" · "}
-      {/* The article by its site's own name, a web address: no word to translate. */}
       <a href={photo.article} target="_blank" rel="noopener noreferrer" className={link}>
-        {new URL(photo.article).host}
+        {t("pictures.wikipedia")}
       </a>
     </p>
   );

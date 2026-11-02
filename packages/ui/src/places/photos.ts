@@ -309,7 +309,8 @@ async function ask(
   const author = textOf(metadata?.Artist?.value ?? "");
   return {
     url: url.href,
-    small: url.href.replace(/\/960px-/, "/500px-"),
+    // A thumbnail's URL names its width; one that does not is the only size there is.
+    small: /\/960px-/.test(url.href) ? url.href.replace(/\/960px-/, "/500px-") : url.href,
     article: `${wiki}/wiki/${encodeURIComponent(page.title!.replaceAll(" ", "_"))}`,
     source: `https://commons.wikimedia.org/wiki/${encodeURIComponent(file.replaceAll(" ", "_"))}`,
     author: author === "" ? null : author,

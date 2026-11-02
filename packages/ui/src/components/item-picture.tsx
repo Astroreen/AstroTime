@@ -1,18 +1,21 @@
-// An item's picture (design D215, D216, D220): the illustration its title
-// gives while illustrations are on (D217), else its place's photo, and the
+// An item's picture (design D215, D216, D220, D223): the user's own picture
+// for a word of theirs its title has; else the illustration its title gives
+// while illustrations are on (D217); else its place's photo; and the
 // details' header drawn over it, a photo with its credit.
 import type { Item } from "@astrotime/core";
 import type { CSSProperties, ReactNode } from "react";
 
 import { ITEM_ART, type Art } from "../pictures/art.ts";
 import type { PlacePhoto } from "../places/photos.ts";
-import { subjectOf } from "../pictures/subjects.ts";
+import { usePictureUrl } from "../pictures/own.ts";
+import { ownWordOf, subjectOf } from "../pictures/subjects.ts";
 import { useSettings } from "../settings.ts";
 import { creditLine, PhotoCredit, usePlacePhoto } from "./place-photo.tsx";
 
 /** What a card or a header is drawn over: an illustration, or a place's photo. */
 export interface Backdrop {
-  readonly url: string;
+  /** `null` while the user's own picture is read from the device. */
+  readonly url: string | null;
   readonly srcSet?: string;
   readonly ground: string;
   readonly photo: boolean;
@@ -27,19 +30,26 @@ export function backdropOf(picture: Art | PlacePhoto): Backdrop {
   if ("ground" in picture) return { url: picture.url, ground: picture.ground, photo: false };
   return {
     url: picture.url,
-    srcSet: `${picture.small} 500w, ${picture.url} 960w`,
+    ...(picture.small !== picture.url && { srcSet: `${picture.small} 500w, ${picture.url} 960w` }),
     ground: PHOTO_GROUND,
     photo: true,
     credit: creditLine(picture),
   };
 }
 
-/** The illustration an item is drawn over, if any: its subject's, while illustrations are on. */
-export function useItemArt(title: string | null | undefined): Art | null {
+/**
+ * What an item's title draws it over, if anything: the user's own picture
+ * for a word of theirs (design D223, whether illustrations are on or not:
+ * they chose it), else its subject's illustration while illustrations are on.
+ */
+export function useItemArt(title: string | null | undefined): Backdrop | null {
   const { settings } = useSettings();
+  const own = ownWordOf(title, settings.ownWords);
+  const url = usePictureUrl(own?.picture ?? null);
+  if (own) return { url, ground: PHOTO_GROUND, photo: true };
   if (!settings.illustrations) return null;
   const subject = subjectOf(title);
-  return subject && ITEM_ART[subject];
+  return subject && backdropOf(ITEM_ART[subject]);
 }
 
 /**
@@ -51,24 +61,26 @@ export function useItemArt(title: string | null | undefined): Art | null {
 export function DetailsPicture({ item, children }: { item: Item; children: ReactNode }) {
   const art = useItemArt(item.summary);
   const photo = usePlacePhoto(item, art === null);
-  const picture = art ? backdropOf(art) : photo ? backdropOf(photo) : null;
+  const picture = art ?? (photo ? backdropOf(photo) : null);
   if (!picture) return children;
   return (
     <div
       className="details-picture relative mb-4 h-40 shrink-0 overflow-hidden"
       style={{ "--ground": picture.ground } as CSSProperties}
     >
-      <img
-        src={picture.url}
-        {...(picture.srcSet && {
-          srcSet: picture.srcSet,
-          sizes: "(min-width: 640px) 448px, 100vw",
-        })}
-        alt=""
-        decoding="async"
-        draggable={false}
-        className="absolute inset-0 size-full object-cover"
-      />
+      {picture.url && (
+        <img
+          src={picture.url}
+          {...(picture.srcSet && {
+            srcSet: picture.srcSet,
+            sizes: "(min-width: 640px) 448px, 100vw",
+          })}
+          alt=""
+          decoding="async"
+          draggable={false}
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
       <span
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-16 bg-linear-to-b from-black/30 to-transparent"

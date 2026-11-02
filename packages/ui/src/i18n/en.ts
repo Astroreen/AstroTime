@@ -370,6 +370,7 @@ export const en = {
   "edit.description": "Description",
   "description.emptyItem": "An empty item",
   "description.code": "Code",
+  "mention.people": "People",
   "places.results": "Places",
   "places.credit": "Places from © OpenStreetMap contributors",
   "places.map": "Map of {{place}}",

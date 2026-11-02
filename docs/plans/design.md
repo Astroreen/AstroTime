@@ -1689,6 +1689,44 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   `packages/ui/test/pinch.test.ts` (the height kept as drawn, and the
   time under the fingers kept through steps and after).
 
+- **D193. A saved item lands; the strip's new rows come in** (the
+  owner's feedback 13: "more animations ... and much more you can think
+  of", the calendar views' part). Within [D154](#D154)'s rules (only
+  `transform` and `opacity` move, nothing when the user asks for less
+  motion, [D119](#D119)):
+  - **the occurrence the edit dialog saved lands where it goes**: as the
+    dialog and its draft ([D155](#D155)) go, the item drawn from the store
+    in their place grows in from 94% and from clear, in 220 ms, so the eye
+    follows it from the draft to the item. It is that occurrence alone:
+    the editor tells the views its item's UID (a new item's first UID
+    made at saving, the new series' after "this and following", else the
+    item edited) and where its form starts it (a day, or a day and a
+    time, read on the form's own zone: `landed` in the calendar's
+    context), so a new series lands on the day it begins, not on each of
+    its days. It lands once: when its landing ends (`animationend`) the
+    mark goes, and a period away and back draws it plainly; saved on a
+    period not drawn (or in a hidden calendar), the next period or view
+    drops it, so it lands nowhere later. It is marked (`data-landed`) in the time grid,
+    the strip, the Month and the Agenda's rows; the Agenda's picture cards
+    are thread M's and are not marked;
+  - **opening the all-day strip fades its new rows in**: the rows the
+    chevron or "+N" shows anew come down 4 px from clear, in 180 ms; the
+    first rows, there before, do not move. On another period, with the
+    strip open from before ([D151](#D151)), the rows are just there.
+
+  Growing the strip's height itself is not animated: a height that moves
+  would move the grid under it on every frame. Tested:
+  `apps/web/e2e/motion.spec.ts` (a new event saved is the only item
+  marked and runs `item-land`, unmarked once it ran, and not again a week
+  away and back, the landing held still while its mark is read; a new
+  weekly series marked on its first Tuesday only; one saved two weeks on,
+  plain when the view gets there;
+  the rows past the fold run `row-in` when the strip opens, the first
+  rows none, and none on the next week or back on the first),
+  `editing.spec.ts` (after "this and following", Thursday's occurrence
+  lands and Friday's does not), `packages/ui/test/landing.test.ts` (9:00
+  in New York, 16:00 in Vilnius, lands on its own wall clock).
+
 - **D194. The React Compiler's bail-outs are chosen, not found** (the
   owner cares for battery and CPU: foundation [D181](foundation.md#D181),
   [D182](foundation.md#D182)). The compiler leaves a component it cannot
@@ -1715,8 +1753,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
 
 ### Decided in round 4: the editor
 
-The owner's feedback after round 3 on the edit dialog: its icons and its
-reminders and its description.
+The owner's feedback after round 3 on the edit dialog: its icons, its
+reminders, its description and mentions in it.
 
 - **D205. Each row's icon is level with the middle of its control** (the
   owner's feedback 12 after round 3: "Some icons are not centred with their
@@ -1815,15 +1853,17 @@ reminders and its description.
     (`-`) takes no next line in as its own; a link or an image with no
     words is named by its address; a written target's `\` escapes are
     taken out; an item's lines belong to it from its content's column (its
-    marker's indent and width: 3 under `1. `), so `  2. y` after `1. x` is
-    the next item. A code block that scrolls sideways takes the keyboard's
+    marker's indent and width: 3 under `1. `; with five spaces or more
+    after the marker, one past it), so `  2. y` after `1. x` is the next
+    item. A code block that scrolls sideways takes the keyboard's
     focus, named "Code" (axe's `scrollable-region-focusable`). A paragraph
     keeps its spaces and indents as typed (`white-space: pre-wrap`, as the
     details drew a description before), so a plain description reads as
     it did.
   - **A checklist's box** is drawn where a bullet would be, read-only
-    (`role="checkbox"`, `aria-readonly`, named by its own first line, or
-    "An empty item" when it has none; a numbered checklist is drawn as a
+    (`role="checkbox"`, `aria-readonly`, named by its own first line, its
+    words, or "An empty item" when it has none: a nested list or code
+    block first under it is not its line; a numbered checklist is drawn as a
     plain one, its boxes in place of its numbers): ticking one
     would rewrite the user's text; a ticked item is struck and muted, as
     in Google Keep.
@@ -1838,6 +1878,64 @@ reminders and its description.
     ([foundation D145](foundation.md#D145)), and it makes no HTML.
     _Until round 4_ the details linked bare web and mail links and nothing
     else was markup.
+
+- **D208. "@" in a description mentions someone the account's server
+  knows** (the owner's feedback 9 after round 3: "in an event's or task's
+  description, one could mention @user").
+  - **Typing:** in the edit dialog's description, "@" at a word's start
+    and two letters or more ask the server of the item's calendar for
+    people whose name or e-mail holds them, once typing rests (250 ms), at
+    most 8, each query answered kept while the dialog is open (a search
+    that failed is asked again). A list under
+    the field offers each with their e-mail; arrows move, Enter or a tap
+    picks, Escape closes the list (not the dialog), Tab leaves the field
+    and picks nothing (WAI-ARIA's combobox). The people offered are those
+    of the account of the item's calendar now: switched to another
+    account's calendar, the first's go at once. The calendar on
+    this device and the demo offer no one.
+  - **Where people come from** (AGENTS.md rule 4): `Provider.people`, which
+    only `@astrotime/caldav` knows as a request: RFC 3744's
+    `principal-property-search` by `displayname` or Sabre's
+    `email-address`, over every principal collection
+    (`apply-to-principal-collection-set`), as Nextcloud's Calendar finds
+    attendees, asked of the calendar home in one `REPORT`. Individuals
+    only (`calendar-user-type`), no group, room or resource; the e-mail
+    from `email-address`, else a `mailto:` in `calendar-user-address-set`.
+    A principal that names no `calendar-user-type` is taken as an
+    individual (RFC 6638 makes `INDIVIDUAL` the default). Radicale answers
+    it with nobody; a server that refuses the report finds no one.
+    `peopleOf` (`@astrotime/sync/people`) opens the account's provider from
+    the platform's HTTP, as a sync does (the UI knows no protocol), and asks
+    with the account's credentials; offline or refused, it has no answer,
+    and a mention can still be typed. Tested on recorded answers of
+    Nextcloud 34 (the test user, who has no e-mail) and Radicale 3.8, and
+    on one written by hand
+    for the e-mail, group and room paths, in the shape Sabre documents
+    (`packages/caldav/test/fixtures`); end to end on Radicale with that
+    answer served for the one report.
+  - **A live query, not the store's** ([foundation D5](foundation.md#D5)
+    keeps the UI on the store): people are no calendar data, are not
+    synced, and a server's whole directory (every user of a Nextcloud) is
+    neither the device's to keep nor small; the search asks the server for
+    the few a query names, as the place search asks Photon
+    ([D175](#D175)), and keeps nothing once the dialog closes.
+  - **What is written:** a Markdown link to the person's e-mail,
+    `[@Anna Berg](mailto:anna@example.com)` (in the name only what would
+    change a link's words escaped: brackets, a backslash, `*`, `_`, a
+    backtick, `~`, `<`; a hyphen or a full stop stays as typed, so it reads
+    so in other clients), which reads as plain text in
+    Nextcloud's apps and others and keeps who was meant (in the address a
+    space, a bracket, `%`, `<`, `>`, a quote, a backslash, `?` or `#`
+    percent-encoded,
+    so the link stays whole; read back decoded, or as written when it does
+    not decode; the chip's link to write to them is made from the address
+    encoded again, so one that decodes to `?` or `#` adds no header or
+    body); someone with no e-mail is written `@Name`. A mention invites no one and sends nothing:
+    no `ATTENDEE` is written ([D108](#D108): AstroTime does not invite).
+  - **Read:** the details ([D207](#D207)) draw such a link as a chip with
+    the name; a tap shows the e-mail, as a link to write to them.
+  - **Privacy:** the query goes to the account's own server only, as
+    every other request of the account.
 
 ### Decided in round 4: the app shell
 
@@ -2131,12 +2229,12 @@ own (below).
   Agenda's scroller and half a screen around it), the details as they
   open; one request at a time across the app, one per place however many
   cards show it. A photo that comes while its card is above the screen's
-  top waits for the card's next drawing (kept, never noted as none), so
-  nothing on screen moves; a known one draws at once, tall from the start. 960 px, with the 500 px
+  top waits, kept (never noted as none), until the card comes near the
+  screen again, so nothing on screen moves; a known one draws at once, tall from the start. 960 px, with the 500 px
   one in a `srcset` for a phone.
 - **D221. A place's photo is credited, kept and can be turned off.**
   - **Credit**: in the details, at the foot of the header: "Photo: author,
-    licence · en.wikipedia.org" (the article's site by its address), the
+    licence · Wikipedia", the
     author linking to the photo's Commons page (the licence does, when
     Commons names no author),
     the licence to its text (only an https address: Commons' metadata is
@@ -2145,8 +2243,7 @@ own (below).
     the author as text, its HTML's tags gone and its entities read. The
     Agenda's card credits it too, "© author" (its licence when Commons
     names none) small in its top right corner; a tap opens the details
-    with the whole credit; the Agenda's card, a
-    thumbnail that opens the details, does not repeat it.
+    with the whole credit.
   - **Kept on this device**, in the preferences (`astrotime.placePhotos`),
     each place by its language, name and rounded point: its photo, or that
     it has none (asked again after 30 days, an article may come), the 300
@@ -2170,6 +2267,48 @@ own (below).
     else of the item, never its title. The page's policy names exactly
     those origins (`connect-src`, `img-src`, foundation D110), and none
     with places off.
+
+- **D222. The user's own pictures are kept on this device.** Feedback 10:
+  "the picture banners — it would be good to be able to make your own
+  too". A picture the user chooses (`pictures/own.ts`) is kept in the
+  page's IndexedDB (`astrotime-pictures`), never in a calendar, never
+  sent anywhere, made smaller as it is added: its long side at most
+  1600 px, WebP where the browser writes it, else JPEG, decoded and drawn
+  off the page's own canvas (`createImageBitmap`, `OffscreenCanvas`), so a
+  phone camera's photo of several megabytes keeps a few hundred
+  kilobytes. A file that is no picture is refused, said in the dialog,
+  and nothing is kept. The settings hold only each picture's id; a word
+  deleted, a picture replaced or a banner reset forgets its picture, and
+  so does a dialog closed unsaved (its pick, or one that arrives after it
+  closed). No sweep of pictures nothing names: every tab and window
+  shares the database, and one tab's sweep would take a picture another
+  tab has just picked and not yet saved; a picture left by a tab closed
+  mid-pick stays ([Deferred](#deferred)). A picture that could not be read
+  is asked for again next time, not remembered as missing; one removed
+  while it was read gets no URL. Where the browser has no
+  `OffscreenCanvas` the page's own canvas draws it, and with no canvas at
+  all it is kept as it came.
+  Across devices: [Deferred](#deferred), as own colours are (D173).
+- **D223. Your words and pictures, your month banners.** Settings →
+  Pictures, under its switches (`picture-settings.tsx`, loaded with
+  Settings, its strings too, `i18n/pictures.ts`, foundation
+  [D145](foundation.md#D145)):
+  - **"Your words and pictures"**: each word with its picture's
+    thumbnail; a tap edits it in a dialog of its own (the word, "Choose a
+    picture", Delete), as an own colour is; "Add a word with a picture"
+    makes one. An item whose title has a word of theirs (`ownWordOf`: each
+    of its words begins a title's word, three letters or more, a shorter
+    one whole; several in a row; case and diacritics aside) is drawn over
+    their picture in the Agenda and its details, before AstroTime's
+    subjects and place photos, and with illustrations off too: the user
+    chose it.
+  - **"Your month banners"**: the twelve months, each with AstroTime's
+    banner or theirs; "Choose a picture for <month>" sets it, "Back to
+    AstroTime's" resets it. Their banner shows for its month as named
+    (no hemisphere's turn: they chose it for that month), with month
+    banners off too.
+  - **For one item**, a picture of its own: [Deferred](#deferred); it
+    would need the item to carry it to other devices and clients.
 
 ## Deferred
 
@@ -2210,6 +2349,11 @@ own (below).
   article (most cafés, offices, homes) has no photo; a source of photos of
   any place that sends nothing more and needs no key was not found. The
   desktop has none, as it has no map ([foundation Deferred](foundation.md#deferred)).
+- **Mentions from contacts** — [D208](#D208) offers the server's users;
+  the account's CardDAV address books (another protocol, another home to
+  discover) and, on Android, the phone's contacts (a permission and a
+  plugin) would offer people who are not users; a mention typed by hand as
+  `@Name` with no link is shown as words, not a chip.
 - **The tasks beside the calendar on a wide screen** — [D227](#D227)
   shows the tasks in the view's place; Google Calendar web also shows a
   list beside the calendar, opened from a rail on its right. It comes back
@@ -2229,6 +2373,18 @@ own (below).
   "in the park"); reading a word's neighbours (a verb before an object)
   would let "Train for the marathon" be sport and "Park the car" nothing
   without a list of phrases.
+- **The user's own pictures across devices** ([D222](#D222)): kept on one
+  device; the account's own files (thread N's `Provider.files()`, a
+  folder of the account's WebDAV) could carry them and the words to the
+  user's other devices.
+- **A picture left by a tab closed mid-pick** ([D222](#D222)): a dialog's
+  pick is forgotten as the dialog closes, but a tab closed with the dialog
+  open leaves its pick in the database, named by nothing. A sweep safe
+  for every tab (pictures older than a day that no tab's settings name,
+  read again right before deleting) would take them.
+- **A picture for one item** ([D223](#D223)): an item's own picture, which
+  its calendar object would carry (an `ATTACH` or an `X-` property) for
+  other devices and clients to show.
 - **The reminder tally across devices** — [D206](#D206)'s "most added"
   is counted per device; a new device offers the defaults until the user
   adds some there. Counting from the store's alarms (the user's own items

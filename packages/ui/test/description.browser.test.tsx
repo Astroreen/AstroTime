@@ -55,3 +55,32 @@ test("a code block, which scrolls sideways, is reached by the keyboard and named
   expect(code.tabIndex).toBe(0);
   expect(code.getAttribute("aria-label")).toBe("Code");
 });
+
+test("a box is named by its own line only: a nested list or code first leaves it an empty item", () => {
+  const host = drawn("- [ ]\n  - nested\n- [x]\n  ```\n  code\n  ```");
+  const boxes = [...host.querySelectorAll('[role="checkbox"]')];
+  expect(boxes.map(nameOf)).toEqual(["An empty item", "An empty item"]);
+  // What is under it is still drawn.
+  expect(host.textContent).toContain("nested");
+  expect(host.querySelector("pre")?.textContent).toBe("code");
+});
+
+test("a numbered checklist is drawn with its boxes in place of its numbers", () => {
+  const host = drawn("1. [ ] Book\n2. [x] Pack");
+  const list = host.querySelector("ol")!;
+  expect(list.getAttribute("start")).toBe("1");
+  expect(list.className).not.toContain("list-decimal");
+  const items = [...list.querySelectorAll(":scope > li")];
+  expect(items.every((item) => item.className.includes("list-none"))).toBe(true);
+  expect(
+    items.map((item) => item.querySelector('[role="checkbox"]')?.getAttribute("aria-checked")),
+  ).toEqual(["false", "true"]);
+});
+
+test("a paragraph keeps its spaces as typed", () => {
+  const host = drawn("Room:   4\n  second floor");
+  const paragraph = host.querySelector("p")!;
+  expect(paragraph.className).toContain("whitespace-pre-wrap");
+  expect(paragraph.textContent).toBe("Room:   4  second floor");
+  expect(paragraph.querySelectorAll("br")).toHaveLength(1);
+});

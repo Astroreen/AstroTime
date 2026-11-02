@@ -405,8 +405,13 @@ describe("after #94's review (design D207)", () => {
     expect(parseMarkdown("```\n\tindented\ta\n```")).toEqual([
       { type: "code", text: "\tindented\ta" },
     ]);
-    const [list] = parseMarkdown("- a\n  ```\n  \tx\n  ```");
-    expect(JSON.stringify(list)).toContain('"text":"\\tx"');
+    expect(parseMarkdown("- a\n  ```\n  \tx\n  ```")).toEqual([
+      {
+        type: "list",
+        start: null,
+        items: [{ checked: null, children: [paragraph("a"), { type: "code", text: "\tx" }] }],
+      },
+    ]);
   });
 
   test("an empty heading is text, not an empty heading", () => {
@@ -487,4 +492,15 @@ describe("an item's lines, from its content's column (design D207)", () => {
       list(null, item(paragraph("x"), list(null, item(paragraph("y"))))),
     ]);
   });
+});
+
+test("five spaces or more after a marker: the item's column is one past it", () => {
+  // "  y" after a blank line is under the item from column 2, not 7.
+  expect(parseMarkdown("-      x\n\n  y")).toEqual([
+    {
+      type: "list",
+      start: null,
+      items: [{ checked: null, children: [paragraph("x"), paragraph("y")] }],
+    },
+  ]);
 });

@@ -267,12 +267,17 @@ test("the details read the description as Markdown; the editor keeps it as typed
   await expect(link).toHaveAttribute("href", "https://example.com/budget");
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  // A mention is a chip (design D208), its e-mail on its title.
+  await expect(details.getByRole("button", { name: "@Anna Berg" })).toHaveAttribute(
+    "title",
+    "anna@example.com",
+  );
   // The text itself is what was written, Markdown and all.
   await details.getByRole("button", { name: "Edit" }).click();
   await expect(
     page.getByRole("dialog", { name: "Edit event" }).getByRole("textbox", { name: "Description" }),
   ).toHaveValue(
-    "## Agenda\n- [x] Last quarter's **actuals**\n- [ ] Next year's *draft*\n- Travel, see `travel.ods`\n\n> Bring the numbers, not the slides.\n\n[The sheet](https://example.com/budget)",
+    "## Agenda\n- [x] Last quarter's **actuals**\n- [ ] Next year's *draft*\n- Travel, see `travel.ods`\n\n> Bring the numbers, not the slides.\n\n[The sheet](https://example.com/budget), ask [@Anna Berg](mailto:anna@example.com)",
   );
 });
 
@@ -520,6 +525,14 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
   });
 
   test("this and following: the series is split at Thursday", async ({ page }) => {
+    // A landing that lasts, so its mark is there to read (design D193).
+    await page.addInitScript(() =>
+      document.addEventListener("DOMContentLoaded", () => {
+        const style = document.createElement("style");
+        style.textContent = "[data-landed] { animation-duration: 600s !important; }";
+        document.head.append(style);
+      }),
+    );
     await openDemo(page, "week");
     const dialog = await editItem(page, "Thursday, November 5", /^Stand-up, /, "Stand-up");
     await dialog.getByRole("textbox", { name: "Title" }).fill("Daily sync");
@@ -530,6 +543,15 @@ test.describe("an occurrence of a series asks the scope (D11)", () => {
     await expect(item(page, "Thursday, November 5", /^Daily sync, 9:00/)).toBeVisible();
     await expect(item(page, "Friday, November 6", /^Daily sync, 9:00/)).toBeVisible();
     await expect(item(page, "Wednesday, November 4", /^Stand-up, 9:00/)).toBeVisible();
+    // The occurrence edited lands, in the new series it is in now; its
+    // following days do not (design D193).
+    await expect(item(page, "Thursday, November 5", /^Daily sync, 9:00/)).toHaveAttribute(
+      "data-landed",
+      "true",
+    );
+    await expect(item(page, "Friday, November 6", /^Daily sync, 9:00/)).not.toHaveAttribute(
+      "data-landed",
+    );
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(item(page, "Monday, November 9", /^Daily sync, 9:00/)).toBeVisible();
   });
