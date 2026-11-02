@@ -2238,8 +2238,9 @@ task?"
     `..` or hidden `.htaccess`; the endings it refuses, `.part` and
     `.filepart`, made `_part` and `_filepart`; at most 200 bytes of UTF-8
     (Nextcloud takes 255, and " (20)" may follow), the extension kept and
-    no character cut in half, its ends made safe again after the cut;
-    "file" when nothing is left.
+    no character cut in half, its ends made safe again after the cut, the
+    stem's too before the extension (no "name .pdf"); "file" when nothing
+    is left.
   - **Never over a file there**: `PUT` with `If-None-Match: *`, and on
     `412` "name (2).ext", then "(3)", up to twenty; past that, or on any
     other refusal (a quota full, a name refused), the upload says it

@@ -197,6 +197,8 @@ test("a name Nextcloud takes, inside /Calendar: no `.` or `..`, no hidden file, 
   // A cut that leaves ".part" or a dot last is made safe again.
   expect(safeName(`${"a".repeat(195)}.part${"b".repeat(100)}`)).toBe(`${"a".repeat(195)}_part`);
   expect(safeName(`${"a".repeat(199)}.${"b".repeat(100)}`)).toBe("a".repeat(199));
+  // A cut that leaves a space or a dot before the extension: trimmed there too.
+  expect(safeName(`${"a".repeat(194)} .${"x".repeat(100)}.pdf`)).toBe(`${"a".repeat(194)}.pdf`);
   // Uploaded, a traversal stays a name in /Calendar: never the files' root or its parent.
   const urls: string[] = [];
   const http: HttpClient = async (request) => {
