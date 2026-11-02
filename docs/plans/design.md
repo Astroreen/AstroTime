@@ -1584,8 +1584,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
 
 ### Decided in round 4: the editor
 
-The owner's feedback after round 3 on the edit dialog: its icons and its
-reminders and its description.
+The owner's feedback after round 3 on the edit dialog: its icons, its
+reminders, its description and mentions in it.
 
 - **D205. Each row's icon is level with the middle of its control** (the
   owner's feedback 12 after round 3: "Some icons are not centred with their
@@ -1707,6 +1707,40 @@ reminders and its description.
     ([foundation D145](foundation.md#D145)), and it makes no HTML.
     _Until round 4_ the details linked bare web and mail links and nothing
     else was markup.
+
+- **D208. "@" in a description mentions someone the account's server
+  knows** (the owner's feedback 9 after round 3: "in an event's or task's
+  description, one could mention @user").
+  - **Typing:** in the edit dialog's description, "@" at a word's start
+    and two letters or more ask the server of the item's calendar for
+    people whose name or e-mail holds them, once typing rests (250 ms), at
+    most 8, each query asked once while the dialog is open. A list under
+    the field offers each with their e-mail; arrows move, Enter or Tab or a
+    tap picks, Escape closes the list (not the dialog). The calendar on
+    this device and the demo offer no one.
+  - **Where people come from** (AGENTS.md rule 4): `Provider.people`, which
+    only `@astrotime/caldav` knows as a request: RFC 3744's
+    `principal-property-search` by `displayname` or Sabre's
+    `email-address`, over every principal collection
+    (`apply-to-principal-collection-set`), as Nextcloud's Calendar finds
+    attendees, asked of the calendar home in one `REPORT`. Individuals
+    only (`calendar-user-type`), no group, room or resource; the e-mail
+    from `email-address`, else a `mailto:` in `calendar-user-address-set`.
+    Radicale answers it with nobody; a server that refuses the report
+    finds no one. `peopleOf` (`@astrotime/sync`) asks with the account's
+    credentials; offline or refused, it finds no one, and a mention can
+    still be typed. Tested on recorded answers of Nextcloud 34 and
+    Radicale 3.8 (`packages/caldav/test/fixtures`), and end to end on
+    Radicale with Nextcloud's answer served for that one report.
+  - **What is written:** a Markdown link to the person's e-mail,
+    `[@Anna Berg](mailto:anna@example.com)`, which reads as plain text in
+    Nextcloud's apps and others and keeps who was meant; someone with no
+    e-mail is written `@Name`. A mention invites no one and sends nothing:
+    no `ATTENDEE` is written ([D108](#D108): AstroTime does not invite).
+  - **Read:** the details ([D207](#D207)) draw such a link as a chip with
+    the name; a tap shows the e-mail, as a link to write to them.
+  - **Privacy:** the query goes to the account's own server only, as
+    every other request of the account.
 
 ### Decided in round 4: the app shell
 
@@ -1970,6 +2004,11 @@ own (below).
   which draw our own pictures only; it asks a photo service and needs its
   privacy notes and setting, so it is its own change, thread M's next
   (D220, D221).
+- **Mentions from contacts** — [D208](#D208) offers the server's users;
+  the account's CardDAV address books (another protocol, another home to
+  discover) and, on Android, the phone's contacts (a permission and a
+  plugin) would offer people who are not users; a mention typed by hand as
+  `@Name` with no link is shown as words, not a chip.
 - **The tasks beside the calendar on a wide screen** — [D227](#D227)
   shows the tasks in the view's place; Google Calendar web also shows a
   list beside the calendar, opened from a rail on its right. It comes back

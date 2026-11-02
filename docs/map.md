@@ -69,7 +69,8 @@ When you add a package, app or module, add its line here in the same PR.
     `FileStore`, `RemoteFile`: an account's files where its server keeps
     them, `plans/foundation.md#D231`);
     `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a
-    calendar. → `plans/foundation.md#D37`
+    calendar. → `plans/foundation.md#D37`; `people` and `Person`, someone
+    the server knows, for a mention. → `plans/design.md#D208`
   - `SecretStore` — where a platform keeps credentials, never the store.
     → `plans/android.md#D60`
   - `test/fixtures/` — iCalendar as each client writes it; where each file
@@ -129,7 +130,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars with
     their sync tokens, `sync-collection` with the objects' data and a full
     listing as fallback, multiget, writes with ETags.
-    → `plans/foundation.md#D2`, `plans/foundation.md#D127`
+    → `plans/foundation.md#D2`, `plans/foundation.md#D127`; `people`, RFC
+    3744's principal search asked of the calendar home.
+    → `plans/design.md#D208`
   - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
     `resumeLoginFlow`, one a page before this one started, from its
     `LoginFlowState` → `plans/foundation.md#D121`;
@@ -172,6 +175,8 @@ When you add a package, app or module, add its line here in the same PR.
     and `accountFiles` (`files.ts`, `@astrotime/sync/files`, loaded with
     the file picker), them opened with its saved credentials.
     → `plans/foundation.md#D231`
+    → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
+    mention. → `plans/design.md#D208`
   - `test/budget.test.ts` — the requests each action costs a server, held
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
@@ -272,6 +277,9 @@ When you add a package, app or module, add its line here in the same PR.
       taken off, a link added. → `plans/design.md#D233`
     - `file-picker.tsx` — the account's files, a folder at a time, to
       attach one. → `plans/design.md#D234`
+    - `mention-field.tsx` — the edit dialog's description, where "@"
+      offers the account's people and writes a mention.
+      → `plans/design.md#D208`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
       map and actions. → `plans/design.md#D175`, `plans/design.md#D177`

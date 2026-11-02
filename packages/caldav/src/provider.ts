@@ -6,6 +6,7 @@ import {
   ServerBusyError,
   type CalendarRights,
   type Changes,
+  type Person,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -422,6 +423,15 @@ export class CalDavProvider implements Provider {
       else incomplete = true;
     }
     return { objects, removed, incomplete };
+  }
+
+  /**
+   * People the server finds by name or e-mail (design D208), from a module
+   * of its own, loaded with the first search (foundation D145).
+   */
+  async people(query: string): Promise<Person[]> {
+    const { searchPeople } = await import("./people.ts");
+    return searchPeople((request, accept) => this.request(request, accept), this.homeUrl, query);
   }
 
   /**

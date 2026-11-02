@@ -5,6 +5,7 @@ import { useId, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CheckIcon } from "./icons.tsx";
+import { MentionChip, mentionIn } from "./mention-chip.tsx";
 import { parseMarkdown, type Block, type Inline, type ListItem } from "../calendar/markdown.ts";
 
 export function Description({ text }: { text: string }) {
@@ -135,7 +136,10 @@ function inline(node: Inline, key: number): ReactNode {
       return <em key={key}>{node.children.map(inline)}</em>;
     case "del":
       return <del key={key}>{node.children.map(inline)}</del>;
-    case "link":
+    case "link": {
+      // A mention (design D208): `[@Anna Berg](mailto:anna@example.com)`.
+      const person = mentionIn(node.href, node.children);
+      if (person) return <MentionChip key={key} {...person} />;
       return (
         <a
           key={key}
@@ -147,5 +151,6 @@ function inline(node: Inline, key: number): ReactNode {
           {node.children.map(inline)}
         </a>
       );
+    }
   }
 }
