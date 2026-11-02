@@ -371,6 +371,18 @@ describe("what a drop gives a task (foundation D16, design D159)", () => {
         ),
       ),
     ).toEqual(["2026-10-24T09:00:00", "2026-10-26T09:00:00"]);
+    // A task over days in the strip dropped onto the grid on the day of the change.
+    expect(
+      walls(
+        dropped(
+          task(date("2026-10-23"), date("2026-10-26")),
+          "move",
+          { day: "2026-10-23", minutes: null },
+          { day: "2026-10-25", minutes: 9 * 60 },
+          timeZone,
+        ),
+      ),
+    ).toEqual(["2026-10-25T09:00:00", "2026-10-28T09:00:00"]);
   });
 
   test("a task with a start and a due into the strip and back keeps its due as many days after", () => {

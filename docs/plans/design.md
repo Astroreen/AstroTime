@@ -940,8 +940,12 @@ For the items' editor and details:
   written (foundation [D7](foundation.md#D7)): while the user leaves it, it
   follows the due (`withDueAt`), and the task keeps only its `DUE`, so a
   due moved or made all day shows where it now is; a new title alone
-  writes the title. Once the user sets the start, it is written; and when
-  the due is cleared, the start shown is written, as a task needs a time.
+  writes the title. Once the user sets the start, or turns "All day" on or
+  off (the times change with a start shown), it is written; and when the
+  due is cleared, the start shown is written, as a task needs a time.
+  "All day" is one switch for both ends: a task another client wrote
+  with a date start and a timed due (or the other way round) opens as the
+  start is, and its due is written that way only when its times change.
 - **D161. Overdue is its due, else its start; the tasks screen's new task
   is today's.**
   - A task is **overdue**, and rolls over to today's "N undone tasks"

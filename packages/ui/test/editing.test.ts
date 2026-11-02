@@ -35,6 +35,7 @@ import {
   scopesFor,
   switchKind,
   timesOfForm,
+  withAllDay,
   withDue,
   withDueAt,
   withStartDate,
@@ -188,6 +189,16 @@ describe("the form", () => {
       summary: "Call",
     });
     expect(parse("DTSTART;VALUE=DATE:20261120\r\n")).not.toHaveProperty("startless");
+    // A date start with a timed due: one "All day" for both, the start's; the
+    // due's time shows only once the times are changed (design D160).
+    const mixed = parse(
+      "DTSTART;VALUE=DATE:20261120\r\nDUE;TZID=Europe/Vilnius:20261121T150000\r\n",
+    );
+    expect(mixed).toMatchObject({ allDay: true, startDate: "2026-11-20", endDate: "2026-11-21" });
+    expect(changesOf(mixed, { ...mixed, summary: "Call" }, "Reminder")).toEqual({
+      summary: "Call",
+    });
+    expect(timesOfForm(mixed).end).toEqual({ type: "date", date: "2026-11-21" });
   });
 
   test("an item opens with its own times in its zone; a UTC time in the user's, kept UTC", async () => {
@@ -786,10 +797,14 @@ describe("saving writes pending changes through the store (D5)", () => {
     });
     expect(due).toContain("DUE;TZID=Europe/Vilnius:20261105T170000\r\n");
     expect(due).not.toContain("DTSTART");
-    // Made all day: still only a due, now a date.
-    const allDay = await save("all-day.ics", (form) => ({ ...form, allDay: true }));
+    // Made all day: the times changed with a start shown, so the start is written too.
+    const allDay = await save("all-day.ics", (form) => {
+      const changed = withAllDay(form, true);
+      expect(changed).not.toHaveProperty("startless");
+      return changed;
+    });
+    expect(allDay).toContain("DTSTART;VALUE=DATE:20261105\r\n");
     expect(allDay).toContain("DUE;VALUE=DATE:20261105\r\n");
-    expect(allDay).not.toContain("DTSTART");
     // The start set by the user is written, the due kept as far after it.
     const started = await save("started.ics", (form) => withStartTime(form, "14:00"));
     expect(started).toContain("DTSTART;TZID=Europe/Vilnius:20261105T140000\r\n");

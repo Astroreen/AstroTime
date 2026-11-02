@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   switchKind,
+  withAllDay,
   withDue,
   withDueAt,
   withStartTime,
@@ -210,7 +211,7 @@ function Fields({
         <Toggle
           label={t("edit.allDay")}
           checked={form.allDay}
-          onChange={(allDay) => set({ allDay })}
+          onChange={(allDay) => onChange(withAllDay(form, allDay))}
         />
         <DateTime
           form={form}

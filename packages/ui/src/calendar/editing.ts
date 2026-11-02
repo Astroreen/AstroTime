@@ -316,6 +316,11 @@ export function withDueAt(form: Form, due: { endDate?: string; endTime?: string 
   return next.startless ? { ...next, startDate: next.endDate, startTime: next.endTime } : next;
 }
 
+/** All day or not, the start's and the due's alike: the start shown is written from then on (design D160). */
+export function withAllDay(form: Form, allDay: boolean): Form {
+  return { ...started(form), allDay };
+}
+
 /** The form with its start set by the user: written from now on (design D160). */
 function started(form: Form): Form {
   if (!form.startless) return form;
