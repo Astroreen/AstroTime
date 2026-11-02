@@ -74,6 +74,31 @@ describe("an item's subject from its title", () => {
     expect(subjectOf(null)).toBeNull();
   });
 
+  test("a word with another sense gives nothing alone, its subject with a word that says it", () => {
+    for (const title of [
+      "Park the car",
+      "Train the new hire",
+      "First class",
+      "Case study review",
+      "Film the talk",
+      "Gig economy panel",
+      "Shop talk",
+      "Fly the drone",
+    ])
+      expect(subjectOf(title), title).toBeNull();
+    expect(subjectOf("Night train to Riga")).toBe("travel");
+    expect(subjectOf("Train to Riga")).toBe("travel");
+    expect(subjectOf("Walk in the park")).toBe("walk");
+    expect(subjectOf("Kids to the park")).toBe("walk");
+    expect(subjectOf("Study group")).toBe("study");
+    expect(subjectOf("Class with Ms. Lee")).toBe("study");
+  });
+
+  test("a title is read once: asked again, the same answer", () => {
+    expect(subjectOf("Lunch with Anna")).toBe("meal");
+    expect(subjectOf("Lunch with Anna")).toBe("meal");
+  });
+
   test("a run that is no sport", () => {
     expect(subjectOf("Run the release")).toBeNull();
   });
@@ -99,6 +124,12 @@ describe("an item's subject from its title", () => {
     expect(subjectOf("Birthday dinner")).toBe("birthday");
     expect(subjectOf("Обед после концерта")).toBe("music");
     expect(subjectOf("Coffee at the airport")).toBe("travel");
+  });
+
+  test("a title written decomposed (NFD) reads as the same words", () => {
+    expect(subjectOf("Йога".normalize("NFD"))).toBe("sport");
+    expect(subjectOf("Перелёт в Ригу".normalize("NFD"))).toBe("travel");
+    expect(subjectOf("Новогодний корпоратив".normalize("NFD"))).toBe("winter");
   });
 
   test("case and diacritics do not matter", () => {
@@ -134,20 +165,24 @@ describe("a month's banner", () => {
       "Chile/Continental",
     ])
       expect(isSouthern(zone), zone).toBe(true);
-    // Every zone the tz database places south of the equator, the tropics too.
+    // The tropics keep the northern months, either side of the equator.
     for (const zone of [
-      "Pacific/Tahiti",
-      "Pacific/Apia",
-      "Pacific/Rarotonga",
-      "Africa/Luanda",
-      "Africa/Lubumbashi",
-      "America/La_Paz",
+      // Links to Nairobi in `backward`, placed north of the equator in zone.tab.
+      "Africa/Addis_Ababa",
+      "Africa/Asmara",
+      "Africa/Djibouti",
+      "Africa/Kampala",
+      "Africa/Mogadishu",
+      "Africa/Nairobi",
+      "Asia/Jakarta",
       "America/Lima",
+      "Africa/Luanda",
+      "America/La_Paz",
+      "Pacific/Tahiti",
+      "America/Bogota",
+      "Asia/Singapore",
     ])
-      expect(isSouthern(zone), zone).toBe(true);
-    // North of it, however near: the northern months.
-    expect(isSouthern("America/Bogota")).toBe(false);
-    expect(isSouthern("Asia/Singapore")).toBe(false);
+      expect(isSouthern(zone), zone).toBe(false);
     expect(isSouthern("UTC")).toBe(false);
   });
 });

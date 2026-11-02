@@ -246,7 +246,8 @@ async function picture(event: FetchEvent, pathname: string): Promise<Response> {
   const shown = await cache.match(pathname);
   if (shown) return shown;
   const answer = await fetch(event.request);
-  if (answer.ok && answer.type === "basic") {
+  // A whole picture only: a partial one (206) is never kept as it.
+  if (answer.status === 200 && answer.type === "basic") {
     event.waitUntil(cache.put(pathname, answer.clone()).catch(() => {}));
   }
   return answer;

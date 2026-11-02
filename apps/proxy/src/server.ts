@@ -29,9 +29,16 @@ export function contentSecurityPolicy(
   places: string | null = PLACES.photon,
 ): string {
   // Places on the map (D178): the Photon Location searches, the tiles of
-  // the place card's map; neither when the deployment turned them off.
-  const photon = places === null ? "" : ` ${new URL(places).origin}`;
-  const tiles = places === null ? "" : ` ${new URL(PLACES.tiles).origin}`;
+  // the place card's map, and the Wikipedias and Wikimedia a place's photo
+  // comes from (design D221); none when the deployment turned places off.
+  const photon =
+    places === null
+      ? ""
+      : ` ${[places, ...Object.values(PLACES.wikipedias)].map((url) => new URL(url).origin).join(" ")}`;
+  const tiles =
+    places === null
+      ? ""
+      : ` ${[PLACES.tiles, ...PLACES.photos].map((url) => new URL(url).origin).join(" ")}`;
   return [
     // Nothing the app does not ask for below: no frames, objects, fonts or media.
     "default-src 'none'",
@@ -40,7 +47,7 @@ export function contentSecurityPolicy(
     // The built stylesheet, and the <style> elements Base UI adds, which carry the nonce.
     nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
     // SQLite's wasm, every CalDAV request through /dav-proxy/ (D39), and
-    // the place search, which never goes through the proxy (D178).
+    // the place search and a place photo's lookup, which never go through the proxy (D178).
     `connect-src 'self'${photon}`,
     // The store's worker (packages/storage/src/web), and the service worker
     // that keeps the app's files for starting offline (D124).

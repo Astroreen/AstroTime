@@ -61,6 +61,8 @@ export interface Settings {
   readonly illustrations: boolean;
   /** A picture of the season above each month of the Agenda (design D218). */
   readonly monthBanners: boolean;
+  /** A photo of an item's place from Wikipedia, where the platform reaches the network (design D221). */
+  readonly placePhotos: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   places: true,
   illustrations: true,
   monthBanners: true,
+  placePhotos: true,
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -106,6 +109,7 @@ export function readSettings(stored: string | null): Settings {
     places: value.places !== false,
     illustrations: value.illustrations !== false,
     monthBanners: value.monthBanners !== false,
+    placePhotos: value.placePhotos !== false,
   };
 }
 

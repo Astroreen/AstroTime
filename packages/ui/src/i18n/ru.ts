@@ -285,6 +285,12 @@ export const ru = {
   "settings.pictures": "Картинки",
   "settings.pictures.illustrations": "Иллюстрации по названию",
   "settings.pictures.banners": "Картинки месяцев в расписании",
+  "settings.pictures.placePhotos": "Фото мест",
+  "settings.pictures.placePhotos.hint":
+    "Название места и его точка (около 100 м) уходят в {{host}} за его фото",
+  "pictures.photoBy": "Фото:",
+  "pictures.photoAuthorUnknown": "автор неизвестен",
+  "pictures.photoWikipedia": "Википедия",
   "settings.places": "Места",
   "settings.places.search": "Искать места на карте",
   "settings.places.hint":
