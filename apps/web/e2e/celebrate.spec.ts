@@ -12,7 +12,20 @@ async function logBursts(page: Page) {
     // Settles with the first shape thrown: the burst throws all of them in one go.
     let thrownOnce = () => {};
     const burst = new Promise<void>((resolve) => (thrownOnce = resolve));
-    Object.assign(window, { thrown, burst });
+    // The middle of the checkbox or button pressed, as it is at the press:
+    // what the app measures there, before anything moves.
+    const pressed: { x: number; y: number }[] = [];
+    addEventListener(
+      "click",
+      (event) => {
+        const target = (event.target as Element).closest('[role="checkbox"], button');
+        if (!target) return;
+        const { left, top, width, height } = target.getBoundingClientRect();
+        pressed.push({ x: left + width / 2, y: top + height / 2 });
+      },
+      true,
+    );
+    Object.assign(window, { thrown, burst, pressed });
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (this: Element, frames, options) {
       const layer = this.parentElement;
@@ -36,6 +49,12 @@ async function logBursts(page: Page) {
     );
 }
 
+/** Where the last press was, as the page measured it at the press. */
+const pressedAt = (page: Page) =>
+  page.evaluate(() =>
+    (window as unknown as { pressed: { x: number; y: number }[] }).pressed.at(-1)!,
+  );
+
 /** The burst's code arrived: it is loaded with the first completion (D145). */
 const loaded = (page: Page) =>
   page.evaluate(() =>
@@ -58,17 +77,15 @@ test("completing a task from its checkbox throws a burst from it; not completing
   const panel = await openTasks(page);
   expect(await loaded(page)).toBe(false);
   const box = panel.getByRole("checkbox", { name: "Send the report" });
-  // Where it rests: a list chosen slides in (design D199).
-  await box.click({ trial: true });
-  const from = (await box.boundingBox())!;
   await box.click();
   await page.evaluate(() => (window as unknown as { burst: Promise<void> }).burst);
+  const from = await pressedAt(page);
   const shapes = await thrown();
   // Every shape starts at the checkbox's middle, on a layer a screen reader does not see.
   expect(shapes.length).toBe(18);
   for (const { x, y, hidden } of shapes) {
-    expect(Math.abs(x - (from.x + from.width / 2))).toBeLessThan(1);
-    expect(Math.abs(y - (from.y + from.height / 2))).toBeLessThan(1);
+    expect(Math.abs(x - from.x)).toBeLessThan(1);
+    expect(Math.abs(y - from.y)).toBeLessThan(1);
     expect(hidden).toBe(true);
   }
 
@@ -122,9 +139,8 @@ test("a burst whose code comes late starts where the press was, though the row h
   });
   const panel = await openTasks(page);
   const box = panel.getByRole("checkbox", { name: "Send the report" });
-  await box.click({ trial: true });
-  const from = (await box.boundingBox())!;
   await box.click();
+  const from = await pressedAt(page);
   await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
   await expect(box).toHaveCount(0);
   // Its row gone from the motion layer too: nothing is left where it was pressed.
@@ -134,8 +150,8 @@ test("a burst whose code comes late starts where the press was, though the row h
   const shapes = await thrown();
   expect(shapes.length).toBe(18);
   for (const { x, y } of shapes) {
-    expect(Math.abs(x - (from.x + from.width / 2))).toBeLessThan(1);
-    expect(Math.abs(y - (from.y + from.height / 2))).toBeLessThan(1);
+    expect(Math.abs(x - from.x)).toBeLessThan(1);
+    expect(Math.abs(y - from.y)).toBeLessThan(1);
   }
 });
 
