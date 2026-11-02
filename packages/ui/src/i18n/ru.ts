@@ -300,7 +300,7 @@ export const ru = {
   "notice.open": "Открыть",
   "details.readOnly": "Календарь «{{calendar}}» только для чтения: здесь это не изменить.",
   "attachments.title": "Вложения",
-  "attachments.save": "Сохранить {{name}}",
+  "attachments.save": "Сохранить",
   "attachments.bytes": "{{count}} Б",
   "attachments.kind.image": "Изображение",
   "attachments.kind.audio": "Аудио",

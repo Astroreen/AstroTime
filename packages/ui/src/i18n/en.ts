@@ -287,7 +287,7 @@ export const en = {
   "notice.open": "Open",
   "details.readOnly": "{{calendar}} is read-only: this item cannot be changed here.",
   "attachments.title": "Attachments",
-  "attachments.save": "Save {{name}}",
+  "attachments.save": "Save",
   "attachments.bytes": "{{count}} B",
   "attachments.kind.image": "Image",
   "attachments.kind.audio": "Audio",
