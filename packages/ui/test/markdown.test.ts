@@ -462,3 +462,29 @@ describe("after #94's low review (design D207)", () => {
     ]);
   });
 });
+
+describe("an item's lines, from its content's column (design D207)", () => {
+  const item = (...children: unknown[]) => ({ checked: null, children });
+  const list = (start: number | null, ...items: unknown[]) => ({ type: "list", start, items });
+
+  test("a sibling indented less than the content's column is a sibling", () => {
+    expect(parseMarkdown("1. x\n  2. y")).toEqual([
+      list(1, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+    expect(parseMarkdown("- x\n - y")).toEqual([
+      list(null, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+    expect(parseMarkdown("  - x\n  - y")).toEqual([
+      list(null, item(paragraph("x")), item(paragraph("y"))),
+    ]);
+  });
+
+  test("an item under a number nests from its content's column, under a bullet from 2", () => {
+    expect(parseMarkdown("1. x\n   - y")).toEqual([
+      list(1, item(paragraph("x"), list(null, item(paragraph("y"))))),
+    ]);
+    expect(parseMarkdown("- x\n  - y")).toEqual([
+      list(null, item(paragraph("x"), list(null, item(paragraph("y"))))),
+    ]);
+  });
+});

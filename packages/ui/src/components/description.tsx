@@ -33,14 +33,7 @@ function block(node: Block, key: number): ReactNode {
       );
     }
     case "code":
-      return (
-        <pre
-          key={key}
-          className="overflow-x-auto rounded-lg bg-canvas p-3 font-mono text-small whitespace-pre"
-        >
-          <code>{node.text}</code>
-        </pre>
-      );
+      return <Code key={key} text={node.text} />;
     case "quote":
       return (
         <blockquote
@@ -71,6 +64,21 @@ function block(node: Block, key: number): ReactNode {
       );
     }
   }
+}
+
+/** A code block, which scrolls sideways: a keyboard reaches it too. */
+function Code({ text }: { text: string }) {
+  const { t } = useTranslation();
+  return (
+    <pre
+      tabIndex={0}
+      role="group"
+      aria-label={t("description.code")}
+      className="overflow-x-auto rounded-lg bg-canvas p-3 font-mono text-small whitespace-pre focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <code>{text}</code>
+    </pre>
+  );
 }
 
 /**

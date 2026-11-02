@@ -195,23 +195,24 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // "* * *" or "- - -" after an item is a rule that ends the list, not an item.
     if (!marker || RULE.test(lines[i]!) || /\d/.test(marker[2]!) !== ordered) break;
     // What follows the marker; the lines under it are indented at least this far.
-    const indent = marker[0].length;
-    const body = [lines[i]!.slice(indent)];
+    // Its content's column, its marker's indent and width included (as
+    // CommonMark's): a line under it belongs to it from this column on.
+    const indent = indentOf(marker[0].replace(/\S/g, " ") + "x");
+    const body = [lines[i]!.slice(marker[0].length)];
     i++;
     while (i < lines.length) {
       const next = lines[i]!;
       if (BLANK.test(next)) {
         // A blank line ends the item unless what follows is still indented under it.
         const after = lines[i + 1];
-        if (after !== undefined && !BLANK.test(after) && indentOf(after) >= Math.min(indent, 2)) {
+        if (after !== undefined && !BLANK.test(after) && indentOf(after) >= indent) {
           body.push("");
           i++;
           continue;
         }
         break;
       }
-      if (indentOf(next) >= Math.min(indent, 2))
-        body.push(dropColumns(next, Math.min(indent, indentOf(next))));
+      if (indentOf(next) >= indent) body.push(dropColumns(next, indent));
       else if (ITEM.test(next) || interrupts(next)) break;
       // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
       else if (body.at(-1)?.trim()) body.push(next);

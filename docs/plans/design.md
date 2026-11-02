@@ -1600,7 +1600,10 @@ reminders and its description.
     no mark closes inside a bare link; a lone `#` is text; an empty item
     (`-`) takes no next line in as its own; a link or an image with no
     words is named by its address; a written target's `\` escapes are
-    taken out. A paragraph
+    taken out; an item's lines belong to it from its content's column (its
+    marker's indent and width: 3 under `1. `), so `  2. y` after `1. x` is
+    the next item. A code block that scrolls sideways takes the keyboard's
+    focus, named "Code" (axe's `scrollable-region-focusable`). A paragraph
     keeps its spaces and indents as typed (`white-space: pre-wrap`, as the
     details drew a description before), so a plain description reads as
     it did.

@@ -48,3 +48,10 @@ test("each box is named by its own line, not by the list nested under it; an emp
   expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(["true", "false"]);
   expect(boxes.map(nameOf)).toEqual(["Pack", "An empty item"]);
 });
+
+test("a code block, which scrolls sideways, is reached by the keyboard and named", () => {
+  const host = drawn("```\nconst a = 1;\n```");
+  const code = host.querySelector("pre")!;
+  expect(code.tabIndex).toBe(0);
+  expect(code.getAttribute("aria-label")).toBe("Code");
+});

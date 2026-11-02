@@ -347,6 +347,7 @@ export const en = {
   "edit.location": "Location",
   "edit.description": "Description",
   "description.emptyItem": "An empty item",
+  "description.code": "Code",
   "places.results": "Places",
   "places.credit": "Places from © OpenStreetMap contributors",
   "places.map": "Map of {{place}}",
