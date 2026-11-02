@@ -87,23 +87,24 @@ for (const [size, viewport] of [
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("button", { name: "Add a reminder" }).click();
     await page.getByRole("menuitem", { name: "10 minutes before" }).click();
-    const controls = [
-      dialog.getByRole("switch", { name: "All day" }),
-      dialog.getByRole("combobox", { name: "Repeat" }),
-      dialog.getByRole("list", { name: "Reminders" }).getByRole("listitem").first(),
-      dialog.getByRole("combobox", { name: "Calendar" }),
-      dialog.getByRole("combobox", { name: "Colour" }),
-      dialog.getByRole("combobox", { name: "Location" }),
+    const list = dialog.getByRole("list", { name: "Reminders" });
+    const allDay = dialog.getByRole("switch", { name: "All day" });
+    // Each control and the box its row's icon is levelled with: the switch's
+    // is its 40 px row, "All day" beside it.
+    const rows: (readonly [Locator, Locator?])[] = [
+      [allDay, allDay.locator("xpath=parent::label")],
+      [dialog.getByRole("combobox", { name: "Repeat" })],
+      [list.getByRole("listitem").first()],
+      [dialog.getByRole("combobox", { name: "Calendar" })],
+      [dialog.getByRole("combobox", { name: "Colour" })],
+      [dialog.getByRole("combobox", { name: "Location" })],
     ];
-    for (const control of controls) {
+    for (const [control, measured = control] of rows) {
       // The row's icon: the hidden one before the column the control is in.
       const icon = control.locator(
         "xpath=ancestor::div[contains(@class, 'items-start')][1]/span[@aria-hidden='true']",
       );
-      // The switch is in its 40 px row, "All day" beside it.
-      const box = await (
-        control === controls[0] ? control.locator("xpath=parent::label") : control
-      ).boundingBox();
+      const box = await measured.boundingBox();
       const drawn = await icon.boundingBox();
       expect(box && drawn).toBeTruthy();
       const middle = box!.y + box!.height / 2;

@@ -1293,8 +1293,7 @@ Settings, the colours and the lists controls open.
 
 ### Decided in round 4: the editor
 
-The owner's feedback after round 3 on the edit dialog: its icons, its
-reminders, and the description.
+The owner's feedback after round 3 on the edit dialog: its icons.
 
 - **D205. Each row's icon is level with the middle of its control** (the
   owner's feedback 12 after round 3: "Some icons are not centred with their

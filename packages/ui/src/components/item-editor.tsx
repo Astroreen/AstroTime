@@ -365,7 +365,9 @@ function Fields({
 /**
  * A row of the form: its icon level with the middle of its first control, a
  * 40 px field (design D205), below its label when it has one (`labelled`:
- * the label's 20 px line and the 4 px under it).
+ * the label's 20 px line, `fieldLabel`'s `leading-5`, and the 4 px under it,
+ * the `gap-1` of the column that holds the label and its dropdown in
+ * `Select`, `RepeatField` and the Colour row; `editing.spec.ts` measures it).
  */
 function Section({
   icon,
