@@ -1509,8 +1509,10 @@ reminders and its description.
     from any client, so where marks may close and which brackets pair are
     found once per text, a run of backticks with no closer is not looked
     for again, and a link's target is read 2 KiB ahead at most; random text
-    never throws (a seeded fuzz in `markdown.test.ts`), and 60 000
-    characters of open marks parse in milliseconds.
+    never throws (a seeded fuzz in `markdown.test.ts`), and the parser's
+    counted steps grow with the text, not with its square. A bare link
+    keeps a trailing `*`, `_` or `~` unless it closes emphasis opened
+    before it (`https://example.com/a_`).
   - **As CommonMark where text is plain:** only a bullet or a list from 1
     cuts a paragraph short, so a wrapped line "2019. was a good year" stays
     words; a backtick fence has no backtick after it on its line ("Run
@@ -1613,10 +1615,10 @@ bar, the sidebar and the accounts panel.
   saved) so the edit dialog does not parse every object.
 - **The description's preview in the editor, and Markdown's rarer parts**
   — [D207](#D207) draws Markdown in the details only; the edit dialog
-  stays plain text with no preview toggle. Tables, images (a remote image
-  would load from a server the user did not pick), footnotes, reference
+  stays plain text with no preview toggle. Tables, footnotes, reference
   links (`[words][ref]`) and a heading underlined with `===` are read as
-  text.
+  text; an image (`![words](https://…)`) is a link to it named by its words,
+  since a remote picture would load from a server the user did not pick.
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as
   RFC 9074 writes it, `RELATED-TO;RELTYPE=SNOOZE` ([D164](#D164)); no
   recorded fixture shows how Apple's apps write one, so one with a

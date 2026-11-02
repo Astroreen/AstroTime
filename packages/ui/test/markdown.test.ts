@@ -2,7 +2,7 @@
 // details draw, and what is never a link or markup.
 import { describe, expect, test } from "vite-plus/test";
 
-import { linkOf, parseMarkdown, safeHref } from "../src/calendar/markdown.ts";
+import { linkOf, parseMarkdown, safeHref, work } from "../src/calendar/markdown.ts";
 
 const paragraph = (...children: unknown[]) => ({ type: "paragraph", children });
 
@@ -171,8 +171,26 @@ describe("safety", () => {
     ]);
   });
 
-  test("a bare link ends before the marks around it", () => {
-    expect(linkOf("https://example.com/x**")).toBe("https://example.com/x");
+  test("a bare link ends before a mark only where it closes emphasis opened before it", () => {
+    expect(linkOf("https://example.com/x**", "*")).toBe("https://example.com/x");
+    expect(linkOf("https://example.com/a_")).toBe("https://example.com/a_");
+    expect(linkOf("https://example.com/a_~", "~")).toBe("https://example.com/a_");
+    expect(parseMarkdown("see https://example.com/a_ now")).toEqual([
+      paragraph(
+        "see ",
+        { type: "link", href: "https://example.com/a_", children: ["https://example.com/a_"] },
+        " now",
+      ),
+    ]);
+    expect(parseMarkdown("_see https://example.com/a_")).toEqual([
+      paragraph({
+        type: "em",
+        children: [
+          "see ",
+          { type: "link", href: "https://example.com/a", children: ["https://example.com/a"] },
+        ],
+      }),
+    ]);
   });
 });
 
@@ -255,6 +273,17 @@ describe("what the review found (design D207)", () => {
     }
   });
 
+  test("an image is read as a link to it, named by its words; no picture is loaded", () => {
+    expect(parseMarkdown("Map: ![The square](https://example.com/map.png)")).toEqual([
+      paragraph("Map: ", {
+        type: "link",
+        href: "https://example.com/map.png",
+        children: ["The square"],
+      }),
+    ]);
+    expect(parseMarkdown("![x](javascript:alert(1))")).toEqual([paragraph("x")]);
+  });
+
   test("emphasis nested deeper than eight reads as text", () => {
     const deep = "*_".repeat(20) + "x" + "_*".repeat(20);
     expect(() => parseMarkdown(deep)).not.toThrow();
@@ -268,27 +297,31 @@ describe("what the review found (design D207)", () => {
   });
 });
 
-describe("untrusted text costs time in proportion to its length", () => {
+describe("untrusted text costs work in proportion to its length", () => {
   // Each of these took seconds when every opener scanned the rest of the
-  // text for its closer; in proportion to their length they take a few
-  // milliseconds. The ceiling is generous: nothing here waits for time.
-  test.each([
-    ["unclosed stars", "*a ".repeat(20_000)],
-    ["unclosed underscores", "_a ".repeat(20_000)],
-    ["stars alone", "*".repeat(60_000)],
-    ["brackets", "[".repeat(60_000)],
-    ["targets with no end", "[a](".repeat(15_000)],
-    ["angle targets with no end", "[a](<".repeat(12_000)],
-    [
-      "backticks of every length",
-      Array.from({ length: 300 }, (_, i) => "`".repeat(i + 1) + "a").join(" "),
-    ],
-    ["a long bare link of brackets", `https://example.com/${")".repeat(60_000)}`],
-    ["a heading of spaces", `# ${" ".repeat(60_000)}x`],
-  ])("%s", (_, text) => {
-    const started = performance.now();
+  // text for its closer. The parser counts its steps (`work`): twice the
+  // text costs about twice the steps, not four times. No clock is read.
+  const stepsOf = (text: string) => {
+    work.steps = 0;
     parseMarkdown(text);
-    expect(performance.now() - started).toBeLessThan(1000);
+    return work.steps;
+  };
+  test.each([
+    ["unclosed stars", (n: number) => "*a ".repeat(n)],
+    ["unclosed underscores", (n: number) => "_a ".repeat(n)],
+    ["stars alone", (n: number) => "*".repeat(n)],
+    ["brackets", (n: number) => "[".repeat(n)],
+    ["targets with no end", (n: number) => "[a](".repeat(n)],
+    ["angle targets with no end", (n: number) => "[a](<".repeat(n)],
+    ["images with no end", (n: number) => "![a](".repeat(n)],
+    ["a long bare link of brackets", (n: number) => `https://example.com/${")".repeat(n)}`],
+    ["bare links with marks", (n: number) => "*x https://e.com/a_ ".repeat(n)],
+    ["a heading of spaces", (n: number) => `# ${" ".repeat(n)}x`],
+    ["nested lists", (n: number) => "- a\n  - b\n".repeat(n)],
+  ])("%s", (_, make) => {
+    const once = stepsOf(make(5000));
+    const twice = stepsOf(make(10_000));
+    expect(twice / once).toBeLessThan(2.5);
   });
 });
 

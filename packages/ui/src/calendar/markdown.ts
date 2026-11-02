@@ -30,6 +30,13 @@ export type Block =
     }
   | { readonly type: "rule" };
 
+/**
+ * The parser's steps, counted where it walks the text: a test reads it to
+ * see that twice the text costs about twice the work (design D207), with
+ * no clock.
+ */
+export const work = { steps: 0 };
+
 /** How deep quotes and lists nest before the rest reads as text. */
 const DEEPEST = 8;
 
@@ -43,6 +50,7 @@ const BLANK = /^[ \t]*$/;
 
 /** The description as blocks. */
 export function parseMarkdown(text: string): readonly Block[] {
+  work.steps += text.length;
   return blocks(text.replace(/\r\n?/g, "\n").split("\n").map(expandIndent), 0);
 }
 
@@ -80,6 +88,7 @@ function blocks(lines: readonly string[], depth: number): Block[] {
   const out: Block[] = [];
   let i = 0;
   while (i < lines.length) {
+    work.steps++;
     const line = lines[i]!;
     if (BLANK.test(line)) {
       i++;
@@ -221,6 +230,7 @@ type Mark = (typeof DELIMITERS)[number][0];
  */
 function closersOf(text: string): Record<Mark, number[]> {
   const found = { "**": [], __: [], "~~": [], "*": [], _: [] } as Record<Mark, number[]>;
+  work.steps += text.length;
   for (let at = 1; at < text.length; at++) {
     const before = text[at - 1]!;
     if (/\s/.test(before) || before === "\\") continue;
@@ -251,6 +261,7 @@ function firstFrom(sorted: readonly number[], from: number): number | undefined 
 function bracketsOf(text: string): Map<number, number> {
   const pairs = new Map<number, number>();
   const open: number[] = [];
+  work.steps += text.length;
   for (let at = 0; at < text.length; at++) {
     const char = text[at];
     if (char === "\\") at++;
@@ -280,8 +291,12 @@ function inline(text: string, links = true, depth = 0): Inline[] {
   const brackets = links && depth < DEEPEST ? bracketsOf(text) : null;
   /** By a run of backticks' length, where a search for its closer found none. */
   const unclosed = new Map<number, number>();
+  /** Where each mark is first: a bare link's trailing mark closes one opened before it. */
+  const firstMark = { "*": text.indexOf("*"), _: text.indexOf("_"), "~": text.indexOf("~") };
+  work.steps += text.length;
   let i = 0;
   while (i < text.length) {
+    work.steps++;
     const char = text[i]!;
     if (char === "\\" && ESCAPABLE.test(text[i + 1] ?? "")) {
       plain += text[i + 1];
@@ -298,6 +313,7 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       while (text[i + length] === "`") length++;
       const run = "`".repeat(length);
       const end = (unclosed.get(length) ?? -1) > i ? -1 : text.indexOf(run, i + length);
+      if ((unclosed.get(length) ?? -1) <= i) work.steps += (end > 0 ? end : text.length) - i;
       if (end > 0) {
         push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });
         i = end + length;
@@ -317,8 +333,10 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       i = emphasis.end;
       continue;
     }
-    if (brackets && char === "[") {
-      const link = linkAt(text, i, brackets.get(i));
+    // An image is read as a link to it, named by its words (no picture is loaded).
+    const image = char === "!" && text[i + 1] === "[";
+    if (brackets && (char === "[" || image)) {
+      const link = linkAt(text, i + (image ? 1 : 0), brackets.get(i + (image ? 1 : 0)));
       if (link) {
         const href = safeHref(link.href);
         const children = inline(link.text, false, depth + 1);
@@ -344,7 +362,11 @@ function inline(text: string, links = true, depth = 0): Inline[] {
     if (links && (char === "h" || char === "H" || char === "m" || char === "M")) {
       BARE.lastIndex = i;
       const bare = WORD.test(text[i - 1] ?? "") ? null : BARE.exec(text);
-      const url = bare ? linkOf(bare[0]) : "";
+      if (bare) work.steps += bare[0].length;
+      const opened = (["*", "_", "~"] as const)
+        .filter((mark) => firstMark[mark] >= 0 && firstMark[mark] < i)
+        .join("");
+      const url = bare ? linkOf(bare[0], opened) : "";
       // Only a link with more than its scheme: "mailto::" is words.
       if (bare && safeHref(url) && !/^(?:https?:\/\/|mailto:)$/i.test(url)) {
         push({ type: "link", href: url, children: [url] });
@@ -408,6 +430,7 @@ function linkAt(
     const start = at;
     let open = 0;
     for (; at < limit; at++) {
+      work.steps++;
       const code = text.charCodeAt(at);
       if (code === 92) at++; // "\\"
       else if (code <= 32) break; // a space, a tab, a line end
@@ -429,7 +452,10 @@ function linkAt(
 
 /** Where `char` is in `text` from `from`, looked for up to `limit` only; -1 when not there. */
 function findBefore(text: string, char: string, from: number, limit: number): number {
-  for (let at = from; at < limit; at++) if (text[at] === char) return at;
+  for (let at = from; at < limit; at++) {
+    work.steps++;
+    if (text[at] === char) return at;
+  }
   return -1;
 }
 
@@ -441,16 +467,19 @@ const PAIRS: Record<string, string> = { ")": "(", "]": "[" };
 /**
  * A link as found in text, without what ends the sentence after it: a full
  * stop, a comma, or a closing bracket the link did not open
- * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own). Counted once.
+ * (`https://en.wikipedia.org/wiki/Foo_(bar)` keeps its own), and a `*`,
+ * `_` or `~` only where it closes emphasis opened before the link (`marks`):
+ * `https://example.com/a_` keeps its own. Counted once.
  */
-export function linkOf(found: string): string {
+export function linkOf(found: string, marks = ""): string {
   const counts = new Map<string, number>();
   for (const char of found) counts.set(char, (counts.get(char) ?? 0) + 1);
   let end = found.length;
   while (end > 0) {
     const last = found[end - 1]!;
     const open = PAIRS[last];
-    if (".,;:!?*_~".includes(last)) end--;
+    work.steps++;
+    if (".,;:!?".includes(last) || marks.includes(last)) end--;
     else if (open && (counts.get(open) ?? 0) < (counts.get(last) ?? 0)) {
       counts.set(last, counts.get(last)! - 1);
       end--;
