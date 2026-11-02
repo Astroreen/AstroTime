@@ -1420,6 +1420,17 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     its right; a window narrowed to 700 px moving the dialog to the middle;
     a task's draft on a full today in the Month), each failing before the
     change.
+- **D190. A double click on an empty slot keeps the dialog it opened.**
+  The first click of a double click on an empty slot of the grid (or the
+  all-day strip, [D188](#D188)) opens the new item's dialog; once the
+  editor's chunk is loaded, the dialog is there before the second press,
+  which lands on its backdrop and closed it again, so nothing stayed open
+  ([D154](#D154) had a double click make one event only on a first load).
+  A backdrop press that is a double click's second (`detail` over 1) no
+  longer closes the edit dialog; a single press there still does
+  ([D136](#D136)). Found while testing D188. Tested:
+  `apps/web/e2e/drag.spec.ts` (a double click on an empty hour with the
+  editor's chunk loaded first, failing before the change).
 
 ### Decided in round 4: the editor
 

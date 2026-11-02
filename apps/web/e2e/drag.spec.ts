@@ -339,17 +339,26 @@ test("a double click on the month picker's day acts once: it picks the day and m
   await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
 });
 
-test("a double click on an empty hour makes one new event there (design D154)", async ({
+test("a double click on an empty hour makes one new event there, its dialog kept open (design D154, D190)", async ({
   page,
 }) => {
   await openDemo(page, "week");
   await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
+  // The editor's chunk loaded, as after any first dialog: the dialog opens
+  // with the first click, under the second press.
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const at = await pointOn(page, "Tuesday, November 3", 16.1);
   await page.mouse.dblclick(at.x, at.y);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
+  // A single press on the backdrop still closes it.
+  await page.mouse.click(at.x, at.y);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("a double click's second click on an empty hour after a press on an item is a click of its own (design D154)", async ({

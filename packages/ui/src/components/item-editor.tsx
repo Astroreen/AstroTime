@@ -132,7 +132,19 @@ export function ItemEditor({
       )
     : "";
   return (
-    <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root
+      open={state !== null}
+      onOpenChange={(open, details) => {
+        // A double click on an empty slot opens the dialog with its first
+        // click; its second press lands on the backdrop and is no "close"
+        // (design D190).
+        if (!open && details.reason === "outside-press" && details.event.detail > 1) {
+          details.cancel();
+          return;
+        }
+        if (!open) onClose();
+      }}
+    >
       <Dialog.Portal>
         <DialogBackdrop
           className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "sm:bg-black/20" : ""}`}
