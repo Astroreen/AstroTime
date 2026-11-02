@@ -220,9 +220,16 @@ test("from the grid into the strip an event is all day; from the strip onto the 
   await drag(page, await pointIn(lunch), birthday);
   const allDay = strip.getByRole("listitem", { name: "Lunch with Marta, All day" });
   await expect(allDay).toBeVisible();
-  await drag(page, await pointIn(allDay, 8), await pointOn(page, "Thursday, November 5", 18.6));
+  // Dropped clear of the grid's bottom 48 px, where a drag scrolls the grid
+  // each frame it is held (design D111). 6:30 PM was 3 px above that edge
+  // here and 19 px into it on CI, whose fonts set the headers lower, and
+  // landed a frame or two of scrolling later, at 6:45.
+  const to = await pointOn(page, "Thursday, November 5", 16.6);
+  const grid = (await page.locator("main [data-current] [data-scroller]").boundingBox())!;
+  expect(to.y).toBeLessThan(grid.y + grid.height - 48);
+  await drag(page, await pointIn(allDay, 8), to);
   await expect(
-    item(page, "Thursday, November 5", "Lunch with Marta, 6:30 – 7:30 PM"),
+    item(page, "Thursday, November 5", "Lunch with Marta, 4:30 – 5:30 PM"),
   ).toBeVisible();
 });
 
