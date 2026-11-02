@@ -317,6 +317,7 @@ export function CalendarScreen({
       setAnchor(day);
       setFound({ objectId: result.stored.id, anchor: day });
       setTasksOpen(false);
+      setTaskFocus(null);
     } else {
       // An undated task lives on the tasks screen only (docs/plans/foundation.md#D16).
       setTaskFocus({ calendarId: result.stored.calendarId, objectId: result.stored.id });
@@ -355,6 +356,7 @@ export function CalendarScreen({
     setDrawerOpen(false);
     setSettingsOpen(false);
     setTasksOpen(false);
+    setTaskFocus(null);
     if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
     const stored = await store.object(reminder.objectId);
     if (!stored || stored.pending === "delete") return;

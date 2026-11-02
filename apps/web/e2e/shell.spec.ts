@@ -101,3 +101,26 @@ test("on a phone a view's key closes the tasks screen too", async ({ page }) => 
     "false",
   );
 });
+
+test("a dated search result closes the tasks and forgets the task a search asked for", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const search = async (words: string, result: string) => {
+    await page.getByRole("button", { name: "Search" }).click();
+    await page.getByRole("searchbox", { name: "Search" }).fill(words);
+    await page
+      .getByRole("list", { name: "Search results" })
+      .getByRole("button", { name: result })
+      .click();
+    await page.keyboard.press("Escape");
+  };
+  await search("library", "Return the library books, No date");
+  const books = tasks(page).getByRole("listitem", { name: "Return the library books" });
+  await expect(books).toHaveAttribute("data-found", "true");
+  await search("report", "Send the report, Today, 3:00 PM");
+  await expect(tasks(page)).toHaveCount(0);
+  await switchTo(page).getByRole("button", { name: "Tasks" }).click();
+  await expect(books).toBeVisible();
+  await expect(books).not.toHaveAttribute("data-found");
+});
