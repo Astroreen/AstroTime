@@ -1668,10 +1668,12 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     the editor tells the views its item's UID (a new item's first UID
     made at saving, the new series' after "this and following", else the
     item edited) and where its form starts it (a day, or a day and a
-    time: `landed` in the calendar's context), so a new series lands on
-    the day it begins, not on each of its days. It lands once: when its
-    landing ends (`animationend`) the mark goes, and a period away and
-    back draws it plainly. It is marked (`data-landed`) in the time grid,
+    time, read on the form's own zone: `landed` in the calendar's
+    context), so a new series lands on the day it begins, not on each of
+    its days. It lands once: when its landing ends (`animationend`) the
+    mark goes, and a period away and back draws it plainly; saved on a
+    period not drawn (or in a hidden calendar), the next period or view
+    drops it, so it lands nowhere later. It is marked (`data-landed`) in the time grid,
     the strip, the Month and the Agenda's rows; the Agenda's picture cards
     are thread M's and are not marked;
   - **opening the all-day strip fades its new rows in**: the rows the
@@ -1683,10 +1685,14 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   would move the grid under it on every frame. Tested:
   `apps/web/e2e/motion.spec.ts` (a new event saved is the only item
   marked and runs `item-land`, unmarked once it ran, and not again a week
-  away and back; a new weekly series marked on its first Tuesday only;
+  away and back, the landing held still while its mark is read; a new
+  weekly series marked on its first Tuesday only; one saved two weeks on,
+  plain when the view gets there;
   the rows past the fold run `row-in` when the strip opens, the first
-  rows none, and none on the next week), `editing.spec.ts` (after "this
-  and following", Thursday's occurrence lands and Friday's does not).
+  rows none, and none on the next week or back on the first),
+  `editing.spec.ts` (after "this and following", Thursday's occurrence
+  lands and Friday's does not), `packages/ui/test/landing.test.ts` (9:00
+  in New York, 16:00 in Vilnius, lands on its own wall clock).
 
 ### Decided in round 4: the editor
 

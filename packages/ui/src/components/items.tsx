@@ -122,12 +122,13 @@ export const itemStyle = (color: string, style: CSSProperties = {}) =>
 
 /**
  * Whether this is the occurrence the edit dialog saved, which lands once
- * (design D193): its own item and start, not the series' others.
+ * (design D193): its own item and start, read on its own wall clock (the
+ * form's zone), not the series' others.
  */
-const lands = (entry: Entry, landed: Landed | null | undefined, timeZone: string) =>
+export const lands = (entry: Entry, landed: Landed | null | undefined, timeZone: string) =>
   landed != null &&
   entry.occurrence.item.uid === landed.uid &&
-  wallClockOf(entry.occurrence.start, timeZone).startsWith(landed.at);
+  wallClockOf(entry.occurrence.start, landed.zone ?? timeZone).startsWith(landed.at);
 
 /** What the list item of a draggable entry takes: its key, whether it is held, its press. */
 function dragProps(entry: Entry, source: DragSource | null, held: boolean) {

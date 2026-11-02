@@ -4,10 +4,12 @@ import { createContext, useContext } from "react";
 import type { Formats } from "../calendar/format.ts";
 import type { Entry } from "../calendar/query.ts";
 
-/** An occurrence by its item's UID and where it starts on the wall clock: a day, or a day and a time. */
+/** An occurrence by its item's UID and where it starts on its own wall clock: a day, or a day and a time. */
 export interface Landed {
   readonly uid: string;
   readonly at: string;
+  /** The zone `at` is in, the form's; `null`: floating, in the view's zone. */
+  readonly zone: string | null;
 }
 
 export interface CalendarContextValue {

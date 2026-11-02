@@ -401,10 +401,15 @@ function Strip({
   // Opened here, now: the rows it shows anew fade in under the others
   // (design D193); on another period, opened before, they are just there.
   const [seenCollapsed, setSeenCollapsed] = useState(collapsed);
+  const [seenDay, setSeenDay] = useState(days[0]);
   const [grewOn, setGrewOn] = useState<string | null>(null);
   if (seenCollapsed !== collapsed) {
     setSeenCollapsed(collapsed);
     setGrewOn(collapsed ? null : days[0]!);
+  } else if (seenDay !== days[0]) {
+    // Another period: coming back to this one, its rows are just there.
+    setSeenDay(days[0]);
+    setGrewOn(null);
   }
   const grew = (span: Span) => grewOn === days[0] && span.row >= STRIP_ROWS - 1;
   return (

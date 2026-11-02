@@ -396,8 +396,10 @@ export function useEditingState({
           // The occurrence saved: where the form put it, in the series it is
           // in now (a split's "this and following" is a new one).
           const uid = !target || scope === "following" ? made.first() : target.item.uid;
-          const { allDay, startDate, startTime } = state.form;
-          setLanded(uid ? { uid, at: allDay ? startDate : `${startDate}T${startTime}` } : null);
+          const { allDay, startDate, startTime, zone } = state.form;
+          setLanded(
+            uid ? { uid, at: allDay ? startDate : `${startDate}T${startTime}`, zone } : null,
+          );
           setEditing(null);
           setDetails(null);
           onChanged();

@@ -194,8 +194,12 @@ test.describe("on a touch screen", () => {
 test.describe("an item saved, the strip opened (design D193)", () => {
   test.use({ viewport: WIDE });
 
-  test("the item the dialog saved lands where it goes; only it", async ({ page }) => {
+  test("the item the dialog saved lands where it goes; only it, once", async ({ page }) => {
     await openDemo(page, "week");
+    // The landing held where it starts, so its mark is read before it ends.
+    await page.addStyleTag({
+      content: "[data-landed] { animation-play-state: paused !important; }",
+    });
     await page.getByRole("button", { name: "Create" }).click();
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Call the plumber");
@@ -206,8 +210,11 @@ test.describe("an item saved, the strip opened (design D193)", () => {
     await expect(saved).toHaveAttribute("data-landed", "true");
     await expect(saved).toHaveCSS("animation-name", "item-land");
     await expect(page.locator("main [data-landed]")).toHaveCount(1);
-    // Landed once: when its landing ends it is a plain item, and a week
-    // away and back draws it again without landing again.
+    // Let go, it runs and ends: then it is a plain item, and a week away
+    // and back draws it again without landing again.
+    await page.addStyleTag({
+      content: "[data-landed] { animation-play-state: running !important; }",
+    });
     await expect(saved).not.toHaveAttribute("data-landed");
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(header(page, "Sunday, November 8")).toBeVisible();
@@ -261,5 +268,30 @@ test.describe("an item saved, the strip opened (design D193)", () => {
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(header(page, "Sunday, November 8")).toBeVisible();
     await expect(strip.locator(".animate-row-in")).toHaveCount(0);
+    // Back on the week it was opened on: its rows are just there too.
+    await page.getByRole("button", { name: "Previous week" }).click();
+    await expect(rent).toBeVisible();
+    await expect(strip.locator(".animate-row-in")).toHaveCount(0);
+  });
+
+  test("an item saved on a period not drawn lands nowhere later", async ({ page }) => {
+    await openDemo(page, "week");
+    await page.addStyleTag({
+      content: "[data-landed] { animation-play-state: paused !important; }",
+    });
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Renew the lease");
+    await dialog.getByLabel("Start date").fill("2026-11-18");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+    // Two weeks on, it is drawn plainly: the step to another period dropped it.
+    await page.getByRole("button", { name: "Next week" }).click();
+    await page.getByRole("button", { name: "Next week" }).click();
+    const lease = page
+      .getByRole("list", { name: "Wednesday, November 18" })
+      .getByRole("listitem", { name: /^Renew the lease, / });
+    await expect(lease).toBeVisible();
+    await expect(lease).not.toHaveAttribute("data-landed");
   });
 });
