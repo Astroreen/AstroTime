@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vite-plus/test";
 
 import { bannerOf, isSouthern } from "../src/pictures/months.ts";
-import { SUBJECTS, subjectOf } from "../src/pictures/subjects.ts";
+import { ownWordOf, SUBJECTS, subjectOf } from "../src/pictures/subjects.ts";
 
 describe("an item's subject from its title", () => {
   test.each([
@@ -213,5 +213,26 @@ describe("the pictures' files", () => {
       true,
     );
     expect(svg).not.toMatch(/<(script|text|image|foreignObject|a)\b|href=|on\w+=/i);
+  });
+});
+
+describe("the user's own words (design D223)", () => {
+  const own = [
+    { id: "a", word: "Теннис", picture: "1" },
+    { id: "b", word: "book club", picture: "2" },
+    { id: "c", word: "Ox", picture: "3" },
+  ];
+
+  test("a word of theirs begins a title's word, case and diacritics aside, the first of theirs a title has", () => {
+    expect(ownWordOf("Теннис с Петей", own)?.id).toBe("a");
+    expect(ownWordOf("На теннисе", own)?.id).toBe("a");
+    expect(ownWordOf("Book Club: Dune", own)?.id).toBe("b");
+    // Several words: in a row.
+    expect(ownWordOf("Club for books", own)).toBeNull();
+    // A short word only whole.
+    expect(ownWordOf("Oxford trip", own)).toBeNull();
+    expect(ownWordOf("Ox Bar", own)?.id).toBe("c");
+    expect(ownWordOf("Lunch", own)).toBeNull();
+    expect(ownWordOf("Теннис", [])).toBeNull();
   });
 });

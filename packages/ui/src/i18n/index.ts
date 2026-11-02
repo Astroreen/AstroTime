@@ -2,11 +2,15 @@
 // plurals from `Intl.PluralRules`, one instance per app.
 import i18next, { type i18n } from "i18next";
 
-import { en, type Catalog } from "./en.ts";
+import { en, type Catalog as Strings } from "./en.ts";
+import type { pictureStrings } from "./pictures.ts";
 import { ru } from "./ru.ts";
 
 export const LANGUAGES = ["en", "ru"] as const;
 export type Language = (typeof LANGUAGES)[number];
+
+/** Every string `t` knows: the app's, and those that load later with their part (`pictures.ts`). */
+type Catalog = Strings & (typeof pictureStrings)["en"];
 
 export const catalogs = { en, ru } satisfies Record<Language, Record<string, string>>;
 
@@ -23,7 +27,7 @@ declare module "i18next" {
 type PluralSuffix = "zero" | "one" | "two" | "few" | "many" | "other";
 type Base<T> = { [K in keyof T]: K extends `${infer B}_${PluralSuffix}` ? B : K }[keyof T];
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const sameKeys: Same<Base<typeof ru>, Base<Catalog>> = true;
+const sameKeys: Same<Base<typeof ru>, Base<Strings>> = true;
 void sameKeys;
 
 export function createI18n(language: Language): i18n {

@@ -30,6 +30,13 @@ export interface OwnColor {
   readonly name: string | null;
 }
 
+/** A word of the user's own with their picture (design D223): `picture` is its id in `pictures/own.ts`. */
+export interface OwnWord {
+  readonly id: string;
+  readonly word: string;
+  readonly picture: string;
+}
+
 export interface Settings {
   readonly theme: Theme;
   readonly language: "system" | Language;
@@ -66,6 +73,10 @@ export interface Settings {
   readonly placePhotos: boolean;
   /** A burst of shapes when the user completes a task: on unless turned off (design D198). */
   readonly celebrate: boolean;
+  /** The user's own words, each with their picture, before AstroTime's subjects (design D223). */
+  readonly ownWords: readonly OwnWord[];
+  /** The user's own banner of a month ("1"–"12"), by its picture's id (design D223). */
+  readonly ownBanners: Readonly<Record<string, string>>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -84,6 +95,8 @@ export const DEFAULT_SETTINGS: Settings = {
   monthBanners: true,
   placePhotos: true,
   celebrate: true,
+  ownWords: [],
+  ownBanners: {},
 };
 
 const oneOf = <T>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -115,6 +128,8 @@ export function readSettings(stored: string | null): Settings {
     monthBanners: value.monthBanners !== false,
     placePhotos: value.placePhotos !== false,
     celebrate: value.celebrate !== false,
+    ownWords: Array.isArray(value.ownWords) ? value.ownWords.filter(isOwnWord) : [],
+    ownBanners: readBanners(value.ownBanners),
   };
 }
 
@@ -154,6 +169,20 @@ function readColors(value: unknown): readonly OwnColor[] {
     if (typeof id !== "string" || typeof hex !== "string" || !HEX.test(hex)) return [];
     return [{ id, hex, name: typeof name === "string" && name.trim() !== "" ? name : null }];
   });
+}
+
+const isText = (value: unknown): value is string => typeof value === "string" && value !== "";
+
+function isOwnWord(value: unknown): value is OwnWord {
+  const { id, word, picture } = (value ?? {}) as Partial<Record<keyof OwnWord, unknown>>;
+  return isText(id) && isText(word) && isText(picture);
+}
+
+function readBanners(value: unknown): Readonly<Record<string, string>> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([month, id]) => /^([1-9]|1[0-2])$/.test(month) && isText(id)),
+  );
 }
 
 /** The locale's week start and clock, or the ones chosen in settings (design D45). */

@@ -268,3 +268,89 @@ test("a title edited to another subject draws the new picture, faded in once it 
   await expect(dinner.locator("img")).toHaveAttribute("src", /meal/);
   await expect(dinner.locator("img")).toHaveAttribute("data-shown", "true");
 });
+
+test.describe("the user's own pictures", () => {
+  /** A picture from the device: a PNG. */
+  const OWN = PHOTO;
+
+  async function openSettings(page: Page) {
+    await page.getByRole("button", { name: "Main menu" }).click();
+    await page
+      .getByRole("dialog", { name: "Main menu" })
+      .getByRole("button", { name: "Settings" })
+      .click();
+    return page.getByRole("dialog", { name: "Settings" });
+  }
+
+  test("a word of the user's with their picture draws their items over it, kept on the device (D222, D223)", async ({
+    page,
+  }) => {
+    await openDemo(page, "agenda");
+    let settings = await openSettings(page);
+    await settings.getByRole("button", { name: "Add a word with a picture" }).click();
+    const editor = page.getByRole("dialog", { name: "A word's picture" });
+    await editor.getByRole("textbox", { name: "Word" }).fill("stand");
+    const chooser = page.waitForEvent("filechooser");
+    await editor.getByRole("button", { name: "Choose a picture" }).click();
+    await (await chooser).setFiles({ name: "team.png", mimeType: "image/png", buffer: OWN });
+    await expect(editor.locator("img")).toHaveAttribute("src", /^blob:/);
+    await editor.getByRole("button", { name: "Save" }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(settings.getByRole("listitem").filter({ hasText: "stand" })).toBeVisible();
+    await settings.getByRole("button", { name: "Close settings" }).click();
+
+    const standUp = page.getByRole("listitem", { name: /^Stand-up/ }).first();
+    await expect(standUp.locator("img")).toHaveAttribute("src", /^blob:/);
+    expect(await loaded(standUp.locator("img"))).toBe(true);
+    // Kept on the device: another load draws it too.
+    await page.reload();
+    await expect(
+      page
+        .getByRole("listitem", { name: /^Stand-up/ })
+        .first()
+        .locator("img"),
+    ).toHaveAttribute("src", /^blob:/);
+
+    // A file that is no picture is refused, said in the dialog.
+    settings = await openSettings(page);
+    await settings.getByRole("button", { name: "Add a word with a picture" }).click();
+    const again = page.getByRole("dialog", { name: "A word's picture" });
+    const refused = page.waitForEvent("filechooser");
+    await again.getByRole("button", { name: "Choose a picture" }).click();
+    await (
+      await refused
+    ).setFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("no") });
+    await expect(again.getByRole("alert")).toHaveText(
+      "That file is not a picture this device can read",
+    );
+    await expect(again.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  test("a month banner of the user's own, and back to AstroTime's (D223)", async ({ page }) => {
+    await openDemo(page, "agenda");
+    const settings = await openSettings(page);
+    await settings.getByRole("button", { name: /^Your month banners/ }).click();
+    const banners = page.getByRole("dialog", { name: "Your month banners" });
+    const chooser = page.waitForEvent("filechooser");
+    await banners.getByRole("button", { name: "Choose a picture for December" }).click();
+    await (await chooser).setFiles({ name: "snow.png", mimeType: "image/png", buffer: OWN });
+    const reset = banners.getByRole("button", { name: "Back to AstroTime's for December" });
+    await expect(reset).toBeVisible();
+    await page.keyboard.press("Escape");
+    await settings.getByRole("button", { name: "Close settings" }).click();
+    const december = page.getByRole("heading", { name: "December", exact: true });
+    await december.scrollIntoViewIfNeeded();
+    const banner = page.locator(".month-banner", { has: december });
+    await expect(banner.locator("img")).toHaveAttribute("src", /^blob:/);
+
+    const again = await openSettings(page);
+    await again.getByRole("button", { name: /^Your month banners/ }).click();
+    await page
+      .getByRole("dialog", { name: "Your month banners" })
+      .getByRole("button", { name: "Back to AstroTime's for December" })
+      .click();
+    await page.keyboard.press("Escape");
+    await again.getByRole("button", { name: "Close settings" }).click();
+    await expect(banner.locator("img")).toHaveAttribute("src", /month-12/);
+  });
+});

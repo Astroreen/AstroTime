@@ -3,6 +3,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { catalogs, createI18n, LANGUAGES } from "../src/i18n/index.ts";
+import { pictureStrings } from "../src/i18n/pictures.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
 const base = (key: string) => key.replace(PLURAL, "");
@@ -66,4 +67,15 @@ test("plurals follow each language's rules", () => {
     "среда, 4 ноября, 3 записи",
     "среда, 4 ноября, 5 записей",
   ]);
+});
+
+test("the strings that load later have the same keys in every language (design D222)", () => {
+  expect(Object.keys(pictureStrings.ru).toSorted()).toEqual(
+    Object.keys(pictureStrings.en).toSorted(),
+  );
+  for (const key of Object.keys(pictureStrings.en) as (keyof typeof pictureStrings.en)[]) {
+    expect(variables(pictureStrings.ru[key]), key).toEqual(variables(pictureStrings.en[key]));
+    // None is also in the app's own catalog: one place for each string.
+    expect(catalogs.en, key).not.toHaveProperty(key);
+  }
 });

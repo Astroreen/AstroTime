@@ -21,6 +21,7 @@ import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
 import { ColorSettings } from "./color-settings.tsx";
+import { PictureSettings } from "./picture-settings.tsx";
 import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
@@ -188,6 +189,8 @@ function SettingsGroups({
             })}
           />
         ) : null}
+        {/* The user's own words with their pictures, and month banners (D222, D223). */}
+        <PictureSettings />
       </Group>
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
