@@ -4,11 +4,21 @@
 // /sw.js as one classic script (its import is bundled in); the build fills in
 // the two constants below (apps/web/service-worker.ts). CalDAV through
 // /dav-proxy/ and anything else that is not the app's is never touched.
-import { namedFiles, presetKey, presetOf, routeOf, withoutPreset, withPresetBack } from "./page.ts";
+import {
+  carryPictures,
+  namedFiles,
+  presetKey,
+  presetOf,
+  routeOf,
+  withoutPreset,
+  withPresetBack,
+} from "./page.ts";
 
 declare const self: ServiceWorkerGlobalScope;
 /** Every file of this version, by path under the app's base; the base itself is the page. */
 declare const ASTROTIME_PRECACHE: readonly string[];
+/** The pictures of this version (design D219), kept as each is first shown, not on install. */
+declare const ASTROTIME_PICTURES: readonly string[];
 /** This version: a hash of its files. */
 declare const ASTROTIME_VERSION: string;
 /** A build for the tests (`ASTROTIME_SW_TEST_HOOKS=1`), which lets a page set the navigation bound. */
@@ -17,6 +27,7 @@ declare const ASTROTIME_TEST_HOOKS: boolean;
 const PREFIX = "astrotime-";
 const CACHE = `${PREFIX}${ASTROTIME_VERSION}`;
 const FILES = new Set(ASTROTIME_PRECACHE);
+const PICTURES = new Set(ASTROTIME_PICTURES);
 /** The versions kept, newest last, and the tabs that run the one before (`Kept`). */
 const VERSIONS = `${PREFIX}versions`;
 /** The app's base path, from the worker's scope; the page's own path. */
@@ -96,6 +107,15 @@ self.addEventListener("install", (event) => {
       try {
         // Hashed names never change their content: whatever answers is this version's.
         await cache.addAll([...FILES].filter((path) => path !== BASE));
+        // The pictures a kept version showed, as far as they can be read (design D219).
+        const before = await kept().then(
+          ({ versions }) => versions.filter((name) => name !== CACHE),
+          () => [],
+        );
+        await carryPictures(PICTURES, before, {
+          match: (path, cacheName) => caches.match(path, { cacheName }),
+          put: (path, shown) => cache.put(path, shown),
+        });
         const page = await fetch(BASE, { cache: "no-store" });
         if (!keepable(page))
           throw new Error(`The app's page is not one to keep (${page.status}, ${page.type}).`);
@@ -195,7 +215,8 @@ async function navigate(event: FetchEvent): Promise<Response> {
 
 /** The versions kept and the tabs on the one before, as the last activation left them. */
 async function kept(): Promise<Kept> {
-  const listed = await (await caches.open(VERSIONS)).match(BASE);
+  // Read without opening it: an install that fails leaves no cache behind.
+  const listed = await caches.match(BASE, { cacheName: VERSIONS });
   const value = listed ? ((await listed.json()) as Partial<Kept>) : {};
   return { versions: value.versions ?? [], older: value.older ?? [] };
 }
@@ -215,12 +236,28 @@ async function olderFile(event: FetchEvent, pathname: string): Promise<Response>
   return fetch(event.request);
 }
 
+/**
+ * A picture (design D219): this version's kept one, or the network's, kept
+ * for the next time; offline and never shown before, the card is drawn
+ * without it.
+ */
+async function picture(event: FetchEvent, pathname: string): Promise<Response> {
+  const cache = await caches.open(CACHE);
+  const shown = await cache.match(pathname);
+  if (shown) return shown;
+  const answer = await fetch(event.request);
+  if (answer.ok && answer.type === "basic") {
+    event.waitUntil(cache.put(pathname, answer.clone()).catch(() => {}));
+  }
+  return answer;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  switch (routeOf(url.pathname, request.mode === "navigate", BASE, FILES)) {
+  switch (routeOf(url.pathname, request.mode === "navigate", BASE, FILES, PICTURES)) {
     case "page":
       return event.respondWith(navigate(event));
     case "file":
@@ -228,6 +265,8 @@ self.addEventListener("fetch", (event) => {
       return event.respondWith(
         caches.match(url.pathname, { cacheName: CACHE }).then((file) => file ?? fetch(request)),
       );
+    case "picture":
+      return event.respondWith(picture(event, url.pathname));
     case "older":
       return event.respondWith(olderFile(event, url.pathname));
     default:

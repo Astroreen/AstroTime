@@ -282,6 +282,9 @@ export const ru = {
   "settings.keepRunning": "Работать в фоне после закрытия окна",
   "settings.keepRunning.hint":
     "AstroTime продолжает синхронизировать и напоминать; выйти можно из трея или меню.",
+  "settings.pictures": "Картинки",
+  "settings.pictures.illustrations": "Иллюстрации по названию",
+  "settings.pictures.banners": "Картинки месяцев в расписании",
   "settings.places": "Места",
   "settings.places.search": "Искать места на карте",
   "settings.places.hint":

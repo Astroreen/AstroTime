@@ -17,7 +17,7 @@ import { CheckCircleIcon } from "./icons.tsx";
  * a list item named by its title and time, and the button says the same. It
  * takes the keys that move the item (design D112).
  */
-function Opener({
+export function Opener({
   entry,
   label,
   keys,
@@ -51,7 +51,7 @@ function Opener({
 }
 
 /** When an item is: "All day", its time (a task's start, design D159), or its start and end. */
-function useItemTime(): (entry: Entry, allDay: boolean) => string {
+export function useItemTime(): (entry: Entry, allDay: boolean) => string {
   const { t, formats, timeZone } = useCalendar();
   return (entry, allDay) => {
     const { item, start, end } = entry.occurrence;
@@ -63,7 +63,7 @@ function useItemTime(): (entry: Entry, allDay: boolean) => string {
 }
 
 /** The accessible name of an item: what it is, its title and when. */
-function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => string {
+export function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => string {
   const { t } = useCalendar();
   const timeOf = useItemTime();
   return (entry, allDay, time = timeOf(entry, allDay)) => {
@@ -75,7 +75,7 @@ function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => strin
 }
 
 /** The title on one line, cut with an ellipsis, or (`clip`) cut short as the month's chips are. */
-function Title({
+export function Title({
   entry,
   wrap,
   clip,
@@ -117,7 +117,7 @@ function Title({
   );
 }
 
-const itemStyle = (color: string, style: CSSProperties = {}) =>
+export const itemStyle = (color: string, style: CSSProperties = {}) =>
   ({ "--item": color, ...style }) as CSSProperties;
 
 /** What the list item of a draggable entry takes: its key, whether it is held, its press. */

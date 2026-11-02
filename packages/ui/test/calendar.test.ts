@@ -205,6 +205,8 @@ describe("the drawer's settings override the locale (D53)", () => {
       reminders: false,
       keepRunning: false,
       places: false,
+      illustrations: false,
+      monthBanners: false,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
     // Reminders are on unless turned off (foundation D101), and so is
@@ -215,6 +217,9 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"weekNumbers":"no"}').weekNumbers).toBe(true);
     // Places on the map too (design D175).
     expect(readSettings('{"places":null}').places).toBe(true);
+    // And the pictures (design D217, D218).
+    expect(readSettings('{"illustrations":0}').illustrations).toBe(true);
+    expect(readSettings("{}").monthBanners).toBe(true);
     // Colours that cannot be read are dropped; a blank name is the generated one (design D170).
     expect(
       readSettings(
