@@ -37,6 +37,8 @@ const around = (day: string): Loaded => ({
   ceiling: addDays(day, REACH),
 });
 
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 /** Within a screen of the end. */
 const nearEnd = (element: HTMLElement) =>
   element.scrollHeight - element.scrollTop - element.clientHeight < element.clientHeight;
@@ -111,6 +113,10 @@ export function AgendaView({
   const reported = useRef<string | null>(null);
   /** Where the list itself last scrolled to, so that scroll reads nothing more. */
   const own = useRef<number | null>(null);
+  /** The list's days, which a jump slides in. */
+  const list = useRef<HTMLDivElement>(null);
+  /** The day last jumped to, slid in once however many passes it takes. */
+  const moved = useRef<string | null>(null);
   /** A day to bring to the top of the list once it is read. */
   const [jump, setJump] = useState<string | null>(anchor);
 
@@ -140,6 +146,19 @@ export function AgendaView({
     const groups = groupsOf(element);
     if (jump !== null) {
       const target = groups.find((group) => group.dataset["day"]! >= jump);
+      // A day picked elsewhere slides in from the side of time it lies on
+      // (design D154); the list's first day on open comes as it is.
+      const from = top.current?.day;
+      if (from && from !== jump && moved.current !== jump && !reducedMotion()) {
+        list.current?.animate(
+          [
+            { transform: `translateY(${jump > from ? 24 : -24}px)`, opacity: 0 },
+            { transform: "none", opacity: 1 },
+          ],
+          { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+        );
+      }
+      moved.current = jump;
       scrollTo(element, target ? target.offsetTop : element.scrollHeight);
       if (target) {
         top.current = { day: target.dataset["day"]!, offset: element.scrollTop - target.offsetTop };
@@ -198,7 +217,7 @@ export function AgendaView({
       onScroll={onScroll}
       className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable] [--gutter:3.25rem] lg:[--gutter:4rem]"
     >
-      <div className="pt-1 pb-24">
+      <div ref={list} data-agenda="" className="pt-1 pb-24">
         <button type="button" onClick={earlier} className={endButton}>
           {t("agenda.earlier")}
         </button>

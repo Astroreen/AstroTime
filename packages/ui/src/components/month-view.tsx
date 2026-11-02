@@ -13,7 +13,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent 
 import { weekdayOf } from "../calendar/dates.ts";
 import { foldWeek, type MonthWeek } from "../calendar/month.ts";
 import type { StripSpan } from "../calendar/query.ts";
-import { useMediaQuery, useSwipe } from "../hooks.ts";
+import { useMediaQuery } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
 import { GhostChip, StripChip } from "./items.tsx";
@@ -38,11 +38,10 @@ export interface MonthViewProps {
   readonly undone: readonly UndoneTask[];
   readonly undoneColor: (task: UndoneTask) => string;
   readonly onOpenDay: (day: string) => void;
-  readonly onSwipe: (direction: 1 | -1) => void;
 }
 
 export function MonthView(props: MonthViewProps) {
-  const { weeks, today, onSwipe } = props;
+  const { weeks, today } = props;
   const { formats, weekNumbers } = useCalendar();
   const body = useRef<HTMLDivElement>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
@@ -62,7 +61,6 @@ export function MonthView(props: MonthViewProps) {
   }, [weeks.length]);
 
   const root = useRef<HTMLDivElement>(null);
-  useSwipe(root, onSwipe);
   const tiles = useRef(new Map<string, HTMLElement>());
   // The day under a point: the tile it is on, or the nearest.
   const surface: DragSurface = {

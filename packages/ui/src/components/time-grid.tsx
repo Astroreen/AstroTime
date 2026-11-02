@@ -10,6 +10,7 @@ import {
   useLayoutEffect,
   useRef,
   type CSSProperties,
+  type RefObject,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -17,7 +18,6 @@ import {
 import { daysBetween } from "../calendar/dates.ts";
 import { columnAt, slotAt } from "../calendar/drag.ts";
 import type { Entry, RangeLayout } from "../calendar/query.ts";
-import { useSwipe } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
 import { useEditing } from "./editing.tsx";
@@ -38,14 +38,17 @@ export interface TimeGridProps {
   readonly undoneColor: (task: UndoneTask) => string;
   readonly expanded: boolean;
   readonly onExpandedChange: (expanded: boolean) => void;
-  /** A horizontal swipe on a touch screen: the next (`1`) or previous (`-1`) period. */
-  readonly onSwipe: (direction: 1 | -1) => void;
   /** A "+" button floats over the grid's corner (design D132): room is kept below midnight. */
   readonly floating: boolean;
+  /** The period shown, not one drawn beside it for a swipe (design D154). */
+  readonly current: boolean;
+  /** Where the grid was last scrolled, kept for the next period's and view's grid. */
+  readonly scroll: RefObject<number | null>;
 }
 
 export function TimeGrid(props: TimeGridProps) {
-  const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe, floating } = props;
+  const { days, layout, today, minutes, expanded, onExpandedChange, floating, current, scroll } =
+    props;
   const { t, formats, weekNumbers } = useCalendar();
   const single = days.length === 1;
   const compact = days.length > 3;
@@ -67,16 +70,16 @@ export function TimeGrid(props: TimeGridProps) {
   );
 
   const scroller = useRef<HTMLDivElement>(null);
-  // On open, the grid shows the current time, or the morning on another day.
+  // On open, the grid shows the current time, or the morning on another day;
+  // afterwards the user's scroll stays, on the next period and view too.
   useLayoutEffect(() => {
     const element = scroller.current;
     if (!element) return;
     const hour = days.includes(today) ? Math.max(0, minutes / 60 - 2) : 7.5;
-    element.scrollTop = hour * HOUR;
-    // Only on open; afterwards the user's scroll stays.
+    element.scrollTop = scroll.current ?? hour * HOUR;
+    // Only on open.
   }, []);
 
-  useSwipe(scroller, onSwipe);
   const editing = useEditing();
 
   const root = useRef<HTMLDivElement>(null);
@@ -110,6 +113,9 @@ export function TimeGrid(props: TimeGridProps) {
   const createAt = (day: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!editing.canCreate || target?.closest("[role=listitem], button")) return;
+    // The second click of a double one made nothing more: its first made it,
+    // or was another control's, a closing picker's day (design D136).
+    if (event.detail > 1) return;
     const top = event.currentTarget.getBoundingClientRect().top;
     const slot = Math.floor(((event.clientY - top) / HOUR) * 2) * 30;
     editing.create("event", { day, at: Math.max(0, Math.min(slot, 23 * 60 + 30)) });
@@ -152,6 +158,10 @@ export function TimeGrid(props: TimeGridProps) {
         </div>
         <div
           ref={scroller}
+          data-scroller=""
+          onScroll={(event) => {
+            if (current) scroll.current = event.currentTarget.scrollTop;
+          }}
           // Room under midnight, so the "+" button never hides the last hour (design D132).
           className={`relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable] ${floating ? "pb-20" : ""}`}
         >
@@ -334,7 +344,7 @@ function Strip({
     <div
       role="list"
       aria-label={t("grid.allDay")}
-      className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] overflow-y-auto"}`}
+      className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] touch-pan-y overflow-y-auto"}`}
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
         // `repeat(0, …)` is no value: the strip would keep the rows it had.

@@ -126,10 +126,13 @@ test("a period whose items cannot be read is drawn all the same, empty, not held
         .getByRole("listitem", { name: /^Design review, / }),
     )
     .toBeInTheDocument();
+  // The days around a period are read with it (design D154): Thursday comes
+  // with Wednesday's read, Friday's own read is the one that fails.
   await userEvent.keyboard("n");
-  const thursday = page.getByRole("list", { name: "Thursday, November 5" });
-  await expect.element(thursday).toBeInTheDocument();
-  expect(thursday.getByRole("listitem").elements()).toEqual([]);
+  await userEvent.keyboard("n");
+  const friday = page.getByRole("list", { name: "Friday, November 6" });
+  await expect.element(friday).toBeInTheDocument();
+  await expect.element(friday.getByRole("listitem").first()).not.toBeInTheDocument();
   expect(errors).toHaveBeenCalled();
 });
 
