@@ -3,7 +3,7 @@
 // by an edit with nothing else touched.
 import { describe, expect, test } from "vite-plus/test";
 
-import { CalendarObject, editItem, inlineFile } from "../src/index.ts";
+import { CalendarObject, editItem, inlineFile, zonedTime } from "../src/index.ts";
 import { canonicalLine, contentLines, fixture, load } from "./support.ts";
 
 const NOW = Date.parse("2026-11-04T08:40:00Z");
@@ -106,4 +106,157 @@ describe("editing", () => {
     const { ics } = editItem(CalendarObject.parse(before), { summary: "Plan" }, { now: NOW });
     expect(attachLines(ics)).toEqual(attachLines(before));
   });
+});
+
+/** An object of `lines`, in Vilnius's time. */
+const ics = (...components: string[][]) =>
+  [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//AstroTime//Test//EN",
+    ...components.flatMap((lines) => [["BEGIN:VEVENT"], lines, ["END:VEVENT"]].flat()),
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n");
+const vilnius = (local: string) => zonedTime(local, "Europe/Vilnius");
+
+describe("reading, every client's way", () => {
+  const first = (...attach: string[]) =>
+    CalendarObject.parse(
+      ics([
+        "UID:a",
+        "DTSTAMP:20261101T000000Z",
+        "DTSTART:20261105T090000Z",
+        "SUMMARY:A",
+        ...attach,
+      ]),
+    ).master!.attachments[0]!;
+
+  test("a name: FILENAME first, then Outlook's, Apple's, Oracle's own parameter", () => {
+    expect(
+      first("ATTACH;X-APPLE-FILENAME=apple.pdf;FILENAME=standard.pdf:https://x.org/1").name,
+    ).toBe("standard.pdf");
+    expect(
+      first("ATTACH;X-ORACLE-FILENAME=oracle.pdf;X-APPLE-FILENAME=apple.pdf:https://x.org/1").name,
+    ).toBe("apple.pdf");
+    expect(first("ATTACH;X-ORACLE-FILENAME=oracle.pdf:https://x.org/1").name).toBe("oracle.pdf");
+    expect(
+      first("ATTACH;X-FILENAME=outlook.pdf;X-APPLE-FILENAME=apple.pdf:https://x.org/1").name,
+    ).toBe("outlook.pdf");
+    expect(first("ATTACH:https://x.org/1").name).toBeNull();
+  });
+
+  test("a SIZE that is no size: an inline file counts its own, a link has none", () => {
+    expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY;SIZE=-5:QUJD").size).toBe(3);
+    expect(first("ATTACH;SIZE=big:https://x.org/1").size).toBeNull();
+    expect(first("ATTACH;SIZE=1.5:https://x.org/1").size).toBeNull();
+  });
+
+  test("an inline file's size from its base64: padding counted off, a folded line's spaces too", () => {
+    expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY:QQ==").size).toBe(1);
+    expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY:QUI=").size).toBe(2);
+    expect(first("ATTACH;ENCODING=BASE64;VALUE=BINARY:QUJD").size).toBe(3);
+    // 60 bytes, folded across lines as a client writes a long one.
+    const sixty = btoa("x".repeat(60));
+    expect(
+      first(`ATTACH;ENCODING=BASE64;VALUE=BINARY:${sixty.slice(0, 40)}\r\n ${sixty.slice(40)}`)
+        .size,
+    ).toBe(60);
+  });
+});
+
+describe("a series", () => {
+  const A = "ATTACH;FILENAME=a.pdf:https://x.org/a";
+  const B = "ATTACH;FILENAME=b.pdf:https://x.org/b";
+  const C = "ATTACH;FILENAME=c.pdf:https://x.org/c";
+  const series = ics(
+    [
+      "UID:s",
+      "DTSTAMP:20261101T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DURATION:PT1H",
+      "RRULE:FREQ=WEEKLY;COUNT=4",
+      "SUMMARY:Weekly",
+      A,
+      B,
+    ],
+    // An exception with the series' attachments, and one with its own (an inline file).
+    [
+      "UID:s",
+      "DTSTAMP:20261101T000000Z",
+      "RECURRENCE-ID;TZID=Europe/Vilnius:20261109T090000",
+      "DTSTART;TZID=Europe/Vilnius:20261109T100000",
+      "DURATION:PT1H",
+      "SUMMARY:Weekly",
+      A,
+      B,
+    ],
+    [
+      "UID:s",
+      "DTSTAMP:20261101T000000Z",
+      "RECURRENCE-ID;TZID=Europe/Vilnius:20261116T090000",
+      "DTSTART;TZID=Europe/Vilnius:20261116T090000",
+      "DURATION:PT1H",
+      "SUMMARY:Weekly",
+      C,
+      "ATTACH;ENCODING=BASE64;VALUE=BINARY;FILENAME=note.txt:aGk=",
+    ],
+  );
+  const names = (object: CalendarObject) => [
+    object.master!.attachments.map((a) => a.name),
+    ...object.exceptions.map((e) => e.attachments.map((a) => a.name)),
+  ];
+
+  test("removed from every occurrence: also from the exception that had the series' list, not from one with its own", () => {
+    const { ics: after } = editItem(
+      CalendarObject.parse(series),
+      { attachments: { remove: [0], add: [{ uri: "https://x.org/d", name: "d.pdf" }] } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    expect(names(CalendarObject.parse(after))).toEqual([
+      ["b.pdf", "d.pdf"],
+      ["b.pdf", "d.pdf"],
+      ["c.pdf", "note.txt"],
+    ]);
+  });
+
+  test("removed from one occurrence: its exception only", () => {
+    const { ics: after } = editItem(
+      CalendarObject.parse(series),
+      { attachments: { remove: [0], add: [] } },
+      { now: NOW, scope: "this", recurrenceId: vilnius("2026-11-16T09:00:00") },
+    );
+    expect(names(CalendarObject.parse(after))).toEqual([
+      ["a.pdf", "b.pdf"],
+      ["a.pdf", "b.pdf"],
+      ["note.txt"],
+    ]);
+  });
+
+  test("an occurrence's inline file is its exception's; one with none is the series'", () => {
+    const object = CalendarObject.parse(series);
+    const file = inlineFile(object, vilnius("2026-11-16T09:00:00"), 1)!;
+    expect(new TextDecoder().decode(file.bytes)).toBe("hi");
+    expect(inlineFile(object, vilnius("2026-11-23T09:00:00"), 1)).toBeNull();
+  });
+});
+
+test("a name with , ; : and a quote is quoted as RFC 6868 says and read back as it was", () => {
+  const name = 'C:\\Users\\me\\Q3; final, "really".pdf';
+  const { ics: after } = editItem(
+    load("apple-event-attachments.ics"),
+    {
+      attachments: {
+        remove: [],
+        add: [{ uri: "https://x.org/q", name, parameters: { "X-NOTE": "a;b" } }],
+      },
+    },
+    { now: NOW },
+  );
+  expect(attachLines(after).at(-1)).toBe(
+    "ATTACH;FILENAME=C:\\Users\\me\\Q3; final, ^'really^'.pdf;X-NOTE=a;b:https://x.org/q",
+  );
+  expect(CalendarObject.parse(after).master!.attachments.at(-1)!.name).toBe(
+    'Q3; final, "really".pdf',
+  );
 });

@@ -1,14 +1,21 @@
 // AstroTime's shell plugin (docs/plans/android.md#D68): the system bars
 // follow the theme the app shows, which the user may set apart from the
-// system's. The TypeScript side is apps/mobile/src/shell.ts.
+// system's; and a file the user keeps (an inline attachment, design D230) is
+// saved where they pick, through the system's "Save to" picker, which needs
+// no storage permission. The TypeScript side is apps/mobile/src/shell.ts.
 package io.github.astroreen.astrotime.shell
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
+import android.util.Base64
+import androidx.activity.result.ActivityResult
 import androidx.core.view.WindowCompat
+import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 
 @CapacitorPlugin(name = "AstroTimeShell")
@@ -24,6 +31,41 @@ class ShellPlugin : Plugin() {
         activity.runOnUiThread {
             Bars.set(activity, Bars.Style(dark, background))
             call.resolve()
+        }
+    }
+
+    /** Asks where to save `data` (base64) as `name`, then writes it there; resolves `{ saved }`. */
+    @PluginMethod
+    fun saveFile(call: PluginCall) {
+        val name = call.getString("name")
+        val data = call.getString("data")
+        if (name.isNullOrBlank() || data == null) {
+            call.reject("saveFile needs `name` and `data`.", "invalid")
+            return
+        }
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = call.getString("type")?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        startActivityForResult(call, intent, "fileSaved")
+    }
+
+    @ActivityCallback
+    private fun fileSaved(call: PluginCall, result: ActivityResult) {
+        val target = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || target == null) {
+            call.resolve(JSObject().put("saved", false))
+            return
+        }
+        try {
+            val bytes = Base64.decode(call.getString("data") ?: "", Base64.DEFAULT)
+            val stream = context.contentResolver.openOutputStream(target, "w")
+                ?: throw java.io.IOException("No stream for $target")
+            stream.use { it.write(bytes) }
+            call.resolve(JSObject().put("saved", true))
+        } catch (error: Exception) {
+            call.reject("The file could not be written.", "write", error)
         }
     }
 }

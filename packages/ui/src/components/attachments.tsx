@@ -1,69 +1,45 @@
 // An item's attachments in its details (design D230; foundation D229): each
 // with its name, kind and size where its client wrote them. A link opens
 // where links open, a new tab or the system's browser; a file inline in the
-// object is listed without being decoded, and saved only when asked. Loaded
-// with the details.
-import { inlineFile, type Attachment } from "@astrotime/core";
+// object is listed without being decoded, and saved only when asked, where
+// the platform saves files (`Platform.saveFile`, Android's), else as the
+// browser downloads them (the web's and the desktop's). Loaded with the
+// details.
+import { inlineFile, type InlineFile } from "@astrotime/core";
 import type { Calendar } from "@astrotime/storage";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { attachmentHref, attachmentText } from "../calendar/attachments.ts";
 import type { Target } from "../calendar/editing.ts";
+import type { Platform } from "../platform.ts";
+import { useAccounts } from "./accounts-context.tsx";
 
 /**
- * Where a link goes: absolute, or relative to the calendar's server, as
- * Nextcloud Calendar writes its users' files (`/index.php/f/123`); only web
- * links open, never `javascript:` or `data:`.
+ * Saves an inline file, decoded now (D230): through the platform where it
+ * saves files, else by a download link of its bytes, attached to the page
+ * for its click; its URL is kept in `links` and let go when the list goes,
+ * so a download that starts late still finds it.
  */
-function attachmentHref(uri: string, base: string | undefined): string | null {
-  try {
-    const url = new URL(uri, base);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
-  } catch {
-    return null;
+async function save(
+  file: InlineFile,
+  name: string,
+  platform: Platform,
+  links: string[],
+): Promise<void> {
+  const type = file.type ?? "application/octet-stream";
+  if (platform.saveFile) {
+    await platform.saveFile({ name, type, bytes: file.bytes });
+    return;
   }
-}
-
-/** A file's kind in a word: its name's extension, else its type's subtype ("PDF", "PNG"). */
-function kindOf(attachment: Attachment): string | null {
-  const extension = /\.([a-z0-9]{1,5})$/i.exec(attachment.name ?? "")?.[1];
-  if (extension) return extension.toUpperCase();
-  const subtype = attachment.type?.split("/")[1]?.split(/[+;.]/)[0];
-  return subtype && subtype.length <= 5 ? subtype.toUpperCase() : null;
-}
-
-/** Bytes from a kilobyte up as the language writes them: 47 kB, 3.2 MB (less: `attachments.bytes`). */
-function sizeText(bytes: number, locale: string): string {
-  const units = ["byte", "kilobyte", "megabyte", "gigabyte"] as const;
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1000 && unit < units.length - 1) {
-    value /= 1000;
-    unit += 1;
-  }
-  return new Intl.NumberFormat(locale, {
-    style: "unit",
-    unit: units[unit],
-    unitDisplay: "short",
-    maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0,
-  }).format(value);
-}
-
-/** A link with no name, as a reader recognises it: its host and path. */
-const shortLink = (href: string) => {
-  const url = new URL(href);
-  return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
-};
-
-/** Saves an inline file through a link of its bytes, decoded now (D230). */
-function save(target: Target, index: number, fallback: string): void {
-  const file = inlineFile(target.object, target.recurrenceId, index);
-  if (!file) return;
-  const blob = new Blob([file.bytes.slice()], { type: file.type ?? "application/octet-stream" });
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = file.name ?? fallback;
+  link.href = URL.createObjectURL(new Blob([file.bytes.slice()], { type }));
+  link.download = name;
+  link.hidden = true;
+  links.push(link.href);
+  document.body.append(link);
   link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 0);
+  link.remove();
 }
 
 const row =
@@ -77,22 +53,18 @@ export function AttachmentList({
   calendar: Calendar | undefined;
 }) {
   const { t, i18n } = useTranslation();
+  const { platform } = useAccounts();
+  // The download links made while the list is shown, let go with it.
+  const links = useRef<string[]>([]);
+  useEffect(() => {
+    const made = links.current;
+    return () => made.forEach((link) => URL.revokeObjectURL(link));
+  }, []);
   return (
     <ul className="-mx-2 -my-1.5 flex flex-col">
       {target.item.attachments.map((attachment, index) => {
         const href = attachment.uri ? attachmentHref(attachment.uri, calendar?.url) : null;
-        const name =
-          attachment.name ?? (href ? shortLink(href) : (attachment.uri ?? t("attachments.file")));
-        const about = [
-          kindOf(attachment),
-          attachment.size === null
-            ? null
-            : attachment.size < 1000
-              ? t("attachments.bytes", { count: attachment.size })
-              : sizeText(attachment.size, i18n.language),
-        ]
-          .filter(Boolean)
-          .join(" · ");
+        const { name, about } = attachmentText(attachment, href, t, i18n.language);
         const content = (
           <>
             <span
@@ -118,7 +90,10 @@ export function AttachmentList({
                 type="button"
                 className={row}
                 aria-label={t("attachments.save", { name })}
-                onClick={() => save(target, index, name)}
+                onClick={() => {
+                  const file = inlineFile(target.object, target.recurrenceId, index);
+                  if (file) void save(file, file.name ?? name, platform, links.current);
+                }}
               >
                 {content}
               </button>

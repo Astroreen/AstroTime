@@ -11,7 +11,28 @@ export interface NativeShell {
    * 140, which Capacitor keeps clear of the bars).
    */
   setBars(options: { dark: boolean; background: string | null }): Promise<void>;
+  /**
+   * Asks where to save a file, with the system's "Save to" picker (design
+   * D230), and writes it there; `data` is its bytes in base64. Resolves
+   * whether it was saved: not when the user went back.
+   */
+  saveFile(options: { name: string; type: string; data: string }): Promise<{ saved: boolean }>;
 }
+
+/** Bytes as base64, in pieces, so a big file does not overflow the call stack. */
+export function base64Of(bytes: Uint8Array): string {
+  let binary = "";
+  for (let at = 0; at < bytes.length; at += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  return btoa(binary);
+}
+
+/** `Platform.saveFile` through the shell's picker (design D230). */
+export const saveFile =
+  (shell: NativeShell) =>
+  async (file: { name: string; type: string; bytes: Uint8Array }): Promise<void> => {
+    await shell.saveFile({ name: file.name, type: file.type, data: base64Of(file.bytes) });
+  };
 
 /** What the shell uses of `@capacitor/app`. */
 export interface NativeApp {

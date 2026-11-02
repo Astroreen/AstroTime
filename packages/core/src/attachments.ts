@@ -3,7 +3,7 @@
 // name, type and size its client wrote, and kept as written, every
 // parameter with it, until the user removes it (foundation D7); one added
 // is written as given, a provider's own parameters too (Nextcloud's
-// `X-NC-FILE-ID`, foundation D231); `inline-file.ts` decodes an inline one.
+// `X-NC-FILE-ID`); `inline-file.ts` decodes an inline one.
 import ICAL from "ical.js";
 
 /** An item's `ATTACH`. */
@@ -29,8 +29,8 @@ export interface Attachment {
 /** The parameters clients write a file's name in, the standard's first. */
 const NAMES = ["filename", "x-filename", "x-apple-filename", "x-oracle-filename"];
 
-/** The last part of a path, or the text itself. */
-const lastPart = (path: string) => path.split("/").findLast((part) => part.length > 0) ?? null;
+/** The last part of a path, Unix's or Windows', or the text itself. */
+const lastPart = (path: string) => path.split(/[\\/]/).findLast((part) => part.length > 0) ?? null;
 
 /** The bytes base64 text holds, not decoding it (an inline file is not loaded to be listed). */
 function base64Size(text: string): number {

@@ -1419,14 +1419,30 @@ reminders.
   files part; [foundation D229](foundation.md#D229)), after the
   description, under a paperclip: each a row with a mark (a sheet for a
   file, by link or inline; a chain for a bare link), its name (or, for a
-  link with none, its host and path), and under it its kind (the name's
-  extension, else the type's: "PDF") and size ("482 kB", the language's
-  own units; under a kilobyte "22 B" / "22 Б"). A web link opens where the
-  description's links open, a new tab or the system's browser; a link of
-  another kind is shown and not followed. A file inline in the object is a
-  button, "Save figures.txt": decoded then, and saved under its name. The
-  rows are AstroTime's own drawings ([D43](#D43)), loaded with the details.
-  The demo's "Budget planning" carries one of each.
+  link with none, its host and path), and under it its kind and size. The
+  kind is the name's extension ("DOCX"), else a known type's usual one
+  (`text/plain` "TXT", `application/pdf` "PDF", Office's and
+  OpenDocument's), else what the type says in words ("Image", "Audio",
+  "Video", "Text"), else none: a subtype such as `plain` or `vnd.…` says
+  nothing to a reader. The size is in the language's own units ("482 kB";
+  under a kilobyte "22 B" / "22 Б"), the unit promoted after rounding, so
+  never "1000 kB" (`calendar/attachments.ts`). A web link opens where the
+  description's links open, a new tab or the system's browser (the
+  desktop's `setWindowOpenHandler`, Android's WebView); a link of another
+  kind (`javascript:`, `data:`, `ftp:`) is shown as written and not
+  followed. A file inline in the object is a button, "Save figures.txt":
+  decoded then, and saved under its name, by each platform its own way:
+  the web downloads it (a link of its bytes attached to the page for its
+  click; the link's URL let go when the list closes, not on a timer); the
+  desktop's Electron asks where to save it, as for any download
+  (`apps/desktop/e2e/attachments.spec.ts` answers and reads the file);
+  Android's WebView downloads no `blob:` link, so the platform saves it
+  (`Platform.saveFile`): the shell plugin's `saveFile` opens the system's
+  "Save to" picker (`ACTION_CREATE_DOCUMENT`, no storage permission) and
+  writes the bytes where the user picks (its TypeScript glue is unit
+  tested; the picker itself is not driven on a device in CI). The rows are
+  AstroTime's own drawings ([D43](#D43)), loaded with the details. The
+  demo's "Budget planning" carries one of each.
 
 ## Deferred
 
