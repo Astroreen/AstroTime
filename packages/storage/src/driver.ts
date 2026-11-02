@@ -21,12 +21,21 @@ export interface SqlDriver {
   subscribe?(listener: () => void): () => void;
 }
 
-/** Runs `operation` in a transaction of its own, rolled back if it fails. */
-export async function transaction<T>(driver: SqlDriver, operation: () => Promise<T>): Promise<T> {
+/**
+ * Runs `operation` in a transaction of its own, rolled back if it fails, and
+ * also when `wrote`, asked at its end, says it wrote nothing: no COMMIT, so
+ * no other tab is told of a change that is not there
+ * (docs/plans/foundation.md#D181).
+ */
+export async function transaction<T>(
+  driver: SqlDriver,
+  operation: () => Promise<T>,
+  wrote: () => Promise<boolean> = async () => true,
+): Promise<T> {
   await driver.script("BEGIN IMMEDIATE;");
   try {
     const result = await operation();
-    await driver.script("COMMIT;");
+    await driver.script((await wrote()) ? "COMMIT;" : "ROLLBACK;");
     return result;
   } catch (error) {
     // A statement that failed may have ended the transaction already.

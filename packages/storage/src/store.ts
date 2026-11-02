@@ -30,7 +30,7 @@ import {
 } from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 
-import { handOverIn, transaction, type SqlDriver } from "./driver.ts";
+import { CommitInDoubtError, handOverIn, transaction, type SqlDriver } from "./driver.ts";
 import { migrate } from "./migrations.ts";
 import * as schema from "./schema.ts";
 import { containsPattern, foldForSearch, titlesOf } from "./search.ts";
@@ -113,10 +113,11 @@ export class Store {
   }
 
   /**
-   * Calls `listener` after every write, before the write's promise resolves,
-   * so a view reads the store again (a sync writes while the app is open),
-   * and after another tab's (docs/plans/foundation.md#D98). Returns the
-   * function that stops it.
+   * Calls `listener` after every write that changed a row, before the
+   * write's promise resolves, so a view reads the store again (a sync writes
+   * while the app is open), and after another tab's
+   * (docs/plans/foundation.md#D98). A write that changed nothing calls no
+   * one (D181). Returns the function that stops it.
    */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -978,15 +979,35 @@ export class Store {
    * two tabs on one database, and a failed one leaves nothing of itself. One
    * whose leader went fails with the `HandOverError` itself, not Drizzle's
    * wrapping of it, so its caller can tell that nothing was written.
+   *
+   * The listeners hear only a write that changed a row
+   * (docs/plans/foundation.md#D181): one that found nothing to do (an
+   * `IfUnused` whose calendar is used) ends with ROLLBACK and tells nobody,
+   * here or in another tab, or a live query that calls it would run forever.
    */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.queue.then(async () => {
+      let wrote = false;
       try {
-        return await transaction(this.driver, operation);
+        // Inside the transaction no one else's statement runs, another tab's
+        // neither (D99): the connection's count of changed rows moves only for ours.
+        let before = 0;
+        const value = await transaction(
+          this.driver,
+          async () => {
+            before = await this.changedRows();
+            return operation();
+          },
+          // Should this read fail, the operation is rolled back and fails: whole or not at all (D99).
+          async () => (wrote = (await this.changedRows()) !== before),
+        );
+        if (wrote) this.notify();
+        return value;
       } catch (error) {
-        throw handOverIn(error) ?? error;
-      } finally {
-        this.notify();
+        const handOver = handOverIn(error);
+        // A COMMIT in doubt may have written: the views read again.
+        if (handOver instanceof CommitInDoubtError) this.notify();
+        throw handOver ?? error;
       }
     });
     this.queue = result.then(
@@ -997,6 +1018,12 @@ export class Store {
   }
 
   private queue: Promise<void> = Promise.resolve();
+
+  /** The rows the connection has inserted, updated or deleted since it opened. */
+  private async changedRows(): Promise<number> {
+    const [[count] = [0]] = await this.driver.query("SELECT total_changes()", []);
+    return Number(count);
+  }
 
   private async upsert(
     calendarId: string,

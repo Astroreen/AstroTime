@@ -632,8 +632,10 @@ test("a big download is stored in batches: a transaction and a notification per 
   for (let i = 0; i < 1_000; i++) server.objects.delete(`${calendarUrl}t${i}.ics`);
   writes = 0;
   expect(await syncAccount(store, server, account.id)).toMatchObject({ removed: 1_000 });
-  // The calendar, the unreadable object offered again, the removals, the sync state.
-  expect(writes).toBe(4);
+  // The calendar, the removals, the sync state. The unreadable object offered
+  // again is a batch that stores nothing: no row changed, so no one is told
+  // (D99, docs/plans/foundation.md#D181).
+  expect(writes).toBe(3);
 });
 
 test("an edit made here while the sync downloads is kept, never overwritten, and not counted (D99, AGENTS.md rule 2)", async () => {

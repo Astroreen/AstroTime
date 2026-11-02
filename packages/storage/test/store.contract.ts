@@ -762,6 +762,55 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(heard).toBe(3);
     });
 
+    test("a write that changed nothing, or failed, notifies nobody and commits nothing (D181)", async () => {
+      // The driver's transactions' ends counted: a COMMIT is what tells the other tabs (D98).
+      const inner = await driver();
+      const ends: string[] = [];
+      const counted: SqlDriver = {
+        query: (statement, params) => inner.query(statement, params),
+        script: (statement) => {
+          if (/^(COMMIT|ROLLBACK)/.test(statement)) ends.push(statement.slice(0, -1));
+          return inner.script(statement);
+        },
+        close: () => inner.close(),
+        ...(inner.subscribe ? { subscribe: (listener) => inner.subscribe!(listener) } : {}),
+      };
+      const store = await Store.open(counted);
+      const account = await store.addAccount({
+        provider: "caldav",
+        name: "Nextcloud",
+        serverUrl: "https://cloud.example.com/",
+        username: "astro",
+      });
+      const local = await store.addLocalCalendarIfEmpty({
+        account: "On this device",
+        calendar: "Personal",
+        color: "#7c8db5",
+      });
+      expect(local).toBeNull();
+      const listener = vi.fn();
+      store.subscribe(listener);
+      ends.length = 0;
+      // Found nothing to do: no calendar on this device, a store with accounts, no such account.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      expect(
+        await store.addLocalCalendarIfEmpty({ account: "a", calendar: "c", color: "#000000" }),
+      ).toBeNull();
+      await store.updateAccount("no-such-account", { name: "Nobody" });
+      await expect(
+        store.changeLocal(async () => {
+          throw new Error("Nothing done.");
+        }),
+      ).rejects.toThrow("Nothing done.");
+      expect(listener).not.toHaveBeenCalled();
+      expect(ends).toEqual(["ROLLBACK", "ROLLBACK", "ROLLBACK", "ROLLBACK"]);
+      // A write that changed a row is committed and heard, as before.
+      await store.updateAccount(account.id, { name: "Renamed" });
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(ends.at(-1)).toBe("COMMIT");
+      expect((await store.accounts())[0]).toMatchObject({ name: "Renamed" });
+    });
+
     test("conflicts keep our refused version and go with their object", async () => {
       const { store, account, calendar } = await setup();
       const object = await store.saveFromServer(calendar.id, {
