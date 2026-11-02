@@ -15,8 +15,8 @@ export interface CalendarContextValue {
   readonly timeZone: string;
   /** An item's colour: its own `COLOR`, else its calendar's (design D47). */
   readonly colorOf: (entry: Entry) => string;
-  /** Whether the views show the week numbers (design D169); they do unless `false`. */
-  readonly weekNumbers?: boolean;
+  /** Whether the views show the week numbers (design D169). */
+  readonly weekNumbers: boolean;
   /** The stored object a search jumped to, marked on the views (design D53). */
   readonly found?: string | null;
 }

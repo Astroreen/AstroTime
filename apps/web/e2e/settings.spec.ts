@@ -96,19 +96,43 @@ test("the week numbers go from the week views and the Month once turned off, and
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
-  const number = page.getByRole("main").getByText("Week 45", { exact: true });
+  const main = page.getByRole("main");
+  const number = main.getByText(/^Week \d+$/);
+  const month = page.locator('[data-view="month"]');
+  /** The first day's tile starts where the Month's grid does: no column, no gap before it. */
+  const firstDayInset = async () => {
+    const view = (await month.boundingBox())!;
+    const first = (await month
+      .getByRole("list", { name: "Sunday, November 1", exact: true })
+      .boundingBox())!;
+    // The view's own padding: px-1.5.
+    return Math.round(first.x - view.x - 6);
+  };
+  // On by default: the Week's pill and the Month's column, with its room.
   await expect(number).toHaveCount(1);
+  await page.keyboard.press("m");
+  await expect(month).toBeVisible();
+  await expect(number).toHaveCount(6);
+  expect(await firstDayInset()).toBeGreaterThan(20);
+
   await inSettings(page, (settings) =>
     settings.getByRole("switch", { name: "Show week numbers" }).click(),
   );
   await expect(number).toHaveCount(0);
+  expect(await firstDayInset()).toBe(0);
+  // Kept: after a reload, neither the Month nor the week views have them.
   await page.reload();
-  await expect(header(page, "Wednesday, November 4")).toBeVisible();
-  await expect(number).toHaveCount(0);
-  // The Month's column of pills goes with them: its first day starts at the edge.
+  await expect(main.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
   await page.keyboard.press("m");
-  await expect(page.locator('[data-view="month"]')).toBeVisible();
-  await expect(page.getByRole("main").getByText(/^Week \d+$/)).toHaveCount(0);
+  await expect(month).toBeVisible();
+  await expect(number).toHaveCount(0);
+  expect(await firstDayInset()).toBe(0);
+  for (const key of ["w", "x"]) {
+    await page.keyboard.press(key);
+    await expect(month).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: "Wednesday, November 4" })).toBeVisible();
+    await expect(number).toHaveCount(0);
+  }
 });
 
 test("on a phone, Settings is the drawer's last row and a screen of its own", async ({ page }) => {

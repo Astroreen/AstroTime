@@ -1,8 +1,7 @@
 // The settings (design D53, D131): this device's theme, language, week
-// start and clock, whether completed tasks show on the views (D51), whether
-// the week numbers do (D169), and
-// whether reminders notify (foundation D101). Kept in the app's preferences
-// as one value and applied at once.
+// start and clock, whether completed tasks (D51) and the week numbers
+// (D169) show on the views, and whether reminders notify (foundation D101).
+// Kept in the app's preferences as one value and applied at once.
 import { createContext, useContext } from "react";
 
 import type { LocaleSettings } from "./calendar/locale.ts";

@@ -46,7 +46,7 @@ export interface TimeGridProps {
 
 export function TimeGrid(props: TimeGridProps) {
   const { days, layout, today, minutes, expanded, onExpandedChange, onSwipe, floating } = props;
-  const { t, formats, weekNumbers = true } = useCalendar();
+  const { t, formats, weekNumbers } = useCalendar();
   const single = days.length === 1;
   const compact = days.length > 3;
   const columns: CSSProperties = {
