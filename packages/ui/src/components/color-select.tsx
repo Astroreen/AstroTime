@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { colorName } from "../calendar/color-names.ts";
 import type { Language } from "../i18n/index.ts";
-import { useSettings } from "../settings.ts";
+import { OWN, useSettings } from "../settings.ts";
 import { Select, type SelectOption } from "./select.tsx";
 
 /** RFC 7986 `COLOR`s to pick from: CSS names, as Nextcloud writes them. */
@@ -60,6 +60,7 @@ export function ColorSelect({
   value,
   onChange,
   calendarColor,
+  ownById = false,
   className,
 }: {
   label: string;
@@ -67,6 +68,8 @@ export function ColorSelect({
   value: string | null;
   onChange: (color: string | null) => void;
   calendarColor: string | null;
+  /** Own colours chosen by their id (a default in Settings, D172), not their hex. */
+  ownById?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -82,8 +85,9 @@ export function ColorSelect({
     })),
   ];
   for (const color of settings.colors) {
-    if (options.some((option) => option.value === color.hex)) continue;
-    options.push({ value: color.hex, label: nameOf(color), leading: <Dot color={color.hex} /> });
+    const own = ownById ? `${OWN}${color.id}` : color.hex;
+    if (options.some((option) => option.value === own)) continue;
+    options.push({ value: own, label: nameOf(color), leading: <Dot color={color.hex} /> });
   }
   // The item's own colour, from another client or a colour since deleted.
   if (value && !options.some((option) => option.value === value)) {

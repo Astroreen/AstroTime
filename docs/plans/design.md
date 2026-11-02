@@ -1064,16 +1064,21 @@ Settings, the colours and the lists controls open.
   "Тёмно-синий", "Глубокий бирюзовый".
   - **The rule:** an own colour's name is `null` while generated, so it
     follows every change of the colour, and the language spoken. Typing in
-    the name makes it the user's: it stays through changes of the colour
-    until they press "Name it from the colour", or clear the field.
+    the name makes it the user's, as typed: it stays through changes of
+    the colour until they press "Name it from the colour", or save it
+    blank.
 - **D172. Default colours for new items** (feedback 10): "Colour of new
   events" and "Colour of new tasks" in Settings' "Colours" group, "The
   calendar's colour" by default. A default other than that is the new
   item's own `COLOR`, written when it is saved, as if chosen in its dialog:
   [D47](#D47) holds, an item's own colour before its calendar's. The dialog
   opens on the kind's default; switched to the other kind while still in
-  it, the colour follows. An own colour deleted that was a default gives
-  the default back to the calendar's.
+  it, the colour follows.
+  - **An own colour is a default by its id** (`own:<id>`), so recolouring
+    it moves the default; deleted, the default is the calendar's again.
+  - **Read leniently:** a stored default that is no colour `editItem`
+    takes ([foundation D174](foundation.md#D174)) reads as the calendar's,
+    so it never refuses a new item's save.
 - **D173. The user's own colours** (feedback 10: "make my own colours with
   their own names"): made, renamed, recoloured and deleted in Settings, in
   a dialog of their own: a palette (thirteen hues in three tones and three

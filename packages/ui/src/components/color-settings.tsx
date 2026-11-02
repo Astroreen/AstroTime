@@ -7,7 +7,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { colorName } from "../calendar/color-names.ts";
-import { useSettings, type OwnColor } from "../settings.ts";
+import { OWN, useSettings, type OwnColor } from "../settings.ts";
 import { ColorSelect, Dot, useColorLanguage, useOwnColorName } from "./color-select.tsx";
 import { CloseIcon, PlusIcon, RepeatIcon } from "./icons.tsx";
 import { dialogIcon } from "./item-details.tsx";
@@ -62,6 +62,7 @@ export function ColorSettings({ rowClassName }: { rowClassName: string }) {
             labelClassName="min-w-0 flex-1"
             value={settings.defaultColors[kind]}
             calendarColor={null}
+            ownById
             onChange={(color) =>
               change({ defaultColors: { ...settings.defaultColors, [kind]: color } })
             }
@@ -112,7 +113,7 @@ export function ColorSettings({ rowClassName }: { rowClassName: string }) {
         }}
         onDelete={(color) => {
           // A default that was this colour goes back to the calendars' own.
-          const reset = (value: string | null) => (value === color.hex ? null : value);
+          const reset = (value: string | null) => (value === `${OWN}${color.id}` ? null : value);
           change({
             colors: settings.colors.filter((c) => c.id !== color.id),
             defaultColors: {
@@ -167,7 +168,7 @@ function ColorEditor({
 /**
  * The colour's form. Its name is the generated one, following every change
  * of the colour, until the user writes one; then it stays until they ask
- * for a generated one again, or clear it (design D170).
+ * for a generated one again, or save it blank (design D170).
  */
 function ColorForm({
   color,
@@ -197,7 +198,9 @@ function ColorForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        if (valid) onSave({ id: color?.id ?? crypto.randomUUID(), hex, name });
+        // A name left blank is the generated one (design D170).
+        if (valid)
+          onSave({ id: color?.id ?? crypto.randomUUID(), hex, name: name?.trim() ? name : null });
       }}
       className="flex flex-col gap-4"
     >
@@ -214,7 +217,9 @@ function ColorForm({
             <input
               id={nameId}
               value={name ?? generated}
-              onChange={(e) => setName(e.target.value.trim() === "" ? null : e.target.value)}
+              // As typed, spaces and a cleared field too: the generated name
+              // comes back on saving a blank one, or on the button.
+              onChange={(e) => setName(e.target.value)}
               className="h-10 min-w-0 flex-1 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none focus:ring-2 focus:ring-accent"
             />
             <button

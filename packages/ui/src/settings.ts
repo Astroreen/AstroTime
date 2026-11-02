@@ -3,6 +3,7 @@
 // (D169) show on the views, the colours new items start with and the
 // user's own (D172, D173), and whether reminders notify (foundation D101).
 // Kept in the app's preferences as one value and applied at once.
+import { isColorName } from "@astrotime/core";
 import { createContext, useContext } from "react";
 
 import type { LocaleSettings } from "./calendar/locale.ts";
@@ -37,7 +38,8 @@ export interface Settings {
   readonly weekNumbers: boolean;
   /**
    * The colour a new event or task starts with (design D172): `null`, its
-   * calendar's; else a palette name or a hex, written as its own `COLOR`.
+   * calendar's; an own colour by its id (`own:<id>`), so recolouring it
+   * moves the default; else a CSS name or a hex. See `defaultColorOf`.
    */
   readonly defaultColors: { readonly event: string | null; readonly task: string | null };
   /** The user's own colours, on this device (design D173). */
@@ -99,9 +101,28 @@ export function readSettings(stored: string | null): Settings {
 }
 
 const HEX = /^#[0-9a-f]{6}$/;
-/** A colour as settings keep it: a hex in lower case, or a name of letters. */
+/** An own colour as a default names it: by its id. */
+export const OWN = "own:";
+/**
+ * A default as settings keep it: an own colour's id, a hex in lower case,
+ * or a CSS3 name, which `editItem` takes (foundation D174); anything else
+ * is the calendar's colour, so no new item's save is refused for it.
+ */
 const colorValue = (value: unknown): string | null =>
-  typeof value === "string" && (HEX.test(value) || /^[a-z]+$/.test(value)) ? value : null;
+  typeof value === "string" && (value.startsWith(OWN) || HEX.test(value) || isColorName(value))
+    ? value
+    : null;
+
+/** The colours new items start with, resolved: a CSS name or a hex, or `null` for the calendar's. */
+export type DefaultColors = Readonly<Record<"event" | "task", string | null>>;
+
+/** The colour a new item of `kind` starts with (design D172); `null`, its calendar's. */
+export function defaultColorOf(settings: Settings, kind: "event" | "task"): string | null {
+  const value = settings.defaultColors[kind];
+  if (!value?.startsWith(OWN)) return value;
+  const id = value.slice(OWN.length);
+  return settings.colors.find((color) => color.id === id)?.hex ?? null;
+}
 
 function readDefaults(value: unknown): Settings["defaultColors"] {
   const read = (value ?? {}) as { event?: unknown; task?: unknown };

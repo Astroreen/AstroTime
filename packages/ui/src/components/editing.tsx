@@ -44,7 +44,7 @@ import {
 } from "../calendar/editing.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
-import type { Settings } from "../settings.ts";
+import type { DefaultColors } from "../settings.ts";
 import { ChangeNotice } from "./change-notice.tsx";
 import { ItemDetails } from "./item-details.tsx";
 import type { EditorState } from "./item-editor.tsx";
@@ -144,7 +144,7 @@ export function useEditingState({
   /** Calendars hidden from the views: a new item goes in a visible one first. */
   hidden: ReadonlySet<string>;
   /** The colour a new event or task starts with (design D172); `null`, its calendar's. */
-  defaultColors: Settings["defaultColors"];
+  defaultColors: DefaultColors;
   timeZone: string;
   today: string;
   minutes: number;

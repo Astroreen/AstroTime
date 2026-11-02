@@ -12,7 +12,7 @@ import {
 import { Formats } from "../src/calendar/format.ts";
 import { localeSettings } from "../src/calendar/locale.ts";
 import { periodOf, stepAnchor, titleRange } from "../src/calendar/views.ts";
-import { DEFAULT_SETTINGS, readSettings, withSettings } from "../src/settings.ts";
+import { DEFAULT_SETTINGS, defaultColorOf, readSettings, withSettings } from "../src/settings.ts";
 
 describe("days", () => {
   test("arithmetic on calendar days ignores zones and DST", () => {
@@ -227,11 +227,29 @@ describe("the drawer's settings override the locale (D53)", () => {
       defaultColors: { event: null, task: null },
       colors: [{ id: "b", hex: "#00585e", name: null }],
     });
+    // A default editItem would refuse is the calendar's; an own colour's id and a CSS3 name stay (D172).
+    expect(
+      readSettings('{"defaultColors":{"event":"notacolour","task":"Grey"}}').defaultColors,
+    ).toEqual({ event: null, task: "Grey" });
+    expect(readSettings('{"defaultColors":{"event":"own:b"}}').defaultColors.event).toBe("own:b");
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(
       readSettings('{"theme":"pink","weekStart":3,"clock":"24","hideCompleted":"yes"}'),
     ).toEqual(DEFAULT_SETTINGS);
+  });
+
+  test("an own colour as a default is its colour now; gone, the calendar's (design D172)", () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      defaultColors: { event: "own:a", task: "own:gone" },
+      colors: [{ id: "a", hex: "#00585e", name: null }],
+    };
+    expect(defaultColorOf(settings, "event")).toBe("#00585e");
+    expect(defaultColorOf(settings, "task")).toBeNull();
+    expect(
+      defaultColorOf({ ...settings, defaultColors: { event: "tomato", task: null } }, "event"),
+    ).toBe("tomato");
   });
 
   test("days near today by name, others by date, the year when it is not this one", () => {

@@ -35,7 +35,7 @@ import {
   type RepeatChoice,
 } from "../calendar/editing.ts";
 import { alarmPresets, alarmWords, repeatWords } from "../calendar/words.ts";
-import { useSettings, type Settings } from "../settings.ts";
+import { defaultColorOf, useSettings, type DefaultColors } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import {
   BellIcon,
@@ -170,7 +170,11 @@ function Fields({
 }) {
   const { t } = useTranslation();
   const { timeZone } = useCalendar();
-  const defaults = useSettings().settings.defaultColors;
+  const { settings } = useSettings();
+  const defaults = {
+    event: defaultColorOf(settings, "event"),
+    task: defaultColorOf(settings, "task"),
+  };
   const set = (changes: Partial<Form>) => onChange({ ...form, ...changes });
   const event = form.kind === "event";
   return (
@@ -324,7 +328,7 @@ function Fields({
 }
 
 /** Switched kind, a new item still in its kind's default colour takes the other's (design D172). */
-function withKindColor(form: Form, next: Form, defaults: Settings["defaultColors"]): Form {
+function withKindColor(form: Form, next: Form, defaults: DefaultColors): Form {
   return form.color === defaults[form.kind] ? { ...next, color: defaults[next.kind] } : next;
 }
 

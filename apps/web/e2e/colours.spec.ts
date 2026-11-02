@@ -48,6 +48,9 @@ test("an own colour is named from its colour until named by hand, and a generate
   // Named by hand: the name stays when the colour changes, until asked for a generated one.
   await row.click();
   const editing = page.getByRole("dialog", { name: "Edit colour" });
+  // Spaces typed stay as typed: the generated name does not snap back mid-word.
+  await editing.getByRole("textbox", { name: "Name" }).fill(" ");
+  await expect(editing.getByRole("textbox", { name: "Name" })).toHaveValue(" ");
   await editing.getByRole("textbox", { name: "Name" }).fill("Lipstick");
   await editing.getByRole("textbox", { name: "Hex code" }).fill("#b22222");
   await expect(editing.getByRole("textbox", { name: "Name" })).toHaveValue("Lipstick");
@@ -116,4 +119,17 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   await choose(edit.getByRole("combobox", { name: "Colour" }), "Pink");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(drawn).toHaveAttribute("style", /--item: palevioletred/);
+
+  // Recoloured, the own colour is still the default: by its id, not its hex.
+  const again = await openSettings(page);
+  await again.getByRole("button", { name: "Dusty rose", exact: true }).click();
+  const recolour = page.getByRole("dialog", { name: "Edit colour" });
+  await recolour.getByRole("textbox", { name: "Hex code" }).fill("#00585e");
+  await recolour.getByRole("button", { name: "Save" }).click();
+  await expect(again.getByRole("combobox", { name: "Colour of new events" })).toHaveText(
+    "Deep teal",
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(dialog.getByRole("combobox", { name: "Colour" })).toHaveText("Deep teal");
 });

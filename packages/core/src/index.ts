@@ -76,3 +76,4 @@ export {
   type WriteResult,
 } from "./provider.ts";
 export type { SecretStore } from "./secrets.ts";
+export { isColorName } from "./colors.ts";
