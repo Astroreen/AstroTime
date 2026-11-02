@@ -210,6 +210,8 @@ When you add a package, app or module, add its line here in the same PR.
       (`reschedule`); the details (`item-details.tsx`), the edit
       dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
       → `plans/design.md#D108`
+    - `draft-aside.ts` — where the edit dialog stands on a wide screen,
+      beside its draft. → `plans/design.md#D155`
     - `pager.tsx` — `Pager`: how a view moves from one period to the
       next, a swipe's periods side by side under the finger, a step's
       slide, a view's fade. → `plans/design.md#D154`
@@ -241,6 +243,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `rights.ts` — `rightsOf`: what the user may do in a calendar, the
       one check of whether an item can be created, edited or deleted.
       → `plans/foundation.md#D37`
+    - `draft.ts` — the draft: the edit dialog's item as its form says,
+      drawn into the views' entries (`draftOf`, `withDraft`).
+      → `plans/design.md#D155`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
       (`saveChanges`, a drag's too); `words.ts` — rules and reminders in

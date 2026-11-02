@@ -84,7 +84,12 @@ function parse(ics: string): CalendarObject | null {
   }
 }
 
-function expand(object: CalendarObject, row: StoredObject, range: Range): Entry[] {
+/** The entries of an object's occurrences in `range`, as the views draw them; none for a series too dense. */
+export function expand(
+  object: CalendarObject,
+  row: Pick<StoredObject, "id" | "calendarId">,
+  range: Range,
+): Entry[] {
   let occurrences: Occurrence[];
   try {
     occurrences = occurrencesBetween(object, range);

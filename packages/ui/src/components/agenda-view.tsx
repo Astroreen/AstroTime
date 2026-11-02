@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { agendaDays } from "../calendar/agenda.ts";
+import { withDraft, type Draft } from "../calendar/draft.ts";
 import { addDays } from "../calendar/dates.ts";
 import type { ObjectCache } from "../calendar/query.ts";
 import { useEntries } from "../hooks.ts";
@@ -74,6 +75,8 @@ export interface AgendaViewProps {
   readonly onVisibleDay: (day: string) => void;
   /** "Hide completed tasks" (design D96): completed tasks leave the list. */
   readonly hideCompleted?: boolean;
+  /** The edit dialog's item as its form says (design D155). */
+  readonly draft?: Draft | null;
 }
 
 export function AgendaView({
@@ -85,6 +88,7 @@ export function AgendaView({
   undoneColor,
   onVisibleDay,
   hideCompleted = false,
+  draft = null,
 }: AgendaViewProps) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
@@ -95,7 +99,11 @@ export function AgendaView({
     () =>
       data
         ? agendaDays(
-            hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries,
+            withDraft(
+              hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries,
+              draft,
+              { from: data.from, to: data.to, timeZone },
+            ),
             data.from,
             data.to,
             {
@@ -105,7 +113,7 @@ export function AgendaView({
             },
           )
         : [],
-    [data, today, timeZone, hideCompleted],
+    [data, today, timeZone, hideCompleted, draft],
   );
 
   const scroller = useRef<HTMLDivElement>(null);

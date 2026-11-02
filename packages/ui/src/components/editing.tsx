@@ -13,7 +13,7 @@ import {
   type Task,
 } from "@astrotime/core";
 import type { Calendar, Store, StoredObject } from "@astrotime/storage";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -42,6 +42,7 @@ import {
   type Notice,
   type Target,
 } from "../calendar/editing.ts";
+import { draftOf } from "../calendar/draft.ts";
 import { liveQuery } from "../calendar/live.ts";
 import { rightsOf } from "../calendar/rights.ts";
 import { ChangeNotice } from "./change-notice.tsx";
@@ -409,12 +410,30 @@ export function useEditingState({
       ? { ...editing.state, form: { ...editing.state.form, calendarId: shown.calendar.id } }
       : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
+  // The item as the form says now, drawn in the views behind the dialog (design D155).
+  // In the calendar the dialog shows it going to (a new item's, as above).
+  const draftForm = editing?.state.form ?? null;
+  const draftTarget = editing?.target ?? null;
+  const draftCalendar = shown?.calendar.id ?? draftForm?.calendarId ?? null;
+  const draft = useMemo(
+    () =>
+      draftForm && draftCalendar
+        ? draftOf(
+            draftTarget,
+            { ...draftForm, calendarId: draftCalendar },
+            t("edit.untitledReminder"),
+          )
+        : null,
+    [draftForm, draftTarget, draftCalendar, t],
+  );
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
 
   const dialogs = (
     <>
       <ItemDetails
-        target={details}
+        // Hidden while its item is edited, so the draft behind shows (design
+        // D155); back when the edit dialog goes.
+        target={editing ? null : details}
         calendar={calendar}
         color={details ? colorOf(details) : ""}
         related={related}
@@ -436,5 +455,5 @@ export function useEditingState({
       <ChangeNotice notice={notice} onClose={() => setNotice(null)} />
     </>
   );
-  return { value, dialogs };
+  return { value, dialogs, draft };
 }

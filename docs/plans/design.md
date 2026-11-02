@@ -1009,6 +1009,35 @@ Settings, the colours and the lists controls open.
   making one new event there. Year view and a swipe between the Agenda's
   days are not part of it; three periods are drawn on a touch screen only,
   as a desktop has no swipe.
+- **D155. The item being made is drawn behind its dialog** (the owner's
+  feedback 5 on v0.3.0: "I want to see a preview of the item in the
+  background while I make it. When I create an event or a task, a modal
+  opens and I still see the background. If the item lands on a day or days
+  shown behind it, it should always be shown there as a preview."). While
+  the edit dialog is open, the views draw its **draft**: the item as the
+  form says now, on its days and times, under its title, in its colour and
+  calendar, as an event or a task, following every change of a field. A new
+  item is the object the form would save (`createItem` on the form's
+  changes, as saving makes it), so a series is drawn on each of its days; an
+  edited one is its occurrence at the form's times (`timesOfForm`,
+  `ghostOf`), drawn instead of the occurrence where it was, the series'
+  other occurrences kept (the scope is asked at saving). It is laid out with
+  the others ([D153](#D153)), raised over them with a shadow (`data-draft`),
+  and brought into sight where the view scrolls; it goes with the dialog,
+  and a saved item is then drawn from the store. The seam is
+  `useEditingState`'s `draft` (`calendar/draft.ts`: `draftOf`, `withDraft`),
+  from the editor's own state: the form's fields are not touched, so they
+  may change without the views knowing. From 1024 px, where a dialog and a
+  day fit side by side, the dialog stands at the side of the screen away
+  from the draft (`useDraftAside`), and its backdrop dims less (20%), as
+  Google Calendar's web app keeps its draft beside its dialog; narrower, it
+  stays in the middle (on a phone it is the whole screen). The Agenda draws
+  it too. Tested: `packages/ui/test/draft.test.ts` (a new event, a new
+  series, an edited event and an edited occurrence of a series, a form with
+  no date) and `apps/web/e2e/draft.spec.ts` (a new event that follows its
+  form, all day into the strip, the dialog beside it; an edited event at its
+  new place and back at its old one when the dialog goes; a task in the
+  Month; the phone).
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
