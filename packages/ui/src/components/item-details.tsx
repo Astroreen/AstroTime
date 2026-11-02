@@ -34,6 +34,7 @@ import {
   SubtasksIcon,
 } from "./icons.tsx";
 import { AttachmentList, AttachmentsIcon } from "./attachments.tsx";
+import { DetailsPicture } from "./item-picture.tsx";
 import { PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
@@ -164,45 +165,48 @@ function Body({
 
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
-        {/* A task's star beside the pencil, as an icon toggle (design D196). */}
-        {task && rights.edit && (
-          <button
-            type="button"
-            className={dialogIcon}
-            // One name, its state pressed or not (a toggle's name does not
-            // change); the tooltip, for a pointer, says what a press does.
-            aria-label={t("details.star")}
-            aria-pressed={starred}
-            title={t(starred ? "details.unstar" : "details.star")}
-            onClick={onStar}
-          >
-            <StarIcon filled={starred} className={`size-5 ${starred ? "text-accent" : ""}`} />
-          </button>
-        )}
-        {rights.edit && (
-          <button
-            type="button"
-            className={dialogIcon}
-            aria-label={t("details.edit")}
-            title={t("details.edit")}
-            onClick={onEdit}
-          >
-            <EditIcon className="size-5" />
-          </button>
-        )}
-        {actions.length > 0 && (
-          <MenuButton
-            label={t("details.more")}
-            icon={<MoreIcon className="size-5" />}
-            className={dialogIcon}
-            options={actions}
-            onChoose={(action) =>
-              action === "delete" ? onDelete() : action === "copy" ? onCopy() : onCopyTo()
-            }
-          />
-        )}
-      </div>
+      {/* Over the item's picture, when its title gives one (design D216). */}
+      <DetailsPicture title={item.summary}>
+        <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
+          {/* A task's star beside the pencil, as an icon toggle (design D196). */}
+          {task && rights.edit && (
+            <button
+              type="button"
+              className={dialogIcon}
+              // One name, its state pressed or not (a toggle's name does not
+              // change); the tooltip, for a pointer, says what a press does.
+              aria-label={t("details.star")}
+              aria-pressed={starred}
+              title={t(starred ? "details.unstar" : "details.star")}
+              onClick={onStar}
+            >
+              <StarIcon filled={starred} className={`size-5 ${starred ? "text-accent" : ""}`} />
+            </button>
+          )}
+          {rights.edit && (
+            <button
+              type="button"
+              className={dialogIcon}
+              aria-label={t("details.edit")}
+              title={t("details.edit")}
+              onClick={onEdit}
+            >
+              <EditIcon className="size-5" />
+            </button>
+          )}
+          {actions.length > 0 && (
+            <MenuButton
+              label={t("details.more")}
+              icon={<MoreIcon className="size-5" />}
+              className={dialogIcon}
+              options={actions}
+              onChoose={(action) =>
+                action === "delete" ? onDelete() : action === "copy" ? onCopy() : onCopyTo()
+              }
+            />
+          )}
+        </div>
+      </DetailsPicture>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
         <div className="flex items-start gap-4">
           <span

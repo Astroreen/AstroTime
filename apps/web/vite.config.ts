@@ -52,6 +52,12 @@ export default defineConfig({
     manifest: true,
     rolldownOptions: {
       output: {
+        // The pictures (design D219) apart from the other files: the service
+        // worker keeps each as it is first shown, not with the app (D124).
+        assetFileNames: (asset) =>
+          asset.originalFileNames.some((name) => name.includes("/pictures/art/"))
+            ? "assets/pictures/[name]-[hash][extname]"
+            : "assets/[name]-[hash][extname]",
         // Libraries in chunks of their own (docs/plans/foundation.md#D145): an
         // update of AstroTime's own code leaves them in the browser's cache.
         // Only what the page loads at once (`$initial`): a library only a

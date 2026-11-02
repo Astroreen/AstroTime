@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" width="360" height="120" preserveAspectRatio="xMidYMid slice">
+  <rect width="360" height="120" fill="#c6b3e6"/>
+  <circle cx="40" cy="18" r="70" fill="#d2c3ec"/>
+  <path d="M232 0h24l40 96h-104zM300 0h20l30 96h-80z" fill="#f6d98b" opacity=".35"/>
+  <path d="M230 0h28v8a14 6 0 0 1-28 0zM298 0h24v7a12 5 0 0 1-24 0z" fill="#1f2a44"/>
+  <path d="M0 96h360v24H0z" fill="#7a4f8f"/>
+  <path d="M0 96h360v5H0z" fill="#663f79"/>
+  <rect x="284" y="52" width="46" height="46" rx="5" fill="#1f2a44"/>
+  <rect x="284" y="52" width="46" height="6" rx="3" fill="#2f4a7a"/>
+  <circle cx="307" cy="81" r="12" fill="#59627a"/>
+  <circle cx="307" cy="81" r="5" fill="#1f2a44"/>
+  <circle cx="295" cy="64" r="2" fill="#e6b54a"/>
+  <circle cx="303" cy="64" r="2" fill="#a8c7fa"/>
+  <g transform="translate(230 83) rotate(-20) scale(.82)">
+    <path d="M-4-48h8v-32h-8z" fill="#5e3b26"/>
+    <rect x="-6" y="-94" width="12" height="16" rx="3" fill="#5e3b26"/>
+    <circle cx="-8" cy="-89" r="2" fill="#e6b54a"/>
+    <circle cx="8" cy="-89" r="2" fill="#e6b54a"/>
+    <circle cx="-8" cy="-83" r="2" fill="#e6b54a"/>
+    <circle cx="8" cy="-83" r="2" fill="#e6b54a"/>
+    <circle cx="0" cy="-30" r="15" fill="#c98f63"/>
+    <circle cx="0" cy="0" r="21" fill="#c98f63"/>
+    <path d="M-12-20h24v8h-24z" fill="#c98f63"/>
+    <path d="M21 0a21 21 0 0 1-38 12c12 4 28 0 38-12z" fill="#a8714a"/>
+    <circle cx="0" cy="-16" r="6" fill="#5e3b26"/>
+    <rect x="-8" y="6" width="16" height="4" rx="2" fill="#5e3b26"/>
+    <path d="M-2-80V8M2-80V8" stroke="#f7ead7" stroke-width="1"/>
+  </g>
+  <path d="M168 50v-22l14-4v22" fill="none" stroke="#2f4a7a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="164" cy="51" rx="5" ry="4" fill="#2f4a7a"/>
+  <ellipse cx="178" cy="47" rx="5" ry="4" fill="#2f4a7a"/>
+  <path d="M266 38V20c4 2 8 4 8 10" fill="none" stroke="#3565c4" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="262" cy="39" rx="5" ry="4" fill="#3565c4"/>
+  <path d="M342 32V16" stroke="#e2725b" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="338" cy="33" rx="5" ry="4" fill="#e2725b"/>
+</svg>

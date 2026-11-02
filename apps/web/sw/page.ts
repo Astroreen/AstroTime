@@ -66,21 +66,62 @@ export function withPresetBack(html: string, preset: string): string {
 /**
  * What the worker does with a GET of the app's origin, under its scope `base`
  * (D124): a navigation to one of the app's pages gets the `page`; a file this
- * version lists, its own (`file`); another file under `assets/`, the version
- * before's for a tab still on it (`older`); everything else, the page's own
- * path and the kept preset included, goes to the network untouched (`null`).
+ * version lists, its own (`file`); a picture it lists to keep as it is first
+ * shown (design D219), kept then (`picture`); another file under `assets/`,
+ * the version before's for a tab still on it (`older`); everything else, the
+ * page's own path and the kept preset included, goes to the network
+ * untouched (`null`).
  */
 export function routeOf(
   pathname: string,
   navigation: boolean,
   base: string,
   listed: ReadonlySet<string>,
-): "page" | "file" | "older" | null {
+  pictures: ReadonlySet<string> = new Set(),
+): "page" | "file" | "picture" | "older" | null {
   if (navigation) return isAppPage(pathname, base) ? "page" : null;
   if (pathname === base || pathname === presetKey(base)) return null;
   if (listed.has(pathname)) return "file";
+  if (pictures.has(pathname)) return "picture";
   return pathname.startsWith(`${base}assets/`) ? "older" : null;
 }
 
 /** Where the preset of the latest network page is kept, beside the page. */
 export const presetKey = (base: string) => `${base}.astrotime-preset`;
+
+/** What `carryPictures` reads and writes: the kept versions' caches, and this version's. */
+interface PictureCaches {
+  match(path: string, cacheName: string): Promise<Response | undefined>;
+  put(path: string, picture: Response): Promise<void>;
+}
+
+/**
+ * Gives a new version the pictures a kept version showed (design D219),
+ * looked up at once, one version after another per picture. Only an
+ * optimisation: a picture that cannot be read or written (a quota, a
+ * damaged cache) is left to be fetched when it is next shown, and never
+ * fails the install. Resolves with the paths carried.
+ */
+export async function carryPictures(
+  pictures: Iterable<string>,
+  versions: readonly string[],
+  caches: PictureCaches,
+): Promise<string[]> {
+  const carried = await Promise.all(
+    [...pictures].map(async (path) => {
+      try {
+        for (const cacheName of versions) {
+          const shown = await caches.match(path, cacheName);
+          if (shown) {
+            await caches.put(path, shown);
+            return path;
+          }
+        }
+      } catch {
+        // Not carried: fetched again when shown.
+      }
+      return null;
+    }),
+  );
+  return carried.filter((path) => path !== null);
+}

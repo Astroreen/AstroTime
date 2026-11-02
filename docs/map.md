@@ -248,6 +248,10 @@ When you add a package, app or module, add its line here in the same PR.
       dialog. → `plans/foundation.md#D107`
     - `change-notice.tsx` — the notice when a deletion, a completion or a
       star did not land. → `plans/foundation.md#D103`
+    - `picture-card.tsx` — the Agenda's card over its picture;
+      `item-picture.tsx`, whether an item has one and the details' header;
+      `month-banner.tsx`, the Agenda's banner above a month.
+      → `plans/design.md#D216`, `plans/design.md#D218`
     - `description.tsx` — an item's description in the details, drawn
       as Markdown from `calendar/markdown.ts`'s tree (`parseMarkdown`; no
       HTML, links only to http(s), mailto, tel). → `plans/design.md#D207`
@@ -300,6 +304,11 @@ When you add a package, app or module, add its line here in the same PR.
     maps". `test/fixtures/`, Photon's recorded answers:
     [`README.md`](../packages/ui/test/fixtures/README.md).
     → `plans/design.md#D175`, `plans/foundation.md#D178`
+  - `pictures/` — the pictures: `subjectOf` (`subjects.ts`), the subject a
+    title's words give an item; `bannerOf` (`months.ts`), a month's banner,
+    south of the equator too (`southern-zones.ts`, generated); `art.ts`, the pictures' URLs and grounds;
+    `art/`, AstroTime's own SVGs, each a file fetched when shown.
+    → `plans/design.md#D215`, `plans/design.md#D218`, `plans/design.md#D219`
   - `hooks.ts` — `useEntries` (a view's live query of a range of days),
     `useSwipe` (a finger's sideways swipe, its axis locked first,
     `plans/design.md#D152`; `swipeOutcome`, where one let go goes,
@@ -481,6 +490,9 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR
   `windowsZones.xml` and writes `packages/core/src/windows-zones.ts`.
   → `plans/foundation.md#D32`
+- `scripts/generate-southern-zones.ts` — fetches a pinned IANA tz release
+  and writes `packages/ui/src/pictures/southern-zones.ts`, the zones south
+  of the equator. → `plans/design.md#D218`
 - `scripts/big-calendar.ts` — D118's big calendar, generated the same on
   every run, for both benchmarks. → `plans/foundation.md#D118`
 - `scripts/bench-cold-start.ts` — the built web app opened on that calendar

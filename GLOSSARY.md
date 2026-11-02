@@ -116,6 +116,16 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Edit dialog** — where an item is created or changed (design D108).
 - **Agenda** — the view that lists items in time order, day by day,
   instead of a grid ("Расписание" in Russian, as Google's).
+- **Picture** — any image AstroTime draws behind an item or a month: an
+  illustration or a month banner (design D215–D219). Not the **theme**,
+  which is light, dark or the system's.
+- **Subject** — what an item's title says it is about, by its words
+  (lunch, a birthday, a flight): `subjectOf`, one of twelve, each drawn as
+  an **illustration** (design D215). Never "theme" for this.
+- **Illustration** — a subject's picture, drawn by AstroTime: the Agenda's
+  card is drawn over it, the details under it (design D216).
+- **Month banner** — the wide picture of a month's season over its first
+  day in the Agenda (design D218).
 - **Account button** — the avatar at the end of the top bar; it opens the
   **accounts dialog**: each account with its sync status and menu, "Sync
   now", "Add account" (foundation D92).

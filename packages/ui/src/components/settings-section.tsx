@@ -2,6 +2,7 @@
 // dialog from 640 px, in groups: general (theme, language, the burst on a
 // completed task, D198), the views (week
 // start, clock, "hide completed", week numbers), the colours (D172, D173),
+// the pictures (D217),
 // the accounts with how each syncs, whether it syncs at all (foundation
 // D171), its menu and its calendars, each shown or not (D137), reminders
 // (foundation D101), places on the map (D175) and, on the desktop, whether
@@ -161,6 +162,19 @@ function SettingsGroups({
       {/* What new items start with, and the user's own colours (D172, D173). */}
       <Group title={t("settings.colors")}>
         <ColorSettings rowClassName={choiceRow} />
+      </Group>
+      {/* The pictures the Agenda and the details are drawn with (D217). */}
+      <Group title={t("settings.pictures")}>
+        <Toggle
+          label={t("settings.pictures.illustrations")}
+          checked={settings.illustrations}
+          onChange={(illustrations) => change({ illustrations })}
+        />
+        <Toggle
+          label={t("settings.pictures.banners")}
+          checked={settings.monthBanners}
+          onChange={(monthBanners) => change({ monthBanners })}
+        />
       </Group>
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
