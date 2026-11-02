@@ -10,36 +10,7 @@ import {
   type Task,
   wallClockOf,
 } from "../src/index.ts";
-import { fixture, load } from "./support.ts";
-
-/** Unfolded content lines (RFC 5545 §3.1). */
-function contentLines(ics: string): string[] {
-  return ics
-    .replaceAll(/\r\n[ \t]/g, "")
-    .split("\r\n")
-    .filter(Boolean);
-}
-
-/** `NAME;B=2;A="1":value` → `NAME;A=1;B=2:value`: parameters sorted, quotes off. */
-function canonicalLine(line: string): string {
-  let inQuotes = false;
-  let colon = -1;
-  const breaks: number[] = [];
-  for (let i = 0; i < line.length && colon < 0; i++) {
-    const c = line[i];
-    if (c === '"') inQuotes = !inQuotes;
-    else if (!inQuotes && c === ";") breaks.push(i);
-    else if (!inQuotes && c === ":") colon = i;
-  }
-  const head = line.slice(0, colon);
-  const name = head.slice(0, breaks[0] ?? head.length).toUpperCase();
-  const params = breaks
-    .map((at, i) => head.slice(at + 1, breaks[i + 1] ?? head.length).replaceAll('"', ""))
-    // VALUE=URI on ATTACH or VALUE=TEXT is the default and may be dropped.
-    .filter((param) => !/^VALUE=(URI|TEXT)$/i.test(param) || name.startsWith("X-"))
-    .toSorted();
-  return [name, ...params].join(";") + line.slice(colon);
-}
+import { canonicalLine, contentLines, fixture, load } from "./support.ts";
 
 const fixtures = readdirSync(new URL("fixtures", import.meta.url)).filter((f) =>
   f.endsWith(".ics"),

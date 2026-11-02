@@ -40,6 +40,7 @@ import {
   SubtasksIcon,
   TrashIcon,
 } from "./icons.tsx";
+import { PlaceCard } from "./place-card.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
@@ -60,6 +61,7 @@ export function ItemDetails({
   onDelete,
   onComplete,
   onStar,
+  onCopyFailed,
 }: {
   target: Target | null;
   calendar: Calendar | undefined;
@@ -71,6 +73,8 @@ export function ItemDetails({
   onDelete: () => void;
   onComplete: () => void;
   onStar: () => void;
+  /** A place's address could not be copied: the notice says so (design D177). */
+  onCopyFailed: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -88,6 +92,7 @@ export function ItemDetails({
               onDelete={onDelete}
               onComplete={onComplete}
               onStar={onStar}
+              onCopyFailed={onCopyFailed}
             />
           )}
           <Dialog.Close
@@ -111,6 +116,7 @@ function Body({
   onDelete,
   onComplete,
   onStar,
+  onCopyFailed,
 }: {
   target: Target;
   calendar: Calendar | undefined;
@@ -120,6 +126,7 @@ function Body({
   onDelete: () => void;
   onComplete: () => void;
   onStar: () => void;
+  onCopyFailed: () => void;
 }) {
   const { t } = useTranslation();
   const { formats, timeZone } = useCalendar();
@@ -214,8 +221,8 @@ function Body({
             </Row>
           )}
           {item.location && (
-            <Row icon={<PlaceIcon className="size-5" />}>
-              <span className="break-words whitespace-pre-wrap">{item.location}</span>
+            <Row icon={<PlaceIcon className="size-5" />} label={t("edit.location")}>
+              <PlaceCard location={item.location} geo={item.geo} onCopyFailed={onCopyFailed} />
             </Row>
           )}
           {item.description && (

@@ -1,9 +1,11 @@
 // The built app under its Content Security Policy (docs/plans/foundation.md#D110),
 // served by the web image's own server: the store opens (wasm in a worker, on
-// OPFS), an account is added through /dav-proxy/, its event's details and
-// edit dialog open, and the browser reports not one violation. The
+// OPFS), an account is added through /dav-proxy/, its event's details (with
+// its place's map, D178) and edit dialog (with Location's search) open, and
+// the browser reports not one violation. The
 // production build has no demo data (D57), so the app starts on its
 // first-run screen, which shows only once the store is open.
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { test as base, expect } from "@playwright/test";
@@ -52,6 +54,12 @@ const test = base.extend<{ radicale: CalDavServer; violations: string[] }>({
 
 test.use({ viewport: WIDE });
 
+/** A white tile: a 1×1 PNG. */
+const TILE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 test("the built app opens its store, adds an account through the proxy, and breaks no rule of its policy", async ({
   page,
   radicale,
@@ -64,7 +72,7 @@ test("the built app opens its store, adds an account through the proxy, and brea
       Authorization: `Basic ${btoa(`${radicale.username}:${radicale.password}`)}`,
       "Content-Type": "text/calendar",
     },
-    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nDESCRIPTION:Notes: https://example.com/plan. Not a link: javascript:alert(1)\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+    body: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Another client//EN\r\nBEGIN:VEVENT\r\nUID:planning\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T140000\r\nDTEND;TZID=Europe/Vilnius:20261104T150000\r\nSUMMARY:Planning with Radicale\r\nDESCRIPTION:Notes: https://example.com/plan. Not a link: javascript:alert(1)\r\nLOCATION:Brandenburg Gate\\, Pariser Platz 1\\, Berlin\r\nGEO:52.51627;13.377703\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
   });
   expect(response.status).toBe(201);
 
@@ -76,6 +84,22 @@ test("the built app opens its store, adds an account through the proxy, and brea
     if (/\.(js|wasm)$/.test(path)) {
       files.push({ path, policy: answer.headers()["content-security-policy"] ?? "" });
     }
+  });
+  // Photon and the tiles, faked: the policy is the browser's to apply before
+  // a request leaves, so a refused origin is a violation all the same.
+  await page.route("https://photon.komoot.io/api/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: readFileSync(
+        new URL("../../../../packages/ui/test/fixtures/photon-en.json", import.meta.url),
+      ),
+    }),
+  );
+  const tiles: string[] = [];
+  await page.route("https://tile.openstreetmap.org/**", (route) => {
+    tiles.push(route.request().url());
+    return route.fulfill({ contentType: "image/png", body: TILE });
   });
   const loaded = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
   await openApp(page);
@@ -129,14 +153,34 @@ test("the built app opens its store, adds an account through the proxy, and brea
     .getByRole("button", { name: /^Planning with Radicale, / })
     .click();
   const details = page.getByRole("dialog", { name: "Planning with Radicale" });
-  await expect(details.getByRole("link")).toHaveCount(1);
-  await expect(details.getByRole("link", { name: "https://example.com/plan" })).toHaveAttribute(
+  const description = details.getByRole("definition").filter({ hasText: "Notes:" });
+  await expect(description.getByRole("link")).toHaveCount(1);
+  await expect(description.getByRole("link", { name: "https://example.com/plan" })).toHaveAttribute(
     "href",
     "https://example.com/plan",
   );
   await expect(details.getByText(/javascript:alert\(1\)/)).toBeVisible();
+  // The place's map, its tiles from OpenStreetMap's server (img-src, D178).
+  const map = details.getByRole("img", { name: "Map of Brandenburg Gate" });
+  await expect(map).toBeVisible();
+  await map
+    .locator("img")
+    .evaluateAll((all) =>
+      Promise.all(
+        (all as HTMLImageElement[]).map((img) =>
+          img.complete ? null : new Promise((done) => img.addEventListener("load", done)),
+        ),
+      ),
+    );
+  expect(tiles.length).toBeGreaterThan(0);
   await details.getByRole("button", { name: "Edit" }).click();
-  await expect(page.getByRole("dialog", { name: "Edit event" })).toBeVisible();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  await expect(edit).toBeVisible();
+  // Location's search reaches Photon from the page (connect-src, D178).
+  await edit.getByRole("combobox", { name: "Location" }).fill("Brandenburger Tor");
+  await expect(
+    page.getByRole("listbox", { name: "Places" }).getByRole("option").first(),
+  ).toBeVisible();
 
   expect(violations).toEqual([]);
 });

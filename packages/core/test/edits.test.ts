@@ -310,14 +310,18 @@ describe("editing writes what the user changed, and nothing else (D7)", () => {
   test("Apple's attendees, organizer and X- properties survive an edit of the location", () => {
     const source = fixture("apple-event-attendees.ics");
     const { ics } = editItem(CalendarObject.parse(source), { location: "Room 1" }, { now: NOW });
+    // The old place's point goes with it (D176); everything else stays.
     const unchanged = (text: string) =>
       text
         .replaceAll(/\r\n[ \t]/g, "")
         .split("\r\n")
-        .filter((line) => !/^(LOCATION|DTSTAMP|LAST-MODIFIED)[:;]/.test(line));
+        .filter(
+          (line) => !/^(LOCATION|DTSTAMP|LAST-MODIFIED|X-APPLE-STRUCTURED-LOCATION)[:;]/.test(line),
+        );
     // As ical.js writes the source back (quotes only where a value needs them).
     expect(unchanged(ics)).toEqual(unchanged(CalendarObject.parse(source).serialize()));
     expect(ics).toContain("LOCATION:Room 1\r\n");
+    expect(ics).not.toContain("X-APPLE-STRUCTURED-LOCATION");
   });
 
   test("a new description drops its HTML twins (ALTREP, X-ALT-DESC); other parameters stay", () => {

@@ -46,6 +46,7 @@ import {
   RepeatIcon,
 } from "./icons.tsx";
 import { dialogIcon, priorityOf, sheet } from "./item-details.tsx";
+import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
@@ -303,11 +304,10 @@ function Fields({
       </Section>
 
       <Section icon={<PlaceIcon className="size-5" />}>
-        <input
-          aria-label={t("edit.location")}
-          placeholder={t("edit.location")}
+        <PlaceField
           value={form.location}
-          onChange={(e) => set({ location: e.target.value })}
+          geo={form.place?.geo ?? null}
+          onChange={(location, picked) => set({ location, place: picked ?? form.place })}
           className={field}
         />
       </Section>

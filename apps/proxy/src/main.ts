@@ -1,7 +1,7 @@
 // Starts the web app's server from its environment (README.md#self-hosting).
 import { resolve } from "node:path";
 
-import { presetFrom } from "@astrotime/caldav";
+import { placesFrom, presetFrom } from "@astrotime/caldav";
 
 import { allowlist, createAppServer, publicHosts } from "./server.ts";
 
@@ -19,6 +19,8 @@ const server = createAppServer({
   allow: allowlist(process.env["ASTROTIME_PROXY_ALLOW"], preset),
   ...(hosts ? { hosts } : {}),
   ...(preset ? { preset } : {}),
+  // The place search (D178): the public Photon, a self-hosted one, or none.
+  places: placesFrom(process.env),
 });
 server.listen(port, () => {
   console.log(`AstroTime on :${port}, serving ${root}`);

@@ -9,7 +9,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { extname, join, resolve, sep } from "node:path";
 
-import { proxyHandler, withPreset, type Preset } from "@astrotime/caldav";
+import { PLACES, proxyHandler, withPreset, type Preset } from "@astrotime/caldav";
 
 export const DAV_PROXY_PREFIX = "/dav-proxy/";
 
@@ -24,7 +24,14 @@ export const NONCE_PLACEHOLDER = "astrotime-csp-nonce";
  * (D110). The page's carries its nonce; every file's carries it too without
  * one, since a worker answers to the policy its own script came with.
  */
-export function contentSecurityPolicy(nonce?: string): string {
+export function contentSecurityPolicy(
+  nonce?: string,
+  places: string | null = PLACES.photon,
+): string {
+  // Places on the map (D178): the Photon Location searches, the tiles of
+  // the place card's map; neither when the deployment turned them off.
+  const photon = places === null ? "" : ` ${new URL(places).origin}`;
+  const tiles = places === null ? "" : ` ${new URL(PLACES.tiles).origin}`;
   return [
     // Nothing the app does not ask for below: no frames, objects, fonts or media.
     "default-src 'none'",
@@ -32,14 +39,15 @@ export function contentSecurityPolicy(nonce?: string): string {
     "script-src 'self' 'wasm-unsafe-eval'",
     // The built stylesheet, and the <style> elements Base UI adds, which carry the nonce.
     nonce === undefined ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`,
-    // SQLite's wasm, and every CalDAV request through /dav-proxy/ (D39).
-    "connect-src 'self'",
+    // SQLite's wasm, every CalDAV request through /dav-proxy/ (D39), and
+    // the place search, which never goes through the proxy (D178).
+    `connect-src 'self'${photon}`,
     // The store's worker (packages/storage/src/web), and the service worker
     // that keeps the app's files for starting offline (D124).
     "worker-src 'self'",
     // The web app manifest and its icons, the page's icon among them (D124).
     "manifest-src 'self'",
-    "img-src 'self'",
+    `img-src 'self'${tiles}`,
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",
@@ -92,6 +100,8 @@ export interface ServerOptions {
   readonly hosts?: readonly PublicHost[];
   /** The server and user name the page names for signing in (D123). */
   readonly preset?: Preset;
+  /** The Photon Location searches (`placesFrom`'s, D178); null: no places. The public one when absent. */
+  readonly places?: string | null;
   readonly fetch?: typeof fetch;
 }
 
@@ -288,7 +298,7 @@ function matches(header: string | undefined, etag: string): boolean {
  * again only when its size or time changes. Each answer reads one open
  * file: its size, ETag and body agree even if the file is replaced meanwhile.
  */
-function staticFiles(root: string, preset: Preset | null) {
+function staticFiles(root: string, preset: Preset | null, places: string | null) {
   const etags = new Map<string, { readonly stamp: string; readonly etag: Promise<string> }>();
   const etagOf = (file: string, handle: FileHandle, info: Stats): Promise<string> => {
     const stamp = `${info.ino}:${info.size}:${info.mtimeMs}`;
@@ -341,7 +351,7 @@ function staticFiles(root: string, preset: Preset | null) {
     }
     const target = found ? file : join(root, "index.html");
     if (extname(target).toLowerCase() === ".html") {
-      await page(target, req, res, preset);
+      await page(target, req, res, preset, places);
       return;
     }
     const variants = await Promise.all(
@@ -374,7 +384,7 @@ function staticFiles(root: string, preset: Preset | null) {
         ETag: etag,
         Vary: "Accept-Encoding",
         "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": contentSecurityPolicy(),
+        "Content-Security-Policy": contentSecurityPolicy(undefined, places),
       };
       if (matches(req.headers["if-none-match"], etag)) {
         res.writeHead(304, headers).end();
@@ -397,7 +407,7 @@ function staticFiles(root: string, preset: Preset | null) {
 
 /**
  * The app's page, with a fresh nonce in its policy and its tags on every
- * answer (D110), and the preset in its head (D123). It is read whole (under
+ * answer (D110), and the preset in its head (D123), the place search with it (D178). It is read whole (under
  * a kilobyte) and sent as it is: not compressed, and with no ETag, so no 304
  * can pair a stored page with another answer's nonce.
  */
@@ -406,13 +416,14 @@ async function page(
   req: IncomingMessage,
   res: ServerResponse,
   preset: Preset | null,
+  places: string | null,
 ): Promise<void> {
   const nonce = randomBytes(16).toString("base64");
   const html = (await readFile(file, "utf8")).replaceAll(NONCE_PLACEHOLDER, nonce);
-  const body = Buffer.from(withPreset(html, preset));
+  const body = Buffer.from(withPreset(html, preset, places));
   res.writeHead(200, {
     ...PAGE_HEADERS,
-    "Content-Security-Policy": contentSecurityPolicy(nonce),
+    "Content-Security-Policy": contentSecurityPolicy(nonce, places),
     "Cache-Control": "no-cache",
     "Content-Type": TYPES[".html"],
     "Content-Length": body.length,
@@ -441,7 +452,8 @@ function createAppHandler(options: ServerOptions, root: string): Server {
     allow: options.allow,
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
-  const serveStatic = staticFiles(root, options.preset ?? null);
+  const places = options.places === undefined ? PLACES.photon : options.places;
+  const serveStatic = staticFiles(root, options.preset ?? null, places);
   return createServer((req, res) => {
     const url = req.url ?? "/";
     // The cause goes to the log; the client learns only that it failed.

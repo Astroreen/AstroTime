@@ -64,8 +64,26 @@ The app installs as a web app on phones and desktops, and once loaded it
 starts with no network ([D124](docs/plans/foundation.md#D124)); a new
 version is offered with a quiet "Reload" after you update the container.
 
+Location searches places on the map with
+[Photon](https://photon.komoot.io), komoot's public geocoder over
+OpenStreetMap, and an item's place shows a map of OpenStreetMap's tiles
+([D178](docs/plans/foundation.md#D178)): what the user types there goes to
+Photon, from the browser itself, never through the proxy. Name your own
+Photon, or none, with `ASTROTIME_PLACES_URL`:
+
+```sh
+-e ASTROTIME_PLACES_URL=https://photon.example.com/api/   # a self-hosted Photon
+-e ASTROTIME_PLACES_URL=off                               # no place search and no maps
+```
+
+Each user can also turn it off in Settings → Places.
+
 The container sends the app with a strict Content Security Policy and a
-fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Let the
+fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Beyond
+the app's own origin it names only the place search's: `connect-src` the
+Photon's origin (`https://photon.komoot.io` unless you name another) and
+`img-src https://tile.openstreetmap.org`, neither with
+`ASTROTIME_PLACES_URL=off`. Let the
 reverse proxy pass it on as it is and keep the page out of its cache: a policy
 added there applies on top of this one, and a cached page would give everyone
 the same nonce.

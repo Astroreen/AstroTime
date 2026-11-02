@@ -11,6 +11,7 @@ import {
   editItem,
   hasOccurrence,
   movedRepeat,
+  placeText,
   repeatOf,
   timesOf,
   wallClockIn,
@@ -18,6 +19,7 @@ import {
   zonedTime,
   type Alarm,
   type CalendarRights,
+  type Place,
   type Item,
   type ItemChanges,
   type ItemTime,
@@ -35,6 +37,7 @@ import {
   type Store,
 } from "@astrotime/storage";
 
+import { nameAndAddress } from "../places/map.ts";
 import { addDays, daysBetween } from "./dates.ts";
 import { rightsOf } from "./rights.ts";
 
@@ -89,6 +92,11 @@ export interface Form {
   readonly repeat: RepeatChoice;
   readonly alarms: readonly AlarmChoice[];
   readonly location: string;
+  /**
+   * The place `location` names on the map: picked from the place search, or
+   * the item's own; `null` for free text (design D175).
+   */
+  readonly place: Place | null;
   readonly description: string;
   /** RFC 7986 `COLOR`; `null` for the calendar's. */
   readonly color: string | null;
@@ -166,6 +174,7 @@ export function formOf(target: Target, timeZone: string, today: string): Form {
     repeat: rule ? (rule.exact ? rule.repeat : "kept") : null,
     alarms: item.alarms.map((alarm, index) => ({ kind: "existing", index, alarm })),
     location: item.location ?? "",
+    place: item.geo ? { ...nameAndAddress(item.location ?? ""), geo: item.geo } : null,
     description: item.description ?? "",
     color: item.color,
     status: STATUSES.find((s) => s === task?.status?.toUpperCase()) ?? "NEEDS-ACTION",
@@ -218,6 +227,7 @@ export function newForm(
     repeat: null,
     alarms: [],
     location: "",
+    place: null,
     description: "",
     color: null,
     status: "NEEDS-ACTION",
@@ -457,7 +467,11 @@ export function changesOf(initial: Form | null, form: Form, untitled: string): I
   const was = initial;
   const differs = <K extends keyof Form>(key: K) => !was || was[key] !== form[key];
   if (differs("summary") && (was || form.summary.trim())) changes.summary = form.summary.trim();
-  if (differs("location") && (was || form.location.trim())) changes.location = form.location.trim();
+  if ((differs("location") || differs("place")) && (was || form.location.trim())) {
+    // A place picked is written with its point while its text stays as picked (D176).
+    const text = form.location.trim();
+    changes.location = form.place && placeText(form.place) === text ? form.place : text;
+  }
   if (differs("description") && (was || form.description.trim()))
     changes.description = form.description.trim();
   // The clock matters only for a timed item; a new item always has a start (design D159).
@@ -914,8 +928,17 @@ export async function rewriteTarget(
   });
 }
 
-/** What the user is told when a change made outside the edit dialog did not land (D99, D103). */
-export type Notice = "gone" | "inDoubt" | "failed" | "deleteInDoubt" | "deleteFailed";
+/**
+ * What the user is told when a change made outside the edit dialog did not
+ * land (D99, D103), or a place's address could not be copied (design D177).
+ */
+export type Notice =
+  | "gone"
+  | "inDoubt"
+  | "failed"
+  | "deleteInDoubt"
+  | "deleteFailed"
+  | "copyFailed";
 
 /** The notice for a change that failed; a deletion of an item gone already never does. */
 export function noticeOf(error: unknown, action: "change" | "delete"): Notice | null {

@@ -1,5 +1,5 @@
 export { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
-export type { Alarm, Event, Item, Participant, Task } from "./item.ts";
+export type { Alarm, Event, Geo, Item, Participant, Task } from "./item.ts";
 export {
   boundsOf,
   ExpansionLimitError,
@@ -15,11 +15,13 @@ export {
   deleteItem,
   editItem,
   hasOccurrence,
+  placeText,
   PRODID,
   timesOf,
   type ItemChanges,
   type ItemTimes,
   type NewAlarm,
+  type Place,
   type Scope,
   type TaskStatus,
 } from "./edits.ts";

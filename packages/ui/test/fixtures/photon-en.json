@@ -1,0 +1,120 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "N",
+        "osm_id": 3862767512,
+        "osm_key": "railway",
+        "osm_value": "station",
+        "type": "house",
+        "name": "Brandenburger Tor",
+        "street": "Unter den Linden",
+        "locality": "Friedrich-Wilhelm-Stadt",
+        "district": "Mitte",
+        "city": "Berlin",
+        "country": "Germany",
+        "postcode": "10117",
+        "countrycode": "DE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3809897, 52.5166047]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "N",
+        "osm_id": 30353086,
+        "osm_key": "railway",
+        "osm_value": "halt",
+        "type": "house",
+        "name": "Brandenburger Tor",
+        "street": "Unter den Linden",
+        "locality": "Friedrich-Wilhelm-Stadt",
+        "district": "Mitte",
+        "city": "Berlin",
+        "country": "Germany",
+        "postcode": "10117",
+        "countrycode": "DE"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3818418, 52.5164415]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 50637691,
+        "osm_key": "building",
+        "osm_value": "yes",
+        "type": "house",
+        "name": "Brandenburger Tor",
+        "street": "Brandenburger Straße",
+        "locality": "Nikolaigärten",
+        "district": "Historische Innenstadt",
+        "city": "Potsdam",
+        "state": "Brandenburg",
+        "country": "Germany",
+        "postcode": "14467",
+        "countrycode": "DE",
+        "extent": [13.0479614, 52.3996449, 13.0481824, 52.3994593]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.0480817, 52.3995537]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 518071791,
+        "osm_key": "tourism",
+        "osm_value": "attraction",
+        "type": "house",
+        "housenumber": "1",
+        "name": "Brandenburg Gate",
+        "street": "Pariser Platz",
+        "locality": "Friedrich-Wilhelm-Stadt",
+        "district": "Mitte",
+        "city": "Berlin",
+        "country": "Germany",
+        "postcode": "10117",
+        "countrycode": "DE",
+        "extent": [13.3775798, 52.5164328, 13.3778251, 52.516117]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3777034, 52.5162699]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 143076040,
+        "osm_key": "building",
+        "osm_value": "gatehouse",
+        "type": "house",
+        "name": "Brandenburger Tor",
+        "street": "Rudolf-Breitscheid-Straße",
+        "city": "Altentreptow",
+        "county": "Mecklenburgische Seenplatte",
+        "state": "Mecklenburg-Vorpommern",
+        "country": "Germany",
+        "postcode": "17087",
+        "countrycode": "DE",
+        "extent": [13.2503701, 53.6904049, 13.2505591, 53.6902938]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.2504625, 53.6903518]
+      }
+    }
+  ]
+}
