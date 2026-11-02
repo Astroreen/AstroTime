@@ -5,6 +5,7 @@ import { dayRange, layoutSpans, type Occurrence } from "@astrotime/core";
 
 import {
   byOccurrence,
+  draftsAmong,
   undoneChip,
   type Entry,
   type LayoutContext,
@@ -24,6 +25,7 @@ export function layoutMonth(
 ): MonthWeek[] {
   const { today, timeZone, undone } = options;
   const shown = byOccurrence(entries);
+  const drafts = draftsAmong(shown);
   // The days each occurrence shows on, once, so each week takes only its own.
   const covered = [...shown.keys()].map((occurrence) => {
     const { first, last } = dayRange(occurrence, timeZone);
@@ -38,10 +40,12 @@ export function layoutMonth(
       .filter((item) => item.first <= last && item.last >= first)
       .map((item) => item.occurrence);
     if (undone > 0 && week.includes(today)) occurrences.push(undoneChip(today));
-    const spans = layoutSpans(occurrences, week, timeZone, { timed: true }).map((span) => ({
-      span,
-      entry: shown.get(span.occurrence) ?? null,
-    }));
+    const spans = layoutSpans(occurrences, week, timeZone, { timed: true, first: drafts }).map(
+      (span) => ({
+        span,
+        entry: shown.get(span.occurrence) ?? null,
+      }),
+    );
     weeks.push({ days: week, spans });
   }
   return weeks;

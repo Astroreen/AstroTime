@@ -375,13 +375,15 @@ export interface Span {
  * each span gets the first row free on all its days, longest spans first, so
  * a three-day conference reads as one bar (D14, D42). With `timed`, as a
  * month's week has no time grid, timed items join after the all-day ones in
- * time order, each over the days it shows on (design D86).
+ * time order, each over the days it shows on (design D86). Those in `first`
+ * (the item being made, design D187) take their rows before any other, so
+ * no fold hides them.
  */
 export function layoutSpans(
   occurrences: readonly Occurrence[],
   days: readonly string[],
   timeZone: string,
-  options: { readonly timed?: boolean } = {},
+  options: { readonly timed?: boolean; readonly first?: ReadonlySet<Occurrence> } = {},
 ): Span[] {
   const first = days[0];
   const last = days.at(-1);
@@ -394,7 +396,11 @@ export function layoutSpans(
     if (isAllDay(occurrence, timeZone)) strip.push(occurrence);
     else if (options.timed) timed.push(occurrence);
   }
-  const ordered = [...sortAllDay(strip, timeZone), ...sortTimed(timed, timeZone)];
+  const sorted = [...sortAllDay(strip, timeZone), ...sortTimed(timed, timeZone)];
+  const leading = options.first;
+  const ordered = leading?.size
+    ? [...sorted.filter((o) => leading.has(o)), ...sorted.filter((o) => !leading.has(o))]
+    : sorted;
   for (const occurrence of ordered) {
     const { first: startDay, last: endDay } = dayRange(occurrence, timeZone);
     const firstDay = Math.max(0, daysBetween(first, startDay));
