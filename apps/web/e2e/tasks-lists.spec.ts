@@ -75,6 +75,28 @@ test.describe("with a mouse", () => {
   });
 });
 
+test("the list shown is its tab's panel: controlled by it, named by it, reached by Tab from it", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const panel = tasks(page);
+  const tab = panel.getByRole("tab", { name: /^Tasks/ });
+  await tab.click();
+  const shown = panel.getByRole("tabpanel", { name: /^Tasks/ });
+  await expect(shown).toBeVisible();
+  const id = await shown.getAttribute("id");
+  expect(id).toBeTruthy();
+  await expect(tab).toHaveAttribute("aria-controls", id!);
+  // A tab not chosen controls no panel: none of its is drawn as one.
+  await expect(panel.getByRole("tab", { name: /^Personal/ })).not.toHaveAttribute(
+    "aria-controls",
+    /.+/,
+  );
+  await expect(shown).toHaveAttribute("tabindex", "0");
+});
+
 test.describe("on a touch screen", () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 

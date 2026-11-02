@@ -1402,17 +1402,18 @@ whole row".
   ([D152](#D152)); a vertical move scrolls the list. A task's motion
   ([D197](#D197)) measures and moves the list shown alone, never the lists
   drawn beside it, whose cards have the same names. The list shown and those
-  beside are drawn alike (only the shown one is the tab panel, by its role
-  and its tab's name), so a list a swipe settles on keeps its state, its
-  "Completed" open, and is not drawn anew. A device with a touch screen and
-  a mouse (a touch laptop) draws the lists beside too, from the start: three
-  lists of a few tasks each are cheap, and a swipe must find them there. The
-  tab strip follows the list chosen, its indicator sliding as before.
-  `prefers-reduced-motion` swaps lists at once. On a wide screen the lists
-  stay one at a time under their tabs, in the column the calendar | tasks
-  switch shows them in ([D227](#D227)); Google Tasks web's lists side by
-  side as columns are [deferred](#deferred): with few lists the tabs carry
-  the counts the columns would not, and columns ask for dragging tasks
+  beside are drawn alike (only the shown one is the tab panel: by its role,
+  its tab's name, the tab's `aria-controls` naming it, and a place in the
+  Tab order after its tab), so a list a swipe settles on keeps its state,
+  its "Completed" open, and is not drawn anew. A device with a touch screen
+  and a mouse (a touch laptop) draws the lists beside too, from the start:
+  three lists of a few tasks each are cheap, and a swipe must find them
+  there. The tab strip follows the list chosen, its indicator sliding as
+  before. `prefers-reduced-motion` swaps lists at once. On a wide screen the
+  lists stay one at a time under their tabs, in the column the calendar |
+  tasks switch shows them in ([D227](#D227)); Google Tasks web's lists side
+  by side as columns are [deferred](#deferred): with few lists the tabs
+  carry the counts the columns would not, and columns ask for dragging tasks
   between lists, which AstroTime does not have yet
   (`apps/web/e2e/tasks-lists.spec.ts`).
 - **D200. A little more motion** (the owner's item 13: "and much more you
@@ -1420,15 +1421,18 @@ whole row".
   lights pops (scaled to 1.35 and back in 300 ms), on the tasks screen and
   in a task's details; one lit already when the screen opens, or lit by a
   sync, does not (the pop answers a press: the button is marked when
-  pressed, and the pop runs when it shows lit). An item's details grow out
-  of the press that opened them: the popup's scale starts from where the row
-  or the item was pressed (on a phone too, from 0.9, where it only faded
-  before; from 0.95 on a wide screen, as before, now from the press); opened
-  by a key, they grow from their middle. The press is heard by the details'
-  own code, loaded later (D145), so the first load carries only the star's
-  pop. With D197's tick drawn in and a new task coming in from above, and
-  D198's burst, that is the tasks' motion; `prefers-reduced-motion` stops
-  all of it (`apps/web/e2e/details-motion.spec.ts`).
+  pressed, and the pop runs when it shows lit; the mark goes when the pop
+  ends, and a press that turns a star off leaves none, so a star lit later
+  by a sync or from the details does not pop on the row). An item's details
+  grow out of the press that opened them: the popup's scale starts from
+  where the row or the item was pressed (on a phone too, from 0.9, where it
+  only faded before; from 0.95 on a wide screen, as before, now from the
+  press); opened by a key, they grow from their middle. The press is heard
+  by the details' own code, loaded later (D145), so the first load carries
+  only the star's pop. With D197's tick drawn in and a new task coming in
+  from above, and D198's burst, that is the tasks' motion;
+  `prefers-reduced-motion` stops all of it
+  (`apps/web/e2e/details-motion.spec.ts`).
 
 ### Decided in round 4: the calendar views
 
