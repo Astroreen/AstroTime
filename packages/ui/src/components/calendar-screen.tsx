@@ -243,11 +243,13 @@ export function CalendarScreen({
     colorOf: (target) => validColor(target.item.color) ?? colorOfCalendar(target.calendarId),
     onChanged: () => scheduler.changed(),
   });
-  // The draft brought into sight as it moves, where the view scrolls.
+  // The draft brought into sight when its day or time changes, where the
+  // view scrolls; typing its title moves nothing.
+  const draftWhen = editing.draft?.when ?? null;
   useEffect(() => {
-    if (!editing.draft) return;
+    if (draftWhen === null) return;
     shownDraft()?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [editing.draft]);
+  }, [draftWhen]);
   // The period drawn and, on a touch screen, those beside it whose items are
   // read, each laid out once for what it draws (design D154).
   const undoneCount = data.undone.length;

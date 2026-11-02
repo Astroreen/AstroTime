@@ -1,10 +1,17 @@
 // The item the edit dialog makes, drawn in the views behind it as the form
 // says now (design D155): a new item where it would go, an edited one at its
 // new place instead of its old one.
-import { CalendarObject, createItem, type Occurrence, type Range } from "@astrotime/core";
+import {
+  CalendarObject,
+  CalendarObjectError,
+  createItem,
+  isDone,
+  type Occurrence,
+  type Range,
+} from "@astrotime/core";
 
 import { ghostOf } from "./drag.ts";
-import { changesOf, timesOfForm, type Form, type Target } from "./editing.ts";
+import { changesOf, problemOf, timesOfForm, type Form, type Target } from "./editing.ts";
 import { expand, type Entry } from "./query.ts";
 
 /** The stored object's id the draft's entries carry, which no stored object has. */
@@ -17,6 +24,8 @@ export type Draft =
       readonly kind: "new";
       readonly object: CalendarObject;
       readonly calendarId: string;
+      /** Its times, so a view brings it into sight when they change, not with each letter typed. */
+      readonly when: string;
     }
   | {
       /** An edited item: its occurrence at the form's times, with the form's title and colour. */
@@ -24,6 +33,7 @@ export type Draft =
       readonly target: Target;
       readonly occurrence: Occurrence;
       readonly calendarId: string;
+      readonly when: string;
     };
 
 /**
@@ -32,10 +42,17 @@ export type Draft =
  * a new item's reminder says without a title (foundation D103).
  */
 export function draftOf(target: Target | null, form: Form, untitled: string): Draft | null {
+  // A date not chosen yet: no day to draw it on.
+  if (problemOf(form) === "noDate") return null;
   try {
     if (!target) {
       const ics = createItem(form.kind, changesOf(null, form, untitled), { now: 0, uid: DRAFT });
-      return { kind: "new", object: CalendarObject.parse(ics), calendarId: form.calendarId };
+      return {
+        kind: "new",
+        object: CalendarObject.parse(ics),
+        calendarId: form.calendarId,
+        when: JSON.stringify(timesOfForm(form)),
+      };
     }
     const times = timesOfForm(form);
     if (!times.start && !times.end) return null;
@@ -52,9 +69,12 @@ export function draftOf(target: Target | null, form: Form, untitled: string): Dr
       target,
       occurrence: { ...moved, item: { ...moved.item, summary, color: form.color } },
       calendarId: form.calendarId,
+      when: JSON.stringify(times),
     };
-  } catch {
-    // Times no item can take yet (a field half typed): nothing is drawn for it.
+  } catch (error) {
+    // What no item can hold yet (an event that would have no start): nothing
+    // is drawn for it; anything else is a fault, told and not drawn.
+    if (!(error instanceof CalendarObjectError)) console.error(error);
     return null;
   }
 }
@@ -91,7 +111,8 @@ export function withDraft(
       occurrence,
       object: target.object,
       calendarId: draft.calendarId,
-      done: false,
+      // Done as the occurrence it stands for is: a series done, or this one.
+      done: (target.object.master !== null && isDone(target.object.master)) || isDone(target.item),
     },
   ];
 }

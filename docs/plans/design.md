@@ -1020,24 +1020,29 @@ Settings, the colours and the lists controls open.
   item is the object the form would save (`createItem` on the form's
   changes, as saving makes it), so a series is drawn on each of its days; an
   edited one is its occurrence at the form's times (`timesOfForm`,
-  `ghostOf`), drawn instead of the occurrence where it was, the series'
-  other occurrences kept (the scope is asked at saving). It is laid out with
+  `ghostOf`), drawn instead of the occurrence where it was, done as it is,
+  the series' other occurrences kept: the scope (this, this and following,
+  all) is asked only at saving ([D108](#D108)), so while the dialog is open
+  the one occurrence it edits is what is known to move, and a changed rule's
+  new occurrences are not drawn ([Deferred](#deferred)). It is laid out with
   the others ([D153](#D153)), raised over them with a shadow (`data-draft`),
-  and brought into sight where the view scrolls; it goes with the dialog,
-  and a saved item is then drawn from the store. The seam is
-  `useEditingState`'s `draft` (`calendar/draft.ts`: `draftOf`, `withDraft`),
-  from the editor's own state: the form's fields are not touched, so they
-  may change without the views knowing. From 1024 px, where a dialog and a
-  day fit side by side, the dialog stands at the side of the screen away
-  from the draft (`useDraftAside`), and its backdrop dims less (20%), as
-  Google Calendar's web app keeps its draft beside its dialog; narrower, it
-  stays in the middle (on a phone it is the whole screen). The Agenda draws
-  it too. Tested: `packages/ui/test/draft.test.ts` (a new event, a new
-  series, an edited event and an edited occurrence of a series, a form with
-  no date) and `apps/web/e2e/draft.spec.ts` (a new event that follows its
-  form, all day into the strip, the dialog beside it; an edited event at its
-  new place and back at its old one when the dialog goes; a task in the
-  Month; the phone).
+  and brought into sight where the view scrolls when its day or time changes
+  (not with each letter of its title); it goes with the dialog, and a saved
+  item is then drawn from the store. The seam is `useEditingState`'s `draft`
+  (`calendar/draft.ts`: `draftOf`, `withDraft`), from the editor's own
+  state: the form's fields are not touched, so they may change without the
+  views knowing. From 1024 px, where a dialog and a day fit side by side,
+  the dialog stands at the side of the screen away from the draft
+  (`useDraftAside`), and its backdrop dims less (20%), as Google Calendar's
+  web app keeps its draft beside its dialog; narrower, it stays in the
+  middle (on a phone it is the whole screen). The Agenda draws it too.
+  Tested: `packages/ui/test/draft.test.ts` (a new event, a new series, an
+  edited event and an edited occurrence of a series, a form with no date,
+  which draws nothing; a fault other than an item that cannot be made yet is
+  told on the console, not swallowed) and `apps/web/e2e/draft.spec.ts` (a
+  new event that follows its form, all day into the strip, the dialog beside
+  it; an edited event at its new place and back at its old one when the
+  dialog goes; a task in the Month; the phone).
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
@@ -1162,6 +1167,11 @@ Settings, the colours and the lists controls open.
 
 ## Deferred
 
+- **A changed rule's occurrences in the draft** ([D155](#D155)): an edited
+  series' draft moves the one occurrence the dialog edits; a new rule's
+  other days, and a scope's (this and following, all) are drawn once saved.
+  Drawing them needs the scope before Save (D108 asks after), or the rule
+  applied to the whole series for the preview alone.
 - **A date picker of our own** — the edit dialog's dates are still the
   browser's date field; its calendar is no list, so [D167](#D167) left it.
   The month picker's grid is the natural start.
