@@ -66,7 +66,7 @@ test("an inline attachment is saved where the user says", async ({ radicale }) =
     .click();
   await page
     .getByRole("dialog", { name: "Planning" })
-    .getByRole("button", { name: "Save agenda.txt" })
+    .getByRole("button", { name: /^Save agenda\.txt / })
     .click();
   expect(await saved).toBe("agenda.txt completed");
   expect(readFileSync(target, "utf8")).toBe("1. Budget\n");

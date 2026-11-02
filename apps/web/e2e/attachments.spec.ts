@@ -30,7 +30,7 @@ for (const [size, viewport] of [
     await expect(link).toHaveAttribute("href", "https://example.com/budget/sheet");
 
     // The inline file is decoded only when saved.
-    const save = list.getByRole("button", { name: "Save figures.txt" });
+    const save = list.getByRole("button", { name: /^Save figures\.txt / });
     await expect(save).toContainText("TXT · 22 B");
     const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
     expect(download.suggestedFilename()).toBe("figures.txt");
