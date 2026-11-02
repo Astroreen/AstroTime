@@ -1285,6 +1285,22 @@ Settings, the colours and the lists controls open.
   `z-index` raises it over the other items and the now line; in the Agenda
   it would pass over a day's sticky header while the list scrolls under an
   open dialog, which the dialog covers in practice.
+- **The draft's placement read from a ref** ([D155](#D155)): `useDraft`
+  makes the draft in a memo keyed on `placementOf(form)` that reads the form
+  from a ref written during render, so a field that changes where the item
+  is drawn but is left out of `placementOf` would keep an old draft with
+  nothing failing. A memo keyed on the placement's own fields (or a test
+  that every field `draftOf` reads is in `placementOf`) would close it.
+- **An edited draft offered to every range** ([D155](#D155)): `withDraft`
+  adds an edited item's draft to each range a view asks for, and the layout
+  leaves it out of the days it is not on; it is untested on a page the draft
+  is not on (a swipe's neighbour). Filtering it by its days first would make
+  that explicit.
+- **The double click's one second** ([D154](#D154)): a second click of a
+  double click is told from a click of its own by the grid's last press
+  within 1 s, a fixed window, where the system's double-click time may be
+  shorter or longer; the window's edge is untested. The click's own
+  `detail` is all the browser tells.
 - **A changed rule's occurrences in the draft** ([D155](#D155)): an edited
   series' draft moves the one occurrence the dialog edits; a new rule's
   other days, and a scope's (this and following, all) are drawn once saved.
