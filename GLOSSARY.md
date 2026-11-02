@@ -18,8 +18,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   delete (`CalendarRights`, foundation D37). A **read-only** calendar
   grants none.
 - **Event** — a `VEVENT`: something that happens at a time.
-- **Task** — a `VTODO`: something to do, possibly with a due time. Never
-  "todo" or "reminder" in code or UI.
+- **Task** — a `VTODO`: something to do at its **start** (a day, or a day
+  and a time), possibly with a due (design D159). Never "todo" or
+  "reminder" in code or UI.
 - **Item** — an event or a task, when it does not matter which.
 - **Calendar object** — one resource on a CalDAV server: a `VCALENDAR` with
   the components of one UID (a master and its exceptions) and their time
@@ -41,8 +42,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   reminder. In code a `Reminder` is one time an alarm fires (each
   occurrence and each repeat its own); the reminders a platform is handed,
   7 days ahead and at most 100, are the **reminder set** (foundation D100).
-- **Due** — a task's `DUE`. A task is **overdue** when its due has passed
-  and it is not completed.
+- **Due** — a task's `DUE`, the time it must be done by; optional. A task
+  is **overdue** when its due has passed (its start, without a due) and it
+  is not completed (design D161).
 
 ## The screen
 
@@ -51,8 +53,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   items; it does not scroll away.
 - **Chip** — a small item, of two kinds: in the all-day strip, any item one
   line high (a **span** in the week's strip, D42), and in the Month view
-  every item; in the time grid, a task with only a due (or start) time,
-  30 minutes tall (`shape: "chip"` in `layoutDay`).
+  every item; in the time grid, a task at its start's time (its due's
+  without a start), 30 minutes tall whatever its due (`shape: "chip"` in
+  `layoutDay`, design D159).
 - **Block** — a timed item with a length, drawn from its start to its end
   in the time grid. `shape: "block"` in the layout.
 - **Span** — a chip drawn as one bar over every day the item covers, in
@@ -87,7 +90,7 @@ One word per concept. Use these terms in code, docs, commits and UI.
   month's six weeks; previous and next move by one period (by month in the
   Month view and the Agenda).
 - **Undone tasks chip** — the one chip on today that stands for every
-  undone task due before today, "N undone tasks" (design D51).
+  overdue task, "N undone tasks" (design D51, D161).
 - **Dropdown** — a button that opens a list under it to choose from:
   AstroTime's own (`Select`, `MenuButton`), never the browser's `<select>`
   (design D167).

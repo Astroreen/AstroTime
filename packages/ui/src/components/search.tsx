@@ -29,8 +29,9 @@ export interface SearchResult {
 }
 
 /**
- * When a result is: its day, and its time or times; a task by its due, the
- * day and the time it is due on.
+ * When a result is: its day, and its time or times; a task as the calendar
+ * shows it, the day and time it starts, or is due without a start (design
+ * D159).
  */
 export function resultWhen(
   { item, occurrence }: SearchResult,
@@ -39,16 +40,11 @@ export function resultWhen(
   const { noDate, formats, timeZone, today } = context;
   if (!occurrence) return noDate;
   const { start, end } = occurrence;
-  if (item.kind === "task" && item.due) {
-    // A due date is the task's last day; its occurrence ends the day after (D42).
-    if (end.type === "date") return formats.day(addDays(end.date, -1), today);
-    return `${formats.day(wallClockOf(end, timeZone).slice(0, 10), today)}, ${formats.time(end, timeZone)}`;
-  }
   const day = formats.day(wallClockOf(start, timeZone).slice(0, 10), today);
   if (start.type === "date") return day;
   const time =
     item.kind === "task" || wallClockOf(start, timeZone) === wallClockOf(end, timeZone)
-      ? formats.time(item.kind === "task" ? end : start, timeZone)
+      ? formats.time(start, timeZone)
       : formats.timeRange(start, end, timeZone);
   return `${day}, ${time}`;
 }

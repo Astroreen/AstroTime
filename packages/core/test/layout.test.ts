@@ -74,11 +74,11 @@ describe("the time grid (D14, D16)", () => {
     ]);
   });
 
-  test("a task with a start and a due time is a block from one to the other", () => {
+  test("a task with a start and a due time is a chip at its start, however far its due (design D159)", () => {
     const [placed] = day(
       task("work", "DTSTART:20261102T130000Z\r\nDUE:20261102T170000Z\r\n"),
     ).timed;
-    expect(placed).toMatchObject({ shape: "block", top: 780, bottom: 1020 });
+    expect(placed).toMatchObject({ shape: "chip", top: 780, bottom: 810 });
   });
 
   test("an item over midnight is clipped to the day and says it goes on", () => {
@@ -332,12 +332,27 @@ describe("the all-day strip across a week (D14, D42)", () => {
 });
 
 describe("chips, days and edges", () => {
-  test("a task with a date start and a timed due is a chip at the due, on that day only", () => {
+  test("a task shows on its start's day only: a date start is all day there, not on its due's day", () => {
     const ics = task("report", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T150000Z\r\n");
     const monday = layoutDay(on("2026-11-02", "2026-11-03", ics), "2026-11-02", { timeZone });
+    const tuesday = layoutDay(on("2026-11-03", "2026-11-04", ics), "2026-11-03", { timeZone });
     const wednesday = layoutDay(on("2026-11-04", "2026-11-05", ics), "2026-11-04", { timeZone });
-    expect([monday.allDay.length, monday.timed.length]).toEqual([0, 0]);
-    expect(wednesday.timed.map((p) => [p.shape, p.top])).toEqual([["chip", 900]]);
+    expect(monday.allDay.map((o) => o.item.uid)).toEqual(["report"]);
+    expect([tuesday.allDay.length, tuesday.timed.length]).toEqual([0, 0]);
+    expect([wednesday.allDay.length, wednesday.timed.length]).toEqual([0, 0]);
+  });
+
+  test("a timed task due days later is a chip on its start's day only", () => {
+    const ics = task("essay", "DTSTART:20261102T090000Z\r\nDUE:20261104T170000Z\r\n");
+    const monday = layoutDay(on("2026-11-02", "2026-11-03", ics), "2026-11-02", { timeZone });
+    const tuesday = layoutDay(on("2026-11-03", "2026-11-04", ics), "2026-11-03", { timeZone });
+    expect(monday.timed.map((p) => [p.shape, p.top, p.bottom])).toEqual([["chip", 540, 570]]);
+    expect([monday.allDay.length, tuesday.allDay.length, tuesday.timed.length]).toEqual([0, 0, 0]);
+    const week = ["2026-11-02", "2026-11-03", "2026-11-04"];
+    expect(layoutSpans(on("2026-11-02", "2026-11-05", ics), week, timeZone)).toEqual([]);
+    expect(
+      layoutSpans(on("2026-11-02", "2026-11-05", ics), week, timeZone, { timed: true }),
+    ).toMatchObject([{ firstDay: 0, lastDay: 0 }]);
   });
 
   test("each occurrence of a series of timed tasks is a chip at its own due, on its own day", () => {
@@ -444,9 +459,13 @@ describe("chips, days and edges", () => {
     ]);
   });
 
-  test("the days an item shows on: a chip's own day; a timed item to the day it ends, not past midnight", () => {
+  test("the days an item shows on: a task's start day; a timed item to the day it ends, not past midnight", () => {
     const range = (ics: string) => dayRange(on("2026-11-01", "2026-11-06", ics)[0]!, timeZone);
     expect(range(task("chip", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T120000Z\r\n"))).toEqual({
+      first: "2026-11-02",
+      last: "2026-11-02",
+    });
+    expect(range(task("due", "DUE:20261104T120000Z\r\n"))).toEqual({
       first: "2026-11-04",
       last: "2026-11-04",
     });
@@ -502,11 +521,11 @@ describe("whole days, DST and deep cascades", () => {
     ).toBe(0);
   });
 
-  test("a task's due date is its last day: Jun 1 to Jun 3 covers all three", () => {
+  test("a task's due date is its last day, though it shows on its start's only: Jun 1 to Jun 3", () => {
     const ics = task("move", "DTSTART;VALUE=DATE:20270601\r\nDUE;VALUE=DATE:20270603\r\n");
     const days = ["2027-06-01", "2027-06-02", "2027-06-03", "2027-06-04"];
     const [span] = layoutSpans(on("2027-06-01", "2027-06-05", ics), days, timeZone);
-    expect(span).toMatchObject({ firstDay: 0, lastDay: 2 });
+    expect(span).toMatchObject({ firstDay: 0, lastDay: 0 });
     expect(on("2027-06-03", "2027-06-04", ics)).toHaveLength(1);
     expect(on("2027-06-04", "2027-06-05", ics)).toHaveLength(0);
   });

@@ -73,13 +73,13 @@ the project.
   [D153](#D153)); an item drawn over another (D15) gets a
   thin outline in the background colour, so the edge between them shows.
   In the all-day strip, items are chips one line high. In the time grid a
-  task with only a due (or start) time is a chip as D42 sizes it (30
-  minutes tall, one line of text); a task with a timed start and due is a
-  block like an event.
+  task is a chip as D42 sizes it (30 minutes tall, one line of text) at
+  its start. _Changed in round 3 ([D159](#D159)): a task with a timed
+  start and due was a block like an event._
 - **D51. Tasks on the calendar.** A task's chip carries a check-circle icon;
   a completed task stays, struck through, in a muted colour. Undone tasks
-  whose due (a date, a time, the end of a start–due block, or the start of
-  a task with a start and no due) is before the
+  whose due (a date or a time, or the start of a task with no due,
+  [D161](#D161)) is before the
   start of today, in the user's zone, collapse into one chip on today,
   "N undone tasks", which opens them; it shows only on today, in every view
   that has today, and the days they were due no longer show them. This is
@@ -338,7 +338,8 @@ the project.
     Task to switch. The title; "All day"; the start and end dates (the
     browser's date field) and times (a list of every quarter of an hour in
     the user's clock, [D96](#D96), since the browser's time field keeps its
-    own); a task's start and due, each with a switch; the zone when it is
+    own); a task's start, always, and its due, a field of its own
+    ([D159](#D159); _until round 3 each had a switch_); the zone when it is
     not the user's; the repeat (does not repeat, every day, every week on
     the start's weekday, every weekday, every month on its day, on its nth
     weekday, every year, "Custom…": every n days, weeks, months or years,
@@ -351,9 +352,9 @@ the project.
     take new items, or for an existing item its own, and others only when
     its own lets it be deleted (a move is a creation there and a deletion
     here, [foundation D106](foundation.md#D106)); the colour, the calendar's or one of nine CSS names; the
-    location; the description. A new start keeps the event's length; a new
-    start date (a task's due without a start) moves its end, and the rule
-    with it ([foundation D105](foundation.md#D105)). An end
+    location; the description. A new start keeps the event's length, and a
+    task's due as far after it ([D159](#D159)); a new start date moves its
+    end, and the rule with it ([foundation D105](foundation.md#D105)). An end
     before the start, a due before the start or a repeat ending before the
     item is refused, in words;
   - **creating**: the "+" button makes an event on the day shown from the
@@ -380,8 +381,9 @@ the project.
   Nextcloud Tasks offers it (none; high, medium, low written as 1, 5, 9;
   read 1–4, 5, 6–9), the progress in percent and the tags, comma-separated
   (`CATEGORIES`). Each list on the tasks screen has "Add a task" at the top
-  of its card, which makes an undated task in that list, as the tasks
-  screen's "+" button does on a phone.
+  of its card, which makes a task in that list, as the tasks screen's "+"
+  button does on a phone: on today, all day, since round 3
+  ([D161](#D161)); it was undated.
 
 ### Decided while building PR 6b
 
@@ -766,18 +768,20 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
     series, as a drop that changes nothing ([D111](#D111)); it writes
     nothing either.
   - **Event, task, event keeps the event's times** while creating: switched
-    to a task, the event's all-day state, its days and its end time are
-    kept with the form, and switched back it has them again, from the day
-    the task is due on (several days, no length, all day). A task made an
-    event otherwise holds its one day: an end before the start is the next
-    day's, one at it an hour.
+    to a task, the event's days and its end time are kept with the form,
+    and switched back it has them again, from the day the task starts on
+    (several days, no length, all day). A task made an event otherwise
+    lasts an hour from its start, or its one day. _Since round 3
+    ([D159](#D159)):_ the task keeps the event's start and all-day state,
+    with no due; it was due on the event's day, all day.
   - **A dialog keeps its keys**: the view and period keys
     ([D88](#D88)) do nothing behind the scope question or a confirmation
     (`alertdialog`), as behind any other dialog.
 - **D144. Words that said the wrong thing.**
   - **A task's reminder on its due date reads as its day**: "On the day at
     9:00", "1 day before at 9:00", as an all-day item's ([D108](#D108)).
-    The dialog relates a task's reminders to its due (`RELATED=END`), and a
+    The dialog related a task's reminders to its due (`RELATED=END`; _since
+    round 3 to its start, [D159](#D159), and to its due only without one_), and a
     due date counts from its day's midnight, as an all-day start does; the
     words read only a start that way, so every preset of a dated task said
     "9 hours after the start" or "39 hours before". After a timed due it
@@ -794,10 +798,10 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
     and the time, or the day alone for a due date, where it gave its
     start's day with its due's time.
 
-### Decided in round 3: the views and motion
+### Decided in round 3
 
-The owner's feedback on v0.3.0, tested on a phone and a computer, for the
-views: "nothing animates when I flip a week, a month or a day"; "the
+The owner's feedback on v0.3.0, tested on the web on a phone and a
+computer. For the views: "nothing animates when I flip a week, a month or a day"; "the
 calendar button at the top right does not always work: on the phone I have
 to hold it or press it twice"; "in the Day view, with many tasks on a day
 without a set time, when I flip to another day the room those tasks took at
@@ -862,10 +866,7 @@ I make it"; "sometimes an item's text is covered by another event".
   (`apps/web/e2e/calendar.spec.ts`; on the phone's views it failed before).
   D15, D42's cascade and D50 point here.
 
-### Decided in round 3: settings, colours, dropdowns, accounts
-
-The owner's feedback after v0.3.0, tried on a phone and a computer, for
-Settings, the colours and the lists controls open.
+For Settings, the colours and the lists controls open:
 
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
@@ -890,6 +891,63 @@ Settings, the colours and the lists controls open.
     time list and its reminder menu open, in both themes.
   - A choice may carry something before its name (`leading`), drawn in the
     list and on the button: the colour dropdown's dot.
+
+For the items' editor and details:
+
+- **D159. A task is at its start** (the owner's feedback 4 and 7: "a task
+  is a fixed time; on the calendar it shows as a task exactly 30 minutes
+  long"; "it is odd that I can pick all day but not pick a due"). It
+  changes foundation [D16](foundation.md#D16) and [D42](foundation.md#D42),
+  [D50](#D50), [D51](#D51), [D108](#D108)'s "a task's start and due, each
+  with a switch", [D109](#D109), [D143](#D143)'s event-to-task switching
+  and [D144](#D144)'s reminders counted from the due:
+  - **a task has a start, always**: a day and a time, or only a day when
+    "All day" is on. There is no switch on the start. A task made on a
+    tapped slot, or switched to from the event a tap or "+" began, takes
+    that day and time, as the event would; the all-day state is kept too;
+  - **on the calendar a task is a chip at its start**: 30 minutes tall at
+    its time on the time grid, or one line in the all-day strip on its day,
+    whatever its due and however far it is (`layoutDay`, `dayRange`; the
+    Month and the Agenda show it on that day only). One with only a due
+    (another client's, below) shows at its due the same way;
+  - **the due is a field of its own, off at first**: "Add due" ("Добавить
+    срок"); tapped, it is set on the start's day, an hour after its start
+    for a timed task (the next day's past midnight), the day alone for an
+    all-day one; a ✕ beside it clears it ("Remove due"). "All day" is the
+    start's and the due's alike. A due before the start is refused, in
+    words (D108's rule);
+  - **the due moves with the start**, as an event's end does: a new start
+    in the dialog keeps the time between them (`withStartTime`,
+    `withStartDate`), and a drag or a key moves both, a due date by the
+    days the start moved (foundation [D113](foundation.md#D113)); a task
+    is never resized, as it has no length on the grid;
+  - **its reminders count from its start**, where the calendar shows it
+    (`RELATED=START`); one with only a due counts from its due
+    (`RELATED=END`, as RFC 5545 §3.6.6 requires a `DTSTART` for the first);
+  - **its details and a search result read its start** ("Wednesday,
+    November 4, 3:00 PM · Due Friday, November 6"), its due after it.
+- **D160. Tasks other clients wrote stay as they are.** Nextcloud Tasks
+  and others write tasks with only a `DUE`, or with neither date. Such a
+  task shows at its due ([D159](#D159)), or on the tasks screen only with
+  neither, as before. The edit dialog opens it with a start shown from its
+  due (the due's day and time, all day for a due date), or today, all day,
+  without either; that start is the form's from the moment it opens, so it
+  is written only when the user changes the task's times, with them
+  (foundation [D7](foundation.md#D7)): a new title alone writes the title.
+- **D161. Overdue is its due, else its start; the tasks screen's new task
+  is today's.**
+  - A task is **overdue**, and rolls over to today's "N undone tasks"
+    ([D51](#D51)), when its due is before today, or, without a due, its
+    start is (`isUndoneBefore`, unchanged: the occurrence ends at its due,
+    else at its start). A task started before today and due after it is
+    not overdue: it stays on its start's day.
+  - The tasks screen's "Add a task" ([D109](#D109)) opens a task on today,
+    all day, in that list, no longer an undated one. The owner's model has
+    no undated task: a start "always has to be chosen", and a task with no
+    day never reaches the calendar, the logic error of feedback 4. Google
+    Tasks' list item with no date is what the owner moved away from; today
+    all day is the least the list asks of the user, and the dialog changes
+    it.
 
 ## Deferred
 

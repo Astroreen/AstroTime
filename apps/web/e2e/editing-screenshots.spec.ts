@@ -29,6 +29,7 @@ const WORDS = {
     editEvent: "Edit event",
     title: "Title",
     startTime: "Start time",
+    twoPm: "2:00 PM",
     menu: "Main menu",
     settings: "Settings",
     language: "Language",
@@ -41,6 +42,13 @@ const WORDS = {
     accounts: /^Accounts/,
     reviewConflicts: "Review",
     conflicts: "Conflicts",
+    task: "Task",
+    newTask: "New task",
+    addDue: "Add due",
+    dueDate: "Due date",
+    startDate: "Start date",
+    startTime: "Start time",
+    pack: "Pack the bags",
   },
   ru: {
     today: "среда, 4 ноября",
@@ -54,6 +62,7 @@ const WORDS = {
     editEvent: "Изменить мероприятие",
     title: "Название",
     startTime: "Время начала",
+    twoPm: "14:00",
     menu: "Главное меню",
     settings: "Настройки",
     language: "Язык",
@@ -66,12 +75,24 @@ const WORDS = {
     accounts: /^Аккаунты/,
     reviewConflicts: "Разобрать",
     conflicts: "Конфликты",
+    task: "Задача",
+    newTask: "Новая задача",
+    addDue: "Добавить срок",
+    dueDate: "Дата срока",
+    startDate: "Дата начала",
+    startTime: "Время начала",
+    pack: "Собрать вещи",
   },
 } as const;
 
 async function open(
   browser: Browser,
-  options: { language: Language; theme: Theme; size: { width: number; height: number } },
+  options: {
+    language: Language;
+    theme: Theme;
+    size: { width: number; height: number };
+    touch?: boolean;
+  },
   view: "day" | "week",
 ): Promise<Page> {
   const context = await browser.newContext({
@@ -80,7 +101,7 @@ async function open(
     viewport: options.size,
     timezoneId: "Europe/Vilnius",
     // A phone is touched: the dropdowns' rows are a finger's (design D167).
-    ...(options.size === PHONE ? { hasTouch: true, isMobile: true } : {}),
+    ...(options.size === PHONE || options.touch ? { hasTouch: true, isMobile: true } : {}),
   });
   const page = await context.newPage();
   await openDemo(page, view);
@@ -183,6 +204,55 @@ for (const language of ["en", "ru"] as const) {
       await expect(phone.getByRole("listbox")).toBeVisible();
       await shot(phone, name("dropdown-settings", "phone"));
       await phone.context().close();
+    });
+  }
+}
+
+/** A phone held in the hand, as the owner tests on: a touch screen. */
+const TOUCH_PHONE = { width: 390, height: 844 };
+
+for (const language of ["en", "ru"] as const) {
+  for (const theme of ["dark", "light"] as const) {
+    test(`a task's time (design D159), ${language}, ${theme}`, async ({ browser }) => {
+      const w = WORDS[language];
+      const name = (what: string, size: string) => `${what}-${theme}-${language}-${size}`;
+
+      // On a phone: a task from "+", its start as an event's, then its due.
+      const phone = await open(browser, { language, theme, size: TOUCH_PHONE, touch: true }, "day");
+      await phone.getByRole("button", { name: w.create }).click();
+      await phone
+        .getByRole("dialog", { name: w.newEvent })
+        .getByRole("radio", { name: w.task })
+        .click();
+      const task = phone.getByRole("dialog", { name: w.newTask });
+      await task.getByRole("textbox", { name: w.title }).fill(w.pack);
+      await shot(phone, name("task-new", "phone"));
+      await task.getByRole("button", { name: w.addDue }).click();
+      await task.getByLabel(w.dueDate).fill("2026-11-06");
+      await shot(phone, name("task-due", "phone"));
+      await task.getByRole("button", { name: w.save }).click();
+      await expect(task).toHaveCount(0);
+      await shot(phone, name("task-chip", "phone"));
+      await phone.context().close();
+
+      // On a wide screen: the same task in the week, a chip at its start.
+      const wide = await open(browser, { language, theme, size: WIDE }, "week");
+      await wide.getByRole("button", { name: w.create }).click();
+      await wide
+        .getByRole("dialog", { name: w.newEvent })
+        .getByRole("radio", { name: w.task })
+        .click();
+      const wideTask = wide.getByRole("dialog", { name: w.newTask });
+      await wideTask.getByRole("textbox", { name: w.title }).fill(w.pack);
+      await wideTask.getByLabel(w.startDate).fill("2026-11-05");
+      await choose(wideTask.getByLabel(w.startTime), w.twoPm);
+      await wideTask.getByRole("button", { name: w.addDue }).click();
+      await wideTask.getByLabel(w.dueDate).fill("2026-11-07");
+      await shot(wide, name("task-due", "wide"));
+      await wideTask.getByRole("button", { name: w.save }).click();
+      await expect(wideTask).toHaveCount(0);
+      await shot(wide, name("task-chip", "wide"));
+      await wide.context().close();
     });
   }
 }

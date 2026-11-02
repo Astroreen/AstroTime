@@ -264,7 +264,7 @@ const CALENDARS: readonly DemoCalendar[] = [
     items: (day, l, zone) => {
       const t = (en: string, ru: string) => (l === "en" ? en : ru);
       return [
-        // A timed task: a 30-minute chip at its due (D16).
+        // A timed task with only a due, as Nextcloud Tasks writes it: a 30-minute chip at its due (D16).
         task("demo-report", t("Send the report", "Отправить отчёт"), {
           DUE: at(zone, day(0), "15:00"),
         }),
@@ -272,7 +272,7 @@ const CALENDARS: readonly DemoCalendar[] = [
           DUE: at(zone, day(-1), "14:00"),
           ...done,
         }),
-        // A start–due task: a block, like an event.
+        // A task with a start and a due: a chip at its start (design D159).
         // Reminding an hour before its due (foundation D100).
         task(
           "demo-proposal",

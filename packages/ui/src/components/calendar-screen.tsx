@@ -225,6 +225,7 @@ export function CalendarScreen({
     calendars: lists?.calendars ?? [],
     hidden,
     timeZone,
+    today,
     minutes,
     colorOf: (target) => validColor(target.item.color) ?? colorOfCalendar(target.calendarId),
     onChanged: () => scheduler.changed(),

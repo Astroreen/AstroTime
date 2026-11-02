@@ -35,6 +35,7 @@ import {
   scopesFor,
   switchKind,
   timesOfForm,
+  withDue,
   withStartDate,
   withStartTime,
   type Form,
@@ -48,6 +49,7 @@ import { createI18n } from "../src/i18n/index.ts";
 
 const timeZone = "Europe/Vilnius";
 const NOW = Date.parse("2026-11-04T10:40:00+02:00");
+const TODAY = "2026-11-04";
 
 async function demo() {
   const store = await Store.open(nodeDriver());
@@ -105,17 +107,92 @@ describe("the form", () => {
       startTime: "14:30",
       endTime: "15:30",
     });
-    expect(newForm("task", { ...options, day: null })).toMatchObject({
-      startDate: "",
+  });
+
+  test("a new task starts as a new event does, with no due; the tasks screen's on the day (design D159)", () => {
+    const options = { calendarId: "c", day: "2026-11-04", minutes: 10 * 60 + 40, timeZone };
+    expect(newForm("task", options)).toMatchObject({
+      startDate: "2026-11-04",
+      startTime: "11:00",
       endDate: "",
-      allDay: true,
+      allDay: false,
     });
+    expect(newForm("task", { ...options, at: 14 * 60 + 30 })).toMatchObject({
+      startDate: "2026-11-04",
+      startTime: "14:30",
+      endDate: "",
+    });
+    const listed = newForm("task", { ...options, allDay: true });
+    expect(listed).toMatchObject({ startDate: "2026-11-04", endDate: "", allDay: true });
+    expect(timesOfForm(listed)).toEqual({ start: { type: "date", date: "2026-11-04" }, end: null });
+    expect(changesOf(null, listed, "Reminder").time).toEqual(timesOfForm(listed));
+  });
+
+  test("a task's due: set an hour after its start or on its day, moved with its start, cleared", () => {
+    const options = { calendarId: "c", day: "2026-11-04", minutes: 0, at: 9 * 60, timeZone };
+    const task = newForm("task", options);
+    const due = withDue(task, true);
+    expect(due).toMatchObject({ endDate: "2026-11-04", endTime: "10:00" });
+    expect(withDue({ ...task, startTime: "23:30" }, true)).toMatchObject({
+      endDate: "2026-11-05",
+      endTime: "00:30",
+    });
+    expect(withDue({ ...task, allDay: true }, true)).toMatchObject({ endDate: "2026-11-04" });
+    // Its due follows its start, as an event's end does.
+    expect(withStartTime(due, "11:00")).toMatchObject({ endDate: "2026-11-04", endTime: "12:00" });
+    expect(withStartDate({ ...due, endDate: "2026-11-06" }, "2026-11-05")).toMatchObject({
+      startDate: "2026-11-05",
+      endDate: "2026-11-07",
+    });
+    // With no due, only the start moves.
+    expect(withStartTime(task, "11:00")).toMatchObject({ startTime: "11:00", endDate: "" });
+    expect(withDue(due, false)).toMatchObject({ endDate: "" });
+    expect(timesOfForm(withDue(due, false)).end).toBeNull();
+    // A due before the start is refused, in words.
+    expect(problemOf({ ...due, endTime: "08:00" })).toBe("dueBeforeStart");
+    expect(problemOf(due)).toBeNull();
+    expect(problemOf({ ...task, startDate: "" })).toBe("noDate");
+  });
+
+  test("a task another client wrote with only a due starts there; with neither, today; written only when its times change", () => {
+    const parse = (props: string) => {
+      const object = CalendarObject.parse(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20261101T000000Z\r\n${props}END:VTODO\r\nEND:VCALENDAR\r\n`,
+      );
+      return formOf(
+        { objectId: "x", calendarId: "c", object, recurrenceId: null, item: object.master! },
+        timeZone,
+        TODAY,
+      );
+    };
+    const due = parse("DUE;TZID=Europe/Vilnius:20261120T150000\r\n");
+    expect(due).toMatchObject({
+      startDate: "2026-11-20",
+      startTime: "15:00",
+      endDate: "2026-11-20",
+      endTime: "15:00",
+      allDay: false,
+      startless: true,
+    });
+    expect(changesOf(due, { ...due, summary: "Call" }, "Reminder")).toEqual({ summary: "Call" });
+    expect(changesOf(due, withStartTime(due, "16:00"), "Reminder").time).toMatchObject({
+      start: { local: "2026-11-20T16:00:00" },
+      end: { local: "2026-11-20T16:00:00" },
+    });
+    const dated = parse("DUE;VALUE=DATE:20261120\r\n");
+    expect(dated).toMatchObject({ startDate: "2026-11-20", endDate: "2026-11-20", allDay: true });
+    const undated = parse("");
+    expect(undated).toMatchObject({ startDate: TODAY, endDate: "", allDay: true, startless: true });
+    expect(changesOf(undated, { ...undated, summary: "Call" }, "Reminder")).toEqual({
+      summary: "Call",
+    });
+    expect(parse("DTSTART;VALUE=DATE:20261120\r\n")).not.toHaveProperty("startless");
   });
 
   test("an item opens with its own times in its zone; a UTC time in the user's, kept UTC", async () => {
     const { store, rowOf } = await demo();
     const review = await rowOf("Work", "demo-review");
-    const form = formOf(await targetOn(store, review, "2026-11-04"), timeZone);
+    const form = formOf(await targetOn(store, review, "2026-11-04"), timeZone, TODAY);
     expect(form).toMatchObject({
       summary: "Design review",
       startTime: "10:00",
@@ -132,6 +209,7 @@ describe("the form", () => {
     const utc = formOf(
       { objectId: "x", calendarId: "c", object, recurrenceId: null, item: object.master! },
       timeZone,
+      TODAY,
     );
     expect(utc).toMatchObject({ endDate: "2026-11-20", endTime: "10:00", utc: true });
     expect(timesOfForm({ ...utc, endTime: "11:00" }).end).toMatchObject({
@@ -144,7 +222,7 @@ describe("the form", () => {
   test("an all-day event's last day is the day before its DTEND", async () => {
     const { store, rowOf } = await demo();
     const conference = await rowOf("Work", "demo-conference");
-    const form = formOf(await targetOn(store, conference, "2026-11-05"), timeZone);
+    const form = formOf(await targetOn(store, conference, "2026-11-05"), timeZone, TODAY);
     expect(form).toMatchObject({ allDay: true, startDate: "2026-11-05", endDate: "2026-11-07" });
     expect(timesOfForm(form)).toEqual({
       start: { type: "date", date: "2026-11-05" },
@@ -155,7 +233,7 @@ describe("the form", () => {
   test("changes hold only what the user changed", async () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     expect(changesOf(initial, initial, "Reminder")).toEqual({});
     expect(changesOf(initial, { ...initial, summary: "  Review  " }, "Reminder")).toEqual({
       summary: "Review",
@@ -250,7 +328,11 @@ describe("the form's corners", () => {
   };
 
   test("an event without a length (no DTEND) saves while its times are as they were", () => {
-    const initial = formOf(event("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n"), timeZone);
+    const initial = formOf(
+      event("DTSTART;TZID=Europe/Vilnius:20261105T090000\r\n"),
+      timeZone,
+      TODAY,
+    );
     expect(problemOf({ ...initial, summary: "Ping 2" }, initial)).toBeNull();
     // A new start moves its end with it, and it keeps no length.
     const later = withStartTime(initial, "10:00");
@@ -268,6 +350,7 @@ describe("the form's corners", () => {
         "DTSTART;TZID=Europe/Vilnius:20261105T220000\r\nDTEND;TZID=Europe/Vilnius:20261106T020000\r\n",
       ),
       timeZone,
+      TODAY,
     );
     expect(withStartTime(night, "23:00")).toMatchObject({
       startDate: "2026-11-05",
@@ -280,6 +363,7 @@ describe("the form's corners", () => {
         "DTSTART;TZID=Europe/Vilnius:20261105T220000\r\nDTEND;TZID=Europe/Vilnius:20261105T230000\r\n",
       ),
       timeZone,
+      TODAY,
     );
     expect(withStartTime(late, "23:30")).toMatchObject({ endDate: "2026-11-06", endTime: "00:30" });
     expect(withStartTime(late, "09:00")).toMatchObject({ endDate: "2026-11-05", endTime: "10:00" });
@@ -311,14 +395,38 @@ describe("the form's corners", () => {
       startDate: "2026-11-05",
       endDate: "2026-11-06",
     });
-    // Due on another day meanwhile: as long, from there.
-    const moved = { ...switchKind(long, "task"), endDate: "2026-11-10" };
+    // Made a task, it keeps the event's start and all-day state, with no due (design D159).
+    expect(switchKind(long, "task")).toMatchObject({
+      kind: "task",
+      allDay: false,
+      startDate: "2026-11-05",
+      startTime: "10:00",
+      endDate: "",
+    });
+    // Started on another day meanwhile: as long, from there.
+    const moved = withStartDate(switchKind(long, "task"), "2026-11-10");
     expect(switchKind(moved, "event")).toMatchObject({
       startDate: "2026-11-10",
       endDate: "2026-11-12",
       endTime: "12:00",
     });
     expect(switchKind(moved, "event")).not.toHaveProperty("asEvent");
+  });
+
+  test("a task made an event lasts an hour from its start, or its one day", () => {
+    const options = { calendarId: "c", day: "2026-11-05", minutes: 0, at: 23 * 60 + 30, timeZone };
+    expect(switchKind(newForm("task", options), "event")).toMatchObject({
+      kind: "event",
+      startDate: "2026-11-05",
+      startTime: "23:30",
+      endDate: "2026-11-06",
+      endTime: "00:30",
+    });
+    expect(switchKind(newForm("task", { ...options, allDay: true }), "event")).toMatchObject({
+      allDay: true,
+      startDate: "2026-11-05",
+      endDate: "2026-11-05",
+    });
   });
 
   test("an event over midnight made a task and back keeps its length", () => {
@@ -345,7 +453,7 @@ describe("the scopes offered (D11)", () => {
   test("all three; a new day not for all; a new rule not for one; none for an item that does not repeat", async () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     expect(scopesFor(target, initial, { ...initial, summary: "x" })).toEqual([
       "this",
       "following",
@@ -363,7 +471,7 @@ describe("the scopes offered (D11)", () => {
     expect(changesOf(initial, nextDay, "Reminder")).not.toHaveProperty("repeat");
     expect(scopesFor(target, initial, { ...nextDay, repeat: null })).toEqual(["following"]);
     const single = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
-    const form = formOf(single, timeZone);
+    const form = formOf(single, timeZone, TODAY);
     expect(scopesFor(single, form, { ...form, summary: "x" })).toEqual([]);
     // Saved with nothing changed, a series asks nothing (it writes nothing).
     expect(scopesFor(target, initial, { ...initial })).toEqual([]);
@@ -376,7 +484,7 @@ describe("what a calendar's rights offer (D37)", () => {
   test("a calendar that takes no new items offers no split: a new rule on a new day cannot be saved there", async () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const editOnly = rights(false, true, true);
     expect(scopesFor(target, initial, { ...initial, summary: "x" }, editOnly)).toEqual([
       "this",
@@ -603,7 +711,7 @@ describe("saving writes pending changes through the store (D5)", () => {
       ics: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nBEGIN:VEVENT\r\nUID:ping\r\nDTSTAMP:20261101T000000Z\r\nDTSTART;TZID=Europe/Vilnius:20261105T090000\r\nSUMMARY:Ping\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
     });
     const target = await targetOn(store, stored, "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const form = { ...initial, summary: "Ping 2" };
     expect(problemOf(form, initial)).toBeNull();
     await saveForm(
@@ -622,7 +730,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const { store, rowOf } = await demo();
     const before = await rowOf("Work", "demo-standup");
     const target = await targetOn(store, before, "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     expect(scopesFor(target, initial, { ...initial })).toEqual([]);
     let writes = 0;
     const stop = store.subscribe(() => writes++);
@@ -640,7 +748,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const { store, byName, rowOf } = await demo();
     const work = byName("Work");
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     await saveForm(
       store,
       {
@@ -659,7 +767,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   test("a move to another calendar: created there, deleted here", async () => {
     const { store, byName, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Personal", "demo-lunch"), "2026-11-04");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const work = byName("Work");
     await saveForm(
       store,
@@ -682,7 +790,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   test("a series moved to another calendar with a new time moves as the occurrence did", async () => {
     const { store, byName, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const personal = byName("Personal");
     await saveForm(
       store,
@@ -711,7 +819,7 @@ describe("saving writes pending changes through the store (D5)", () => {
       ics: `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\n${exception("20261105", "First")}${exception("20261106", "Second")}END:VCALENDAR\r\n`,
     });
     const second = await targetOn(store, row, "2026-11-06");
-    const initial = formOf(second, timeZone);
+    const initial = formOf(second, timeZone, TODAY);
     await saveForm(
       store,
       {
@@ -739,7 +847,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     const { store, byName, rowOf } = await demo();
     const row = await rowOf("Work", "demo-review");
     const target = await targetOn(store, row, "2026-11-04");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     // The dialog is open; a sync brings the server's newer version: a new
     // place, another client's property, a reminder before the one there was.
     const theirs = row.ics
@@ -771,7 +879,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   test("an item or an occurrence gone meanwhile: nothing is saved, and the user is told", async () => {
     const { store, rowOf } = await demo();
     const standup = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(standup, timeZone);
+    const initial = formOf(standup, timeZone, TODAY);
     // Another tab deleted this occurrence while the dialog was open.
     await deleteTarget(store, standup, "this", NOW);
     const before = (await rowOf("Work", "demo-standup")).ics;
@@ -789,7 +897,7 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect((await rowOf("Work", "demo-standup")).ics).toBe(before);
 
     const review = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
-    const reviewForm = formOf(review, timeZone);
+    const reviewForm = formOf(review, timeZone, TODAY);
     await store.deleteLocal(review.objectId);
     await expect(
       saveForm(
@@ -809,7 +917,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   test("the store's leader gone: tried once more; a commit in doubt read again (D99)", async () => {
     const { store, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-review"), "2026-11-04");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const save = (on: Store, summary: string) =>
       saveForm(
         on,
@@ -898,7 +1006,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   test("this and following on another day: the new series' rule names the new days", async () => {
     const { store, byName, rowOf } = await demo();
     const target = await targetOn(store, await rowOf("Work", "demo-standup"), "2026-11-05");
-    const initial = formOf(target, timeZone);
+    const initial = formOf(target, timeZone, TODAY);
     const form = followed(initial, withStartDate(initial, "2026-11-06"));
     await saveForm(
       store,

@@ -253,7 +253,7 @@ test("a read-only calendar's item opens without edit or delete", async ({ page }
   await expect(details.getByRole("button", { name: "Delete" })).toHaveCount(0);
 });
 
-test("the tasks screen adds a task to its list, undated, and completes it", async ({ page }) => {
+test("the tasks screen adds a task to its list, today, and completes it", async ({ page }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   const panel = page.getByRole("region", { name: "Tasks" });
@@ -266,7 +266,10 @@ test("the tasks screen adds a task to its list, undated, and completes it", asyn
     .click();
   const dialog = page.getByRole("dialog", { name: "New task" });
   await expect(dialog.getByLabel("List")).toHaveText(/.+/);
-  await expect(dialog.getByRole("switch", { name: "Due date" })).not.toBeChecked();
+  // A start always, today, all day; no due until one is added (design D159).
+  await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-04");
+  await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();
+  await expect(dialog.getByRole("button", { name: "Add due" })).toBeVisible();
   await dialog.getByRole("textbox", { name: "Title" }).fill("Buy stamps");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
@@ -278,6 +281,73 @@ test("the tasks screen adds a task to its list, undated, and completes it", asyn
       .getByRole("list", { name: "Completed tasks" })
       .getByRole("checkbox", { name: "Buy stamps" }),
   ).toBeChecked();
+});
+
+test("a task made on a tapped slot starts there, a chip at its start; its due is a field of its own (design D159)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  const column = day(page, "Thursday, November 5");
+  const box = (await column.boundingBox())!;
+  await column.click({ position: { x: box.width - 10, y: 14.25 * 56 } });
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await dialog.getByRole("radio", { name: "Task" }).click();
+  const task = page.getByRole("dialog", { name: "New task" });
+  // The slot's day and time, no switch on the start, no due.
+  await expect(task.getByLabel("Start date")).toHaveValue("2026-11-05");
+  await expect(task.getByLabel("Start time")).toHaveText("2:00 PM");
+  await expect(task.getByRole("switch")).toHaveCount(1);
+  await expect(task.getByLabel("Due date")).toHaveCount(0);
+  await task.getByRole("textbox", { name: "Title" }).fill("Pack the bags");
+  await task.getByRole("button", { name: "Add due" }).click();
+  await expect(task.getByLabel("Due date")).toHaveValue("2026-11-05");
+  await expect(task.getByLabel("Due time")).toHaveText("3:00 PM");
+  // A due before the start is refused, in words.
+  await choose(task.getByLabel("Due time"), "1:00 PM");
+  await task.getByRole("button", { name: "Save" }).click();
+  await expect(task.getByRole("alert")).toHaveText("The due date cannot be before the start.");
+  await task.getByLabel("Due date").fill("2026-11-07");
+  await task.getByRole("button", { name: "Save" }).click();
+  await expect(task).toHaveCount(0);
+  // A 30-minute chip at its start, not a block to its due; not on the due's day.
+  const chip = item(page, "Thursday, November 5", "Task: Pack the bags, 2:00 PM");
+  await expect(chip).toBeVisible();
+  expect(Math.round((await chip.boundingBox())!.height)).toBeLessThan(30);
+  await expect(item(page, "Saturday, November 7", /Pack the bags/)).toHaveCount(0);
+  await opener(page, "Thursday, November 5", "Task: Pack the bags, 2:00 PM").click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Pack the bags" })
+      .getByText("Thursday, November 5, 2:00 PM · Due Saturday, November 7, 1:00 PM"),
+  ).toBeVisible();
+});
+
+test("an all-day task shows in the strip on its day; its due can be cleared (design D159)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  await page
+    .getByRole("dialog", { name: "New event" })
+    .getByRole("radio", { name: "Task" })
+    .click();
+  const task = page.getByRole("dialog", { name: "New task" });
+  await task.getByRole("textbox", { name: "Title" }).fill("Plan the trip");
+  await task.getByRole("switch", { name: "All day" }).click();
+  await expect(task.getByLabel("Start time")).toHaveCount(0);
+  await task.getByLabel("Start date").fill("2026-11-06");
+  await task.getByRole("button", { name: "Add due" }).click();
+  await expect(task.getByLabel("Due date")).toHaveValue("2026-11-06");
+  await expect(task.getByLabel("Due time")).toHaveCount(0);
+  await task.getByRole("button", { name: "Remove due" }).click();
+  await expect(task.getByRole("button", { name: "Add due" })).toBeVisible();
+  await task.getByRole("button", { name: "Save" }).click();
+  await expect(task).toHaveCount(0);
+  await expect(
+    page.getByRole("list", { name: "All day" }).getByRole("listitem", {
+      name: "Task: Plan the trip, All day",
+    }),
+  ).toBeVisible();
 });
 
 test("a task's details complete it and star it", async ({ page }) => {
@@ -347,6 +417,29 @@ test.describe("the Conflicts list (D6)", () => {
 
 test.describe("on a phone, in Russian", () => {
   test.use({ viewport: PHONE, locale: "ru-RU" });
+
+  test("a task from «+» starts as an event would, with «Добавить срок» for its due (design D159)", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Создать" }).click();
+    await page
+      .getByRole("dialog", { name: "Новое мероприятие" })
+      .getByRole("radio", { name: "Задача" })
+      .click();
+    const task = page.getByRole("dialog", { name: "Новая задача" });
+    await expect(task.getByLabel("Дата начала")).toHaveValue("2026-11-04");
+    await expect(task.getByLabel("Время начала")).toHaveText("11:00");
+    await expect(task.getByRole("button", { name: "Добавить срок" })).toBeVisible();
+    await task.getByRole("textbox", { name: "Название" }).fill("Купить марки");
+    await task.getByRole("button", { name: "Сохранить" }).click();
+    await expect(task).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("list", { name: "среда, 4 ноября" })
+        .getByRole("listitem", { name: "Задача: Купить марки, 11:00" }),
+    ).toBeVisible();
+  });
 
   test("the edit dialog covers the screen and speaks Russian; a weekly rule reads in words", async ({
     page,

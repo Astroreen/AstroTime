@@ -51,8 +51,10 @@ import { ItemEditor } from "./lazy.tsx";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
 interface CreateOptions {
-  /** The day it is on; `null`: an undated task. */
-  readonly day: string | null;
+  /** The day it is on. */
+  readonly day: string;
+  /** On the day, with no time: the tasks screen's new task (design D159). */
+  readonly allDay?: boolean;
   /** Minutes past midnight of a tapped slot of the time grid. */
   readonly at?: number;
   /** Minutes it lasts, a press dragged over the grid; an hour by default. */
@@ -130,6 +132,7 @@ export function useEditingState({
   calendars,
   hidden,
   timeZone,
+  today,
   minutes,
   colorOf,
   onChanged,
@@ -139,6 +142,7 @@ export function useEditingState({
   /** Calendars hidden from the views: a new item goes in a visible one first. */
   hidden: ReadonlySet<string>;
   timeZone: string;
+  today: string;
   minutes: number;
   colorOf: (target: Target) => string;
   /** A local change was written: the sync scheduler sends it soon (D91). */
@@ -243,6 +247,7 @@ export function useEditingState({
         timeZone,
         ...(options.at === undefined ? {} : { at: options.at }),
         ...(options.length === undefined ? {} : { length: options.length }),
+        ...(options.allDay === undefined ? {} : { allDay: options.allDay }),
       });
       setEditing({
         target: null,
@@ -350,7 +355,7 @@ export function useEditingState({
 
   const edit = () => {
     if (!details) return;
-    const form = formOf(details, timeZone);
+    const form = formOf(details, timeZone, today);
     setEditing({
       target: details,
       initial: form,

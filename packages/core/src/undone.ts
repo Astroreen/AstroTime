@@ -19,9 +19,10 @@ export function isDone(item: Item): boolean {
 
 /**
  * Whether one occurrence of a task is undone with its due before `day`
- * starts in `timeZone` (D51). Its due is a due date or time, the end of a
- * start–due block, or the start of a task with a start and no due. An
- * occurrence is done when its own item is, or the series it belongs to.
+ * starts in `timeZone` (D51). Its due is its due date or time when it has
+ * one, else its start (design D159): a task shown on a day before today,
+ * with no due after it. An occurrence is done when its own item is, or the
+ * series it belongs to.
  */
 export function isUndoneBefore(
   object: CalendarObject,
