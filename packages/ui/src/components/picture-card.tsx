@@ -92,6 +92,12 @@ function PictureCard({ entry, allDay, part, backdrop }: AgendaItemProps & { back
         className={`absolute inset-y-0 right-0 h-full w-full object-cover ${backdrop.photo ? "" : "max-w-[19.5rem] object-right"}`}
       />
       <span aria-hidden="true" className="picture-scrim absolute inset-0" />
+      {/* A photo's author on the card as on its details, which credit it whole (D221). */}
+      {backdrop.credit && (
+        <span className="picture-text absolute top-1 right-2 max-w-[60%] truncate text-tiny text-white/90">
+          {backdrop.credit}
+        </span>
+      )}
       <span className="relative flex min-w-0 flex-1 items-end gap-2 px-2.5 pt-2 pb-2.5">
         {task && <CheckCircleIcon className="mb-px size-4 shrink-0 self-start" />}
         <span className="picture-text flex min-w-0 flex-1 flex-col gap-0.5">

@@ -166,6 +166,8 @@ test.describe("a place's photo", () => {
     expect(asked.map((url) => url.searchParams.get("gsrsearch")).filter(Boolean)).toEqual([
       "brandenburger tor nearcoord:1km,52.517,13.381",
     ]);
+    // The card credits its author too (D221).
+    await expect(card.getByText("© Thomas Wolf, www.foto-tw.de")).toBeVisible();
     await card.getByRole("button").click();
     const details = page.getByRole("dialog", { name: "Sightseeing" });
     await expect(details.locator(".details-picture img")).toHaveAttribute("srcset", /500px/);
@@ -181,6 +183,46 @@ test.describe("a place's photo", () => {
     );
     // Asked once, however many places show it.
     expect(asked.filter((url) => url.searchParams.has("gsrsearch"))).toHaveLength(1);
+  });
+
+  test("a home address sends nothing: only a place with a name of its own is looked up (D220)", async ({
+    page,
+  }) => {
+    const asked = await fakeServices(page);
+    // Photon's answer for a home: an address, a street and a number, no name.
+    await page.route("https://photon.komoot.io/api/**", (route) =>
+      route.fulfill({
+        json: {
+          features: [
+            {
+              properties: {
+                street: "Unter den Linden",
+                housenumber: "77",
+                postcode: "10117",
+                city: "Berlin",
+                country: "Germany",
+              },
+              geometry: { type: "Point", coordinates: [13.3807, 52.5165] },
+            },
+          ],
+        },
+      }),
+    );
+    await openDemo(page, "agenda");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Plumber");
+    await dialog.getByRole("combobox", { name: "Location" }).fill("Unter den Linden 77");
+    await page.getByRole("listbox", { name: "Places" }).getByRole("option").first().tap();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+    const card = page.getByRole("listitem", { name: /^Plumber/ });
+    await card.scrollIntoViewIfNeeded();
+    await card.getByRole("button").click();
+    await expect(page.getByRole("dialog", { name: "Plumber" })).toBeVisible();
+    await expect(page.locator(".details-picture")).toHaveCount(0);
+    await expect(card.locator("img")).toHaveCount(0);
+    expect(asked).toEqual([]);
   });
 
   test("Settings → Pictures → Photos of places off: nothing is asked, the plain card (D221)", async ({

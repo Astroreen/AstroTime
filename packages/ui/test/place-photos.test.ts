@@ -6,7 +6,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { httpsOf, isKept, namesPlace, textOf, wikipediaPhotos } from "../src/places/photos.ts";
+import {
+  httpsOf,
+  isAddress,
+  isKept,
+  namesPlace,
+  textOf,
+  wikipediaPhotos,
+} from "../src/places/photos.ts";
 import { memoryPreferences } from "../src/preferences.ts";
 
 const recorded = (name: string): unknown =>
@@ -145,6 +152,34 @@ describe("a place's photo from Wikipedia", () => {
     expect(broken.known(GATE, "en")).toBeUndefined();
   });
 
+  test("two tabs keeping places each keep theirs: a write reads what the other kept first", async () => {
+    const preferences = memoryPreferences();
+    const gate = fakeWikipedia();
+    const square = fakeWikipedia(recorded("ru-search"));
+    const first = wikipediaPhotos(preferences, gate.fetch);
+    const second = wikipediaPhotos(preferences, square.fetch);
+    // Both read the empty store before either writes.
+    expect(first.known(GATE, "en")).toBeUndefined();
+    expect(second.known(SQUARE, "ru")).toBeUndefined();
+    await first.find(GATE, "en");
+    await second.find(SQUARE, "ru");
+    const third = wikipediaPhotos(preferences, gate.fetch);
+    expect(third.known(GATE, "en")?.licence).toBe("CC BY-SA 3.0");
+    expect(third.known(SQUARE, "ru")?.licence).toBe("CC BY-SA 3.0");
+  });
+
+  test("a short name is searched whole; a name with nothing to search for asks nothing and notes nothing", async () => {
+    const { fetch, asked } = fakeWikipedia(recorded("en-search-none"));
+    const preferences = memoryPreferences();
+    const photos = wikipediaPhotos(preferences, fetch);
+    await photos.find({ name: "Ox Bar", geo: GATE.geo }, "en");
+    expect(asked[0]!.searchParams.get("gsrsearch")).toBe("ox bar nearcoord:1km,52.517,13.381");
+    const nothing = { name: " — ", geo: GATE.geo };
+    expect(await photos.find(nothing, "en")).toBeNull();
+    expect(photos.known(nothing, "en")).toBeUndefined();
+    expect(asked).toHaveLength(1);
+  });
+
   test("a service that fails rejects, and nothing is kept, so it is asked again", async () => {
     const preferences = memoryPreferences();
     const failing = (async () => new Response("", { status: 503 })) as typeof globalThis.fetch;
@@ -167,6 +202,7 @@ describe("whether a title names the place", () => {
     // A short word is the same word only whole: "Tor" is not "Tower".
     ["Tower Bridge", "Tor", false],
     ["Vilnius", "Vilnius", true],
+    ["Ox Bar", "Ox Bar", true],
     // A word many places share is not enough.
     ["Площадь Революции (Москва)", "Красная площадь", false],
     ["Central Park", "Gorky Park", false],
@@ -182,4 +218,26 @@ test("Commons' HTML credit as text", () => {
   expect(textOf("Ann &amp; Bo &lt;3")).toBe("Ann & Bo <3");
   expect(textOf("Jos&#233;&nbsp;Ruiz &#x2014; &apos;Pepe&apos;")).toBe("José Ruiz — 'Pepe'");
   expect(textOf("&unknown; stays")).toBe("&unknown; stays");
+});
+
+describe("an address is never a place to look up (design D220)", () => {
+  test.each([
+    "12 Main St",
+    "Verkių g. 31a",
+    "Unter den Linden 5",
+    "ул. Ленина",
+    "Тверская улица",
+    "Baker Street",
+    "Flat 4B",
+    "",
+  ])("%s reads as an address", (name) => {
+    expect(isAddress(name)).toBe(true);
+  });
+
+  test.each(["Brandenburger Tor", "Красная площадь", "Times Square", "Louvre", "Café Einstein"])(
+    "%s is a place with a name of its own",
+    (name) => {
+      expect(isAddress(name)).toBe(false);
+    },
+  );
 });

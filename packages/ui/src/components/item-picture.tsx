@@ -8,7 +8,7 @@ import { ITEM_ART, type Art } from "../pictures/art.ts";
 import type { PlacePhoto } from "../places/photos.ts";
 import { subjectOf } from "../pictures/subjects.ts";
 import { useSettings } from "../settings.ts";
-import { PhotoCredit, usePlacePhoto } from "./place-photo.tsx";
+import { creditLine, PhotoCredit, usePlacePhoto } from "./place-photo.tsx";
 
 /** What a card or a header is drawn over: an illustration, or a place's photo. */
 export interface Backdrop {
@@ -16,6 +16,8 @@ export interface Backdrop {
   readonly srcSet?: string;
   readonly ground: string;
   readonly photo: boolean;
+  /** A photo's credit in a line, where a card shows it (design D221). */
+  readonly credit?: string;
 }
 
 /** A photo's ground until it comes: a calm slate, under white text. */
@@ -28,6 +30,7 @@ export function backdropOf(picture: Art | PlacePhoto): Backdrop {
     srcSet: `${picture.small} 500w, ${picture.url} 960w`,
     ground: PHOTO_GROUND,
     photo: true,
+    credit: creditLine(picture),
   };
 }
 

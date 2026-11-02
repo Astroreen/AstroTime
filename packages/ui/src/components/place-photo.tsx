@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 
 import { nameAndAddress } from "../places/map.ts";
 import {
+  isAddress,
   wikipediaPhotos,
   type PhotoLookup,
   type PhotoPlace,
@@ -34,6 +35,8 @@ function usePhotoPlace(
   const { i18n } = useTranslation();
   if (!settings.placePhotos || !platform.places || !item.geo || !item.location) return null;
   const { name } = nameAndAddress(item.location, item.placeLabel);
+  // An address (a home, an office) is never sent: only a place with a name of its own (D220).
+  if (isAddress(name)) return null;
   return {
     place: { name, geo: item.geo },
     lookup: lookupOf(platform.preferences),
@@ -65,7 +68,9 @@ export function usePlacePhoto(
     if (!asked || !wanted || photo !== undefined) return;
     let live = true;
     asked.lookup.find(asked.place, asked.language).then(
-      (answer) => live && setFound({ key, photo: answer && welcome() ? answer : null }),
+      // A photo the card cannot take now (it is above the screen's top) is
+      // kept and known at its next drawing; no "none" is noted for it.
+      (answer) => live && (answer === null || welcome()) && setFound({ key, photo: answer }),
       // The service failed or the network is gone: the plain card, and asked again next time.
       () => live && setFound({ key, photo: null }),
     );
@@ -115,3 +120,6 @@ export function PhotoCredit({ photo, className = "" }: { photo: PlacePhoto; clas
     </p>
   );
 }
+
+/** A photo's credit in a line, for the Agenda's card: "© author" or its licence (design D221). */
+export const creditLine = (photo: PlacePhoto) => `© ${photo.author ?? photo.licence}`;

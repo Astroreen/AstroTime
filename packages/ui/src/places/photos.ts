@@ -51,9 +51,8 @@ const RADIUS = "1km";
 
 const KEY = "astrotime.placePhotos";
 
-/** The words of a place's name, folded; only those of three letters or more count. */
-const wordsOf = (text: string) =>
-  (foldForSearch(text).match(/[\p{L}\p{N}]+/gu) ?? []).filter((word) => word.length >= 3);
+/** The words of a place's name, folded, short ones too ("Ox Bar"). */
+const wordsOf = (text: string) => foldForSearch(text).match(/[\p{L}\p{N}]+/gu) ?? [];
 
 /** Words many places' names share, which say nothing of which place it is. */
 const GENERIC = new Set(
@@ -120,6 +119,62 @@ export function namesPlace(title: string, name: string): boolean {
   return shared(ours, theirs) * 2 >= ours.length && shared(theirs, ours) * 2 >= theirs.length;
 }
 
+/** Words that make a name a street's: a place on it is an address, not a place of its own. */
+const STREETS = new Set(
+  [
+    "street",
+    "st",
+    "road",
+    "rd",
+    "avenue",
+    "ave",
+    "lane",
+    "ln",
+    "boulevard",
+    "blvd",
+    "drive",
+    "strasse",
+    "straße",
+    "str",
+    "gasse",
+    "weg",
+    "allee",
+    "gatve",
+    "g",
+    "iela",
+    "rue",
+    "via",
+    "calle",
+    "ulica",
+    "ul",
+    "улица",
+    "ул",
+    "проспект",
+    "пр",
+    "пр-т",
+    "переулок",
+    "пер",
+    "шоссе",
+    "бульвар",
+    "б-р",
+    "проезд",
+    "тупик",
+  ].map((word) => foldForSearch(word)),
+);
+
+/**
+ * Whether a place's name reads as an address, a home or an office rather
+ * than a place with a name of its own (design D220): a number in it ("12
+ * Main St", "Verkių g. 31a", "ул. Ленина, 5"), or a street's word
+ * ("Unter den Linden Str.", "Тверская улица"). Such a place is never looked
+ * up: only a named place (a museum, a restaurant, a park) goes out.
+ */
+export function isAddress(name: string): boolean {
+  if (/\p{N}/u.test(name)) return true;
+  const words = foldForSearch(name).match(/[\p{L}\p{N}-]+/gu) ?? [];
+  return words.length === 0 || words.some((word) => STREETS.has(word));
+}
+
 /** The keys a place is kept under: its language, name and point rounded as asked. */
 const keyOf = (place: PhotoPlace, language: string) =>
   `${language}|${foldForSearch(place.name)}|${place.geo.lat.toFixed(3)},${place.geo.lon.toFixed(3)}`;
@@ -156,6 +211,8 @@ export function wikipediaPhotos(
     return stored;
   };
   const keep = (key: string, photo: PlacePhoto | null) => {
+    // Read again first: another tab may have kept places since this one read them.
+    stored = undefined;
     const kept = read();
     delete kept[key];
     kept[key] = { photo, at: now() };
@@ -182,6 +239,8 @@ export function wikipediaPhotos(
         const again = known(place, language);
         if (again !== undefined) return again;
         const photo = await ask(place, wikipediaOf(language), fetch);
+        // A name with nothing to search for was never asked: nothing is noted.
+        if (photo === undefined) return null;
         keep(key, photo);
         return photo;
       })
@@ -210,10 +269,10 @@ async function ask(
   place: PhotoPlace,
   wiki: string,
   fetch: typeof globalThis.fetch,
-): Promise<PlacePhoto | null> {
+): Promise<PlacePhoto | null | undefined> {
   // Only the name's words: anything else is the search's own syntax.
   const name = wordsOf(place.name).join(" ");
-  if (name === "") return null;
+  if (name === "") return undefined;
   const { lat, lon } = place.geo;
   const found = (await query(wiki, fetch, {
     generator: "search",

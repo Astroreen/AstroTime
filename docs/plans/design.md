@@ -1903,29 +1903,41 @@ own (below).
   not name is not shown. With none, the plain card.
   Wikimedia Commons' geosearch was rejected (random photos near a point,
   not of the place), and Wikidata's (it answered "too busy" when tried).
+  **Never an address**: a place whose name reads as one (a number in it,
+  "12 Main St", "Verkių g. 31a", "Unter den Linden 77", as Photon names a
+  house it has no name for; or a street's word, "Baker Street", "ул.
+  Ленина") is not looked up, nor one with no name at all: a home or an
+  office sends nothing, only a named place (a museum, a restaurant, a
+  park) goes out (`isAddress`). A name's short words count too ("Ox
+  Bar"); a name with nothing left to search for asks nothing and notes
+  nothing.
   **When**: a card asks once it nears the screen (an intersection with the
   Agenda's scroller and half a screen around it), the details as they
   open; one request at a time across the app, one per place however many
   cards show it. A photo that comes while its card is above the screen's
-  top waits for the card's next drawing, so nothing on screen moves; a
-  known one draws at once, tall from the start. 960 px, with the 500 px
+  top waits for the card's next drawing (kept, never noted as none), so
+  nothing on screen moves; a known one draws at once, tall from the start. 960 px, with the 500 px
   one in a `srcset` for a phone.
 - **D221. A place's photo is credited, kept and can be turned off.**
-  - **Credit** at the foot of the details' header: "Photo: author,
+  - **Credit**: in the details, at the foot of the header: "Photo: author,
     licence · en.wikipedia.org" (the article's site by its address), the
     author linking to the photo's Commons page (the licence does, when
     Commons names no author),
     the licence to its text (only an https address: Commons' metadata is
     anyone's to edit, so a `javascript:` one is no link), "Wikipedia" to
     the article, as Commons' licences (CC BY, CC BY-SA) ask of a reuse;
-    the author as text, its HTML's tags gone and its entities read; the Agenda's card, a
+    the author as text, its HTML's tags gone and its entities read. The
+    Agenda's card credits it too, "© author" (its licence when Commons
+    names none) small in its top right corner; a tap opens the details
+    with the whole credit; the Agenda's card, a
     thumbnail that opens the details, does not repeat it.
   - **Kept on this device**, in the preferences (`astrotime.placePhotos`),
     each place by its language, name and rounded point: its photo, or that
     it has none (asked again after 30 days, an article may come), the 300
     latest; the photos themselves as the browser keeps any image. A failed
     request keeps nothing; an entry of another shape (another version's, a
-    hand's) is dropped as it is read, never drawn.
+    hand's) is dropped as it is read, never drawn. Each write reads the
+    kept places again first, so two tabs keep each other's.
   - **Settings → Pictures, "Photos of places"**, on by default as places
     are (D175), saying what goes where: "A place's name and point (to
     about 100 m) go to en.wikipedia.org for its photo" (ru.wikipedia.org in
@@ -1934,7 +1946,8 @@ own (below).
     Android, not the desktop, foundation D72); a deployment that turned
     places off (`ASTROTIME_PLACES_URL=off`, foundation D178) has no photos
     either.
-  - **What is sent**: the place's name and its point to some 100 m, to
+  - **What is sent**: never for an address (above); for a named place,
+    its name and its point to some 100 m, to
     `en.wikipedia.org` or `ru.wikipedia.org`, from the page, with no
     cookies (`credentials: "omit"`, the API's anonymous `origin=*`); the
     photo from `upload.wikimedia.org` or `thumb.wikimedia.org`. Nothing
