@@ -399,6 +399,9 @@ export function CalendarScreen({
         /^[a-z]$/.test(typed) || !event.code.startsWith("Key")
           ? typed
           : event.code.slice(3).toLowerCase();
+      // With the tasks in the view's place, a step would move a calendar
+      // nobody sees (D227): only a view's key, which brings it back, counts.
+      if (wideTasks && !VIEW_KEYS.has(key)) return;
       if (key === "n" || key === "j") setAnchor((current) => stepAnchor(view, current, 1));
       else if (key === "p" || key === "k") setAnchor((current) => stepAnchor(view, current, -1));
       else if (key === "t") setAnchor(today);
@@ -411,7 +414,7 @@ export function CalendarScreen({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, today, setView]);
+  }, [view, today, setView, wideTasks]);
 
   const title = formats.period(...titleRange(view, days, anchor), today.slice(0, 4));
   // A new event on the day shown, from the next half hour (Google).

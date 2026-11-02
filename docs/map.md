@@ -345,6 +345,8 @@ When you add a package, app or module, add its line here in the same PR.
     `places.spec.ts` searches and picks a place on a phone and a wide
     screen with Photon and the tiles faked, `places-screenshots.spec.ts`
     takes the places' evidence. → `plans/design.md#D175`;
+    `shell.spec.ts` drives the wide calendar | tasks switch and what
+    brings the calendar back. → `plans/design.md#D227`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

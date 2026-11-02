@@ -1353,8 +1353,9 @@ bar, the sidebar and the accounts panel.
   layout of lists side by side can widen), fading up into place; the
   sidebar stays, and a view picked there, or a view's key, brings the
   calendar back, as do a search's result with a date and a tapped reminder.
-  Today, the arrows and the period hide while the tasks are shown: they
-  move nothing there. The 360 px panel right of the calendar ([D95](#D95))
+  Today, the arrows and the period hide while the tasks are shown, and the
+  keys that step a period or go to today do nothing: they would move a
+  calendar nobody sees. The 360 px panel right of the calendar ([D95](#D95))
   goes: Google opens it from a rail on the right AstroTime does not have,
   and a switch whose two halves were both shown would say nothing
   ([Deferred](#deferred)). On a phone the single tasks button stays, its
