@@ -257,6 +257,10 @@
   .picture-card > img:not([data-shown]) {
     opacity: 0;
   }
+  /* A place's photo fills the card whole (design D220). */
+  .picture-card[data-photo] > img {
+    mask-image: none;
+  }
   .picture-card[data-done] > img {
     filter: grayscale(0.7);
     opacity: 0.55;
@@ -331,6 +335,15 @@
   @keyframes tick-draw {
     from {
       stroke-dashoffset: 1;
+    }
+  }
+  /* A star the user lit pops (design D200); one lit already at a load does not. */
+  [data-pop][aria-pressed="true"] svg {
+    animation: star-pop 300ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  @keyframes star-pop {
+    40% {
+      scale: 1.35;
     }
   }
   /* The item a search jumped to (design D53). */

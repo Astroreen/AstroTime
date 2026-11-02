@@ -4,6 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import {
   carryPictures,
+  keepsPicture,
   isAppPage,
   namedFiles,
   PRESET_MARK,
@@ -137,4 +138,11 @@ test("a new version takes over the pictures a kept version showed; one it cannot
   );
   expect(carried.toSorted()).toEqual(["a.svg", "b.svg"]);
   expect(put.toSorted()).toEqual(["a.svg", "b.svg"]);
+});
+
+test("a picture is kept only whole, the app's own: never a partial answer, an error or another origin's (design D219)", () => {
+  expect(keepsPicture({ status: 200, type: "basic" })).toBe(true);
+  expect(keepsPicture({ status: 206, type: "basic" })).toBe(false);
+  expect(keepsPicture({ status: 404, type: "basic" })).toBe(false);
+  expect(keepsPicture({ status: 200, type: "opaque" })).toBe(false);
 });

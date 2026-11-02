@@ -40,6 +40,26 @@ import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
+/**
+ * Where the last press was, so the details grow out of it (design D200);
+ * a key's press has no place, and they grow from their middle. Heard from
+ * when this code is loaded, with the first opening's press or before it.
+ */
+let pressed: { readonly x: number; readonly y: number } | null = null;
+addEventListener("pointerdown", (event) => (pressed = { x: event.clientX, y: event.clientY }), {
+  capture: true,
+  passive: true,
+});
+addEventListener("keydown", () => (pressed = null), { capture: true, passive: true });
+
+/** The popup grows out of the press that opened it: its scale's origin set there before it shows. */
+const growFromPress = (popup: HTMLElement | null) => {
+  if (!popup || !pressed) return;
+  const { left, top } = popup.getBoundingClientRect();
+  popup.style.transformOrigin = `${pressed.x - left}px ${pressed.y - top}px`;
+  pressed = null;
+};
+
 export function ItemDetails({
   target,
   calendar,
@@ -80,7 +100,11 @@ export function ItemDetails({
     <Dialog.Root open={target !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <DialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup className={`${sheet} z-[110] sm:w-[min(28rem,calc(100vw-2rem))]`}>
+        {/* On a phone it grows too, not only fades (design D200). */}
+        <DialogPopup
+          ref={growFromPress}
+          className={`${sheet} z-[110] data-ending-style:scale-[0.96] data-starting-style:scale-[0.9] sm:w-[min(28rem,calc(100vw-2rem))]`}
+        >
           {target && (
             <Body
               target={target}
@@ -165,8 +189,8 @@ function Body({
 
   return (
     <>
-      {/* Over the item's picture, when its title gives one (design D216). */}
-      <DetailsPicture title={item.summary}>
+      {/* Over the item's picture, when its title or its place gives one (design D216, D221). */}
+      <DetailsPicture item={item}>
         <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
           {/* A task's star beside the pencil, as an icon toggle (design D196). */}
           {task && rights.edit && (
@@ -178,7 +202,11 @@ function Body({
               aria-label={t("details.star")}
               aria-pressed={starred}
               title={t(starred ? "details.unstar" : "details.star")}
-              onClick={onStar}
+              onClick={(event) => {
+                // Its star pops when it lights, after this press (design D200).
+                event.currentTarget.dataset["pop"] = "";
+                onStar();
+              }}
             >
               <StarIcon filled={starred} className={`size-5 ${starred ? "text-accent" : ""}`} />
             </button>

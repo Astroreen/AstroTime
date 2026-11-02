@@ -1,0 +1,71 @@
+{
+  "batchcomplete": true,
+  "continue": {
+    "gsroffset": 3,
+    "continue": "gsroffset||"
+  },
+  "query": {
+    "pages": [
+      {
+        "pageid": 156604,
+        "ns": 0,
+        "title": "Brandenburg Gate",
+        "index": 1,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Brandenburger_Tor_abends.jpg/960px-Brandenburger_Tor_abends.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 640
+        },
+        "pageimage": "Brandenburger_Tor_abends.jpg",
+        "coordinates": [
+          {
+            "lat": 52.5163,
+            "lon": 13.3777,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      },
+      {
+        "pageid": 9558926,
+        "ns": 0,
+        "title": "Berlin Brandenburger Tor station",
+        "index": 2,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Hp_Berlin_Brandenburger_Tor_%28S-Bahn%29_1.jpg/960px-Hp_Berlin_Brandenburger_Tor_%28S-Bahn%29_1.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 720
+        },
+        "pageimage": "Hp_Berlin_Brandenburger_Tor_(S-Bahn)_1.jpg",
+        "coordinates": [
+          {
+            "lat": 52.51638889,
+            "lon": 13.38083333,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      },
+      {
+        "pageid": 36299614,
+        "ns": 0,
+        "title": "Unter den Linden (Berlin U-Bahn)",
+        "index": 3,
+        "thumbnail": {
+          "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/Unter_den_linden_ubahn_station_6.jpg/960px-Unter_den_linden_ubahn_station_6.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+          "width": 960,
+          "height": 640
+        },
+        "pageimage": "Unter_den_linden_ubahn_station_6.jpg",
+        "coordinates": [
+          {
+            "lat": 52.517,
+            "lon": 13.3889,
+            "primary": true,
+            "globe": "earth"
+          }
+        ]
+      }
+    ]
+  }
+}

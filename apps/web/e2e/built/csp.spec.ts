@@ -1,8 +1,8 @@
 // The built app under its Content Security Policy (docs/plans/foundation.md#D110),
 // served by the web image's own server: the store opens (wasm in a worker, on
 // OPFS), an account is added through /dav-proxy/, its event's details (with
-// its place's map, D178, and an inline attachment saved, design D230) and
-// edit dialog (with Location's search) open, and
+// its place's map, D178, its photo, design D220, and an inline attachment
+// saved, design D230) and edit dialog (with Location's search) open, and
 // the browser reports not one violation. The
 // production build has no demo data (D57), so the app starts on its
 // first-run screen, which shows only once the store is open.
@@ -102,6 +102,25 @@ test("the built app opens its store, adds an account through the proxy, and brea
     tiles.push(route.request().url());
     return route.fulfill({ contentType: "image/png", body: TILE });
   });
+  // A place's photo (design D220): Wikipedia's recorded answers, and the photo a tile.
+  const fixture = (name: string) =>
+    readFileSync(
+      new URL(`../../../../packages/ui/test/fixtures/wikipedia-${name}.json`, import.meta.url),
+    );
+  await page.route("https://en.wikipedia.org/w/api.php**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: fixture(
+        new URL(route.request().url()).searchParams.has("gsrsearch") ? "en-search" : "en-imageinfo",
+      ),
+    }),
+  );
+  const photos: string[] = [];
+  await page.route("https://thumb.wikimedia.org/**", (route) => {
+    photos.push(route.request().url());
+    return route.fulfill({ contentType: "image/png", body: TILE });
+  });
   const loaded = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
   await openApp(page);
   const policy = (await loaded).headers()["content-security-policy"] ?? "";
@@ -174,6 +193,13 @@ test("the built app opens its store, adds an account through the proxy, and brea
       ),
     );
   expect(tiles.length).toBeGreaterThan(0);
+  // Its photo from Wikipedia (connect-src) and Wikimedia (img-src), credited (design D221).
+  await expect(details.locator(".details-picture img")).toHaveAttribute(
+    "src",
+    /thumb\.wikimedia\.org/,
+  );
+  await expect(details.getByRole("link", { name: "CC BY-SA 3.0" })).toBeVisible();
+  expect(photos.length).toBeGreaterThan(0);
   // An inline attachment saved: a download link of its bytes (a `blob:`
   // URL), clicked under the policy (design D230).
   const [download] = await Promise.all([

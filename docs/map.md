@@ -261,6 +261,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `picture-card.tsx` — the Agenda's card over its picture;
       `item-picture.tsx`, whether an item has one and the details' header;
       `month-banner.tsx`, the Agenda's banner above a month.
+      `place-photo.tsx`, a place's photo for a card or the details, and its
+      credit (`plans/design.md#D221`).
       → `plans/design.md#D216`, `plans/design.md#D218`
     - `description.tsx` — an item's description in the details, drawn
       as Markdown from `calendar/markdown.ts`'s tree (`parseMarkdown`; no
@@ -315,7 +317,8 @@ When you add a package, app or module, add its line here in the same PR.
       occurrence, when a press is a drag. → `plans/foundation.md#D113`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in
-    maps". `test/fixtures/`, Photon's recorded answers:
+    maps". `wikipediaPhotos` (`photos.ts`), a place's photo from
+    Wikipedia, kept on the device (`plans/design.md#D220`). `test/fixtures/`, Photon's recorded answers:
     [`README.md`](../packages/ui/test/fixtures/README.md).
     → `plans/design.md#D175`, `plans/foundation.md#D178`
   - `pictures/` — the pictures: `subjectOf` (`subjects.ts`), the subject a

@@ -207,6 +207,7 @@ describe("the drawer's settings override the locale (D53)", () => {
       places: false,
       illustrations: false,
       monthBanners: false,
+      placePhotos: false,
       celebrate: false,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
@@ -221,6 +222,7 @@ describe("the drawer's settings override the locale (D53)", () => {
     // And the pictures (design D217, D218).
     expect(readSettings('{"illustrations":0}').illustrations).toBe(true);
     expect(readSettings("{}").monthBanners).toBe(true);
+    expect(readSettings('{"placePhotos":"no"}').placePhotos).toBe(true);
     // A completed task is celebrated too (design D198).
     expect(readSettings('{"celebrate":"no"}').celebrate).toBe(true);
     // Colours that cannot be read are dropped; a blank name is the generated one (design D170).
