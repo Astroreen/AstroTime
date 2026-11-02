@@ -13,8 +13,12 @@ export function useCelebrate(): (from: Element | null | undefined) => void {
     if (!from || !settings.celebrate || matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
+    // Where it was pressed, now: a first burst waits for its code, and what
+    // was pressed may have moved by then (its row on its way to "Completed").
+    const { left, top, width, height } = from.getBoundingClientRect();
+    const at = { x: left + width / 2, y: top + height / 2 };
     import("./celebrate.ts").then(
-      ({ celebrate }) => celebrate(from),
+      ({ celebrate }) => celebrate(at),
       () => {
         // Not loaded (offline, a new release): the task is completed all the same.
       },

@@ -159,13 +159,19 @@ test("one task checked and unchecked at once ends as the store has it, nothing l
 }) => {
   const panel = await openTasks(page);
   const box = panel.getByRole("checkbox", { name: "Send the report" });
-  // Two presses before either write lands, each its own: the second after
-  // React has drawn the first (its microtasks), as a second tap would be.
-  await box.evaluate(async (element) => {
-    (element as HTMLElement).click();
-    for (let turn = 0; turn < 3; turn++) await Promise.resolve();
-    (element as HTMLElement).click();
-  });
+  // Two presses before either write lands, each its own: the second as soon
+  // as the box shows the first (its own check, drawn before the write is).
+  await box.evaluate(
+    (element) =>
+      new Promise<void>((pressed) => {
+        new MutationObserver((_, observer) => {
+          observer.disconnect();
+          (element as HTMLElement).click();
+          pressed();
+        }).observe(element, { attributes: true, attributeFilter: ["aria-checked"] });
+        (element as HTMLElement).click();
+      }),
+  );
   const list = panel.getByRole("list", { name: "Tasks", exact: true });
   // A third write after them, seen once it is read: the two before it are written by then.
   const star = panel.getByRole("button", { name: "Star: Water the plants" });

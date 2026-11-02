@@ -9,10 +9,8 @@
 const COLORS = ["var(--color-accent)", "#f2b84b", "#e8708c", "#4fc59b", "#8f7ff2"];
 const PIECES = 18;
 
-export function celebrate(from: Element): void {
-  const { left, top, width, height } = from.getBoundingClientRect();
-  const x = left + width / 2;
-  const y = top + height / 2;
+/** A burst from `x`, `y`: the middle of what was pressed, in the viewport, as it was at the press. */
+export function celebrate({ x, y }: { readonly x: number; readonly y: number }): void {
   const layer = document.createElement("div");
   layer.dataset["celebration"] = "";
   layer.setAttribute("aria-hidden", "true");

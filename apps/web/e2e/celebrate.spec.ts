@@ -85,6 +85,36 @@ test("completing a task from its checkbox throws a burst from it; not completing
   expect(await thrown()).toEqual([]);
 });
 
+test("a burst whose code comes late starts where the press was, though the row has moved on", async ({
+  page,
+}) => {
+  const thrown = await logBursts(page);
+  // The burst's code held back until the row has left.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/celebrate/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const panel = await openTasks(page);
+  const box = panel.getByRole("checkbox", { name: "Send the report" });
+  await box.click({ trial: true });
+  const from = (await box.boundingBox())!;
+  await box.click();
+  await expect(panel.getByRole("button", { name: "Completed (4)" })).toBeVisible();
+  await expect(box).toHaveCount(0);
+  // Its row gone from the motion layer too: nothing is left where it was pressed.
+  await expect(page.locator("[data-motion-layer] [data-task]")).toHaveCount(0);
+  release();
+  await page.evaluate(() => (window as unknown as { burst: Promise<void> }).burst);
+  const shapes = await thrown();
+  expect(shapes.length).toBe(18);
+  for (const { x, y } of shapes) {
+    expect(Math.abs(x - (from.x + from.width / 2))).toBeLessThan(1);
+    expect(Math.abs(y - (from.y + from.height / 2))).toBeLessThan(1);
+  }
+});
+
 test("Mark completed in a task's details throws a burst from the button", async ({ page }) => {
   const thrown = await logBursts(page);
   await openTasks(page);
