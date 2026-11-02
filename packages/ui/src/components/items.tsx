@@ -6,8 +6,7 @@
 import { wallClockOf, type Placed } from "@astrotime/core";
 import type { CSSProperties } from "react";
 
-import type { Entry } from "../calendar/query.ts";
-import { DRAFT } from "../calendar/draft.ts";
+import { DRAFT, type Entry } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { useDragSource, type DragSource } from "./drag.tsx";
 import { targetOf, useEditing } from "./editing.tsx";

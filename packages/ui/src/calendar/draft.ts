@@ -12,10 +12,9 @@ import {
 
 import { ghostOf } from "./drag.ts";
 import { changesOf, problemOf, timesOfForm, type Form, type Target } from "./editing.ts";
-import { expand, type Entry } from "./query.ts";
+import { DRAFT, expand, type DrawnDraft, type Entry } from "./query.ts";
 
-/** The stored object's id the draft's entries carry, which no stored object has. */
-export const DRAFT = "draft";
+export { DRAFT } from "./query.ts";
 
 /** What the views draw for the form. */
 export type Draft =
@@ -42,9 +41,9 @@ export type Draft =
  * a new item's reminder says without a title (foundation D103).
  */
 export function draftOf(target: Target | null, form: Form, untitled: string): Draft | null {
-  // A date not chosen yet: no day to draw it on.
-  if (problemOf(form) === "noDate") return null;
   try {
+    // A date not chosen yet: no day to draw it on.
+    if (problemOf(form) === "noDate") return null;
     if (!target) {
       const ics = createItem(form.kind, changesOf(null, form, untitled), { now: 0, uid: DRAFT });
       return {
@@ -115,4 +114,65 @@ export function withDraft(
       done: (target.object.master !== null && isDone(target.object.master)) || isDone(target.item),
     },
   ];
+}
+
+/**
+ * The fields of a form that change where and how its draft is drawn: its
+ * kind, times, rule, colour and calendar. Its title only renames it, and its
+ * other fields draw nothing, so typing them makes no draft anew.
+ */
+export function placementOf(form: Form): string {
+  const { kind, allDay, startDate, startless, startTime, endDate, endTime, zone, utc } = form;
+  const { repeat, color, calendarId } = form;
+  return JSON.stringify([
+    kind,
+    allDay,
+    startDate,
+    startless ?? false,
+    startTime,
+    endDate,
+    endTime,
+    zone,
+    utc,
+    repeat,
+    color,
+    calendarId,
+  ]);
+}
+
+/**
+ * The draft as the views take it (`DrawnDraft`), titled `summary`: a new
+ * item's occurrences are expanded once for each range a view asks for and
+ * kept in `expanded`, which belongs to the draft, so a new title renames
+ * them without expanding them again.
+ */
+export function drawn(
+  draft: Draft | null,
+  summary: string,
+  expanded: Map<string, readonly Entry[]> = new Map(),
+): DrawnDraft | null {
+  if (!draft) return null;
+  const title = summary.trim() || null;
+  const named = (entry: Entry): Entry => ({
+    ...entry,
+    occurrence: { ...entry.occurrence, item: { ...entry.occurrence.item, summary: title } },
+  });
+  if (draft.kind === "edit") {
+    const { occurrence } = draft;
+    const item = { ...occurrence.item, summary: title };
+    const renamed = { ...draft, occurrence: { ...occurrence, item } };
+    return { when: draft.when, apply: (entries, range) => withDraft(entries, renamed, range) };
+  }
+  return {
+    when: draft.when,
+    apply(entries, range) {
+      const key = `${range.from}/${range.to}/${range.timeZone}`;
+      let own = expanded.get(key);
+      if (!own) {
+        own = withDraft([], draft, range);
+        expanded.set(key, own);
+      }
+      return [...entries, ...own.map(named)];
+    },
+  };
 }

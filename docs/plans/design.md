@@ -1036,18 +1036,27 @@ Settings, the colours and the lists controls open.
   the others ([D153](#D153)), raised over them with a shadow (`data-draft`),
   and brought into sight where the view scrolls when its day or time changes
   (not with each letter of its title); it goes with the dialog, and a saved
-  item is then drawn from the store. The seam is `useEditingState`'s `draft`
-  (`calendar/draft.ts`: `draftOf`, `withDraft`), from the editor's own
-  state: the form's fields are not touched, so they may change without the
-  views knowing. From 1024 px, where a dialog and a day fit side by side,
-  the dialog stands at the side of the screen away from the draft
-  (`useDraftAside`), and its backdrop dims less (20%), as Google Calendar's
-  web app keeps its draft beside its dialog; narrower, it stays in the
-  middle (on a phone it is the whole screen). The Agenda draws it too.
-  Tested: `packages/ui/test/draft.test.ts` (a new event, a new series, an
-  edited event and an edited occurrence of a series, a form with no date,
-  which draws nothing; a fault other than an item that cannot be made yet is
-  told on the console, not swallowed) and `apps/web/e2e/draft.spec.ts` (a
+  item is then drawn from the store. The editor makes it, in its own chunk
+  (`useDraft` in `draft-aside.ts`, on `calendar/draft.ts`'s `draftOf` and
+  `withDraft`), so nothing of it is in the first load ([foundation
+  D145](foundation.md#D145)), and hands the views what it does to their
+  entries (`DrawnDraft`: `apply`, `when`) through `useEditingState`'s
+  `draft`; the form's fields are not touched. It is made anew only when
+  where or how it is drawn changes (`placementOf`: kind, times, rule,
+  colour, calendar): a new title renames it without making, parsing or
+  expanding it again (a new item's occurrences are kept for each range a
+  view asked for), and the description, the place or a reminder change
+  nothing, so typing on a phone stays light. From 1024 px, where a dialog
+  and a day of a week fit side by side, the dialog stands at the side of the
+  screen away from the draft (`useDraftAside`), and its backdrop dims less
+  (20%), as Google Calendar's web app keeps its draft beside its dialog;
+  narrower, it stays in the middle (on a phone it is the whole screen). The
+  Agenda draws it too. Tested: `packages/ui/test/draft.test.ts` (a new
+  event, a new series, an edited event and an edited occurrence of a series,
+  a form with no date, which draws nothing and tells nothing; a fault other
+  than an item that cannot be made yet, which is told on the console; a done
+  task drawn done; a new item outside the days asked; a new title renaming
+  the draft without expanding it again) and `apps/web/e2e/draft.spec.ts` (a
   new event that follows its form, all day into the strip, the dialog beside
   it; an edited event at its new place and back at its old one when the
   dialog goes; a task in the Month; the phone).
@@ -1267,6 +1276,15 @@ Settings, the colours and the lists controls open.
 
 ## Deferred
 
+- **The draft beside the dialog in the Day view and the Agenda**
+  ([D155](#D155)): there the draft is as wide as the view, so the dialog,
+  standing at one side, still covers part of it; a dialog placed by the
+  draft's height, or the view scrolled to its free half, would keep it
+  whole.
+- **The draft over the Agenda's sticky day headers** ([D155](#D155)): its
+  `z-index` raises it over the other items and the now line; in the Agenda
+  it would pass over a day's sticky header while the list scrolls under an
+  open dialog, which the dialog covers in practice.
 - **A changed rule's occurrences in the draft** ([D155](#D155)): an edited
   series' draft moves the one occurrence the dialog edits; a new rule's
   other days, and a scope's (this and following, all) are drawn once saved.

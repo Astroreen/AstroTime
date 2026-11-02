@@ -13,7 +13,6 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
-import { withDraft } from "../calendar/draft.ts";
 import { itemOf } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { shownCalendars } from "../calendar/calendars.ts";
@@ -34,9 +33,7 @@ import { KEYS, readHidden, usePreference, type Preferences } from "../preference
 import { defaultColorOf, useSettings } from "../settings.ts";
 import { AccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
-import { AgendaView } from "./agenda-view.tsx";
 import { CalendarContext } from "./context.ts";
-import { shownDraft } from "./draft-aside.ts";
 import { DrawerContent } from "./drawer.tsx";
 import { EditingContext, targetOf, useEditingState } from "./editing.tsx";
 import {
@@ -53,7 +50,7 @@ import { MonthView } from "./month-view.tsx";
 import { Pager, type Page } from "./pager.tsx";
 import { useReminders } from "./reminders-context.tsx";
 import { SearchBar, SearchResults, type SearchResult } from "./search.tsx";
-import { SettingsScreen } from "./lazy.tsx";
+import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { TimeGrid } from "./time-grid.tsx";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
@@ -248,13 +245,6 @@ export function CalendarScreen({
     },
     onChanged: () => scheduler.changed(),
   });
-  // The draft brought into sight when its day or time changes, where the
-  // view scrolls; typing its title moves nothing.
-  const draftWhen = editing.draft?.when ?? null;
-  useEffect(() => {
-    if (draftWhen === null) return;
-    shownDraft()?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [draftWhen]);
   // The period drawn and, on a touch screen, those beside it whose items are
   // read, each laid out once for what it draws (design D154).
   const undoneCount = data.undone.length;
@@ -271,11 +261,8 @@ export function CalendarScreen({
       : drawnRead.entries;
     const context = { today, timeZone, undone: undoneCount };
     const page = (pageAnchor: string, pageDays: readonly string[]): Shown => {
-      const entries = withDraft(shown, draft, {
-        from: pageDays[0]!,
-        to: addDays(pageDays.at(-1)!, 1),
-        timeZone,
-      });
+      const range = { from: pageDays[0]!, to: addDays(pageDays.at(-1)!, 1), timeZone };
+      const entries = draft ? draft.apply(shown, range) : shown;
       return {
         key: `${drawnView}:${pageDays[0]}`,
         days: pageDays,
@@ -587,6 +574,8 @@ export function CalendarScreen({
                     onVisibleDay={setAnchor}
                     draft={editing.draft}
                     hideCompleted={hideCompleted}
+                    // Its code did not arrive, and the notice was closed: the Week.
+                    onClose={() => setView("week")}
                   />
                 ) : !drawn || !pages ? null : (
                   <Pager

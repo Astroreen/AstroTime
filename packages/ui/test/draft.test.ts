@@ -1,9 +1,9 @@
 import { CalendarObject, occurrencesBetween } from "@astrotime/core";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import { DRAFT, draftOf, withDraft } from "../src/calendar/draft.ts";
+import { DRAFT, draftOf, drawn, placementOf, withDraft } from "../src/calendar/draft.ts";
 import { formOf, newForm, type Form, type Target } from "../src/calendar/editing.ts";
-import { expand } from "../src/calendar/query.ts";
+import { expand, type Entry } from "../src/calendar/query.ts";
 
 const timeZone = "Europe/Vilnius";
 const range = { from: "2026-11-02", to: "2026-11-09", timeZone };
@@ -44,14 +44,14 @@ describe("the edit dialog's item drawn behind it (design D155)", () => {
       }),
       summary: "Planning",
     };
-    const drawn = withDraft(stored, draftOf(null, form, "Reminder"), range);
-    const draft = drawn.filter((entry) => entry.objectId === DRAFT);
+    const shown = withDraft(stored, draftOf(null, form, "Reminder"), range);
+    const draft = shown.filter((entry) => entry.objectId === DRAFT);
     expect(draft).toHaveLength(1);
     expect(draft[0]!.calendarId).toBe("work");
     expect(draft[0]!.occurrence.item.summary).toBe("Planning");
     expect(wall(draft[0]!)).toBe("2026-11-05T16:00");
     // The stored items stay.
-    expect(drawn.filter((entry) => entry.objectId === "lunch-id")).toHaveLength(1);
+    expect(shown.filter((entry) => entry.objectId === "lunch-id")).toHaveLength(1);
   });
 
   test("a new event that repeats is drawn on each of its days", () => {
@@ -81,9 +81,9 @@ describe("the edit dialog's item drawn behind it (design D155)", () => {
       startTime: "16:30",
       endTime: "17:30",
     };
-    const drawn = withDraft(stored, draftOf(target, form, "Reminder"), range);
-    expect(drawn.filter((entry) => entry.objectId === "lunch-id")).toEqual([]);
-    const draft = drawn.find((entry) => entry.objectId === DRAFT);
+    const shown = withDraft(stored, draftOf(target, form, "Reminder"), range);
+    expect(shown.filter((entry) => entry.objectId === "lunch-id")).toEqual([]);
+    const draft = shown.find((entry) => entry.objectId === DRAFT);
     expect(wall(draft!)).toBe("2026-11-04T16:30");
     expect(draft!.occurrence.item.summary).toBe("Lunch");
   });
@@ -110,9 +110,9 @@ describe("the edit dialog's item drawn behind it (design D155)", () => {
       startTime: "18:00",
       endTime: "19:00",
     };
-    const drawn = withDraft(entries, draftOf(occurrence, form, "Reminder"), range);
-    expect(drawn.filter((entry) => entry.objectId === "daily")).toHaveLength(entries.length - 1);
-    const draft = drawn.find((entry) => entry.objectId === DRAFT);
+    const shown = withDraft(entries, draftOf(occurrence, form, "Reminder"), range);
+    expect(shown.filter((entry) => entry.objectId === "daily")).toHaveLength(entries.length - 1);
+    const draft = shown.find((entry) => entry.objectId === DRAFT);
     expect(wall(draft!)).toBe("2026-11-05T18:00");
   });
 
@@ -122,5 +122,80 @@ describe("the edit dialog's item drawn behind it (design D155)", () => {
       startDate: "",
     };
     expect(draftOf(null, form, "Reminder")).toBeNull();
+  });
+
+  test("a fault other than an item that cannot be made yet is told, and nothing is drawn", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const form = {
+        ...newForm("event", { calendarId: "work", day: "2026-11-05", minutes: 0, timeZone }),
+        // A zone `Intl` does not know: no item, and no reason the form can say.
+        zone: "Nowhere/Never",
+      };
+      expect(draftOf(null, form, "Reminder")).toBeNull();
+      expect(errors).toHaveBeenCalledTimes(1);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  test("a form with no date yet draws nothing, and tells nothing", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const form = {
+        ...newForm("event", { calendarId: "work", day: "2026-11-05", minutes: 0, timeZone }),
+        endDate: "",
+      };
+      expect(draftOf(null, form, "Reminder")).toBeNull();
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  test("an edited task that is done is drawn done", () => {
+    const task = CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VTODO",
+        "UID:paid",
+        "SUMMARY:Pay the rent",
+        "DTSTART;TZID=Europe/Vilnius:20261104T090000",
+        "STATUS:COMPLETED",
+        "END:VTODO",
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+    const done: Target = {
+      objectId: "paid",
+      calendarId: "personal",
+      object: task,
+      recurrenceId: null,
+      item: task.master!,
+    };
+    const form = formOf(done, timeZone, "2026-11-04");
+    const drawnIn = withDraft([], draftOf(done, form, "Reminder"), range);
+    expect(drawnIn.map((entry) => entry.done)).toEqual([true]);
+  });
+
+  test("a new item outside the days asked for is drawn on none of them", () => {
+    const form = newForm("event", { calendarId: "work", day: "2026-12-01", minutes: 0, timeZone });
+    expect(withDraft(stored, draftOf(null, form, "Reminder"), range)).toEqual(stored);
+  });
+
+  test("a new title renames the draft without expanding it again; its times make it anew", () => {
+    const form = newForm("event", { calendarId: "work", day: "2026-11-05", minutes: 0, timeZone });
+    const expanded = new Map<string, readonly Entry[]>();
+    const made = draftOf(null, form, "Reminder");
+    const first = drawn(made, "Planning", expanded)!.apply([], range);
+    const second = drawn(made, "Planning with Olga", expanded)!.apply([], range);
+    expect(expanded.size).toBe(1);
+    expect(first.map((entry) => entry.occurrence.item.summary)).toEqual(["Planning"]);
+    expect(second.map((entry) => entry.occurrence.item.summary)).toEqual(["Planning with Olga"]);
+    // The title and the description are not where it is; its start is.
+    expect(placementOf({ ...form, summary: "x", description: "y" })).toBe(placementOf(form));
+    expect(placementOf({ ...form, startTime: "16:00" })).not.toBe(placementOf(form));
   });
 });

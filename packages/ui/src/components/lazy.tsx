@@ -1,5 +1,5 @@
-// Dialogs that load with their first opening, not with the app
-// (docs/plans/foundation.md#D145): each stands in for its component with the
+// Dialogs that load with their first opening, not with the app, and the
+// Agenda with its first showing (docs/plans/foundation.md#D145): each stands in for its component with the
 // same props, draws nothing until it is first open, and fetches its code
 // once the page is idle, so the first opening does not wait for it. Code that
 // did not arrive (offline, or a release replaced it) is asked for again: the
@@ -201,4 +201,17 @@ export const ConflictsDialog = deferred(
   () => import("./conflicts-dialog.tsx"),
   (module) => module.ConflictsDialog,
   (props: ComponentProps<typeof import("./conflicts-dialog.tsx").ConflictsDialog>) => props.open,
+);
+
+/**
+ * The Agenda, which a view of its own shows: drawn while it is the view
+ * (design D87), its code fetched once the page is idle; closing the notice
+ * of code that did not arrive leaves it for another view (`onClose`).
+ */
+export const AgendaView = deferred(
+  () => import("./agenda-view.tsx"),
+  (module) => module.AgendaView,
+  (
+    _props: ComponentProps<typeof import("./agenda-view.tsx").AgendaView> & { onClose: () => void },
+  ) => true,
 );

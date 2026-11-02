@@ -7,9 +7,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { agendaDays } from "../calendar/agenda.ts";
-import { withDraft, type Draft } from "../calendar/draft.ts";
 import { addDays } from "../calendar/dates.ts";
-import type { ObjectCache } from "../calendar/query.ts";
+import type { DrawnDraft, ObjectCache } from "../calendar/query.ts";
 import { useEntries } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { AgendaCard } from "./items.tsx";
@@ -76,7 +75,7 @@ export interface AgendaViewProps {
   /** "Hide completed tasks" (design D96): completed tasks leave the list. */
   readonly hideCompleted?: boolean;
   /** The edit dialog's item as its form says (design D155). */
-  readonly draft?: Draft | null;
+  readonly draft?: DrawnDraft | null;
 }
 
 export function AgendaView({
@@ -95,26 +94,17 @@ export function AgendaView({
   const [range, setRange] = useState(() => around(anchor));
   const data = useEntries(store, cache, { ids, from: range.from, to: range.to, today, timeZone });
   const loaded = data !== null && data.from === range.from && data.to === range.to;
-  const days = useMemo(
-    () =>
-      data
-        ? agendaDays(
-            withDraft(
-              hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries,
-              draft,
-              { from: data.from, to: data.to, timeZone },
-            ),
-            data.from,
-            data.to,
-            {
-              today,
-              timeZone,
-              undone: data.undoneCurrent ? data.undone.length : 0,
-            },
-          )
-        : [],
-    [data, today, timeZone, hideCompleted, draft],
-  );
+  const days = useMemo(() => {
+    if (!data) return [];
+    const shown = hideCompleted ? data.entries.filter((entry) => !entry.done) : data.entries;
+    // The edit dialog's item as its form says (design D155).
+    const entries = draft ? draft.apply(shown, { from: data.from, to: data.to, timeZone }) : shown;
+    return agendaDays(entries, data.from, data.to, {
+      today,
+      timeZone,
+      undone: data.undoneCurrent ? data.undone.length : 0,
+    });
+  }, [data, today, timeZone, hideCompleted, draft]);
 
   const scroller = useRef<HTMLDivElement>(null);
   /** The group at the top of the screen and how far the list is scrolled past its top. */

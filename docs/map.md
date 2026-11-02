@@ -212,14 +212,16 @@ When you add a package, app or module, add its line here in the same PR.
       screen), from the top bar's gear or the drawer's last row.
       → `plans/design.md#D131`, `plans/design.md#D96`
     - `lazy.tsx` — dialogs that load with their first opening: the edit
-      dialog, Settings, the Conflicts list. → `plans/foundation.md#D145`
+      dialog, Settings, the Conflicts list; and the Agenda with its first
+      showing. → `plans/foundation.md#D145`
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
       (`reschedule`); the details (`item-details.tsx`), the edit
       dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
       → `plans/design.md#D108`
-    - `draft-aside.ts` — where the edit dialog stands on a wide screen,
-      beside its draft. → `plans/design.md#D155`
+    - `draft-aside.ts` — `useDraft`, the edit dialog's draft made in the
+      editor's chunk and handed to the views (`DrawnDraft`), and where the
+      dialog stands on a wide screen, beside it. → `plans/design.md#D155`
     - `pager.tsx` — `Pager`: how a view moves from one period to the
       next, a swipe's periods side by side under the finger, a step's
       slide, a view's fade. → `plans/design.md#D154`
