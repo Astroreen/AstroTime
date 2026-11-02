@@ -155,6 +155,35 @@ test.describe("on a touch screen", () => {
     ]);
   });
 
+  test("a list swiped away and back keeps its state: Completed stays open", async ({ page }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const panel = tasks(page);
+    const completed = panel.getByRole("button", { name: /^Completed/ });
+    await completed.click();
+    await expect(completed).toHaveAttribute("aria-expanded", "true");
+    const touch = await finger(page);
+    const swipe = async (from: number, by: number) => {
+      await touch("touchStart", from);
+      for (let step = 1; step <= 10; step++) await touch("touchMove", from + by * step);
+      await touch("touchEnd");
+    };
+    await swipe(330, -18);
+    await expect(panel.getByRole("tab", { name: /^Tasks/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await swipe(60, 18);
+    await expect(panel.getByRole("tab", { name: /^Personal/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(panel.getByRole("tabpanel", { name: /^Personal/ })).toBeVisible();
+    await expect(
+      panel.getByRole("tabpanel").getByRole("button", { name: /^Completed/ }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
   test("a vertical scroll of a list moves to no other list", async ({ page }) => {
     await openDemo(page, "day");
     await page.getByRole("button", { name: "Tasks", exact: true }).click();
