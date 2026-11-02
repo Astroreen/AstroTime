@@ -60,7 +60,11 @@ test.describe("in Russian", () => {
       .getByRole("list", { name: "Результаты поиска" })
       .getByRole("button", { name: "Отправить отчёт, Сегодня, 15:00" })
       .click();
+    // Its details open (their code may still be loading): then closed.
+    const details = page.getByRole("dialog", { name: "Отправить отчёт" });
+    await expect(details).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(details).toHaveCount(0);
     await expect(
       page
         .getByRole("list", { name: "среда, 4 ноября" })
