@@ -144,3 +144,73 @@ for (const [language, theme, size] of [
     await context.close();
   });
 }
+
+// The user's own pictures (D222, D223): a word with a picture and a month
+// banner of their own, the "picture" one of AstroTime's own banners, so the
+// evidence shows no one's photo.
+for (const [language, theme, size] of [
+  ["en", "dark", "phone"],
+  ["ru", "light", "phone"],
+  ["en", "light", "wide"],
+] as const) {
+  test(`own pictures ${language} ${theme} ${size}`, async ({ browser }) => {
+    const phone = size === "phone";
+    const context = await browser.newContext({
+      locale: LOCALES[language],
+      colorScheme: theme,
+      viewport: phone ? PHONE : WIDE,
+      ...(phone ? { hasTouch: true, isMobile: true } : {}),
+      timezoneId: "Europe/Vilnius",
+    });
+    const page = await context.newPage();
+    const picture = {
+      name: "lake.svg",
+      mimeType: "image/svg+xml",
+      buffer: fixture("../../src/pictures/art/month-07.svg"),
+    };
+    await openDemo(page, "agenda");
+    const openSettings = async () => {
+      if (phone) {
+        await page.getByRole("button", { name: /^(Main menu|Главное меню)$/ }).click();
+        await page
+          .getByRole("dialog")
+          .getByRole("button", { name: /^(Settings|Настройки)$/ })
+          .click();
+      } else {
+        await page.getByRole("button", { name: /^(Settings|Настройки)$/ }).click();
+      }
+      return page.getByRole("dialog", { name: /^(Settings|Настройки)$/ });
+    };
+    const settings = await openSettings();
+    await settings
+      .getByRole("button", { name: /^(Add a word with a picture|Добавить слово с картинкой)$/ })
+      .click();
+    const editor = page.getByRole("dialog", { name: /^(A word's picture|Картинка для слова)$/ });
+    await editor.getByRole("textbox").fill(language === "en" ? "Stand-up" : "Планёрка");
+    const chooser = page.waitForEvent("filechooser");
+    await editor.getByRole("button", { name: /^(Choose a picture|Выбрать картинку)$/ }).click();
+    await (await chooser).setFiles(picture);
+    await expect(editor.locator("img")).toHaveAttribute("src", /^blob:/);
+    // Base UI marks a dialog entering or leaving: the screenshot waits for it to settle.
+    await expect(page.locator("[data-starting-style], [data-ending-style]")).toHaveCount(0);
+    await pictures(page);
+    const name = `${directory}/own-pictures-${language}-${theme}-${size}`;
+    await page.screenshot({ path: `${name}-editor.png` });
+    await editor.getByRole("button", { name: /^(Save|Сохранить)$/ }).click();
+    await expect(editor).toHaveCount(0);
+    const group = settings.getByRole("region", { name: /^(Pictures|Картинки)$/ });
+    await group.scrollIntoViewIfNeeded();
+    await expect(page.locator("[data-starting-style], [data-ending-style]")).toHaveCount(0);
+    await pictures(page);
+    await page.screenshot({ path: `${name}-settings.png` });
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const card = page
+      .getByRole("listitem", { name: new RegExp(language === "en" ? "^Stand-up" : "^Планёрка") })
+      .first();
+    await expect(card.locator("img")).toHaveAttribute("data-shown", "true");
+    await pictures(page);
+    await page.screenshot({ path: `${name}-agenda.png` });
+    await context.close();
+  });
+}

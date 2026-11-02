@@ -62,8 +62,23 @@ export type WriteResult =
   /** `conflict`: the object changed on the server first (412); `gone`: it no longer exists. */
   | { readonly ok: false; readonly reason: "conflict" | "gone" };
 
+/**
+ * Someone the account's server knows (design D208): a user of the same
+ * Nextcloud, found by name or e-mail for a mention in a description.
+ */
+export interface Person {
+  readonly name: string;
+  readonly email: string | null;
+}
+
 export interface Provider {
   calendars(): Promise<RemoteCalendar[]>;
+  /**
+   * People whose name or e-mail holds `query`, as the server finds them;
+   * none where it finds nobody (design D208). A provider without people
+   * leaves it out.
+   */
+  people?(query: string): Promise<Person[]>;
   /**
    * What changed in a calendar since `state`. `known` holds every href the
    * device has with its ETag, for servers (or expired tokens) that can only

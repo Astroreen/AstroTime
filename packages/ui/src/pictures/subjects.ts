@@ -370,3 +370,29 @@ function read(title: string): Subject | null {
   }
   return null;
 }
+
+/**
+ * The user's own word a title has, if any (design D223): each word of
+ * theirs the start of a title's word, three letters or more ("обед" finds
+ * "обеда"), in a row when they wrote several, case and diacritics aside;
+ * the first of theirs that a title has.
+ */
+export function ownWordOf<T extends { readonly word: string }>(
+  title: string | null | undefined,
+  own: readonly T[],
+): T | null {
+  if (!title || own.length === 0) return null;
+  const words = title.normalize("NFC").match(WORD) ?? [];
+  const folded = words.map(foldForSearch);
+  for (const entry of own) {
+    const parts = (entry.word.normalize("NFC").match(WORD) ?? []).map((word) => {
+      const text = foldForSearch(word);
+      return { text, prefix: text.length >= 3, exact: false };
+    });
+    if (parts.length === 0) continue;
+    for (let at = 0; at + parts.length <= words.length; at++) {
+      if (parts.every((part, i) => fits(part, words[at + i]!, folded[at + i]!))) return entry;
+    }
+  }
+  return null;
+}

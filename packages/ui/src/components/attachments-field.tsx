@@ -8,11 +8,17 @@ import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
 import { accountFiles } from "@astrotime/sync/files";
-import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
-import { attachmentHref, attachmentText, sameLink, typedLink } from "../calendar/attachments.ts";
+import {
+  attachmentHref,
+  attachmentText,
+  bareName,
+  typedLink,
+  withAttached,
+} from "../calendar/attachments.ts";
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
@@ -78,24 +84,37 @@ export function AttachmentsField({
     | { readonly state: "failed"; readonly name: string; readonly tooBig: boolean }
     | null
   >(null);
+  // Files uploaded while the item's calendar moved to another account: held,
+  // each with its alert, attached if the item comes back to the account it
+  // went to; none is dropped by the next upload (foundation D232).
+  const [held, setHeld] = useState<
+    readonly { readonly name: string; readonly from: string; readonly attachment: NewAttachment }[]
+  >([]);
   const picker = useRef<HTMLInputElement>(null);
-  // Whether the dialog is still open: an upload that ends after it closed
-  // changes nothing here (foundation D232).
-  const mounted = useRef(true);
+  // The form as it is now, read when an upload ends (it takes a while, and
+  // what the user changed meanwhile stays); null once the dialog closed,
+  // which an upload that ends after it leaves alone (foundation D232).
+  const latest = useRef<{
+    readonly value: readonly AttachmentChoice[];
+    readonly onChange: (attachments: readonly AttachmentChoice[]) => void;
+    readonly calendar: Calendar | undefined;
+  } | null>(null);
   useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  // The form as it is when the file is ready, not when it was picked: an
-  // upload takes a while, and what the user changed meanwhile stays.
-  const attach = useEffectEvent((attachment: NewAttachment) => {
-    if (!mounted.current) return;
-    // A file attached already is not attached twice, its link as it resolves.
-    if (!value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, calendar?.url)))
-      onChange([...value, { kind: "new", attachment }]);
+    latest.current = { value, onChange, calendar };
   });
+  useEffect(
+    () => () => {
+      latest.current = null;
+    },
+    [],
+  );
+  /** Attaches files to the form as it is now, all in one change (design D233). */
+  const attach = (attachments: readonly NewAttachment[], base: string | undefined) => {
+    const now = latest.current;
+    if (!now) return;
+    const next = withAttached(now.value, attachments, base);
+    if (next !== now.value) now.onChange(next);
+  };
   const upload = async (file: File) => {
     if (!account) return;
     if (file.size > MAX_UPLOAD) {
@@ -103,6 +122,7 @@ export function AttachmentsField({
       return;
     }
     setUploading({ state: "sending", name: file.name });
+    const from = account.id;
     try {
       const files = await accountFiles({ http: platform.http, secrets: platform.secrets }, account);
       if (!files) throw new Error("This account's files cannot be opened.");
@@ -112,19 +132,47 @@ export function AttachmentsField({
         new Uint8Array(await file.arrayBuffer()),
       );
       if (!sent.attachment) throw new Error("The file uploaded has no link.");
-      attach(sent.attachment);
-      if (mounted.current) setUploading(null);
+      const now = latest.current;
+      if (!now) return;
+      // The item moved to another account's calendar meanwhile: a link to
+      // this account's file would not open there. Not attached, and said so.
+      if (now.calendar?.accountId !== from) {
+        const { attachment } = sent;
+        setHeld((list) => [...list, { name: sent.name, from, attachment }]);
+        setUploading(null);
+        return;
+      }
+      attach([sent.attachment], now.calendar.url);
+      setUploading(null);
     } catch (error) {
       console.error(error);
-      if (mounted.current) setUploading({ state: "failed", name: file.name, tooBig: false });
+      if (latest.current) setUploading({ state: "failed", name: file.name, tooBig: false });
     }
   };
+  // The item back in the account the file went to: attached after all, and
+  // the alert gone. Another calendar of another account changes nothing.
+  useEffect(() => {
+    const back = held.filter((file) => file.from === calendar?.accountId);
+    if (back.length === 0) return;
+    attach(
+      back.map((file) => file.attachment),
+      calendar?.url,
+    );
+    setHeld((list) => list.filter((file) => !back.includes(file)));
+  }, [held, calendar]);
   const [adding, setAdding] = useState(false);
   const [link, setLink] = useState("");
+  // The user tried to add what they typed (Enter, or left the field): only
+  // then does a bare name say what makes it a link (design D233).
+  const [tried, setTried] = useState(false);
   const inputId = useId();
+  const hintId = useId();
   const typed = typedLink(link);
   const add = () => {
-    if (!typed) return;
+    if (!typed) {
+      setTried(true);
+      return;
+    }
     onChange([...value, { kind: "new", attachment: { uri: typed } }]);
     setLink("");
     setAdding(false);
@@ -168,7 +216,12 @@ export function AttachmentsField({
             autoFocus
             placeholder="https://"
             value={link}
-            onChange={(event) => setLink(event.target.value)}
+            onChange={(event) => {
+              setLink(event.target.value);
+              setTried(false);
+            }}
+            onBlur={() => setTried(true)}
+            aria-describedby={hintId}
             onKeyDown={(event) => {
               // Enter adds the link here, not the dialog's save; Escape leaves it.
               if (event.key === "Enter") {
@@ -221,10 +274,19 @@ export function AttachmentsField({
           )}
         </div>
       )}
+      {/* Not a web link yet: what makes it one, said to the field it describes (design D233). */}
+      <p id={hintId} aria-live="polite" className="text-note text-ink-muted empty:hidden">
+        {adding && tried && bareName(link) ? t("attachments.notLink") : ""}
+      </p>
+      {held.map((file) => (
+        <p key={file.attachment.uri} role="alert" className="text-note text-danger">
+          {t("attachments.moved", { name: file.name })}
+        </p>
+      ))}
       {uploading && (
         <p
-          role={uploading.state === "failed" ? "alert" : "status"}
-          className={`text-note ${uploading.state === "failed" ? "text-danger" : "text-ink-muted"}`}
+          role={uploading.state === "sending" ? "status" : "alert"}
+          className={`text-note ${uploading.state === "sending" ? "text-ink-muted" : "text-danger"}`}
         >
           {uploading.state === "sending"
             ? t("attachments.uploading", { name: uploading.name })
@@ -240,7 +302,7 @@ export function AttachmentsField({
           onClose={() => setBrowsing(false)}
           onPick={(attachment) => {
             setBrowsing(false);
-            attach(attachment);
+            attach([attachment], calendar?.url);
           }}
         />
       )}

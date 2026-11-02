@@ -13,6 +13,7 @@ import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
 import { accountFiles } from "../src/files.ts";
+import { peopleOf } from "../src/people.ts";
 import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
 
@@ -738,4 +739,35 @@ describe("an account's files (foundation D231)", () => {
     const { account } = await add("a.example");
     expect(await accountFiles({ http, secrets }, account)).toBeNull();
   });
+});
+
+test("people for a mention come from the account's provider with its credentials; nobody where it cannot ask (design D208)", async () => {
+  const { store, a, net, context, add } = await setup();
+  const anna = { name: "Anna Berg", email: "anna@example.com" };
+  const asked: string[] = [];
+  a.people = async (query) => {
+    asked.push(query);
+    return [anna];
+  };
+  const account = (await add("a.example")).account;
+  expect(await peopleOf(context, account.id, "ann")).toEqual([anna]);
+  expect(asked).toEqual(["ann"]);
+  expect(net.connections).toEqual(["https://a.example/ as astro"]);
+  // A provider without people, refused credentials, none saved, no server.
+  const b = (await add("b.example")).account;
+  expect(await peopleOf(context, b.id, "ann")).toEqual([]);
+  // Refused: no answer (`null`), which the editor does not keep.
+  a.people = async () => {
+    throw new AuthError("refused");
+  };
+  expect(await peopleOf(context, account.id, "ann")).toBeNull();
+  await context.secrets.delete(`account:${account.id}`);
+  expect(await peopleOf(context, account.id, "ann")).toEqual([]);
+  const local = await store.addAccount({
+    provider: "local",
+    name: "On this device",
+    serverUrl: "",
+    username: null,
+  });
+  expect(await peopleOf(context, local.id, "ann")).toEqual([]);
 });

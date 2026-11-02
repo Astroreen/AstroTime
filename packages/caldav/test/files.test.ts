@@ -3,7 +3,7 @@
 // each file with the ATTACH Nextcloud Calendar writes for it.
 import { readFileSync } from "node:fs";
 
-import { expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { filesOf, safeName } from "../src/files.ts";
 import type { HttpClient, HttpRequest } from "../src/index.ts";
@@ -194,6 +194,9 @@ test("a name Nextcloud takes, inside /Calendar: no `.` or `..`, no hidden file, 
   expect(new TextEncoder().encode(long).length).toBeLessThanOrEqual(200);
   expect(long).toBe(`${"я".repeat(98)}.pdf`);
   expect(safeName("a".repeat(300))).toBe("a".repeat(200));
+  // A cut that leaves ".part" or a dot last is made safe again.
+  expect(safeName(`${"a".repeat(195)}.part${"b".repeat(100)}`)).toBe(`${"a".repeat(195)}_part`);
+  expect(safeName(`${"a".repeat(199)}.${"b".repeat(100)}`)).toBe("a".repeat(199));
   // Uploaded, a traversal stays a name in /Calendar: never the files' root or its parent.
   const urls: string[] = [];
   const http: HttpClient = async (request) => {
@@ -218,4 +221,41 @@ test("a name Nextcloud takes, inside /Calendar: no `.` or `..`, no hidden file, 
     `PUT ${root}/file`,
     `PUT ${root}/_.._x.txt`,
   ]);
+});
+
+describe("an upload refused", () => {
+  /** Files whose server answers MKCOL, PUT and PROPFIND as given. */
+  const answering = (mkcol: number, put: (n: number) => number) => {
+    let puts = 0;
+    const http: HttpClient = async (request) => ({
+      status: request.method === "MKCOL" ? mkcol : request.method === "PUT" ? put(++puts) : 207,
+      url: request.url,
+      header: () => null,
+      body: "<multistatus/>",
+    });
+    return { files: filesOf(http, { username: "u", password: "p" }, HOME)!, puts: () => puts };
+  };
+  const bytes = new Uint8Array([1]);
+
+  test("every name taken: twenty tries, then it says there is no free name", async () => {
+    const { files, puts } = answering(405, () => 412);
+    await expect(files.upload("a.txt", "text/plain", bytes)).rejects.toThrow(/No free name/);
+    expect(puts()).toBe(20);
+  });
+
+  test("the folder refused (403) or the quota full (507): it fails, nothing is put", async () => {
+    for (const status of [403, 507]) {
+      const { files, puts } = answering(status, () => 201);
+      await expect(files.upload("a.txt", "text/plain", bytes)).rejects.toThrow(String(status));
+      expect(puts()).toBe(0);
+    }
+  });
+
+  test("the file refused (403, 507, 415): it fails at once, no other name is tried", async () => {
+    for (const status of [403, 507, 415]) {
+      const { files, puts } = answering(201, () => status);
+      await expect(files.upload("a.txt", "text/plain", bytes)).rejects.toThrow(String(status));
+      expect(puts()).toBe(1);
+    }
+  });
 });

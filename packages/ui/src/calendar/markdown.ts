@@ -197,7 +197,11 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // What follows the marker; the lines under it are indented at least this far.
     // Its content's column, its marker's indent and width included (as
     // CommonMark's): a line under it belongs to it from this column on.
-    const indent = indentOf(marker[0].replace(/\S/g, " ") + "x");
+    // Five spaces or more after the marker start an indented line of the
+    // item: its column is then one past the marker.
+    const marked = indentOf(marker[1]! + marker[2]!.replace(/./g, " ") + "x");
+    const after = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
+    const indent = after >= 5 ? marked + 1 : marked + after;
     const body = [lines[i]!.slice(marker[0].length)];
     i++;
     while (i < lines.length) {

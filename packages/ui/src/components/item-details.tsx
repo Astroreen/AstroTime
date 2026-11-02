@@ -203,10 +203,12 @@ function Body({
               aria-pressed={starred}
               title={t(starred ? "details.unstar" : "details.star")}
               onClick={(event) => {
-                // Its star pops when it lights, after this press (design D200).
-                event.currentTarget.dataset["pop"] = "";
+                // Its star pops when it lights after this press, once: the
+                // mark goes when the pop ends (design D200).
+                if (!starred) event.currentTarget.dataset["pop"] = "";
                 onStar();
               }}
+              onAnimationEnd={(event) => delete event.currentTarget.dataset["pop"]}
             >
               <StarIcon filled={starred} className={`size-5 ${starred ? "text-accent" : ""}`} />
             </button>

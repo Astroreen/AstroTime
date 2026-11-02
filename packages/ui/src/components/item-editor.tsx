@@ -63,6 +63,7 @@ import {
   RepeatIcon,
 } from "./icons.tsx";
 import { ColorSelect } from "./color-select.tsx";
+import { MentionField } from "./mention-field.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { useAccounts } from "./accounts-context.tsx";
@@ -417,12 +418,11 @@ function Fields({
       </Section>
 
       <Section icon={<NotesIcon className="size-5" />}>
-        <textarea
-          aria-label={t("edit.description")}
-          placeholder={t("edit.description")}
+        <MentionField
+          label={t("edit.description")}
           value={form.description}
-          rows={4}
-          onChange={(e) => set({ description: e.target.value })}
+          accountId={calendars.find((c) => c.id === form.calendarId)?.accountId ?? null}
+          onChange={(description) => set({ description })}
           className={`${field} h-auto py-2`}
         />
       </Section>

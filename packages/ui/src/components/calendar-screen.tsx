@@ -282,6 +282,10 @@ export function CalendarScreen({
     },
     onChanged: () => scheduler.changed(),
   });
+  // A saved occurrence on no period drawn (another one, a hidden calendar)
+  // lands nowhere: a new period or view drops it, so it lands no later (design D193).
+  const landedGone = useEffectEvent(() => editing.onLanded());
+  useEffect(() => landedGone(), [anchor, view]);
   // The period drawn and, on a touch screen, those beside it whose items are
   // read, each laid out once for what it draws (design D154).
   const undoneCount = data.undone.length;
@@ -491,7 +495,16 @@ export function CalendarScreen({
 
   return (
     <CalendarContext.Provider
-      value={{ t, formats, timeZone, colorOf, weekNumbers, hour, found: foundId }}
+      value={{
+        t,
+        formats,
+        timeZone,
+        colorOf,
+        weekNumbers,
+        hour,
+        landed: editing.landed,
+        found: foundId,
+      }}
     >
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>
@@ -626,6 +639,10 @@ export function CalendarScreen({
               )}
               <main
                 ref={mainRef}
+                // The saved item's landing ran: it lands no more when drawn again (design D193).
+                onAnimationEnd={(event) => {
+                  if (event.animationName === "item-land") editing.onLanded();
+                }}
                 style={{ "--hour": `${hour}px` } as CSSProperties}
                 hidden={wideTasks}
                 aria-label={title}

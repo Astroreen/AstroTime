@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, NOW, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
+import { addAccount, choose, NOW, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
 
 const SERVER = "https://cloud.example.com";
 const USER = "astrotime-test";
@@ -263,6 +263,89 @@ test("what the user changes while a file uploads stays: the file joins the list 
   const list = edit.getByRole("list", { name: "Attachments" });
   await expect(list.getByRole("listitem")).toHaveText([/example\.org\/agenda/, /minutes\.txt/]);
   await expect(edit.getByRole("textbox", { name: "Title" })).toHaveValue("Quarterly review, v2");
+});
+
+test("an item moved to another account while its file uploads: not attached, said so; back, attached (D232)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  let answer!: () => void;
+  const held = new Promise<void>((resolve) => (answer = resolve));
+  await fakeNextcloud(page, held);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  const chooser = page.waitForEvent("filechooser");
+  await edit.getByRole("button", { name: "From this device" }).click();
+  await (
+    await chooser
+  ).setFiles({ name: "minutes.txt", mimeType: "text/plain", buffer: Buffer.from("Minutes") });
+  await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
+  // Meanwhile the item goes to the calendar on this device, which has no files.
+  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
+  answer();
+  await expect(edit.getByRole("alert")).toHaveText(
+    "minutes.txt was uploaded to the Calendar folder of your files, but is not attached while the item is in another account's calendar: move it back to attach it.",
+  );
+  await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
+  // Back in the account the file went to: attached after all, the alert gone.
+  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Work");
+  await expect(edit.getByRole("list", { name: "Attachments" }).getByRole("listitem")).toHaveText([
+    /minutes\.txt/,
+  ]);
+  await expect(edit.getByRole("alert")).toHaveCount(0);
+});
+
+test("a bare name.ext is no link: tried, the field says to put https:// before it (design D233)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  await fakeNextcloud(page);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  const link = edit.getByRole("textbox", { name: "Link" });
+  const hint = edit.getByText("Not a web link yet: put https:// before it.");
+  // Not while typing, nor for what is no bare name.
+  await link.fill("1234");
+  await link.press("Enter");
+  await expect(hint).toHaveCount(0);
+  await link.fill("report.pdf");
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await expect(hint).toHaveCount(0);
+  // Tried: Enter says what makes it a link.
+  await link.press("Enter");
+  await expect(hint).toBeVisible();
+  // Said to the field: its description, in a live region.
+  await expect(link).toHaveAccessibleDescription("Not a web link yet: put https:// before it.");
+  await expect(hint).toHaveAttribute("aria-live", "polite");
+  await link.fill("https://example.org/report.pdf");
+  await expect(hint).toHaveCount(0);
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
+  // A site's name alone is a link.
+  await link.fill("example.org");
+  await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
 });
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];

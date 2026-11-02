@@ -316,6 +316,9 @@ export const en = {
   "attachments.uploading": "Uploading {{name}}…",
   "attachments.uploadFailed": "{{name}} could not be uploaded.",
   "attachments.tooBig": "{{name}} is over 50 MB: attach it from your files instead.",
+  "attachments.moved":
+    "{{name}} was uploaded to the Calendar folder of your files, but is not attached while the item is in another account's calendar: move it back to attach it.",
+  "attachments.notLink": "Not a web link yet: put https:// before it.",
   "attachments.file": "File",
   "details.reminders": "Reminders",
   "details.guests": "Guests",
@@ -370,6 +373,7 @@ export const en = {
   "edit.description": "Description",
   "description.emptyItem": "An empty item",
   "description.code": "Code",
+  "mention.people": "People",
   "places.results": "Places",
   "places.credit": "Places from © OpenStreetMap contributors",
   "places.map": "Map of {{place}}",
