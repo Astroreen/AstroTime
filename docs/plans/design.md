@@ -1581,6 +1581,29 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   keeps their width in the layout, which is what this measures). The
   thumb's colours under the pointer and while dragged, Firefox's
   `@supports` branch and WebKit are not tested ([Deferred](#deferred)).
+- **D193. A saved item lands; the strip's new rows come in** (the
+  owner's feedback 13: "more animations ... and much more you can think
+  of", the calendar views' part). Within [D154](#D154)'s rules (only
+  `transform` and `opacity` move, nothing when the user asks for less
+  motion, [D119](#D119)):
+  - **the item the edit dialog saved lands where it goes**: as the dialog
+    and its draft ([D155](#D155)) go, the item drawn from the store in
+    their place grows in from 94% and from clear, in 220 ms, so the eye
+    follows it from the draft to the item. The editor tells the views
+    which item, by its UID (a new item's first UID made at saving, an
+    edited one's own: `landed` in the calendar's context), and only that
+    item is marked (`data-landed`) in the time grid, the strip, the Month
+    and the Agenda's rows; the Agenda's picture cards are thread M's and
+    are not marked;
+  - **opening the all-day strip fades its new rows in**: the rows the
+    chevron or "+N" shows anew come down 4 px from clear, in 180 ms; the
+    first rows, there before, do not move. On another period, with the
+    strip open from before ([D151](#D151)), the rows are just there.
+    Growing the strip's height itself is not animated: a height that
+    moves would move the grid under it on every frame. Tested:
+    `apps/web/e2e/motion.spec.ts` (a new event saved is the only item
+    marked and runs `item-land`; the rows past the fold run `row-in` when
+    the strip opens, the first rows none, and none on the next week).
 
 ### Decided in round 4: the editor
 

@@ -455,7 +455,7 @@ export function CalendarScreen({
 
   return (
     <CalendarContext.Provider
-      value={{ t, formats, timeZone, colorOf, weekNumbers, found: foundId }}
+      value={{ t, formats, timeZone, colorOf, weekNumbers, landed: editing.landed, found: foundId }}
     >
       <EditingContext.Provider value={editing.value}>
         <Dialog.Root open={!wide && drawerOpen} onOpenChange={setDrawerOpen}>

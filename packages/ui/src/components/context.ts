@@ -17,6 +17,8 @@ export interface CalendarContextValue {
   readonly colorOf: (entry: Entry) => string;
   /** Whether the views show the week numbers (design D169). */
   readonly weekNumbers: boolean;
+  /** The UID of the item just saved from the edit dialog, which lands with motion (design D193). */
+  readonly landed?: string | null;
   /** The stored object a search jumped to, marked on the views (design D53). */
   readonly found?: string | null;
 }

@@ -190,3 +190,37 @@ test.describe("on a touch screen", () => {
     await expect(header(page, "Wednesday, November 4")).toBeVisible();
   });
 });
+
+test.describe("an item saved, the strip opened (design D193)", () => {
+  test.use({ viewport: WIDE });
+
+  test("the item the dialog saved lands where it goes; only it", async ({ page }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Call the plumber");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    const saved = page
+      .getByRole("list", { name: "Wednesday, November 4" })
+      .getByRole("listitem", { name: /^Call the plumber, / });
+    await expect(saved).toHaveAttribute("data-landed", "true");
+    await expect(saved).toHaveCSS("animation-name", "item-land");
+    await expect(page.locator("main [data-landed]")).toHaveCount(1);
+  });
+
+  test("opening the strip fades its new rows in; on the next period, opened already, they are just there", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    const strip = page.getByRole("list", { name: "All day" });
+    await page.getByRole("button", { name: "Show all all-day items" }).click();
+    const rent = strip.getByRole("listitem", { name: "Completed task: Pay the rent, All day" });
+    await expect(rent.locator("xpath=..")).toHaveCSS("animation-name", "row-in");
+    // The first rows were there: they do not move.
+    const birthday = strip.getByRole("listitem", { name: "Mom's birthday, All day" });
+    await expect(birthday.locator("xpath=..")).toHaveCSS("animation-name", "none");
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(header(page, "Sunday, November 8")).toBeVisible();
+    await expect(strip.locator(".animate-row-in")).toHaveCount(0);
+  });
+});

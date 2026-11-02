@@ -9,6 +9,7 @@ import type { UndoneTask } from "@astrotime/storage";
 import {
   useLayoutEffect,
   useRef,
+  useState,
   type CSSProperties,
   type RefObject,
   type MouseEvent,
@@ -397,6 +398,15 @@ function Strip({
     ? foldWeek(layout.strip, STRIP_ROWS)
     : { shown: layout.strip, more: [] };
   const rows = collapsed ? STRIP_ROWS : layout.rows;
+  // Opened here, now: the rows it shows anew fade in under the others
+  // (design D193); on another period, opened before, they are just there.
+  const [seenCollapsed, setSeenCollapsed] = useState(collapsed);
+  const [grewOn, setGrewOn] = useState<string | null>(null);
+  if (seenCollapsed !== collapsed) {
+    setSeenCollapsed(collapsed);
+    setGrewOn(collapsed ? null : days[0]!);
+  }
+  const grew = (span: Span) => grewOn === days[0] && span.row >= STRIP_ROWS - 1;
   return (
     <div
       role="list"
@@ -420,7 +430,7 @@ function Strip({
       }}
     >
       {shown.map(({ span, entry }) => (
-        <StripCell key={entry?.key ?? "undone"} span={span}>
+        <StripCell key={entry?.key ?? "undone"} span={span} grew={grew(span)}>
           {entry ? (
             <StripChip
               entry={entry}
@@ -467,10 +477,18 @@ function Strip({
   );
 }
 
-function StripCell({ span, children }: { span: Span; children: ReactNode }) {
+function StripCell({
+  span,
+  grew = false,
+  children,
+}: {
+  span: Span;
+  grew?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
-      className="min-w-0 px-[1.5px]"
+      className={`min-w-0 px-[1.5px] ${grew ? "animate-row-in" : ""}`}
       style={{ gridColumn: `${span.firstDay + 1} / ${span.lastDay + 2}`, gridRow: span.row + 1 }}
     >
       {children}
