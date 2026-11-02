@@ -3,7 +3,19 @@
 import type { Person } from "@astrotime/core";
 
 import type { HttpRequest, HttpResponse } from "./http.ts";
-import { escape, NAMESPACES, parseMultistatus, text } from "./xml.ts";
+import type { escape, parseMultistatus, text } from "./xml.ts";
+
+/**
+ * What the search reads and writes XML with, handed by the provider: this
+ * module imports none of `xml.ts`, so the bundler keeps that with the app
+ * and this chunk small (foundation D145).
+ */
+export interface Xml {
+  readonly namespaces: string;
+  readonly escape: typeof escape;
+  readonly parse: typeof parseMultistatus;
+  readonly text: typeof text;
+}
 
 /** A search asks for no one on fewer letters, and offers at most this many. */
 const PEOPLE_FROM = 2;
@@ -14,15 +26,15 @@ const PEOPLE_AT_MOST = 8;
  * e-mail (Sabre's `email-address`), as Nextcloud's Calendar asks it for
  * attendees.
  */
-function principalSearch(query: string): string {
-  const match = escape(query);
+function principalSearch(xml: Xml, query: string): string {
+  const match = xml.escape(query);
   const by = (prop: string) =>
     `<d:property-search><d:prop><${prop}/></d:prop><d:match>${match}</d:match></d:property-search>`;
-  return `<?xml version="1.0" encoding="utf-8"?><d:principal-property-search ${NAMESPACES} xmlns:s="http://sabredav.org/ns" test="anyof">${by("d:displayname")}${by("s:email-address")}<d:prop><d:displayname/><s:email-address/><c:calendar-user-address-set/><c:calendar-user-type/></d:prop><d:apply-to-principal-collection-set/></d:principal-property-search>`;
+  return `<?xml version="1.0" encoding="utf-8"?><d:principal-property-search ${xml.namespaces} xmlns:s="http://sabredav.org/ns" test="anyof">${by("d:displayname")}${by("s:email-address")}<d:prop><d:displayname/><s:email-address/><c:calendar-user-address-set/><c:calendar-user-type/></d:prop><d:apply-to-principal-collection-set/></d:principal-property-search>`;
 }
 
 /** Every `<href>` of a prop. */
-function hrefsOf(value: unknown): string[] {
+function hrefsOf(text: Xml["text"], value: unknown): string[] {
   const listed =
     value && typeof value === "object" && "href" in value
       ? (value as { href: unknown[] }).href
@@ -42,9 +54,11 @@ function hrefsOf(value: unknown): string[] {
  */
 export async function searchPeople(
   send: (request: HttpRequest, accept: readonly number[]) => Promise<HttpResponse>,
+  xml: Xml,
   homeUrl: string,
   query: string,
 ): Promise<Person[]> {
+  const { text } = xml;
   const words = query.trim();
   if (words.length < PEOPLE_FROM) return [];
   const response = await send(
@@ -52,16 +66,16 @@ export async function searchPeople(
       method: "REPORT",
       url: homeUrl,
       headers: { Depth: "0", "Content-Type": "application/xml; charset=utf-8" },
-      body: principalSearch(words),
+      body: principalSearch(xml, words),
     },
     [400, 403, 404, 405, 415, 501],
   );
   if (response.status !== 207) return [];
   const people = new Map<string, Person>();
-  for (const found of parseMultistatus(response.body).responses) {
+  for (const found of xml.parse(response.body).responses) {
     const type = text(found.props["calendar-user-type"])?.toUpperCase();
     if (type && type !== "INDIVIDUAL") continue;
-    const mailto = hrefsOf(found.props["calendar-user-address-set"]).find((href) =>
+    const mailto = hrefsOf(text, found.props["calendar-user-address-set"]).find((href) =>
       /^mailto:/i.test(href),
     );
     const email = text(found.props["email-address"]) ?? mailto?.replace(/^mailto:/i, "") ?? null;

@@ -26,6 +26,8 @@ import {
 import {
   attribute,
   children,
+  escape,
+  NAMESPACES,
   multiget,
   parseMultistatus,
   propfind,
@@ -431,7 +433,12 @@ export class CalDavProvider implements Provider {
    */
   async people(query: string): Promise<Person[]> {
     const { searchPeople } = await import("./people.ts");
-    return searchPeople((request, accept) => this.request(request, accept), this.homeUrl, query);
+    return searchPeople(
+      (request, accept) => this.request(request, accept),
+      { namespaces: NAMESPACES, escape, parse: parseMultistatus, text },
+      this.homeUrl,
+      query,
+    );
   }
 
   /**
