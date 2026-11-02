@@ -411,7 +411,9 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       const link = linkAt(text, i + (image ? 1 : 0), brackets.get(i + (image ? 1 : 0)));
       if (link) {
         const href = safeHref(link.href);
-        const children = inline(link.text, false, depth + 1);
+        const words = inline(link.text, false, depth + 1);
+        // A link with no words is named by where it goes, so it can be seen and pressed.
+        const children = words.length > 0 ? words : [href ?? link.href];
         if (href) push({ type: "link", href, children });
         else {
           // Not a link it may follow: its words, as written.
@@ -509,7 +511,8 @@ function linkAt(
       else if (code === 40) open++; // "("
       else if (code === 41 && open-- === 0) break; // ")"
     }
-    href = text.slice(start, at);
+    // Its escapes taken out: `\)` is a ")" of the address.
+    href = text.slice(start, at).replace(/\\([!-/:-@[-`{-~])/g, "$1");
   }
   skip();
   if (text[at] === '"') {

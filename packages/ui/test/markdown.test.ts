@@ -440,3 +440,25 @@ describe("after #94's last review (design D207)", () => {
     ]);
   });
 });
+
+describe("after #94's low review (design D207)", () => {
+  test("a link or image with no words is named by its address", () => {
+    expect(parseMarkdown("[](https://example.com/a) ![](https://example.com/b.png)")).toEqual([
+      paragraph(
+        { type: "link", href: "https://example.com/a", children: ["https://example.com/a"] },
+        " ",
+        {
+          type: "link",
+          href: "https://example.com/b.png",
+          children: ["https://example.com/b.png"],
+        },
+      ),
+    ]);
+  });
+
+  test("a written target's escapes are taken out", () => {
+    expect(parseMarkdown("[a](https://example.com/a\\)b)")).toEqual([
+      paragraph({ type: "link", href: "https://example.com/a)b", children: ["a"] }),
+    ]);
+  });
+});
