@@ -513,26 +513,41 @@ Decided while building PR 7.
   - **What it keeps.** On install it keeps this version's files in a cache
     of its own (`astrotime-<version>`) and the page as the server sent it
     then, policy and nonce with it ([D110](#D110)), but without the preset's
-    tags ([D123](#D123)), which only the server says: the block the server
-    marks between `<!-- astrotime-preset -->` comments, and any
-    `<meta name="astrotime-server|username">` however it is written. A page
+    tags ([D123](#D123)): the block the server marks between
+    `<!-- astrotime-preset -->` comments, and any
+    `<meta name="astrotime-server|username">` however it is written. The
+    tags are kept apart and given back to the kept page each time it
+    answers, as the latest network page had them (none, if it had none), so
+    a start with no network, or on a link too slow to begin answering,
+    signs in as the server's page does; they are public ([D123](#D123)). A page
     that names a file this version does not list (a rolling deploy, the page
     newer than the worker) fails the install, so the version that has them
     keeps it. Its files answer from
     the cache; the page comes from the network first (a fresh nonce, the
     preset) and from the cache when there is no network, or when what
     answers is a server error (a reverse proxy's 502, 503 or 504 while the
-    container is down), or when the network has not answered within three
+    container is down), or when the network has not begun to answer within three
     seconds (a connection that stalls, lie-fi, may settle only after tens
-    of seconds). The network's page, when it comes, refreshes the kept one
-    in the background. Only the server's own page is ever kept: an `ok`,
+    of seconds). In a build for the tests (`ASTROTIME_SW_TEST_HOOKS=1`, a
+    define the image's build leaves `false`, so its worker has none of it),
+    a page may set the bound, finite and at most ten seconds, so no test
+    waits on time passing. The network's page, when it comes, refreshes the kept
+    one in the background. Only the server's own page is ever kept: an `ok`,
     `basic`, HTML answer that was not redirected (a sign-on's login page, a
     slash added); a version whose page is not one fails its install and
     keeps nothing. It answers only the app's own navigations, under
     its scope: a route of the single-page app, never `/dav-proxy/`, the
     health check, or a file. It touches nothing else: never `/dav-proxy/`, never a request that is not a `GET`
-    of the app's origin, never a file it does not list. Activated, it
-    deletes older versions' caches. The proxy's static serving stays as
+    of the app's origin, never a file it does not list, and the page only to
+    a navigation. Every path is under the app's base, the scope the worker
+    is registered at (Vite's `base`), `/` or a sub-path alike. Activated, it
+    keeps its own cache and the version before's (`astrotime-versions` lists
+    them, and the tabs that were open when the user asked for this version):
+    a file this version does not list comes from the older version's cache
+    only for one of those tabs, which still runs the older page and may ask
+    for its files (a lazily loaded chunk); any other tab, or a file neither
+    has, goes to the network. This version's files and page come from its
+    own cache only, never the older's. Older versions go. The proxy's static serving stays as
     [D80](#D80) says: hashed files immutable, the rest (`/sw.js`, the
     manifest, icons) revalidated, so the browser's check of the worker costs
     a 304.
@@ -877,21 +892,33 @@ Decided while building PR 5a-3.
     which checks both in one transaction, and which the UI calls as the store
     comes to hold a server's calendars); before that (a first sync that
     failed or found none, only shared or read-only calendars, none for
-    tasks), it stays, so the user always has somewhere to create either. A new
-    item's dialog left open as it steps aside saves where the dialog then
-    shows, the first calendar that takes it, decided in the save's own
-    transaction (`LocalChange.calendars`), since the screen's list of
-    calendars may not have caught up yet when Save is pressed. A calendar
-    still there that no longer takes the item (read-only now, its components
-    changed) is refused instead (`RefusedError`): the dialog stays open on
-    "this calendar no longer takes this item", since it still shows that
-    calendar chosen, and moving the item where the user did not pick would
-    surprise. A vanished calendar's fallback is no such surprise: the
-    dialog's field already shows the calendar it goes to. One that holds items stays
-    beside the server's, as its own calendar, and its items move to a
-    server's calendar one by one in the edit dialog ([D106](#D106)).
-    Removing it asks first, and says its items are on no server. Uploading
-    them all at once is [Deferred](#deferred).
+    tasks), it stays, so the user always has somewhere to create either.
+    One that holds items stays beside the server's, as its own calendar,
+    and its items move to a server's calendar one by one in the edit dialog
+    ([D106](#D106)). Removing it asks first, and says its items are on no
+    server. Uploading them all at once is [Deferred](#deferred).
+  - Where a new item goes is one rule, `newItemCalendar` (on
+    `firstCalendarFor`: the first calendar that takes it, visible before
+    hidden, in list order), as calendars come and go while its dialog is
+    open (this one stepping aside, one deleted or shared read-only on the
+    server):
+    - its calendar, while that takes the item;
+    - its calendar still, refused, once it is there but no longer takes
+      the item (read-only now, its components changed): the field keeps
+      showing it, the save ends in `RefusedError`, nothing is saved and the
+      dialog stays open on "this calendar no longer takes this item".
+      Moving the item where the user did not pick would surprise;
+    - when its calendar is gone, the first that takes the item, which the
+      field then shows in its place;
+    - none: `NowhereError`, "no calendar takes this item now", nothing
+      saved.
+
+    The field applies the rule to the screen's list, which may lag the
+    store by a moment: it is a best effort. The save applies it again to
+    the calendars read in its own transaction (`LocalChange.calendars`),
+    and that is authoritative: in the moment the two differ, the item goes
+    where the store says, never to a calendar that is gone.
+
   - The accounts dialog says what it is ("Not synced: on this device only")
     and, on the web, where its data lives (D121's address), and invites to
     add an account while there is none of a server. An account offline is

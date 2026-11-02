@@ -211,14 +211,18 @@ export function useEditingState({
   const rewrite = (target: Target, ics: (object: CalendarObject) => string) =>
     write(rewriteTarget(store, target, ics));
 
-  /** Why a save did not land, for the user (D99): gone or refused meanwhile, unclear, or failed. */
-  const failureOf = (error: unknown): "gone" | "refused" | "nowhere" | "inDoubt" | "failed" => {
+  /** Why a save did not land, for the user (D99): gone meanwhile, unclear, or failed. */
+  const failureOf = (error: unknown): "gone" | "inDoubt" | "failed" => {
     if (error instanceof GoneError) return "gone";
-    if (error instanceof RefusedError) return "refused";
-    if (error instanceof NowhereError) return "nowhere";
     if (error instanceof InDoubtError) return "inDoubt";
     console.error(error);
     return "failed";
+  };
+  /** As `failureOf`, and for a new item, its calendar refusing it or none taking it (D122). */
+  const saveFailureOf = (error: unknown): "refused" | "nowhere" | ReturnType<typeof failureOf> => {
+    if (error instanceof RefusedError) return "refused";
+    if (error instanceof NowhereError) return "nowhere";
+    return failureOf(error);
   };
 
   const value: EditingValue = {
@@ -260,11 +264,7 @@ export function useEditingState({
               onChanged();
               resolve("saved");
             },
-            // A move keeps its own calendar, which a new item's refusal is not about.
-            (error: unknown) => {
-              const failure = failureOf(error);
-              resolve(failure === "refused" || failure === "nowhere" ? "failed" : failure);
-            },
+            (error: unknown) => resolve(failureOf(error)),
           );
         };
         const rights = rightsOf(byId(target.calendarId));
@@ -329,7 +329,7 @@ export function useEditingState({
         },
         (error: unknown) => {
           // Gone meanwhile, or unclear whether it was saved: the user is told so (D99).
-          const failure = failureOf(error);
+          const failure = saveFailureOf(error);
           setEditing(
             (current) =>
               current && {

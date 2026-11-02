@@ -44,3 +44,39 @@ export function isAppPage(pathname: string, base: string): boolean {
   if (rest.startsWith("dav-proxy/") || rest === "dav-proxy" || rest === "healthz") return false;
   return !/\.[^/]+$/.test(rest);
 }
+
+/** The page's preset tags as the server wrote them, to give a kept page back; empty without one. */
+export function presetOf(html: string): string {
+  return [...html.matchAll(BLOCK), ...withoutBlock(html).matchAll(TAG)]
+    .map(([found]) => found)
+    .join("");
+}
+
+const withoutBlock = (html: string) => html.replace(BLOCK, "");
+
+/** A kept page with the preset the latest network page had, in its head. */
+export function withPresetBack(html: string, preset: string): string {
+  return preset === "" ? html : html.replace("</head>", () => `${preset}</head>`);
+}
+
+/**
+ * What the worker does with a GET of the app's origin, under its scope `base`
+ * (D124): a navigation to one of the app's pages gets the `page`; a file this
+ * version lists, its own (`file`); another file under `assets/`, the version
+ * before's for a tab still on it (`older`); everything else, the page's own
+ * path and the kept preset included, goes to the network untouched (`null`).
+ */
+export function routeOf(
+  pathname: string,
+  navigation: boolean,
+  base: string,
+  listed: ReadonlySet<string>,
+): "page" | "file" | "older" | null {
+  if (navigation) return isAppPage(pathname, base) ? "page" : null;
+  if (pathname === base || pathname === presetKey(base)) return null;
+  if (listed.has(pathname)) return "file";
+  return pathname.startsWith(`${base}assets/`) ? "older" : null;
+}
+
+/** Where the preset of the latest network page is kept, beside the page. */
+export const presetKey = (base: string) => `${base}.astrotime-preset`;
