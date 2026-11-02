@@ -231,17 +231,7 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(
       readSettings('{"defaultColors":{"event":"notacolour","task":"Grey"}}').defaultColors,
     ).toEqual({ event: null, task: "Grey" });
-    const own = (event: string) =>
-      readSettings(
-        JSON.stringify({
-          defaultColors: { event },
-          colors: [{ id: "b", hex: "#00585e", name: " Sea " }],
-        }),
-      );
-    expect(own("own:b").defaultColors.event).toBe("own:b");
-    // An own colour that is gone is the calendar's; a hand-written name is kept trimmed.
-    expect(own("own:gone").defaultColors.event).toBeNull();
-    expect(own("own:b").colors[0]?.name).toBe("Sea");
+    expect(readSettings('{"defaultColors":{"event":"own:b"}}').defaultColors.event).toBe("own:b");
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(

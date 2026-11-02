@@ -1084,7 +1084,9 @@ Settings, the colours and the lists controls open.
   even the default's own: then it stays.
   - **An own colour is a default by its id** (`own:<id>`), so recolouring
     it moves the default; deleted, the default is the calendar's again,
-    and a stored id that names no own colour reads so too.
+    and a stored id that names no own colour is the calendar's where it is
+    used (`defaultColorOf`, the dropdown), not on reading the settings,
+    whose code loads at once ([foundation D145](foundation.md#D145)).
   - **Read leniently:** a stored default that is no colour `editItem`
     takes ([foundation D174](foundation.md#D174)) reads as the calendar's,
     so it never refuses a new item's save.

@@ -92,7 +92,8 @@ export function readSettings(stored: string | null): Settings {
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),
     hideCompleted: value.hideCompleted === true,
     weekNumbers: value.weekNumbers !== false,
-    ...colorsOf(value),
+    defaultColors: readDefaults(value.defaultColors),
+    colors: readColors(value.colors),
     reminders: value.reminders !== false,
     keepRunning: value.keepRunning !== false,
     places: value.places !== false,
@@ -123,18 +124,9 @@ export function defaultColorOf(settings: Settings, kind: "event" | "task"): stri
   return settings.colors.find((color) => color.id === id)?.hex ?? null;
 }
 
-/** The own colours, and the defaults; one naming an own colour that is gone is the calendar's. */
-function colorsOf(value: {
-  readonly defaultColors?: unknown;
-  readonly colors?: unknown;
-}): Pick<Settings, "defaultColors" | "colors"> {
-  const colors = readColors(value.colors);
-  const read = (value.defaultColors ?? {}) as { event?: unknown; task?: unknown };
-  const of = (stored: unknown) => {
-    const color = colorValue(stored);
-    return color?.startsWith(OWN) && !colors.some((c) => `${OWN}${c.id}` === color) ? null : color;
-  };
-  return { colors, defaultColors: { event: of(read.event), task: of(read.task) } };
+function readDefaults(value: unknown): Settings["defaultColors"] {
+  const read = (value ?? {}) as { event?: unknown; task?: unknown };
+  return { event: colorValue(read.event), task: colorValue(read.task) };
 }
 
 function readColors(value: unknown): readonly OwnColor[] {
@@ -142,7 +134,7 @@ function readColors(value: unknown): readonly OwnColor[] {
   return value.flatMap((entry: unknown) => {
     const { id, hex, name } = (entry ?? {}) as Partial<Record<keyof OwnColor, unknown>>;
     if (typeof id !== "string" || typeof hex !== "string" || !HEX.test(hex)) return [];
-    return [{ id, hex, name: typeof name === "string" && name.trim() !== "" ? name.trim() : null }];
+    return [{ id, hex, name: typeof name === "string" && name.trim() !== "" ? name : null }];
   });
 }
 

@@ -149,7 +149,8 @@ test("a colour chosen in the dialog stays through a switch of kind, the default'
     await settings.getByRole("button", { name: "Add a colour" }).click();
     const editor = page.getByRole("dialog", { name: "New colour" });
     await editor.getByRole("textbox", { name: "Hex code" }).fill("#c48b9f");
-    await editor.getByRole("textbox", { name: "Name" }).fill(name);
+    // Spaces around a hand-written name are not kept (design D170).
+    await editor.getByRole("textbox", { name: "Name" }).fill(`  ${name} `);
     await editor.getByRole("button", { name: "Save" }).click();
     await expect(editor).toHaveCount(0);
   }
