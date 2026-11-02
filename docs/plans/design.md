@@ -1586,24 +1586,32 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   of", the calendar views' part). Within [D154](#D154)'s rules (only
   `transform` and `opacity` move, nothing when the user asks for less
   motion, [D119](#D119)):
-  - **the item the edit dialog saved lands where it goes**: as the dialog
-    and its draft ([D155](#D155)) go, the item drawn from the store in
-    their place grows in from 94% and from clear, in 220 ms, so the eye
-    follows it from the draft to the item. The editor tells the views
-    which item, by its UID (a new item's first UID made at saving, an
-    edited one's own: `landed` in the calendar's context), and only that
-    item is marked (`data-landed`) in the time grid, the strip, the Month
-    and the Agenda's rows; the Agenda's picture cards are thread M's and
-    are not marked;
+  - **the occurrence the edit dialog saved lands where it goes**: as the
+    dialog and its draft ([D155](#D155)) go, the item drawn from the store
+    in their place grows in from 94% and from clear, in 220 ms, so the eye
+    follows it from the draft to the item. It is that occurrence alone:
+    the editor tells the views its item's UID (a new item's first UID
+    made at saving, the new series' after "this and following", else the
+    item edited) and where its form starts it (a day, or a day and a
+    time: `landed` in the calendar's context), so a new series lands on
+    the day it begins, not on each of its days. It lands once: when its
+    landing ends (`animationend`) the mark goes, and a period away and
+    back draws it plainly. It is marked (`data-landed`) in the time grid,
+    the strip, the Month and the Agenda's rows; the Agenda's picture cards
+    are thread M's and are not marked;
   - **opening the all-day strip fades its new rows in**: the rows the
     chevron or "+N" shows anew come down 4 px from clear, in 180 ms; the
     first rows, there before, do not move. On another period, with the
     strip open from before ([D151](#D151)), the rows are just there.
-    Growing the strip's height itself is not animated: a height that
-    moves would move the grid under it on every frame. Tested:
-    `apps/web/e2e/motion.spec.ts` (a new event saved is the only item
-    marked and runs `item-land`; the rows past the fold run `row-in` when
-    the strip opens, the first rows none, and none on the next week).
+
+  Growing the strip's height itself is not animated: a height that moves
+  would move the grid under it on every frame. Tested:
+  `apps/web/e2e/motion.spec.ts` (a new event saved is the only item
+  marked and runs `item-land`, unmarked once it ran, and not again a week
+  away and back; a new weekly series marked on its first Tuesday only;
+  the rows past the fold run `row-in` when the strip opens, the first
+  rows none, and none on the next week), `editing.spec.ts` (after "this
+  and following", Thursday's occurrence lands and Friday's does not).
 
 ### Decided in round 4: the editor
 
