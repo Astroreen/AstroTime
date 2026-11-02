@@ -295,7 +295,7 @@ test("an item moved to another account while its file uploads: not attached, sai
   await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
   answer();
   await expect(edit.getByRole("alert")).toHaveText(
-    "minutes.txt was uploaded, but the item is now in another account's calendar: it is not attached.",
+    "minutes.txt was uploaded, but is not attached while the item is in another account's calendar: move it back to attach it.",
   );
   await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
   // Back in the account the file went to: attached after all, the alert gone.
