@@ -52,6 +52,9 @@ export interface TimeGridProps {
 }
 
 export function TimeGrid(props: TimeGridProps) {
+  // Not memoized by the React Compiler, on purpose: 1.4 KiB of the first
+  // load for the grid's memos (foundation D145); its items are (design D194).
+  "use no memo";
   const { days, layout, today, minutes, expanded, onExpandedChange, floating, current, scroll } =
     props;
   const { t, formats, weekNumbers, hour } = useCalendar();

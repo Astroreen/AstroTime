@@ -85,6 +85,11 @@ export function CalendarScreen({
   settings: LocaleSettings;
   timeZone: string;
 }) {
+  // Not memoized by the React Compiler, on purpose: its memos for a screen
+  // this big would add 3.7 KiB to the first load (foundation D145), and the
+  // costly part, laying out the periods drawn, is a `useMemo` of its own;
+  // the views under it are memoized (design D194).
+  "use no memo";
   const { t } = useTranslation();
   // Made again when the settings change the language, week or clock (D53).
   const formats = useMemo(() => new Formats(settings), [settings]);
