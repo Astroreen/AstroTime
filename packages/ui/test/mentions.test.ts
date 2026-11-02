@@ -3,8 +3,8 @@
 import { expect, test } from "vite-plus/test";
 
 import { parseMarkdown } from "../src/calendar/markdown.ts";
-import { mentionIn } from "../src/components/mention-chip.tsx";
-import { addressOf, mentionOf } from "../src/components/mention-field.tsx";
+import { addressOf, mailtoOf, mentionIn } from "../src/components/mention-chip.tsx";
+import { mentionOf } from "../src/components/mention-field.tsx";
 
 test("a mailto link named @Name is a mention, its address decoded", () => {
   expect(mentionIn("mailto:anna@example.com", ["@Anna Berg"])).toEqual({
@@ -61,4 +61,14 @@ test("a name with Markdown's marks is written escaped and reads back as it is", 
   };
   expect(link.children).toEqual([`@${person.name}`]);
   expect(mentionIn(link.href, link.children)).toEqual(person);
+});
+
+test("an address that decodes to a query adds no header: the chip's link re-encodes it", () => {
+  const person = mentionIn("mailto:a%40x.com%3Fbcc%3Devil%40y.com", ["@A"]);
+  expect(person).toEqual({ name: "A", email: "a@x.com?bcc=evil@y.com" });
+  const href = mailtoOf(person!.email);
+  expect(href).toBe("mailto:a@x.com%3Fbcc=evil@y.com");
+  // As a mail client reads it: one address, no query.
+  expect(new URL(href).search).toBe("");
+  expect(mailtoOf("a@x.com#body")).toBe("mailto:a@x.com%23body");
 });

@@ -3,6 +3,28 @@
 // to them. It is a link to `mailto:` with "@" words in the text.
 import { useState } from "react";
 
+/**
+ * An e-mail as a link's address: what would end it or break it (a space,
+ * brackets, "%", "<", ">", a quote, a backslash; "?" and "#", which start a
+ * query or a fragment) percent-encoded; the rest as written,
+ * so it reads in other clients.
+ */
+export function addressOf(email: string): string {
+  return email.replace(/[\s%()<>"[\]\\?#]/g, (char) =>
+    [...new TextEncoder().encode(char)]
+      .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
+      .join(""),
+  );
+}
+
+/**
+ * The link to write to someone, from their address re-encoded: an address
+ * that decoded to "?" or "#" ("a@x.com?bcc=…") adds no header or body.
+ */
+export function mailtoOf(email: string): string {
+  return `mailto:${addressOf(email)}`;
+}
+
 /** The person a link names, when it is a mention: `[@Anna Berg](mailto:anna@example.com)`. */
 export function mentionIn(
   href: string,
@@ -39,7 +61,7 @@ export function MentionChip({ name, email }: { name: string; email: string }) {
       </button>
       {open && (
         <a
-          href={`mailto:${email}`}
+          href={mailtoOf(email)}
           target="_blank"
           rel="noopener noreferrer"
           className="break-all text-accent underline underline-offset-2"

@@ -2,7 +2,9 @@
 // (`@astrotime/sync/people`), so the web app loads it with the edit dialog.
 import type { Person } from "@astrotime/core";
 
-import type { SyncContext } from "./all.ts";
+import type { HttpClient } from "@astrotime/caldav";
+
+import { connectCalDav, type Connect, type SyncContext } from "./all.ts";
 import { readSecret } from "./secret.ts";
 
 /**
@@ -14,7 +16,10 @@ import { readSecret } from "./secret.ts";
  * and a mention can still be typed.
  */
 export async function peopleOf(
-  context: Pick<SyncContext, "store" | "secrets" | "connect">,
+  // The platform's HTTP, through which this opens the account's provider as
+  // a sync does; or the provider's opening itself (a test's).
+  context: Pick<SyncContext, "store" | "secrets"> &
+    ({ readonly http: HttpClient } | { readonly connect: Connect }),
   accountId: string,
   query: string,
 ): Promise<Person[] | null> {
@@ -23,7 +28,8 @@ export async function peopleOf(
   const credentials = (await readSecret(context.secrets, accountId))?.credentials;
   if (!credentials) return [];
   try {
-    const provider = await context.connect(account, credentials);
+    const connect = "connect" in context ? context.connect : connectCalDav(context.http);
+    const provider = await connect(account, credentials);
     return (await provider.people?.(query)) ?? [];
   } catch {
     return null;

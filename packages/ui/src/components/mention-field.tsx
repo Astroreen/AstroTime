@@ -4,12 +4,12 @@
 // to their e-mail, `[@Anna Berg](mailto:anna@example.com)`, which reads in
 // any client and which the details draw as a chip; it invites no one.
 import type { Person } from "@astrotime/core";
-import { connectCalDav } from "@astrotime/sync";
 import { peopleOf } from "@astrotime/sync/people";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAccounts } from "./accounts-context.tsx";
+import { addressOf } from "./mention-chip.tsx";
 import { row } from "./select.tsx";
 
 /** "@" and what follows it up to the caret, at a word's start: the query. */
@@ -23,20 +23,6 @@ interface Query {
   /** Where its "@" is, and the caret. */
   readonly start: number;
   readonly end: number;
-}
-
-/**
- * An e-mail as a link's address: what would end it or break it (a space,
- * brackets, "%", "<", ">", a quote, a backslash; "?" and "#", which start a
- * query or a fragment) percent-encoded; the rest as written,
- * so it reads in other clients.
- */
-export function addressOf(email: string): string {
-  return email.replace(/[\s%()<>"[\]\\?#]/g, (char) =>
-    [...new TextEncoder().encode(char)]
-      .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
-      .join(""),
-  );
 }
 
 /** How a person picked is written into the description. */
@@ -77,7 +63,6 @@ export function MentionField({
   const [active, setActive] = useState(0);
   // What each query found, while the dialog is open: typing back asks nothing again.
   const [known] = useState(() => new Map<string, Person[]>());
-  const [connect] = useState(() => connectCalDav(platform.http));
   /** Where the caret goes once a mention is in. */
   const caret = useRef<number | null>(null);
 
@@ -93,19 +78,22 @@ export function MentionField({
     let live = true;
     // The server is asked once typing rests, not on every letter.
     const timer = setTimeout(() => {
-      void peopleOf({ store, secrets: platform.secrets, connect }, accountId, text).then(
-        (people) => {
-          // Only an answer is kept: a search that failed is asked again.
-          if (people) known.set(key, people);
-          if (live) setFound({ accountId, text, people: people ?? [] });
-        },
-      );
+      // The sync layer opens the account's provider and asks it: the UI knows no protocol.
+      void peopleOf(
+        { store, secrets: platform.secrets, http: platform.http },
+        accountId,
+        text,
+      ).then((people) => {
+        // Only an answer is kept: a search that failed is asked again.
+        if (people) known.set(key, people);
+        if (live) setFound({ accountId, text, people: people ?? [] });
+      });
     }, REST_MS);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [text, accountId, store, platform, connect, known]);
+  }, [text, accountId, store, platform, known]);
 
   useEffect(() => {
     if (caret.current === null || !field.current) return;

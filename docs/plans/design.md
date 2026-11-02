@@ -1732,14 +1732,24 @@ reminders, its description and mentions in it.
     attendees, asked of the calendar home in one `REPORT`. Individuals
     only (`calendar-user-type`), no group, room or resource; the e-mail
     from `email-address`, else a `mailto:` in `calendar-user-address-set`.
-    Radicale answers it with nobody; a server that refuses the report
-    finds no one. `peopleOf` (`@astrotime/sync`) asks with the account's
-    credentials; offline or refused, it finds no one, and a mention can
-    still be typed. Tested on recorded answers of Nextcloud 34 (the test
-    user, who has no e-mail) and Radicale 3.8, and on one written by hand
+    A principal that names no `calendar-user-type` is taken as an
+    individual (RFC 6638 makes `INDIVIDUAL` the default). Radicale answers
+    it with nobody; a server that refuses the report finds no one.
+    `peopleOf` (`@astrotime/sync/people`) opens the account's provider from
+    the platform's HTTP, as a sync does (the UI knows no protocol), and asks
+    with the account's credentials; offline or refused, it has no answer,
+    and a mention can still be typed. Tested on recorded answers of
+    Nextcloud 34 (the test user, who has no e-mail) and Radicale 3.8, and
+    on one written by hand
     for the e-mail, group and room paths, in the shape Sabre documents
     (`packages/caldav/test/fixtures`); end to end on Radicale with that
     answer served for the one report.
+  - **A live query, not the store's** ([foundation D5](foundation.md#D5)
+    keeps the UI on the store): people are no calendar data, are not
+    synced, and a server's whole directory (every user of a Nextcloud) is
+    neither the device's to keep nor small; the search asks the server for
+    the few a query names, as the place search asks Photon
+    ([D175](#D175)), and keeps nothing once the dialog closes.
   - **What is written:** a Markdown link to the person's e-mail,
     `[@Anna Berg](mailto:anna@example.com)` (in the name only what would
     change a link's words escaped: brackets, a backslash, `*`, `_`, a
@@ -1749,7 +1759,9 @@ reminders, its description and mentions in it.
     space, a bracket, `%`, `<`, `>`, a quote, a backslash, `?` or `#`
     percent-encoded,
     so the link stays whole; read back decoded, or as written when it does
-    not decode); someone with no e-mail is written `@Name`. A mention invites no one and sends nothing:
+    not decode; the chip's link to write to them is made from the address
+    encoded again, so one that decodes to `?` or `#` adds no header or
+    body); someone with no e-mail is written `@Name`. A mention invites no one and sends nothing:
     no `ATTENDEE` is written ([D108](#D108): AstroTime does not invite).
   - **Read:** the details ([D207](#D207)) draw such a link as a chip with
     the name; a tap shows the e-mail, as a link to write to them.

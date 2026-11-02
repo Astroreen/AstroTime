@@ -5,6 +5,7 @@
 // to see a person offered and picked.
 import { readFileSync } from "node:fs";
 
+import AxeBuilder from "@axe-core/playwright";
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
@@ -72,6 +73,12 @@ test("typing @ offers the server's people; a pick writes a mailto link (design D
     "Anna Berganna@example.com",
     "Annika Lindannika@example.com",
   ]);
+  // The field and its list as a screen reader meets them (WCAG 2.2 AA).
+  const audit = await new AxeBuilder({ page })
+    .include('[role="dialog"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"])
+    .analyze();
+  expect(audit.violations.map((violation) => violation.id)).toEqual([]);
   await description.press("ArrowDown");
   await expect(people.getByRole("option", { name: /Annika Lind/ })).toHaveAttribute(
     "aria-selected",
