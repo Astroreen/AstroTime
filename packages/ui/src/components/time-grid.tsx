@@ -17,7 +17,7 @@ import {
 } from "react";
 
 import { daysBetween } from "../calendar/dates.ts";
-import { columnAt, slotAt } from "../calendar/drag.ts";
+import { columnAt, evenColumns, slotAt } from "../calendar/drag.ts";
 import { foldWeek } from "../calendar/month.ts";
 import type { Entry, RangeLayout } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
@@ -361,9 +361,10 @@ function Strip({
     pressed.current = null;
     const still = from && Math.hypot(event.clientX - from.x, event.clientY - from.y) < 8;
     if (!editing.canCreate || event.detail > 1 || !still || onItem(event.target)) return;
-    const { left, width } = event.currentTarget.getBoundingClientRect();
-    const index = Math.floor(((event.clientX - left) / width) * days.length);
-    const day = days[Math.max(0, Math.min(days.length - 1, index))]!;
+    // The days by the content box: an open strip's scrollbar is no day's.
+    const strip = event.currentTarget;
+    const left = strip.getBoundingClientRect().left + strip.clientLeft;
+    const day = days[columnAt(event.clientX, evenColumns(left, strip.clientWidth, days.length))]!;
     editing.create("event", { day, allDay: true });
   };
   // A drag's ghost over the days it goes to, on the first row.
