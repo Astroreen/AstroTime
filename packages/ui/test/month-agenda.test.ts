@@ -75,8 +75,10 @@ describe("the month (design D86)", () => {
       lastDay: 0,
       continuesBefore: true,
     });
-    // Undone tasks due before today are on today's chip only (design D51).
-    expect(weeks.flatMap((w) => w.spans).filter((s) => title(s) === "Reply to Olga")).toEqual([]);
+    // An undone task due before today stays on its day, and counts in today's chip (design D185).
+    expect(weeks.flatMap((w) => w.spans).filter((s) => title(s) === "Reply to Olga")).toMatchObject(
+      [{ span: { firstDay: 0, lastDay: 0 } }],
+    );
     expect(weeks.flatMap((w) => w.spans).filter((s) => s.entry === null)).toHaveLength(1);
   });
 });

@@ -306,7 +306,7 @@ test("the month picker jumps to the day picked", async ({ page }) => {
   await expect(page.getByRole("main", { name: "December" })).toBeVisible();
 });
 
-test("the all-day strip folds past three rows to two and +N, and expands in place (D51)", async ({
+test("the all-day strip folds past three rows, a day with more giving its last to +N; it expands in place (D51, D186)", async ({
   page,
 }) => {
   await page.setViewportSize(PHONE);
@@ -324,16 +324,29 @@ test("the all-day strip folds past three rows to two and +N, and expands in plac
   await expect(rent).toHaveCount(0);
 });
 
-test("undone tasks due before today leave their days for one chip on today (D51)", async ({
+test("a folded strip draws a day's one item past two rows instead of +1 (D186)", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
   await openDemo(page, "week");
-  // Rolled over: no longer on the day it was due…
+  // Today folds; Friday has three, and keeps them all.
+  await expect(strip(page).getByRole("button", { name: /more on Wednesday/ })).toBeVisible();
   await expect(
-    day(page, "Monday, November 2").getByRole("listitem", { name: /Reply to Olga/ }),
-  ).toHaveCount(0);
-  // …while a completed task stays where it was.
+    strip(page).getByRole("listitem", { name: "Task: Water the plants, All day" }),
+  ).toBeVisible();
+  await expect(strip(page).getByRole("button", { name: /more on Friday/ })).toHaveCount(0);
+});
+
+test("an undone task due before today stays on its day and counts in today's chip (D51, D185)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  // On the day it was due, as Google draws it…
+  await expect(
+    day(page, "Monday, November 2").getByRole("listitem", { name: "Task: Reply to Olga, 9:00 AM" }),
+  ).toBeVisible();
+  // …and a completed task stays where it was.
   await expect(
     strip(page).getByRole("listitem", { name: "Completed task: Tidy the desk, All day" }),
   ).toBeVisible();

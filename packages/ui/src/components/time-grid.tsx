@@ -18,6 +18,7 @@ import {
 
 import { daysBetween } from "../calendar/dates.ts";
 import { columnAt, slotAt } from "../calendar/drag.ts";
+import { foldWeek } from "../calendar/month.ts";
 import type { Entry, RangeLayout } from "../calendar/query.ts";
 import { useCalendar } from "./context.ts";
 import { DragContext, useDrag, type DragSurface, type Ghost } from "./drag.tsx";
@@ -26,7 +27,7 @@ import { ChevronIcon } from "./icons.tsx";
 import { GhostBlock, GhostChip, HOUR, StripChip, TimedItem } from "./items.tsx";
 import { UndoneChip } from "./undone-chip.tsx";
 
-/** Past this many rows the strip folds to two and "+N" (design D51). */
+/** Past this many rows the strip folds: a day with more gives its last row to "+N" (design D51, D186). */
 const STRIP_ROWS = 3;
 /** Milliseconds within which two presses can be one double click. */
 const DOUBLE_CLICK = 1000;
@@ -351,21 +352,11 @@ function Strip({
       : null;
   const first = over ? Math.max(0, daysBetween(days[0]!, over.first)) : 0;
   const last = over ? Math.min(days.length - 1, daysBetween(days[0]!, over.last)) : -1;
-  const shown = collapsed
-    ? layout.strip.filter(({ span }) => span.row < STRIP_ROWS - 1)
-    : layout.strip;
-  const more = collapsed
-    ? days
-        .map((day, index) => ({
-          day,
-          index,
-          count: layout.strip.filter(
-            ({ span }) =>
-              span.row >= STRIP_ROWS - 1 && span.firstDay <= index && index <= span.lastDay,
-          ).length,
-        }))
-        .filter(({ count }) => count > 0)
-    : [];
+  // Folded as a month's week is: a day with more than fits gives its last
+  // row to "+N", any other day keeps all its rows (design D186).
+  const { shown, more } = collapsed
+    ? foldWeek(layout.strip, STRIP_ROWS)
+    : { shown: layout.strip, more: [] };
   const rows = collapsed ? STRIP_ROWS : layout.rows;
   return (
     <div
@@ -406,16 +397,16 @@ function Strip({
           />
         </div>
       )}
-      {more.map(({ day, index, count }) => (
+      {more.map(({ index, count }) => (
         <div
-          key={day}
+          key={index}
           role="listitem"
           className="px-[1.5px]"
           style={{ gridColumn: index + 1, gridRow: STRIP_ROWS }}
         >
           <button
             type="button"
-            aria-label={t("grid.moreLabel", { count, day: formats.fullDate(day) })}
+            aria-label={t("grid.moreLabel", { count, day: formats.fullDate(days[index]!) })}
             onClick={() => onExpandedChange(true)}
             className="h-full w-full truncate rounded-[5px] px-1.5 text-left text-small text-ink-muted -outline-offset-2 hover:bg-raised"
           >
