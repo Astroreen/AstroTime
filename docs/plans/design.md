@@ -1432,8 +1432,8 @@ bar, the sidebar and the accounts panel.
   bar's right, 8 px in, growing from its top right corner as Google's
   account popover does; on a phone centred as before, from its top. A line
   of `line` around it sets it apart from the page, which is not dimmed:
-  nested in the drawer's dialog root, Base UI draws no backdrop for it, as
-  before. Its title is first and ✕ at the right of its header, on every
+  it has no backdrop (nested in the drawer's dialog root, Base UI never drew
+  the one it had). Its title is first and ✕ at the right of its header, on every
   screen: the owner's word over [D137](#D137)'s "✕ before its title, as
   every other dialog", for this panel only; the other dialogs keep ✕
   first.
@@ -1456,7 +1456,13 @@ bar, the sidebar and the accounts panel.
   Calendar web's full tasks view; one line, `max-w-[40rem]`, that a wider
   layout of lists side by side can widen), fading up into place; the
   sidebar stays, and a view picked there, or a view's key, brings the
-  calendar back, as do a search's result with a date and a tapped reminder.
+  calendar back, as do a search's result with a date and a tapped reminder
+  (each forgetting the task a search asked the tasks screen for). While
+  the tasks show, no view in the sidebar is the current one, and its
+  Create makes a task, for today in the first list, as the screen's own
+  "Add a task" would. The calendar's view stays drawn under them, hidden,
+  on purpose: back on the calendar, its period and the grid's scroll are
+  where the user left them, with nothing to read again.
   Today, the arrows and the period hide while the tasks are shown, and the
   keys that step a period or go to today do nothing: they would move a
   calendar nobody sees. The 360 px panel right of the calendar ([D95](#D95))

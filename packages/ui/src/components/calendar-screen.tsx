@@ -420,7 +420,11 @@ export function CalendarScreen({
 
   const title = formats.period(...titleRange(view, days, anchor), today.slice(0, 4));
   // A new event on the day shown, from the next half hour (Google).
-  const create = () => editing.value.create("event", { day: anchor });
+  // Over the tasks screen, a task, for today, as the screen's own "Add a task" (D227).
+  const create = () =>
+    wideTasks
+      ? editing.value.create("task", { day: today, allDay: true })
+      : editing.value.create("event", { day: anchor });
   // On a wide screen the sidebar's top holds Create, as Google Calendar's web
   // app; with no sidebar the "+" button floats (D132).
   const sidebar = wide && sidebarOpen;
@@ -432,7 +436,8 @@ export function CalendarScreen({
   };
   const drawer = (
     <DrawerContent
-      view={view}
+      // No view is the one shown while the tasks take its place (D227).
+      view={wideTasks ? null : view}
       onView={pickView}
       accounts={lists?.accounts ?? []}
       calendars={lists?.calendars ?? []}

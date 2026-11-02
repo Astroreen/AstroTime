@@ -17,7 +17,7 @@ import { CalendarRow } from "./calendar-row.tsx";
 import { CloseIcon } from "./icons.tsx";
 import { ConflictsDialog } from "./lazy.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
-import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
+import { DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
 const syncs = (account: Account) => account.provider === "caldav";
 
@@ -283,11 +283,9 @@ export function AccountButton({ accounts }: { accounts: readonly Account[] }) {
       <Dialog.Portal>
         {/*
           The panel hangs under the top bar, the button that opened it in
-          sight, on a wide screen at its right (design D225). Nested in the
-          drawer's dialog root, Base UI draws no backdrop for it: the page
-          is not dimmed.
+          sight, on a wide screen at its right (design D225); the page is not
+          dimmed, so it has no backdrop.
         */}
-        <DialogBackdrop className="fixed inset-0 z-[80] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <DialogPopup className="fixed top-[calc(3.5rem+var(--inset-top))] left-1/2 z-[90] max-h-[calc(100dvh-4.5rem-var(--inset-top)-var(--inset-bottom))] origin-top w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 lg:right-[calc(0.5rem+var(--inset-right))] lg:left-auto lg:origin-top-right lg:translate-x-0 ring-1 ring-line">
           {/* Its title, then ✕ at the right, as the owner asked (design D225). */}
           <div className="mb-2 flex items-center gap-2 pl-2">
