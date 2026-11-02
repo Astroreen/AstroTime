@@ -59,7 +59,7 @@ class ExchangeTest {
         headers: Map<String, String> = emptyMap(),
         body: String? = null,
         cleartext: Set<String> = servers.flatMap { listOf(origin(it.at("a.test")), origin(it.at("b.test"))) }.toSet(),
-    ) = exchange.run(HttpRequest(method, url.toString(), headers, body, cleartext))
+    ) = exchange.run(HttpRequest(method, url.toString(), headers, body?.toByteArray(Charsets.UTF_8), cleartext))
 
     @Test
     fun `PROPFIND, REPORT and MKCALENDAR pass with their bodies and headers`() {
@@ -84,6 +84,23 @@ class ExchangeTest {
         assertEquals("<sync-collection/>", report.body?.utf8())
         assertEquals(201, run("MKCALENDAR", server.at(path = "/new/")).status)
         assertEquals("MKCALENDAR", server.takeRequest().method)
+    }
+
+    @Test
+    fun `a file's bytes pass as they are, from base64 (design D232)`() {
+        val server = server()
+        server.enqueue(answer(201))
+        val bytes = byteArrayOf(0, -1, 10, 13, 0x7f, -128)
+        val request =
+            requestOf(
+                org.json.JSONObject()
+                    .put("method", "PUT")
+                    .put("url", server.at(path = "/f.bin").toString())
+                    .put("bodyBase64", java.util.Base64.getEncoder().encodeToString(bytes))
+                    .put("cleartext", org.json.JSONArray(listOf(origin(server.at())))),
+            )
+        assertEquals(201, exchange.run(request).status)
+        assertEquals(bytes.toList(), server.takeRequest().body?.toByteArray()?.toList())
     }
 
     @Test

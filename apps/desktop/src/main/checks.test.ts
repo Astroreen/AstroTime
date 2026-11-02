@@ -18,6 +18,9 @@ test("a CalDAV request passes as it is, with any method and a body or none", () 
   expect(checkRequest(request)).toEqual(request);
   const report = { ...request, method: "REPORT", body: "<x/>" };
   expect(checkRequest({ ...report, extra: "dropped" })).toEqual(report);
+  // A file's bytes, uploaded to an account's files (foundation D232).
+  const put = { ...request, method: "PUT", body: new Uint8Array([0, 255]) };
+  expect(checkRequest(put)).toEqual(put);
 });
 
 test("anything that is not one http(s) request is refused", () => {
@@ -39,6 +42,7 @@ test("anything that is not one http(s) request is refused", () => {
     { ...request, headers: { Cookie: "session=1" } },
     { ...request, headers: { "Content-Length": "999" } },
     { ...request, body: { xml: "<x/>" } },
+    { ...request, body: [0, 255] },
   ];
   for (const value of refused) expect(() => checkRequest(value)).toThrow(TypeError);
 });

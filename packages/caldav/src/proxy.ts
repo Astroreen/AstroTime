@@ -113,7 +113,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       answer = await run(target, {
         method: request.method,
         headers,
-        ...(hasBody ? { body: await request.text() } : {}),
+        // As bytes: a file uploaded passes as it is, text too (foundation D232).
+        ...(hasBody ? { body: await request.arrayBuffer() } : {}),
         // A redirect goes back to the client, mapped into the proxy, so the
         // client sees the URL that answered (discovery's /.well-known redirect).
         redirect: "manual",

@@ -103,6 +103,12 @@ export interface RemoteFile {
 export interface FileStore {
   /** What a folder holds, folders first, each by name; `/` is the top. */
   list(path: string): Promise<RemoteFile[]>;
+  /**
+   * Uploads a file from the device where the server's calendar app keeps
+   * what it attaches (docs/plans/foundation.md#D232), under a name not
+   * taken; resolves with the file as listed.
+   */
+  upload(name: string, type: string, bytes: Uint8Array): Promise<RemoteFile>;
 }
 
 /** A provider could not reach its server; local changes wait for the next sync. */

@@ -2,11 +2,15 @@ import { expect, test } from "vite-plus/test";
 
 import { CalDavProvider, canonicalHref, type HttpClient, type HttpRequest } from "../src/index.ts";
 
+/** A request's body as text: the provider sends text to CalDAV. */
+const bodyText = (request: { readonly body?: string | Uint8Array }) =>
+  typeof request.body === "string" ? request.body : "";
+
 test("hrefs the server names on another origin never get the credentials", async () => {
   const requests: HttpRequest[] = [];
   const http: HttpClient = async (request) => {
     requests.push(request);
-    const body = request.body?.includes("calendar-multiget")
+    const body = bodyText(request).includes("calendar-multiget")
       ? ""
       : `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>https://evil.example/steal.ics</d:href><d:propstat><d:prop><d:getetag>"1"</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>/cal/ok.ics</d:href><d:propstat><d:prop><d:getetag>"2"</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
     return { status: 207, url: request.url, header: () => null, body };
@@ -18,7 +22,7 @@ test("hrefs the server names on another origin never get the credentials", async
   );
   await provider.changes("https://dav.example/cal/", { syncToken: null, ctag: null }, new Map());
   expect(requests.every((r) => new URL(r.url).origin === "https://dav.example")).toBe(true);
-  expect(requests.some((r) => r.body?.includes("evil.example"))).toBe(false);
+  expect(requests.some((r) => bodyText(r).includes("evil.example"))).toBe(false);
   await expect(provider.fetch("https://evil.example/steal.ics")).rejects.toThrow(
     /credentials stay home/,
   );
@@ -72,8 +76,8 @@ test("discovery does not follow a principal or a home the server names on anothe
 test("requests about an href use the server's own spelling of it", async () => {
   const bodies: string[] = [];
   const http: HttpClient = async (request) => {
-    bodies.push(`${request.method} ${request.url} ${request.body ?? ""}`);
-    if (request.body?.includes("calendar-multiget")) {
+    bodies.push(`${request.method} ${request.url} ${bodyText(request)}`);
+    if (bodyText(request).includes("calendar-multiget")) {
       return {
         status: 207,
         url: request.url,
@@ -130,7 +134,7 @@ test("writes and deletions use the server's spelling too", async () => {
 test("an object without an ETag on either side is fetched again, not taken as unchanged", async () => {
   const bodies: string[] = [];
   const http: HttpClient = async (request) => {
-    bodies.push(request.body ?? "");
+    bodies.push(bodyText(request));
     return {
       status: 207,
       url: request.url,
