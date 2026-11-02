@@ -1,5 +1,6 @@
-// The scrollbar's thumb (design D191) against every surface a scroller sits
-// on, light and dark: 3:1 or more at rest (WCAG 1.4.11), stronger under the
+// The scrollbar's thumb (design D191) against the theme's four surfaces a
+// scroller sits on (the canvas, a tile, a raised surface and its hover),
+// light and dark: 3:1 or more at rest (WCAG 1.4.11), stronger under the
 // pointer and while dragged. The thumb's shares of the ink and the theme's
 // colours are read from styles.css; the mixing is `color-mix(in srgb, …,
 // transparent)` drawn over the surface, modelled here.
@@ -46,7 +47,7 @@ const surfaces = ["canvas", "tile", "raised", "raised-hover"].map(token);
 
 describe("the scrollbar's thumb (design D191)", () => {
   for (const theme of ["light", "dark"] as const) {
-    test(`3:1 or more at rest on every surface, ${theme}; stronger under the pointer and dragged`, () => {
+    test(`3:1 or more at rest on the four surfaces, ${theme}; stronger under the pointer and dragged`, () => {
       for (const surface of surfaces) {
         const on = (part: number) =>
           contrast(over(rgb(ink[theme]), rgb(surface[theme]), part), rgb(surface[theme]));
