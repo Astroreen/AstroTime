@@ -116,6 +116,14 @@ export function attachmentText(
 }
 
 /**
+ * Whether what was typed is one word, a dot and another, with nothing
+ * after it (`report.pdf`, `notes.md`, `example.org`): as likely a file's
+ * name as a site, so no link until it says so, with `https://`, a path, a
+ * query or a fragment (`example.org/plan`, `example.org?x=1`).
+ */
+export const bareName = (typed: string) => /^[^.\s/:?#@]+\.[^.\s/:?#@]+$/.test(typed.trim());
+
+/**
  * A web link typed: with `http://` or `https://`, else `https://` before it.
  * Its host has a dot (`docs.example.org`, `example.org/plan`,
  * `192.168.1.10`), is `localhost`, or is a name with its port
@@ -134,10 +142,7 @@ export function typedLink(text: string): string | null {
   const host = /^(?:https?:\/\/)?([^/:?#]*)/i.exec(trimmed)?.[1] ?? "";
   // An address with a user (`a@b.com`, `user@host`) is mail, not a page.
   if (host.includes("@")) return null;
-  // One word, a dot and another, with nothing after (`report.pdf`,
-  // `notes.md`, `example.org`): as likely a file's name as a site. It is a
-  // link once it says so, with `https://` or a path (the field says how).
-  if (!scheme && !/[/:]/.test(trimmed) && /^[^.]+\.[^.]+$/.test(host)) return null;
+  if (bareName(trimmed)) return null;
   // Digits and dots: an address only as four numbers (no "1.5" read as 1.0.0.5).
   if (/^[\d.]+$/.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
   try {

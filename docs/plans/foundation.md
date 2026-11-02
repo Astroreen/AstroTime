@@ -2259,14 +2259,15 @@ task?"
     the row says "Uploading minutes.txt…", and one that failed says so.
     The file joins the attachments as they are when it is ready, not as
     they were when it was picked: what the user changed meanwhile (a link
-    added, the title) stays; but if the item went to another account's
-    calendar meanwhile, the file is not attached (a link to the first
-    account's file would not open there), and the dialog says so. The form and its callback are read as
-    the latest render left them (a ref, not what was there when the file
-    was picked). A dialog closed
-    before the upload ended is
-    left alone: nothing changes in it after, and the file stays in
-    `/Calendar`, uploaded and not attached ([Deferred](#deferred)).
+    added, the title) stays. If the item went to another account's calendar
+    meanwhile, the file is not attached (a link to the first account's file
+    would not open there) and the dialog says so; back in that account, it
+    is attached and the alert goes; a move to another calendar of the same
+    account changes nothing. The form and its callback are read as the
+    latest render left them (a ref, not what was there when the file was
+    picked). A dialog closed (saved) before the upload ended is left alone:
+    nothing changes in it after, and the file stays in `/Calendar`, uploaded
+    and not attached ([Deferred](#deferred)).
 
 ## Deferred
 

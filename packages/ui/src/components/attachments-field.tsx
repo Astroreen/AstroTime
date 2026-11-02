@@ -12,7 +12,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AttachmentChoice } from "../calendar/editing.ts";
-import { attachmentHref, attachmentText, sameLink, typedLink } from "../calendar/attachments.ts";
+import {
+  attachmentHref,
+  attachmentText,
+  bareName,
+  sameLink,
+  typedLink,
+} from "../calendar/attachments.ts";
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
@@ -76,8 +82,14 @@ export function AttachmentsField({
   const [uploading, setUploading] = useState<
     | { readonly state: "sending"; readonly name: string }
     | { readonly state: "failed"; readonly name: string; readonly tooBig: boolean }
-    // Uploaded, but the item's calendar moved to another account meanwhile.
-    | { readonly state: "moved"; readonly name: string }
+    // Uploaded, but the item's calendar moved to another account meanwhile:
+    // held, attached if it comes back to the account it was uploaded to.
+    | {
+        readonly state: "moved";
+        readonly name: string;
+        readonly from: string;
+        readonly attachment: NewAttachment;
+      }
     | null
   >(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -126,7 +138,7 @@ export function AttachmentsField({
       // The item moved to another account's calendar meanwhile: a link to
       // this account's file would not open there. Not attached, and said so.
       if (now.calendar?.accountId !== from) {
-        setUploading({ state: "moved", name: sent.name });
+        setUploading({ state: "moved", name: sent.name, from, attachment: sent.attachment });
         return;
       }
       attach(sent.attachment, now.calendar.url);
@@ -136,12 +148,25 @@ export function AttachmentsField({
       if (latest.current) setUploading({ state: "failed", name: file.name, tooBig: false });
     }
   };
+  // The item back in the account the file went to: attached after all, and
+  // the alert gone. Another calendar of another account changes nothing.
+  useEffect(() => {
+    if (uploading?.state !== "moved" || calendar?.accountId !== uploading.from) return;
+    attach(uploading.attachment, calendar.url);
+    setUploading(null);
+  }, [uploading, calendar]);
   const [adding, setAdding] = useState(false);
   const [link, setLink] = useState("");
+  // The user tried to add what they typed (Enter, or left the field): only
+  // then does a bare name say what makes it a link (design D233).
+  const [tried, setTried] = useState(false);
   const inputId = useId();
   const typed = typedLink(link);
   const add = () => {
-    if (!typed) return;
+    if (!typed) {
+      setTried(true);
+      return;
+    }
     onChange([...value, { kind: "new", attachment: { uri: typed } }]);
     setLink("");
     setAdding(false);
@@ -185,7 +210,11 @@ export function AttachmentsField({
             autoFocus
             placeholder="https://"
             value={link}
-            onChange={(event) => setLink(event.target.value)}
+            onChange={(event) => {
+              setLink(event.target.value);
+              setTried(false);
+            }}
+            onBlur={() => setTried(true)}
             onKeyDown={(event) => {
               // Enter adds the link here, not the dialog's save; Escape leaves it.
               if (event.key === "Enter") {
@@ -238,7 +267,7 @@ export function AttachmentsField({
           )}
         </div>
       )}
-      {adding && link.trim() !== "" && !typed && (
+      {adding && tried && bareName(link) && (
         // Not a web link yet: what makes it one (design D233).
         <p className="text-note text-ink-muted">{t("attachments.notLink")}</p>
       )}

@@ -265,7 +265,7 @@ test("what the user changes while a file uploads stays: the file joins the list 
   await expect(edit.getByRole("textbox", { name: "Title" })).toHaveValue("Quarterly review, v2");
 });
 
-test("an item moved to another account's calendar while its file uploads: not attached, and said so (design D232)", async ({
+test("an item moved to another account while its file uploads: not attached, said so; back, attached (D232)", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
@@ -298,9 +298,15 @@ test("an item moved to another account's calendar while its file uploads: not at
     "minutes.txt was uploaded, but the item is now in another account's calendar: it is not attached.",
   );
   await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
+  // Back in the account the file went to: attached after all, the alert gone.
+  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Work");
+  await expect(edit.getByRole("list", { name: "Attachments" }).getByRole("listitem")).toHaveText([
+    /minutes\.txt/,
+  ]);
+  await expect(edit.getByRole("alert")).toHaveCount(0);
 });
 
-test("a word and an ending alone is not taken for a link: the field says to put https:// before it (design D233)", async ({
+test("a bare name.ext is no link: tried, the field says to put https:// before it (design D233)", async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
@@ -320,9 +326,17 @@ test("a word and an ending alone is not taken for a link: the field says to put 
   const edit = page.getByRole("dialog", { name: "Edit event" });
   await edit.getByRole("button", { name: "Add a link" }).click();
   const link = edit.getByRole("textbox", { name: "Link" });
+  const hint = edit.getByText("Not a web link yet: put https:// before it.");
+  // Not while typing, nor for what is no bare name.
+  await link.fill("1234");
+  await link.press("Enter");
+  await expect(hint).toHaveCount(0);
   await link.fill("report.pdf");
   await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
-  await expect(edit.getByText("Not a web link yet: put https:// before it.")).toBeVisible();
+  await expect(hint).toHaveCount(0);
+  // Tried: Enter says what makes it a link.
+  await link.press("Enter");
+  await expect(hint).toBeVisible();
   await link.fill("https://example.org/report.pdf");
   await expect(edit.getByText("Not a web link yet: put https:// before it.")).toHaveCount(0);
   await expect(edit.getByRole("button", { name: "Add", exact: true })).toBeEnabled();

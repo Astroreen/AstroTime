@@ -5,6 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   attachmentHref,
   attachmentText,
+  bareName,
   kindOf,
   sameLink,
   sizeText,
@@ -111,6 +112,15 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   expect(typedLink("archive.zip")).toBeNull();
   expect(typedLink("notes.md")).toBeNull();
   expect(typedLink("example.org")).toBeNull();
+  // A query or a fragment says it is a link.
+  expect(typedLink("example.org?x=1")).toBe("https://example.org/?x=1");
+  expect(typedLink("example.org#top")).toBe("https://example.org/#top");
+  expect([
+    bareName("report.pdf"),
+    bareName(" notes.md "),
+    bareName("1234"),
+    bareName("a.b.c"),
+  ]).toEqual([true, true, false, false]);
   expect(typedLink("a@b.com")).toBeNull();
   expect(typedLink("https://user@example.org/")).toBeNull();
   expect(typedLink("example.org/report.pdf")).toBe("https://example.org/report.pdf");
