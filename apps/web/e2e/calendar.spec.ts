@@ -109,6 +109,66 @@ test("a swipe on a touch screen moves to the next period", async ({ page }) => {
   await expect(header(page, "Saturday, November 7")).toBeVisible();
 });
 
+test.describe("on a touch screen, after a swipe (D152)", () => {
+  test.use({ viewport: PHONE, hasTouch: true });
+
+  /** A finger's quick swipe to the left at `y`, as Chromium's touch input sends it: it ends in a fling. */
+  async function swipeLeft(page: Page, y: number) {
+    const cdp = await page.context().newCDPSession(page);
+    // Its own times, 16 ms apart: a quick flick, whatever the machine's speed.
+    let time = Date.now() / 1000;
+    const touch = (type: "touchStart" | "touchMove" | "touchEnd", x?: number) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: x === undefined ? [] : [{ x, y }],
+        timestamp: (time += 0.016),
+      });
+    await touch("touchStart", 320);
+    for (let step = 1; step <= 8; step++) await touch("touchMove", 320 - step * 30);
+    await touch("touchEnd");
+  }
+
+  test("the next tap on the top bar lands the first time", async ({ page }) => {
+    await openDemo(page, "week");
+    await expect(header(page, "Wednesday, November 4")).toBeVisible();
+    await swipeLeft(page, 600);
+    await expect(header(page, "Sunday, November 8")).toBeVisible();
+    // The browser's fling stopped by this tap took its click.
+    await page.getByRole("button", { name: /^Today, / }).tap();
+    await expect(header(page, "Wednesday, November 4")).toBeVisible();
+  });
+
+  test("in the Month too", async ({ page }) => {
+    await openDemo(page, "month");
+    await expect(page.getByRole("main", { name: "November" })).toBeVisible();
+    await swipeLeft(page, 500);
+    await expect(page.getByRole("main", { name: "December" })).toBeVisible();
+    await page.getByRole("button", { name: "Search" }).tap();
+    await expect(page.getByRole("searchbox")).toBeVisible();
+  });
+});
+
+test("the all-day strip is as tall as the days shown need, on every period (D151)", async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await openDemo(page, "day");
+  await expect(header(page, "Wednesday, November 4")).toBeVisible();
+  for (const name of ["Thursday", "Friday", "Saturday", "Sunday", "Monday"]) {
+    await page.locator("body").press("n");
+    await expect(
+      page.getByRole("heading", { name: new RegExp(`^${name}, November`) }),
+    ).toBeVisible();
+  }
+  // Monday the 9th has two rows of all-day items; Tuesday none.
+  await expect(strip(page).getByRole("listitem")).toHaveCount(2);
+  await expect(strip(page)).toHaveCSS("height", "50px");
+  await page.locator("body").press("n");
+  await expect(header(page, "Tuesday, November 10")).toBeVisible();
+  await expect(strip(page).getByRole("listitem")).toHaveCount(0);
+  await expect(strip(page)).toHaveCSS("height", "4px");
+});
+
 test("the time grid is drawn where it stays: the strip's items do not push it down as they arrive", async ({
   page,
 }) => {

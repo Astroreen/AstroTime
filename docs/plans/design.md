@@ -94,7 +94,8 @@ the project.
   completed" toggle stays, in the drawer, and hides completed tasks' chips on
   every view. When the all-day strip holds more than
   fits, it shows the first two rows and "+N", with a chevron that expands
-  it in place.
+  it in place (_since [D151](#D151):_ open, it stays open from period to
+  period).
 - **D52. The tasks screen is Google Tasks'.** The tasks toggle in the top
   bar opens it: a tab per task list (a VTODO calendar) with its count of
   undone tasks, and "+ New list"; under the tab, a card with the list's
@@ -132,7 +133,7 @@ the project.
   - the top bar names the month, both months across a change of month
     ("October – November"), and the year only when it is not this one; prev
     and next buttons sit in it on a wide screen, a horizontal swipe moves on
-    a touch screen, and `n`/`j`, `p`/`k` and `t` move on a keyboard; search,
+    a touch screen ([D152](#D152)), and `n`/`j`, `p`/`k` and `t` move on a keyboard; search,
     the tasks toggle (5b) and the account (5a-3) join it with their screens;
   - the week number is ISO's, of the week the first day belongs to in the
     locale's weeks (the reference's 3 days from Sunday, November 1 show 44);
@@ -791,6 +792,42 @@ dialog ([D108](#D108)) and the words of the UI did wrong, and do now:
   - **A task in the search results** reads as its due: the day it is due
     and the time, or the day alone for a due date, where it gave its
     start's day with its due's time.
+
+### Decided in round 3: the views and motion
+
+The owner's feedback on v0.3.0, tested on a phone and a computer, for the
+views: "nothing animates when I flip a week, a month or a day"; "the
+calendar button at the top right does not always work: on the phone I have
+to hold it or press it twice"; "in the Day view, with many tasks on a day
+without a set time, when I flip to another day the room those tasks took at
+the top stays"; "I want to see a preview of the item in the background while
+I make it"; "sometimes an item's text is covered by another event".
+
+- **D151. The all-day strip is as tall as the days shown need**, on every
+  period: flipped from a day whose strip held rows to one with none, the
+  strip kept the old rows' room over nothing. Its rows were a style,
+  `repeat(N, 24px)`, and `repeat(0, 24px)` is no value at all, so the
+  browser kept the one before; with no rows it is now `none`, and the strip
+  is its 4 px edge (`apps/web/e2e/calendar.spec.ts`). D51's expanded strip
+  stays the user's choice across periods and views while the app is open,
+  as Google Calendar's web app keeps its all-day section open from week to
+  week: a strip with three rows or fewer has no chevron and shows all, so a
+  choice kept never hides anything; the chevron folds it again.
+- **D152. A swipe leaves the next tap alone.** After a quick sideways swipe
+  over the time grid or the Month, the next tap anywhere, a top-bar button
+  above all (the date icon of Today), gave no click: the swipe ended in the
+  browser's own fling (Chromium starts one even over `touch-action: pan-y`,
+  where it can move nothing sideways), and the next touch only stopped that
+  fling, which takes its tap; a second tap, or a long press after it,
+  worked. Reproduced in Chromium's touch input with a flick's timing
+  (16 ms between moves): the click came after a slow swipe, a swipe over
+  the top bar, or a vertical one, and never after a quick one over a
+  `pan-y` view. Now `useSwipe` locks a finger's axis on its first 8 px of
+  movement, under the browser's own touch slop, and cancels a sideways
+  finger's `touchmove`s, so no fling starts; a vertical one stays the
+  grid's scroll. Every top-bar button, the drawer's rows and the Agenda
+  were checked after a swipe on a phone's viewport: each takes the first
+  tap; the two `pan-y` views were the only ones it took.
 
 ## Deferred
 

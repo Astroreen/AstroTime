@@ -76,7 +76,7 @@ export function TimeGrid(props: TimeGridProps) {
     // Only on open; afterwards the user's scroll stays.
   }, []);
 
-  const swipe = useSwipe(onSwipe);
+  useSwipe(scroller, onSwipe);
   const editing = useEditing();
 
   const root = useRef<HTMLDivElement>(null);
@@ -151,7 +151,6 @@ export function TimeGrid(props: TimeGridProps) {
           ref={scroller}
           // Room under midnight, so the "+" button never hides the last hour (design D132).
           className={`relative min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-gutter:stable] ${floating ? "pb-20" : ""}`}
-          {...swipe}
         >
           <div className="grid" style={{ ...columns, height: 24 * HOUR }}>
             <div aria-hidden="true" className="relative">
@@ -335,7 +334,8 @@ function Strip({
       className={`grid gap-y-0.5 ${collapsed ? "" : "max-h-[40vh] overflow-y-auto"}`}
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${rows}, 24px)`,
+        // `repeat(0, …)` is no value: the strip would keep the rows it had.
+        gridTemplateRows: rows === 0 ? "none" : `repeat(${rows}, 24px)`,
         minHeight: rows === 0 ? 4 : undefined,
       }}
     >
