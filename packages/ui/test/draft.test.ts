@@ -227,4 +227,10 @@ describe("where the dialog stands beside the draft (design D187)", () => {
     expect(besideOf({ left: 600, right: 630 }, 639)).toBeNull();
     expect(besideOf({ left: 0, right: 30 }, 1000)).toEqual({ side: "right", width: 576 });
   });
+
+  test("a larger font makes the dialog wider, as the sheet's 36 rem does", () => {
+    expect(besideOf({ left: 0, right: 30 }, 1600, 20)).toEqual({ side: "right", width: 720 });
+    // And it floats from 40 rem.
+    expect(besideOf({ left: 0, right: 30 }, 799, 20)).toBeNull();
+  });
 });

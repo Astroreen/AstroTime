@@ -160,6 +160,37 @@ test.describe("on a screen under 1024 px (design D187)", () => {
     await expect(strip).toBeVisible();
     expect(await apart("left")).toBe(true);
   });
+
+  test("a draft on the left of the screen has the dialog on its right", async ({ page }) => {
+    await openDemo(page, "week");
+    const monday = page.getByRole("list", { name: "Monday, November 2" });
+    const box = (await monday.boundingBox())!;
+    await monday.click({ position: { x: box.width / 2, y: 16.25 * 56 } });
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(inDay(page, "Monday, November 2")).toBeVisible();
+    const drawn = (await draft(page).boundingBox())!;
+    await expect(dialog).toHaveAttribute("data-aside", "right");
+    await expect(dialog).toHaveAttribute(
+      "data-aside-for",
+      `${Math.round(drawn.x)},${Math.round(drawn.x + drawn.width)}`,
+    );
+    const left = await dialog.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).left),
+    );
+    expect(left).toBeGreaterThanOrEqual(drawn.x + drawn.width);
+  });
+
+  test("a narrower window moves the dialog to the middle, with no render of its own", async ({
+    page,
+  }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog).toHaveAttribute("data-aside", "left");
+    // Wide enough to float, too narrow for a phone's width beside Wednesday.
+    await page.setViewportSize({ width: 700, height: 800 });
+    await expect(dialog).not.toHaveAttribute("data-aside");
+  });
 });
 
 test.describe("on a phone", () => {

@@ -18,10 +18,10 @@ import type { Form, Target } from "../calendar/editing.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
 import { useMediaQuery } from "../hooks.ts";
 
-/** From this wide the dialog floats (`sm:`, `dialog-parts.tsx`'s `sheet`); narrower it is the whole screen. */
-const FLOATS = 640;
-/** The dialog's widest, as the sheet's `sm:w-[min(36rem,…)]` in the middle. */
-const WIDEST = 36 * 16;
+/** From this wide, in rem, the dialog floats (Tailwind's `sm:`, `dialog-parts.tsx`'s `sheet`); narrower it is the whole screen. */
+const FLOATS_REM = 40;
+/** The dialog's widest in rem, as the sheet's `sm:w-[min(36rem,…)]` in the middle: larger with the user's larger font. */
+const WIDEST_REM = 36;
 /** The narrowest it stands beside the draft: a phone's width, which the form is made for. */
 const NARROWEST = 360;
 /** Its margin from the screen's edge, and from the draft. */
@@ -48,12 +48,25 @@ export interface Placed extends Aside {
  */
 export function useDraftAside(open: boolean): Placed | null {
   // Heard for its changes: a window made narrower or wider renders anew.
-  const floating = useMediaQuery(`(min-width: ${FLOATS}px)`);
+  const floating = useMediaQuery(`(min-width: ${FLOATS_REM}rem)`);
   const [aside, setAside] = useState<Placed | null>(null);
+  // The view's size changed (a window resized, the drawer opened): the
+  // draft's edges move with no render of the dialog's own, so it renders.
+  const [, setResized] = useState(0);
+  useEffect(() => {
+    const main = open && floating ? document.querySelector("main") : null;
+    if (!main) return;
+    const observer = new ResizeObserver(() => setResized((count) => count + 1));
+    observer.observe(main);
+    return () => observer.disconnect();
+  }, [open, floating]);
+  // On every render: the draft moves as the form changes. A scroll moves it
+  // up or down only, which leaves its sides, and so the aside, as they are.
   useLayoutEffect(() => {
     const draft = open && floating ? shownDraft() : null;
     const rect = draft?.getBoundingClientRect();
-    const beside = rect ? besideOf(rect, window.innerWidth) : null;
+    const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const beside = rect ? besideOf(rect, window.innerWidth, rem) : null;
     const next =
       beside && rect
         ? { ...beside, draft: `${Math.round(rect.left)},${Math.round(rect.right)}` }
@@ -69,14 +82,18 @@ export function useDraftAside(open: boolean): Placed | null {
   return floating ? aside : null;
 }
 
-/** Where a dialog fits beside `draft` on a screen `screen` wide (design D187). */
-export function besideOf(draft: { left: number; right: number }, screen: number): Aside | null {
-  if (screen < FLOATS) return null;
+/** Where a dialog fits beside `draft` on a screen `screen` wide, with the root font `rem` px (design D187). */
+export function besideOf(
+  draft: { left: number; right: number },
+  screen: number,
+  rem = 16,
+): Aside | null {
+  if (screen < FLOATS_REM * rem) return null;
   const left = draft.left - MARGIN - GAP;
   const right = screen - draft.right - MARGIN - GAP;
   // A tie goes right, as the dialog reads from the left edge of the screen otherwise.
   const side = right >= left ? "right" : "left";
-  const width = Math.floor(Math.min(WIDEST, side === "right" ? right : left));
+  const width = Math.floor(Math.min(WIDEST_REM * rem, side === "right" ? right : left));
   return width >= NARROWEST ? { side, width } : null;
 }
 

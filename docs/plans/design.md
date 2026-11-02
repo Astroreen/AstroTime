@@ -1351,7 +1351,8 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   (on a phone: today's tasks under the chip a tap on "+N" away in the Day
   view; a Friday with three items kept whole in 3 days, failing before the
   change).
-- **D187. The item being made is never hidden** (the owner's feedback 1:
+- **D187. The item being made is laid out first, and its dialog stands
+  beside it where there is room** (the owner's feedback 1:
   "when I tap the calendar and choose to create a task, the task does not
   appear in the background; when I also turn on 'All day', the task does
   not appear at the top"). It changes [D155](#D155). The draft was drawn
@@ -1371,21 +1372,31 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
     too, as a full tile would hide it otherwise: an edited event shows in
     its tile's first row while its dialog is open, and goes back to its
     place among the timed items once saved;
-  - **the dialog stands beside it wherever it floats** (from 640 px), on
-    the side with more room, as wide as that room up to its 36 rem, down
-    to 360 px, a phone's width, which the form is made for (`besideOf`,
-    with its place and width in `asideStyle`, one source for both);
-    with less room on both sides (the Day view's one wide column, a narrow
-    window) it stays in the middle, as before. The backdrop dims less
-    (20%) whenever it stands aside.
+  - **the dialog stands beside it where there is room**: wherever it
+    floats (from 40 rem, Tailwind's `sm`, 640 px at the usual font), on
+    the side with more room, as wide as that room up to its 36 rem, down to
+    360 px, a phone's width, which the form is made for (`besideOf`, with
+    its place and width in `asideStyle`, one source for both). It is
+    worked out again on every render and whenever the view changes size
+    (a window resized, the drawer opened: a `ResizeObserver` on `main`); a
+    scroll moves the draft up or down only, which leaves the aside as it
+    is. The dialog says the draft's edges it stands beside
+    (`data-aside-for`). The backdrop dims less (20%) whenever it stands
+    aside. **Where there is no such room it stays in the middle and can
+    still cover the draft**: on a phone, where it is the whole screen
+    (the draft is drawn behind it, as D155 has it); in the Day view, whose
+    one column leaves less than 360 px on either side at any width; and on
+    a window under about 800 px for a day in the middle of a week.
     A timed draft was never folded; it was only covered. Tested:
     `packages/core/test/layout.test.ts` (`first` in the strip and in a
     month's week), `packages/ui/test/draft.test.ts` (where the dialog
-    stands, how wide, 360 px against 359, a tie, under 640 px),
-    `apps/web/e2e/draft.spec.ts` (at 1000 px a task on a tapped slot of a
-    full today, timed and then all day under a title sorted after today's
-    tasks, beside the dialog; a task's draft on a full today in the Month),
-    each failing before the change.
+    stands, how wide, 360 px against 359, a tie, under 40 rem, a larger
+    font), `apps/web/e2e/draft.spec.ts` (at 1000 px a task on a tapped slot
+    of a full today, timed and then all day under a title sorted after
+    today's tasks, beside the dialog; a draft on Monday with the dialog on
+    its right; a window narrowed to 700 px moving the dialog to the middle;
+    a task's draft on a full today in the Month), each failing before the
+    change.
 
 ### Decided in round 4: the editor
 
