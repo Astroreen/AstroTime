@@ -71,3 +71,37 @@ test("another client's COLOR wins over a hex it no longer names; the hex stays i
   // Another case of the same name still names it.
   expect(colorOf(written.replace("COLOR:rosybrown", "COLOR:RosyBrown"))).toBe("#c48b9f");
 });
+
+test("a colour that is neither a CSS3 name nor a hex is refused, nothing written", () => {
+  const object = CalendarObject.parse(fixture("nextcloud-web-event-timed.ics"));
+  for (const color of ["not-a-colour", "#12345", "rgb(1, 2, 3)", "rebeccapurple"]) {
+    expect(() => editItem(object, { color }, { now: NOW })).toThrow(RangeError);
+  }
+  // Every CSS3 spelling is a name: grey as gray, cyan as aqua, in any case.
+  for (const color of ["Grey", "cyan", "LightSlateGrey"]) {
+    expect(editItem(object, { color }, { now: NOW }).ics).toContain(`COLOR:${color}\r\n`);
+  }
+});
+
+test("a series with exceptions refuses a bad colour before writing anything; a good one reaches the exceptions", () => {
+  const source = fixture("nextcloud-web-event-recurring.ics");
+  const object = CalendarObject.parse(source);
+  expect(object.exceptions.length).toBeGreaterThan(0);
+  expect(() => editItem(object, { color: "not-a-colour" }, { now: NOW })).toThrow(RangeError);
+  // The object handed in is as it was.
+  expect(object.serialize()).toBe(CalendarObject.parse(source).serialize());
+  const coloured = CalendarObject.parse(editItem(object, { color: "#c48b9f" }, { now: NOW }).ics);
+  expect([coloured.master?.color, ...coloured.exceptions.map((e) => e.color)]).toEqual(
+    [coloured.master, ...coloured.exceptions].map(() => "#c48b9f"),
+  );
+});
+
+test("a CSS3 name's hex, in any case and either spelling", async () => {
+  const { colorNameHex } = await import("../src/colors.ts");
+  expect(colorNameHex("DarkKhaki")).toBe("#bdb76b");
+  expect(colorNameHex("grey")).toBe("#808080");
+  expect(colorNameHex("lightslategrey")).toBe("#778899");
+  expect(colorNameHex("cyan")).toBe("#00ffff");
+  expect(colorNameHex("magenta")).toBe("#ff00ff");
+  expect(colorNameHex("#bdb76b")).toBeNull();
+});

@@ -12,7 +12,7 @@ import {
 import { Formats } from "../src/calendar/format.ts";
 import { localeSettings } from "../src/calendar/locale.ts";
 import { periodOf, stepAnchor, titleRange } from "../src/calendar/views.ts";
-import { DEFAULT_SETTINGS, readSettings, withSettings } from "../src/settings.ts";
+import { DEFAULT_SETTINGS, defaultColorOf, readSettings, withSettings } from "../src/settings.ts";
 
 describe("days", () => {
   test("arithmetic on calendar days ignores zones and DST", () => {
@@ -197,6 +197,11 @@ describe("the drawer's settings override the locale (D53)", () => {
       clock: 24,
       hideCompleted: true,
       weekNumbers: false,
+      defaultColors: { event: "#c48b9f", task: "tomato" },
+      colors: [
+        { id: "a", hex: "#c48b9f", name: null },
+        { id: "b", hex: "#00585e", name: "Sea" },
+      ],
       reminders: false,
       keepRunning: false,
       places: false,
@@ -210,11 +215,41 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"weekNumbers":"no"}').weekNumbers).toBe(true);
     // Places on the map too (design D175).
     expect(readSettings('{"places":null}').places).toBe(true);
+    // Colours that cannot be read are dropped; a blank name is the generated one (design D170).
+    expect(
+      readSettings(
+        JSON.stringify({
+          defaultColors: { event: "rgb(1,2,3)", task: 5 },
+          colors: [{ id: "a", hex: "#C48B9F" }, { id: "b", hex: "#00585e", name: " " }, null],
+        }),
+      ),
+    ).toMatchObject({
+      defaultColors: { event: null, task: null },
+      colors: [{ id: "b", hex: "#00585e", name: null }],
+    });
+    // A default editItem would refuse is the calendar's; an own colour's id and a CSS3 name stay (D172).
+    expect(
+      readSettings('{"defaultColors":{"event":"notacolour","task":"Grey"}}').defaultColors,
+    ).toEqual({ event: null, task: "Grey" });
+    expect(readSettings('{"defaultColors":{"event":"own:b"}}').defaultColors.event).toBe("own:b");
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(
       readSettings('{"theme":"pink","weekStart":3,"clock":"24","hideCompleted":"yes"}'),
     ).toEqual(DEFAULT_SETTINGS);
+  });
+
+  test("an own colour as a default is its colour now; gone, the calendar's (design D172)", () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      defaultColors: { event: "own:a", task: "own:gone" },
+      colors: [{ id: "a", hex: "#00585e", name: null }],
+    };
+    expect(defaultColorOf(settings, "event")).toBe("#00585e");
+    expect(defaultColorOf(settings, "task")).toBeNull();
+    expect(
+      defaultColorOf({ ...settings, defaultColors: { event: "tomato", task: null } }, "event"),
+    ).toBe("tomato");
   });
 
   test("days near today by name, others by date, the year when it is not this one", () => {

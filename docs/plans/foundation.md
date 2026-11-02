@@ -1940,7 +1940,15 @@ The owner's feedback after v0.3.0, tried on a phone and a computer.
   while `COLOR` (in any case) is still its nearest name, else `COLOR`:
   another client that changed the colour wins, and the hex it left behind
   stays in the file unread, as every property does ([D7](#D7)). Other
-  clients show the nearest name; nothing else is lost. The names live in
+  clients show the nearest name; nothing else is lost. A hex left behind
+  is read again if another client later sets `COLOR` back to its nearest
+  name: the colour comes back exact, which is taken as right. `editItem`
+  writes only a CSS3 name (any case, either spelling of `gray`, `cyan`,
+  `magenta`) or a hex, and refuses anything else (`RangeError`), checked
+  once before anything is written, so no series or exception is left half
+  coloured. Core exports `isColorName` and `colorNameHex` for the UI: its
+  settings read a stored default with the same check, and the colour
+  dropdown names a CSS name by its hex. The names live in
   `packages/core/src/colors.ts`, some 1.5 KiB of the first visit
   ([D145](#D145)).
 
