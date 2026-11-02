@@ -324,7 +324,13 @@ test("the details of an event show where, the description's link, the reminder, 
   );
   await expect(details.getByText("10 minutes before")).toBeVisible();
   await expect(details.getByText("Marta Lind")).toBeVisible();
-  await expect(details.getByText("Calendar: Work")).toBeVisible();
+  // Its calendar by name, the icon and a term for a screen reader saying what it is (design D196).
+  await expect(details.getByRole("definition").filter({ hasText: /^Work$/ })).toBeVisible();
+  await expect(details.getByRole("term").filter({ hasText: /^Calendar$/ })).toHaveCount(1);
+  await expect(details.getByText("Calendar: Work")).toHaveCount(0);
+  // Every row's term names it: none is an icon alone to a screen reader.
+  const terms = await details.getByRole("term").allTextContents();
+  expect(terms).toEqual(["Location", "Description", "Reminders", "Guests", "Calendar"]);
 
   await details.getByRole("button", { name: "Edit" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit event" });
@@ -648,11 +654,20 @@ test("a task's details complete it and star it", async ({ page }) => {
   await expect(details.getByText("Due Wednesday, November 4, 3:00 PM")).toBeVisible();
   await details.getByRole("button", { name: "Mark completed" }).click();
   await expect(details.getByRole("button", { name: "Mark not completed" })).toBeVisible();
-  await details.getByRole("button", { name: "Star" }).click();
-  await expect(details.getByRole("button", { name: "Remove star" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  // The star is an icon toggle in the top bar, beside the pencil (design D196).
+  const star = details.getByRole("button", { name: "Star", exact: true });
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  const edit = details.getByRole("button", { name: "Edit" });
+  const [starBox, editBox] = [(await star.boundingBox())!, (await edit.boundingBox())!];
+  expect(starBox.y).toBe(editBox.y);
+  expect(editBox.x - (starBox.x + starBox.width)).toBeLessThanOrEqual(8);
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await expect(star).toHaveAttribute("title", "Remove star");
+  // Its list by name alone: "Tasks", no "List: Tasks".
+  await expect(details.getByRole("definition").filter({ hasText: /^Tasks$/ })).toBeVisible();
+  await expect(details.getByRole("term").filter({ hasText: /^List$/ })).toHaveCount(1);
+  await expect(details.getByText("List: Tasks")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(
     item(page, "Wednesday, November 4", "Completed task: Send the report, 3:00 PM"),

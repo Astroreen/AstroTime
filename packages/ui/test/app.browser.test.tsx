@@ -554,7 +554,8 @@ test("an item opens its details; Escape closes them and the focus is back on the
   button.click();
   const details = page.getByRole("dialog", { name: "Design review" });
   await expect.element(details).toBeInTheDocument();
-  await expect.element(details.getByText("Calendar: Work")).toBeInTheDocument();
+  // Its calendar by name, the term naming it for a screen reader (design D196).
+  await expect.element(details.getByText("Work", { exact: true })).toBeInTheDocument();
   await userEvent.keyboard("{Escape}");
   await expect.element(details).not.toBeInTheDocument();
   await expect.element(opener).toHaveFocus();

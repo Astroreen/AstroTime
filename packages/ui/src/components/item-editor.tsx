@@ -65,7 +65,7 @@ import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./sign-in-dialog.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
-import { useDraft, useDraftAside } from "./draft-aside.ts";
+import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
@@ -90,12 +90,6 @@ const field =
   "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
 /** A dropdown's button in the form, as a field (design D167). */
 const fieldButton = "h-10 w-full min-w-0 rounded-lg bg-canvas pr-2 pl-3 ring-1 ring-line";
-/** Where the dialog stands: beside the draft on a wide screen, or in the middle (design D155). */
-const ASIDE = {
-  middle: "",
-  right: "lg:right-6 lg:left-auto lg:translate-x-0",
-  left: "lg:left-6 lg:translate-x-0",
-} as const;
 /** A dropdown's label above it: one 20 px line, which `Section` counts on. */
 const fieldLabel = "text-small leading-5 text-ink-muted";
 
@@ -124,7 +118,7 @@ export function ItemEditor({
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
   useAlarmCount(state);
-  // Beside the item it makes, on a wide screen (design D155).
+  // Beside the item it makes, where there is room (design D155, D187).
   const aside = useDraftAside(state !== null);
   const title = form
     ? t(
@@ -141,10 +135,13 @@ export function ItemEditor({
     <Dialog.Root open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <DialogBackdrop
-          className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "lg:bg-black/20" : ""}`}
+          className={`fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 ${aside ? "sm:bg-black/20" : ""}`}
         />
         <DialogPopup
-          className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))] ${ASIDE[aside ?? "middle"]}`}
+          className={`${sheet} z-[130] sm:w-[min(36rem,calc(100vw-2rem))]`}
+          style={aside ? asideStyle(aside) : undefined}
+          data-aside={aside?.side}
+          data-aside-for={aside?.draft}
         >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("edit.close")}>

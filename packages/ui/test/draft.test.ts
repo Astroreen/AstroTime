@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { DRAFT, draftOf, drawn, placementOf, withDraft } from "../src/calendar/draft.ts";
 import { formOf, newForm, type Form, type Target } from "../src/calendar/editing.ts";
 import { expand, type Entry } from "../src/calendar/query.ts";
+import { besideOf } from "../src/components/draft-aside.ts";
 
 const timeZone = "Europe/Vilnius";
 const range = { from: "2026-11-02", to: "2026-11-09", timeZone };
@@ -197,5 +198,39 @@ describe("the edit dialog's item drawn behind it (design D155)", () => {
     // The title and the description are not where it is; its start is.
     expect(placementOf({ ...form, summary: "x", description: "y" })).toBe(placementOf(form));
     expect(placementOf({ ...form, startTime: "16:00" })).not.toBe(placementOf(form));
+  });
+});
+
+describe("where the dialog stands beside the draft (design D187)", () => {
+  test("on the side with more room, as wide as it fits, down to a phone's width", () => {
+    // A week's Wednesday at 1000 px: 419 px to its left, 380 to its right.
+    expect(besideOf({ left: 451, right: 588 }, 1000)).toEqual({ side: "left", width: 419 });
+    // A wide screen's Thursday: the whole dialog fits on its left.
+    expect(besideOf({ left: 950, right: 1105 }, 1440)).toEqual({ side: "left", width: 576 });
+    expect(besideOf({ left: 300, right: 400 }, 1440)).toEqual({ side: "right", width: 576 });
+    // A Day view's one wide column leaves no room: the middle.
+    expect(besideOf({ left: 60, right: 980 }, 1000)).toBeNull();
+  });
+
+  test("a phone's width is the least: 360 px of room stands aside, 359 does not", () => {
+    // Room on the right: 1000 − right − 24 − 8.
+    expect(besideOf({ left: 0, right: 608 }, 1000)).toEqual({ side: "right", width: 360 });
+    expect(besideOf({ left: 0, right: 609 }, 1000)).toBeNull();
+  });
+
+  test("a tie goes right", () => {
+    // 400 px of room on each side.
+    expect(besideOf({ left: 432, right: 568 }, 1000)).toEqual({ side: "right", width: 400 });
+  });
+
+  test("under 640 px the dialog is the whole screen: never aside", () => {
+    expect(besideOf({ left: 600, right: 630 }, 639)).toBeNull();
+    expect(besideOf({ left: 0, right: 30 }, 1000)).toEqual({ side: "right", width: 576 });
+  });
+
+  test("a larger font makes the dialog wider, as the sheet's 36 rem does", () => {
+    expect(besideOf({ left: 0, right: 30 }, 1600, 20)).toEqual({ side: "right", width: 720 });
+    // And it floats from 40 rem.
+    expect(besideOf({ left: 0, right: 30 }, 799, 20)).toBeNull();
   });
 });

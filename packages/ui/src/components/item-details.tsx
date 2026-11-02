@@ -2,7 +2,7 @@
 // Calendar shows them when an item is tapped: its colour, title, when it is
 // and how it repeats, where, its description as Markdown (design D207), its reminders,
 // its guests (shown, never invited: no iTIP), its calendar; a task's due and
-// subtasks, with complete and star (no status, priority, progress or tags,
+// subtasks, with complete and, beside Edit, star (no status, priority, progress or tags,
 // design D162). Edit shows only where the calendar can be written; Delete,
 // "Make a copy" and "Copy to" are in a "⋯" menu (design D163).
 import { isDone, repeatOf, timesOf, type ItemTime, type Participant } from "@astrotime/core";
@@ -161,6 +161,19 @@ function Body({
   return (
     <>
       <div className="flex h-14 shrink-0 items-center justify-end gap-1 px-2 pl-14">
+        {/* A task's star beside the pencil, as an icon toggle (design D196). */}
+        {task && rights.edit && (
+          <button
+            type="button"
+            className={dialogIcon}
+            aria-label={t("details.star")}
+            aria-pressed={starred}
+            title={t(starred ? "details.unstar" : "details.star")}
+            onClick={onStar}
+          >
+            <StarIcon filled={starred} className={`size-5 ${starred ? "text-accent" : ""}`} />
+          </button>
+        )}
         {rights.edit && (
           <button
             type="button"
@@ -205,7 +218,7 @@ function Body({
         </div>
         <dl className="mt-4 flex flex-col gap-3 text-body">
           {rule && (
-            <Row icon={<RepeatIcon className="size-5" />}>
+            <Row icon={<RepeatIcon className="size-5" />} label={t("edit.repeat")}>
               {rule.exact
                 ? repeatWords(rule.repeat, times.start ?? times.end, t, formats)
                 : t("repeat.kept", {
@@ -224,7 +237,7 @@ function Body({
             </Row>
           )}
           {item.description && (
-            <Row icon={<NotesIcon className="size-5" />}>
+            <Row icon={<NotesIcon className="size-5" />} label={t("edit.description")}>
               <Description text={item.description} />
             </Row>
           )}
@@ -266,12 +279,12 @@ function Body({
             </Row>
           )}
           {!task && item.categories.length > 0 && (
-            <Row icon={<NotesIcon className="size-5" />}>
+            <Row icon={<NotesIcon className="size-5" />} label={t("details.tags")}>
               {t("details.categories", { categories: item.categories.join(", ") })}
             </Row>
           )}
           {task && (related.parent || related.subtasks.length > 0) && (
-            <Row icon={<SubtasksIcon className="size-5" />}>
+            <Row icon={<SubtasksIcon className="size-5" />} label={t("details.subtasks")}>
               {related.parent && <p>{t("details.parent", { title: related.parent })}</p>}
               {related.subtasks.length > 0 && (
                 <div>
@@ -285,9 +298,13 @@ function Body({
               )}
             </Row>
           )}
+          {/* Its list or calendar by name alone, the icon saying which (design D196). */}
           {calendar && (
-            <Row icon={<CalendarIcon className="size-5" />}>
-              {t(task ? "details.list" : "details.calendar", { calendar: calendar.name })}
+            <Row
+              icon={<CalendarIcon className="size-5" />}
+              label={t(task ? "edit.list" : "edit.calendar")}
+            >
+              {calendar.name}
             </Row>
           )}
         </dl>
@@ -306,15 +323,6 @@ function Body({
               <CheckIcon className="size-4" />
               {t(done ? "details.uncomplete" : "details.complete")}
             </button>
-            <button
-              type="button"
-              aria-pressed={starred}
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-body font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
-              onClick={onStar}
-            >
-              <StarIcon filled={starred} className="size-4" />
-              {t(starred ? "details.unstar" : "details.star")}
-            </button>
           </div>
         )}
       </div>
@@ -322,12 +330,13 @@ function Body({
   );
 }
 
-function Row({ icon, label, children }: { icon: ReactNode; label?: string; children: ReactNode }) {
+/** A row of the details: its icon, and its name for a screen reader as the term (design D196). */
+function Row({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-4">
       <dt className="mt-px shrink-0 text-ink-muted">
         {icon}
-        {label && <span className="sr-only">{label}</span>}
+        <span className="sr-only">{label}</span>
       </dt>
       <dd className="min-w-0 flex-1">{children}</dd>
     </div>
