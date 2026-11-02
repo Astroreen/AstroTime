@@ -331,6 +331,55 @@ describe("the all-day strip across a week (D14, D42)", () => {
   });
 });
 
+describe("the item being made laid out first (design D187)", () => {
+  const week = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"];
+  const rows = (occurrences: Occurrence[], first: Set<Occurrence>, timed = false) =>
+    layoutSpans(occurrences, week, timeZone, { timed, first }).map((s) => [
+      s.occurrence.item.uid,
+      s.row,
+    ]);
+
+  test("in the strip it takes the first row, before a longer span and a title sorted first", () => {
+    const occurrences = on(
+      "2026-11-02",
+      "2026-11-06",
+      allDay("conference", "20261102", "20261105"),
+      allDay("birthday", "20261103", "20261104"),
+      task("zebra", "DUE;VALUE=DATE:20261103\r\n"),
+    );
+    const zebra = occurrences.find((o) => o.item.uid === "zebra")!;
+    expect(rows(occurrences, new Set())).toEqual([
+      ["conference", 0],
+      ["birthday", 1],
+      ["zebra", 2],
+    ]);
+    expect(rows(occurrences, new Set([zebra]))).toEqual([
+      ["zebra", 0],
+      ["conference", 1],
+      ["birthday", 2],
+    ]);
+  });
+
+  test("in a month's week a timed one goes before the all-day ones too, so a full tile shows it", () => {
+    const occurrences = on(
+      "2026-11-02",
+      "2026-11-06",
+      allDay("birthday", "20261103", "20261104"),
+      event("lunch", "20261103T120000Z", "20261103T130000Z"),
+    );
+    const lunch = occurrences.find((o) => o.item.uid === "lunch")!;
+    expect(rows(occurrences, new Set(), true)).toEqual([
+      ["birthday", 0],
+      ["lunch", 1],
+    ]);
+    // An edited event moves up while its dialog is open, and back once saved.
+    expect(rows(occurrences, new Set([lunch]), true)).toEqual([
+      ["lunch", 0],
+      ["birthday", 1],
+    ]);
+  });
+});
+
 describe("chips, days and edges", () => {
   test("a task shows on its start's day only: a date start is all day there, not on its due's day", () => {
     const ics = task("report", "DTSTART;VALUE=DATE:20261102\r\nDUE:20261104T150000Z\r\n");
