@@ -1456,11 +1456,17 @@ The owner's feedback after round 3 (round 4), the calendar views' part.
   editor's chunk is loaded, the dialog is there before the second press,
   which lands on its backdrop and closed it again, so nothing stayed open
   ([D154](#D154) had a double click make one event only on a first load).
-  A backdrop press that is a double click's second (`detail` over 1) no
-  longer closes the edit dialog; a single press there still does
-  ([D136](#D136)). Found while testing D188. Tested:
-  `apps/web/e2e/drag.spec.ts` (a double click on an empty hour with the
-  editor's chunk loaded first, failing before the change).
+  A backdrop press no longer closes the edit dialog when it is the second
+  press of the double click whose first click opened it: the first press
+  outside after opening, one more in the click count (`detail`) than that
+  click, within 8 px of it and 500 ms (`useSecondPress` in
+  `item-editor.tsx`). Any other press there still closes it ([D136](#D136)),
+  one the browser counts as a second click too (after a click elsewhere).
+  Found while testing D188. Tested: `apps/web/e2e/drag.spec.ts` (a double
+  click on an empty hour with the editor's chunk loaded first, then a
+  single press on the backdrop closing it; a dialog opened by a single
+  click closing on a backdrop press counted as a second click elsewhere,
+  which `detail` alone kept open; each failing before its change).
 
 ### Decided in round 4: the editor
 

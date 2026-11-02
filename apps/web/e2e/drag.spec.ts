@@ -361,6 +361,29 @@ test("a double click on an empty hour makes one new event there, its dialog kept
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("a dialog opened by a single click closes on a backdrop press that is not its double click's second (design D190)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const at = await pointOn(page, "Tuesday, November 3", 16.1);
+  // Found before the dialog makes the views inert: Sunday stays clear of
+  // the dialog, which stands on Tuesday's right.
+  const elsewhere = await pointOn(page, "Sunday, November 1", 16.1);
+  await page.mouse.click(at.x, at.y);
+  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  // A press on the backdrop that the browser counts as a second click (a
+  // click just before, elsewhere) but is not the opening click's second:
+  // it closes the dialog. `detail` alone would have kept it open.
+  await page.mouse.move(elsewhere.x, elsewhere.y);
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
+  await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
+});
+
 test("a double click's second click on an empty hour after a press on an item is a click of its own (design D154)", async ({
   page,
 }) => {

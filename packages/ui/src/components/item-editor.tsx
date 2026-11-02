@@ -117,6 +117,7 @@ export function ItemEditor({
   const formId = useId();
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
+  const secondPress = useSecondPress(state !== null);
   useAlarmCount(state);
   // Beside the item it makes, where there is room (design D155, D187).
   const aside = useDraftAside(state !== null);
@@ -138,7 +139,7 @@ export function ItemEditor({
         // A double click on an empty slot opens the dialog with its first
         // click; its second press lands on the backdrop and is no "close"
         // (design D190).
-        if (!open && details.reason === "outside-press" && details.event.detail > 1) {
+        if (!open && details.reason === "outside-press" && secondPress(details.event)) {
           details.cancel();
           return;
         }
@@ -1021,4 +1022,50 @@ function CustomReminder({
       </div>
     </div>
   );
+}
+
+/** How far apart, in px and ms, two presses are still one double click's. */
+const SAME_SPOT = 8;
+const DOUBLE_CLICK_MS = 500;
+
+/**
+ * Whether a press outside the dialog is the second press of the double
+ * click whose first click opened it (design D190): the first press outside
+ * after it opened, one more in the click count than that click, at about
+ * its spot, soon after it. Anything else (a single press, one after
+ * another click, a second press elsewhere) is a press of its own.
+ */
+function useSecondPress(open: boolean): (event: Event) => boolean {
+  // The last click on the page, heard before any handler opens a dialog with it.
+  const lastClick = useRef<{ x: number; y: number; detail: number; at: number } | null>(null);
+  const opener = useRef<typeof lastClick.current>(null);
+  useEffect(() => {
+    const heard = (event: MouseEvent) => {
+      lastClick.current = {
+        x: event.clientX,
+        y: event.clientY,
+        detail: event.detail,
+        at: event.timeStamp,
+      };
+    };
+    document.addEventListener("click", heard, true);
+    return () => document.removeEventListener("click", heard, true);
+  }, []);
+  // On opening, the click that opened it, if it was one just now.
+  useEffect(() => {
+    const click = lastClick.current;
+    opener.current = open && click && performance.now() - click.at < DOUBLE_CLICK_MS ? click : null;
+  }, [open]);
+  return (event) => {
+    const first = opener.current;
+    opener.current = null;
+    return (
+      first !== null &&
+      event instanceof MouseEvent &&
+      event.detail === first.detail + 1 &&
+      Math.abs(event.clientX - first.x) < SAME_SPOT &&
+      Math.abs(event.clientY - first.y) < SAME_SPOT &&
+      event.timeStamp - first.at < DOUBLE_CLICK_MS
+    );
+  };
 }
