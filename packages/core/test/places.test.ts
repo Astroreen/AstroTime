@@ -120,6 +120,16 @@ describe("reading a place's point", () => {
     expect(master(event("LOCATION:Somewhere", "GEO;VALUE=TEXT:52,5;13,4")).geo).toBeNull();
   });
 
+  test("Apple's name with no X-ADDRESS on a one-line LOCATION: the name, and no address", () => {
+    const item = master(
+      event(
+        "LOCATION:Apple Park",
+        "X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-TITLE=Apple Park:geo:37.3,-122",
+      ),
+    );
+    expect(item.placeLabel).toEqual({ name: "Apple Park", address: "" });
+  });
+
   test("a cut-off GEO is no point", () => {
     for (const value of ["52.5;", ";13.4", ";", "52.5"])
       expect(master(event("LOCATION:Somewhere", `GEO;VALUE=TEXT:${value}`)).geo, value).toBeNull();
@@ -221,6 +231,26 @@ describe("writing a place", () => {
         .map(canonicalLine);
     expect(place(ics)).toEqual(place(source));
     expect(place(ics).join()).toContain("X-APPLE-RADIUS=141.17");
+  });
+
+  test("the same place, its text spaced otherwise or its new point no point, changes nothing (D7)", () => {
+    const source = fixture("apple-event-attendees.ics");
+    const { location, geo } = master(source);
+    const radius = (ics: string) => contentLines(ics).join().includes("X-APPLE-RADIUS=141.17");
+    // LOCATION as read, around a trimmed text.
+    const spaced = source.replace("LOCATION:Apple Park", "LOCATION:  Apple Park");
+    const name = "Apple Park";
+    const address = "One Apple Park Way, Cupertino";
+    const written = { text: location!, name, address };
+    for (const next of [
+      { name, address, geo: geo!, written },
+      { name, address, geo: { lat: Number.NaN, lon: 1 }, written },
+      { name, address, geo: { lat: 91, lon: 1 }, written },
+    ]) {
+      expect(
+        radius(editItem(CalendarObject.parse(spaced), { location: next }, { now: NOW }).ics),
+      ).toBe(true);
+    }
   });
 
   test("a point off the globe is written as text alone", () => {
