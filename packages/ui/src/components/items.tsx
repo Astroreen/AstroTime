@@ -75,10 +75,39 @@ function useItemLabel(): (entry: Entry, allDay: boolean, time?: string) => strin
 }
 
 /** The title on one line, cut with an ellipsis, or (`clip`) cut short as the month's chips are. */
-function Title({ entry, wrap, clip }: { entry: Entry; wrap: boolean; clip?: boolean }) {
+function Title({
+  entry,
+  wrap,
+  clip,
+  lines,
+}: {
+  entry: Entry;
+  wrap: boolean;
+  clip?: boolean;
+  /** At most this many lines, wrapped, the last one cut short. */
+  lines?: number | undefined;
+}) {
   const { t } = useCalendar();
   const title = entry.occurrence.item.summary?.trim() || t("item.untitled");
-  if (wrap) return <span className="item-title-wrap">{title}</span>;
+  if (wrap) {
+    return (
+      <span
+        className="item-title-wrap"
+        style={
+          lines === undefined
+            ? undefined
+            : {
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: lines,
+                overflow: "hidden",
+              }
+        }
+      >
+        {title}
+      </span>
+    );
+  }
   return (
     <span
       className={`item-title min-w-0 flex-1 overflow-hidden whitespace-nowrap ${clip ? "" : "text-ellipsis"}`}
@@ -191,6 +220,8 @@ export function AgendaCard({
 
 /** HOUR pixels per hour in the time grid. */
 export const HOUR = 56;
+/** Pixels a line of an item's title takes: `text-tiny` or `text-note` at 1.2. */
+const LINE = { compact: 13.2, wide: 15 } as const;
 
 /** A timed item in a day's column: a block from start to end, or a task's 30-minute chip. */
 export function TimedItem({
@@ -203,13 +234,25 @@ export function TimedItem({
   /** A narrow column (a week on a phone): smaller text, no time line. */
   compact: boolean;
 }) {
-  const { shape, top, bottom, left, width, layer, continuesBefore, continuesAfter } = placed;
+  const { shape, top, bottom, left, width, layer, room, continuesBefore, continuesAfter } = placed;
   const { colorOf, formats, timeZone, found } = useCalendar();
   const label = useItemLabel();
   const { source, held } = useDragSource(entry, "grid");
   const height = ((bottom - top) / 60) * HOUR - 2;
   const task = entry.occurrence.item.kind === "task";
-  const showTime = shape === "block" && !compact && height >= 38;
+  // Another item drawn over this one from `room` on: its text keeps above
+  // that, as many whole lines as fit (design D153).
+  const covered = room < bottom - top;
+  const visible = covered ? (room / 60) * HOUR - 2 : height;
+  const showTime = shape === "block" && !compact && visible >= 38;
+  const lines = covered
+    ? Math.max(
+        1,
+        Math.floor(
+          (visible - (compact ? 2 : 4) - (showTime ? 14 : 0)) / LINE[compact ? "compact" : "wide"],
+        ),
+      )
+    : undefined;
   const name = label(entry, false);
   // A block's edges resize it where its ends are drawn; a short one keeps its top for moving.
   const edges = shape === "block";
@@ -240,7 +283,11 @@ export function TimedItem({
       })}
     >
       {task && shape === "chip" && <CheckCircleIcon className="size-3 shrink-0" />}
-      {shape === "chip" ? <Title entry={entry} wrap={false} /> : <Title entry={entry} wrap />}
+      {shape === "chip" ? (
+        <Title entry={entry} wrap={false} />
+      ) : (
+        <Title entry={entry} wrap lines={lines} />
+      )}
       {showTime && (
         <span className="item-time block text-chip font-normal">
           {formats.timeRange(entry.occurrence.start, entry.occurrence.end, timeZone)}

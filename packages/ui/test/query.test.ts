@@ -55,7 +55,7 @@ describe("the demo data on the views", () => {
     ).toBe(true);
   });
 
-  test("today's timed items cascade (D15), and a task with a due time is a chip (D16)", async () => {
+  test("today's timed items cover no title (D15, design D153), and a task with a due time is a chip (D16)", async () => {
     const { store, ids } = await demoStore();
     const [column] = (await layoutOf(store, ids, [today])).columns;
     const placed = Object.fromEntries(
@@ -65,8 +65,10 @@ describe("the demo data on the views", () => {
       ]),
     );
     expect(placed["Design review"]).toEqual({ left: 0, shape: "block" });
-    expect(placed["Budget planning"]).toEqual({ left: 0.15, shape: "block" });
-    expect(placed["Call with Anna"]).toEqual({ left: 0.3, shape: "block" });
+    // An hour after the review: over it, a step into its column.
+    expect(placed["Budget planning"]).toEqual({ left: 0.075, shape: "block" });
+    // 15 minutes after the budget, within its title room: a column beside.
+    expect(placed["Call with Anna"]).toEqual({ left: 0.5, shape: "block" });
     expect(placed["Send the report"]).toEqual({ left: 0, shape: "chip" });
   });
 

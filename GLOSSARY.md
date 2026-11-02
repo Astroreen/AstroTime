@@ -63,6 +63,8 @@ One word per concept. Use these terms in code, docs, commits and UI.
   (design D111).
 - **Cluster** — timed items that overlap, directly or through others; they
   share the column's width (D15).
+- **Title room** — the minutes at the top of a timed item its title and
+  time need (45); no item is drawn over them (design D153).
 - **Tasks screen** — the task lists, as in Google Tasks: a screen on a
   phone, a panel beside the calendar on a wide screen (design D52).
 - **Task list** — a calendar that holds tasks (its components include

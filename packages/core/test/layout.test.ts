@@ -38,6 +38,9 @@ const brief = (placed: ReturnType<typeof day>["timed"]) =>
     width: p.width,
     layer: p.layer,
   }));
+/** `minutes` past midnight as a UTC time on the test's day. */
+const at = (minutes: number) =>
+  `20261102T${String(Math.floor(minutes / 60)).padStart(2, "0")}${String(minutes % 60).padStart(2, "0")}00Z`;
 
 describe("which items go to the all-day strip (D14, D16, D42)", () => {
   test("all-day events, tasks due on a date, and timed items a day long or more; not chips or short blocks", () => {
@@ -143,47 +146,126 @@ describe("overlaps (D15)", () => {
     ]);
   });
 
-  test("starting together, the shorter one goes on top", () => {
+  test("starting together, they share the width side by side, the longer first (design D153)", () => {
     const timed = brief(
       day(
         event("short", "20261102T090000Z", "20261102T093000Z"),
         event("long", "20261102T090000Z", "20261102T110000Z"),
       ).timed,
     );
-    expect(timed.map((t) => [t.uid, t.layer, t.left])).toEqual([
-      ["long", 0, 0],
-      ["short", 1, 0.15],
+    expect(timed.map((t) => [t.uid, t.left, t.width])).toEqual([
+      ["long", 0, 0.5],
+      ["short", 0.5, 0.5],
     ]);
   });
 
-  test("a cascade steps once per item under it, and items that do not overlap stay apart", () => {
+  test("starting within an item's title room, an item takes a column beside it; later, it goes over it (design D153)", () => {
     const timed = brief(
       day(
         event("a", "20261102T090000Z", "20261102T120000Z"),
+        // 30 minutes after a: its title would be covered.
         event("b", "20261102T093000Z", "20261102T113000Z"),
+        // An hour after a: over it, a step in, in a's column.
         event("c", "20261102T100000Z", "20261102T110000Z"),
         event("later", "20261102T130000Z", "20261102T140000Z"),
       ).timed,
     );
-    expect(timed.map((t) => [t.uid, t.left])).toEqual([
-      ["a", 0],
-      ["b", 0.15],
-      ["c", 0.3],
-      ["later", 0],
+    expect(timed.map((t) => [t.uid, t.left, t.width])).toEqual([
+      ["a", 0, 0.5],
+      ["b", 0.5, 0.5],
+      ["c", 0.075, 0.425],
+      ["later", 0, 1],
     ]);
   });
 
-  test("past three at once, the cluster switches to equal columns", () => {
+  test("an item starting in a column's free time takes it rather than go over another", () => {
     const timed = brief(
       day(
-        event("a", "20261102T090000Z", "20261102T110000Z"),
-        event("b", "20261102T090000Z", "20261102T110000Z"),
-        event("c", "20261102T093000Z", "20261102T103000Z"),
-        event("d", "20261102T100000Z", "20261102T120000Z"),
+        event("a", "20261102T090000Z", "20261102T120000Z"),
+        event("b", "20261102T090000Z", "20261102T100000Z"),
+        event("c", "20261102T103000Z", "20261102T110000Z"),
       ).timed,
     );
-    expect(timed.every((t) => t.width === 0.25)).toBe(true);
-    expect(new Set(timed.map((t) => t.left)).size).toBe(4);
+    expect(timed.map((t) => [t.uid, t.left, t.width])).toEqual([
+      ["a", 0, 0.5],
+      ["b", 0.5, 0.5],
+      ["c", 0.5, 0.5],
+    ]);
+  });
+
+  test("the owner's day: 10:00–11:30, 11:00–12:30 and 11:30–12:00 cover no title (design D153)", () => {
+    // "Созвон с Анной" was drawn over the title of "Планирование бюджета".
+    const timed = brief(
+      day(
+        event("budget", "20261102T100000Z", "20261102T113000Z"),
+        event("anna", "20261102T110000Z", "20261102T123000Z"),
+        event("short", "20261102T113000Z", "20261102T120000Z"),
+      ).timed,
+    );
+    expect(timed.map((t) => [t.uid, t.left, t.width])).toEqual([
+      // Nothing beside it while it lasts: the whole width.
+      ["budget", 0, 1],
+      // An hour in, over it, a step in: budget's first hour shows above it.
+      ["anna", 0.075, 0.425],
+      // Within anna's title room: beside it.
+      ["short", 0.5, 0.5],
+    ]);
+    expect(
+      day(
+        event("budget", "20261102T100000Z", "20261102T113000Z"),
+        event("anna", "20261102T110000Z", "20261102T123000Z"),
+        event("short", "20261102T113000Z", "20261102T120000Z"),
+      ).timed.map((p) => p.room),
+    ).toEqual([60, 90, 30]);
+  });
+
+  test("past three stacked at once, the next item takes a column of its own", () => {
+    const timed = brief(
+      day(
+        event("a", "20261102T090000Z", "20261102T130000Z"),
+        event("b", "20261102T100000Z", "20261102T130000Z"),
+        event("c", "20261102T110000Z", "20261102T130000Z"),
+        event("d", "20261102T120000Z", "20261102T130000Z"),
+      ).timed,
+    );
+    expect(timed.map((t) => [t.uid, t.left, t.width])).toEqual([
+      ["a", 0, 0.5],
+      ["b", 0.075, 0.425],
+      ["c", 0.15, 0.35],
+      ["d", 0.5, 0.5],
+    ]);
+  });
+
+  test("on any day, an item drawn over another starts at least its title room after it (design D153)", () => {
+    // A small generator, the same on every run: days of up to eight items
+    // between 8:00 and 14:00, on quarter hours, 15 minutes to three hours long.
+    let seed = 20261102;
+    const random = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return seed % n;
+    };
+    for (let run = 0; run < 300; run++) {
+      const events = Array.from({ length: 1 + random(8) }, (_, i) => {
+        const start = 8 * 60 + 15 * random(24);
+        return event(`e${i}`, at(start), at(start + 15 * (1 + random(12))));
+      });
+      const placed = day(...events).timed;
+      for (const [i, under] of placed.entries()) {
+        for (const over of placed.slice(i + 1)) {
+          const across =
+            over.left < under.left + under.width - 1e-9 &&
+            under.left < over.left + over.width - 1e-9;
+          if (!across || over.top >= under.bottom || under.top >= over.bottom) continue;
+          expect(over.layer).toBeGreaterThan(under.layer);
+          expect(over.top - under.top).toBeGreaterThanOrEqual(45);
+          expect(over.left).toBeGreaterThan(under.left);
+          expect(under.room).toBeLessThanOrEqual(over.top - under.top);
+        }
+        expect(under.room).toBeGreaterThanOrEqual(Math.min(45, under.bottom - under.top));
+        expect(under.left).toBeGreaterThanOrEqual(0);
+        expect(under.left + under.width).toBeLessThanOrEqual(1 + 1e-9);
+      }
+    }
   });
 
   test("an item freeing a column lets the next one take it", () => {
@@ -432,28 +514,25 @@ describe("whole days, DST and deep cascades", () => {
   test("the cascade is transitive: an item over one that is itself cascaded steps once more", () => {
     const timed = brief(
       day(
-        event("a", "20261102T090000Z", "20261102T120000Z"),
-        event("b", "20261102T093000Z", "20261102T103000Z"),
-        event("c", "20261102T101500Z", "20261102T110000Z"),
-        event("d", "20261102T104500Z", "20261102T113000Z"),
+        event("a", "20261102T090000Z", "20261102T130000Z"),
+        event("b", "20261102T100000Z", "20261102T120000Z"),
+        event("c", "20261102T110000Z", "20261102T113000Z"),
+        event("d", "20261102T114500Z", "20261102T123000Z"),
       ).timed,
     );
-    // c sits on b (and a); d overlaps a and c but not b, and still goes one step past c.
+    // c sits on b (and a); d overlaps a and b but not c, and goes one step past b only.
     expect(timed.map((t) => [t.uid, t.left])).toEqual([
       ["a", 0],
       ["b", 0.15],
       ["c", 0.3],
-      ["d", 0.45],
+      ["d", 0.3],
     ]);
   });
 
-  test("a chain too deep for the cascade switches to columns, so no item hides another", () => {
-    // Eight items, each overlapping only the next: at most two at once, but
-    // the cascade would step 7 × 15% and run off the column.
+  test("a chain of items each starting in the last one's title room takes two columns, so no item hides another", () => {
+    // Eight items, each overlapping only the next, 20 minutes after it.
     const chain = Array.from({ length: 8 }, (_, i) => {
       const start = 9 * 60 + i * 20;
-      const at = (m: number) =>
-        `20261102T${String(Math.floor(m / 60)).padStart(2, "0")}${String(m % 60).padStart(2, "0")}00Z`;
       return event(`c${i}`, at(start), at(start + 30));
     });
     const timed = brief(day(...chain).timed);
