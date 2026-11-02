@@ -1291,6 +1291,21 @@ Settings, the colours and the lists controls open.
     is not there, so the tasks screen shows it at the top and its details
     name no parent.
 
+### Decided in round 4: tasks
+
+The owner's feedback after round 3, on the tasks screen and a task's
+details: "a task opens only when I tap on the level of its text, not on the
+whole row".
+
+- **D195. The whole row opens a task**, as in Google Tasks: its title, its
+  due line and the empty space right of them, by mouse and by finger, on
+  every row of the tasks screen (a list's, a subtask's, "Completed"'s). The
+  title stays the one button that opens it, for the keyboard and a screen
+  reader, and its cover (`::after`) spreads over the whole row; the
+  checkbox and the star sit above the cover and keep their own actions. The
+  row shows it is one target: a hover background, and the focus ring drawn
+  around the row, not the title (`apps/web/e2e/tasks.spec.ts`).
+
 ## Deferred
 
 - **Apple's snooze on a copy** — a copy drops a snooze `VALARM` written as

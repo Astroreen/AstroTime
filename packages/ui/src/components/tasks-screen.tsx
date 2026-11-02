@@ -524,13 +524,18 @@ function TaskItem({
 
   return (
     <li ref={element} aria-label={title} data-found={found || undefined} className="rounded-xl">
-      <div className="flex items-start gap-3 py-1.5 pr-1" style={{ paddingLeft: 16 + depth * 32 }}>
+      {/* The whole row opens the task (design D195): the title's button covers
+          it, and the checkbox and the star sit above that cover. */}
+      <div
+        className="relative flex items-start gap-3 rounded-xl py-1.5 pr-1 hover:bg-canvas"
+        style={{ paddingLeft: 16 + depth * 32 }}
+      >
         <Checkbox.Root
           checked={row.done}
           disabled={readOnly}
           onCheckedChange={(done) => actions.complete(row, done)}
           aria-label={title}
-          className="mt-2 grid size-[22px] shrink-0 place-items-center rounded-full border-2 border-ink-muted text-accent hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-checked:border-transparent"
+          className="relative z-10 mt-2 grid size-[22px] shrink-0 place-items-center rounded-full border-2 border-ink-muted text-accent hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-checked:border-transparent"
         >
           <Checkbox.Indicator className="flex data-unchecked:hidden">
             <CheckIcon className="size-5" strokeWidth="2.4" />
@@ -540,7 +545,7 @@ function TaskItem({
           <button
             type="button"
             onClick={() => actions.open(row)}
-            className={`text-left text-row leading-snug break-words focus-visible:outline-2 focus-visible:outline-accent ${row.done ? "text-ink-muted line-through" : ""}`}
+            className={`text-left text-row leading-snug break-words outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent ${row.done ? "text-ink-muted line-through" : ""}`}
           >
             {title}
           </button>
@@ -565,7 +570,7 @@ function TaskItem({
             aria-pressed={row.starred}
             aria-label={t("tasks.star", { title })}
             onClick={() => actions.star(row)}
-            className={`${roundButton} ${row.starred ? "text-accent" : "text-ink-muted"}`}
+            className={`${roundButton} relative z-10 ${row.starred ? "text-accent" : "text-ink-muted"}`}
           >
             <StarIcon filled={row.starred} className="size-[22px]" />
           </button>
