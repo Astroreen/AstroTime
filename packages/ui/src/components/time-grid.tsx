@@ -110,14 +110,22 @@ export function TimeGrid(props: TimeGridProps) {
   const ghost = drag.ghost;
   // A tap on an empty slot creates an event there, an hour long, from the
   // half hour tapped (Google); a press to size it comes with dragging.
+  // The slot this grid's last click was on, so a double click's second
+  // click makes nothing more than its first (design D154).
+  const clicked = useRef<string | null>(null);
   const createAt = (day: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!editing.canCreate || target?.closest("[role=listitem], button")) return;
-    // The second click of a double one made nothing more: its first made it,
-    // or was another control's, a closing picker's day (design D136).
-    if (event.detail > 1) return;
     const top = event.currentTarget.getBoundingClientRect().top;
     const slot = Math.floor(((event.clientY - top) / HOUR) * 2) * 30;
+    const spot = `${day}/${slot}`;
+    const last = clicked.current;
+    clicked.current = spot;
+    // A double click's second click on the slot its first took, or after a
+    // first that was not on this grid (a closing month picker's day, whose
+    // period this grid is: design D136), creates nothing; one on another
+    // slot of this grid is a click of its own.
+    if (event.detail > 1 && (last === null || last === spot)) return;
     editing.create("event", { day, at: Math.max(0, Math.min(slot, 23 * 60 + 30)) });
   };
 

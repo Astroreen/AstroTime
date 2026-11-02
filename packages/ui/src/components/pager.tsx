@@ -6,6 +6,7 @@
 // move, on the compositor, and a finger's move renders nothing.
 // `prefers-reduced-motion` swaps at once.
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 import { swipeOutcome, useSwipe } from "../hooks.ts";
 
@@ -110,8 +111,11 @@ export function Pager<P extends Page>({
     });
     settling.current = { animation, step };
     animation.onfinish = () => {
-      if (step !== 0) onStep(step);
-      else {
+      // The step drawn at once, so the track is back under the new period
+      // in this frame; a step that changed no period (a parent that would
+      // not move) puts the track back where it was, and the swipe is free.
+      if (step !== 0) flushSync(() => onStep(step));
+      if (settling.current?.animation === animation) {
         settling.current = null;
         animation.cancel();
       }

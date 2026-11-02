@@ -76,12 +76,22 @@ test.describe("on a wide screen", () => {
     await page.getByRole("button", { name: "November, choose a date" }).click();
     await page.getByRole("button", { name: "Monday, November 23" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    const calls = await taken();
+    const later = await taken();
     expect(
-      calls
+      later
         .filter(({ where }) => where === "agenda")
         .map(({ frames }) => JSON.parse(frames)[0].transform),
     ).toEqual(["translateY(24px)"]);
+    // Back to an earlier day: from above.
+    await page.getByRole("button", { name: "November, choose a date" }).click();
+    await page.getByRole("button", { name: "Monday, November 2", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const earlier = await taken();
+    expect(
+      earlier
+        .filter(({ where }) => where === "agenda")
+        .map(({ frames }) => JSON.parse(frames)[0].transform),
+    ).toEqual(["translateY(-24px)"]);
   });
 
   test.describe("with reduced motion", () => {

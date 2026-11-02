@@ -699,7 +699,7 @@ are its decisions.
   picker's day is tested to act once: it picks the day, and its second
   click, passing the closing picker to the grid, makes no event there
   (_since [D154](#D154):_ a double click's second click creates nothing on
-  the grid).
+  the slot its first took, or after a first that was not on the grid).
   **Unverified against Base UI's menus and popovers:** no test was found
   that tells the old global rule from this one there (a menu's and the
   month picker's double click pass under both, Base UI making them inert
@@ -844,10 +844,14 @@ I make it"; "sometimes an item's text is covered by another event".
   nothing; the owner saw a swipe now and then go nowhere, and CI's two
   `useSwipe` tests failed now and then; on a CPU slowed twelve times it
   failed 5 runs in 5. The finger is now kept in a ref beside the listeners,
-  which are attached as the element is (a layout effect), and a test swipes
-  on that slowed CPU (it failed 2 runs in 3 before). The Month's test waited
-  for the month's name, which the top bar shows before its days are drawn;
-  it waits for a day now.
+  which are attached as the element is (a layout effect), and
+  `packages/ui/test/swipe-strict.browser.test.tsx` attaches them again while
+  a finger is down, at a known point (a new ref), and the swipe still ends
+  (it fails with the finger kept in the listeners). An end-to-end test on a
+  CPU slowed twelve times was tried first and left out: on CI's two cores it
+  ran past its 30 s before the read of the next days, and could not tell a
+  lost swipe from a slow one. The Month's test waited for the month's name,
+  which the top bar shows before its days are drawn; it waits for a day now.
 - **D153. No item covers another's title** (the owner's feedback 6 on
   v0.3.0: "Sometimes an item's text is covered by another event. Text is
   what matters most. Maybe push the event further aside, or give it an extra
@@ -886,12 +890,14 @@ I make it"; "sometimes an item's text is covered by another event".
 - **D154. Periods move, as Google Calendar's Android app moves them** (the
   owner's feedback 1 on v0.3.0: "There are no transition animations. On the
   phone I can swipe, and nothing animates when I flip a week, a month or a
-  day."). A view reads the periods before and after the one it shows with it
-  (one live query over the three, so a step to either is drawn at once, from
-  what is read: a read draws a period when it covers its days, not only when
-  it is its exact range), and its periods are drawn by one `Pager`
-  (`components/pager.tsx`), in every view but the Agenda. On a touch screen
-  (`any-pointer: coarse`) the periods before and after are drawn beside the
+  day."). Its periods are drawn by one `Pager` (`components/pager.tsx`), in
+  every view but the Agenda. On a touch screen (`any-pointer: coarse`) a
+  view reads the periods before and after the one it shows with it (one live
+  query over the three, so a step to either is drawn at once: a read draws a
+  period when it covers its days, not only when it is its exact range);
+  elsewhere it reads the period shown only, as before, since nothing is
+  drawn beside it (a Month would expand three months of series for nothing
+  on every change). There the periods before and after are drawn beside the
   one shown, `inert` and hidden from a screen reader, and a sideways swipe
   carries all three under the finger: `useSwipe` locks the axis on the first
   8 px ([D152](#D152)), and each move sets the track's `transform` and
@@ -900,28 +906,34 @@ I make it"; "sometimes an item's text is covered by another event".
   Material's emphasized decelerate (at most 260 ms, less for what is left of
   the way) on the next or previous period past a quarter of the view's width
   (56 to 120 px) or a flick of 24 px on at 0.4 px/ms, and back otherwise
-  (`swipeOutcome`); the step lands in the same frame as the settle ends, the
-  periods drawn in time order so none is moved in the page and each keeps
-  its scroll. A vertical move is the grid's scroll, a long press the drag's
-  ([D111](#D111)): neither moves the period. A step by the arrows, the keys,
-  Today, the month picker or a day opened slides the new period in from the
-  side it comes from (40 px and a fade, 220 ms), on every screen; another
-  view fades in (160 ms); the Agenda slides a picked day in from above or
-  below (24 px). Only `transform` and `opacity` move, with the Web
-  Animations API, on the compositor. `prefers-reduced-motion` swaps at once:
-  no slide, no fade, no follow. The time grid's scroll is kept from period
-  to period and view to view (it was kept by its one grid; each period now
-  has its own). A double click's second click on the grid creates nothing:
-  the period picked in the month picker is now drawn at once, so the second
-  click of a double click on its day, passing the closing picker
-  ([D136](#D136)), landed on an empty hour of the new week, where the old
-  week's taller strip had taken it before. Tested in
-  `apps/web/e2e/motion.spec.ts` from the page's own calls to `animate`, so
-  no test waits for an animation: the slide's side, the fade, nothing with
-  reduced motion, the track under the finger and its settle, a short swipe
-  going back, a vertical scroll moving nothing. Year view and a swipe
-  between the Agenda's days are not part of it; three periods are drawn on a
-  touch screen only, as a desktop has no swipe.
+  (`swipeOutcome`); the step lands in the same frame as the settle ends (and
+  a step that changed no period gives the track back, so a swipe never stays
+  stuck on a neighbour), the periods drawn in time order so none is moved in
+  the page and each keeps its scroll. A vertical move is the grid's scroll,
+  a long press the drag's ([D111](#D111)): neither moves the period. A step
+  by the arrows, the keys, Today, the month picker or a day opened slides
+  the new period in from the side it comes from (40 px and a fade, 220 ms),
+  on every screen; another view fades in (160 ms); the Agenda slides a
+  picked day in from above or below (24 px). Only `transform` and `opacity`
+  move, with the Web Animations API, on the compositor.
+  `prefers-reduced-motion` swaps at once: no slide, no fade, no follow. The
+  time grid's scroll is kept from period to period and view to view (it was
+  kept by its one grid; each period now has its own). A double click's
+  second click on the grid creates nothing when it lands on the slot its
+  first took, or when its first was not on that grid: the second click of a
+  double click on the month picker's day passes the closing picker
+  ([D136](#D136)) to the grid, and with the period drawn at once it can land
+  on an empty hour, where the old week's taller strip had taken it before; a
+  second click on another slot of the same grid is a click of its own.
+  Tested in `apps/web/e2e/motion.spec.ts` from the page's own calls to
+  `animate`, so no test waits for an animation: the slide's side, the fade,
+  nothing with reduced motion, the track under the finger and its settle, a
+  short swipe going back, a vertical scroll moving nothing; in
+  `packages/ui/test/pager.browser.test.tsx`, a step that changed no period
+  freeing the swipe and a swipe with nothing beside stepping at once; in
+  `drag.spec.ts`, a double click on an empty hour making one new event
+  there. Year view and a swipe between the Agenda's days are not part of it;
+  three periods are drawn on a touch screen only, as a desktop has no swipe.
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base

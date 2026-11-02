@@ -339,6 +339,19 @@ test("a double click on the month picker's day acts once: it picks the day and m
   await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
 });
 
+test("a double click on an empty hour makes one new event there (design D154)", async ({
+  page,
+}) => {
+  await openDemo(page, "week");
+  await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
+  const at = await pointOn(page, "Tuesday, November 3", 16.1);
+  await page.mouse.dblclick(at.x, at.y);
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
+});
+
 test("keys move a focused item and say where it went; Shift moves its end", async ({ page }) => {
   await openDemo(page, "week");
   const opener = day(page, "Wednesday, November 4").getByRole("button", {

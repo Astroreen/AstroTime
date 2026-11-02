@@ -111,10 +111,12 @@ export function CalendarScreen({
   const [expanded, setExpanded] = useState(false);
 
   const days = periodOf(view, anchor, settings.weekStart);
-  // The periods before and after are read with this one, so a step to
-  // either draws at once and a swipe carries them in beside it (design D154).
-  const before = periodOf(view, stepAnchor(view, anchor, -1), settings.weekStart);
-  const after = periodOf(view, stepAnchor(view, anchor, 1), settings.weekStart);
+  // On a touch screen the periods before and after are read with this one,
+  // so a swipe carries them in beside it and a step to either draws at once
+  // (design D154); elsewhere, with no swipe, only the period shown is.
+  const coarse = useMediaQuery("(any-pointer: coarse)");
+  const before = coarse ? periodOf(view, stepAnchor(view, anchor, -1), settings.weekStart) : days;
+  const after = coarse ? periodOf(view, stepAnchor(view, anchor, 1), settings.weekStart) : days;
   const from = before[0]!;
   const to = addDays(after.at(-1)!, 1);
 
@@ -208,7 +210,6 @@ export function CalendarScreen({
   const undoneColor = (task: UndoneTask) => colorOfCalendar(task.object.calendarId);
   // The period drawn and, on a touch screen, those beside it whose items are
   // read, each laid out once for what it draws (design D154).
-  const coarse = useMediaQuery("(any-pointer: coarse)");
   const undoneCount = data.undone.length;
   const drawnView = drawn?.view ?? null;
   const drawnAnchor = drawn?.anchor ?? null;
