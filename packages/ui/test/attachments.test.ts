@@ -10,6 +10,7 @@ import {
   sameLink,
   sizeText,
   typedLink,
+  withAttached,
 } from "../src/calendar/attachments.ts";
 import { createI18n } from "../src/i18n/index.ts";
 
@@ -117,8 +118,17 @@ test("a link typed: a host with a dot, localhost, or a name with its port; never
   // A query or a fragment says it is a link.
   expect(typedLink("example.org?x=1")).toBe("https://example.org/?x=1");
   expect(typedLink("example.org#top")).toBe("https://example.org/#top");
-  const names = ["report.pdf", " notes.md ", "data.JSON", "a.7z", "example.org", "google.com"];
+  const names = [
+    "report.pdf",
+    " notes.md ",
+    "data.JSON",
+    "a.7z",
+    "logo.svg",
+    "example.org",
+    "google.com",
+  ];
   expect([...names, "1234", "a.b.pdf"].map(bareName)).toEqual([
+    true,
     true,
     true,
     true,
@@ -145,4 +155,26 @@ test("two links are one file as they resolve: Nextcloud Calendar's relative form
   );
   expect(sameLink("/index.php/f/241", "/index.php/f/242", base)).toBe(false);
   expect(sameLink(null, null, base)).toBe(false);
+});
+
+test("files attached all at once, each once: two held files both join the list", () => {
+  const base = "https://cloud.example.com/remote.php/dav/calendars/astro/work/";
+  const there = { kind: "new", attachment: { uri: "/index.php/f/1" } } as const;
+  const next = withAttached(
+    [there],
+    [
+      { uri: "https://cloud.example.com/index.php/f/2", name: "/Calendar/a.txt" },
+      { uri: "https://cloud.example.com/index.php/f/3", name: "/Calendar/b.txt" },
+      // There already, written absolute: not twice.
+      { uri: "https://cloud.example.com/index.php/f/1" },
+    ],
+    base,
+  );
+  expect(next.map((choice) => choice.attachment.uri)).toEqual([
+    "/index.php/f/1",
+    "https://cloud.example.com/index.php/f/2",
+    "https://cloud.example.com/index.php/f/3",
+  ]);
+  // Nothing new: the same list, so nothing is written.
+  expect(withAttached(next, [{ uri: "/index.php/f/2" }], base)).toBe(next);
 });

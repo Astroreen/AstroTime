@@ -1,7 +1,9 @@
 // What the UI says of an attachment (design D230; foundation D229): where
 // its link goes, its kind and size in words, its name.
-import type { Attachment } from "@astrotime/core";
+import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { TFunction } from "i18next";
+
+import type { AttachmentChoice } from "./editing.ts";
 
 /**
  * Where a link goes: absolute, or relative to the calendar's server, as
@@ -25,6 +27,26 @@ export function attachmentHref(uri: string, base: string | undefined): string | 
 export function sameLink(a: string | null, b: string | null, base: string | undefined): boolean {
   if (a === null || b === null) return false;
   return (attachmentHref(a, base) ?? a) === (attachmentHref(b, base) ?? b);
+}
+
+/**
+ * The form's attachments with new ones after them, each once (a file there
+ * already, its link as it resolves, is not added again; design D233): the
+ * same list when nothing is added.
+ */
+export function withAttached(
+  value: readonly AttachmentChoice[],
+  attachments: readonly NewAttachment[],
+  base: string | undefined,
+): readonly AttachmentChoice[] {
+  const added: AttachmentChoice[] = [];
+  const there = (attachment: NewAttachment) =>
+    [value, added].some((list) =>
+      list.some((choice) => sameLink(choice.attachment.uri, attachment.uri, base)),
+    );
+  for (const attachment of attachments)
+    if (!there(attachment)) added.push({ kind: "new", attachment });
+  return added.length === 0 ? value : [...value, ...added];
 }
 
 /** Formats known by their media type, named as their files' usual extension. */
@@ -123,7 +145,7 @@ export function attachmentText(
  * is a link.
  */
 export const bareName = (typed: string) =>
-  /^[^.\s/:?#@]+\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|jpe?g|png|gif|heic|webp|mp3|mp4|zip|rar|7z|tar|gz|md|json)$/i.test(
+  /^[^.\s/:?#@]+\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|jpe?g|png|gif|heic|webp|mp3|mp4|zip|rar|7z|tar|gz|md|json|svg)$/i.test(
     typed.trim(),
   );
 

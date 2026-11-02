@@ -1820,11 +1820,13 @@ bar, the sidebar and the accounts panel.
   none, nor a file's name typed alone, one word and a common file's ending
   (`report.pdf`, `notes.md`, `archive.zip`: pdf, doc(x), xls(x), ppt(x),
   odt, ods, odp, txt, csv, jpg, jpeg, png, gif, heic, webp, mp3, mp4, zip,
-  rar, 7z, tar, gz, md, json); another scheme, `javascript:` or `mailto:`,
-  never is). "Add" waits until it is one, and once the user tried to add a
-  file's name (Enter, or leaving the field) the field says "Not a web link
-  yet: put https:// before it", in a polite live region the field names as
-  its description, not before and not for anything else. It is added with
+  rar, 7z, tar, gz, md, json, svg; zip and md are top-level domains too,
+  refused on purpose, a file of that name being likelier than a site);
+  another scheme, `javascript:` or `mailto:`, never is). "Add" waits until
+  it is one, and once the user tried to add a file's name (Enter, or leaving
+  the field) the field says "Not a web link yet: put https:// before it", in
+  a polite live region the field names as its description, not before and
+  not for anything else. It is added with
   Enter or "Add", Escape leaving it; Enter there adds the link and does
   not save the dialog. The form keeps
   them as reminders are kept (`AttachmentChoice`: one the item has,

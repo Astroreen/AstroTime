@@ -16,8 +16,8 @@ import {
   attachmentHref,
   attachmentText,
   bareName,
-  sameLink,
   typedLink,
+  withAttached,
 } from "../calendar/attachments.ts";
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
@@ -108,11 +108,12 @@ export function AttachmentsField({
     },
     [],
   );
-  const attach = (attachment: NewAttachment, base: string | undefined) => {
+  /** Attaches files to the form as it is now, all in one change (design D233). */
+  const attach = (attachments: readonly NewAttachment[], base: string | undefined) => {
     const now = latest.current;
-    // A file attached already is not attached twice, its link as it resolves.
-    if (now && !now.value.some((choice) => sameLink(choice.attachment.uri, attachment.uri, base)))
-      now.onChange([...now.value, { kind: "new", attachment }]);
+    if (!now) return;
+    const next = withAttached(now.value, attachments, base);
+    if (next !== now.value) now.onChange(next);
   };
   const upload = async (file: File) => {
     if (!account) return;
@@ -141,7 +142,7 @@ export function AttachmentsField({
         setUploading(null);
         return;
       }
-      attach(sent.attachment, now.calendar.url);
+      attach([sent.attachment], now.calendar.url);
       setUploading(null);
     } catch (error) {
       console.error(error);
@@ -153,7 +154,10 @@ export function AttachmentsField({
   useEffect(() => {
     const back = held.filter((file) => file.from === calendar?.accountId);
     if (back.length === 0) return;
-    for (const file of back) attach(file.attachment, calendar?.url);
+    attach(
+      back.map((file) => file.attachment),
+      calendar?.url,
+    );
     setHeld((list) => list.filter((file) => !back.includes(file)));
   }, [held, calendar]);
   const [adding, setAdding] = useState(false);
@@ -298,7 +302,7 @@ export function AttachmentsField({
           onClose={() => setBrowsing(false)}
           onPick={(attachment) => {
             setBrowsing(false);
-            attach(attachment, calendar?.url);
+            attach([attachment], calendar?.url);
           }}
         />
       )}
