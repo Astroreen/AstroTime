@@ -60,10 +60,16 @@ export function repeatOf(object: CalendarObject): RepeatRule | null {
   if (!(first instanceof ICAL.Recur)) return null;
   const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
   const anchor = start instanceof ICAL.Time ? fromIcalTime(start) : null;
-  return readRule(first, anchor, rules.length === 1 && !master.hasProperty("rdate"));
+  const single = rules.length === 1 && !master.hasProperty("rdate");
+  return readRule(first, anchor, single, start instanceof ICAL.Time ? start : undefined);
 }
 
-function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): RepeatRule {
+function readRule(
+  rule: ICAL.Recur,
+  anchor: ItemTime | null,
+  single: boolean,
+  start?: ICAL.Time,
+): RepeatRule {
   const frequency = (["DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const).find(
     (f) => f === rule.freq,
   );
@@ -102,12 +108,7 @@ function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): R
 
   let end: RepeatEnd = { type: "never" };
   if (rule.count) end = { type: "count", count: rule.count };
-  else if (rule.until) {
-    const until = fromIcalTime(rule.until);
-    // A UTC end names the series' last moment: its day is the one in the series' zone.
-    const zone = anchor?.type === "zoned" ? anchor.timeZone : "UTC";
-    end = { type: "until", until: wallClockOf(until, zone).slice(0, 10) };
-  }
+  else if (rule.until) end = { type: "until", until: untilDayOf(rule.until, anchor, start) };
   return {
     repeat: {
       frequency: frequency ?? "DAILY",
@@ -118,6 +119,23 @@ function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): R
     },
     exact,
   };
+}
+
+/**
+ * The day an `UNTIL` ends on. A UTC end names the series' last moment: its
+ * day is the one in the series' zone, as `Intl` knows it, or as the
+ * object's VTIMEZONE does for a zone `Intl` does not know (`Customized Time
+ * Zone`, D32).
+ */
+function untilDayOf(until: ICAL.Time, anchor: ItemTime | null, start?: ICAL.Time): string {
+  const zone = anchor?.type === "zoned" ? anchor.timeZone : "UTC";
+  try {
+    return wallClockOf(fromIcalTime(until), zone).slice(0, 10);
+  } catch (error) {
+    if (!(error instanceof RangeError) || !start?.zone) throw error;
+    const day = until.convertToZone(start.zone);
+    return `${String(day.year).padStart(4, "0")}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
+  }
 }
 
 function localOf(time: ItemTime): string {

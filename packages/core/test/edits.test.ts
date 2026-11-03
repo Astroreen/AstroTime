@@ -536,6 +536,43 @@ describe("the repeat rule", () => {
     expect(yearly).toContain("RRULE:FREQ=YEARLY\r\n");
   });
 
+  test("an end in UTC is read on the day of a zone only the object's VTIMEZONE knows (D32)", () => {
+    // Outlook's own name for a zone, UTC+2 in winter: 23:00Z on 9 November is 01:00 on the 10th.
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Customized Time Zone",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T040000",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+      "END:STANDARD",
+      "BEGIN:DAYLIGHT",
+      "DTSTART:16010101T030000",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+      "END:DAYLIGHT",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:custom",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART;TZID=Customized Time Zone:20261102T090000",
+      "DTEND;TZID=Customized Time Zone:20261102T100000",
+      "RRULE:FREQ=DAILY;UNTIL=20261109T230000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+    expect(repeatOf(CalendarObject.parse(ics))?.repeat.end).toEqual({
+      type: "until",
+      until: "2026-11-10",
+    });
+  });
+
   test("set on an item that did not repeat, and taken away with its exclusions and exceptions", () => {
     const repeating = editItem(
       load("nextcloud-web-event-timed.ics"),
