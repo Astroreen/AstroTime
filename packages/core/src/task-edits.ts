@@ -6,7 +6,7 @@ import ICAL from "ical.js";
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { plus } from "./item.ts";
 import { lengthOf } from "./occurrences.ts";
-import { fromIcalTime, keepTzid, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, wallClockIn, type ItemTime } from "./time.ts";
 
 /**
  * The task completed or not, as Nextcloud Tasks writes it: completed is
@@ -123,7 +123,15 @@ export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICA
 
 /** `time` as an ical.js time in the zone (and kind) of `template`. */
 function like(template: ICAL.Time, time: ItemTime): ICAL.Time {
-  const local = time.type === "date" ? `${time.date}T00:00:00` : time.local;
+  // An occurrence named in another zone (another client's RECURRENCE-ID in
+  // UTC) is its instant on the template's wall clock.
+  const frame = template.isDate ? null : fromIcalTime(template);
+  const local =
+    time.type === "date"
+      ? `${time.date}T00:00:00`
+      : time.type === "zoned" && frame?.type === "zoned" && frame.timeZone !== time.timeZone
+        ? wallClockIn(time.epochMs, frame.timeZone)
+        : time.local;
   const [year, month, day, hour, minute, second] = (local.match(/\d+/g) ?? []).map(Number);
   const result = ICAL.Time.fromData(
     { year, month, day, hour, minute, second, isDate: template.isDate },

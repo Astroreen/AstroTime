@@ -1535,6 +1535,46 @@ describe("a series' corners (D142)", () => {
     expect(split).toContain("EXDATE;TZID=America/New_York:20261116T090000\r\n");
   });
 
+  test("an occurrence named in UTC: this and following starts the new series at its instant, on the series' clock", () => {
+    // Another client's exception names 9 November at 9:00 in Vilnius as 7:00 UTC.
+    const named = object(
+      [...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=4"],
+      [
+        "RECURRENCE-ID:20261109T070000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261109T090000",
+        "DTEND;TZID=Europe/Vilnius:20261109T100000",
+        "SUMMARY:Lesson (own)",
+      ],
+    );
+    const recurrenceId = zonedTime("2026-11-09T07:00:00", "UTC");
+    const { ics, split } = editItem(
+      named,
+      { description: "Bring the book" },
+      { now: NOW, scope: "following", recurrenceId, newUid: "v2" },
+    );
+    expect(starts(ics)).toEqual(["2026-11-02T09:00:00"]);
+    expect(split).toContain("DTSTART;TZID=Europe/Vilnius:20261109T090000\r\n");
+    expect(starts(split!)).toEqual([
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+    // An exception made for an occurrence named in UTC is at that instant too.
+    const plain = object([...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=4"]);
+    const once = editItem(
+      plain,
+      { summary: "Lesson (once)" },
+      { now: NOW, scope: "this", recurrenceId: zonedTime("2026-11-16T07:00:00", "UTC") },
+    ).ics;
+    expect(once).toContain("RECURRENCE-ID;TZID=Europe/Vilnius:20261116T090000\r\n");
+    expect(starts(once)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+  });
+
   test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
     const rdate = "RDATE;TZID=America/New_York:20261104T090000";
     // And one of its own after the split below, which goes.
