@@ -3,7 +3,13 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { ALL_RIGHTS, NO_RIGHTS } from "@astrotime/core";
 
-import { SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
+import {
+  LOCAL_CALENDAR_URL,
+  LOCAL_SERVER,
+  SCHEMA_VERSION,
+  Store,
+  type SqlDriver,
+} from "../src/index.ts";
 
 const vcal = (body: string) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\n${body}END:VCALENDAR\r\n`;
@@ -428,6 +434,75 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       await served("tasks", ["VTODO"]);
       expect(await store.removeLocalCalendarIfUnused()).toBe(true);
       expect(await store.accounts()).toEqual([server]);
+    });
+
+    test("an account on this device with no calendar left goes, and that is said (D122)", async () => {
+      const { store } = await setup();
+      await store.saveCalendar({
+        accountId: (await store.accounts())[0]!.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/tasks/",
+        name: "Tasks",
+        color: null,
+        components: ["VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      await store.addAccount({
+        provider: "local",
+        name: "On this device",
+        serverUrl: LOCAL_SERVER,
+        username: null,
+      });
+      expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+      expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+    });
+
+    test("a calendar the user made on this device is the user's: it never steps aside (import D269)", async () => {
+      const { store, account: server } = await setup();
+      await store.saveCalendar({
+        accountId: server.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/tasks/",
+        name: "Tasks",
+        color: null,
+        components: ["VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      const local = await store.addAccount({
+        provider: "local",
+        name: "On this device",
+        serverUrl: LOCAL_SERVER,
+        username: null,
+      });
+      const holidays = await store.saveCalendar({
+        accountId: local.id,
+        url: `${LOCAL_SERVER}holidays/`,
+        name: "Holidays",
+        color: "#d50000",
+        components: ["VEVENT"],
+        rights: ALL_RIGHTS,
+      });
+      // The first calendar beside it, empty: it steps aside as D122 says, alone.
+      await store.saveCalendar({
+        accountId: local.id,
+        url: LOCAL_CALENDAR_URL,
+        name: "Personal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      // Empty too, and other calendars take new events and tasks: it stays all the same.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+      expect((await store.calendars(local.id)).map((c) => c.name)).toEqual(["Holidays"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // Its items are final, as the first one's are (D122).
+      expect(
+        (
+          await store.saveLocal(
+            holidays.id,
+            event("new-year", "20270101T000000Z", "20270101T010000Z"),
+          )
+        ).pending,
+      ).toBe("none");
     });
 
     test("the calendar on this device stays beside a server's account while it holds items (D122)", async () => {

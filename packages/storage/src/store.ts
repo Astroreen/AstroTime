@@ -235,7 +235,7 @@ export class Store {
       await this.db.insert(schema.calendars).values({
         id: crypto.randomUUID(),
         accountId: account.id,
-        url: `${LOCAL_SERVER}personal/`,
+        url: LOCAL_CALENDAR_URL,
         name: names.calendar,
         color: names.color,
         components: "VEVENT,VTODO",
@@ -275,13 +275,16 @@ export class Store {
       if (!takes("VEVENT") || !takes("VTODO")) return false;
       let removed = false;
       for (const account of local) {
-        const [used] = await this.db
-          .select({ id: schema.objects.id })
-          .from(schema.objects)
-          .innerJoin(schema.calendars, eq(schema.objects.calendarId, schema.calendars.id))
-          .where(eq(schema.calendars.accountId, account.id))
-          .limit(1);
-        if (used) continue;
+        // The first calendar steps aside when it holds nothing; one the user
+        // made here (an import's, import D269) stays, and keeps the account.
+        for (const calendar of await this.calendars(account.id)) {
+          const first = calendar.url === LOCAL_CALENDAR_URL;
+          if (first && !(await this.hasObjects([calendar.id]))) {
+            await this.db.delete(schema.calendars).where(eq(schema.calendars.id, calendar.id));
+            removed = true;
+          }
+        }
+        if ((await this.calendars(account.id)).length > 0) continue;
         await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
         removed = true;
       }
@@ -1072,8 +1075,10 @@ const IN_LIMIT = 500;
 /** Rows in one multi-row `INSERT`: 15 columns each, 1 500 bound values. */
 const ROWS_PER_INSERT = 100;
 
-/** The calendar on this device's address: no server's, only unique (D122). */
-const LOCAL_SERVER = "local:";
+/** The calendar on this device's account's address: no server's, only unique (D122). */
+export const LOCAL_SERVER = "local:";
+/** The calendar on this device the store makes itself (D122); the user's own have others. */
+export const LOCAL_CALENDAR_URL = `${LOCAL_SERVER}personal/`;
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they

@@ -21,18 +21,20 @@ export interface SplitObject {
 /**
  * What went wrong with a part of the file. Not among the objects: `no-uid`
  * (where no UID can be given), `invalid` (ical.js or AstroTime cannot read
- * it), `unterminated` (its `END` never came). Among them all the same
- * (`kept`): `duplicate` (the same component twice under one UID: one is
+ * it). `unterminated`: its `END` never came; kept when what came reads
+ * whole. Among them all the same (`kept`): `duplicate` (the same component twice under one UID: one is
  * kept), `several-masters` and `mixed-kinds` (a second master, or a
  * component of another kind, under a UID taken: it becomes an object of its
  * own under a new UID), `joined-line` (a line broken without folding,
  * joined to the text value before it), `dropped-line` (a stray line that
  * belongs to no value, left out), `ambiguous-line` (after a text value, a
  * line that reads as a property iCalendar does not name, "Meeting-ID:123":
- * kept as that property). Of the calendar itself: `invalid-zone` (a
- * `VTIMEZONE` that cannot be read: the objects naming it go without it, and
- * their times are read from the TZID, foundation D32) and
- * `invalid-property` (a calendar property that cannot be read, left out).
+ * kept as that property), `stray-end` (an `END` with no `BEGIN`, left
+ * out). Of the calendar itself: `invalid-zone` (a `VTIMEZONE` that cannot
+ * be read: the objects naming it go without it, and their times are read
+ * from the TZID, foundation D32), `conflicting-zone` (a second, different
+ * definition of a TZID: the objects take the first) and `invalid-property`
+ * (a calendar property that cannot be read, left out).
  */
 export type SplitProblemReason =
   | "no-uid"
@@ -44,6 +46,8 @@ export type SplitProblemReason =
   | "joined-line"
   | "dropped-line"
   | "ambiguous-line"
+  | "stray-end"
+  | "conflicting-zone"
   | "invalid-zone"
   | "invalid-property";
 
@@ -155,11 +159,12 @@ const KNOWN = new Set(
 );
 
 /** What was done to a line: joined to it, left out, or kept as a property that may not be one. */
-type Note = "joined" | "dropped" | "ambiguous";
+type Note = "joined" | "dropped" | "ambiguous" | "end";
 const NOTED = {
   joined: "joined-line",
   dropped: "dropped-line",
   ambiguous: "ambiguous-line",
+  end: "stray-end",
 } as const satisfies Record<Note, SplitProblemReason>;
 
 /** Properties whose value is free text, where a line break written as is belongs (RFC 5545 §3.3.11). */
@@ -238,6 +243,8 @@ interface Block {
   readonly lines: string[];
   readonly notes: Note[];
   whole: boolean;
+  /** Cut by the file's end, not by the next component. */
+  atEnd?: boolean;
 }
 
 const BEGIN = /^BEGIN:([A-Za-z0-9-]+)[ \t]*$/i;
@@ -292,11 +299,15 @@ function calendarsOf(content: readonly Line[], strict: boolean): Calendar[] {
     else if (begin) {
       block = { name: begin, lines: [line.text], notes: [], whole: false };
       blocks.push(block);
+    } else if (end) {
+      // An END with no BEGIN before it: said as one, not read as a property.
+      header.push({ text: line.text, note: "end" });
     } else header.push(line);
   }
   if (header) {
     if (strict) throw new NotCalendarError("The VCALENDAR is cut short.");
     // Cut short: what came whole is read, the component cut is not.
+    if (block) (block as Block).atEnd = true;
     close();
   }
   return calendars;
@@ -310,7 +321,9 @@ function calendarOf(header: readonly Line[], blocks: readonly Block[]): Calendar
   const own = (reason: SplitProblemReason, uid: string | null = null, kept = true) =>
     problems.push({ index: -1, uid, component: "VCALENDAR", reason, kept });
   for (const line of header) if (line.note) own(NOTED[line.note]);
-  const properties = header.filter((line) => line.note !== "dropped").map((line) => line.text);
+  const properties = header
+    .filter((line) => line.note !== "dropped" && line.note !== "end")
+    .map((line) => line.text);
   let root: ICAL.Component;
   try {
     root = new ICAL.Component(ICAL.parse(wrap(properties)) as unknown[]);
@@ -320,7 +333,7 @@ function calendarOf(header: readonly Line[], blocks: readonly Block[]): Calendar
     for (const property of properties) {
       try {
         const read = new ICAL.Component(ICAL.parse(wrap([property])) as unknown[]);
-        for (const one of read.getAllProperties()) root.addProperty(one);
+        for (const one of read.getAllProperties().slice()) root.addProperty(one);
       } catch {
         own("invalid-property", CONTENT_LINE.exec(property)?.[1]?.toUpperCase() ?? null, false);
       }
@@ -337,12 +350,15 @@ function calendarOf(header: readonly Line[], blocks: readonly Block[]): Calendar
   }
   const zones: Part[] = [];
   const parts: Part[] = [];
-  blocks.forEach(({ name, lines: block, whole, notes }, index) => {
+  blocks.forEach(({ name, lines: block, whole, atEnd, notes }, index) => {
     let component: ICAL.Component | null = null;
     try {
-      if (whole) {
+      // One whose END never came but whose next one began is read as if it
+      // had: what it says may be whole. Cut by the file's end, its last line may not be.
+      if (whole || !atEnd) {
+        const body = whole ? block : [...block, `END:${name}`];
         component =
-          new ICAL.Component(ICAL.parse(wrap(block)) as unknown[]).getAllSubcomponents()[0] ?? null;
+          new ICAL.Component(ICAL.parse(wrap(body)) as unknown[]).getAllSubcomponents()[0] ?? null;
       }
     } catch {
       // Left unread: a problem of its own.
@@ -379,12 +395,20 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
     kept: boolean,
   ) => problems.push({ index: part.index, uid, component: part.name, reason, kept });
 
+  // A TZID defined twice: the first definition is the one every object
+  // takes, the same on every run; a different second one is said.
   const zones = new Map<string, ICAL.Component>();
   for (const zone of calendar.zones) {
     const tzid = zone.component?.getFirstPropertyValue("tzid");
-    if (typeof tzid === "string") {
-      if (!zones.has(tzid)) zones.set(tzid, zone.component!);
-    } else problem(zone, zone.uid, zone.whole ? "invalid-zone" : "unterminated", false);
+    if (typeof tzid !== "string") {
+      problem(zone, zone.uid, zone.whole ? "invalid-zone" : "unterminated", false);
+      continue;
+    }
+    if (!zone.whole) problem(zone, tzid, "unterminated", true);
+    const first = zones.get(tzid);
+    if (!first) zones.set(tzid, zone.component!);
+    else if (canonical(first) !== canonical(zone.component!))
+      problem(zone, tzid, "conflicting-zone", false);
   }
 
   const groups = new Map<string, Group>();
@@ -414,6 +438,7 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
       continue;
     }
     placeOf.set(component, part.index);
+    if (!part.whole) problem(part, part.uid, "unterminated", true);
     for (const note of part.notes) problem(part, part.uid, NOTED[note], true);
     let uid = component.getFirstPropertyValue("uid");
     if ((typeof uid !== "string" || uid === "") && newUid) {
@@ -572,4 +597,91 @@ function refreshOf(root: ICAL.Component): number | null {
     }
   }
   return null;
+}
+
+/**
+ * A component's meaning as one string: its properties and subcomponents in
+ * an order of their own, so two definitions written in another order (a
+ * `VTIMEZONE`'s observances, its lines) compare the same.
+ */
+function canonical(component: ICAL.Component): string {
+  const [name, properties, components] = component.toJSON() as [string, unknown[], unknown[]];
+  const sorted = (items: readonly string[]) => items.toSorted().join("|");
+  return JSON.stringify([
+    name,
+    sorted(properties.map((property) => JSON.stringify(property))),
+    sorted(components.map((child) => canonical(new ICAL.Component(child as unknown[])))),
+  ]);
+}
+
+/**
+ * An object's text with every component under another UID: an imported
+ * item kept as a copy beside the one already there (import.md D270). A
+ * `RELATED-TO` naming a UID in `related` (another item copied with it, a
+ * subtask's parent) names its copy instead.
+ */
+export function withUid(
+  ics: string,
+  uid: string,
+  related: ReadonlyMap<string, string> = new Map(),
+): string {
+  const root = new ICAL.Component(ICAL.parse(ics) as unknown[]);
+  for (const component of root.getAllSubcomponents()) {
+    if (component.name === "vtimezone") continue;
+    component.updatePropertyWithValue("uid", uid);
+    for (const property of component.getAllProperties("related-to")) {
+      const copy = related.get(String(property.getFirstValue()));
+      if (copy) property.setValue(copy);
+    }
+  }
+  return writeCalendar(root);
+}
+
+/**
+ * The file's object over the one stored (import.md D270, "Use the file's version").
+ * The file says what the item is: every property and component iCalendar
+ * names (its times, `DTEND` or `DURATION`, its rule, its exceptions, its
+ * guests) is the file's, and what the file leaves out is gone. The stored
+ * copy gives only what a file from another app cannot know of it
+ * (foundation D7): its `X-` properties the file does not have, and its
+ * alarms and its attachments when the file has none of them. An exception
+ * the file does not have goes: the file's series is the series.
+ */
+export function overlay(stored: string, incoming: string): string {
+  const base = new ICAL.Component(ICAL.parse(stored) as unknown[]);
+  const over = new ICAL.Component(ICAL.parse(incoming) as unknown[]);
+  const occurrence = (component: ICAL.Component) =>
+    `${component.name}|${component.getFirstProperty("recurrence-id")?.toICALString() ?? ""}`;
+  const old = new Map(
+    base
+      .getAllSubcomponents()
+      .filter((component) => component.name !== "vtimezone")
+      .map((component) => [occurrence(component), component] as const),
+  );
+  // Copies of ical.js's lists (`slice`): adding an item to one component takes it from the other.
+  for (const component of over.getAllSubcomponents().slice()) {
+    if (component.name === "vtimezone") continue;
+    const before = old.get(occurrence(component));
+    if (!before) continue;
+    const has = new Set(component.getAllProperties().map((property) => property.name));
+    for (const property of before.getAllProperties().slice()) {
+      const keep =
+        (property.name.startsWith("x-") && !has.has(property.name)) ||
+        (property.name === "attach" && !has.has("attach"));
+      if (keep) component.addProperty(property);
+    }
+    if (component.getAllSubcomponents("valarm").length === 0)
+      for (const alarm of before.getAllSubcomponents("valarm").slice())
+        component.addSubcomponent(alarm);
+  }
+  // A zone the result names that the file does not define: the stored one's.
+  const defined = new Set(
+    over.getAllSubcomponents("vtimezone").map((zone) => String(zone.getFirstPropertyValue("tzid"))),
+  );
+  const named = new Set(over.getAllSubcomponents().flatMap(tzidsOf));
+  for (const zone of base.getAllSubcomponents("vtimezone").slice()) {
+    const tzid = String(zone.getFirstPropertyValue("tzid"));
+    if (named.has(tzid) && !defined.has(tzid)) over.addSubcomponent(zone);
+  }
+  return writeCalendar(over);
 }

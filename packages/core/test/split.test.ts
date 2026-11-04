@@ -7,7 +7,9 @@ import {
   NotCalendarError,
   splitCalendar,
   splitCalendars,
+  overlay,
   type SplitCalendar,
+  withUid,
 } from "../src/split.ts";
 import { fixture } from "./support.ts";
 
@@ -321,12 +323,21 @@ describe("components that cannot be objects, and those kept all the same (D272)"
       "SUMMARY:x",
     ]);
     for (const split of [splitCalendar(text), splitCalendars(text, { newUid: () => "x" })[0]!]) {
-      expect(split.objects.map((object) => object.uid)).toEqual(["a", "b"]);
+      // What it said reads whole: kept, and said.
+      expect(split.objects.map((object) => object.uid)).toEqual(["a", "cut", "b", "t"]);
       expect(split.problems).toEqual([
-        { index: 1, uid: "cut", component: "VEVENT", reason: "unterminated", kept: false },
-        { index: 3, uid: "t", component: "VTODO", reason: "unterminated", kept: false },
+        { index: 1, uid: "cut", component: "VEVENT", reason: "unterminated", kept: true },
+        { index: 3, uid: "t", component: "VTODO", reason: "unterminated", kept: true },
       ]);
     }
+    // One that does not read whole, the END of what was in it lost: not kept.
+    const broken = splitCalendar(
+      calendar(["BEGIN:VEVENT", "UID:v", "BEGIN:VALARM", "ACTION:DISPLAY"], event("c")),
+    );
+    expect(broken.objects.map((object) => object.uid)).toEqual(["c"]);
+    expect(broken.problems).toEqual([
+      { index: 0, uid: "v", component: "VEVENT", reason: "unterminated", kept: false },
+    ]);
     // And the next calendar after it, in a file of several.
     const two = lines(
       "BEGIN:VCALENDAR",
@@ -338,7 +349,7 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     );
     expect(
       splitCalendars(two, { newUid: () => "x" }).map((one) => one.objects.map((o) => o.uid)),
-    ).toEqual([[], ["b"]]);
+    ).toEqual([["a"], ["b"]]);
   });
 
   test("a VTIMEZONE that cannot be read is named; the objects naming it are kept and read the TZID", () => {
@@ -373,6 +384,64 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     ]);
     const start = CalendarObject.parse(split.objects[0]!.ics).master!.start;
     expect(start).toMatchObject({ type: "zoned", timeZone: "Europe/Vilnius" });
+  });
+
+  test("a TZID defined twice, differently: the objects take the first, the second is named", () => {
+    const zone = (offset: string) => [
+      "BEGIN:VTIMEZONE",
+      "TZID:Office",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      `TZOFFSETFROM:${offset}`,
+      `TZOFFSETTO:${offset}`,
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    const at = (uid: string) => event(uid, ["DTEND;TZID=Office:20261105T120000"]);
+    const split = splitCalendar(
+      calendar(
+        zone("+0200"),
+        at("a"),
+        [
+          "BEGIN:VTIMEZONE",
+          "BEGIN:STANDARD",
+          "TZOFFSETTO:+0200",
+          "TZOFFSETFROM:+0200",
+          "DTSTART:19700101T000000",
+          "END:STANDARD",
+          "TZID:Office",
+          "END:VTIMEZONE",
+        ],
+        zone("+0500"),
+        at("b"),
+      ),
+    );
+    // The same definition again, its lines in another order, is no problem; a different one is.
+    expect(split.problems).toEqual([
+      { index: 3, uid: "Office", component: "VTIMEZONE", reason: "conflicting-zone", kept: false },
+    ]);
+    for (const object of split.objects) {
+      expect(object.ics).toContain("TZOFFSETTO:+0200");
+      expect(object.ics).not.toContain("+0500");
+    }
+  });
+
+  test("an END with no BEGIN is named as one, and the calendar's properties are kept", () => {
+    const split = splitCalendar(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "X-WR-CALNAME:Kept",
+        "END:VEVENT",
+        ...event("a"),
+        "END:VCALENDAR",
+      ),
+    );
+    expect(split.name).toBe("Kept");
+    expect(split.objects.map((object) => object.uid)).toEqual(["a"]);
+    expect(split.problems).toEqual([
+      { index: -1, uid: null, component: "VCALENDAR", reason: "stray-end", kept: true },
+    ]);
   });
 
   test("a calendar property that cannot be read is named; the others go with each object", () => {
@@ -527,5 +596,93 @@ describe("jCal (RFC 7265)", () => {
     expect(() => jcalText({ items: [] })).toThrow(NotCalendarError);
     expect(() => jcalText(["vevent", [], []])).toThrow(NotCalendarError);
     expect(() => jcalText([])).toThrow(NotCalendarError);
+  });
+});
+
+describe("an object under another UID (import D270)", () => {
+  test("every component, a series' exceptions too, and nothing else changed", () => {
+    const [series] = splitCalendar(fixture("exports/google-export.ics")).objects;
+    const copy = CalendarObject.parse(withUid(series!.ics, "copy"));
+    expect(copy.uid).toBe("copy");
+    expect(copy.exceptions.map((exception) => exception.uid)).toEqual(["copy"]);
+    const original = CalendarObject.parse(series!.ics);
+    expect({ ...copy.master, uid: "x" }).toEqual({ ...original.master, uid: "x" });
+  });
+});
+
+describe("the file's object over the one stored (import D270, Update them)", () => {
+  const vevents = (ics: string) =>
+    new ICAL.Component(ICAL.parse(ics)).getAllSubcomponents("vevent");
+
+  test("the file says what the item is: its end, its rule, its exceptions", () => {
+    const stored = calendar(
+      event("s", [
+        "DTEND:20261105T100000Z",
+        "RRULE:FREQ=DAILY;COUNT=5",
+        "EXDATE:20261106T090000Z",
+        "LOCATION:Old room",
+      ]),
+      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:stored only"]),
+    );
+    // DURATION for DTEND, no rule, so no exceptions: a single event.
+    const incoming = calendar(event("s", ["DURATION:PT2H"]));
+    const merged = overlay(stored, incoming);
+    const [master, ...rest] = vevents(merged);
+    expect(rest).toEqual([]);
+    expect(master!.hasProperty("dtend")).toBe(false);
+    expect(master!.getFirstPropertyValue("duration")?.toString()).toBe("PT2H");
+    for (const gone of ["rrule", "exdate", "location"])
+      expect(master!.hasProperty(gone)).toBe(false);
+    CalendarObject.parse(merged);
+  });
+
+  test("its EXDATEs are the file's", () => {
+    const merged = overlay(
+      calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261106T090000Z"])),
+      calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261107T090000Z"])),
+    );
+    expect(merged).toContain("EXDATE:20261107T090000Z");
+    expect(merged).not.toContain("EXDATE:20261106T090000Z");
+  });
+
+  test("what another app cannot know stays: X- properties, alarms and attachments the file has none of", () => {
+    const alarm = [
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      "TRIGGER:-PT10M",
+      "DESCRIPTION:Soon",
+      "END:VALARM",
+    ];
+    const stored = calendar([
+      ...event("s", ["X-MINE:1", "X-BOTH:stored", "ATTACH:https://e.com/a"]).slice(0, -1),
+      ...alarm,
+      "END:VEVENT",
+    ]);
+    const kept = vevents(overlay(stored, calendar(event("s", ["X-BOTH:file"]))))[0]!;
+    expect(kept.getFirstPropertyValue("x-mine")).toBe("1");
+    expect(kept.getFirstPropertyValue("x-both")).toBe("file");
+    expect(kept.getFirstPropertyValue("attach")).toBe("https://e.com/a");
+    expect(kept.getAllSubcomponents("valarm")).toHaveLength(1);
+    // The file has its own: the stored ones go.
+    const own = vevents(
+      overlay(
+        stored,
+        calendar([
+          ...event("s", ["ATTACH:https://e.com/b"]).slice(0, -1),
+          "BEGIN:VALARM",
+          "ACTION:DISPLAY",
+          "TRIGGER:-PT1H",
+          "DESCRIPTION:Hour",
+          "END:VALARM",
+          "END:VEVENT",
+        ]),
+      ),
+    )[0]!;
+    expect(own.getAllProperties("attach").map((p) => p.getFirstValue())).toEqual([
+      "https://e.com/b",
+    ]);
+    expect(
+      own.getAllSubcomponents("valarm").map((a) => a.getFirstPropertyValue("description")),
+    ).toEqual(["Hour"]);
   });
 });

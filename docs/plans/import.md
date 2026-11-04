@@ -1,7 +1,8 @@
 # Import plan
 
 Status: **in progress** — the formats, their order and the flow are
-decided; the splitter is built (PR I1). This plan owns reading calendars
+decided; the splitter (PR I1) and the import flow for iCalendar, jCal and
+ZIP (PR I2) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -32,7 +33,12 @@ not carry is said, not dropped in silence.
   [D232](foundation.md#D232): an `<input type="file">`, which opens the
   system's picker on Android and the file dialog on the desktop), read in
   the page, and goes nowhere but into the store: no server sees it but the
-  user's own, through the sync, once imported.
+  user's own, through the sync, once imported. A file over 64 MiB is refused before
+  it is read (its text is held whole while it is split); a ZIP is read to
+  1000 files and 64 MiB in all, no file inflating past its stated size or
+  1000 times its own, so a ZIP bomb costs nothing: what is past a limit is
+  named as unread, and so is an entry whose own header is not where the
+  archive's directory says, or names another file or method.
 
 - **D266. The formats, and the order they come in.** Surveyed on
   2026-11-04 from each format's specification and each exporter's
@@ -63,7 +69,10 @@ not carry is said, not dropped in silence.
   4791 §4.1). Each component is read on its own, so one value ical.js
   refuses costs that component, not the file, and one whose `END` never
   came ends where the next component begins or the calendar ends, so it
-  never takes the rest of the file with it. It forgives what exporters
+  never takes the rest of the file with it; what it said is kept when it
+  reads whole, and named either way (one cut by the file's end is not
+  kept: its last line may be cut too). An `END` with no `BEGIN` is named
+  as one and left out. It forgives what exporters
   get wrong: a byte order mark, LF or CR line ends, blank lines, several
   `VCALENDAR`s one after another, a file cut short (what came whole is
   kept), a component with no UID (it gets one). Any line that starts as a content
@@ -93,7 +102,9 @@ not carry is said, not dropped in silence.
   file, and so is what was kept but changed. A `VTIMEZONE` that cannot be
   read is named, and the objects naming it go without it: a definition
   ical.js cannot read cannot be stored either, and the time model reads
-  the TZID ([D32](foundation.md#D32)); a missing one likewise. A calendar
+  the TZID ([D32](foundation.md#D32)); a missing one likewise. A TZID
+  defined twice, differently, in one calendar: every object takes the
+  first definition, the same on every run, and the second is named. A calendar
   property that cannot be read is named and left out, the others kept.
   `splitCalendar`, the same with a strict outer shape
   (exactly one whole `VCALENDAR`, else `NotCalendarError`), is D251's.
@@ -121,9 +132,22 @@ not carry is said, not dropped in silence.
 - **D270. The same UID already there.** In the target calendar, an object
   with the same UID that is the same item ([`sameObjects`](foundation.md#D107))
   is skipped, silently counted. One that differs is a duplicate: the
-  dialog asks once for all of them, "Update them", "Import as copies" (a
+  dialog asks once for all of them, "Use the file's version" (which says
+  what it keeps), "Import as copies" (a
   new UID, the series with its exceptions) or "Skip them"; none is chosen
-  for the user.
+  for the user. An update lays the file's object over the stored one
+  (`overlay`): the file says what the item is, every property and
+  component iCalendar names (its start and its `DTEND` or `DURATION`,
+  its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
+  out is gone: the user chose the file's version, so this is their edit,
+  not a sync that drops what it does not understand. The stored copy
+  gives only what a file from another app cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
+  not have, and its alarms and its attachments when the file has none of
+  them. An item deleted here whose deletion has not reached the server
+  yet is not there as the user sees it, so it is not asked about: the
+  file brings it back, as a change of it (the store revives it by UID,
+  [foundation D38](foundation.md#D38)). Copies made in one run name each other: a copied
+  subtask's `RELATED-TO` names its copied parent.
 
 - **D271. Written through the store, in batches.** The objects become
   local changes (`changeLocal`, pending creates or updates), as an edit
@@ -132,7 +156,14 @@ not carry is said, not dropped in silence.
   200 objects a transaction, the page given back between batches, the
   progress shown as a count; "Stop" ends it after the batch in flight, and
   what landed stays, the dialog says how much. A sync is asked for once,
-  at the end.
+  at the end. One import runs at a time: a second tap on "Import" or on an
+  answer before the first came back does nothing, and a run writes a UID
+  to a calendar once (the same UID in two sources or two files of a ZIP is
+  counted as given twice). A write that fails ends the run: the batch is
+  one transaction, so what landed before stays and is counted, and the
+  error is said. A calendar made for the import that got nothing (stopped
+  or failed before its first write) is removed again, and so are those
+  made before one that could not be made.
 
 - **D272. Nothing lost, and what a conversion cannot carry, said.** An
   iCalendar or jCal object is stored as the file wrote it
