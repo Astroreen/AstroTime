@@ -227,6 +227,9 @@ export class IcsProvider implements Provider {
     const changed = [...objects.values()].filter(
       (object) => known.get(object.href) !== object.etag,
     );
+    // Counted among what the calendar shows: `known` is the store's, which
+    // keeps only the kinds kept here (no VJOURNAL), so the file's other
+    // kinds neither dilute nor swell what a held removal weighs (D263).
     const removed = [...known.keys()].filter((href) => !objects.has(href));
     const held =
       removed.length > 0 &&

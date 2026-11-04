@@ -585,7 +585,11 @@ marked _to be recorded_.
   calendar's file would remove N items" with "Remove them", which writes
   that version into the secret as `apply` and syncs: that file, and only
   it, goes through, and once: the sync after it clears `apply`
-  (`settle`), so the same drop later asks again. **Reading at most hourly** (or the file's
+  (`settle`, which reads the secret again and clears only the version
+  that sync used, so a "Remove them" pressed meanwhile stays), so the same
+  drop later asks again. What a removal weighs is counted among the
+  items the calendar shows (the store's events and tasks), never the
+  file's journals. **Reading at most hourly** (or the file's
   `REFRESH-INTERVAL`, if longer) is kept per store in memory
   (`@astrotime/sync/subscriptions`, `recent`), the last result said again
   meanwhile; only after a clean sync: one that failed, or said a problem

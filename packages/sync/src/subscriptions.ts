@@ -126,9 +126,17 @@ export async function settle(
   accountId: string,
   provider: IcsProvider,
 ): Promise<void> {
-  const { url, apply } = provider.subscription;
-  if (apply === null) return;
-  await context.secrets.set(keyOf(accountId), JSON.stringify({ subscription: url, apply: null }));
+  const used = provider.subscription.apply;
+  if (used === null) return;
+  // Read again now: a "Remove them" pressed while this sync ran, for a newer
+  // file, wrote its own version, which stays for the next sync; only the
+  // version this sync used is cleared.
+  const now = parseSubscription(await context.secrets.get(keyOf(accountId)));
+  if (!now || now.apply !== used) return;
+  await context.secrets.set(
+    keyOf(accountId),
+    JSON.stringify({ subscription: now.url, apply: null }),
+  );
 }
 
 /**
