@@ -50,6 +50,7 @@ for (const [name, device] of [
 
     test("a place picked from Location's search shows in the details with its map and links", async ({
       page,
+      context,
     }) => {
       const { searched, tiles } = await fakeServices(page);
       await openDemo(page, "day");
@@ -88,6 +89,22 @@ for (const [name, device] of [
       );
       expect(tiles.length).toBeGreaterThan(0);
       expect(tiles.every((url) => url.startsWith("https://tile.openstreetmap.org/16/"))).toBe(true);
+
+      // A tap on the map opens it in maps, as the icon button does (design D238).
+      await context.route("https://www.openstreetmap.org/**", (route) =>
+        route.fulfill({ contentType: "text/html", body: "<title>maps</title>" }),
+      );
+      const opened = page.waitForEvent("popup");
+      const map = details.getByRole("img", { name: "Map of Brandenburg Gate" });
+      // The map's own link lies over it, out of the accessibility tree: the
+      // tap goes where the map is drawn, as a finger's does.
+      if (name === "phone") await map.tap({ force: true });
+      else await map.click({ force: true });
+      const maps = await opened;
+      await maps.waitForLoadState();
+      expect(maps.url()).toBe(
+        "https://www.openstreetmap.org/?mlat=52.51627&mlon=13.377703#map=17/52.51627/13.377703",
+      );
     });
   });
 }
@@ -150,11 +167,28 @@ test("Copy address copies the text and says so; refused, the notice says it was 
     return page.getByRole("dialog", { name: "Design review" });
   };
   const details = await open();
-  await details.getByRole("button", { name: "Copy address" }).click();
+  // Two icon buttons at the end of the address's line, each with its tooltip (design D238).
+  const copy = details.getByRole("button", { name: "Copy address" });
+  await expect(copy).toHaveAttribute("title", "Copy address");
+  await expect(details.getByRole("link", { name: "Open in maps" })).toHaveAttribute(
+    "title",
+    "Open in maps",
+  );
+  await copy.click();
   await expect(details.getByRole("button", { name: "Copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
   await page.keyboard.press("Escape");
   await expect(details).toHaveCount(0);
+
+  // A tap on the address itself copies it too, and says so.
+  await page.evaluate(() => navigator.clipboard.writeText(""));
+  const tapped = await open();
+  // Its tap target lies over the text, out of the accessibility tree.
+  await tapped.getByText("Room 4, second floor").click({ force: true });
+  await expect(tapped.getByRole("button", { name: "Copied" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  await page.keyboard.press("Escape");
+  await expect(tapped).toHaveCount(0);
 
   // The clipboard refuses: the change notice says so, over the details.
   await page.evaluate(() => {

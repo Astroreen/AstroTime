@@ -939,7 +939,8 @@ an event or a task." What is written and which services are asked:
   OpenStreetMap's tiles 144 px high across the card, the place in its
   middle under a pin, "© OpenStreetMap" in its corner linking to the
   copyright page; the tiles load as the card shows (`loading="lazy"`), and
-  one that does not come leaves the map's ground. Two actions under it:
+  one that does not come leaves the map's ground. Two actions (since [D238](#D238),
+  icons at the end of the address's line):
   - **Open in maps**: OpenStreetMap's page with a marker on the place
     (`openstreetmap.org/?mlat=…&mlon=…#map=17/…`); on Android a `geo:` URI
     with the point and its text (its parentheses escaped, as the label sits
@@ -2392,8 +2393,21 @@ own (below).
   install under a path, `/.well-known/caldav` redirected; and the real
   servers' homes in `packages/sync/test/servers.test.ts`). A CalDAV
   account whose home is not saved gets no reason: its cause is not known
-  (`noFilesOf`, `@astrotime/sync`). The owner's case, and attaching a
+  (`noFilesOf`, `@astrotime/sync/files`). The owner's case, and attaching a
   file inline where there are no files: [Deferred](#deferred).
+- **D238. The place's line, two icons at its end** (the owner's 5, round
+  5: "'Open on map' and 'Copy address' I would make plain icons on the
+  same line as the address, two icons at the end of the line"). The
+  details' place (D177) puts "Open in maps" and "Copy address" as icon
+  buttons at the end of its first line, each with its tooltip; copied,
+  the copy icon turns to a tick and its name to "Copied" for a moment.
+  A tap on the map opens it in maps, a tap on the address copies it
+  (the "copied" feedback, and "Copied" said politely). Those two taps
+  are for the hand: their targets lie over the map and the text, out
+  of the keyboard's order and the accessibility tree, and the icon
+  buttons are the actions for keys and screen readers. OpenStreetMap's
+  credit stays a link of its own over the map. The details' picture
+  (D216, D221) is untouched.
 
 ## Deferred
 

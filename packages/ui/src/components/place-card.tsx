@@ -1,9 +1,10 @@
 // The place in an item's details (docs/plans/design.md#D177): a place with
 // a point shows its name and address over a small map of OpenStreetMap's
 // tiles with a pin, credited as OpenStreetMap asks; any place can be opened
-// in maps and its address copied. A text with no point shows as it always
-// did. The map loads only once the details show it, and not at all with
-// places turned off.
+// in maps and its address copied, by two icon buttons at the end of its
+// line (design D238), or by a tap on the map and on the address. A text
+// with no point shows as it always did. The map loads only once the
+// details show it, and not at all with places turned off.
 import type { Geo } from "@astrotime/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,8 +17,9 @@ import { CheckIcon, CopyIcon, MapIcon } from "./icons.tsx";
 /** The map's box, wider than any card: it is cut to the card's width, the pin in the middle. */
 const BOX = { width: 512, height: 144 } as const;
 
+/** An icon button at the end of the place's line, its first line kept where the text's is. */
 const action =
-  "inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-small font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
+  "-my-2 grid size-10 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-raised-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent";
 
 /** How long "Copied" shows before the button says "Copy address" again. */
 const COPIED_MS = 2000;
@@ -54,37 +56,78 @@ export function PlaceCard({
       // Refused (a permission, a page out of focus): the notice says so.
       () => onCopyFailed(),
     );
+  const link = mapsLink(location, geo, places?.links ?? "web");
+  const copyName = t(copied ? "places.copied" : "places.copy");
   return (
     <div className="flex flex-col gap-2">
-      <p className="flex flex-col">
-        <span className="break-words whitespace-pre-wrap">{name}</span>
-        {address && <span className="break-words text-small text-ink-muted">{address}</span>}
-      </p>
-      {geo && places && (
-        <StaticMap geo={geo} tiles={places.tiles} label={t("places.map", { place: name })} />
-      )}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex items-start gap-1">
+        <div className="relative min-w-0 flex-1">
+          <p className="flex flex-col">
+            <span className="break-words whitespace-pre-wrap">{name}</span>
+            {address && <span className="break-words text-small text-ink-muted">{address}</span>}
+          </p>
+          {clipboard && (
+            // A tap on the address copies it (design D238); keyboards and
+            // screen readers have the button at the end of the line.
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-hidden="true"
+              onClick={copy}
+              className="absolute -inset-1 cursor-copy rounded-lg"
+            />
+          )}
+        </div>
         <a
-          href={mapsLink(location, geo, places?.links ?? "web")}
+          href={link}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={t("places.open")}
+          title={t("places.open")}
           className={action}
         >
-          <MapIcon className="size-[18px]" />
-          {t("places.open")}
+          <MapIcon className="size-5" />
         </a>
         {clipboard && (
-          <button type="button" onClick={copy} className={action}>
-            {copied ? <CheckIcon className="size-[18px]" /> : <CopyIcon className="size-[18px]" />}
-            {t(copied ? "places.copied" : "places.copy")}
+          <button
+            type="button"
+            onClick={copy}
+            aria-label={copyName}
+            title={copyName}
+            className={`${action} -mr-2 ${copied ? "text-accent" : ""}`}
+          >
+            {copied ? <CheckIcon className="size-5" /> : <CopyIcon className="size-5" />}
           </button>
         )}
       </div>
+      {geo && places && (
+        <StaticMap
+          geo={geo}
+          tiles={places.tiles}
+          label={t("places.map", { place: name })}
+          link={link}
+        />
+      )}
+      {/* "Copied", said where the tap was, for a moment. */}
+      <span aria-live="polite" className="sr-only">
+        {copied ? t("places.copied") : ""}
+      </span>
     </div>
   );
 }
 
-function StaticMap({ geo, tiles, label }: { geo: Geo; tiles: string; label: string }) {
+function StaticMap({
+  geo,
+  tiles,
+  label,
+  link,
+}: {
+  geo: Geo;
+  tiles: string;
+  label: string;
+  /** Where a tap on the map goes: maps, as "Open in maps" does (design D238). */
+  link: string;
+}) {
   const { t } = useTranslation();
   return (
     <div className="relative h-36 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
@@ -129,6 +172,15 @@ function StaticMap({ geo, tiles, label }: { geo: Geo; tiles: string; label: stri
           <circle cx="12" cy="12" r="3.6" fill="#fff" />
         </svg>
       </div>
+      {/* The whole map opens maps; the button by the address is its name for keys and screen readers. */}
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="absolute inset-0"
+      />
       <a
         href="https://www.openstreetmap.org/copyright"
         target="_blank"
