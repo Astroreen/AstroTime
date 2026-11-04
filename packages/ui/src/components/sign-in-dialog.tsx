@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 
 import { SignIn } from "../accounts/sign-in.ts";
 import { useAccounts } from "./accounts-context.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 type SignInKind = "nextcloud" | "caldav";
@@ -30,10 +31,6 @@ export interface SignInRequest {
   readonly resume?: boolean;
 }
 
-export const primaryButton =
-  "rounded-full bg-accent px-5 py-2 text-body font-medium text-on-accent hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
-export const textButton =
-  "rounded-full px-4 py-2 text-body font-medium text-accent hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 const input =
   "h-11 w-full rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent";
 

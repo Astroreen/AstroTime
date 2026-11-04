@@ -16,7 +16,7 @@ import { useAccounts } from "./accounts-context.tsx";
 import { AttachmentBody } from "./attachments.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { BackIcon, CloseIcon } from "./icons.tsx";
-import { textButton } from "./sign-in-dialog.tsx";
+import { textButton } from "./buttons.ts";
 
 type Listing =
   | { readonly state: "loading" }

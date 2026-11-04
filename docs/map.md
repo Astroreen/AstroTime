@@ -250,9 +250,11 @@ When you add a package, app or module, add its line here in the same PR.
       screen), from the drawer's foot. → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
     - `lazy.tsx` — dialogs that load with their first opening: the
-      details, the edit dialog, Settings, the Conflicts list, and the
-      copy's notice (`copy-notice.tsx`); and the Agenda with its first
-      showing. → `plans/foundation.md#D145`
+      details, the edit dialog, Settings, the Conflicts list, the sign-in
+      dialog (`plans/providers.md#D255`), and the copy's notice
+      (`copy-notice.tsx`); and the Agenda with its first showing.
+      → `plans/foundation.md#D145`
+    - `buttons.ts` — the filled and the text button every dialog shares.
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
       (`reschedule`); the details (`item-details.tsx`), the edit

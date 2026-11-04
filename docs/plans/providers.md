@@ -355,6 +355,14 @@ marked _to be recorded_.
   made in the same PR by moving something off the first load first (the
   sign-in dialog, which is on it today, is the first candidate), and the
   PR says what moved and both numbers.
+  _Built, the room:_ the sign-in dialog loads with its first opening, as
+  the edit dialog does ([D145](foundation.md#D145)'s `deferred`, in
+  `components/lazy.tsx`), its forms and Base UI's tabs in a chunk of 5.4
+  KiB; the buttons every dialog shares moved to `components/buttons.ts`
+  so the others need not load it. AstroTime's own first load went from
+  132 458 to 130 268 bytes (129.4 to 127.2 KiB), the room P4's registry
+  and subscriptions come into. The `SignIn` steps (`accounts/sign-in.ts`)
+  stay, as the accounts' context takes up a held approval with them.
 
 - **D256. What is not built, and why.**
   - **Proton Calendar** has no API and no CalDAV, and Proton's Bridge

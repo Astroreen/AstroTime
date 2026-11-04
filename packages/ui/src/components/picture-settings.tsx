@@ -13,7 +13,7 @@ import { addPicture, NotAPictureError, removePicture, usePictureUrl } from "../p
 import { useSettings, type OwnWord } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon, PlusIcon } from "./icons.tsx";
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
 const row =

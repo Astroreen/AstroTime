@@ -67,7 +67,7 @@ import { MentionField } from "./mention-field.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
 import { useAccounts } from "./accounts-context.tsx";
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 

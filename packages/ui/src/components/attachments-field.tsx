@@ -26,7 +26,7 @@ import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
 import { FilePicker } from "./file-picker.tsx";
-import { textButton } from "./sign-in-dialog.tsx";
+import { textButton } from "./buttons.ts";
 
 /** A way to attach a file, turned off where the calendar has no files (design D237). */
 const fileButton = `${textButton} disabled:text-ink-muted disabled:hover:bg-transparent`;
