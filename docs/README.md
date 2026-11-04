@@ -31,6 +31,7 @@ what is deferred, and the PRs that land it. Plans are canon once implemented.
 | [`desktop.md`](plans/desktop.md)       | the Linux desktop app: its shell, platform adapters, build and release | in progress |
 | [`providers.md`](plans/providers.md)   | the services beyond Nextcloud, how each is reached, how each is tested | in progress |
 | [`import.md`](plans/import.md)         | calendars and tasks read from files, and written out to one            | in progress |
+| [`server.md`](plans/server.md)         | AstroTime's own CalDAV server, and the mesh of peers with no server    | in progress |
 
 ## Grilling sessions
 
