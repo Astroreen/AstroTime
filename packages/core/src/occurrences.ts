@@ -304,6 +304,14 @@ export function boundsOf(object: CalendarObject): Bounds {
   const span = master ? anchors(master) : null;
   if (master && span) {
     include(span.start, span.end);
+    // An RDATE before DTSTART shows too (`firstDay`): the bounds start there.
+    // One after it only widens them, and the walk below reaches it anyway.
+    for (const property of master.getAllProperties("rdate")) {
+      for (const value of property.getValues()) {
+        const start = value instanceof ICAL.Period ? value.start : value;
+        if (start instanceof ICAL.Time) include(start, plus(start, lengthOf(span)));
+      }
+    }
     const rules = master.getAllProperties("rrule").map((p) => p.getFirstValue() as ICAL.Recur);
     if (rules.some((rule) => rule.until === null && rule.count === null)) {
       open = true;

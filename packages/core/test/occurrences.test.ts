@@ -348,6 +348,30 @@ describe("bounds (for the local store's date index)", () => {
     });
   });
 
+  test("an RDATE before DTSTART, which shows (Google's birthdays), starts the bounds (D36)", () => {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:early",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART:20261110T090000Z",
+      "DTEND:20261110T100000Z",
+      "RDATE:20261103T090000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ];
+    for (const rule of [[], ["RRULE:FREQ=WEEKLY;COUNT=2"], ["RRULE:FREQ=WEEKLY"]]) {
+      const object = CalendarObject.parse(lines.toSpliced(8, 0, ...rule).join("\r\n"));
+      expect(starts(occurrencesBetween(object, vilnius("2026-11-03", "2026-11-04")))).toEqual([
+        "2026-11-03T11:00:00",
+      ]);
+      expect(boundsOf(object).startMs, rule.join()).toBe(Date.parse("2026-11-03T09:00:00Z"));
+    }
+  });
+
   test("an unending series is open; an undated task has no bounds", () => {
     expect(boundsOf(load("tasksorg-task-recurring.ics")).endMs).toBeNull();
     expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
