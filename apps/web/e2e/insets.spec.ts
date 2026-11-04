@@ -8,10 +8,12 @@ import { addAccount, openDemo, PHONE } from "./support.ts";
 const STATUS_BAR = 24;
 const NAVIGATION_BAR = 48;
 
+type Insets = { top: number; right: number; bottom: number; left: number };
+
 /** As SystemBars does once the page has loaded: the insets in CSS pixels, on the root element. */
 async function systemBars(
   page: Page,
-  { top = STATUS_BAR, right = 0, bottom = NAVIGATION_BAR } = {},
+  { top = STATUS_BAR, right = 0, bottom = NAVIGATION_BAR, left = 0 }: Partial<Insets> = {},
 ) {
   await page.evaluate(
     (insets) => {
@@ -20,14 +22,40 @@ async function systemBars(
         root.setProperty(`--safe-area-inset-${side}`, `${size}px`);
       }
     },
-    { top, right, bottom },
+    { top, right, bottom, left },
   );
 }
 
 async function box(locator: Locator) {
   const found = await locator.boundingBox();
   if (!found) throw new Error("not drawn");
-  return { top: found.y, bottom: found.y + found.height, right: found.x + found.width };
+  return {
+    top: found.y,
+    bottom: found.y + found.height,
+    left: found.x,
+    right: found.x + found.width,
+  };
+}
+
+/** Whether `locator` is drawn inside the room the bars leave, on all four sides. */
+async function inRoom(
+  locator: Locator,
+  insets: Insets,
+  viewport: { width: number; height: number },
+) {
+  // Measured where the dialog ends, not mid-way through its opening scale:
+  // its starting style gone, then its transitions finished.
+  const dialog = locator.page().getByRole("dialog").filter({ has: locator }).last();
+  const popup = (await dialog.count()) > 0 ? dialog : locator;
+  await expect(popup).not.toHaveAttribute("data-starting-style");
+  await popup.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  const { top, bottom, left, right } = await box(locator);
+  expect(top).toBeGreaterThanOrEqual(insets.top);
+  expect(bottom).toBeLessThanOrEqual(viewport.height - insets.bottom);
+  expect(left).toBeGreaterThanOrEqual(insets.left);
+  expect(right).toBeLessThanOrEqual(viewport.width - insets.right);
 }
 
 test("the top bar, the drawer, the tasks screen and the floating buttons clear the system bars", async ({
@@ -90,30 +118,72 @@ test("the details and the edit dialog clear the system bars on a phone", async (
   await clear(edit.locator("form"));
 });
 
-test("on a phone turned sideways a card and a centred dialog stay in the room the bars leave", async ({
+// A phone on its side: the status bar on top, a camera cutout at the left,
+// three-button navigation at the right.
+const SIDEWAYS: Insets = { top: STATUS_BAR, right: NAVIGATION_BAR, bottom: 0, left: 32 };
+
+test("on a phone turned sideways a card, the dialog beside its draft and a centred dialog stay in the room the bars leave", async ({
   page,
 }) => {
+  // Wide enough for the card (design D235): the edit dialog stands beside its draft.
   const LANDSCAPE = { width: PHONE.height, height: PHONE.width };
-  // The navigation bar at the side, as three-button navigation puts it.
-  const insets = { top: STATUS_BAR, right: NAVIGATION_BAR, bottom: 0 };
   await page.setViewportSize(LANDSCAPE);
   await openDemo(page, "week");
-  await systemBars(page, insets);
-  const inRoom = async (locator: Locator) => {
-    const { top, bottom, right } = await box(locator);
-    expect(top).toBeGreaterThanOrEqual(insets.top);
-    expect(bottom).toBeLessThanOrEqual(LANDSCAPE.height);
-    expect(right).toBeLessThanOrEqual(LANDSCAPE.width - insets.right);
-  };
+  await systemBars(page, SIDEWAYS);
 
   await page.getByRole("button", { name: "Create" }).click();
   const edit = page.getByRole("dialog", { name: "New event" });
-  await inRoom(edit);
+  await expect(edit).toHaveAttribute("data-aside", /^(left|right)$/);
+  await inRoom(edit, SIDEWAYS, LANDSCAPE);
+  // Narrower by the bar on its side, it does not cover the draft.
+  const draft = await box(page.locator("main [data-draft]").first());
+  const dialog = await box(edit);
+  expect(dialog.right <= draft.left || dialog.left >= draft.right).toBe(true);
   await page.keyboard.press("Escape");
   await expect(edit).toBeHidden();
 
-  const signIn = await addAccount(page);
-  await inRoom(signIn);
+  await inRoom(await addAccount(page), SIDEWAYS, LANDSCAPE);
+});
+
+test("on a small phone turned sideways the sheets cover the screen with their content clear of the bars on all four sides", async ({
+  page,
+}) => {
+  // Narrower than the card's 640 px: every sheet is the whole screen.
+  const SMALL = { width: 480, height: 320 };
+  await page.setViewportSize(SMALL);
+  await openDemo(page, "day");
+  await systemBars(page, SIDEWAYS);
+
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Design review, / })
+    .click();
+  const details = page.getByRole("dialog", { name: "Design review" });
+  await inRoom(details.getByRole("button", { name: "Close", exact: true }), SIDEWAYS, SMALL);
+  await inRoom(details.getByRole("button", { name: "More actions" }), SIDEWAYS, SMALL);
+
+  await details.getByRole("button", { name: "Edit" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  await inRoom(edit.getByRole("button", { name: "Close without saving" }), SIDEWAYS, SMALL);
+  await inRoom(edit.getByRole("button", { name: "Save" }), SIDEWAYS, SMALL);
+  await inRoom(edit.locator("form"), SIDEWAYS, SMALL);
+  await page.keyboard.press("Escape");
+  await expect(edit).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(details).toBeHidden();
+
+  await page.getByRole("button", { name: "Main menu" }).click();
+  await page
+    .getByRole("dialog", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await inRoom(settings.getByRole("button", { name: "Close settings" }), SIDEWAYS, SMALL);
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
+
+  // A centred dialog narrower than its own width, by the bars at its sides.
+  await inRoom(await addAccount(page), SIDEWAYS, SMALL);
 });
 
 test("without insets (a browser, a desktop) nothing moves", async ({ page }) => {
