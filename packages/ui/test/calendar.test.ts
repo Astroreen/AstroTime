@@ -159,6 +159,16 @@ describe("formats", () => {
     // …and starts an American one.
     expect(en.weekNumber(["2026-11-01", "2026-11-02"])).toBe(45);
   });
+
+  test("a week from Saturday has the number of the Monday to Friday it holds", () => {
+    const saturday = new Formats({ ...localeSettings(["en-US"]), weekStart: 6 });
+    // Saturday, October 31 to Friday, November 6: five of its days are ISO week 45.
+    expect(saturday.weekNumber(["2026-10-31", "2026-11-01", "2026-11-02"])).toBe(45);
+    expect(saturday.weekNumber(["2026-11-01"])).toBe(45);
+    expect(saturday.weekNumber(["2026-11-02"])).toBe(45);
+    // Saturday, January 2, 2027 begins the week of January 4, ISO's week 1.
+    expect(saturday.weekNumber(["2027-01-02"])).toBe(1);
+  });
 });
 
 describe("the drawer's settings override the locale (D53)", () => {
