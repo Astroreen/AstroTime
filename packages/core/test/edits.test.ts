@@ -536,6 +536,23 @@ describe("the repeat rule", () => {
     expect(yearly).toContain("RRULE:FREQ=YEARLY\r\n");
   });
 
+  test("a monthly weekday beyond the picker's is inexact (D9)", () => {
+    const monthly = (rule: string) =>
+      repeatOf(
+        CalendarObject.parse(
+          calendar(["DTSTART;TZID=Europe/Vilnius:20261123T090000", `RRULE:FREQ=MONTHLY;${rule}`]),
+        ),
+      );
+    // The second last Monday: no nth the picker names (1–5, or the last).
+    expect(monthly("BYDAY=-2MO")).toMatchObject({ exact: false, repeat: { monthlyWeekday: null } });
+    // The fourth Monday, only when it is the 22nd to the 24th: some months have none.
+    expect(monthly("BYDAY=4MO;BYMONTHDAY=22,23,24")?.exact).toBe(false);
+    expect(monthly("BYDAY=4MO")).toMatchObject({
+      exact: true,
+      repeat: { monthlyWeekday: { nth: 4, weekday: "MO" } },
+    });
+  });
+
   test("an end in UTC is read on the day of a zone only the object's VTIMEZONE knows (D32)", () => {
     // Outlook's own name for a zone, UTC+2 in winter: 23:00Z on 9 November is 01:00 on the 10th.
     const ics = [

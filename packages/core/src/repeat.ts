@@ -90,12 +90,18 @@ function readRule(
       exact = false;
   } else if (frequency === "MONTHLY") {
     const match = byDay.length === 1 ? /^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/.exec(byDay[0]!) : null;
-    if (match?.[1]) monthlyWeekday = { nth: Number(match[1]), weekday: match[2] as Weekday };
+    const nth = Number(match?.[1]);
+    // The nths a `Repeat` holds: 1–5, or −1 for the last (`-2MO` is none of them).
+    if (match?.[1] && ((nth >= 1 && nth <= 5) || nth === -1)) {
+      monthlyWeekday = { nth, weekday: match[2] as Weekday };
+    }
     const onItsDay =
       byDay.length === 0 &&
       (byMonthDay.length === 0 ||
         (byMonthDay.length === 1 && startDate?.getUTCDate() === byMonthDay[0]));
-    if (!(monthlyWeekday || onItsDay) || byMonth.length > 0) exact = false;
+    // An nth weekday on some days of the month only is more than a `Repeat` holds.
+    const onWeekday = monthlyWeekday !== null && byMonthDay.length === 0;
+    if (!(onWeekday || onItsDay) || byMonth.length > 0) exact = false;
   } else if (frequency === "YEARLY") {
     const onItsDay =
       byDay.length === 0 &&
