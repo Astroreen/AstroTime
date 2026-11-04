@@ -564,6 +564,41 @@ marked _to be recorded_.
   the dialog (`i18n/sign-in.ts`, a catalog of their own), so the first
   load grows by 35 bytes (on main `02a577c`), `inClear` alone.
 
+- **D263. Subscriptions, as built.** `@astrotime/ics` (`IcsProvider`):
+  one GET a sync, conditional (`If-None-Match`, `If-Modified-Since`)
+  while the store holds what the validators validate; the calendar's
+  `syncToken` is the validators with the hash of the text, so a server
+  that gives none still reads as unchanged only when the file is
+  ([D127](foundation.md#D127)). The file is split by
+  `@astrotime/core/split` ([import D267](import.md#D267)'s splitter, one
+  for both); a body that is no `VCALENDAR` throws `NotCalendarError`
+  before anything is written, and `VJOURNAL`s are left out. The calendar's
+  own address in the store is `ics:` and 32 hex digits of the address's
+  SHA-256, an object's `<that>#<UID>`; the account's `serverUrl` is the
+  address's origin alone; the address itself is the secret
+  (`{"subscription", "apply"}`). **The held removal** is a calendar's
+  `HeldRemovalError`, reported by the engine as the problem
+  `held-removal` with how many would go and the file's version
+  (`SyncReport.errors[].held`); the account's problems say "The
+  calendar's file would remove N items" with "Remove them", which writes
+  that version into the secret as `apply` and syncs: that file, and only
+  it, goes through. **Reading at most hourly** (or the file's
+  `REFRESH-INTERVAL`, if longer) is kept per store in memory
+  (`@astrotime/sync/subscriptions`, `recent`), the last result said again
+  meanwhile; the user's "Sync now" reads at once. **The registry**
+  ([D255](#D255)): `syncAll` opens a CalDAV account with the platform's
+  `connect` and a subscription with `@astrotime/sync/subscriptions`,
+  imported when such an account syncs (`SyncContext.http` for it); the
+  sign-in dialog's third tab, "Subscribe", reads the file once before
+  anything is kept, so a page or a refusal is said there. Its words, and
+  the held removal's, load in a catalog of their own
+  (`i18n/subscribe.ts`). **The web proxy logs no address**
+  (`logProxyFailure`): a failure names the method and the server's
+  origin, any address in the error's words cut to its origin
+  ([D39](foundation.md#D39)). The first load grows by 585 bytes (126 501 to 127 086 on
+  main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
+  KiB, and #144's 4.6).
+
 ## Deferred
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
@@ -585,6 +620,9 @@ marked _to be recorded_.
 - **Exchange on premises (EWS) and EteSync** ([D256](#D256)).
 - **iCloud's Reminders** — upgraded lists are not on CalDAV; Apple gives
   no other API ([D245](#D245)).
+- **A subscription's own colour and name, changed here** — the file's
+  are shown; renaming or recolouring a subscription waits for the
+  calendars' own settings to keep local names ([D263](#D263)).
 - **A subscription that is not public** — an ICS address behind a
   password (some schools') works only when the password is in the URL;
   Basic on a subscription comes when someone asks.
@@ -649,6 +687,8 @@ not the account's row; the CalDAV provider is imported only when a
 CalDAV account exists (a test of the registry); the first load grows by
 at most 0.1 KiB net; `docs/map.md` names `@astrotime/ics` and the
 registry.
+
+_Built:_ [D263](#D263); the room on the first load in #136 and #144.
 
 ### PR P5 — OAuth and Google
 

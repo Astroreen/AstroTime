@@ -16,6 +16,10 @@
     "./people": {
       "types": "./src/people.ts",
       "import": "./src/people.ts"
+    },
+    "./subscriptions": {
+      "types": "./src/subscriptions.ts",
+      "import": "./src/subscriptions.ts"
     }
   },
   "scripts": {
@@ -24,6 +28,7 @@
   "dependencies": {
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
+    "@astrotime/ics": "workspace:*",
     "@astrotime/storage": "workspace:*"
   },
   "devDependencies": {

@@ -403,7 +403,10 @@ Decided while building PR 4.
   (`canonicalHref`: `a@b.ics` and `a%40b.ics` are one resource) for
   comparing, while requests about an href use the server's own spelling. A redirect
   to another server is not passed through the proxy (the browser would keep
-  the credentials for it): sign in with that server's address instead. The dev server allows any origin
+  the credentials for it): sign in with that server's address instead. _Since
+  round 5 ([providers D263](providers.md#D263)):_ the image's proxy logs a
+  failure by its method and the server's origin only, never a path or a
+  query, since a subscription's address may hold a secret. The dev server allows any origin
   (only while it listens on localhost; with `--host` it requires the list) unless
   `ASTROTIME_PROXY_ALLOW` lists some; the production image (PR 7) requires
   the list.

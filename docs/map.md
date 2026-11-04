@@ -179,6 +179,11 @@ When you add a package, app or module, add its line here in the same PR.
     read from `current-user-privilege-set`; where each comes from:
     [`README.md`](../packages/caldav/test/fixtures/README.md).
     → `plans/foundation.md#D37`
+- `packages/ics` (`@astrotime/ics`) — subscriptions: `IcsProvider`, a
+  read-only calendar from an ICS address by a conditional GET, split by
+  `@astrotime/core/split`; `HeldRemovalError`, a file that would remove
+  most of its calendar. Loaded with an account of its kind.
+  → `plans/providers.md#D251`, `plans/providers.md#D263`
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
   - `syncAll` — the one sync entry every shell calls: every account (but
@@ -193,6 +198,10 @@ When you add a package, app or module, add its line here in the same PR.
     `plans/design.md#D237`
     → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
     mention. → `plans/design.md#D208`
+  - `subscriptions.ts` (`@astrotime/sync/subscriptions`) — adding a
+    subscription, opening it for `syncAll`, its hourly reads, applying a
+    held removal; `syncs`, whether an account syncs with a server.
+    → `plans/providers.md#D263`
   - `test/budget.test.ts` — the requests each action costs a server, held
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
@@ -388,9 +397,11 @@ When you add a package, app or module, add its line here in the same PR.
   - `i18n/` — i18next and the English and Russian catalogs; strings that
     load later with their part (`later.ts`): `pictures.ts`, the pictures',
     `files.ts`, why the edit dialog's attachments have no files,
-    `tasks.ts`, a task's list in a task's words, and `sign-in.ts`, the
+    `tasks.ts`, a task's list in a task's words, `sign-in.ts`, the
     sign-in dialog's word on an address in clear
-    (`plans/providers.md#D262`). → `plans/foundation.md#D17`
+    (`plans/providers.md#D262`), and `subscribe.ts`, the sign-in dialog's
+    subscription and a held removal (`plans/providers.md#D263`).
+    → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
   - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev

@@ -6,6 +6,7 @@ import { catalogs, createI18n, LANGUAGES } from "../src/i18n/index.ts";
 import { fileStrings } from "../src/i18n/files.ts";
 import { pictureStrings } from "../src/i18n/pictures.ts";
 import { signInStrings } from "../src/i18n/sign-in.ts";
+import { subscribeStrings } from "../src/i18n/subscribe.ts";
 import { taskStrings } from "../src/i18n/tasks.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
@@ -73,13 +74,20 @@ test("plurals follow each language's rules", () => {
 });
 
 test("the strings that load later have the same keys in every language (design D222, D236, D237)", () => {
-  for (const later of [pictureStrings, fileStrings, taskStrings, signInStrings] as Record<
-    "en" | "ru",
-    Record<string, string>
-  >[]) {
-    expect(Object.keys(later.ru).toSorted()).toEqual(Object.keys(later.en).toSorted());
+  for (const later of [
+    pictureStrings,
+    fileStrings,
+    taskStrings,
+    signInStrings,
+    subscribeStrings,
+  ] as Record<"en" | "ru", Record<string, string>>[]) {
+    // Plurals apart: each language has its own categories (`_few`, `_many` in Russian).
+    const bases = (catalog: Record<string, string>) =>
+      [...new Set(Object.keys(catalog).map(base))].toSorted();
+    expect(bases(later.ru)).toEqual(bases(later.en));
     for (const key of Object.keys(later.en)) {
-      expect(variables(later.ru[key]!), key).toEqual(variables(later.en[key]!));
+      const ru = Object.keys(later.ru).find((other) => other === key || base(other) === base(key));
+      expect(variables(later.ru[ru!]!), key).toEqual(variables(later.en[key]!));
       // None is also in the app's own catalog: one place for each string.
       expect(catalogs.en, key).not.toHaveProperty(key);
     }

@@ -22,6 +22,8 @@ export type Problem =
   | "no-place"
   | "taken-unreadable"
   | "calendar-gone-unsent"
+  /** A subscription's file would remove most of it: held for the user (providers D263). */
+  | "held-removal"
   | "failed";
 
 class SyncProblem extends Error {
@@ -45,7 +47,13 @@ export interface SyncReport {
    * What failed for one object or one calendar without stopping the rest
    * (D37); a failed change stays pending for the next sync.
    */
-  errors: { href: string; problem: Problem; detail: string }[];
+  errors: {
+    href: string;
+    problem: Problem;
+    detail: string;
+    /** For `held-removal`: how many items would go, and the file's version to apply. */
+    held?: { readonly count: number; readonly version: string };
+  }[];
   /** Local changes dropped because the server deleted their object (D38), so the UI can say so. */
   dropped: string[];
 }
@@ -148,10 +156,14 @@ async function isolated(
     await work();
   } catch (error) {
     if (error instanceof OfflineError || error instanceof AuthError) throw error;
+    // A problem the error names (`SyncProblem`, a subscription's
+    // `HeldRemovalError` with what it holds): the engine imports no provider.
+    const { problem = "failed", held } = error as Partial<SyncReport["errors"][number]>;
     report.errors.push({
       href,
-      problem: error instanceof SyncProblem ? error.problem : "failed",
+      problem,
       detail: error instanceof Error ? error.message : String(error),
+      ...(held ? { held } : {}),
     });
   }
 }

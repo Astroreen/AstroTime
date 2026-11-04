@@ -164,31 +164,35 @@ export class Store {
    * The CalDAV account at this calendar home for this user, or a new one: the
    * lookup and the insert are one transaction (docs/plans/foundation.md#D90,
    * D99), so two sign-ins to one account at once, in two tabs too, add it once.
+   * With `provider: "ics"`, a subscription, its `homeUrl` its calendar's
+   * address (providers D251).
    */
   findOrAddAccount(
     input: Omit<Account, "id" | "createdAt" | "provider" | "homeUrl" | "syncOff"> & {
       homeUrl: string;
+      provider?: "caldav" | "ics";
     },
   ): Promise<{ readonly account: Account; readonly added: boolean }> {
+    const { provider = "caldav", ...fields } = input;
     return this.exclusive(async () => {
       const [existing] = await this.db
         .select()
         .from(schema.accounts)
         .where(
           and(
-            eq(schema.accounts.provider, "caldav"),
-            eq(schema.accounts.homeUrl, input.homeUrl),
-            input.username === null
+            eq(schema.accounts.provider, provider),
+            eq(schema.accounts.homeUrl, fields.homeUrl),
+            fields.username === null
               ? isNull(schema.accounts.username)
-              : eq(schema.accounts.username, input.username),
+              : eq(schema.accounts.username, fields.username),
           ),
         )
         .orderBy(schema.accounts.createdAt)
         .limit(1);
       if (existing) return { account: existing, added: false };
       const account = {
-        ...input,
-        provider: "caldav" as const,
+        ...fields,
+        provider,
         syncOff: false,
         id: crypto.randomUUID(),
         createdAt: Date.now(),

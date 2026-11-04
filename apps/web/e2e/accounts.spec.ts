@@ -289,3 +289,41 @@ test("in Russian the same warning says the same (providers D262)", async ({ brow
   );
   await context.close();
 });
+
+test("a calendar subscribed to by its address shows its events, read-only; an address that is no calendar says so (providers D251)", async ({
+  page,
+}) => {
+  const feed = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//Feed//EN\r\nX-WR-CALNAME:Team holidays\r\nBEGIN:VEVENT\r\nUID:offsite\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T120000\r\nDTEND;TZID=Europe/Vilnius:20261104T130000\r\nSUMMARY:Team offsite\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+  // The feed's server, at the dev server's proxy: a calendar at one address, a sign-in page at another.
+  await page.route("**/dav-proxy/https%3A%2F%2Fcalendar.example.org/**", (route) =>
+    route.request().url().endsWith("/team.ics")
+      ? route.fulfill({ status: 200, contentType: "text/calendar", body: feed })
+      : route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: "<!doctype html><title>Sign in</title>",
+        }),
+  );
+  await openApp(page);
+  const dialog = await addAccount(page);
+  await dialog.getByRole("tab", { name: "Subscribe" }).click();
+  const panel = dialog.getByRole("tabpanel", { name: "Subscribe" });
+  const address = panel.getByRole("textbox", { name: "Calendar address" });
+  await address.fill("webcal://calendar.example.org/login");
+  await panel.getByRole("button", { name: "Subscribe" }).click();
+  await expect(panel.getByRole("alert")).toHaveText(
+    "This address answers, but not with a calendar: a web page, or nothing at all.",
+  );
+  await address.fill("webcal://calendar.example.org/team.ics");
+  await panel.getByRole("button", { name: "Subscribe" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(wednesday(page).getByRole("listitem", { name: /^Team offsite, / })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Team holidays" })).toBeChecked();
+  // Read-only: its details offer no edit.
+  await wednesday(page)
+    .getByRole("listitem", { name: /^Team offsite, / })
+    .click();
+  const details = page.getByRole("dialog", { name: "Team offsite" });
+  await expect(details).toBeVisible();
+  await expect(details.getByRole("button", { name: "Edit" })).toHaveCount(0);
+});

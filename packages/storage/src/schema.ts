@@ -10,7 +10,7 @@ export const accounts = sqliteTable("accounts", {
    * (docs/plans/foundation.md#D57); `local`: the calendar on this device,
    * which has no server (docs/plans/foundation.md#D122).
    */
-  provider: text("provider", { enum: ["caldav", "demo", "local"] }).notNull(),
+  provider: text("provider", { enum: ["caldav", "demo", "local", "ics"] }).notNull(),
   name: text("name").notNull(),
   /** The address the user signed in with. */
   serverUrl: text("server_url").notNull(),
