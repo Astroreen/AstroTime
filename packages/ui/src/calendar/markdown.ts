@@ -217,7 +217,9 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
         break;
       }
       if (indentOf(next) >= indent) body.push(dropColumns(next, indent));
-      else if (ITEM.test(next) || interrupts(next)) break;
+      // The list's next item ends this one; any other list only where it may
+      // cut a paragraph short ("2019. was a good year" carries it on).
+      else if (sibling(next, ordered) || interrupts(next)) break;
       // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
       else if (body.at(-1)?.trim()) body.push(next);
       else break;
@@ -233,6 +235,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     if (i < lines.length && BLANK.test(lines[i]!) && ITEM.test(lines[i + 1] ?? "")) i++;
   }
   return [{ type: "list", start: ordered ? Number.parseInt(first[2]!, 10) : null, items }, i];
+}
+
+/** Whether a line is an item of the same kind of list: bulleted, or numbered. */
+function sibling(line: string, ordered: boolean): boolean {
+  const marker = ITEM.exec(line);
+  return marker !== null && /\d/.test(marker[2]!) === ordered;
 }
 
 /** The schemes a link may have: the web, mail and the phone. */
@@ -302,7 +310,7 @@ function hiddenIn(text: string): Uint8Array {
     }
     let length = 1;
     while (text[at + length] === "`") length++;
-    const end = unclosed.has(length) ? -1 : text.indexOf("`".repeat(length), at + length);
+    const end = unclosed.has(length) ? -1 : closingRun(text, length, at + length);
     if (end < 0) {
       unclosed.add(length);
       at += length;
@@ -320,6 +328,21 @@ function hiddenIn(text: string): Uint8Array {
     }
   }
   return hidden;
+}
+
+/**
+ * Where a code span opened by `length` backticks closes: the next run of
+ * exactly as many (CommonMark's), not part of a longer one (`` `a``b` ``
+ * is one span); -1 when none does.
+ */
+function closingRun(text: string, length: number, from: number): number {
+  for (let at = text.indexOf("`", from); at >= 0; at = text.indexOf("`", at)) {
+    let end = at;
+    while (text[end] === "`") end++;
+    if (end - at === length) return at;
+    at = end;
+  }
+  return -1;
 }
 
 /** The first of `sorted` at or after `from`, by halves. */
@@ -389,7 +412,7 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       let length = 1;
       while (text[i + length] === "`") length++;
       const run = "`".repeat(length);
-      const end = (unclosed.get(length) ?? -1) > i ? -1 : text.indexOf(run, i + length);
+      const end = (unclosed.get(length) ?? -1) > i ? -1 : closingRun(text, length, i + length);
       if ((unclosed.get(length) ?? -1) <= i) work.steps += (end > 0 ? end : text.length) - i;
       if (end > 0) {
         push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });
@@ -520,8 +543,10 @@ function linkAt(
     href = text.slice(start, at).replace(/\\([!-/:-@[-`{-~])/g, "$1");
   }
   skip();
-  if (text[at] === '"') {
-    const end = findBefore(text, '"', at + 1, limit);
+  // A title in double or single quotes, or in parentheses.
+  const closer = TITLES[text[at] ?? ""];
+  if (closer) {
+    const end = findBefore(text, closer, at + 1, limit);
     if (end < 0) return null;
     at = end + 1;
     skip();
@@ -538,6 +563,8 @@ function findBefore(text: string, char: string, from: number, limit: number): nu
   }
   return -1;
 }
+
+const TITLES: Record<string, string> = { '"': '"', "'": "'", "(": ")" };
 
 /** The longest link target, its title included, read after `](`. */
 const LONGEST_TARGET = 2048;

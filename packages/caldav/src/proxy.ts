@@ -96,7 +96,11 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     }
     if (!/^https?:$/.test(target.protocol))
       return new Response("Not a proxied URL.", { status: 400 });
-    if (options.allow !== "*" && !allowed.has(target.origin)) {
+    // An http server on the list is reached over https too: the proxy passes
+    // its upgrade redirect on (below), so the next request must not be refused.
+    const upgraded =
+      target.protocol === "https:" && target.port === "" && allowed.has(`http://${target.host}`);
+    if (options.allow !== "*" && !allowed.has(target.origin) && !upgraded) {
       return new Response(`${target.origin} is not on this proxy's allowlist.`, {
         status: 403,
         headers: { [REFUSED]: "not-allowed" },

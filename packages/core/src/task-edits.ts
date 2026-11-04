@@ -6,7 +6,7 @@ import ICAL from "ical.js";
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { plus } from "./item.ts";
 import { lengthOf } from "./occurrences.ts";
-import { fromIcalTime, keepTzid, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, wallClockIn, zoneOrigin, type ItemTime } from "./time.ts";
 
 /**
  * The task completed or not, as Nextcloud Tasks writes it: completed is
@@ -111,7 +111,15 @@ export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICA
   const at = like(from, recurrenceId);
   const endValue = end?.getFirstValue();
   if (start && end && endValue instanceof ICAL.Time) {
-    end.setValue(plus(at, lengthOf({ start: from, end: endValue })));
+    const moved = plus(at, lengthOf({ start: from, end: endValue }));
+    // An end in a zone of its own (a flight's) stays in it, at the same instant.
+    const instant = fromIcalTime(moved);
+    const own =
+      JSON.stringify(zoneOrigin(endValue)) !== JSON.stringify(zoneOrigin(from)) &&
+      instant.type === "zoned"
+        ? inZoneOf(endValue, instant.epochMs)
+        : null;
+    end.setValue(own ?? moved);
   }
   anchor.setValue(at);
   // RECURRENCE-ID is written as the anchor is: its TZID, or a date.
@@ -121,12 +129,38 @@ export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICA
   return exception;
 }
 
-/** `time` as an ical.js time in the zone (and kind) of `template`. */
+/**
+ * `time` as an ical.js time in the zone (and kind) of `template`. An instant
+ * in another zone is moved to the template's wall clock (an RDATE in UTC of
+ * a series in Berlin), so it still names the same instant.
+ */
 function like(template: ICAL.Time, time: ItemTime): ICAL.Time {
+  if (time.type === "zoned" && !template.isDate) {
+    const same = inZoneOf(template, time.epochMs);
+    if (same) return same;
+  }
   const local = time.type === "date" ? `${time.date}T00:00:00` : time.local;
   const [year, month, day, hour, minute, second] = (local.match(/\d+/g) ?? []).map(Number);
   const result = ICAL.Time.fromData(
     { year, month, day, hour, minute, second, isDate: template.isDate },
+    template.zone ?? undefined,
+  );
+  return keepTzid(template, result);
+}
+
+/** The instant `epochMs` on the wall clock of `template`'s zone; `null` for a time of no zone. */
+function inZoneOf(template: ICAL.Time, epochMs: number): ICAL.Time | null {
+  const origin = zoneOrigin(template);
+  if (origin.kind === "utc" || origin.kind === "defined") {
+    // Through the object's own VTIMEZONE: also a zone `Intl` does not know.
+    const inUtc = ICAL.Time.fromJSDate(new Date(epochMs), true);
+    return keepTzid(template, inUtc.convertToZone(template.zone!));
+  }
+  if (origin.kind !== "undefined") return null;
+  const local = wallClockIn(epochMs, origin.timeZone);
+  const [year, month, day, hour, minute, second] = (local.match(/\d+/g) ?? []).map(Number);
+  const result = ICAL.Time.fromData(
+    { year, month, day, hour, minute, second },
     template.zone ?? undefined,
   );
   return keepTzid(template, result);

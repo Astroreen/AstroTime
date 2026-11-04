@@ -508,6 +508,32 @@ describe("the repeat rule", () => {
     expect(written).toContain("RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1\r\n");
   });
 
+  test("a month has at most five of a weekday: a sixth is no nth weekday", () => {
+    const rule = (byDay: string) =>
+      repeatOf(
+        CalendarObject.parse(
+          [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//test//EN",
+            "BEGIN:VEVENT",
+            "UID:nth",
+            "DTSTAMP:20261001T000000Z",
+            "DTSTART;VALUE=DATE:20261120",
+            `RRULE:FREQ=MONTHLY;BYDAY=${byDay}`,
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+          ].join("\r\n"),
+        ),
+      );
+    expect(rule("-2FR")).toMatchObject({
+      repeat: { monthlyWeekday: { nth: -2, weekday: "FR" } },
+      exact: true,
+    });
+    expect(rule("6FR")).toMatchObject({ repeat: { monthlyWeekday: null }, exact: false });
+  });
+
   test("monthly on the nth weekday, yearly, and an end by count", () => {
     const start = vilnius("2026-11-04T18:00:00");
     const make = (repeat: Repeat) =>

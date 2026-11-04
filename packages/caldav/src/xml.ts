@@ -44,6 +44,9 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
+  // Character references (`&#13;`, `&#x41;`) are XML's own; fast-xml-parser
+  // decodes them only with HTML's entities.
+  htmlEntities: true,
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 

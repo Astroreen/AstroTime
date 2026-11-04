@@ -103,7 +103,7 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
   let cancel: (() => void) | null = null;
   // Shown or dropped already, so a set handed over again never repeats one.
   /** Reminders already shown, or dropped as stale, by id and time: one moved later shows again. */
-  const done = new Set<string>();
+  const done = new Map<string, number>();
   const listeners = new Set<(reminder: ScheduledReminder) => void>();
 
   const show = (reminder: ScheduledReminder) => {
@@ -140,7 +140,7 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
         cancel = page.after(reminder.fireAt - now, arm);
         return;
       }
-      done.add(shownKey(reminder));
+      done.set(shownKey(reminder), reminder.fireAt);
       if (now - reminder.fireAt <= LATE_MS) show(reminder);
     }
   };
@@ -154,8 +154,10 @@ export function webReminders(page: ReminderPage = browserReminderPage()): Remind
   return {
     schedule(reminders) {
       set = reminders.toSorted((a, b) => a.fireAt - b.fireAt);
-      const keys = new Set(set.map(shownKey));
-      for (const key of done) if (!keys.has(key)) done.delete(key);
+      // Kept while a set could still hold them (the late window), whatever
+      // the set says now: one that leaves and comes back is not shown twice.
+      const now = page.now();
+      for (const [key, fireAt] of done) if (now - fireAt > LATE_MS) done.delete(key);
       arm();
     },
     onOpen(listener) {

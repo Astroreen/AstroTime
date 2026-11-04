@@ -140,6 +140,18 @@ test("a new set replaces the one before: a reminder no longer in it does not sho
   expect(fake.timers).toBe(0);
 });
 
+test("a reminder that showed, left the set and came back within its grace is not shown twice", () => {
+  const fake = fakePage();
+  const reminders = webReminders(fake.page);
+  reminders.schedule([reminder("a", 10)]);
+  fake.advance(10 * MINUTE);
+  // Its task ticked done, then unticked a minute later.
+  reminders.schedule([]);
+  fake.advance(MINUTE);
+  reminders.schedule([reminder("a", 10)]);
+  expect(fake.shown.map((s) => s.tag)).toEqual(["a"]);
+});
+
 test("a reminder that showed and is moved later (an edited item) shows again at its new time", () => {
   const fake = fakePage();
   const reminders = webReminders(fake.page);

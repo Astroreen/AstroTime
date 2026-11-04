@@ -73,6 +73,43 @@ describe("the sync engine's harder paths (review of #4)", () => {
     expect((await store.objectAt(calendar.id, `${calendarUrl}twice.ics`))?.etag).toBe('"lost"');
   });
 
+  test("a creation the server stored though it answered with an error is one object, synced next time", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("new"));
+    // Stored, but answered 500: the same sync's download lists it.
+    server.beforeWrite = (method, href) => {
+      if (method !== "create") return;
+      server.objects.set(href, { etag: '"s"', ics: task("new") });
+      throw new Error("PUT answered 500");
+    };
+    expect((await sync()).errors.map((e) => e.problem)).toEqual(["failed"]);
+    expect((await store.undated([calendar.id])).map((o) => o.uid)).toEqual(["new"]);
+    server.beforeWrite = () => {};
+    expect(await sync()).toMatchObject({ conflicts: 0, errors: [] });
+    expect(await store.pending(calendar.id)).toEqual([]);
+    expect((await store.undated([calendar.id])).map((o) => [o.href, o.etag])).toEqual([
+      [`${calendarUrl}new.ics`, '"s"'],
+    ]);
+  });
+
+  test("an edit made while our deletion is on its way is not lost unsaid: its drop is reported", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("x"));
+    await sync();
+    const row = (await store.objectAt(calendar.id, `${calendarUrl}x.ics`))!;
+    await store.deleteLocal(row.id);
+    const remove = server.remove.bind(server);
+    server.remove = async (href, etag) => {
+      await store.saveLocal(calendar.id, task("x", "Edited meanwhile"));
+      return remove(href, etag);
+    };
+    // The deletion reached the server first and wins (D38); the edit it drops is named.
+    expect((await sync()).dropped).toEqual([`${calendarUrl}x.ics`]);
+    expect(await store.pending(calendar.id)).toEqual([]);
+  });
+
   test("a creation at an href another object holds keeps the server's and lists ours as a conflict", async () => {
     const server = memoryServer(calendarUrl);
     const { store, sync, calendar } = await device(server);

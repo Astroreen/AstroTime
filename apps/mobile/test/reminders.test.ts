@@ -315,6 +315,20 @@ test("a reminder past: once handed over it is never shown again; new, it shows w
   expect(phone.calls).toHaveLength(2);
 });
 
+test("a reminder that fired, left the set and came back within the grace is not shown twice", async () => {
+  const phone = device();
+  const preferences = memoryPreferences();
+  const task = reminder("task", NOW + 10 * MINUTE);
+  await scheduler(phone, preferences).reminders.schedule([task]);
+  // Android fired it at its time; the task was ticked done, then unticked.
+  await scheduler(phone, preferences, NOW + 12 * MINUTE).reminders.schedule([]);
+  await scheduler(phone, preferences, NOW + 13 * MINUTE).reminders.schedule([task]);
+  const immediate = phone.calls
+    .flatMap(({ scheduled }) => scheduled)
+    .filter((notification) => notification.schedule === undefined);
+  expect(immediate).toEqual([]);
+});
+
 test("a reminder edited into the past beyond the grace has its alarm cancelled; one that fired and moves ahead gets an id of its own", async () => {
   const phone = device();
   const preferences = memoryPreferences();

@@ -517,13 +517,21 @@ async function propfindOne(
   return { url: response.url, response: parseMultistatus(response.body).responses[0] };
 }
 
+/** A path's last segment decoded; as written when it is no percent-encoding (a stray `%`). */
+function lastSegment(path: string): string {
+  const segment = path.split("/").findLast(Boolean) ?? "";
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 function toCalendar(response: DavResponse, base: string): RemoteCalendar {
   const components = componentsOf(response.props["supported-calendar-component-set"]);
   return {
     url: collection(canonicalHref(response.href, base)),
-    name:
-      text(response.props["displayname"]) ??
-      decodeURIComponent(new URL(response.href, base).pathname.split("/").findLast(Boolean) ?? ""),
+    name: text(response.props["displayname"]) ?? lastSegment(new URL(response.href, base).pathname),
     color: color(text(response.props["calendar-color"])),
     components,
     rights: rightsOf(response.props["current-user-privilege-set"]),

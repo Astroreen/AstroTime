@@ -373,7 +373,8 @@ Decided while building PR 4.
   `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
   origin. The handler (`proxyHandler` in `@astrotime/caldav`) passes only the
   headers CalDAV needs, maps redirects back into its URL space, and refuses
-  origins off its allowlist. It serves the app's own pages only: a request
+  origins off its allowlist (an `http://` origin on it, with no port, lets
+  its host's `https://` through too, as its upgrade redirect passes). It serves the app's own pages only: a request
   with another `Origin`, or that the browser marks cross-site, is refused, so
   a page elsewhere cannot use it to reach the servers behind it. The host is
   compared, not the scheme, so it works behind a TLS terminator. A caller

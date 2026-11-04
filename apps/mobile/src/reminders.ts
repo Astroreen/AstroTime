@@ -250,6 +250,9 @@ export function androidReminders(options: {
     const forget: string[] = [];
     for (const [id, entry] of Object.entries(kept.scheduled)) {
       if (ids.has(id)) continue;
+      // Fired already: remembered while a set could still hold it (the late
+      // window), so one that leaves and comes back is not shown twice.
+      if (entry.fireAt !== null && entry.fireAt < at && at - entry.fireAt <= LATE_MS) continue;
       gone.push(entry.id);
       forget.push(id);
     }

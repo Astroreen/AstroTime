@@ -218,6 +218,27 @@ export function zonedTime(local: string, timeZone: string): Extract<ItemTime, { 
   return { type: "zoned", local, timeZone, epochMs };
 }
 
+/**
+ * @internal The wall clock of an instant in the zone of `reference`. A zone
+ * `Intl` does not know (a VTIMEZONE's own name, `Customized Time Zone`)
+ * takes the reference's offset: exact but across a DST change between them.
+ */
+export function wallClockNear(
+  epochMs: number,
+  reference: Extract<ItemTime, { type: "zoned" }>,
+): string {
+  if (isKnownTimeZone(reference.timeZone)) return wallClockIn(epochMs, reference.timeZone);
+  const offset = wallClockAsUtc(reference.local) - reference.epochMs;
+  return new Date(epochMs + offset).toISOString().slice(0, 19);
+}
+
+/** @internal The instant a wall clock names in the zone of `reference`, as `wallClockNear` reads one. */
+export function epochNear(local: string, reference: Extract<ItemTime, { type: "zoned" }>): number {
+  if (reference.timeZone === "UTC") return wallClockAsUtc(local);
+  if (isKnownTimeZone(reference.timeZone)) return zonedToEpoch(local, reference.timeZone);
+  return wallClockAsUtc(local) - (wallClockAsUtc(reference.local) - reference.epochMs);
+}
+
 /** The wall clock at which a time shows to a user in `timeZone`. */
 export function wallClockOf(time: ItemTime, timeZone: string): string {
   switch (time.type) {

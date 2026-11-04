@@ -504,3 +504,46 @@ test("five spaces or more after a marker: the item's column is one past it", () 
     },
   ]);
 });
+
+describe("as CommonMark reads them (design D207)", () => {
+  test("only an item of its own list ends an item; another list carries its paragraph on", () => {
+    expect(parseMarkdown("- foo\n2019. was a good year")).toEqual([
+      {
+        type: "list",
+        start: null,
+        items: [
+          {
+            checked: null,
+            children: [paragraph("foo", { type: "break" }, "2019. was a good year")],
+          },
+        ],
+      },
+    ]);
+    expect(parseMarkdown("1. a\n2. b")).toEqual([
+      {
+        type: "list",
+        start: 1,
+        items: [
+          { checked: null, children: [paragraph("a")] },
+          { checked: null, children: [paragraph("b")] },
+        ],
+      },
+    ]);
+  });
+
+  test("a code span closes on a run of as many backticks, not on part of a longer one", () => {
+    expect(parseMarkdown("`a``b`")).toEqual([paragraph({ type: "code", text: "a``b" })]);
+    expect(parseMarkdown("``a```b``")).toEqual([paragraph({ type: "code", text: "a```b" })]);
+    expect(parseMarkdown("*x `a``b` y*")).toEqual([
+      paragraph({ type: "em", children: ["x ", { type: "code", text: "a``b" }, " y"] }),
+    ]);
+  });
+
+  test("a link's title may be in single quotes or in parentheses", () => {
+    for (const title of ["'title'", "(title)", '"title"']) {
+      expect(parseMarkdown(`[a](http://x.com ${title})`)).toEqual([
+        paragraph({ type: "link", href: "http://x.com", children: ["a"] }),
+      ]);
+    }
+  });
+});
