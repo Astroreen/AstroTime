@@ -118,6 +118,7 @@ test("a task as a VTODO, and back as the fields Google keeps; what it cannot kee
       notes: "two lines\nhere",
       due: "2026-11-10T00:00:00.000Z",
       status: "completed",
+      completed: "2026-11-09T18:00:00.000Z",
     },
     parent: "p1",
     dropped: [],
@@ -346,4 +347,102 @@ test("a removed task is gone; one already gone says so; an update gives back Goo
     etag: api.tasks.get("t2")!["etag"],
   });
   expect(await provider.update(`${LIST}missing`, ics)).toEqual({ ok: false, reason: "gone" });
+});
+
+test("only a parent RELATED-TO naming a task of the list becomes the parent; any other is said not kept", async () => {
+  const api = tasksApi();
+  api.put({ id: "p1", title: "Parent" });
+  const feed = await synced(api);
+  const make = (uid: string, related: string) =>
+    `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:20261104T080000Z\r\nSUMMARY:${uid}\r\n${related}END:VTODO\r\nEND:VCALENDAR\r\n`;
+  await feed.store.saveLocal(feed.list.id, make("sibling", "RELATED-TO;RELTYPE=SIBLING:p1\r\n"));
+  await feed.store.saveLocal(feed.list.id, make("orphan", "RELATED-TO:not-in-this-list\r\n"));
+  await feed.store.saveLocal(feed.list.id, make("child", "RELATED-TO;RELTYPE=PARENT:p1\r\n"));
+  const report = await feed.sync();
+  const byTitle = (title: string) =>
+    [...api.tasks.values()].find((task) => task["title"] === title)!;
+  expect(byTitle("child")["parent"]).toBe("p1");
+  expect(byTitle("sibling")).not.toHaveProperty("parent");
+  expect(byTitle("orphan")).not.toHaveProperty("parent");
+  expect(
+    report.errors.filter((error) => error.problem === "not-kept").map((error) => error.detail),
+  ).toEqual(["RELATED-TO", "RELATED-TO"]);
+});
+
+test("a task done here sends when it was done", async () => {
+  const api = tasksApi();
+  api.put({ id: "t1", title: "Do it", status: "needsAction" });
+  const feed = await synced(api);
+  const [task] = await feed.store.tasks([feed.list.id]);
+  await feed.store.saveLocal(
+    feed.list.id,
+    task!.ics.replace("STATUS:NEEDS-ACTION", "STATUS:COMPLETED\r\nCOMPLETED:20261103T101500Z"),
+    task!.href!,
+  );
+  await feed.sync();
+  const patch = JSON.parse(
+    String(api.asked.findLast((request) => request.method === "PATCH")!.body),
+  );
+  expect(patch).toMatchObject({ status: "completed", completed: "2026-11-03T10:15:00.000Z" });
+});
+
+test("the Tasks API failing (not enabled, its scope not given) leaves the calendars syncing and the lists as they were", async () => {
+  const calendar = (url: string, name: string) => ({
+    url,
+    name,
+    color: null,
+    components: ["VEVENT" as const],
+    rights: { create: true, edit: true, delete: true },
+  });
+  const events: Provider = {
+    calendars: async () => [
+      calendar("https://apidata.googleusercontent.com/caldav/v2/me/events/", "Me"),
+    ],
+    changes: async () => ({ changed: [], removed: [], syncToken: "s", ctag: null }),
+    fetch: async () => null,
+    create: async () => ({ ok: false, reason: "gone" }),
+    update: async () => ({ ok: false, reason: "gone" }),
+    remove: async () => ({ ok: false, reason: "gone" }),
+  };
+  let tasksUp = true;
+  const tasks: Provider = {
+    ...events,
+    calendars: async () => {
+      if (!tasksUp)
+        throw new Error("Tasks API has not been used in project 123 before or it is disabled.");
+      return [{ ...calendar(LIST, "Inbox"), components: ["VTODO"] }];
+    },
+  };
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "g",
+    serverUrl: TASKS_API,
+    username: null,
+  });
+  const google = new GoogleProvider(events, tasks);
+  await syncAccount(store, google, account.id);
+  expect((await store.calendars(account.id)).map((c) => c.name).toSorted()).toEqual([
+    "Inbox",
+    "Me",
+  ]);
+  tasksUp = false;
+  const report = await syncAccount(store, google, account.id);
+  // The lists stay, the calendars sync, and what failed is said.
+  expect((await store.calendars(account.id)).map((c) => c.name).toSorted()).toEqual([
+    "Inbox",
+    "Me",
+  ]);
+  expect(report.errors).toEqual([
+    expect.objectContaining({
+      href: TASKS_API,
+      problem: "failed",
+      detail: expect.stringContaining("Tasks API"),
+    }),
+  ]);
+  // Both failing is the sync's failure.
+  const down: Provider = { ...events, calendars: async () => Promise.reject(new Error("offline")) };
+  await expect(syncAccount(store, new GoogleProvider(down, down), account.id)).rejects.toThrow(
+    "offline",
+  );
 });

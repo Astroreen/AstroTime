@@ -69,6 +69,7 @@ export {
   AuthError,
   NO_RIGHTS,
   OfflineError,
+  PartialListing,
   retryAfter,
   ServerBusyError,
   type CalendarRights,

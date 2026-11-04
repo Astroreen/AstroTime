@@ -3,8 +3,10 @@ import {
   CalendarObjectError,
   mergeObjects,
   OfflineError,
+  PartialListing,
   sameObjects,
   type Provider,
+  type RemoteCalendar,
   type RemoteObject,
   type SyncState,
   type WriteResult,
@@ -100,14 +102,30 @@ export async function syncAccount(
 }
 
 async function run(store: Store, provider: Provider, accountId: string, report: SyncReport) {
-  const remote = await provider.calendars();
+  let remote: readonly RemoteCalendar[];
+  let unread: PartialListing["unread"] = [];
+  try {
+    remote = await provider.calendars();
+  } catch (error) {
+    // Part of the account read: that part syncs; the rest stays as it is, said.
+    if (!(error instanceof PartialListing)) throw error;
+    remote = error.calendars;
+    unread = error.unread;
+    for (const { prefix, error: why } of unread)
+      report.errors.push({
+        href: prefix,
+        problem: "failed",
+        detail: why instanceof Error ? why.message : String(why),
+      });
+  }
   const listed = new Map(remote.map((calendar) => [calendar.url, calendar.state]));
   const urls = new Set(listed.keys());
   // The listing's state is not the device's: it is kept only once the calendar is downloaded.
   for (const { state: _, ...calendar } of remote)
     await store.saveCalendar({ accountId, ...calendar });
   for (const calendar of await store.calendars(accountId)) {
-    if (urls.has(calendar.url)) continue;
+    if (urls.has(calendar.url) || unread.some(({ prefix }) => calendar.url.startsWith(prefix)))
+      continue;
     // A calendar deleted on the server goes with its objects (D38). One that
     // only went missing from a listing must not take unsent changes with it:
     // it stays, reported, until a listing without it finds it has none.

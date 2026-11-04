@@ -136,6 +136,28 @@ export interface FileStore {
   upload(name: string, type: string, bytes: Uint8Array): Promise<RemoteFile>;
 }
 
+/**
+ * A listing of calendars that could read only part of an account (one of
+ * its APIs failing: Google's Tasks API not enabled, a scope not given):
+ * what it read, and the address prefixes of what it could not, which the
+ * sync leaves as they are, said (docs/plans/providers.md#D252).
+ */
+export class PartialListing extends Error {
+  override name = "PartialListing";
+  readonly calendars: readonly RemoteCalendar[];
+  readonly unread: readonly { readonly prefix: string; readonly error: unknown }[];
+  constructor(
+    calendars: readonly RemoteCalendar[],
+    unread: readonly { readonly prefix: string; readonly error: unknown }[],
+  ) {
+    super(
+      `Part of the account could not be listed: ${unread.map((part) => part.prefix).join(", ")}.`,
+    );
+    this.calendars = calendars;
+    this.unread = unread;
+  }
+}
+
 /** A provider could not reach its server; local changes wait for the next sync. */
 export class OfflineError extends Error {
   override name = "OfflineError";

@@ -5,13 +5,14 @@
 // goes to the API whose address it is. Nothing outside this package knows
 // there are two (AGENTS.md rule 4). Loaded only with a Google account (D255).
 import { CalDavProvider, type HttpClient, type TokenSource } from "@astrotime/caldav";
-import type {
-  Changes,
-  Provider,
-  RemoteCalendar,
-  RemoteObject,
-  SyncState,
-  WriteResult,
+import {
+  PartialListing,
+  type Changes,
+  type Provider,
+  type RemoteCalendar,
+  type RemoteObject,
+  type SyncState,
+  type WriteResult,
 } from "@astrotime/core/provider";
 
 import { GoogleTasks, TASKS_API } from "./tasks.ts";
@@ -35,9 +36,27 @@ export class GoogleProvider implements Provider {
     return url.startsWith(TASKS_API) ? this.tasks : this.events;
   }
 
+  /**
+   * Both APIs' calendars. One failing (the Tasks API not enabled, its scope
+   * not given) does not take the other down: what was read syncs, the rest
+   * stays as it is, said (`PartialListing`); both failing is the sync's failure.
+   */
   async calendars(): Promise<RemoteCalendar[]> {
-    const [calendars, lists] = await Promise.all([this.events.calendars(), this.tasks.calendars()]);
-    return [...calendars, ...lists];
+    const [events, tasks] = await Promise.allSettled([
+      this.events.calendars(),
+      this.tasks.calendars(),
+    ]);
+    if (events.status === "rejected" && tasks.status === "rejected") throw events.reason;
+    if (events.status === "fulfilled" && tasks.status === "fulfilled")
+      return [...events.value, ...tasks.value];
+    const read =
+      events.status === "fulfilled"
+        ? events.value
+        : (tasks as PromiseFulfilledResult<RemoteCalendar[]>).value;
+    const failed = events.status === "rejected" ? events : (tasks as PromiseRejectedResult);
+    throw new PartialListing(read, [
+      { prefix: events.status === "rejected" ? GOOGLE_CALDAV : TASKS_API, error: failed.reason },
+    ]);
   }
 
   changes(
