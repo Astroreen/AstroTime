@@ -704,3 +704,18 @@ test("a deletion of ours the server made too is no dropped change (D38)", async 
   expect([report.removed, report.dropped]).toEqual([1, []]);
   expect(await store.objectAt(calendar.id, `${calendarUrl}a.ics`)).toBeUndefined();
 });
+
+test("an edit of ours whose object the server removed is still a dropped change (D38)", async () => {
+  const server = memoryServer(calendarUrl);
+  server.objects.set(`${calendarUrl}a.ics`, { etag: '"1"', ics: task("a") });
+  const { store, sync, calendar } = await device(server);
+  await store.saveLocal(calendar.id, task("a", "Edited"));
+  server.objects.delete(`${calendarUrl}a.ics`);
+  // Its upload fails, so the server's removal reaches the download still pending.
+  server.beforeWrite = () => {
+    throw new Error("not now");
+  };
+  const report = await sync();
+  expect([report.removed, report.dropped]).toEqual([1, [`${calendarUrl}a.ics`]]);
+  expect(await store.objectAt(calendar.id, `${calendarUrl}a.ics`)).toBeUndefined();
+});
