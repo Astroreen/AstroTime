@@ -12,6 +12,10 @@
     "./copy": {
       "types": "./src/copy.ts",
       "import": "./src/copy.ts"
+    },
+    "./provider": {
+      "types": "./src/provider.ts",
+      "import": "./src/provider.ts"
     }
   },
   "scripts": {
