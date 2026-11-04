@@ -197,8 +197,6 @@ async function everyAccount(
 ): Promise<SyncAllReport> {
   const now = context.now ?? Date.now;
   const accounts: AccountSync[] = [];
-  /** Accounts this run left alone for a hold. */
-  const leftAlone = new Set<string>();
   const known = new Set<string>();
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone; an account whose sync the
@@ -206,19 +204,16 @@ async function everyAccount(
     if (account.provider !== "caldav" || account.syncOff || state.removing.has(account.id))
       continue;
     known.add(account.id);
-    const result = await syncOne(context, state.holds, account, retry);
-    if (result.held) leftAlone.add(account.id);
-    accounts.push(result.sync);
+    accounts.push(await syncOne(context, state.holds, account, retry));
   }
   for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
   // Held and its end are read at one instant, the run's: a hold whose time has
   // gone by (kept for its count by a timeout after it) holds nothing.
   const end = now();
   const holding = (hold: Hold | undefined) => !!hold && (hold.refused !== null || hold.until > end);
-  // Held now, by this run's own answer too: its next sync waits for the hold.
-  const held = accounts
-    .map((sync) => sync.accountId)
-    .filter((id) => leftAlone.has(id) || holding(state.holds.get(id)));
+  // Held now, whether this run left it alone or turned it away: its next
+  // sync waits for the hold; one that ended during the run holds nothing.
+  const held = accounts.map((sync) => sync.accountId).filter((id) => holding(state.holds.get(id)));
   const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > end);
   return {
     accounts,
@@ -233,7 +228,7 @@ async function syncOne(
   holds: Map<string, Hold>,
   account: Account,
   retry: boolean,
-): Promise<{ readonly sync: AccountSync; readonly held: boolean }> {
+): Promise<AccountSync> {
   const accountId = account.id;
   const now = context.now ?? Date.now;
   let secret: string | null = null;
@@ -247,13 +242,12 @@ async function syncOne(
         detail: "No credentials are saved for this account.",
         report: null,
       };
-      return { sync, held: false };
+      return sync;
     }
     const held = holds.get(accountId);
     // Refused credentials stay refused until they change; a busy server is
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
-    if (held && !retry && (held.refused === secret || now() < held.until))
-      return { sync: held.last, held: true };
+    if (held && !retry && (held.refused === secret || now() < held.until)) return held.last;
     const provider = await context.connect(account, credentials);
     const result: AccountSync = {
       accountId,
@@ -261,7 +255,7 @@ async function syncOne(
       report: await syncAccount(context.store, provider, accountId),
     };
     holds.delete(accountId);
-    return { sync: result, held: false };
+    return result;
   } catch (error) {
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
@@ -275,7 +269,7 @@ async function syncOne(
             : "failed";
     const result: AccountSync = { accountId, status, detail, report };
     holdBack(holds, result, error, secret, now(), Math.random());
-    return { sync: result, held: false };
+    return result;
   }
 }
 

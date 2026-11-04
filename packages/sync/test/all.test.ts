@@ -719,11 +719,14 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     expect([silent.held, silent.retryAt]).toEqual([[], null]);
   });
 
-  test("held and retryAt are read at one instant, the run's end: a hold that ended during the run is in neither", async () => {
+  /** Two accounts: the first's server answers as `busyAnswers` says, the second's sync takes `slowTakes`. */
+  async function twoAccounts() {
     const store = await Store.open(nodeDriver());
     const secrets = memorySecrets();
     const server = memoryServer("https://a.example/cal/");
     let time = 1_000_000;
+    let busyAnswer: () => Promise<void> = async () => {};
+    let slowMs = 0;
     const add = async (username: string) =>
       (
         await saveAccount(
@@ -741,19 +744,49 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     const connect: Connect = async (account) => ({
       ...server,
       calendars: async () => {
-        // The first account's server is busy for about a minute...
-        if (account.id === busy.id) throw new ServerBusyError("503", null);
-        // ...and the second one's sync outlasts that minute.
-        time += 10 * 60_000;
+        if (account.id === busy.id) await busyAnswer();
+        else time += slowMs;
         return server.calendars();
       },
     });
-    const report = await syncAll({ store, secrets, connect, now: () => time });
+    return {
+      busy,
+      slow,
+      context: { store, secrets, connect, now: () => time },
+      busyAnswers: (next: () => Promise<void>) => (busyAnswer = next),
+      slowTakes: (ms: number) => (slowMs = ms),
+      time: () => time,
+    };
+  }
+
+  test("held and retryAt are read at one instant, the run's end: a hold that ended during the run is in neither", async () => {
+    const { busy, slow, context, busyAnswers, slowTakes, time } = await twoAccounts();
+    // The first account's server is busy for about a minute...
+    busyAnswers(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    // ...and the second one's sync outlasts that minute.
+    slowTakes(10 * 60_000);
+    const report = await syncAll(context);
     expect(report.accounts.map((a) => [a.accountId, a.status])).toEqual([
       [busy.id, "offline"],
       [slow.id, "synced"],
     ]);
-    expect([report.held, report.retryAt, report.finishedAt]).toEqual([[], null, time]);
+    expect([report.held, report.retryAt, report.finishedAt]).toEqual([[], null, time()]);
+  });
+
+  test("an account left alone for a hold that ends while a later one syncs is not named held", async () => {
+    const { busy, context, busyAnswers, slowTakes } = await twoAccounts();
+    busyAnswers(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    const first = await syncAll(context);
+    expect(first.held).toEqual([busy.id]);
+    // Left alone by the next run, whose other sync outlasts the hold.
+    slowTakes(10 * 60_000);
+    const report = await syncAll(context);
+    expect(report.accounts[0]).toBe(first.accounts[0]);
+    expect([report.held, report.retryAt]).toEqual([[], null]);
   });
 });
 
