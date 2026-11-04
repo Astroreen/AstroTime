@@ -51,8 +51,15 @@ export type SyncLock = <T>(work: () => Promise<T>) => Promise<T>;
 const alone = <T>(context: Pick<SyncContext, "lock">, work: () => Promise<T>): Promise<T> =>
   context.lock ? context.lock(work) : work();
 
-/** Opens the provider of an account with its credentials. */
-export type Connect = (account: Account, credentials: Credentials) => Promise<Provider>;
+/**
+ * Opens the provider of an account with its credentials, and what earlier
+ * syncs learned of how its server authenticates (providers D260).
+ */
+export type Connect = (
+  account: Account,
+  credentials: Credentials,
+  remembered?: RememberedScheme,
+) => Promise<Provider>;
 
 /**
  * CalDAV accounts through the platform's HTTP client, from the home
@@ -60,14 +67,11 @@ export type Connect = (account: Account, credentials: Credentials) => Promise<Pr
  * syncs after (providers D260).
  */
 export function connectCalDav(http: HttpClient): Connect {
-  const schemes = new Map<string, RememberedScheme>();
-  return async (account, credentials) => {
+  return async (account, credentials, remembered) => {
     const home =
       account.homeUrl ??
       (await CalDavProvider.discover(http, account.serverUrl, credentials)).homeUrl;
-    const scheme = schemes.get(account.id) ?? {};
-    schemes.set(account.id, scheme);
-    return new CalDavProvider(http, credentials, home, scheme);
+    return new CalDavProvider(http, credentials, home, remembered);
   };
 }
 
@@ -117,6 +121,12 @@ interface Runs {
   readonly removing: Map<string, number>;
   /** Accounts a sync leaves alone for now, by id (D128). */
   readonly holds: Map<string, Hold>;
+  /**
+   * The scheme each account's server took, for the app's run (providers
+   * D260), by id, with the address and user it was learned for (`by`): one
+   * edited or removed is forgotten.
+   */
+  readonly schemes: Map<string, RememberedScheme & { readonly by?: string }>;
 }
 
 /**
@@ -146,7 +156,14 @@ const runs = new WeakMap<Store, Runs>();
 function runsOf(store: Store): Runs {
   let found = runs.get(store);
   if (!found) {
-    found = { current: null, next: null, retryNext: false, removing: new Map(), holds: new Map() };
+    found = {
+      current: null,
+      next: null,
+      retryNext: false,
+      removing: new Map(),
+      holds: new Map(),
+      schemes: new Map(),
+    };
     runs.set(store, found);
   }
   return found;
@@ -218,14 +235,15 @@ async function everyAccount(
     // user turned off asks nothing of its server (D171), and is not reported.
     if (!syncs(account) || account.syncOff || state.removing.has(account.id)) continue;
     known.add(account.id);
-    const result = await syncOne(context, state.holds, account, retry);
+    const result = await syncOne(context, state, account, retry);
     // Held now, by this run's own answer too: its next sync waits for the hold.
     const hold = state.holds.get(account.id);
     const holding = !!hold && (hold.refused !== null || hold.until > now());
     if (result.held || holding) held.push(account.id);
     accounts.push(result.sync);
   }
-  for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
+  for (const map of [state.holds, state.schemes])
+    for (const key of map.keys()) if (!known.has(key)) map.delete(key);
   const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
   return {
     accounts,
@@ -237,7 +255,7 @@ async function everyAccount(
 
 async function syncOne(
   context: SyncContext,
-  holds: Map<string, Hold>,
+  { holds, schemes }: Pick<Runs, "holds" | "schemes">,
   account: Account,
   retry: boolean,
 ): Promise<{ readonly sync: AccountSync; readonly held: boolean }> {
@@ -267,7 +285,10 @@ async function syncOne(
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
     if (held && !retry && (held.refused === secret || now() < held.until))
       return { sync: held.last, held: true };
-    const provider = subscription ?? (await context.connect(account, credentials!));
+    const by = `${account.serverUrl} ${account.username}`;
+    let remembered = schemes.get(accountId);
+    if (remembered?.by !== by) schemes.set(accountId, (remembered = { by }));
+    const provider = subscription ?? (await context.connect(account, credentials!, remembered));
     const result: AccountSync = {
       accountId,
       status: "synced",

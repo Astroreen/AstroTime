@@ -80,6 +80,8 @@ const basicFirst = (url: string) => !inClear(url);
  */
 export interface RememberedScheme {
   scheme?: Scheme;
+  /** The origin that took it: a request elsewhere starts afresh. */
+  origin?: string;
 }
 
 /** One account's credentials, and the scheme its server asked for. */
@@ -114,7 +116,8 @@ export class Authorization {
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
   ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
-    if (this.scheme === null) this.scheme = this.remembered?.scheme ?? null;
+    if (this.scheme === null && this.remembered?.origin === new URL(request.url).origin)
+      this.scheme = this.remembered.scheme ?? null;
     if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
     const scheme = this.scheme;
     if (scheme === null) return { header: null, answered: null };

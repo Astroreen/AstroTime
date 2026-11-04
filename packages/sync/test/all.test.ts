@@ -816,3 +816,31 @@ describe("why an account has no files to attach from (design D237)", () => {
     expect(noFilesOf(account({ provider: "demo" }))).toBeNull();
   });
 });
+
+test("each account's remembered scheme is its own, kept across syncs, and forgotten when its user changes or it goes (providers D260)", async () => {
+  const { store, secrets, a, add } = await setup();
+  const given: { account: string; remembered: object | undefined }[] = [];
+  const connect: Connect = async (account, _credentials, remembered) => {
+    given.push({ account: account.id, remembered });
+    return a;
+  };
+  const context = { store, secrets, connect };
+  const { account: first } = await add("a.example");
+  const { account: second } = await add("b.example");
+  await syncAll(context);
+  await syncAll(context);
+  const of = (id: string) => given.filter((one) => one.account === id).map((one) => one.remembered);
+  // One slot per account, the same at each sync, never another account's.
+  expect(of(first.id)[0]).toBeDefined();
+  expect(of(first.id)[1]).toBe(of(first.id)[0]);
+  expect(of(second.id)[0]).not.toBe(of(first.id)[0]);
+  // Its user changed: what was learned for the old one is not the new one's.
+  await store.updateAccount(first.id, { username: "someone-else" });
+  await syncAll(context);
+  expect(of(first.id)[2]).not.toBe(of(first.id)[0]);
+  expect(of(first.id)[2]).not.toHaveProperty("scheme");
+  // Removed: the next sync keeps nothing of it (the second account's stays).
+  await removeAccount({ ...context, revokeWaitMs: 0 }, second.id);
+  await syncAll(context);
+  expect(of(first.id)[3]).toBe(of(first.id)[2]);
+});

@@ -24,9 +24,9 @@ export function answerChallenge(
   if (authorization.scheme !== answered) return true;
   // Through the web proxy, the server's challenge comes under its own name
   // (proxy.ts's CHALLENGE, spelled here so this chunk imports nothing).
-  const found = digestChallenge(
-    response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate"),
-  );
+  const header =
+    response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate");
+  const found = digestChallenge(header);
   const answeredDigest = typeof answered === "object" && answered !== null ? answered : null;
   if (found && (!answeredDigest || found.stale || found.challenge.nonce !== answeredDigest.nonce)) {
     authorization.scheme = { ...found.challenge, count: 0 };
@@ -36,18 +36,21 @@ export function answerChallenge(
     authorization.scheme = "basic";
     return true;
   }
-  // A scheme the server no longer takes (set up anew since an earlier sync
-  // learned it: Basic where it took Digest, or back) is asked again in the
-  // one this 401 names, once. The same scheme refused is the password
-  // refused, never sent twice (a brute-force guard counts the user's).
-  authorization.scheme = null;
-  return (
-    answerChallenge(authorization, response, null) &&
-    kindOf(authorization.scheme) !== kindOf(answered)
-  );
+  // Digest refused by a server that asks for Basic now (set up anew since an
+  // earlier sync learned it): Basic once, over https only and only when the
+  // 401 asks for it. A bare 401, or one over plain http, is the password
+  // refused: a forged 401 never gets the password in clear (D260). Basic
+  // refused where Digest is asked was taken up above; the same scheme
+  // refused is the password refused, never sent twice.
+  if (
+    !answeredDigest ||
+    !response.url.startsWith("https:") ||
+    !challengesOf(header ?? "").some(({ scheme }) => scheme === "basic")
+  )
+    return false;
+  authorization.scheme = "basic";
+  return true;
 }
-
-const kindOf = (scheme: Scheme) => (typeof scheme === "object" && scheme ? "digest" : scheme);
 
 /**
  * A request to `url` sent again with the scheme a 401 taught (`answered`):
@@ -62,12 +65,9 @@ export function taken(
   answered: Scheme,
 ): void {
   if (answered !== authorization.scheme || response.status < 200 || response.status > 299) return;
-  if (
-    answered &&
-    authorization.remembered &&
-    new URL(response.url || url).origin === new URL(url).origin
-  )
-    authorization.remembered.scheme = answered;
+  const { origin } = new URL(url);
+  if (answered && authorization.remembered && new URL(response.url || url).origin === origin)
+    Object.assign(authorization.remembered, { scheme: answered, origin });
 }
 
 /**

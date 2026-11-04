@@ -470,3 +470,46 @@ test("a server set up anew, Basic only where it took Digest: asked again in Basi
   expect(answer.status).toBe(207);
   expect(server.sent).toEqual(["Digest", "Basic"]);
 });
+
+test("a recalled Digest met by a bare 401, or by Basic over plain http, is the password refused: never Basic", async () => {
+  for (const [url, challenge] of [
+    ["https://dav.example/", null],
+    ["http://dav.example/", 'Basic realm="r"'],
+  ] as const) {
+    const digest = digestServer();
+    const schemes: RememberedScheme = {};
+    await send(
+      fetchClient({ fetch: digest.fetch }),
+      new Authorization(astro, schemes),
+      propfind(url),
+      [],
+    );
+    expect(schemes.scheme).toMatchObject({ nonce: "n1" });
+    // The same server (or someone forging its answers) now answers 401 with no Digest.
+    const sent: (string | null)[] = [];
+    const forged: HttpClient = async (asked) => {
+      sent.push(asked.headers["Authorization"]?.split(" ")[0] ?? null);
+      return {
+        status: 401,
+        url: asked.url,
+        header: (name) => (name.toLowerCase() === "www-authenticate" ? challenge : null),
+        body: "",
+      };
+    };
+    await expect(
+      send(forged, new Authorization(astro, schemes), propfind(url), []),
+    ).rejects.toBeInstanceOf(AuthError);
+    expect(sent, url).toEqual(["Digest"]);
+  }
+});
+
+test("a scheme remembered of one origin is not sent to another: that one starts afresh", async () => {
+  const server = basicServer();
+  const schemes: RememberedScheme = {};
+  await send(server.http, new Authorization(astro, schemes), propfind("http://basic.example/"), []);
+  expect(schemes).toMatchObject({ scheme: "basic", origin: "http://basic.example" });
+  server.sent.length = 0;
+  // Plain http elsewhere: no recalled Basic in clear, the scheme asked first.
+  await send(server.http, new Authorization(astro, schemes), propfind("http://other.example/"), []);
+  expect(server.sent).toEqual([null, "Basic"]);
+});
