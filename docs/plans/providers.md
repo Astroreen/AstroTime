@@ -437,9 +437,16 @@ marked _to be recorded_.
   provider now sends Basic first, as every other server takes it, and a
   `401` whose `WWW-Authenticate` offers Digest (RFC 7616: MD5, SHA-256
   and their `-sess` forms, `qop=auth` or none) is answered once; the
-  account's provider then stays on Digest, counting the nonce's uses, a
-  stale nonce (`stale=true`) answered again, and a second refusal is the
-  credentials refused, never a loop (`Authorization`, `auth.ts`). It
+  account's provider then stays on Digest, a stale nonce (`stale=true`)
+  answered again, and a refusal of the challenge a request answered is the
+  credentials refused, never a loop (`Authorization`, `auth.ts`). Requests
+  in flight together are each judged by what they were signed with: one
+  sent with Basic, or with an older challenge, before another's `401`
+  taught the current one, is sent again with it, not taken as a wrong
+  password. A Digest answer's count (`nc`) is taken as it is signed,
+  before anything is awaited, so no two share one; they may reach the
+  server out of order, which a nonce's count allows (sabre/dav does not
+  order them). It
   costs a Digest server one request more per sync (the first, refused);
   remembering the scheme with the account would save it, when a budget
   test on a Digest server asks ([Deferred](#deferred)). The web proxy

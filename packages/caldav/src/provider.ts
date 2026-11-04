@@ -481,14 +481,17 @@ export async function send(
   request: HttpRequest,
   accept: readonly number[],
 ): Promise<HttpResponse> {
-  const signed = async () =>
-    http({
+  const signed = async () => {
+    const { header, answered } = await authorization.sign(request);
+    const response = await http({
       ...request,
-      headers: { ...request.headers, Authorization: await authorization.header(request) },
+      headers: { ...request.headers, Authorization: header },
     });
-  let response = await signed();
-  if (response.status === 401 && (await authorization.challenged(response)))
-    response = await signed();
+    return { response, answered };
+  };
+  let { response, answered } = await signed();
+  if (response.status === 401 && (await authorization.challenged(response, answered)))
+    ({ response } = await signed());
   if (response.status === 401) throw new AuthError(request);
   // Rate limited, or down for a while: the sync stops and waits (D128).
   if ((response.status === 429 || response.status === 503) && !accept.includes(response.status))

@@ -32,19 +32,30 @@ export class Authorization {
     this.credentials = credentials;
   }
 
-  /** The `Authorization` header for `request`. */
-  async header(request: Pick<HttpRequest, "method" | "url">): Promise<string> {
-    return this.digest
-      ? (await digest()).digestHeader(this.digest, this.credentials, request)
-      : basic(this.credentials);
+  /**
+   * The `Authorization` header for `request`, and the challenge it answers
+   * (`null`: Basic). A Digest answer's count is taken at once, before
+   * anything is awaited, so requests signed together never share one; they
+   * may still reach the server out of order, which a nonce's count allows.
+   */
+  async sign(
+    request: Pick<HttpRequest, "method" | "url">,
+  ): Promise<{ readonly header: string; readonly answered: DigestChallenge | null }> {
+    const challenge = this.digest;
+    if (!challenge) return { header: basic(this.credentials), answered: null };
+    const count = ++challenge.count;
+    return {
+      header: await (await digest()).digestHeader(challenge, this.credentials, request, count),
+      answered: challenge,
+    };
   }
 
   /**
-   * Learns from a 401 how the server wants to be answered: whether the
-   * request is worth sending again (`digest.ts`, `answerChallenge`).
+   * Learns from a 401 to a request signed for `answered` whether sending it
+   * again may succeed (`digest.ts`, `answerChallenge`).
    */
-  async challenged(response: HttpResponse): Promise<boolean> {
-    return (await digest()).answerChallenge(this, response);
+  async challenged(response: HttpResponse, answered: DigestChallenge | null): Promise<boolean> {
+    return (await digest()).answerChallenge(this, response, answered);
   }
 }
 

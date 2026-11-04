@@ -6,17 +6,25 @@ import type { HttpRequest, HttpResponse } from "./http.ts";
 import type { Credentials } from "./provider.ts";
 
 /**
- * Takes up a server's Digest challenge: a first one, or a stale nonce
- * (RFC 7616 §3.3), is worth sending the request again; a second refusal
- * of the same scheme is the credentials refused.
+ * Takes up a server's Digest challenge after a 401 to a request signed for
+ * `answered`. A request signed before another's 401 taught a newer
+ * challenge (requests in flight together) is sent again with that one; a
+ * first challenge, or a stale nonce (RFC 7616 §3.3), is taken up and worth
+ * sending again; a refusal of the current challenge is the credentials
+ * refused.
  */
-export function answerChallenge(authorization: Authorization, response: HttpResponse): boolean {
+export function answerChallenge(
+  authorization: Authorization,
+  response: HttpResponse,
+  answered: DigestChallenge | null,
+): boolean {
+  if (authorization.digest !== answered) return true;
   // Through the web proxy, the server's challenge comes under its own name
   // (proxy.ts's CHALLENGE, spelled here so this chunk imports nothing).
   const found = digestChallenge(
     response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate"),
   );
-  if (!found || (authorization.digest && !found.stale)) return false;
+  if (!found || (answered && !found.stale)) return false;
   authorization.digest = { ...found.challenge, count: 0 };
   return true;
 }
@@ -64,11 +72,13 @@ export function digestChallenge(
   };
 }
 
-/** The `Authorization` header answering `challenge` for `request`; counts the nonce's use. */
+/** The `Authorization` header answering `challenge` for `request`, its `count`-th use of the nonce. */
 export async function digestHeader(
   challenge: DigestChallenge,
   { username, password }: Credentials,
   request: Pick<HttpRequest, "method" | "url">,
+  /** This answer's use of the nonce, from 1 (`nc`). */
+  count: number,
   cnonce: string = randomHex(),
 ): Promise<string> {
   const hash = challenge.algorithm.startsWith("SHA-256") ? sha256 : md5;
@@ -78,8 +88,7 @@ export async function digestHeader(
   if (challenge.algorithm.endsWith("-sess"))
     ha1 = await hash(`${ha1}:${challenge.nonce}:${cnonce}`);
   const ha2 = await hash(`${request.method}:${uri}`);
-  challenge.count += 1;
-  const nc = challenge.count.toString(16).padStart(8, "0");
+  const nc = count.toString(16).padStart(8, "0");
   const response = await hash(
     challenge.qop
       ? `${ha1}:${challenge.nonce}:${nc}:${cnonce}:${challenge.qop}:${ha2}`

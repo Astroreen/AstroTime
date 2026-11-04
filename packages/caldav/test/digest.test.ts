@@ -2,8 +2,6 @@
 // challenge read from a header beside Basic's, a request answered once the
 // server asks, through the web proxy too, and a wrong password refused
 // after one try, never a loop.
-import { readFileSync } from "node:fs";
-
 import { AuthError } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
@@ -44,6 +42,7 @@ test("a Digest answer is RFC 7616's example, with MD5 and with SHA-256", async (
     { ...RFC, algorithm: "MD5", count: 0 },
     mufasa,
     request,
+    1,
     cnonce,
   );
   expect(withMd5).toContain('response="8ca523f5e9506fed4657c9700eebdbec"');
@@ -54,6 +53,7 @@ test("a Digest answer is RFC 7616's example, with MD5 and with SHA-256", async (
     { ...RFC, algorithm: "SHA-256", count: 0 },
     mufasa,
     request,
+    1,
     cnonce,
   );
   expect(withSha).toContain(
@@ -83,6 +83,8 @@ function digestServer() {
   const nonces = ["n1", "n2"];
   let nonce = nonces[0]!;
   const sent: string[] = [];
+  /** The `nc` of each Digest answer, as it arrived. */
+  const counts: number[] = [];
   const fetch = (async (input: URL | string, init: RequestInit) => {
     const url = new URL(String(input));
     const header = new Headers(init.headers).get("authorization") ?? "";
@@ -97,18 +99,14 @@ function digestServer() {
     if (!header.startsWith("Digest ")) return challenge();
     const said = (name: string) => new RegExp(`${name}="?([^",]+)`).exec(header)?.[1] ?? "";
     if (said("nonce") !== nonce) return challenge(true);
+    // The count the client says, which the answer covers; in any order, as sabre/dav takes them.
+    const count = Number.parseInt(said("nc"), 16);
+    counts.push(count);
     const expected = await digestHeader(
-      {
-        realm: "BaikalDAV",
-        nonce,
-        opaque: "o",
-        qop: "auth",
-        algorithm: "MD5",
-        // The count the client says, which the answer covers.
-        count: Number.parseInt(said("nc"), 16) - 1,
-      },
+      { realm: "BaikalDAV", nonce, opaque: "o", qop: "auth", algorithm: "MD5", count: 0 },
       { username: "astro", password: "secret" },
       { method: init.method ?? "GET", url: url.href },
+      count,
       said("cnonce"),
     );
     const response = /response="([^"]+)"/.exec(expected)?.[1];
@@ -117,6 +115,7 @@ function digestServer() {
   return {
     fetch,
     sent,
+    counts,
     renew: () => {
       nonce = nonces[1]!;
     },
@@ -138,6 +137,35 @@ test("a server that asks for Digest is answered with it, and stays answered so",
   expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
 });
 
+test("requests sent together before the first challenge are each answered with Digest, none refused", async () => {
+  const server = digestServer();
+  const http = fetchClient({ fetch: server.fetch });
+  const auth = new Authorization({ username: "astro", password: "secret" });
+  const urls = ["a", "b", "c", "d", "e"].map((name) => `http://dav.example/dav.php/${name}.ics`);
+  // All five go with Basic before any 401 comes back: the later 401s meet a
+  // challenge already taken up, not a refusal of it.
+  const answers = await Promise.all(urls.map((url) => send(http, auth, propfind(url), [])));
+  expect(answers.map((answer) => answer.status)).toEqual([207, 207, 207, 207, 207]);
+  expect(server.sent.filter((scheme) => scheme === "Basic")).toHaveLength(5);
+  expect(server.sent.filter((scheme) => scheme === "Digest")).toHaveLength(5);
+  // Each answer used the nonce once: no count twice, whatever order they arrived in.
+  expect(server.counts.toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+  // Signed together on a known challenge, they count on.
+  await Promise.all(urls.map((url) => send(http, auth, propfind(url), [])));
+  expect(server.counts.slice(5).toSorted((a, b) => a - b)).toEqual([6, 7, 8, 9, 10]);
+});
+
+test("a stale nonce met by requests in flight together is taken up once and each sent again", async () => {
+  const server = digestServer();
+  const http = fetchClient({ fetch: server.fetch });
+  const auth = new Authorization({ username: "astro", password: "secret" });
+  await send(http, auth, propfind("http://dav.example/dav.php/"), []);
+  server.renew();
+  const urls = ["a", "b", "c"].map((name) => `http://dav.example/dav.php/${name}.ics`);
+  const answers = await Promise.all(urls.map((url) => send(http, auth, propfind(url), [])));
+  expect(answers.map((answer) => answer.status)).toEqual([207, 207, 207]);
+});
+
 test("a wrong password is refused after one Digest try, never in a loop", async () => {
   const server = digestServer();
   const http = fetchClient({ fetch: server.fetch });
@@ -151,19 +179,22 @@ test("a wrong password is refused after one Digest try, never in a loop", async 
 test("through the web proxy the challenge arrives under its own name, and Digest works", async () => {
   const server = digestServer();
   const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: server.fetch });
+  const challenges: string[] = [];
   const http: HttpClient = fetchClient({
     fetch: (async (input: URL | string, init: RequestInit) => {
       const answer = await handler(
         new Request(new URL(String(input), "http://app.localhost"), init),
       );
-      // The browser never sees a WWW-Authenticate, so it never asks itself.
+      // The browser never sees a WWW-Authenticate, so it never asks itself;
+      // the server's challenge comes under the proxy's own name.
       expect(answer.headers.get("www-authenticate")).toBeNull();
+      const challenge = answer.headers.get(CHALLENGE);
+      if (challenge !== null) challenges.push(challenge);
       return answer;
     }) as typeof fetch,
     via: throughProxy("/dav-proxy/"),
   });
   const auth = new Authorization({ username: "astro", password: "secret" });
   expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
-  // digest.ts spells the proxy's header itself, so its chunk imports nothing.
-  expect(readFileSync(new URL("../src/digest.ts", import.meta.url), "utf8")).toContain(CHALLENGE);
+  expect(challenges).toEqual([expect.stringMatching(/^Digest realm="BaikalDAV"/)]);
 });
