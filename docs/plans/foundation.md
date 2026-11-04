@@ -293,9 +293,11 @@ Decided while building PR 2.
   with an IANA name. A series' UTC `UNTIL` in a zone `Intl` does not know
   is read on its day by the zone's VTIMEZONE. A series whose start and
   end are in two zones lasts its first occurrence's wall-clock length when
-  both name one zone (an alias, a Windows name beside its IANA one), and
-  the time between their instants otherwise (a flight from Berlin to New
-  York).
+  both zones have the same offsets at its start and at its end (one zone
+  under two names, an alias or a Windows name beside its IANA one, across
+  DST too), and the time between their instants otherwise (a flight from
+  Berlin to New York); for two zones that only share their offsets then,
+  the two lengths are equal.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
