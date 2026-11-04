@@ -197,7 +197,8 @@ async function everyAccount(
 ): Promise<SyncAllReport> {
   const now = context.now ?? Date.now;
   const accounts: AccountSync[] = [];
-  const held: string[] = [];
+  /** Accounts this run left alone for a hold. */
+  const leftAlone = new Set<string>();
   const known = new Set<string>();
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone; an account whose sync the
@@ -206,19 +207,22 @@ async function everyAccount(
       continue;
     known.add(account.id);
     const result = await syncOne(context, state.holds, account, retry);
-    // Held now, by this run's own answer too: its next sync waits for the hold.
-    const hold = state.holds.get(account.id);
-    const holding = !!hold && (hold.refused !== null || hold.until > now());
-    if (result.held || holding) held.push(account.id);
+    if (result.held) leftAlone.add(account.id);
     accounts.push(result.sync);
   }
   for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
-  // A hold whose time has gone by (kept for its count by a timeout after it) holds nothing.
+  // Held and its end are read at one instant, the run's: a hold whose time has
+  // gone by (kept for its count by a timeout after it) holds nothing.
   const end = now();
+  const holding = (hold: Hold | undefined) => !!hold && (hold.refused !== null || hold.until > end);
+  // Held now, by this run's own answer too: its next sync waits for the hold.
+  const held = accounts
+    .map((sync) => sync.accountId)
+    .filter((id) => leftAlone.has(id) || holding(state.holds.get(id)));
   const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > end);
   return {
     accounts,
-    finishedAt: now(),
+    finishedAt: end,
     retryAt: ends.length > 0 ? Math.min(...ends) : null,
     held,
   };

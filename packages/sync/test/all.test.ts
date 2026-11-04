@@ -718,6 +718,43 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     // No hold left to wait for: the scheduler is not woken for a time gone by.
     expect([silent.held, silent.retryAt]).toEqual([[], null]);
   });
+
+  test("held and retryAt are read at one instant, the run's end: a hold that ended during the run is in neither", async () => {
+    const store = await Store.open(nodeDriver());
+    const secrets = memorySecrets();
+    const server = memoryServer("https://a.example/cal/");
+    let time = 1_000_000;
+    const add = async (username: string) =>
+      (
+        await saveAccount(
+          { store, secrets },
+          {
+            name: `${username}@a.example`,
+            serverUrl: "https://a.example/",
+            homeUrl: "https://a.example/",
+            credentials: { username, password: "right" },
+          },
+        )
+      ).account;
+    const busy = await add("busy");
+    const slow = await add("slow");
+    const connect: Connect = async (account) => ({
+      ...server,
+      calendars: async () => {
+        // The first account's server is busy for about a minute...
+        if (account.id === busy.id) throw new ServerBusyError("503", null);
+        // ...and the second one's sync outlasts that minute.
+        time += 10 * 60_000;
+        return server.calendars();
+      },
+    });
+    const report = await syncAll({ store, secrets, connect, now: () => time });
+    expect(report.accounts.map((a) => [a.accountId, a.status])).toEqual([
+      [busy.id, "offline"],
+      [slow.id, "synced"],
+    ]);
+    expect([report.held, report.retryAt, report.finishedAt]).toEqual([[], null, time]);
+  });
 });
 
 describe("an account's files (foundation D231)", () => {
