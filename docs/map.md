@@ -225,7 +225,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D134`
     - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
       press through while they close, and their looks (`sheet`,
-      `dialogIcon`). → `plans/design.md#D136`
+      `dialogIcon`). → `plans/design.md#D136`; where a sheet or a centred
+      dialog stands, clear of a phone's system bars (`.sheet`, `.centred`
+      in `styles.css`). → `plans/design.md#D235`
     - `color-select.tsx`, `color-settings.tsx` — the colour dropdown with
       a dot left of each name; the default colours and the user's own in
       Settings, each in a dialog of its own. → `plans/design.md#D168`,
@@ -400,7 +402,7 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D108`; `drag.spec.ts` drags, resizes and moves by
     keys (a finger through Chromium's touch input under `page.clock`),
     `drag-screenshots.spec.ts` takes the dragging evidence.
-    → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
+    → `plans/design.md#D111`; `insets.spec.ts` keeps the shell and the dialogs clear of a
     phone's system bars. → `plans/android.md#D68`; `a11y.spec.ts` audits
     every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
     landmarks, reflow and reduced motion. → `plans/design.md#D119`;

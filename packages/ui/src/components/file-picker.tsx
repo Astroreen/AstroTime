@@ -84,7 +84,7 @@ export function FileBrowser({
       <Dialog.Portal>
         <DialogBackdrop className="fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <DialogPopup
-          className={`${sheet} z-[150] sm:h-[min(36rem,calc(100dvh-2rem))] sm:w-[min(28rem,calc(100vw-2rem))]`}
+          className={`${sheet} z-[150] sm:h-[min(36rem,calc(100dvh-2rem-var(--inset-top)-var(--inset-bottom)))] sm:w-[min(28rem,calc(100vw-2rem))]`}
         >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("lazy.close")}>

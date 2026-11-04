@@ -20,7 +20,7 @@ export function UnprotectedDialog({ prompt }: { prompt: UnprotectedPrompt }) {
     <AlertDialog.Root open={asking} onOpenChange={(open) => !open && prompt.answer("until-quit")}>
       <AlertDialog.Portal>
         <AlertDialogBackdrop className="fixed inset-0 z-[120] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <AlertDialogPopup className="fixed top-1/2 left-1/2 z-[130] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <AlertDialogPopup className="centred z-[130] w-[min(28rem,calc(100vw-2rem))] rounded-3xl bg-raised p-6 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           <AlertDialog.Title className="text-title font-medium">
             {t("secrets.unprotected.title")}
           </AlertDialog.Title>
