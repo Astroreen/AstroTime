@@ -597,9 +597,9 @@ marked _to be recorded_.
   account without it is `home.ts` (its credentials, `NoCalendarHomeError`,
   `keepsFiles`). On the web the service worker keeps the chunk with the
   app's other files (foundation D124), so an offline start syncs as it
-  did. AstroTime's own code at once went from 127 520 to 124 343 bytes
-  (−3.1 KiB, the room #158's 138 bytes came out of), and everything at
-  once from 323.6 to 300.2 KiB.
+  did. AstroTime's own code at once went from 127 716 to 124 505 bytes
+  on main `51ad5f3` (−3.1 KiB, the room #158's 146 bytes came out of),
+  and everything at once from 323.8 to 300.4 KiB.
 
 - **D256. What is not built, and why.**
   - **Proton Calendar** has no API and no CalDAV, and Proton's Bridge
@@ -729,8 +729,8 @@ marked _to be recorded_.
   The same scheme refused is the password refused, never sent
   twice (a brute-force guard's count is the user's, not ours). What is
   kept, and that rule, load with Digest (`digest.ts`, `taken` and
-  `answerChallenge`), so the first load grows by 138 bytes (127 520 to 127 658 on main
-  `50a5593`), 36 over a PR's 0.1 KiB, an exception the owner delegated
+  `answerChallenge`), so the first load grows by 146 bytes (127 559 to 127 705 on main
+  `937fdb8`), 44 over a PR's 0.1 KiB, an exception the owner delegated
   ([foundation D145](foundation.md#D145)):
   the price of a scheme bound to its origin and forgotten with its
   account, which the review asked for; it is won back by CalDAV loading
