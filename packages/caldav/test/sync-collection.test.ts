@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { CalDavProvider, type HttpClient } from "../src/index.ts";
 
@@ -229,4 +229,55 @@ test("a report's data spelled with character references arrives as the text they
   const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
   const changes = await provider.changes(home, { syncToken: "t1", ctag: null }, new Map());
   expect(changes.changed.map((o) => o.ics)).toEqual([ics("réf & co").trimEnd()]);
+});
+
+describe("references in a multistatus are read once, whatever value they are in", () => {
+  /** A report naming one object at `href`, its data `data`. */
+  const report = (href: string, data: string) =>
+    multistatus(
+      `<d:response><d:href>${href}</d:href><d:propstat><d:prop><d:getetag>"r"</d:getetag><c:calendar-data>${data}</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+      "t2",
+    );
+  const changesOf = async (body: string) => {
+    const http: HttpClient = async (request) => ({
+      status: 207,
+      url: request.url,
+      header: () => null,
+      body,
+    });
+    const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
+    return provider.changes(home, { syncToken: "t1", ctag: null }, new Map());
+  };
+
+  test("an escaped reference in a report's data stays the text it spells: `&amp;#13;` is `&#13;`", async () => {
+    const changes = await changesOf(
+      report("/cal/a.ics", ics("a &amp;#13; &amp;lt;b&amp;gt;").replaceAll("\r", "&#13;")),
+    );
+    expect(changes.changed.map((o) => o.ics)).toEqual([ics("a &#13; &lt;b&gt;").trimEnd()]);
+  });
+
+  test("an href is read once too: `a&amp;lt;b.ics` is `a&lt;b.ics`, not `a<b.ics`", async () => {
+    const changes = await changesOf(report("/cal/a&amp;lt;b&amp;amp;c.ics", ics("a")));
+    expect(changes.changed.map((o) => o.href)).toEqual([
+      `${home}${encodeURIComponent("a&lt;b&amp;c.ics")}`,
+    ]);
+  });
+
+  test("a displayname: references read once; a name XML does not define (`&nbsp;`) stays as written", async () => {
+    const http: HttpClient = async (request) => ({
+      status: 207,
+      url: request.url,
+      header: () => null,
+      body: `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>/cal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Caf&#xE9; &#233; &amp;#13; &amp;lt; &lt;&amp;&gt; &nbsp;&eacute;</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
+    });
+    const provider = new CalDavProvider(
+      http,
+      { username: "u", password: "p" },
+      "https://dav.example/",
+    );
+    const [calendar] = await provider.calendars();
+    // HTML's names are undeclared in XML (1.0 §4.1), so no well-formed
+    // document holds them; one that does keeps them as it spelt them.
+    expect(calendar?.name).toBe("Café é &#13; &lt; <&> &nbsp;&eacute;");
+  });
 });

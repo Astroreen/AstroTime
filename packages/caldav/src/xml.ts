@@ -37,6 +37,25 @@ export interface Multistatus {
   readonly syncToken: string | null;
 }
 
+/** XML's five predefined entities (XML 1.0 §4.6). */
+const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+
+/**
+ * A value's references read as the characters they spell, in one pass so
+ * `&amp;#13;` stays `&#13;`: character references (`&#13;`, `&#xE9;`, XML
+ * 1.0 §4.1), which the parser's own decoder reads only together with HTML's
+ * named entities, and the five predefined entities. Any other name
+ * (`&nbsp;`, undeclared, so no well-formed document holds it) and a
+ * reference to no character stay as written; a DTD's entities are not read.
+ */
+function decodeReferences(value: string): string {
+  return value.replaceAll(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, dec, name) => {
+    if (name !== undefined) return PREDEFINED[name] ?? reference;
+    const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16);
+    return code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+  });
+}
+
 const parser = new XMLParser({
   // Attributes are kept for <comp name="VEVENT"/>, as `@_name`.
   ignoreAttributes: false,
@@ -44,9 +63,13 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
-  // Character references (`&#13;`, `&#xE9;`, XML 1.0 §4.1) are read as the
-  // characters they spell: the parser reads them only with HTML's entities.
-  htmlEntities: true,
+  entityDecoder: {
+    decode: decodeReferences,
+    setExternalEntities: () => {},
+    addInputEntities: () => {},
+    reset: () => {},
+    setXmlVersion: () => {},
+  },
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 
