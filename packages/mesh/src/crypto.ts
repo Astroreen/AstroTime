@@ -23,12 +23,25 @@ export function fromBase64url(text: string): Uint8Array<ArrayBuffer> | undefined
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-/** The HMAC-SHA-256 key of a mesh secret: proofs, and the root of the session keys. */
-export function proofKey(secret: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
-  return subtle().importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-    "verify",
-  ]);
+/** The secret as HKDF's root: every key is derived from it with a label of its own. */
+function root(secret: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+  return subtle().importKey("raw", secret, "HKDF", false, ["deriveKey"]);
+}
+
+/** The HMAC-SHA-256 key of a mesh's proofs, derived from its secret (label "proof"). */
+export async function proofKey(secret: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+  return subtle().deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(),
+      info: encoder.encode("astrotime-mesh.1 proof"),
+    },
+    await root(secret),
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign", "verify"],
+  );
 }
 
 /** What a proof is over: its purpose and its parts, unambiguous as JSON. */
@@ -61,13 +74,12 @@ export async function sealingKey(
   senderNonce: Uint8Array,
   receiverNonce: Uint8Array,
 ): Promise<CryptoKey> {
-  const root = await subtle().importKey("raw", secret, "HKDF", false, ["deriveKey"]);
   const salt = new Uint8Array(senderNonce.length + receiverNonce.length);
   salt.set(senderNonce);
   salt.set(receiverNonce, senderNonce.length);
   return subtle().deriveKey(
     { name: "HKDF", hash: "SHA-256", salt, info: encoder.encode("astrotime-mesh.1 seal") },
-    root,
+    await root(secret),
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],

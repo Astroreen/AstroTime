@@ -96,7 +96,10 @@ export class MeshNode {
   /** Closes every connection and dials no more. */
   stop(): void {
     this.running = false;
-    for (const dial of this.dials.values()) dial.cancel?.();
+    for (const dial of this.dials.values()) {
+      dial.cancel?.();
+      dial.cancel = undefined;
+    }
     for (const session of this.connections) session.close();
   }
 

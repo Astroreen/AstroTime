@@ -232,6 +232,17 @@ alone needs nothing else.
     per failure up to a minute; an established connection that closes
     otherwise is redialled at once. An address
     that answers with this very peer is never dialled again.
+  - **Keys**: the secret is only HKDF's root; the proofs' HMAC key and
+    each direction's AES-GCM key are derived from it with labels of their
+    own (`astrotime-mesh.1 proof`, `astrotime-mesh.1 seal`).
+  - **A version from the future stays a refusal.** A version stamped more
+    than five minutes ahead (a device's own clock set wrong when it made
+    it) is refused by every receiver, and each anti-entropy batch with it
+    closes that connection with `clock` until real time catches up; the
+    UI's "this device's clock is off" can then blame a device whose clock
+    is right now. Rare, bounded by the drift itself; capping what a peer
+    stamps, or quarantining such a version instead, is
+    [deferred](#deferred).
   - **The seams for PR M2**: `MeshStore` is one transaction (`vector`,
     `setVector`, `current`, `put`, `notCoveredBy`) plus the known
     addresses, so `@astrotime/storage` applies a batch in one SQLite
@@ -251,6 +262,16 @@ alone needs nothing else.
 - Removing a peer from a mesh: a new secret handed to the rest
   ([D287](#D287)).
 - Finding peers on the local network (mDNS) instead of typing an address.
+- A version stamped ahead in a peer's store: cap what it stamps, or
+  quarantine it, instead of every connection refusing it ([D293](#D293)).
+- Limits on a mesh frame, a batch and an address list (a batch could be
+  chunked); within a mesh whose peers all hold the secret ([D293](#D293)).
+- The shells' transports (M2's WebSocket, M3's listeners) must hand a
+  connection's frames to `ConnectionHandlers.message` one at a time, each
+  after the last one's promise settles: the handshake and the sealed
+  frames' counters depend on it, and `MemoryNetwork` does it, so the
+  package's tests cannot catch a shell that does not; M2's and M3's own
+  tests must ([D293](#D293)).
 
 ## PR plan
 

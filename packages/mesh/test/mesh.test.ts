@@ -445,3 +445,18 @@ test("a calendar renamed on two peers at once converges to the newer name", asyn
   await mesh.settle();
   for (const name of ["peer-a", "peer-b", "peer-c"]) expect(mesh.versions(name)).toEqual([job]);
 });
+
+test("a node stopped while a redial waits dials again when it starts", async () => {
+  const mesh = new Harness();
+  mesh.add("peer-c", { listens: true, invitedBy: [] });
+  mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+  const a = await mesh.up("peer-a");
+  await mesh.settle(1);
+  expect(mesh.timers.size).toBe(1);
+
+  a.stop();
+  await mesh.up("peer-c");
+  await a.start();
+  await mesh.settle();
+  expect(a.peers()).toEqual(["peer-c"]);
+});
