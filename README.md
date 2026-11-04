@@ -80,7 +80,8 @@ Each user can also turn it off in Settings → Places.
 
 The container sends the app with a strict Content Security Policy and a
 fresh nonce on every page ([D110](docs/plans/foundation.md#D110)). Beyond
-the app's own origin it names only the place search's: `connect-src` the
+the app's own origin it names only `blob:` for images (the user's own
+pictures) and the place search's: `connect-src` the
 Photon's origin (`https://photon.komoot.io` unless you name another) and
 `img-src https://tile.openstreetmap.org`, neither with
 `ASTROTIME_PLACES_URL=off`. Let the

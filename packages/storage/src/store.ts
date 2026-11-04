@@ -1072,11 +1072,11 @@ const ROWS_PER_INSERT = 100;
 const LOCAL_SERVER = "local:";
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
-  // Editing comes from `read_only` alone (docs/plans/foundation.md#D37).
-  // This build writes it as `!rights.edit` (`saveCalendar`); an older
-  // build's tab writes `read_only` and not `rights`, so where they disagree
-  // `read_only` is the fresher, either way: a row whose `rights` lack
-  // `edit` with `read_only` 0 edits, a combination only such a tab writes.
+  // Editing comes from `read_only` alone, creating and deleting from
+  // `rights` (docs/plans/foundation.md#D37): this build writes `read_only`
+  // as `!rights.edit` (`saveCalendar`), an older build's tab writes only
+  // `read_only`, so it is always the fresher. A `null` `rights`, an older
+  // build's row, grants all or nothing as `read_only` says.
   const granted = rights?.split(",") ?? (readOnly ? [] : RIGHTS);
   return {
     ...row,

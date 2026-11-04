@@ -88,10 +88,13 @@ test("the pictures show under the page's policy: illustrations (design D219) and
   // same files: `appFiles` and its policy are checked here, Electron's
   // `protocol.handle` itself is not (the desktop's e2e runs it).
   const server = createServer((req, res) => {
-    void serve(new Request(`app://astrotime${req.url}`)).then(async (answer) => {
-      res.writeHead(answer.status, Object.fromEntries(answer.headers));
-      res.end(Buffer.from(await answer.arrayBuffer()));
-    });
+    void serve(new Request(`app://astrotime${req.url}`))
+      .then(async (answer) => {
+        res.writeHead(answer.status, Object.fromEntries(answer.headers));
+        res.end(Buffer.from(await answer.arrayBuffer()));
+      })
+      // A file that fails to serve fails the picture, not the wait for it.
+      .catch(() => res.writeHead(500).end());
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const browser = await chromium.launch();
