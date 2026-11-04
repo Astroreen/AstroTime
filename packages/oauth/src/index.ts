@@ -53,7 +53,11 @@ export const MICROSOFT = {
  * scheme, the desktop's loopback address, the web's `oauth.html`.
  */
 export interface OAuthRedirect {
-  /** Makes one sign-in ready: its redirect URI, for the authorization URL. */
+  /**
+   * Makes one sign-in ready: its redirect URI, for the authorization URL.
+   * Called in the user's click itself, before anything is awaited: the web
+   * opens its window there, where no popup blocker holds it.
+   */
   begin(): Promise<OAuthAttempt>;
 }
 
@@ -62,8 +66,9 @@ export interface OAuthAttempt {
   /**
    * Shows the service's page; resolves with the redirect's URL, or `null`
    * when the user left it. Not every platform hears the page closed: on the
-   * web it is a window the app keeps no handle on (`noopener`), so there
-   * `null` comes only from `cancel`, and the sign-in offers its Cancel.
+   * web the window is cut from the app (no `opener`) and not watched, so
+   * there `null` comes only from `cancel`, and the sign-in offers its
+   * Cancel; a window the browser refused rejects (`PopupBlockedError`).
    */
   open(url: string): Promise<string | null>;
   /** Stops waiting: `open` resolves `null`, and what waited for the answer goes. */

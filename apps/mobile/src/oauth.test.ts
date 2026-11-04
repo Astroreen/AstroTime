@@ -79,3 +79,16 @@ test("the redirect that closed the tab wins, though Android told the tab closed 
   for (const then of pending.splice(0)) then();
   expect(await answer).toBe(`${OAUTH_REDIRECT}?code=c&state=s`);
 });
+
+test("a tab that cannot open ends the sign-in, with nothing left listening", async () => {
+  const p = plugins();
+  const failing: OAuthPlugins = {
+    ...p.fake,
+    browser: { ...p.fake.browser, open: () => Promise.reject(new Error("no browser")) },
+  };
+  const attempt = await androidOAuth(failing).begin();
+  await expect(attempt.open("https://accounts.example/authorize")).rejects.toThrow("no browser");
+  await Promise.resolve();
+  expect(p.count("appUrlOpen")).toBe(0);
+  expect(p.count("browserFinished")).toBe(0);
+});

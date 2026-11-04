@@ -59,7 +59,13 @@ export function androidOAuth(
       return {
         redirectUri: OAUTH_REDIRECT,
         async open(url) {
-          await browser.open({ url });
+          try {
+            await browser.open({ url });
+          } catch (error) {
+            // No tab to show the page in: the sign-in ends, nothing left listening.
+            done(null);
+            throw error;
+          }
           return answer;
         },
         cancel: () => done(null),

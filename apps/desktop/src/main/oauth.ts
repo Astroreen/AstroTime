@@ -12,6 +12,12 @@ export interface Loopback {
   readonly redirectUri: string;
   /** The redirect's URL, once the browser came back; `null` when cancelled or too late. */
   readonly answer: Promise<string | null>;
+  /**
+   * The `state` the sign-in sent: only a request that carries it is the
+   * answer; anything else (another page, a stray request) is refused with a
+   * 400 and the server keeps waiting.
+   */
+  expect(state: string): void;
   close(): void;
 }
 
@@ -19,10 +25,17 @@ export interface Loopback {
 export async function loopback(page: string): Promise<Loopback> {
   let finish: (url: string | null) => void = () => {};
   const answer = new Promise<string | null>((resolve) => (finish = resolve));
+  let expected: string | null = null;
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (url.pathname !== "/oauth") {
       res.writeHead(404).end();
+      return;
+    }
+    // Not this sign-in's (no state, or another's): refused, still waiting.
+    // A refusal from the service carries the state too (RFC 6749 §4.1.2.1).
+    if (expected === null || url.searchParams.get("state") !== expected) {
+      res.writeHead(400).end();
       return;
     }
     res.writeHead(200, {
@@ -44,5 +57,10 @@ export async function loopback(page: string): Promise<Loopback> {
     server.closeAllConnections();
     finish(null);
   };
-  return { redirectUri, answer, close };
+  return {
+    redirectUri,
+    answer,
+    expect: (state) => void (expected = state),
+    close,
+  };
 }

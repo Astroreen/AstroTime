@@ -267,6 +267,10 @@ async function start() {
     if (!fromApp(event)) throw new Error("Not the app's page.");
     const redirect = typeof id === "string" ? signIns.get(id) : undefined;
     if (!redirect || typeof url !== "string" || !isWebUrl(url)) return null;
+    // Only the answer to this very page is taken (oauth.ts, `expect`).
+    const sent = new URL(url).searchParams.get("state");
+    if (!sent) return null;
+    redirect.expect(sent);
     openInBrowser(url);
     return redirect.answer;
   });

@@ -31,6 +31,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <!-- No host: the redirect is `io.github.astroreen.astrotime:/oauth`, one slash, as Google
+                     asks of Android clients. The app checks the address again (src/oauth.ts). -->
                 <data android:scheme="io.github.astroreen.astrotime" android:path="/oauth" />
             </intent-filter>
 
