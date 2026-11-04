@@ -9,7 +9,7 @@
 import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
 import { hasFiles } from "@astrotime/sync";
-import { accountFiles } from "@astrotime/sync/files";
+import { accountFiles, noFilesOf } from "@astrotime/sync/files";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -44,7 +44,7 @@ const shown = (attachment: NewAttachment): Attachment => ({
 const MAX_UPLOAD = 50_000_000;
 
 /** Why a calendar has no files to attach from (design D237). */
-type NoFiles = "device" | "server" | "syncOff";
+type NoFiles = ReturnType<typeof noFilesOf>;
 
 /**
  * The account a calendar is in, where it may have files (foundation D231):
@@ -74,13 +74,9 @@ function useFilesAccount(calendar: Calendar | undefined): {
   }, [accountId, store]);
   const account = found && found.id === accountId ? found.account : null;
   if (!account) return { account: null, noFiles: null };
-  if (hasFiles(account)) return { account, noFiles: null };
-  if (account.provider === "local") return { account: null, noFiles: "device" };
-  if (account.provider !== "caldav") return { account: null, noFiles: null };
-  return {
-    account: null,
-    noFiles: hasFiles({ ...account, syncOff: false }) ? "syncOff" : "server",
-  };
+  return hasFiles(account)
+    ? { account, noFiles: null }
+    : { account: null, noFiles: noFilesOf(account) };
 }
 
 export function AttachmentsField({
@@ -315,21 +311,20 @@ export function AttachmentsField({
             </button>
           </>
         )}
-        {account && (
-          // The system's file dialog, Android's picker in the WebView.
-          <input
-            ref={picker}
-            type="file"
-            hidden
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void upload(file);
-            }}
-          />
-        )}
+        {/* The system's file dialog, Android's picker in the WebView: mounted
+            while an upload runs, whatever the calendar becomes. */}
+        <input
+          ref={picker}
+          type="file"
+          hidden
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void upload(file);
+          }}
+        />
       </div>
       {why && (
         <p id={noFilesId} className="text-note text-ink-muted">

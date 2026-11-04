@@ -2351,7 +2351,8 @@ own (below).
     alerts) is centred in the same room, no wider than it, and scrolls
     when taller;
   - the edit dialog beside its draft (D155, D187) keeps its outer margin
-    from the bar on its side, narrower by it; the notices at the foot
+    from the bar on its side, narrower by it, and stands aside only where
+    the room past the bar holds a phone's width; the notices at the foot
     (copied, a change failed) sit above the gesture bar.
     `apps/web/e2e/insets.spec.ts` emulates the insets SystemBars injects
     (a phone upright; on its side, with a cutout at the left and the
@@ -2361,6 +2362,17 @@ own (below).
     The picture drawn under a transparent status bar, as Google Calendar
     does: [Deferred](#deferred) (the status bar's icons would then need
     the picture's lightness, not the theme's).
+- **D236. A task's list is a list** (the owner's 4, round 5: creating a
+  task, its colour field offered "The calendar's colour"). Where the edit
+  dialog speaks of a task's list, it says list, as its List field already
+  did: the colour's first entry is "The list's colour" («Цвет списка»),
+  in the edit dialog and for Settings' "Colour of new tasks"; for a task
+  the edit dialog's problems that name the calendar (none here holds it,
+  it no longer takes it, it takes no new ones to split a series) name
+  the list (`problemKey`, `packages/ui/test/task-words.test.ts`). The
+  notices any item can get say neither: "This is no longer here", "Look
+  again". An event keeps the calendar's words. The details already name
+  a task's list "List".
 - **D237. The three ways to attach, all in sight** (the owner's 3, round
   5: "the add-file button only lets me type a link"). The edit dialog's
   attachments show "Add a link", "From your files" (D234) and "From this
@@ -2377,11 +2389,11 @@ own (below).
   known by the calendar home discovery ends at, whatever address Login
   Flow v2 or the user gave (`packages/caldav/test/nextcloud-home.test.ts`:
   a trailing slash, `index.php`, an app's page, `remote.php/dav`, an
-  install under a path, `/.well-known/caldav` redirected). On the
-  emulator, an account of the test user signed in through CalDAV and
-  through Login Flow v2 showed both file ways, so the owner's missing
-  buttons stay unexplained ([Deferred](#deferred)).
-  Attaching a file inline where there are no files: [Deferred](#deferred).
+  install under a path, `/.well-known/caldav` redirected; and the real
+  servers' homes in `packages/sync/test/servers.test.ts`). A CalDAV
+  account whose home is not saved gets no reason: its cause is not known
+  (`noFilesOf`, `@astrotime/sync`). The owner's case, and attaching a
+  file inline where there are no files: [Deferred](#deferred).
 
 ## Deferred
 
@@ -2392,9 +2404,10 @@ own (below).
   edge as Google Calendar draws it: the bars' icons would follow the
   picture's lightness rather than the theme.
 - **Why the owner's phone showed only "Add a link"** ([D237](#D237)):
-  not reproduced with the test user on the same server and APK; the
-  three ways are now in sight with a reason when off, which shows the
-  cause the next time it happens.
+  not reproduced: on the emulator, the test user on the same server
+  with the same APK, signed in through CalDAV and through Login Flow v2,
+  had both file ways. The three ways are now in sight with a reason when
+  off, which shows the cause the next time it happens.
 - **A file attached inline where the calendar has no files** ([D237](#D237)):
   `ATTACH;VALUE=BINARY` (core's `inlineFile`) for the calendar on this
   device and servers without files; the reason shows instead for now.

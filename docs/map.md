@@ -178,8 +178,9 @@ When you add a package, app or module, add its line here in the same PR.
     `removeAccount` keep an account with its credentials.
     → `plans/foundation.md#D90`; `hasFiles`, whether an account has files,
     and `accountFiles` (`files.ts`, `@astrotime/sync/files`, loaded with
-    the file picker), them opened with its saved credentials.
-    → `plans/foundation.md#D231`
+    the file picker), them opened with its saved credentials; `noFilesOf`
+    there, why an account has none. → `plans/foundation.md#D231`,
+    `plans/design.md#D237`
     → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
     mention. → `plans/design.md#D208`
   - `test/budget.test.ts` — the requests each action costs a server, held
@@ -330,7 +331,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D155`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
-      (`saveChanges`, a drag's too); `copy.ts` — "Make a copy" and "Copy
+      (`saveChanges`, a drag's too); `problems.ts`, its save problems as
+      catalog keys, a task's in its words (design D236); `copy.ts` — "Make a copy" and "Copy
       to…" (`saveCopy`, `copyToForm`, design D164), loaded with the menu;
       `when.ts` — when an item is, in words (the details' line, a move's
       announcement); `words.ts` — rules and reminders in
@@ -375,7 +377,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs; strings that
     load later with their part (`later.ts`): `pictures.ts`, the pictures',
-    and `files.ts`, why the edit dialog's attachments have no files.
+    `files.ts`, why the edit dialog's attachments have no files, and
+    `tasks.ts`, a task's list in a task's words.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`

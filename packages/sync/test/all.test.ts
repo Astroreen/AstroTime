@@ -8,13 +8,20 @@ import {
   type Provider,
   type SecretStore,
 } from "@astrotime/core";
-import { Store } from "@astrotime/storage";
+import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
-import { accountFiles } from "../src/files.ts";
+import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
-import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
+import {
+  hasFiles,
+  removeAccount,
+  saveAccount,
+  syncAll,
+  type Connect,
+  type SyncLock,
+} from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
 
 const task = (uid: string) =>
@@ -770,4 +777,42 @@ test("people for a mention come from the account's provider with its credentials
     username: null,
   });
   expect(await peopleOf(context, local.id, "ann")).toEqual([]);
+});
+
+describe("why an account has no files to attach from (design D237)", () => {
+  const account = (fields: Partial<Account>): Account => ({
+    id: "a",
+    provider: "caldav",
+    name: "astro",
+    serverUrl: "https://cloud.example.com",
+    username: "astro",
+    homeUrl: "https://cloud.example.com/remote.php/dav/calendars/astro/",
+    syncOff: false,
+    createdAt: 0,
+    ...fields,
+  });
+
+  test("a Nextcloud that syncs has files; with its sync off, that is why", () => {
+    expect([hasFiles(account({})), noFilesOf(account({}))]).toEqual([true, null]);
+    expect([hasFiles(account({ syncOff: true })), noFilesOf(account({ syncOff: true }))]).toEqual([
+      false,
+      "syncOff",
+    ]);
+  });
+
+  test("a server that is no Nextcloud keeps none, synced or not", () => {
+    const radicale = {
+      serverUrl: "http://127.0.0.1:5232/",
+      homeUrl: "http://127.0.0.1:5232/astro/",
+    };
+    expect(noFilesOf(account(radicale))).toBe("server");
+    expect(noFilesOf(account({ ...radicale, syncOff: true }))).toBe("server");
+  });
+
+  test("the calendar on this device is on this device; a cause not known is not guessed", () => {
+    expect(noFilesOf(account({ provider: "local", homeUrl: null, username: null }))).toBe("device");
+    // A CalDAV account whose home was never saved, and the demo's: no reason given.
+    expect(noFilesOf(account({ homeUrl: null }))).toBeNull();
+    expect(noFilesOf(account({ provider: "demo" }))).toBeNull();
+  });
 });

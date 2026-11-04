@@ -3,6 +3,7 @@
 import {
   CalDavProvider,
   fetchClient,
+  keepsFiles,
   proxyHandler,
   revokeAppPassword,
   throughProxy,
@@ -121,6 +122,9 @@ describe.each(servers)(
         components: ["VTODO"],
         rights: { create: true, edit: true, delete: true },
       });
+      // The home discovery ends at says whether the server keeps files
+      // (foundation D231, design D237): Nextcloud's does, Radicale's not.
+      expect(keepsFiles(a.provider.homeUrl)).toBe(serverName === "Nextcloud");
     });
 
     // Nextcloud only: the tests know its sharing; Radicale's rights are a config file (fixtures cover them).

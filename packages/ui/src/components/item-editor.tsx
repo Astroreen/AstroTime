@@ -32,7 +32,6 @@ import {
   withStartDate,
   type AlarmChoice,
   type Form,
-  type Problem,
   type RepeatChoice,
   type Target,
 } from "../calendar/editing.ts";
@@ -66,6 +65,8 @@ import { ColorSelect } from "./color-select.tsx";
 import { MentionField } from "./mention-field.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
+import { problemKey, type SaveProblem } from "../calendar/problems.ts";
+import { addTaskStrings } from "../i18n/tasks.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
@@ -90,15 +91,7 @@ export interface EditorState {
   readonly copy?: boolean;
   readonly form: Form;
   /** Why the form cannot be saved, or why saving it did not work. */
-  readonly problem:
-    | Problem
-    | "failed"
-    | "gone"
-    | "refused"
-    | "nowhere"
-    | "inDoubt"
-    | "noSplit"
-    | null;
+  readonly problem: SaveProblem | null;
   readonly saving: boolean;
 }
 
@@ -129,7 +122,9 @@ export function ItemEditor({
   /** The item as the form says now, for the views to draw (design D155). */
   onDraft: (draft: DrawnDraft | null) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // A task's words, loaded with the dialog (design D236).
+  addTaskStrings(i18n);
   const formId = useId();
   const form = state?.form;
   useDraft(target, form ?? null, onDraft);
@@ -208,7 +203,7 @@ export function ItemEditor({
                   role="alert"
                   className="mt-4 rounded-xl bg-danger-soft p-3 text-body text-danger"
                 >
-                  {t(state.problem === "failed" ? "edit.failed" : `edit.problem.${state.problem}`)}
+                  {t(problemKey(state.problem, form?.kind ?? "event"))}
                 </p>
               )}
             </form>
@@ -389,7 +384,9 @@ function Fields({
           onChange={(calendarId) => set({ calendarId })}
           options={calendars.map((c) => [c.id, c.name])}
         />
-        {calendars.length === 0 && <p className="text-small text-danger">{t("edit.noCalendar")}</p>}
+        {calendars.length === 0 && (
+          <p className="text-small text-danger">{t(event ? "edit.noCalendar" : "edit.noList")}</p>
+        )}
       </Section>
 
       <Section icon={<PaletteIcon className="size-5" />} labelled>
@@ -399,6 +396,7 @@ function Fields({
             labelClassName={fieldLabel}
             value={form.color}
             calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
+            task={!event}
             onChange={(color) => {
               setColorChosen(true);
               set({ color });

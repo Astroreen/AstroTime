@@ -130,6 +130,14 @@ test("on a phone turned sideways a card, the dialog beside its draft and a centr
   await page.setViewportSize(LANDSCAPE);
   await openDemo(page, "week");
   await systemBars(page, SIDEWAYS);
+  // The aside reads the side bars as `--inset-*` resolves them (draft-aside.ts).
+  expect(
+    await page.evaluate(() =>
+      ["left", "right"].map((side) =>
+        getComputedStyle(document.documentElement).getPropertyValue(`--inset-${side}`),
+      ),
+    ),
+  ).toEqual(["32px", "48px"]);
 
   await page.getByRole("button", { name: "Create" }).click();
   const edit = page.getByRole("dialog", { name: "New event" });
