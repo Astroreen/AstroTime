@@ -56,6 +56,8 @@ export interface LocalChange {
   calendars(): Promise<Calendar[]>;
   save(calendarId: string, ics: string, href?: string): Promise<StoredObject>;
   delete(id: string): Promise<void>;
+  /** As `Store.withUids`, read in the same transaction as the writes. */
+  withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]>;
 }
 
 /** A task that rolls over to today, with the occurrence it counts by (design D51). */
@@ -573,6 +575,7 @@ export class Store {
         calendars: () => this.calendars(),
         save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
         delete: (id) => this.deleteLocalNow(id),
+        withUids: (calendarId, uids) => this.withUids(calendarId, uids),
       }),
     );
   }

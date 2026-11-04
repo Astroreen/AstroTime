@@ -342,6 +342,7 @@ test("a completion or a star that did not land says so: the task gone meanwhile,
             calendars: () => local.calendars(),
             save: (...args) => local.save(...args),
             delete: (id) => local.delete(id),
+            withUids: (...args) => local.withUids(...args),
           }),
         );
       }

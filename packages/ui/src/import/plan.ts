@@ -252,6 +252,11 @@ export async function runImport(run: Run): Promise<Imported> {
     // one of those that cannot go does not hide why the import stopped.
     for (const calendar of made.values())
       await unmake(store, calendar, ownAccounts).catch(() => {});
+    // An account made just before its calendar could not be: it goes too.
+    for (const id of ownAccounts) {
+      const left = await store.calendars(id).catch(() => [null]);
+      if (left.length === 0) await store.removeAccount(id).catch(() => {});
+    }
     throw error;
   }
 
@@ -335,39 +340,43 @@ export async function runImport(run: Run): Promise<Imported> {
       stopped = true;
       break;
     }
-    const batch: typeof writes = [];
+    let batch: typeof writes = [];
     // Counted once the batch is written: a batch that fails wrote nothing.
     let same = 0;
     let left = 0;
     try {
-      // A UID a sync brought into the calendar since the check: already
-      // there, as the check would have found it (D270), so the answer given
-      // (or "skip", where none was asked) decides, and an update overlays.
+      // In the batch's own transaction (D99): a UID a sync brought into the
+      // calendar since the check is already there, as the check would have
+      // found it (D270), so the answer given (or "skip", where none was
+      // asked) decides, and an update overlays; no sync writes in between.
       const fresh = writes.slice(i, i + BATCH);
-      const there = new Map<string, StoredObject>();
-      for (const calendarId of new Set(
-        fresh.filter((w) => w.as === "new").map((w) => w.calendarId),
-      )) {
-        const uids = fresh
-          .filter((w) => w.as === "new" && w.calendarId === calendarId)
-          .map((w) => w.uid);
-        for (const object of await store.withUids(calendarId, uids))
-          there.set(keyOf(calendarId, object.uid), object);
-      }
-      for (const write of fresh) {
-        const found =
-          write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
-        if (!found) batch.push(write);
-        else if (sameObjects(found.ics, write.ics)) same++;
-        else if (choice === "copy")
-          batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
-        else if (choice === "update")
-          batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
-        else left++;
-      }
-      // The store finds an object of the same UID itself, and updates it
-      // (D270); a batch is one transaction, so a failed one wrote nothing.
       await store.changeLocal(async (local) => {
+        batch = [];
+        same = 0;
+        left = 0;
+        const there = new Map<string, StoredObject>();
+        for (const calendarId of new Set(
+          fresh.filter((w) => w.as === "new").map((w) => w.calendarId),
+        )) {
+          const uids = fresh
+            .filter((w) => w.as === "new" && w.calendarId === calendarId)
+            .map((w) => w.uid);
+          for (const object of await local.withUids(calendarId, uids))
+            there.set(keyOf(calendarId, object.uid), object);
+        }
+        for (const write of fresh) {
+          const found =
+            write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
+          if (!found) batch.push(write);
+          else if (sameObjects(found.ics, write.ics)) same++;
+          else if (choice === "copy")
+            batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
+          else if (choice === "update")
+            batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
+          else left++;
+        }
+        // The store finds an object of the same UID itself, and updates it
+        // (D270); a batch is one transaction, so a failed one wrote nothing.
         for (const write of batch) await local.save(write.calendarId, write.ics);
       });
     } catch (failure) {

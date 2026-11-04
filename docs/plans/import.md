@@ -151,10 +151,12 @@ not carry is said, not dropped in silence.
   them. An item deleted here whose deletion has not reached the server
   yet is not there as the user sees it, so it is not asked about: the
   file brings it back, as a change of it (the store revives it by UID,
-  [foundation D38](foundation.md#D38)). The check is made again before each batch
-  for the items it found new: one a sync brought into the calendar
-  meanwhile is already there, and the answer given (or "skip" where none
-  was asked) decides, so nothing is overwritten unasked. Copies made in one run name each other: a copied
+  [foundation D38](foundation.md#D38)). The check is made again for the items it
+  found new, inside each batch's own transaction (`LocalChange.withUids`,
+  [foundation D99](foundation.md#D99)): one a sync brought into the
+  calendar meanwhile is already there, and the answer given (or "skip"
+  where none was asked) decides; no sync writes between that look and the
+  batch's writes, so nothing is overwritten unasked. Copies made in one run name each other: a copied
   subtask's `RELATED-TO` names its copied parent.
 
 - **D271. Written through the store, in batches.** The objects become
@@ -257,7 +259,10 @@ end date, two occurrences when none is given) as an `RRULE`, `PRIORITY`
 1–3 as 1, 5, 9, Outlook's all-day flag as dates; a rule of several parts,
 a procedure alarm (`PALARM`), any property iCalendar has no place for,
 and a component whose `END` never came (kept as far as it went) are
-named as not carried over. D266, D272.
+named as not carried over; a component AstroTime does not read
+(`VJOURNAL`) is skipped whole and named once. A `;` 1.0 escapes stays
+inside its value. Each `VCALENDAR` of a file is read by its own version:
+a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
 
 ### PR I4 — CSV (Outlook's and Google's columns)
 

@@ -55,7 +55,15 @@ export function vcalendarToIcs(text: string, options: { readonly timeZone: strin
     out.push("END:VCALENDAR");
   };
   let open = false;
+  /** Inside a component AstroTime does not read (a `VJOURNAL`…): how deep. */
+  let foreign: { depth: number } | null = null;
   for (const line of linesOf(text)) {
+    if (foreign) {
+      // Its lines are its own, not the calendar's: skipped with it, named once.
+      if (line.name === "BEGIN") foreign.depth++;
+      else if (line.name === "END" && --foreign.depth === 0) foreign = null;
+      continue;
+    }
     if (line.name === "BEGIN" || line.name === "END") {
       const kind = line.value.trim().toUpperCase();
       if (line.name === "BEGIN" && kind === "VCALENDAR") {
@@ -65,13 +73,17 @@ export function vcalendarToIcs(text: string, options: { readonly timeZone: strin
         zone = { offset: null, daylight: [], tzid: null, definition: [] };
         out.push("BEGIN:VCALENDAR", "VERSION:2.0");
       } else if (line.name === "END" && kind === "VCALENDAR") {
-        close();
+        // An END with no calendar open says nothing.
+        if (open) close();
         open = false;
       } else if (line.name === "BEGIN" && (kind === "VEVENT" || kind === "VTODO")) {
         cutShort();
         component = { name: kind, lines: [] };
       } else if (line.name === "END" && component && kind === component.name) convert();
-      else notImported.add(`${line.name}:${kind}`);
+      else if (line.name === "BEGIN") {
+        notImported.add(kind);
+        foreign = { depth: 1 };
+      } else notImported.add(`${line.name}:${kind}`);
       continue;
     }
     if (component) {
@@ -153,31 +165,51 @@ function parse(text: string): Line | null {
 
 /** A value as text: quoted-printable decoded in its charset, 1.0's `\;` unescaped. */
 function textOf(line: Line): string {
+  return unescaped(decoded(line));
+}
+
+/**
+ * A structured value's parts (`CATEGORIES`, an alarm's fields): split on
+ * each `;` 1.0 does not escape, then each part unescaped, so `A\;B;C` is
+ * two parts, `A;B` and `C`.
+ */
+function partsOf(line: Line): string[] {
+  return decoded(line)
+    .split(/(?<!\\);/)
+    .map(unescaped);
+}
+
+const unescaped = (text: string) => text.replaceAll("\\;", ";").replaceAll(/\r\n|\r/g, "\n");
+
+/** A value as text, quoted-printable decoded in its charset, 1.0's escapes still in it. */
+function decoded(line: Line): string {
   const encoding = (line.params.get("ENCODING") ?? line.bare.find(isEncoding) ?? "").toUpperCase();
-  let value = line.value;
-  if (encoding === "QUOTED-PRINTABLE") {
-    const bytes: number[] = [];
-    for (let i = 0; i < value.length; i++) {
-      const hex = value[i] === "=" ? /^[0-9A-Fa-f]{2}/.exec(value.slice(i + 1, i + 3)) : null;
-      if (hex) {
-        bytes.push(parseInt(hex[0], 16));
-        i += 2;
-      } else {
-        // Text already decoded from the file: its own UTF-8 bytes.
-        bytes.push(...new TextEncoder().encode(value[i]));
-      }
+  const value = line.value;
+  if (encoding !== "QUOTED-PRINTABLE") return value;
+  const bytes: number[] = [];
+  const utf8 = new TextEncoder();
+  for (let i = 0; i < value.length;) {
+    const hex = value[i] === "=" ? /^[0-9A-Fa-f]{2}/.exec(value.slice(i + 1, i + 3)) : null;
+    if (hex) {
+      bytes.push(parseInt(hex[0], 16));
+      i += 3;
+      continue;
     }
-    const charset =
-      line.params.get("CHARSET") ??
-      line.bare.find((b) => /^(UTF-8|WINDOWS-\d+|ISO-8859-\d+)$/.test(b)) ??
-      "utf-8";
-    try {
-      value = new TextDecoder(charset).decode(new Uint8Array(bytes));
-    } catch {
-      value = new TextDecoder().decode(new Uint8Array(bytes));
-    }
+    // Text already decoded from the file: its own UTF-8 bytes, a code point
+    // at a time, so one past the BMP keeps both its halves.
+    const character = String.fromCodePoint(value.codePointAt(i)!);
+    bytes.push(...utf8.encode(character));
+    i += character.length;
   }
-  return value.replaceAll("\\;", ";").replaceAll(/\r\n|\r/g, "\n");
+  const charset =
+    line.params.get("CHARSET") ??
+    line.bare.find((b) => /^(UTF-8|WINDOWS-\d+|ISO-8859-\d+)$/.test(b)) ??
+    "utf-8";
+  try {
+    return new TextDecoder(charset).decode(new Uint8Array(bytes));
+  } catch {
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
 }
 
 const isEncoding = (bare: string) => /^(QUOTED-PRINTABLE|BASE64|8BIT|7BIT)$/.test(bare);
@@ -450,7 +482,7 @@ function convertComponent(
         break;
       case "CATEGORIES":
       case "RESOURCES":
-        out.push(`${line.name}:${textOf(line).split(";").map(escape).join(",")}`);
+        out.push(`${line.name}:${partsOf(line).map(escape).join(",")}`);
         break;
       case "DTSTART":
       case "DTEND":
@@ -582,7 +614,7 @@ function personOf(value: string): { name: string | null; address: string | null 
  * relative to the start, so each occurrence of a series has it.
  */
 function alarmOf(line: Line, start: Time | null, due: Time | null, zone: Zone): string[] | null {
-  const [run = "", snooze = "", repeat = "", ...content] = textOf(line).split(";");
+  const [run = "", snooze = "", repeat = "", ...content] = partsOf(line);
   const time = timeOf(run, zone);
   if (!time) return null;
   // Relative to the start, else a task's due time; else at its instant,

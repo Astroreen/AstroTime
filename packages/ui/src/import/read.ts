@@ -101,11 +101,21 @@ export async function readImport(
     let notImported: readonly string[] = [];
     try {
       let text = decoded.text;
-      // vCalendar 1.0: its converter loads for it alone.
-      if (/^VERSION:1\.0[ \t]*$/im.test(text) && /^BEGIN:VCALENDAR/im.test(text)) {
-        const converted = (await import("./vcs.ts")).vcalendarToIcs(text, options);
-        text = converted.text;
-        notImported = converted.notImported;
+      // vCalendar 1.0, a calendar at a time (a file may hold 2.0 ones
+      // beside it): its converter loads for such a calendar alone.
+      const blocks = text.split(/(?=^BEGIN:VCALENDAR)/im);
+      if (blocks.some(isVCalendar)) {
+        const { vcalendarToIcs } = await import("./vcs.ts");
+        const names = new Set<string>();
+        text = blocks
+          .map((block) => {
+            if (!isVCalendar(block)) return block;
+            const converted = vcalendarToIcs(block, options);
+            for (const name of converted.notImported) names.add(name);
+            return converted.text;
+          })
+          .join("");
+        notImported = [...names];
       }
       calendars = splitCalendars(textOf(text), { newUid: options.newUid });
     } catch (error) {
@@ -128,6 +138,13 @@ export async function readImport(
   }
   if (sources.length === 0) throw new NotImportableError(`${file.name} holds no calendar.`);
   return { sources, guessed, unread };
+}
+
+/** Whether a calendar's text is vCalendar 1.0: its `VERSION` before its first component. */
+function isVCalendar(block: string): boolean {
+  if (!/^BEGIN:VCALENDAR/i.test(block)) return false;
+  const head = block.split(/^BEGIN:V(?!CALENDAR)/im)[0]!;
+  return /^VERSION:1\.0[ \t]*$/im.test(head);
 }
 
 /** iCalendar's text, from jCal's JSON (RFC 7265) when it is that. */

@@ -351,4 +351,81 @@ describe("#151's review", () => {
     expect(text.match(/END:VEVENT/g)).toHaveLength(2);
     expect(notImported).toEqual(["VEVENT without END"]);
   });
+
+  test("an escaped ; stays inside its value; a character past the BMP survives quoted-printable", () => {
+    const { text } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VEVENT",
+        "UID:e",
+        "DTSTART:20261105T090000Z",
+        "CATEGORIES:A\\;B;C",
+        "SUMMARY;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:Party \u{1F389}=20tonight",
+        "DALARM:20261105T085000Z;;;Bring\\; chairs",
+        "END:VEVENT",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(text).toContain("CATEGORIES:A\\;B,C\r\n");
+    expect(text).toContain("SUMMARY:Party \u{1F389} tonight\r\n");
+    expect(text).toContain("DESCRIPTION:Bring\\; chairs\r\n");
+  });
+
+  test("a component AstroTime does not read keeps its lines to itself, named once", () => {
+    const { text, notImported } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VJOURNAL",
+        "UID:j",
+        "SUMMARY:A note",
+        "X-FOO:bar",
+        "END:VJOURNAL",
+        "BEGIN:VEVENT",
+        "UID:e",
+        "DTSTART:20261105T090000Z",
+        "END:VEVENT",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(notImported).toEqual(["VJOURNAL"]);
+    expect(text).not.toContain("X-FOO");
+    expect(text.match(/END:VCALENDAR/g)).toHaveLength(1);
+  });
+
+  test("a file of a 2.0 calendar and a 1.0 one: each read by its own rules", async () => {
+    const file = lines(
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "X-WR-CALNAME:Two",
+      "BEGIN:VEVENT",
+      "UID:two",
+      "DTSTAMP:20261101T080000Z",
+      "DTSTART;TZID=Europe/Vilnius:20261105T090000",
+      "SUMMARY:Escaped\\, comma",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "BEGIN:VCALENDAR",
+      "VERSION:1.0",
+      "BEGIN:VEVENT",
+      "UID:one",
+      "DTSTART:20261106T090000Z",
+      "SUMMARY:Old phone",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    );
+    const mixed = await readImport(
+      { name: "mixed.ics", bytes: new TextEncoder().encode(file) },
+      {
+        language: "en",
+        timeZone: "Europe/Vilnius",
+        newUid: () => "x",
+        pause: () => Promise.resolve(),
+      },
+    );
+    const [two, one] = mixed.sources.map((source) => CalendarObject.parse(source.items[0]!.ics));
+    expect(two!.master).toMatchObject({
+      summary: "Escaped, comma",
+      start: expect.objectContaining({ timeZone: "Europe/Vilnius" }),
+    });
+    expect(one!.master?.summary).toBe("Old phone");
+    expect(mixed.sources[0]!.name).toBe("Two");
+  });
 });

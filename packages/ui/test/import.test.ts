@@ -548,7 +548,7 @@ describe("an import written through the store (import D269–D271)", () => {
   });
 
   test("a UID a sync brought in after the check is already there: the answer decides, nothing overwritten unasked", async () => {
-    for (const choice of ["skip", "update"] as const) {
+    for (const choice of ["skip", "update", "copy"] as const) {
       const { store, personal } = await setup();
       const source = await sourceOf(
         calendar("File", event("late", "20261106T090000Z"), event("twin"), event("fresh")),
@@ -574,10 +574,16 @@ describe("an import written through the store (import D269–D271)", () => {
       if (choice === "skip") {
         expect(result).toMatchObject({ events: 1, skipped: 1, identical: 1 });
         expect(late.pending).toBe("none");
-      } else {
+      } else if (choice === "update") {
         expect(result).toMatchObject({ events: 2, updated: 1, identical: 1 });
         expect(late.startMs).toBe(Date.UTC(2026, 10, 6, 9));
         expect(late.ics).toContain("X-SERVER:kept");
+      } else {
+        // The synced one as it came, the file's beside it under a UID of its own.
+        expect(result).toMatchObject({ events: 2, copies: 1, identical: 1 });
+        expect(late.pending).toBe("none");
+        const starts = (await store.pending(personal.id)).map((object) => object.startMs);
+        expect(starts).toContain(Date.UTC(2026, 10, 6, 9));
       }
     }
   });
@@ -603,6 +609,16 @@ describe("an import written through the store (import D269–D271)", () => {
       skipped: 0,
       error: "The disk is full.",
     });
+  });
+
+  test("an account made for a calendar that then could not be made goes with it", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    store.saveCalendar = () => Promise.reject(new Error("The disk is full."));
+    await expect(run(store, [source], destinations, duplicates)).rejects.toThrow("disk");
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
   });
 
   test("a device account the user had stays when the calendar the import made on it goes", async () => {
