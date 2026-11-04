@@ -20,6 +20,7 @@ export function answerChallenge(
   authorization: Authorization,
   response: HttpResponse,
   answered: Scheme,
+  url: string,
 ): boolean {
   if (authorization.scheme !== answered) return true;
   // Through the web proxy, the server's challenge comes under its own name
@@ -37,15 +38,17 @@ export function answerChallenge(
     return true;
   }
   // Digest refused by a server that asks for Basic now and no Digest at all
-  // (set up anew since an earlier sync learned it): Basic once, over https
-  // only. A 401 that still offers Digest, a bare one, or one over plain
-  // http is the password refused: a forged 401 never gets the password in
-  // clear (D260). Basic refused where Digest is asked was taken up above;
+  // (set up anew since an earlier sync learned it): Basic once, when the
+  // request itself (`url`) went over https and the 401 came from its
+  // origin, not from where a redirect went. A 401 that still offers Digest,
+  // a bare one, or one over plain http is the password refused: a forged
+  // 401 never gets the password in clear (D260). Basic refused where Digest is asked was taken up above;
   // the same scheme refused is the password refused, never sent twice.
   if (
     !answeredDigest ||
     found ||
-    !response.url.startsWith("https:") ||
+    !url.startsWith("https:") ||
+    new URL(response.url || url).origin !== new URL(url).origin ||
     !challengesOf(header ?? "").some(({ scheme }) => scheme === "basic")
   )
     return false;

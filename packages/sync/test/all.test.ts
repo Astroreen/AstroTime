@@ -14,11 +14,11 @@ import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
-import { schemesOf } from "../src/all.ts";
 import { CannotMakeCalendarError, makeCalendar } from "../src/calendars.ts";
 import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
 import {
+  connectCalDav,
   hasFiles,
   removeAccount,
   saveAccount,
@@ -843,14 +843,19 @@ test("each account's remembered scheme is its own, kept across syncs, and forgot
   await syncAll(context);
   expect(of(first.id)[2]).not.toBe(of(first.id)[0]);
   expect(of(first.id)[2]).not.toHaveProperty("scheme");
-  expect(schemesOf(store).get(first.id)).toBe(of(first.id)[2]);
-  // Removed: the next sync keeps nothing of it; the other account's stays.
-  expect(schemesOf(store).has(second.id)).toBe(true);
+  // Not synced (its sync turned off, as a removed account is not): forgotten,
+  // so when it syncs again its slot is a new one; the other's stays.
+  await store.updateAccount(second.id, { syncOff: true });
+  await syncAll(context);
+  await store.updateAccount(second.id, { syncOff: false });
+  await syncAll(context);
+  expect(of(second.id).at(-1)).not.toBe(of(second.id)[0]);
+  expect(of(second.id).at(-1)).toEqual({ by: expect.any(String) });
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
+  // Removed: the same, the other account's slot kept.
   await removeAccount({ ...context, revokeWaitMs: 0 }, second.id);
   await syncAll(context);
-  expect(schemesOf(store).has(second.id)).toBe(false);
-  expect([...schemesOf(store).keys()]).toEqual([first.id]);
-  expect(of(first.id)[3]).toBe(of(first.id)[2]);
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
 });
 
 describe("a calendar made on an account's server (providers D275)", () => {
@@ -969,4 +974,46 @@ describe("a calendar made on an account's server (providers D275)", () => {
     expect(asked.map((calendar) => calendar.name)).toEqual(["Plans 2027"]);
     expect(made.name).toBe("Plans 2027");
   });
+});
+
+test("connectCalDav hands each account's slot to its provider, which fills it once the server took a scheme (providers D260)", async () => {
+  const { store, secrets } = await setup();
+  const sent: (string | null)[] = [];
+  // A plain-http server elsewhere, Basic only: its first answer teaches the scheme.
+  const http: HttpClient = async (request) => {
+    const header = request.headers["Authorization"] ?? null;
+    sent.push(header?.split(" ")[0] ?? null);
+    const ok = header === `Basic ${btoa("astro:right")}`;
+    return {
+      status: ok ? 207 : 401,
+      url: request.url,
+      header: (name) =>
+        name.toLowerCase() === "www-authenticate" && !ok ? 'Basic realm="r"' : null,
+      body: ok ? '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>' : "",
+    };
+  };
+  const real = connectCalDav(http);
+  const slots: (object | undefined)[] = [];
+  const context = {
+    store,
+    secrets,
+    connect: ((account, credentials, remembered) => {
+      slots.push(remembered);
+      return real(account, credentials, remembered);
+    }) satisfies Connect,
+  };
+  await saveAccount(context, {
+    name: "astro@dav.example",
+    serverUrl: "http://dav.example/",
+    homeUrl: "http://dav.example/calendars/astro/",
+    credentials: { username: "astro", password: "right" },
+  });
+  await syncAll(context);
+  expect(sent).toEqual([null, "Basic"]);
+  expect(slots[0]).toMatchObject({ scheme: "basic", origin: "http://dav.example" });
+  // The next sync answers at once: no request without credentials first.
+  sent.length = 0;
+  await syncAll(context);
+  expect(slots[1]).toBe(slots[0]);
+  expect(sent).toEqual(["Basic"]);
 });

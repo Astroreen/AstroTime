@@ -70,7 +70,7 @@ export function connectCalDav(http: HttpClient): Connect {
   return async (account, credentials, remembered) => {
     const home =
       account.homeUrl ??
-      (await CalDavProvider.discover(http, account.serverUrl, credentials)).homeUrl;
+      (await CalDavProvider.discover(http, account.serverUrl, credentials, remembered)).homeUrl;
     return new CalDavProvider(http, credentials, home, remembered);
   };
 }
@@ -152,10 +152,6 @@ const RETRY_AFTER_MAX_MS = 6 * 3_600_000;
 
 /** The sync running on each store, and the one waiting to start after it. */
 const runs = new WeakMap<Store, Runs>();
-
-/** @internal What the store's syncs remember of each account's scheme (tests). */
-export const schemesOf = (store: Store): ReadonlyMap<string, RememberedScheme> =>
-  runsOf(store).schemes;
 
 function runsOf(store: Store): Runs {
   let found = runs.get(store);

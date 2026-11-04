@@ -140,8 +140,9 @@ export class CalDavProvider implements Provider {
     http: HttpClient,
     serverUrl: string,
     credentials: Credentials | TokenSource,
+    remembered?: RememberedScheme,
   ): Promise<Discovery> {
-    const authorization = new Authorization(credentials);
+    const authorization = new Authorization(credentials, remembered);
     const candidates = [new URL("/.well-known/caldav", serverUrl).href, serverUrl];
     let lastError: unknown;
     for (const candidate of candidates) {
@@ -506,7 +507,10 @@ export async function send(
     return { response, answered, sent: header };
   };
   let { response, answered, sent } = await signed();
-  if (response.status === 401 && (await authorization.challenged(response, answered, sent))) {
+  if (
+    response.status === 401 &&
+    (await authorization.challenged(response, answered, sent, request.url))
+  ) {
     ({ response, answered } = await signed());
     await authorization.learned(request.url, response, answered);
   }

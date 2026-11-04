@@ -576,3 +576,43 @@ test("a bearer is never remembered: a renewed token leaves the slot empty, and a
   expect(sent).toEqual([`Basic ${btoa("astro:secret")}`]);
   expect(renewed).toBe(1);
 });
+
+test("a Digest-less 401 from where a redirect went, for a request over plain http, sends no Basic", async () => {
+  const digest = digestServer();
+  const schemes: RememberedScheme = {};
+  await send(
+    fetchClient({ fetch: digest.fetch }),
+    new Authorization(astro, schemes),
+    propfind("http://dav.example/"),
+    [],
+  );
+  expect(schemes).toMatchObject({ origin: "http://dav.example", scheme: { nonce: "n1" } });
+  const sent: (string | null)[] = [];
+  // Asked over http, answered after a redirect from an https address elsewhere: Basic asked, no Digest.
+  const redirected: HttpClient = async (asked) => {
+    sent.push(asked.headers["Authorization"]?.split(" ")[0] ?? null);
+    return {
+      status: 401,
+      url: "https://elsewhere.example/dav/",
+      header: (name) => (name.toLowerCase() === "www-authenticate" ? 'Basic realm="r"' : null),
+      body: "",
+    };
+  };
+  await expect(
+    send(redirected, new Authorization(astro, schemes), propfind("http://dav.example/"), []),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(sent).toEqual(["Digest"]);
+  // Over https too: a 401 from another origin is not this server's word.
+  const secure: RememberedScheme = {};
+  await send(
+    fetchClient({ fetch: digest.fetch }),
+    new Authorization(astro, secure),
+    propfind("https://dav.example/"),
+    [],
+  );
+  sent.length = 0;
+  await expect(
+    send(redirected, new Authorization(astro, secure), propfind("https://dav.example/"), []),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(sent).toEqual(["Digest"]);
+});

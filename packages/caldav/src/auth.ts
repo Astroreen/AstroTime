@@ -146,12 +146,13 @@ export class Authorization {
   async challenged(
     response: HttpResponse,
     answered: Scheme,
-    header: string | null = null,
+    header: string | null,
+    url: string,
   ): Promise<boolean> {
     // A refused token is renewed once, unless another request renewed it
     // already; a refused renewal throws AuthError.
     if (answered === "bearer") return (await bearer()).renewBearer(this.tokens!, header);
-    return (await digest()).answerChallenge(this, response, answered);
+    return (await digest()).answerChallenge(this, response, answered, url);
   }
 
   /**
