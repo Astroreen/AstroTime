@@ -38,7 +38,7 @@ export interface Multistatus {
 }
 
 /** XML's five predefined entities (XML 1.0 §4.6). */
-const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+const PREDEFINED = new Map(Object.entries({ lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" }));
 
 /**
  * A value's references read as the characters they spell, in one pass so
@@ -50,7 +50,7 @@ const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '
  */
 function decodeReferences(value: string): string {
   return value.replaceAll(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, dec, name) => {
-    if (name !== undefined) return PREDEFINED[name] ?? reference;
+    if (name !== undefined) return PREDEFINED.get(name) ?? reference;
     const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16);
     return code <= 0x10ffff ? String.fromCodePoint(code) : reference;
   });

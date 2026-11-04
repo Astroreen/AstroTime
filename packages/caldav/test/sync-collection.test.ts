@@ -263,12 +263,12 @@ describe("references in a multistatus are read once, whatever value they are in"
     ]);
   });
 
-  test("a displayname: references read once; a name XML does not define (`&nbsp;`) stays as written", async () => {
+  test("a displayname: references read once; a name XML does not define (`&nbsp;`, `&constructor;`) stays as written", async () => {
     const http: HttpClient = async (request) => ({
       status: 207,
       url: request.url,
       header: () => null,
-      body: `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>/cal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Caf&#xE9; &#233; &amp;#13; &amp;lt; &lt;&amp;&gt; &nbsp;&eacute;</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
+      body: `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>/cal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Caf&#xE9; &#233; &amp;#13; &amp;lt; &lt;&amp;&gt; &nbsp;&eacute;&constructor;</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
     });
     const provider = new CalDavProvider(
       http,
@@ -278,6 +278,6 @@ describe("references in a multistatus are read once, whatever value they are in"
     const [calendar] = await provider.calendars();
     // HTML's names are undeclared in XML (1.0 §4.1), so no well-formed
     // document holds them; one that does keeps them as it spelt them.
-    expect(calendar?.name).toBe("Café é &#13; &lt; <&> &nbsp;&eacute;");
+    expect(calendar?.name).toBe("Café é &#13; &lt; <&> &nbsp;&eacute;&constructor;");
   });
 });
