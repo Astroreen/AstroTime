@@ -165,16 +165,27 @@ marked _to be recorded_.
   `PROPFIND` answers, where a unit test needs one, are recorded from the
   interop run's container the same way (as Radicale's and Nextcloud's
   are now, `packages/caldav/test/fixtures/README.md`).
-  _Built:_ `packages/caldav/test/recording.ts` (the recorder, the
-  redaction, word by word so a short name inside another word stays, and
-  the strict replay), `scenario.ts` (discovery, a calendar of the
-  recording's own, an event and a task made, found by a sync, changed and
-  deleted), `scripts/record-caldav-service.ts` and `services.test.ts`,
-  first proven on the interop run's Baïkal (Digest), Xandikos and DAViCal
-  (`fixtures/services/`). Recording Xandikos found AstroTime's own
-  scenario writing a `SUMMARY` with an unescaped comma, which Xandikos
-  serves back escaped (RFC 5545 §3.3.11 asks for `\,`): the scenario's
-  text has none now.
+  _Built:_ `packages/caldav/test/recording.ts`: the recorder (each
+  request's `Authorization` kept as its scheme alone, its values in
+  memory only), the stand-ins put in word by word, and **the guard**
+  (`leaks`), which looks at the file to be written on its own, whatever
+  the stand-ins did, for every spelling of the account's values as a raw
+  substring in any case: the user name and e-mail, the password, each
+  URL-encoded, JSON- and XML-escaped, the e-mail's local part and its
+  domain (unless a public mail domain), Basic's base64 of them, and every
+  Digest `response` and `cnonce` sent; any of them found, nothing is
+  written. Only a local test server's fixed user name (the interop run's
+  `astro`) may be declared public. The strict replay answers in order,
+  checks each request's scheme, and recomputes a Digest answer against
+  the challenge whose nonce it names, so a replay proves Digest too.
+  `scenario.ts` makes a calendar named for the run (`astrotime-recording-`,
+  a time and a random part), removes what an earlier run left under that
+  prefix first, and tries its cleanup twice. `scripts/record-caldav-service.ts`
+  and `services.test.ts` complete it, first proven on the interop run's
+  Baïkal (Digest), Xandikos and DAViCal (`fixtures/services/`). Recording
+  Xandikos found AstroTime's own scenario writing a `SUMMARY` with an
+  unescaped comma, which Xandikos serves back escaped (RFC 5545 §3.3.11
+  asks for `\,`): the scenario's text has none now.
 
 ### Known services and subscriptions
 

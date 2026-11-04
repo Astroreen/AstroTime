@@ -3,12 +3,14 @@
   "recorded": "2026-11-04",
   "origin": "http://127.0.0.1:5603",
   "server": "http://127.0.0.1:5603/",
+  "calendar": "astrotime-recording-mw1ffjc4-7d78f73b",
   "exchanges": [
     {
       "request": {
         "method": "PROPFIND",
         "path": "/.well-known/caldav",
         "depth": "0",
+        "scheme": "Basic",
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"
       },
       "response": {
@@ -25,6 +27,7 @@
         "method": "PROPFIND",
         "path": "/user/",
         "depth": "0",
+        "scheme": "Basic",
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><c:calendar-home-set/></d:prop></d:propfind>"
       },
       "response": {
@@ -41,6 +44,7 @@
         "method": "PROPFIND",
         "path": "/user/calendars/",
         "depth": "1",
+        "scheme": "Basic",
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:resourcetype/><d:displayname/><ic:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><nc:deleted-at/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
       },
       "response": {
@@ -55,13 +59,14 @@
     {
       "request": {
         "method": "MKCALENDAR",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": null,
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
+        "scheme": "Basic",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1ffjc4-7d78f73b</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
       },
       "response": {
         "status": 201,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\""
         },
@@ -71,13 +76,14 @@
     {
       "request": {
         "method": "PUT",
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "depth": null,
+        "scheme": "Basic",
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 201,
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "headers": {
           "content-type": "application/octet-stream",
           "etag": "\"f853660fefbbfbf325299e38252fbe1e6e4f91eb\""
@@ -88,13 +94,14 @@
     {
       "request": {
         "method": "PUT",
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-task.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-task.ics",
         "depth": null,
+        "scheme": "Basic",
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nUID:astrotime-recording-vtodo\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 201,
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-task.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-task.ics",
         "headers": {
           "content-type": "application/octet-stream",
           "etag": "\"4c98699c4d3fb3e55c8eb05e6e1d4fca2f26dc66\""
@@ -105,45 +112,48 @@
     {
       "request": {
         "method": "PROPFIND",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": "1",
+        "scheme": "Basic",
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><d:resourcetype/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
       },
       "response": {
         "status": 207,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\""
         },
-        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\" xmlns:ns2=\"http://calendarserver.org/ns/\"><ns0:response><ns0:href>/user/calendars/astrotime-recording/</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"e7851126269e6c5c29047b3c57c0b52c6b72815d\"</ns0:getetag><ns0:resourcetype><ns0:collection /><ns1:calendar /></ns0:resourcetype><ns0:sync-token>e7851126269e6c5c29047b3c57c0b52c6b72815d</ns0:sync-token><ns2:getctag>e7851126269e6c5c29047b3c57c0b52c6b72815d</ns2:getctag></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"f853660fefbbfbf325299e38252fbe1e6e4f91eb\"</ns0:getetag><ns0:resourcetype /></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns0:sync-token /><ns2:getctag /></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-task.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"4c98699c4d3fb3e55c8eb05e6e1d4fca2f26dc66\"</ns0:getetag><ns0:resourcetype /></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns0:sync-token /><ns2:getctag /></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
+        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\" xmlns:ns2=\"http://calendarserver.org/ns/\"><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"de4f3c0dd9851de6695ab0ee132de8e3bb7c747b\"</ns0:getetag><ns0:resourcetype><ns0:collection /><ns1:calendar /></ns0:resourcetype><ns0:sync-token>de4f3c0dd9851de6695ab0ee132de8e3bb7c747b</ns0:sync-token><ns2:getctag>de4f3c0dd9851de6695ab0ee132de8e3bb7c747b</ns2:getctag></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"f853660fefbbfbf325299e38252fbe1e6e4f91eb\"</ns0:getetag><ns0:resourcetype /></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns0:sync-token /><ns2:getctag /></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-task.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"4c98699c4d3fb3e55c8eb05e6e1d4fca2f26dc66\"</ns0:getetag><ns0:resourcetype /></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns0:sync-token /><ns2:getctag /></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
       }
     },
     {
       "request": {
         "method": "REPORT",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": "1",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</d:href><d:href>/user/calendars/astrotime-recording/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
+        "scheme": "Basic",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</d:href><d:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
       },
       "response": {
         "status": 207,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\""
         },
-        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"f853660fefbbfbf325299e38252fbe1e6e4f91eb\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nSUMMARY:Recorded event\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nDTSTAMP:20261104T080000Z\r\nUID:astrotime-recording-vevent\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-task.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"4c98699c4d3fb3e55c8eb05e6e1d4fca2f26dc66\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nUID:astrotime-recording-vtodo\r\nEND:VTODO\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
+        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"f853660fefbbfbf325299e38252fbe1e6e4f91eb\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nSUMMARY:Recorded event\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nDTSTAMP:20261104T080000Z\r\nUID:astrotime-recording-vevent\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-task.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"4c98699c4d3fb3e55c8eb05e6e1d4fca2f26dc66\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nUID:astrotime-recording-vtodo\r\nEND:VTODO\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
       }
     },
     {
       "request": {
         "method": "PUT",
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "depth": null,
+        "scheme": "Basic",
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event changed\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 204,
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "headers": {
           "etag": "\"6d929a089e85811c584b66026e7f160c8fba7cae\""
         },
@@ -153,45 +163,48 @@
     {
       "request": {
         "method": "REPORT",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": "1",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:sync-token>e7851126269e6c5c29047b3c57c0b52c6b72815d</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"
+        "scheme": "Basic",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:sync-token>de4f3c0dd9851de6695ab0ee132de8e3bb7c747b</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"
       },
       "response": {
         "status": 207,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\""
         },
-        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"6d929a089e85811c584b66026e7f160c8fba7cae\"</ns0:getetag></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns1:calendar-data /></ns0:prop></ns0:propstat></ns0:response><ns0:sync-token>89805810f05162ff21bb498e90d7b027c3fde654</ns0:sync-token></ns0:multistatus>"
+        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"6d929a089e85811c584b66026e7f160c8fba7cae\"</ns0:getetag></ns0:prop></ns0:propstat><ns0:propstat><ns0:status>HTTP/1.1 404 Not Found</ns0:status><ns0:prop><ns1:calendar-data /></ns0:prop></ns0:propstat></ns0:response><ns0:sync-token>4dcf8b6640b20c79f4178b9ed9381ab4cce1e488</ns0:sync-token></ns0:multistatus>"
       }
     },
     {
       "request": {
         "method": "REPORT",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": "1",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</d:href></c:calendar-multiget>"
+        "scheme": "Basic",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</d:href></c:calendar-multiget>"
       },
       "response": {
         "status": 207,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\""
         },
-        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"6d929a089e85811c584b66026e7f160c8fba7cae\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nSUMMARY:Recorded event changed\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nDTSTAMP:20261104T080000Z\r\nUID:astrotime-recording-vevent\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
+        "body": "<ns0:multistatus xmlns:ns0=\"DAV:\" xmlns:ns1=\"urn:ietf:params:xml:ns:caldav\"><ns0:response><ns0:href>/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics</ns0:href><ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop><ns0:getetag>\"6d929a089e85811c584b66026e7f160c8fba7cae\"</ns0:getetag><ns1:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nSUMMARY:Recorded event changed\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nDTSTAMP:20261104T080000Z\r\nUID:astrotime-recording-vevent\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</ns1:calendar-data></ns0:prop></ns0:propstat></ns0:response></ns0:multistatus>"
       }
     },
     {
       "request": {
         "method": "DELETE",
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "depth": null,
+        "scheme": "Basic",
         "body": null
       },
       "response": {
         "status": 204,
-        "path": "/user/calendars/astrotime-recording/astrotime-recording-event.ics",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/astrotime-recording-event.ics",
         "headers": {},
         "body": ""
       }
@@ -199,13 +212,14 @@
     {
       "request": {
         "method": "DELETE",
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "depth": null,
+        "scheme": "Basic",
         "body": null
       },
       "response": {
         "status": 204,
-        "path": "/user/calendars/astrotime-recording/",
+        "path": "/user/calendars/astrotime-recording-mw1ffjc4-7d78f73b/",
         "headers": {},
         "body": ""
       }

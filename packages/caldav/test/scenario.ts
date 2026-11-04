@@ -1,7 +1,8 @@
 // What a recording records (docs/plans/providers.md#D249): one account's
 // discovery, its calendars, and a calendar of the recording's own with an
 // event (and a task, where the service keeps them) made, found by a sync,
-// changed, deleted, and the calendar removed. The same steps run against
+// changed, deleted, and the calendar removed; its name is the run's own,
+// and calendars an earlier run left are removed first. The same steps run against
 // the service by scripts/record-caldav-service.ts and against the recording
 // by services.test.ts; every value in them is fixed, so the requests are
 // the same each time.
@@ -13,7 +14,12 @@ import {
   type HttpClient,
 } from "../src/index.ts";
 
-const CALENDAR = "astrotime-recording";
+/** What the recordings' calendars are named from: a run's own name follows it. */
+const PREFIX = "astrotime-recording-";
+
+/** A calendar name for a new recording, unique to the run. */
+export const calendarName = () =>
+  `${PREFIX}${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 
 const object = (component: "VEVENT" | "VTODO", summary: string) =>
   [
@@ -47,13 +53,30 @@ export async function scenario(
   http: HttpClient,
   server: string,
   credentials: Credentials,
-  options: { readonly tasks: boolean },
+  options: { readonly tasks: boolean; readonly calendar: string },
 ): Promise<ScenarioResult> {
   const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
   const provider = new CalDavProvider(http, credentials, homeUrl);
-  const calendars = (await provider.calendars()).map((calendar) => calendar.components);
+  const listed = await provider.calendars();
   const authorization = new Authorization(credentials);
-  const calendarUrl = new URL(`${CALENDAR}/`, homeUrl).href;
+  // Twice at most: a cleanup the server answered with a failure is tried again.
+  const remove = async (url: string) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await send(http, authorization, { method: "DELETE", url, headers: {} }, [404]);
+        return;
+      } catch (error) {
+        if (attempt === 1) throw error;
+      }
+    }
+  };
+  // What an earlier run left, whose cleanup failed for good, goes first.
+  for (const leftover of listed.filter((calendar) => calendar.name.startsWith(PREFIX)))
+    await remove(leftover.url);
+  const calendars = listed
+    .filter((calendar) => !calendar.name.startsWith(PREFIX))
+    .map((calendar) => calendar.components);
+  const calendarUrl = new URL(`${options.calendar}/`, homeUrl).href;
   const components = options.tasks ? ["VEVENT", "VTODO"] : ["VEVENT"];
   await send(
     http,
@@ -62,7 +85,7 @@ export async function scenario(
       method: "MKCALENDAR",
       url: calendarUrl,
       headers: { "Content-Type": "application/xml; charset=utf-8" },
-      body: `<?xml version="1.0" encoding="utf-8"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:set><d:prop><d:displayname>${CALENDAR}</d:displayname><c:supported-calendar-component-set>${components.map((c) => `<c:comp name="${c}"/>`).join("")}</c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>`,
+      body: `<?xml version="1.0" encoding="utf-8"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:set><d:prop><d:displayname>${options.calendar}</d:displayname><c:supported-calendar-component-set>${components.map((c) => `<c:comp name="${c}"/>`).join("")}</c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>`,
     },
     [],
   );
@@ -83,6 +106,6 @@ export async function scenario(
     const removed = (await provider.remove(event, current)).ok;
     return { calendars, found, changed, removed };
   } finally {
-    await send(http, authorization, { method: "DELETE", url: calendarUrl, headers: {} }, [404]);
+    await remove(calendarUrl);
   }
 }
