@@ -81,12 +81,26 @@ function dayOfRule(year: number, month: number, byDay: string): number {
   return lastDate.getUTCDate() - ((lastDate.getUTCDay() - weekday + 7) % 7);
 }
 
+/**
+ * What `changesWithin` found, by its arguments: each item written in a zone
+ * asks again, and the answer is about 1,000 `Intl` calls. Bounded as
+ * `wallClocks` in `time.ts` is.
+ */
+const changes = new Map<string, boolean>();
+const CHANGES = 1000;
+
 /** Whether the zone's offset is ever other than `offset` from the year `from` to the year `to`, sampled weekly. */
 function changesWithin(timeZone: string, from: number, to: number, offset: number): boolean {
-  for (let at = Date.UTC(from, 0, 1); at < Date.UTC(to, 0, 1); at += 7 * DAY_MS) {
-    if (offsetAt(at, timeZone) !== offset) return true;
+  const key = `${timeZone} ${from} ${to} ${offset}`;
+  const known = changes.get(key);
+  if (known !== undefined) return known;
+  let result = false;
+  for (let at = Date.UTC(from, 0, 1); at < Date.UTC(to, 0, 1) && !result; at += 7 * DAY_MS) {
+    result = offsetAt(at, timeZone) !== offset;
   }
-  return false;
+  if (changes.size >= CHANGES) changes.delete(changes.keys().next().value!);
+  changes.set(key, result);
+  return result;
 }
 
 /** How many years after the first a yearly rule is checked for, and the onsets listed for a zone without one. */
