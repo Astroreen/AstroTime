@@ -93,7 +93,10 @@ export class Authorization {
   private readonly tokens: TokenSource | null;
   readonly remembered: RememberedScheme | undefined;
 
-  /** A password's credentials, or a source of OAuth tokens (D254); `remembered`, what earlier syncs learned. */
+  /**
+   * A password's credentials, or a source of OAuth tokens (D254);
+   * `remembered`, what earlier syncs learned.
+   */
   constructor(credentials: Credentials | TokenSource, remembered?: RememberedScheme) {
     this.remembered = remembered;
     if ("token" in credentials) {
@@ -116,9 +119,11 @@ export class Authorization {
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
   ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
-    // A password's scheme only: never a bearer, whose token this account has not.
+    // A password's account recalls a password's scheme only: never a bearer,
+    // whose token it has not, and an OAuth account none (it signs with its token).
     if (
       this.scheme === null &&
+      this.credentials &&
       this.remembered?.origin === new URL(request.url).origin &&
       this.remembered.scheme !== "bearer"
     )

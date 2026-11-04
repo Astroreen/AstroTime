@@ -616,3 +616,26 @@ test("a Digest-less 401 from where a redirect went, for a request over plain htt
   ).rejects.toBeInstanceOf(AuthError);
   expect(sent).toEqual(["Digest"]);
 });
+
+test("an OAuth account given a slot a password filled signs with its token, recalling nothing", async () => {
+  const server = basicServer();
+  const slot: RememberedScheme = {};
+  await send(server.http, new Authorization(astro, slot), propfind("https://basic.example/"), []);
+  // Basic over https goes at once and is not learned; one a 401 taught is.
+  slot.scheme = "basic";
+  slot.origin = "https://basic.example";
+  const sent: (string | null)[] = [];
+  const bearerServer: HttpClient = async (asked) => {
+    sent.push(asked.headers["Authorization"] ?? null);
+    return { status: 207, url: asked.url, header: () => null, body: "" };
+  };
+  const tokens = { token: async () => "t", renew: async () => false };
+  const answer = await send(
+    bearerServer,
+    new Authorization(tokens, slot),
+    propfind("https://basic.example/"),
+    [],
+  );
+  expect(answer.status).toBe(207);
+  expect(sent).toEqual(["Bearer t"]);
+});

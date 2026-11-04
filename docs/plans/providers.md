@@ -712,11 +712,9 @@ marked _to be recorded_.
   account: it is how the server answers, not the user's data, and a
   stored one would be a migration and the store's code on the first load
   to save one request a start. **Never a downgrade:** a Digest refused
-  is sent again in Basic only over https and only when the 401 asks for
-  Basic and no Digest at all (a server set up anew since); one that
-  still offers Digest, a bare 401, or one over plain http, is the
-  password refused, so a forged 401 never gets the password
-  in clear. The same scheme refused is the password refused, never sent
+  goes to Basic only as [D264](#D264) allows; otherwise it is the
+  password refused, so a forged 401 never gets the password in clear.
+  The same scheme refused is the password refused, never sent
   twice (a brute-force guard's count is the user's, not ours). What is
   kept, and that rule, load with Digest (`digest.ts`, `taken` and
   `answerChallenge`), so the first load grows by 138 bytes (127 520 to 127 658 on main
@@ -851,6 +849,21 @@ marked _to be recorded_.
   ([D39](foundation.md#D39)). The first load grows by 649 bytes (126 501 to 127 150 on
   main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
   KiB, and #144's 4.6).
+
+- **D264. Basic after a refused Digest, once, only as a server set up
+  anew asks.** A server that took Digest before (a scheme remembered,
+  [D260](#D260)) and now answers a Digest with a 401 asking for Basic and
+  no Digest at all (its administrator switched it, or a proxy now in
+  front of it asks) is sent the request again in Basic, once, when the
+  request itself went over https and the 401 came from the origin it was
+  sent to, not from where a redirect went. Anything else is the password
+  refused, as before remembering: a 401 that still offers Digest (a wrong
+  password), a bare 401, one over plain http, or one from elsewhere, so a
+  forged 401 never draws the password in clear, and a refused password
+  is never sent twice. Without it, a server switched to Basic would sign
+  the account out until the app restarts. The owner left this call to
+  the orchestrator in round 5, who made it (`digest.ts`,
+  `answerChallenge`).
 
 - **D275. Making a calendar or task list on an account's server.** A
   provider may make one (`Provider.makeCalendar`, with a `NewCalendar`:

@@ -123,8 +123,8 @@ interface Runs {
   readonly holds: Map<string, Hold>;
   /**
    * The scheme each account's server took, for the app's run (providers
-   * D260), by id, with the address and user it was learned for (`by`): one
-   * edited or removed is forgotten.
+   * D260), by id, with the account's kind, address and user it was
+   * learned for (`by`): one edited or removed is forgotten.
    */
   readonly schemes: Map<string, RememberedScheme & { readonly by?: string }>;
 }
@@ -285,7 +285,8 @@ async function syncOne(
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
     if (held && !retry && (held.refused === secret || now() < held.until))
       return { sync: held.last, held: true };
-    const by = `${account.serverUrl} ${account.username}`;
+    // The account's kind too: a password's scheme is no OAuth account's (D260).
+    const by = `${account.provider} ${account.serverUrl} ${account.username}`;
     let remembered = schemes.get(accountId);
     if (remembered?.by !== by) schemes.set(accountId, (remembered = { by }));
     const provider = subscription ?? (await context.connect(account, credentials!, remembered));
