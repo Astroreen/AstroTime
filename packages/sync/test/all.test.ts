@@ -700,6 +700,24 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     await syncAll(context);
     expect(tries()).toBe(2);
   });
+
+  test("a hold whose time has gone by, and a timeout after it, name no retryAt in the past", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    const busy = await syncAll(context);
+    expect(busy.retryAt).toBeGreaterThan(context.now());
+    // The hold ends; the next try finds the server silent.
+    pass(2 * 60_000);
+    answer(async () => {
+      throw new OfflineError("no answer in time");
+    });
+    const silent = await syncAll(context);
+    expect(tries()).toBe(2);
+    // No hold left to wait for: the scheduler is not woken for a time gone by.
+    expect([silent.held, silent.retryAt]).toEqual([[], null]);
+  });
 });
 
 describe("an account's files (foundation D231)", () => {

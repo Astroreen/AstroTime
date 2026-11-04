@@ -213,7 +213,9 @@ async function everyAccount(
     accounts.push(result.sync);
   }
   for (const id of state.holds.keys()) if (!known.has(id)) state.holds.delete(id);
-  const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
+  // A hold whose time has gone by (kept for its count by a timeout after it) holds nothing.
+  const end = now();
+  const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > end);
   return {
     accounts,
     finishedAt: now(),
