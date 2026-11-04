@@ -77,6 +77,7 @@ export async function scenario(
     .filter((calendar) => !calendar.name.startsWith(PREFIX))
     .map((calendar) => calendar.components);
   const calendarUrl = new URL(`${options.calendar}/`, homeUrl).href;
+  let result: ScenarioResult;
   const components = options.tasks ? ["VEVENT", "VTODO"] : ["VEVENT"];
   await send(
     http,
@@ -104,8 +105,17 @@ export async function scenario(
     const changed = second.changed.map((o) => summary(o.ics)).toSorted();
     const current = second.changed.find((o) => o.href === event)?.etag ?? null;
     const removed = (await provider.remove(event, current)).ok;
-    return { calendars, found, changed, removed };
-  } finally {
-    await remove(calendarUrl);
+    result = { calendars, found, changed, removed };
+  } catch (error) {
+    // The scenario's own failure is what to see: a cleanup that fails too
+    // says so beside it, never in its place.
+    await remove(calendarUrl).catch((cleanup: unknown) => {
+      throw new AggregateError([error, cleanup], "The scenario failed, and so did its cleanup.", {
+        cause: error,
+      });
+    });
+    throw error;
   }
+  await remove(calendarUrl);
+  return result;
 }

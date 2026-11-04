@@ -8,7 +8,16 @@ import { readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "vite-plus/test";
 
 import { digestHeader } from "../src/digest.ts";
-import { leaks, redacted, replay, type Account, type Recording } from "./recording.ts";
+import { HttpError, type HttpRequest, type HttpResponse } from "../src/index.ts";
+import {
+  digestParam,
+  leaks,
+  redacted,
+  replay,
+  standInsFor,
+  type Account,
+  type Recording,
+} from "./recording.ts";
 import { scenario } from "./scenario.ts";
 
 const folder = new URL("./fixtures/services/", import.meta.url);
@@ -41,18 +50,21 @@ test("Baïkal's recording is answered with Digest, each answer checked against i
   expect(baikal.exchanges.filter((e) => e.request.scheme === "Digest").length).toBeGreaterThan(5);
 });
 
-const one = (body: string, scheme: "Basic" | "Digest" | null = null): Recording => ({
+const one = (
+  body: string,
+  scheme: "Basic" | "Digest" | null = null,
+  origin = "https://dav.example",
+): Recording => ({
   service: "example",
   recorded: "2026-11-04",
-  origin: "https://dav.example",
   server: "https://dav.example/",
   calendar: "astrotime-recording-x",
   exchanges: [
     {
-      request: { method: "GET", path: "/a", depth: null, scheme, body: null },
+      request: { origin, method: "GET", path: "/a", depth: null, scheme, headers: {}, body: null },
       response: {
         status: 200,
-        path: "/a",
+        url: `${origin}/a`,
         headers: { "www-authenticate": 'Digest realm="r", nonce="n", qop="auth"' },
         body,
       },
@@ -166,4 +178,114 @@ test("a recording is written only once nothing of the account is left in it", ()
     "AstroTime astro",
   );
   expect(() => redacted(one("the secret"), new Map(), local)).toThrow(/not written/);
+});
+
+test("a replay keeps each request's server and the headers that change what it does", async () => {
+  // iCloud answers a home on another of its servers: each request on its own.
+  const twoServers: Recording = {
+    ...one("first"),
+    exchanges: [
+      ...one("first").exchanges,
+      ...one("second", null, "https://p42-dav.example").exchanges,
+    ],
+  };
+  const http = replay(twoServers, credentials);
+  expect((await http({ method: "GET", url: "https://dav.example/a", headers: {} })).body).toBe(
+    "first",
+  );
+  await expect(http({ method: "GET", url: "https://dav.example/a", headers: {} })).rejects.toThrow(
+    /not the recording's/,
+  );
+  // An If-Match, Content-Type or Prefer the recording did not send is another request.
+  for (const header of ["If-Match", "If-None-Match", "Content-Type", "Prefer"]) {
+    const strict = replay(one("x"), credentials);
+    await expect(
+      strict({ method: "GET", url: "https://dav.example/a", headers: { [header]: "*" } }),
+    ).rejects.toThrow(/not the recording's/);
+  }
+});
+
+test("a Digest parameter is read whole: `nonce` is never `cnonce`'s, a quoted comma stays", () => {
+  const answer = 'Digest username="u", realm="a, b", cnonce="CN", nonce="N", nc=00000001';
+  expect(digestParam(answer, "nonce")).toBe("N");
+  expect(digestParam(answer, "cnonce")).toBe("CN");
+  expect(digestParam(answer, "realm")).toBe("a, b");
+  expect(digestParam(answer, "opaque")).toBeNull();
+});
+
+test("values are put out as they are, quotes, backslashes, line breaks and non-ASCII, never a key", () => {
+  const tricky = 'id"with\\back\nline';
+  const recording = one(`owner ${tricky} and Пользователь-Иванов`);
+  const standIns = new Map([
+    [tricky, "account-1"],
+    ["Пользователь-Иванов", "user"],
+  ]);
+  const local: Account = {
+    username: "nobody-here",
+    password: "pw-not-in-file",
+    extra: [tricky, "Пользователь-Иванов"],
+    sent: [],
+  };
+  const result = redacted(recording, standIns, local);
+  expect(result.exchanges[0]!.response.body).toBe("owner account-1 and user");
+  // The keys are the file's own: a value named like one does not touch them.
+  expect(Object.keys(result.exchanges[0]!.response)).toEqual(["status", "url", "headers", "body"]);
+  expect(
+    redacted(one("body"), new Map([["body", "stand-in"]]), { ...local, extra: [] }).exchanges[0]!
+      .response.body,
+  ).toBe("stand-in");
+});
+
+test("ids are found in every address a recording holds: hrefs of owners and shares, other users' e-mails", () => {
+  const exchanges = one(
+    "<d:multistatus><d:response><d:href>/123456789/calendars/home/</d:href>" +
+      "<cs:calendar-owner><d:href>/principals/jane.doe/</d:href></cs:calendar-owner>" +
+      "<c:calendar-user-address-set><d:href>mailto:Jane.Doe@corp-example.org</d:href>" +
+      "<d:href>mailto:colleague@corp-example.org</d:href></c:calendar-user-address-set>" +
+      "<d:href>/shared/0f1e2d3c-4b5a-6978-8091-a2b3c4d5e6f7/</d:href></d:response></d:multistatus>",
+  ).exchanges;
+  const standIns = standInsFor(exchanges, { username: "jane.doe@corp-example.org", extra: [] });
+  expect(standIns.get("123456789")).toMatch(/^account-/);
+  expect(standIns.get("jane.doe")).toBe("user");
+  expect(standIns.get("0f1e2d3c-4b5a-6978-8091-a2b3c4d5e6f7")).toMatch(/^account-/);
+  expect(standIns.get("colleague@corp-example.org")).toMatch(/^person-\d+@example\.com$/);
+  // The calendar's own name, and words of the protocol, stay.
+  expect(standIns.has("calendars")).toBe(false);
+  expect(standIns.has("principals")).toBe(false);
+});
+
+test("a scenario that fails, and whose cleanup fails too, shows its own failure first", async () => {
+  const multistatus = (props: string) =>
+    `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>/x/</d:href><d:propstat><d:prop>${props}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
+  const http = async (request: HttpRequest): Promise<HttpResponse> => {
+    const answer = (status: number, body = "") => ({
+      status,
+      url: request.url,
+      header: (name: string) => (name === "content-type" ? "application/xml" : null),
+      body,
+    });
+    if (request.method === "PROPFIND" && request.headers["Depth"] === "1")
+      return answer(207, '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>');
+    if (request.method === "PROPFIND")
+      return answer(
+        207,
+        multistatus(
+          "<d:current-user-principal><d:href>/p/</d:href></d:current-user-principal><c:calendar-home-set><d:href>/home/</d:href></c:calendar-home-set>",
+        ),
+      );
+    if (request.method === "MKCALENDAR") return answer(201);
+    // The body's step fails, and so does every cleanup.
+    return answer(500);
+  };
+  const failure = scenario(http, "https://dav.example/", credentials, {
+    tasks: false,
+    calendar: "astrotime-recording-test",
+  });
+  const error = await failure.then(
+    () => null,
+    (caught: unknown) => caught,
+  );
+  expect(error).toBeInstanceOf(AggregateError);
+  expect((error as AggregateError).errors[0]).toBeInstanceOf(HttpError);
+  expect(String((error as AggregateError).errors[0])).toMatch(/PUT .*answered 500/);
 });

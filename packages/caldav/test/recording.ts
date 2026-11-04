@@ -6,20 +6,27 @@
 import { digestChallenge, digestHeader } from "../src/digest.ts";
 import type { Credentials, HttpClient, HttpRequest, HttpResponse } from "../src/index.ts";
 
+/** Request headers a replay compares, as a request carries them: what changes what the server does. */
+const COMPARED = ["Content-Type", "If-Match", "If-None-Match", "Prefer"] as const;
+
 export interface Exchange {
   readonly request: {
+    /** The server it went to: a service may answer on several (iCloud's `pNN-caldav`). */
+    readonly origin: string;
     readonly method: string;
-    /** Path and query, on the recording's `origin`. */
+    /** Path and query. */
     readonly path: string;
     readonly depth: string | null;
     /** How the request was signed: its `Authorization`'s scheme alone, never its value. */
     readonly scheme: "Basic" | "Digest" | null;
+    /** `COMPARED`'s headers it carried. */
+    readonly headers: Readonly<Record<string, string>>;
     readonly body: string | null;
   };
   readonly response: {
     readonly status: number;
-    /** The path that answered, after redirects (the well-known address's). */
-    readonly path: string;
+    /** The address that answered, after redirects (the well-known address's). */
+    readonly url: string;
     readonly headers: Readonly<Record<string, string>>;
     readonly body: string;
   };
@@ -29,7 +36,6 @@ export interface Recording {
   /** The service, and what recorded it and when, for fixtures/services/README.md. */
   readonly service: string;
   readonly recorded: string;
-  readonly origin: string;
   /** The address the scenario was given, as a user types it. */
   readonly server: string;
   /** The calendar the scenario made, its name unique to the run. */
@@ -42,6 +48,34 @@ const KEPT = ["content-type", "etag", "dav", "location", "retry-after", "www-aut
 
 const schemeOf = (header: string | undefined): "Basic" | "Digest" | null =>
   header?.startsWith("Basic ") ? "Basic" : header?.startsWith("Digest ") ? "Digest" : null;
+
+/** A request as a recording keeps it, and as a replay compares it. */
+function requestOf(request: HttpRequest): Exchange["request"] {
+  const url = new URL(request.url);
+  const headers: Record<string, string> = {};
+  for (const name of COMPARED) {
+    const value = request.headers[name];
+    if (value !== undefined) headers[name] = value;
+  }
+  return {
+    origin: url.origin,
+    method: request.method,
+    path: `${url.pathname}${url.search}`,
+    depth: request.headers["Depth"] ?? null,
+    scheme: schemeOf(request.headers["Authorization"]),
+    headers,
+    body: typeof request.body === "string" ? request.body : null,
+  };
+}
+
+/** A Digest parameter's value as an answer or a challenge says it, the name whole (`nonce`, not `cnonce`'s). */
+export function digestParam(header: string, name: string): string | null {
+  const match = new RegExp(
+    `(?:^Digest\\s+|,\\s*)${name}\\s*=\\s*(?:"((?:[^"\\\\]|\\\\.)*)"|([^\\s,]*))`,
+    "i",
+  ).exec(header);
+  return match ? (match[1]?.replace(/\\(.)/g, "$1") ?? match[2] ?? "") : null;
+}
 
 /**
  * Wraps `http`, keeping every exchange. `Authorization` is kept as its
@@ -62,26 +96,14 @@ export function recorder(http: HttpClient): {
       const authorization = request.headers["Authorization"];
       if (authorization) sent.push(authorization);
       const response = await http(request);
-      const url = new URL(request.url);
       const headers: Record<string, string> = {};
       for (const name of KEPT) {
         const value = response.header(name);
         if (value !== null) headers[name] = value;
       }
       exchanges.push({
-        request: {
-          method: request.method,
-          path: `${url.pathname}${url.search}`,
-          depth: request.headers["Depth"] ?? null,
-          scheme: schemeOf(authorization),
-          body: typeof request.body === "string" ? request.body : null,
-        },
-        response: {
-          status: response.status,
-          path: `${new URL(response.url).pathname}${new URL(response.url).search}`,
-          headers,
-          body: response.body,
-        },
+        request: requestOf(request),
+        response: { status: response.status, url: response.url, headers, body: response.body },
       });
       return response;
     },
@@ -171,7 +193,7 @@ function spellings(account: Account): { readonly caseless: string[]; readonly ex
   for (const header of account.sent) {
     if (header.startsWith("Basic ")) exact.push(header.slice(6));
     for (const name of ["response", "cnonce"]) {
-      const value = new RegExp(`${name}="([^"]+)"`).exec(header)?.[1];
+      const value = digestParam(header, name);
       if (value) exact.push(value);
     }
   }
@@ -206,28 +228,91 @@ export function redacted(
   account: Account,
 ): Recording {
   // Longest first, so an e-mail is replaced before the name inside it; a
-  // whole word only, so a short name inside another word stays.
+  // whole word only, so a short name inside another word stays. Values are
+  // scrubbed as they are, quotes, backslashes, line breaks and all, never
+  // the file's JSON spelling of them, and keys never.
   const pairs = [...standIns].filter(([value]) => value.length > 0);
   pairs.sort((a, b) => b[0].length - a[0].length);
   const word = (value: string) =>
     new RegExp(
-      `(?<![A-Za-z0-9])${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`,
-      "g",
+      `(?<![\\p{L}\\p{N}])${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`,
+      "gu",
     );
   const scrub = (text: string) => {
     let out = text;
     for (const [value, standIn] of pairs) {
-      out = out.replace(word(value), standIn);
+      out = out.replace(word(value), () => standIn);
       if (encodeURIComponent(value) !== value)
-        out = out.replace(word(encodeURIComponent(value)), encodeURIComponent(standIn));
+        out = out.replace(word(encodeURIComponent(value)), () => encodeURIComponent(standIn));
     }
     return out;
   };
-  const result = JSON.parse(scrub(JSON.stringify(recording))) as Recording;
+  const walk = (value: unknown): unknown =>
+    typeof value === "string"
+      ? scrub(value)
+      : Array.isArray(value)
+        ? value.map(walk)
+        : value !== null && typeof value === "object"
+          ? Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, walk(inner)]))
+          : value;
+  const result = walk(recording) as Recording;
   const found = leaks(JSON.stringify(result), account);
   if (found.length > 0)
     throw new Error(`The recording still holds ${found.join(" and ")}; not written.`);
   return result;
+}
+
+/** What looks like an account's id in a path: six digits or more, a UUID, or 16 hex digits or more. */
+const ID = /\d{6,}|^[0-9a-f]{8}-[0-9a-f]{4}-|^[0-9a-f]{16,}$/i;
+
+/**
+ * The stand-ins for a recording of `account`: its user name and e-mail's
+ * local part; `extra`; every path segment, in any address the recording
+ * holds (requests, answers' addresses, every `href` in an answer: owners,
+ * shared calendars, principals), that looks like an id or is the local
+ * part; and every `mailto:` an answer names (another user's, as a shared
+ * calendar's owner shows it), each its own stand-in.
+ */
+export function standInsFor(
+  exchanges: readonly Exchange[],
+  account: Pick<Account, "username" | "extra">,
+): Map<string, string> {
+  const standIns = new Map<string, string>([
+    [account.username, account.username.includes("@") ? "user@example.com" : "user"],
+  ]);
+  const name = account.username.split("@")[0]!;
+  if (name !== account.username) standIns.set(name, "user");
+  for (const extra of account.extra) standIns.set(extra, `redacted-${standIns.size}`);
+  const paths: string[] = [];
+  for (const { request, response } of exchanges) {
+    paths.push(request.path, new URL(response.url).pathname);
+    for (const match of response.body.matchAll(/<(?:[\w-]+:)?href>([^<]+)</g))
+      paths.push(match[1]!);
+    for (const match of response.body.matchAll(/mailto:([^<"\s]+)/gi)) {
+      const email = decodeURIComponent(match[1]!);
+      if (!standIns.has(email)) standIns.set(email, `person-${standIns.size}@example.com`);
+    }
+  }
+  for (const path of paths) {
+    let pathname = path;
+    try {
+      pathname = new URL(path, "https://x.invalid").pathname;
+    } catch {
+      // Not an address: its segments as written.
+    }
+    for (const raw of pathname.split("/")) {
+      let segment = raw;
+      try {
+        segment = decodeURIComponent(raw);
+      } catch {
+        // Not encoded as a URL encodes: as it is.
+      }
+      if (segment === "" || standIns.has(segment)) continue;
+      if (ID.test(segment) || segment.toLowerCase() === name.toLowerCase())
+        standIns.set(segment, `account-${standIns.size}`);
+    }
+  }
+  return standIns;
 }
 
 /**
@@ -245,20 +330,9 @@ export function replay(
   const challenges: string[] = [];
   const client = async (request: HttpRequest): Promise<HttpResponse> => {
     const exchange = recording.exchanges[next];
-    const url = new URL(request.url);
     const authorization = request.headers["Authorization"];
-    const asked = {
-      method: request.method,
-      path: `${url.pathname}${url.search}`,
-      depth: request.headers["Depth"] ?? null,
-      scheme: schemeOf(authorization),
-      body: typeof request.body === "string" ? request.body : null,
-    };
-    if (
-      !exchange ||
-      url.origin !== recording.origin ||
-      JSON.stringify(asked) !== JSON.stringify(exchange.request)
-    ) {
+    const asked = requestOf(request);
+    if (!exchange || JSON.stringify(asked) !== JSON.stringify(exchange.request)) {
       throw new Error(
         `Request ${next + 1} is not the recording's: asked ${JSON.stringify(asked)}, recorded ${JSON.stringify(exchange?.request ?? null)}.`,
       );
@@ -271,7 +345,7 @@ export function replay(
     if (challenge) challenges.push(challenge);
     return {
       status: exchange.response.status,
-      url: new URL(exchange.response.path, recording.origin).href,
+      url: exchange.response.url,
       header: (name) => headers.get(name.toLowerCase()) ?? null,
       body: exchange.response.body,
     };
@@ -290,7 +364,7 @@ async function checkDigest(
   request: HttpRequest,
   credentials: Credentials,
 ): Promise<void> {
-  const said = (name: string) => new RegExp(`${name}="?([^",]+)"?`).exec(answer)?.[1] ?? "";
+  const said = (name: string) => digestParam(answer, name) ?? "";
   const found = headers
     .map((header) => digestChallenge(header))
     .find((challenge) => challenge?.challenge.nonce === said("nonce"));
@@ -303,8 +377,7 @@ async function checkDigest(
     Number.parseInt(said("nc"), 16),
     said("cnonce"),
   );
-  const response = (header: string) => /response="([^"]+)"/.exec(header)?.[1];
-  if (response(answer) !== response(expected))
+  if (digestParam(answer, "response") !== digestParam(expected, "response"))
     throw new Error(
       "A Digest answer the server would refuse: its response is not the challenge's.",
     );

@@ -1,21 +1,24 @@
 {
   "service": "davical",
   "recorded": "2026-11-04",
-  "origin": "http://127.0.0.1:5604",
   "server": "http://127.0.0.1:5604/caldav.php/",
-  "calendar": "astrotime-recording-mw1ffjvk-518734a5",
+  "calendar": "astrotime-recording-mw1fqozz-e9e413bc",
   "exchanges": [
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PROPFIND",
         "path": "/.well-known/caldav",
         "depth": "0",
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"
       },
       "response": {
         "status": 405,
-        "path": "/.well-known/caldav",
+        "url": "http://127.0.0.1:5604/.well-known/caldav",
         "headers": {
           "content-type": "text/html; charset=iso-8859-1"
         },
@@ -24,15 +27,19 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PROPFIND",
         "path": "/caldav.php/",
         "depth": "0",
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/",
+        "url": "http://127.0.0.1:5604/caldav.php/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
           "etag": "\"4415f4d413fbb6699346e9517f3a0443\"",
@@ -43,15 +50,19 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PROPFIND",
         "path": "/caldav.php/user/",
         "depth": "0",
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><c:calendar-home-set/></d:prop></d:propfind>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
           "etag": "\"005cc9ae987de68fdd560931e90e7614\"",
@@ -62,15 +73,19 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PROPFIND",
         "path": "/caldav.php/user/",
         "depth": "1",
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:resourcetype/><d:displayname/><ic:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><nc:deleted-at/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
           "etag": "\"26149b226e77a207158513e3367a2d34\"",
@@ -81,15 +96,19 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "MKCALENDAR",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": null,
         "scheme": "Basic",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1ffjvk-518734a5</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1fqozz-e9e413bc</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
       },
       "response": {
         "status": 201,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "content-type": "text/plain; charset=\"utf-8\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
@@ -99,15 +118,20 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PUT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "text/calendar; charset=utf-8",
+          "If-None-Match": "*"
+        },
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 201,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "headers": {
           "content-type": "text/plain; charset=\"utf-8\"",
           "etag": "\"03e6c49f1931ed67583d6fd17d0702ec\"",
@@ -118,15 +142,20 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PUT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-task.ics",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-task.ics",
         "depth": null,
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "text/calendar; charset=utf-8",
+          "If-None-Match": "*"
+        },
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nUID:astrotime-recording-vtodo\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 201,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-task.ics",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-task.ics",
         "headers": {
           "content-type": "text/plain; charset=\"utf-8\"",
           "etag": "\"7c0bdbcae540da91efa3b659e6b5ef1b\"",
@@ -137,53 +166,66 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PROPFIND",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": "1",
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><d:resourcetype/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
-          "etag": "\"fa4b0ae00c94e081c0258a40e6866247\"",
+          "etag": "\"2d24f1fcca6d39dfc7f25a3af2615529\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:C1=\"http://calendarserver.org/ns/\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/</href>\n  <propstat>\n   <prop>\n    <resourcetype>\n     <collection/>\n     <C:calendar/>\n    </resourcetype>\n    <sync-token>data:,68</sync-token>\n    <C1:getctag>\"d6ed512faecab9cd442ee2dcac70aa12\"</C1:getctag>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <getetag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"03e6c49f1931ed67583d6fd17d0702ec\"</getetag>\n    <resourcetype/>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <sync-token/>\n    <C1:getctag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-task.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"7c0bdbcae540da91efa3b659e6b5ef1b\"</getetag>\n    <resourcetype/>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <sync-token/>\n    <C1:getctag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n</multistatus>\n"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:C1=\"http://calendarserver.org/ns/\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/</href>\n  <propstat>\n   <prop>\n    <resourcetype>\n     <collection/>\n     <C:calendar/>\n    </resourcetype>\n    <sync-token>data:,71</sync-token>\n    <C1:getctag>\"d6ed512faecab9cd442ee2dcac70aa12\"</C1:getctag>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <getetag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"03e6c49f1931ed67583d6fd17d0702ec\"</getetag>\n    <resourcetype/>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <sync-token/>\n    <C1:getctag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-task.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"7c0bdbcae540da91efa3b659e6b5ef1b\"</getetag>\n    <resourcetype/>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <sync-token/>\n    <C1:getctag/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n</multistatus>\n"
       }
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "REPORT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": "1",
         "scheme": "Basic",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</d:href><d:href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</d:href><d:href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
-          "etag": "\"ecc2ba5e644fddc4a9048169d7d7f387\"",
+          "etag": "\"b8920ffc3e3215baf77c7e3ab5bd4781\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"03e6c49f1931ed67583d6fd17d0702ec\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-task.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"7c0bdbcae540da91efa3b659e6b5ef1b\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nUID:astrotime-recording-vtodo\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n</multistatus>\n"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"03e6c49f1931ed67583d6fd17d0702ec\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-task.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"7c0bdbcae540da91efa3b659e6b5ef1b\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nUID:astrotime-recording-vtodo\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n</multistatus>\n"
       }
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "PUT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Basic",
+        "headers": {
+          "Content-Type": "text/calendar; charset=utf-8",
+          "If-Match": "\"03e6c49f1931ed67583d6fd17d0702ec\""
+        },
         "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event changed\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
       },
       "response": {
         "status": 204,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "headers": {
           "etag": "\"c335d57f751d1ae188a13e90d9358648\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
@@ -193,53 +235,65 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "REPORT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": "1",
         "scheme": "Basic",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:sync-token>data:,68</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:sync-token>data:,71</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
-          "etag": "\"513c1ad4122653497341796e39f1df89\"",
+          "etag": "\"305012cda63572742b04f8346c684cd1\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"c335d57f751d1ae188a13e90d9358648\"</getetag>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <C:calendar-data/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <sync-token>data:,69</sync-token>\n</multistatus>\n"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"c335d57f751d1ae188a13e90d9358648\"</getetag>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n  <propstat>\n   <prop>\n    <C:calendar-data/>\n   </prop>\n   <status>HTTP/1.1 404 Not Found</status>\n  </propstat>\n </response>\n <sync-token>data:,72</sync-token>\n</multistatus>\n"
       }
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "REPORT",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": "1",
         "scheme": "Basic",
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</d:href></c:calendar-multiget>"
+        "headers": {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</d:href></c:calendar-multiget>"
       },
       "response": {
         "status": 207,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "content-type": "text/xml; charset=\"utf-8\"",
-          "etag": "\"6c01267c1c76e46f89250a6b76eed2fd\"",
+          "etag": "\"9023c9fbce5136003e4eb1ccab1aacca\"",
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"c335d57f751d1ae188a13e90d9358648\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event changed\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n</multistatus>\n"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n <response>\n  <href>/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics</href>\n  <propstat>\n   <prop>\n    <getetag>\"c335d57f751d1ae188a13e90d9358648\"</getetag>\n    <C:calendar-data>BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event changed\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n</C:calendar-data>\n   </prop>\n   <status>HTTP/1.1 200 OK</status>\n  </propstat>\n </response>\n</multistatus>\n"
       }
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "DELETE",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Basic",
+        "headers": {
+          "If-Match": "\"c335d57f751d1ae188a13e90d9358648\""
+        },
         "body": null
       },
       "response": {
         "status": 204,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/astrotime-recording-event.ics",
         "headers": {
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
@@ -248,15 +302,17 @@
     },
     {
       "request": {
+        "origin": "http://127.0.0.1:5604",
         "method": "DELETE",
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "path": "/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "depth": null,
         "scheme": "Basic",
+        "headers": {},
         "body": null
       },
       "response": {
         "status": 204,
-        "path": "/caldav.php/user/astrotime-recording-mw1ffjvk-518734a5/",
+        "url": "http://127.0.0.1:5604/caldav.php/user/astrotime-recording-mw1fqozz-e9e413bc/",
         "headers": {
           "dav": "1, 2, 3, access-control, calendar-access, calendar-schedule, extended-mkcol, bind, addressbook, calendar-auto-schedule, calendar-proxy"
         },
