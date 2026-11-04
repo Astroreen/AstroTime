@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 const recorded = readFileSync(
   new URL("../../../packages/ui/test/fixtures/photon-en.json", import.meta.url),
@@ -50,6 +50,7 @@ for (const [name, device] of [
 
     test("a place picked from Location's search shows in the details with its map and links", async ({
       page,
+      context,
     }) => {
       const { searched, tiles } = await fakeServices(page);
       await openDemo(page, "day");
@@ -88,6 +89,33 @@ for (const [name, device] of [
       );
       expect(tiles.length).toBeGreaterThan(0);
       expect(tiles.every((url) => url.startsWith("https://tile.openstreetmap.org/16/"))).toBe(true);
+
+      // A tap on the map opens it in maps, as the icon button does (design D238).
+      await context.route("https://www.openstreetmap.org/**", (route) =>
+        route.fulfill({ contentType: "text/html", body: "<title>maps</title>" }),
+      );
+      const opened = page.waitForEvent("popup");
+      const map = details.getByRole("img", { name: "Map of Brandenburg Gate" });
+      // The map's own link lies over it, out of the accessibility tree: what
+      // a finger meets in the map's middle is that link, to maps.
+      const drawn = await map.boundingBox();
+      if (!drawn) throw new Error("not drawn");
+      const middle = { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 };
+      expect(
+        await page.evaluate(
+          ({ x, y }) => document.elementFromPoint(x, y)?.closest("a")?.getAttribute("href"),
+          middle,
+        ),
+      ).toBe(
+        "https://www.openstreetmap.org/?mlat=52.51627&mlon=13.377703#map=17/52.51627/13.377703",
+      );
+      if (name === "phone") await page.touchscreen.tap(middle.x, middle.y);
+      else await page.mouse.click(middle.x, middle.y);
+      const maps = await opened;
+      await maps.waitForLoadState();
+      expect(maps.url()).toBe(
+        "https://www.openstreetmap.org/?mlat=52.51627&mlon=13.377703#map=17/52.51627/13.377703",
+      );
     });
   });
 }
@@ -141,6 +169,8 @@ test("Copy address copies the text and says so; refused, the notice says it was 
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // A tap on the address waits for a second click: the clock runs on, no wait.
+  await page.clock.install({ time: NOW });
   await openDemo(page, "day");
   const open = async () => {
     await page
@@ -150,11 +180,114 @@ test("Copy address copies the text and says so; refused, the notice says it was 
     return page.getByRole("dialog", { name: "Design review" });
   };
   const details = await open();
-  await details.getByRole("button", { name: "Copy address" }).click();
-  await expect(details.getByRole("button", { name: "Copied" })).toBeVisible();
+  // Two icon buttons at the end of the address's line, each with its
+  // tooltip, a finger's 48 px (design D238).
+  const copy = details.getByRole("button", { name: "Copy address" });
+  const maps = details.getByRole("link", { name: "Open in maps" });
+  await expect(copy).toHaveAttribute("title", "Copy address");
+  await expect(maps).toHaveAttribute("title", "Open in maps");
+  for (const target of [copy, maps]) {
+    const size = await target.boundingBox();
+    expect([size?.width, size?.height]).toEqual([48, 48]);
+  }
+  // "Copied" is said once, by the status, not by the button's name too;
+  // a second copy while it shows says it again, a node of its own.
+  const status = details.getByRole("status");
+  await copy.click();
+  await expect(status).toHaveText("Copied");
+  await expect(copy).toHaveAccessibleName("Copy address");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  const said = status.evaluate(
+    (element) =>
+      new Promise<boolean>((resolve) =>
+        new MutationObserver((_, observer) => {
+          observer.disconnect();
+          resolve(true);
+        }).observe(element, { childList: true }),
+      ),
+  );
+  await copy.click();
+  expect(await said).toBe(true);
+  await expect(status).toHaveText("Copied");
   await page.keyboard.press("Escape");
   await expect(details).toHaveCount(0);
+
+  // A tap on the address itself copies it too, and says so.
+  await page.evaluate(() => navigator.clipboard.writeText(""));
+  const tapped = await open();
+  const text = tapped.getByText("Room 4, second floor");
+  await text.click();
+  await page.clock.runFor(500);
+  await expect(tapped.getByRole("status")).toHaveText("Copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  await page.keyboard.press("Escape");
+  await expect(tapped).toHaveCount(0);
+
+  // Text selected elsewhere, in the description, does not stop a tap on
+  // the address: only the address's own selection is selecting it.
+  await page.evaluate(() => navigator.clipboard.writeText(""));
+  const elsewhere = await open();
+  await elsewhere.getByText("Room 4, second floor").click();
+  await elsewhere.getByText(/^The new month view\./).evaluate((element) => {
+    getSelection()?.selectAllChildren(element);
+  });
+  await page.clock.runFor(500);
+  await expect(elsewhere.getByRole("status")).toHaveText("Copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  await page.keyboard.press("Escape");
+  await expect(elsewhere).toHaveCount(0);
+
+  // A drag across it, a double or a triple click select it, as text,
+  // and copy nothing.
+  const selecting = await open();
+  await page.evaluate(() => {
+    const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+    Object.assign(window, { writes: 0 });
+    navigator.clipboard.writeText = (data) => {
+      Object.assign(window, { writes: (window as unknown as { writes: number }).writes + 1 });
+      return write(data);
+    };
+  });
+  const address = selecting.getByText("Room 4, second floor");
+  // Measured where the details end, not mid-way through their opening scale.
+  await expect(selecting).not.toHaveAttribute("data-starting-style");
+  await selecting.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  /** The middle of `word` in the address, wherever the font puts it. */
+  const middleOf = (word: string) =>
+    address.evaluate((element, wanted) => {
+      const node = element.firstChild!;
+      const range = document.createRange();
+      const at = node.textContent!.indexOf(wanted);
+      range.setStart(node, at);
+      range.setEnd(node, at + wanted.length);
+      const { x, y, width, height } = range.getBoundingClientRect();
+      return { x: x + width / 2, y: y + height / 2 };
+    }, word);
+  const selected = async () => {
+    await page.clock.runFor(500);
+    const selection = (await page.evaluate(() => getSelection()?.toString()))?.trim() ?? "";
+    expect(selection.length).toBeGreaterThan(0);
+    expect("Room 4, second floor").toContain(selection);
+    expect(await page.evaluate(() => (window as unknown as { writes: number }).writes)).toBe(0);
+    await page.evaluate(() => getSelection()?.removeAllRanges());
+  };
+  // From the middle of "Room" to the middle of "floor".
+  const [from, to] = [await middleOf("Room"), await middleOf("floor")];
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await page.mouse.up();
+  await selected();
+  // A double and a triple click on the word "second".
+  const word = await middleOf("second");
+  await page.mouse.dblclick(word.x, word.y);
+  await selected();
+  await page.mouse.click(word.x, word.y, { clickCount: 3 });
+  await selected();
+  await page.keyboard.press("Escape");
+  await expect(selecting).toHaveCount(0);
 
   // The clipboard refuses: the change notice says so, over the details.
   await page.evaluate(() => {

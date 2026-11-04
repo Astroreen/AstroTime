@@ -14,32 +14,20 @@ import { attachmentHref, attachmentText } from "../calendar/attachments.ts";
 import type { Target } from "../calendar/editing.ts";
 import type { Platform } from "../platform.ts";
 import { useAccounts } from "./accounts-context.tsx";
+import { saveFile } from "./save-file.ts";
 
-/**
- * Saves an inline file, decoded now (D230): through the platform where it
- * saves files, else by a download link of its bytes, attached to the page
- * for its click; its URL is kept in `links` and let go when the list goes,
- * so a download that starts late still finds it.
- */
+/** Saves an inline file, decoded now (D230). */
 async function save(
   file: InlineFile,
   name: string,
   platform: Platform,
   links: string[],
 ): Promise<void> {
-  const type = file.type ?? "application/octet-stream";
-  if (platform.saveFile) {
-    await platform.saveFile({ name, type, bytes: file.bytes });
-    return;
-  }
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([file.bytes.slice()], { type }));
-  link.download = name;
-  link.hidden = true;
-  links.push(link.href);
-  document.body.append(link);
-  link.click();
-  link.remove();
+  await saveFile(
+    { name, type: file.type ?? "application/octet-stream", bytes: file.bytes },
+    platform,
+    links,
+  );
 }
 
 /** A row's mark and words, the details' and the edit dialog's (design D230, D233). */

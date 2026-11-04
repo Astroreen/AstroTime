@@ -1,11 +1,12 @@
 // The place in an item's details (docs/plans/design.md#D177): a place with
 // a point shows its name and address over a small map of OpenStreetMap's
 // tiles with a pin, credited as OpenStreetMap asks; any place can be opened
-// in maps and its address copied. A text with no point shows as it always
-// did. The map loads only once the details show it, and not at all with
-// places turned off.
+// in maps and its address copied, by two icon buttons at the end of its
+// line (design D238), or by a tap on the map and on the address. A text
+// with no point shows as it always did. The map loads only once the
+// details show it, and not at all with places turned off.
 import type { Geo } from "@astrotime/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { mapsLink, nameAndAddress, tilesAround } from "../places/map.ts";
@@ -16,10 +17,21 @@ import { CheckIcon, CopyIcon, MapIcon } from "./icons.tsx";
 /** The map's box, wider than any card: it is cut to the card's width, the pin in the middle. */
 const BOX = { width: 512, height: 144 } as const;
 
+/** An icon button at the end of the place's line: 48 px, a finger's target (Material's 48 dp). */
 const action =
-  "inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-small font-medium text-accent ring-1 ring-line hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
+  "grid size-12 shrink-0 place-items-center rounded-full hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent";
+const quiet = "text-ink-muted hover:text-ink";
 
-/** How long "Copied" shows before the button says "Copy address" again. */
+/**
+ * How far down the place's first line sits, level with its 48 px icons'
+ * middle (design D238); the details' pin beside it sits as far.
+ */
+export const PLACE_LINE = "mt-3";
+
+/** How long a click on the address waits for a second, which selects text and copies nothing (D238). */
+const SECOND_CLICK_MS = 300;
+
+/** How long the tick shows after a copy. */
 const COPIED_MS = 2000;
 
 export function PlaceCard({
@@ -38,53 +50,104 @@ export function PlaceCard({
   const { platform } = useAccounts();
   const { settings } = useSettings();
   const places = settings.places ? platform.places : undefined;
-  const [copied, setCopied] = useState(false);
+  // Copies made, each said once (design D238); 0 when the tick is gone.
+  const [copied, setCopied] = useState(0);
+  // A click on the address on its way to copying it, until a second comes.
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(pending.current), []);
   // Only a place with a point is split: free text shows whole, commas and all.
   const { name, address } = geo ? nameAndAddress(location, label) : { name: location, address: "" };
   useEffect(() => {
     if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    const timer = setTimeout(() => setCopied(0), COPIED_MS);
     return () => clearTimeout(timer);
   }, [copied]);
   // No clipboard to write to (an insecure page, some WebViews): no button.
   const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
   const copy = () =>
     void clipboard?.writeText(location).then(
-      () => setCopied(true),
+      () => setCopied((count) => count + 1),
       // Refused (a permission, a page out of focus): the notice says so.
       () => onCopyFailed(),
     );
+  const link = mapsLink(location, geo, places?.links ?? "web");
   return (
     <div className="flex flex-col gap-2">
-      <p className="flex flex-col">
-        <span className="break-words whitespace-pre-wrap">{name}</span>
-        {address && <span className="break-words text-small text-ink-muted">{address}</span>}
-      </p>
-      {geo && places && (
-        <StaticMap geo={geo} tiles={places.tiles} label={t("places.map", { place: name })} />
-      )}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex items-start">
+        {/* Its first line level with the icons' middle; a tap on it copies
+            the address, while a long press, a drag or a double or triple
+            click selects it as text does (design D238). Keys and screen
+            readers have the button at the end. */}
+        <div
+          className={`min-w-0 flex-1 ${PLACE_LINE} ${clipboard ? "cursor-copy" : ""}`}
+          onClick={(event) => {
+            clearTimeout(pending.current);
+            if (event.detail !== 1) return;
+            const line = event.currentTarget;
+            pending.current = setTimeout(() => {
+              // Only text selected in the address itself is the user selecting it.
+              const selection = document.getSelection();
+              const selecting =
+                selection !== null && !selection.isCollapsed && selection.containsNode(line, true);
+              if (!selecting) copy();
+            }, SECOND_CLICK_MS);
+          }}
+        >
+          <p className="flex flex-col">
+            <span className="break-words whitespace-pre-wrap">{name}</span>
+            {address && <span className="break-words text-small text-ink-muted">{address}</span>}
+          </p>
+        </div>
         <a
-          href={mapsLink(location, geo, places?.links ?? "web")}
+          href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className={action}
+          aria-label={t("places.open")}
+          title={t("places.open")}
+          className={`${action} ${quiet}`}
         >
-          <MapIcon className="size-[18px]" />
-          {t("places.open")}
+          <MapIcon className="size-5" />
         </a>
         {clipboard && (
-          <button type="button" onClick={copy} className={action}>
-            {copied ? <CheckIcon className="size-[18px]" /> : <CopyIcon className="size-[18px]" />}
-            {t(copied ? "places.copied" : "places.copy")}
+          <button
+            type="button"
+            onClick={copy}
+            aria-label={t("places.copy")}
+            title={t("places.copy")}
+            className={`${action} ${copied ? "text-accent" : quiet}`}
+          >
+            {copied ? <CheckIcon className="size-5" /> : <CopyIcon className="size-5" />}
           </button>
         )}
       </div>
+      {geo && places && (
+        <StaticMap
+          geo={geo}
+          tiles={places.tiles}
+          label={t("places.map", { place: name })}
+          link={link}
+        />
+      )}
+      {/* "Copied", said once for each copy: each a node of its own. */}
+      <span role="status" className="sr-only">
+        {copied > 0 && <span key={copied}>{t("places.copied")}</span>}
+      </span>
     </div>
   );
 }
 
-function StaticMap({ geo, tiles, label }: { geo: Geo; tiles: string; label: string }) {
+function StaticMap({
+  geo,
+  tiles,
+  label,
+  link,
+}: {
+  geo: Geo;
+  tiles: string;
+  label: string;
+  /** Where a tap on the map goes: maps, as "Open in maps" does (design D238). */
+  link: string;
+}) {
   const { t } = useTranslation();
   return (
     <div className="relative h-36 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
@@ -129,6 +192,15 @@ function StaticMap({ geo, tiles, label }: { geo: Geo; tiles: string; label: stri
           <circle cx="12" cy="12" r="3.6" fill="#fff" />
         </svg>
       </div>
+      {/* The whole map opens maps; the button by the address is its name for keys and screen readers. */}
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="absolute inset-0"
+      />
       <a
         href="https://www.openstreetmap.org/copyright"
         target="_blank"

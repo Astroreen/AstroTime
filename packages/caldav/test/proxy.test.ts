@@ -208,6 +208,30 @@ test("a redirect from http to https on the same host, and a 201's Location, pass
   expect((await answer(301, "https://cloud.example.com:8443/dav/")).status).toBe(502);
 });
 
+test("an http server on the allowlist is followed to https on the same host, not refused there", async () => {
+  const { fetchImpl } = upstream((url) =>
+    url.protocol === "http:"
+      ? new Response(null, {
+          status: 301,
+          headers: { Location: `https://${url.host}${url.pathname}` },
+        })
+      : new Response("<multistatus/>", { status: 207 }),
+  );
+  const handler = proxyHandler({
+    prefix: "/dav-proxy/",
+    allow: ["http://cloud.example.com"],
+    fetch: fetchImpl,
+  });
+  const request = (path: string) =>
+    handler(new Request(`http://app.localhost${path}`, { method: "PROPFIND" }));
+  const first = await request(via.to("http://cloud.example.com/.well-known/caldav"));
+  expect(first.status).toBe(301);
+  expect((await request(first.headers.get("location")!)).status).toBe(207);
+  // Another port, or another host, is still another server.
+  expect((await request(via.to("https://cloud.example.com:8443/dav/"))).status).toBe(403);
+  expect((await request(via.to("https://other.example.com/dav/"))).status).toBe(403);
+});
+
 test("behind a TLS terminator the app's https page still passes: the host is compared, not the scheme", async () => {
   const { fetchImpl } = upstream(() => new Response("ok"));
   const handler = proxyHandler({ prefix: "/dav-proxy/", allow: "*", fetch: fetchImpl });

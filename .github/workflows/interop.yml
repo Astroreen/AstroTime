@@ -1,0 +1,86 @@
+# docs/plans/providers.md, D248: the CalDAV integration tests
+# (packages/sync/test/servers.test.ts) against every self-hostable server of
+# packages/sync/test/interop/compose.yaml, each in a job of its own. Only
+# when the code that talks to servers or a server's pinned version changes
+# (a Dependabot bump of the compose file), weekly for a server's new
+# release, and by hand; Radicale runs them on every PR in ci.yml.
+name: Interop
+
+on:
+  pull_request:
+    paths: &paths
+      - packages/caldav/**
+      - packages/sync/src/**
+      - packages/sync/test/servers.ts
+      - packages/sync/test/servers.test.ts
+      - packages/sync/test/interop/**
+      - packages/core/src/provider.ts
+      - .github/workflows/interop.yml
+  push:
+    branches:
+      - main
+    paths: *paths
+  schedule:
+    - cron: "41 2 * * 1"
+  workflow_dispatch:
+    inputs:
+      server:
+        description: One server of compose.yaml, or all
+        type: choice
+        default: all
+        options:
+          - all
+          - baikal-digest
+          - baikal-basic
+          - xandikos
+          - davical
+          - davis
+          - stalwart
+          - cyrus
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interop-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  server:
+    name: CalDAV against ${{ matrix.server }}
+    strategy:
+      # One server's failure names itself and hides no other's.
+      fail-fast: false
+      matrix:
+        server: ${{ fromJSON((inputs.server && inputs.server != 'all') && format('["{0}"]', inputs.server) || '["baikal-digest","baikal-basic","xandikos","davical","davis","stalwart","cyrus"]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ASTROTIME_INTEROP: ${{ matrix.server }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # The suite runs Radicale too, as on every PR.
+      - run: pipx install radicale==3.8.0
+      - run: docker compose -f packages/sync/test/interop/compose.yaml up -d ${{ matrix.server }}
+      # The server answers a PROPFIND with its user's credentials: curl's own
+      # retries while it starts (its first start makes its database), not a
+      # sleep loop.
+      - name: Wait for the server
+        run: |
+          case "$ASTROTIME_INTEROP" in
+            baikal-digest) url=http://127.0.0.1:5601/dav.php/ user=astro ;;
+            baikal-basic) url=http://127.0.0.1:5602/dav.php/ user=astro ;;
+            xandikos) url=http://127.0.0.1:5603/ user=astro ;;
+            davical) url=http://127.0.0.1:5604/caldav.php/ user=admin ;;
+            davis) url=http://127.0.0.1:5605/dav/ user=astro ;;
+            stalwart) url=http://127.0.0.1:5606/dav/cal/ user=astro ;;
+            cyrus) url=http://127.0.0.1:5607/dav/calendars/user/user1/ user=user1 ;;
+          esac
+          curl -fsS -o /dev/null --retry 90 --retry-delay 2 --retry-all-errors \
+            --anyauth -u "$user:secret" -X PROPFIND -H 'Depth: 0' "$url"
+      # One test file at a time, as against Nextcloud (foundation D27).
+      - run: vp test run --project unit --no-file-parallelism packages/sync/test/servers.test.ts
+      - name: The server's log, when a test failed
+        if: failure()
+        run: docker compose -f packages/sync/test/interop/compose.yaml logs

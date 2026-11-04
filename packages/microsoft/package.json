@@ -1,0 +1,25 @@
+{
+  "name": "@astrotime/microsoft",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Microsoft: one account, its Outlook calendars and its To Do lists over Microsoft Graph",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test"
+  },
+  "dependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@astrotime/storage": "workspace:*",
+    "@astrotime/sync": "workspace:*",
+    "@types/node": "catalog:"
+  }
+}

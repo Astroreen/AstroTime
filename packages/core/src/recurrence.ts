@@ -506,6 +506,17 @@ function onWallClock(
   dtstart: ICAL.Time,
 ): { rule: ICAL.Recur; limit: UntilInstant | null } {
   const { until } = rule;
+  if (until?.isDate && !dtstart.isDate) {
+    // A date UNTIL on a series of times (RFC 5545 forbids it, older clients
+    // write it) ends with its day, as libical reads it: ical.js would end
+    // the series at that day's midnight, before its last occurrence.
+    const walked = rule.clone();
+    walked.until = ICAL.Time.fromData(
+      { year: until.year, month: until.month, day: until.day, hour: 23, minute: 59, second: 59 },
+      dtstart.zone ?? undefined,
+    );
+    return { rule: walked, limit: null };
+  }
   if (!until || zoneOrigin(until).kind !== "utc") return { rule, limit: null };
   const origin = zoneOrigin(dtstart);
   if (origin.kind !== "undefined") return { rule, limit: null };

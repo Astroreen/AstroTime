@@ -1,0 +1,99 @@
+# The self-hostable CalDAV servers of the interop run
+# (docs/plans/providers.md#D248), each pinned to a release: Dependabot's
+# docker-compose ecosystem bumps them, and a bump runs the interop run
+# (.github/workflows/interop.yml). Each listens on 127.0.0.1 only, with the
+# user `astro` (DAViCal: `admin`) and the password `secret`; servers.ts beside
+# it names the address a user would type for each.
+name: astrotime-interop
+
+services:
+  # sabre/dav with Digest, Baïkal's default.
+  baikal-digest:
+    image: ckulka/baikal:0.10.1-nginx
+    environment:
+      BAIKAL_AUTH: Digest
+      BAIKAL_PORT: 5601
+    volumes:
+      - ./baikal/setup.sh:/docker-entrypoint.d/35-astrotime-setup.sh:ro
+    ports:
+      - 127.0.0.1:5601:5601
+
+  # The same with Basic, which a reverse proxy in front of Baïkal often asks for.
+  baikal-basic:
+    image: ckulka/baikal:0.10.1-nginx
+    environment:
+      BAIKAL_AUTH: Basic
+      BAIKAL_PORT: 5602
+    volumes:
+      - ./baikal/setup.sh:/docker-entrypoint.d/35-astrotime-setup.sh:ro
+    ports:
+      - 127.0.0.1:5602:5602
+
+  # Xandikos as its documentation deploys it: authentication is its reverse
+  # proxy's (its own --htpasswd needs TLS), so it takes any credentials.
+  xandikos:
+    image: ghcr.io/jelmer/xandikos:v0.4.10
+    environment:
+      DEFAULTS: "true"
+      AUTOCREATE: "true"
+      CURRENT_USER_PRINCIPAL: /astro/
+    ports:
+      - 127.0.0.1:5603:8000
+
+  # Davis (sabre/dav, as Baïkal, with its own admin pages), on SQLite, its
+  # user made by davis/setup.sh as its admin pages would.
+  davis:
+    image: ghcr.io/tchapi/davis-standalone:5.6.3
+    environment:
+      APP_ENV: prod
+      APP_SECRET: astrotime-interop
+      DATABASE_DRIVER: sqlite
+      DATABASE_URL: sqlite:////var/www/davis/var/data.db
+      AUTH_METHOD: Basic
+      AUTH_REALM: SabreDAV
+      CALDAV_ENABLED: "true"
+      CARDDAV_ENABLED: "false"
+      ADMIN_LOGIN: admin
+      ADMIN_PASSWORD: admin-password
+    volumes:
+      - ./davis/setup.sh:/astrotime-setup.sh:ro
+    entrypoint: ["/bin/sh", "/astrotime-setup.sh"]
+    ports:
+      - 127.0.0.1:5605:9000
+
+  # Stalwart, its own server (mail, CalDAV, CardDAV), configured by a file:
+  # 0.15, the last whose whole configuration a file can hold (1.0 begins
+  # with its web wizard). Dependabot keeps it on 0.x (.github/dependabot.yml).
+  stalwart:
+    image: stalwartlabs/stalwart:v0.15.5
+    entrypoint: ["/usr/local/bin/stalwart", "--config", "/etc/stalwart/config.toml"]
+    volumes:
+      - ./stalwart/config.toml:/etc/stalwart/config.toml:ro
+    ports:
+      - 127.0.0.1:5606:8080
+
+  # Cyrus IMAP, as Fastmail runs it: its project's test server, which makes
+  # users user1 to user5 and takes any password (its fakesaslauthd). Its
+  # image has no version tags: pinned by digest.
+  cyrus:
+    image: ghcr.io/cyrusimap/cyrus-docker-test-server:latest@sha256:035aa4ffdb84df95a1057645d05c9a156dde74e5787ef1a11f7d9c244a38b2c0
+    ports:
+      - 127.0.0.1:5607:8080
+
+  # DAViCal, on its own PostgreSQL; its user is its administrator, `admin`.
+  # Its image has no version tags: pinned by digest.
+  davical:
+    image: tuxnvape/davical-standalone:latest@sha256:dfb52fc1f05aa68ecd4d87a3f9f1f8a1a6a4c044a64ba0d1dd17c484a96f4124
+    environment:
+      DBHOST: davical-db
+      PGSQL_ROOT_PASS: davical
+      PASSDAVDB: davical
+      ADMINDAVICALPASS: secret
+    depends_on:
+      - davical-db
+    ports:
+      - 127.0.0.1:5604:80
+  davical-db:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_PASSWORD: davical

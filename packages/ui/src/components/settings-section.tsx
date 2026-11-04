@@ -5,21 +5,24 @@
 // the pictures (D217),
 // the accounts with how each syncs, whether it syncs at all (foundation
 // D171), its menu and its calendars, each shown or not (D137), reminders
-// (foundation D101), places on the map (D175) and, on the desktop, whether
-// closing the window quits
+// (foundation D101), places on the map (D175), the data (import from a file,
+// import D265) and, on the desktop, whether closing the window quits
 // (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
+import { syncs } from "@astrotime/sync";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
-import { useId, type ReactNode } from "react";
+import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { addDataStrings } from "../i18n/data.ts";
 import { LANGUAGES } from "../i18n/index.ts";
 import { wikipediaOf } from "../places/photos.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
 import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
+import { deferred } from "./lazy.tsx";
 import { ColorSettings } from "./color-settings.tsx";
 import { PictureSettings } from "./picture-settings.tsx";
 import { useCalendar } from "./context.ts";
@@ -56,9 +59,7 @@ export function SettingsScreen({
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
         <DialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup
-          className={`${sheet} z-[110] pt-(--inset-top) pb-(--inset-bottom) sm:w-[min(40rem,calc(100vw-2rem))] sm:pt-0 sm:pb-0`}
-        >
+        <DialogPopup className={`${sheet} z-[110] sm:w-[min(40rem,calc(100vw-2rem))]`}>
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("settings.close")}>
               <CloseIcon className="size-5" />
@@ -100,6 +101,7 @@ function SettingsGroups({
   onLeave: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  addDataStrings(i18n);
   const spoken = i18n.resolvedLanguage ?? i18n.language;
   const { formats } = useCalendar();
   const { settings, change } = useSettings();
@@ -207,7 +209,7 @@ function SettingsGroups({
                 <AccountRow account={account} onLeave={onLeave} />
               </div>
               {/* Whether it syncs at all (foundation D171); off, its calendars stay. */}
-              {account.provider === "caldav" && (
+              {syncs(account) && (
                 <Toggle
                   label={t("accounts.sync")}
                   checked={!account.syncOff}
@@ -248,6 +250,10 @@ function SettingsGroups({
           />
         </Group>
       ) : null}
+      <Group title={t("settings.data")}>
+        <ImportEntry calendars={calendars} hidden={hidden} colorOf={colorOf} />
+        <ExportEntry calendars={calendars} colorOf={colorOf} />
+      </Group>
       <Group title={t("settings.notifications")}>
         <RemindersSwitch />
       </Group>
@@ -261,6 +267,107 @@ function SettingsGroups({
           />
         </Group>
       ) : null}
+    </>
+  );
+}
+
+/** The import dialog, loaded with its first opening (import D273). */
+const ImportDialog = deferred(
+  () => import("./import-dialog.tsx"),
+  (module) => module.ImportDialog,
+  (props: ComponentProps<typeof import("./import-dialog.tsx").ImportDialog>) => props.file !== null,
+);
+
+/**
+ * "Import from a file" (import D265): the device's own picker, with no filter
+ * of types (Android's hides a `.ics` whose type it does not know), then the
+ * import dialog over Settings with the file picked.
+ */
+function ImportEntry({
+  calendars,
+  hidden,
+  colorOf,
+}: {
+  calendars: readonly Calendar[];
+  hidden: ReadonlySet<string>;
+  colorOf: (calendar: Calendar) => string;
+}) {
+  const { t } = useTranslation();
+  const input = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const hintId = useId();
+  return (
+    <>
+      <button
+        type="button"
+        aria-describedby={hintId}
+        onClick={() => input.current?.click()}
+        className="flex min-h-12 flex-col items-start justify-center gap-0.5 px-4 py-2 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        <span className="text-body text-accent">{t("settings.import")}</span>
+        <span id={hintId} className="text-note text-ink-muted">
+          {t("settings.import.hint")}
+        </span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        hidden
+        tabIndex={-1}
+        onChange={(event) => {
+          const picked = event.target.files?.[0] ?? null;
+          event.target.value = "";
+          if (picked) setFile(picked);
+        }}
+      />
+      <ImportDialog
+        file={file}
+        onClose={() => setFile(null)}
+        calendars={calendars}
+        hidden={hidden}
+        colorOf={colorOf}
+      />
+    </>
+  );
+}
+
+/** The export dialog, loaded with its first opening (import D274). */
+const ExportDialog = deferred(
+  () => import("./export-dialog.tsx"),
+  (module) => module.ExportDialog,
+  (props: ComponentProps<typeof import("./export-dialog.tsx").ExportDialog>) => props.open,
+);
+
+/** "Export to a file" (import D274): a calendar or list as one `.ics`. */
+function ExportEntry({
+  calendars,
+  colorOf,
+}: {
+  calendars: readonly Calendar[];
+  colorOf: (calendar: Calendar) => string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const hintId = useId();
+  return (
+    <>
+      <button
+        type="button"
+        aria-describedby={hintId}
+        onClick={() => setOpen(true)}
+        className="flex min-h-12 flex-col items-start justify-center gap-0.5 border-t border-line px-4 py-2 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        <span className="text-body text-accent">{t("settings.export")}</span>
+        <span id={hintId} className="text-note text-ink-muted">
+          {t("settings.export.hint")}
+        </span>
+      </button>
+      <ExportDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        calendars={calendars}
+        colorOf={colorOf}
+      />
     </>
   );
 }

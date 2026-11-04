@@ -285,7 +285,12 @@ Decided while building PR 2.
   VTIMEZONE's rules differ from today's IANA data (an old or custom one, a
   historical date), the instant is the VTIMEZONE's and the wall clock in
   `timeZone` may differ from the written one, as for any VTIMEZONE named
-  with an IANA name.
+  with an IANA name. An item whose ends are in two zones ical.js holds as
+  wall clocks (a flight from Berlin to New York) lasts as long as their
+  instants say, not their wall clocks. A defined TZID `Intl` does not know
+  is read on a wall clock (a series moved, its `UNTIL`'s day) with the
+  series' own offset (`wallClockNear`, `epochNear` in `time.ts`): exact
+  but across a DST change between the two.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
@@ -298,7 +303,11 @@ Decided while building PR 2.
   its occurrence, as Google shows it. A `RECURRENCE-ID` written as another
   kind of time than the series' start (a date for a zoned series, a floating
   time for a zoned one) matches by wall clock, or by day when one side is a
-  date.
+  date. An exception made for an occurrence (`exceptionOf`) names it on
+  the series' wall clock: at its instant when the occurrence is named in
+  another zone (an `RDATE` in UTC beside a series in Berlin), as written
+  in the series' own zone (an occurrence in a DST gap too); an end in a
+  zone of its own stays in that zone, at its instant.
 
 ### Sync
 
@@ -310,7 +319,12 @@ Decided while building PR 2.
   [D37](#D37)) a deletion of ours comes back, reported. A deletion of ours
   the server refuses because the object changed there is dropped: the object
   comes back as the server has it. An edit of an object deleted on this
-  device before the deletion is uploaded revives it as an update. Otherwise
+  device before the deletion is uploaded revives it as an update; one made
+  while the deletion is on its way stays, and the server's deletion then
+  drops it, reported. A creation of ours that a listing names before its
+  upload is known to have landed (the server stored it, then answered an
+  error) is not stored as a second object: the listing leaves it and keeps
+  its token, and the next upload finds the href taken by it. Otherwise
   the store never lets the
   server's version overwrite a pending local change; the sync engine (PR 4)
   is the one place that applies these rules.
@@ -379,8 +393,10 @@ Decided while building PR 4.
   `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
   origin. The handler (`proxyHandler` in `@astrotime/caldav`) passes only the
   headers CalDAV needs, maps redirects back into its URL space, and refuses
-  origins off its allowlist. It serves the app's own pages only: a request
-  with another `Origin`, or that the browser marks cross-site, is refused, so
+  origins off its allowlist (an `http://` origin on it, with no port, lets
+  its host's `https://` through too, as its upgrade redirect passes). It
+  serves the app's own pages only: a request with another `Origin`, or that
+  the browser marks cross-site, is refused, so
   a page elsewhere cannot use it to reach the servers behind it. The host is
   compared, not the scheme, so it works behind a TLS terminator. A caller
   that is not a browser sends neither header and passes: the check keeps
@@ -393,7 +409,10 @@ Decided while building PR 4.
   (`canonicalHref`: `a@b.ics` and `a%40b.ics` are one resource) for
   comparing, while requests about an href use the server's own spelling. A redirect
   to another server is not passed through the proxy (the browser would keep
-  the credentials for it): sign in with that server's address instead. The dev server allows any origin
+  the credentials for it): sign in with that server's address instead. _Since
+  round 5 ([providers D263](providers.md#D263)):_ the image's proxy logs a
+  failure by its method and the server's origin only, never a path or a
+  query, since a subscription's address may hold a secret. The dev server allows any origin
   (only while it listens on localhost; with `--host` it requires the list) unless
   `ASTROTIME_PROXY_ALLOW` lists some; the production image (PR 7) requires
   the list.
@@ -927,7 +946,11 @@ Decided while building PR 5a-3.
     One that holds items stays beside the server's, as its own calendar,
     and its items move to a server's calendar one by one in the edit dialog
     ([D106](#D106)). Removing it asks first, and says its items are on no
-    server. Uploading them all at once is [Deferred](#deferred).
+    server. Other calendars on this device, the user's own (an import
+    makes them, [import D269](import.md#D269)), are on the same account
+    under addresses of their own: they keep their names and never step
+    aside, empty or not; the first one still steps aside alone when it is
+    empty, and the account goes once it has no calendar left. Uploading them all at once is [Deferred](#deferred).
   - Where a new item goes is one rule, `newItemCalendar` (on
     `firstCalendarFor`: the first calendar that takes it, visible before
     hidden, in list order), as calendars come and go while its dialog is
@@ -1130,7 +1153,9 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   set computed on waking: each platform shows such a one within its own
   grace (the web 5 minutes, [D101](#D101); the desktop an hour,
   [desktop D76](desktop.md#D76)) and drops it after; one turned off,
-  deleted or edited away is not in the new set, so it never shows.
+  deleted or edited away is not in the new set, so it never shows. One
+  shown that leaves the set and comes back within its grace (a task ticked
+  done and unticked) is not shown again, on every platform.
   - **What notifies.** `ACTION:DISPLAY` and `AUDIO`; an alarm without
     `ACTION` reads as `DISPLAY`. `EMAIL` is not ours (a server such as
     Nextcloud sends it), `NONE` (RFC 9074, Apple's placeholder) and
@@ -1361,6 +1386,8 @@ Decided while building PR 6a.
     undefined). Weekdays shift by as many days (Monday, Wednesday and
     Friday a day later are Tuesday, Thursday and Saturday; "weekly on
     Tuesday" becomes "on Wednesday"); the start's nth weekday of its month
+    (the first to the fifth, or the last to the fifth from last; any other
+    `BYDAY` position is no preset, and the rule is kept as written)
     becomes the new day's, as the repeat menu names it (the 2nd Tuesday
     moved to the 18th is the 3rd Wednesday, a day in the month's last week
     the last); the start's day of the month (`BYMONTHDAY`) and a yearly
@@ -1409,7 +1436,8 @@ Decided while building PR 6a.
     not count, so no object is left with no occurrence (an edit's old
     series, a deletion's whole object goes). An exception before it counts
     even when an EXDATE names its occurrence too, as the views show it
-    ([D34](#D34)).
+    ([D34](#D34)). Deleting "this occurrence" when it is the last that
+    shows deletes the object too.
   - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
     made all-day or timed (`movedRule`): it ends on the same day, written
     as a date for an all-day series, as 23:59:59 that day in the start's
@@ -1776,8 +1804,12 @@ Found by the logic QA after v0.2.0 (the owner's feedback: "silly logic
 errors").
 
 - **D141. A series' set is RFC 5545's where ical.js strays.**
-  `seriesStarts` (`recurrence.ts`, [D118](#D118)) follows RFC 5545 in four
+  `seriesStarts` (`recurrence.ts`, [D118](#D118)) follows RFC 5545 in five
   places where ical.js does not:
+  - **A date `UNTIL` on a series of times** (RFC 5545 forbids it, older
+    clients write it) ends with its day, as libical reads it: ical.js ended
+    the series at that day's midnight, before its last occurrence, while
+    the edit dialog said "until" that day. The rule as written is kept.
   - **A UTC `UNTIL` bounds by its instant** in a zone the object does not
     define ([D32](#D32): Google's and Outlook's TZID with no VTIMEZONE).
     ical.js has such a `DTSTART` as a wall clock and compared the `UNTIL`
@@ -1817,6 +1849,14 @@ optimization is lacking").
     i18next and the rest each in one, cached across updates. The groups take
     only what the page loads at once (`$initial`), so a library only a
     dialog loaded later uses (Base UI's switch) loads with that dialog.
+    _Since round 5 ([providers D255](providers.md#D255)):_ AstroTime's own
+    packages that load at once (`core`, `caldav`, `storage`, `sync`) are a
+    group too, `app`: a part loaded later that needs some of them (the
+    subscriptions' file splitter needs the iCalendar core) takes them from
+    it. Without it the bundler cut those modules into a chunk of their own,
+    which compresses worse (a lazy import of `@astrotime/core/split` cost
+    1.5 KiB at once); with it the first load is one `index` and one `app`
+    chunk, 4.6 KiB smaller (131 200 to 126 492 bytes on main `ea40a24`).
   - **Dialogs with their first opening**: the edit dialog, Settings and the
     Conflicts list (`components/lazy.tsx`), each a stand-in with its props
     that draws nothing until first open, stays drawn after, and fetches its
@@ -1839,8 +1879,14 @@ optimization is lacking").
     menu's choice (`calendar/copy.ts`, `@astrotime/core/copy`); after #78
     AstroTime's own code at once was 130.3 KiB, past the budget, and it is
     123.5 KiB with them out of the first load.
-    Signing in and the sync stack stay in the first load
-    ([Deferred](#deferred)). _Since [design D155](design.md#D155):_ the
+    The sync stack stays in the first load ([Deferred](#deferred)); _since
+    round 5_ but for CalDAV's provider and XML parser, which load with an
+    account's first sync or sign-in ([providers D255](providers.md#D255)).
+    _Since round 5:_ the sign-in dialog loads the same way, with its
+    first opening (its forms and Base UI's tabs, 5.4 KiB; the buttons every
+    dialog shares in `components/buttons.ts`), for the room
+    [providers D255](providers.md#D255) asks; the `SignIn` steps stay, as
+    the accounts' context takes up a held approval with them. _Since [design D155](design.md#D155):_ the
     Agenda loads the same way, with its first showing (its notice's "Close"
     leaves it for the Week), and the edit dialog's draft is made in the
     editor's chunk, so neither is in the first load.
@@ -1849,6 +1895,16 @@ optimization is lacking").
     at once and fails when they pass 340 KiB gzipped (318 at D145) or
     AstroTime's own code in them 130 KiB (120); a PR that needs more raises
     the budget, saying why.
+    _Exceptions the owner delegated:_ #158's
+    +146 bytes (127 559 to 127 705 on main `937fdb8`), 44 over a PR's
+    +0.1 KiB (a remembered scheme bound to its
+    origin and pruned with its account, [providers D260](providers.md#D260)),
+    paid back by [providers D255](providers.md#D255)'s lazy CalDAV
+    (`perf/lazy-caldav`, −3.1 KiB measured); #161's +235 bytes (124 723 to
+    124 958 on main `51ad5f3`), 133 over, for "+ New list" on the tasks
+    screen, its dialog's loader and the chunk that makes a calendar named
+    in the first load ([design D276](design.md#D276)), accepted by the
+    orchestrator for the owner in round 5.
   - **Measured by hand** with `scripts/bench-cold-start.ts`: the built app
     on the image's server, its store filled with `big-calendar.ts`'s 12 230
     objects (D118's), the median of five new tabs, the service worker passed
@@ -2287,6 +2343,39 @@ task?"
 
 ## Deferred
 
+- **A creation whose upload keeps failing, listed by the server**
+  ([D38](#D38)) — it stays pending and reported, and every sync keeps its
+  token and lists the calendar again until the upload recognises the
+  object as its own (or another's, which then wins and ours goes to the
+  Conflicts list); a server that keeps refusing the write (a 500, a 403)
+  makes each sync a full listing for as long, with no cap or backoff.
+  The token is kept on purpose: advanced, the server's object would never
+  be listed again, and a local deletion of the pending creation (which
+  removes it at once, D38) would leave it unseen on this device.
+- **A second edit made while an update's server copy is found gone**
+  ([D38](#D38)) — the server's deletion wins and the href is reported in
+  `dropped`, but that second edit goes with it, not left pending as a
+  deletion in flight leaves one.
+- **A VTIMEZONE-only zone across DST** ([D32](#D32)) — a zone `Intl`
+  does not know (`Customized Time Zone`) is read on a wall clock with the
+  series' own offset (`wallClockNear`, `epochNear`), wherever `edits.ts`
+  and `repeat.ts` need one: a series moved, a RECURRENCE-ID in UTC put on
+  its clock and ordered, the `UNTIL` before an occurrence, the day an
+  `UNTIL` ends on. On the far side of a DST change each is an hour off;
+  reading through the object's VTIMEZONE (ical.js's `convertToZone`) would
+  be exact. Before, each of these threw.
+- **A weekly series with ends in two undefined zones across DST**
+  ([D32](#D32)) — its length is the first occurrence's, by instant, so
+  in the weeks where the two zones' DST rules differ (Europe's and the US'
+  in March and October) an occurrence's end is an hour off its written
+  wall clock in the end's zone.
+- **"This and following" from an RDATE its rule does not make**
+  ([D105](#D105)) — the new series starts on the RDATE's day, and an
+  `RRULE` that leaves its days to `DTSTART` (no `BYDAY`, `BYMONTHDAY`,
+  `BYMONTH`) moves to that day: Mondays split at a Wednesday RDATE become
+  Wednesdays. Its `COUNT` is one short too, since `DTSTART` counts as an
+  occurrence of the rule. Writing those parts out from the old start, and
+  counting the start, waits; AstroTime itself writes no RDATEs.
 - **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
   in the user's `/Calendar`, attached to nothing; attaching it to the item
   if that was saved meanwhile, or removing it, waits for an upload that
@@ -2329,10 +2418,12 @@ task?"
 - **An `RDATE` period moved with its series** — a series moved keeps its
   `RDATE`s of periods where they were, and one made all-day keeps them
   timed ([D142](#D142)).
-- **The sync stack and signing in with their first use** — CalDAV, the
-  XML parser and the sign-in dialog (some 30 KiB gzipped) still load at
-  once ([D145](#D145)); they belong to the accounts' code, which was being
-  rewritten when D145 was measured.
+- **The sync stack with its first use** — the engine and the `SignIn`
+  steps still load at once ([D145](#D145)); they belong to the accounts'
+  code, which was being rewritten when D145 was measured. The sign-in
+  dialog itself loads with its first opening since round 5, and CalDAV's
+  provider and XML parser with an account's first sync or sign-in
+  ([providers D255](providers.md#D255)).
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by

@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { PLACES, placesFrom, presetFrom, throughProxy } from "@astrotime/caldav";
 import { chromium } from "playwright";
-import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vite-plus/test";
 
 import { compress } from "../src/compress.ts";
 import {
@@ -767,4 +767,35 @@ test("compressing again drops a copy that no longer pays off", async () => {
   writeFileSync(join(root, "app.js"), "1");
   expect(await compress(root)).toBe(0);
   expect(readdirSync(root)).toEqual(["app.js"]);
+});
+
+test("a proxied failure is logged by method and origin, never a path or a query (providers D251)", async () => {
+  const secret = "https://cal.example/feeds/private-4f3e2d1c/basic.ics?token=s3cr3t";
+  // An address with credentials in it, as an error's words may carry one.
+  const credentialed = "https://jane:t0ken-xyz@cal.example:8443/feeds/private-4f3e2d1c/basic.ics";
+  const broken = (async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("BEGIN:VCALENDAR"));
+          controller.error(new Error(`upstream broke while reading ${secret} (${credentialed})`));
+        },
+      }),
+      { status: 200 },
+    )) as unknown as typeof fetch;
+  const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+  writeFileSync(join(root, "index.html"), "x");
+  const server = createAppServer({ root, allow: ["https://cal.example"], fetch: broken });
+  const base = await listen(server);
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const read = fetch(`${base}${throughProxy(DAV_PROXY_PREFIX).to(secret)}`).then((response) =>
+    response.text(),
+  );
+  await expect(read).rejects.toThrow();
+  const logged = log.mock.calls.flat().map(String).join("\n");
+  log.mockRestore();
+  expect(logged).toContain("GET https://cal.example");
+  expect(logged).not.toMatch(/private-4f3e2d1c|basic\.ics|token|s3cr3t|jane|t0ken-xyz/);
+  expect(logged).toContain("https://cal.example:8443");
+  await new Promise((resolve) => server.close(resolve));
 });

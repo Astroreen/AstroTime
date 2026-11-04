@@ -3,7 +3,14 @@
 import { expect, test } from "vite-plus/test";
 
 import { catalogs, createI18n, LANGUAGES } from "../src/i18n/index.ts";
+import { fileStrings } from "../src/i18n/files.ts";
+import { dataStrings } from "../src/i18n/data.ts";
+import { importStrings } from "../src/i18n/import.ts";
+import { newListStrings } from "../src/i18n/new-list.ts";
 import { pictureStrings } from "../src/i18n/pictures.ts";
+import { signInStrings } from "../src/i18n/sign-in.ts";
+import { subscribeStrings } from "../src/i18n/subscribe.ts";
+import { taskStrings } from "../src/i18n/tasks.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
 const base = (key: string) => key.replace(PLURAL, "");
@@ -69,13 +76,32 @@ test("plurals follow each language's rules", () => {
   ]);
 });
 
-test("the strings that load later have the same keys in every language (design D222)", () => {
-  expect(Object.keys(pictureStrings.ru).toSorted()).toEqual(
-    Object.keys(pictureStrings.en).toSorted(),
-  );
-  for (const key of Object.keys(pictureStrings.en) as (keyof typeof pictureStrings.en)[]) {
-    expect(variables(pictureStrings.ru[key]), key).toEqual(variables(pictureStrings.en[key]));
-    // None is also in the app's own catalog: one place for each string.
-    expect(catalogs.en, key).not.toHaveProperty(key);
+test("the strings that load later have the same keys in every language (design D222, D236, D237, providers D262, D263, import D273, design D276)", () => {
+  for (const later of [
+    pictureStrings,
+    fileStrings,
+    taskStrings,
+    signInStrings,
+    subscribeStrings,
+    dataStrings,
+    importStrings,
+    newListStrings,
+  ] as Record<"en" | "ru", Record<string, string>>[]) {
+    const bases = (catalog: Record<string, string>) =>
+      [...new Set(Object.keys(catalog).map(base))].toSorted();
+    expect(bases(later.ru)).toEqual(bases(later.en));
+    for (const language of LANGUAGES) {
+      const categories = new Intl.PluralRules(language).resolvedOptions().pluralCategories;
+      for (const key of Object.keys(later[language]).filter((name) => PLURAL.test(name))) {
+        for (const category of categories)
+          expect(later[language], language).toHaveProperty(`${base(key)}_${category}`);
+      }
+    }
+    for (const key of Object.keys(later.en)) {
+      const ru = later.ru[key] ?? later.ru[`${base(key)}_other`]!;
+      expect(variables(ru), key).toEqual(variables(later.en[key]!));
+      // None is also in the app's own catalog: one place for each string.
+      expect(catalogs.en, key).not.toHaveProperty(key);
+    }
   }
 });

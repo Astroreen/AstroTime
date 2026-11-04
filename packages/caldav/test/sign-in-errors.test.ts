@@ -6,16 +6,16 @@ import { AuthError, OfflineError, ServerBusyError } from "@astrotime/core";
 import { expect, test, vi } from "vite-plus/test";
 
 import {
-  CalDavProvider,
   CertificateError,
   fetchClient,
   NoCalendarHomeError,
   proxyHandler,
   ProxyRefusedError,
-  startLoginFlow,
   throughProxy,
   type HttpClient,
 } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
+import { startLoginFlow } from "../src/login-flow.ts";
 
 const via = throughProxy("/dav-proxy/");
 const credentials = { username: "u", password: "p" };

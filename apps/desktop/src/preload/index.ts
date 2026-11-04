@@ -21,6 +21,11 @@ const bridge: Bridge = {
     delete: (key) => ipcRenderer.invoke(CHANNELS.secretsDelete, key),
   },
   openExternal: (url) => ipcRenderer.send(CHANNELS.openExternal, url),
+  oauth: {
+    begin: () => ipcRenderer.invoke(CHANNELS.oauthBegin),
+    open: (id, url) => ipcRenderer.invoke(CHANNELS.oauthOpen, id, url),
+    cancel: (id) => ipcRenderer.send(CHANNELS.oauthCancel, id),
+  },
   connectStore: () => ipcRenderer.send(CHANNELS.store),
   reminders: {
     supported: process.argv.includes(NOTIFICATIONS_ARGUMENT),

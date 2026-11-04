@@ -29,7 +29,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `recurrence.ts` — where a series is walked from (`startNear`: whole
       periods of its rule after `DTSTART`, near the range) and its starts
       (`seriesStarts`). → `plans/foundation.md#D118`
-  - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `ItemTime`, `wallClockOf` — the time model (`time.ts`, also
+    `@astrotime/core/time` with `ianaName`, a TZID or Windows zone name as
+    IANA's, for the providers). → `plans/foundation.md#D31`
   - `colors.ts` — CSS3's colour names and the nearest of a hex: an item's
     exact colour is written as `COLOR` with `X-ASTROTIME-COLOR` beside it.
     → `plans/foundation.md#D174`
@@ -60,12 +62,30 @@ When you add a package, app or module, add its line here in the same PR.
   - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
     `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its
     start's day. → `plans/foundation.md#D105`
+  - `splitCalendar`, `splitCalendars` (`split.ts`, `@astrotime/core/split`)
+    — a calendar file cut into one object per UID with the zones it uses;
+    strict for a subscription's answer, forgiving for a file from the
+    device; `jcalText`, jCal as iCalendar; `overlay`, a file's version
+    over a stored one; `joinCalendar`, objects as one calendar file.
+    Loaded with what needs it.
+    → `plans/import.md#D267`, `plans/providers.md#D251`
+  - `lines.ts` (`@astrotime/core/lines`) — iCalendar's lines for the
+    providers that map another service's JSON: escaping, folding at 75
+    octets, a calendar's components and their properties, times.
+    → `plans/providers.md#D253`
+  - `PartialListing` (`provider.ts`) — a provider of two parts listing
+    one: the engine keeps the other part's calendars and reports it
+    `failed`. → `plans/providers.md#D252`
   - `vtimezone.ts` — a VTIMEZONE made from `Intl` for a zone the object
     does not define. → `plans/foundation.md#D104`
   - `mergeObjects` — the three-way merge of a refused write;
     `differences`, the fields two versions differ in.
     → `plans/foundation.md#D6`, `plans/foundation.md#D107`
   - `Provider` — the interface every provider implements (and
+    `makeCalendar` with a `NewCalendar`, a calendar or task list made on
+    the server, its name as `calendarNameOf` (`new-calendar.ts`,
+    `@astrotime/core/new-calendar`) sends it, `CannotMakeCalendarError`
+    why none was, `plans/providers.md#D275`; and
     `FileStore`, `RemoteFile`: an account's files where its server keeps
     them, `plans/foundation.md#D231`);
     `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a
@@ -92,7 +112,10 @@ When you add a package, app or module, add its line here in the same PR.
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
-      → `plans/foundation.md#D122`
+      → `plans/foundation.md#D122`; another calendar there (an import's,
+      made in `import/plan.ts`) is never removed; `withUids`, a
+      calendar's objects by UID, an import's last look before each batch.
+      → `plans/import.md#D269`, `plans/import.md#D270`
     - `subscribe` — hears every write that changed a row, for live
       queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`
     - `undoneTasksBefore` — the undone tasks due before today.
@@ -127,13 +150,25 @@ When you add a package, app or module, add its line here in the same PR.
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 
 - `packages/caldav` (`@astrotime/caldav`) — the CalDAV provider.
-  - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars with
-    their sync tokens, `sync-collection` with the objects' data and a full
-    listing as fallback, multiget, writes with ETags.
+  - `CalDavProvider`, `send` (`@astrotime/caldav/provider`, loaded with an
+    account's first sync or sign-in, with its XML parser; the index exports
+    `home.ts`'s credentials, `NoCalendarHomeError` and `keepsFiles` for the
+    first load) → `plans/providers.md#D255` — discovery
+    (`/.well-known/caldav`), calendars with their sync tokens,
+    `sync-collection` with the objects' data and a full listing as
+    fallback, multiget, writes with ETags.
     → `plans/foundation.md#D2`, `plans/foundation.md#D127`; `people`, RFC
     3744's principal search asked of the calendar home.
-    → `plans/design.md#D208`
-  - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
+    → `plans/design.md#D208`; `makeCalendar`, one `MKCALENDAR` in the
+    home (`make.ts`, loaded then). → `plans/providers.md#D275`
+  - `Authorization` (`auth.ts`) — a request's credentials: Basic, an
+    OAuth bearer token (`TokenSource`, `plans/providers.md#D254`), or
+    Digest once the server asks (`digest.ts`, loaded then).
+    → `plans/providers.md#D260`; `inClear`, whether an address sends them
+    unencrypted, for the sign-in dialog's word. → `plans/providers.md#D262`
+  - `startLoginFlow` (`@astrotime/caldav/login-flow`, loaded with the
+    first sign-in, `plans/providers.md#D260`) — Nextcloud Login Flow v2.
+    → `plans/foundation.md#D19`;
     `resumeLoginFlow`, one a page before this one started, from its
     `LoginFlowState` → `plans/foundation.md#D121`;
     `revokeAppPassword`, the app password it gave revoked when its account
@@ -159,11 +194,40 @@ When you add a package, app or module, add its line here in the same PR.
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
   - `CertificateError` — a server certificate the platform refused (Android's
     plugin tells it apart). → `plans/android.md#D62`
+  - `test/recording.ts`, `test/scenario.ts` — a service's requests and
+    answers recorded (`scripts/record-caldav-service.ts`, the account's
+    values put out) and replayed strictly by `test/services.test.ts`; the
+    recordings in `test/fixtures/services/`. → `plans/providers.md#D249`
   - `test/fixtures/` — calendar homes' `PROPFIND` answers from Nextcloud
     (owned, shared read-only and read-write) and Radicale, for the rights
     read from `current-user-privilege-set`; where each comes from:
     [`README.md`](../packages/caldav/test/fixtures/README.md).
     → `plans/foundation.md#D37`
+- `packages/ics` (`@astrotime/ics`) — subscriptions: `IcsProvider`, a
+  read-only calendar from an ICS address by a conditional GET, split by
+  `@astrotime/core/split`; `HeldRemovalError`, a file that would remove
+  most of its calendar. Loaded with an account of its kind.
+  → `plans/providers.md#D251`, `plans/providers.md#D263`
+- `packages/google` (`@astrotime/google`) — a Google account:
+  `GoogleProvider`, its calendars over Google's CalDAV and its task lists
+  over the Tasks API (`GoogleTasks`, `vtodoOf`, `taskFieldsOf`); what a
+  write could not keep said (`WriteResult.dropped`, the sync's
+  `not-kept`). → `plans/providers.md#D252`; a new calendar through the
+  Calendar API (`GoogleCalendars`), a new task list through the Tasks
+  API (`makeCalendar`). → `plans/providers.md#D275`
+- `packages/microsoft` (`@astrotime/microsoft`) — a Microsoft account
+  over Graph: `MicrosoftProvider`, its Outlook calendars
+  (`OutlookCalendars`, `veventOf`, `eventFieldsOf`, `rruleOf`,
+  `recurrenceOf`) and its To Do lists (`MicrosoftTodo`, `vtodoOf`,
+  `todoFieldsOf`); not wired in yet. → `plans/providers.md#D253`; a new
+  Outlook calendar or To Do list (`makeCalendar`). → `plans/providers.md#D275`
+- `packages/oauth` (`@astrotime/oauth`) — OAuth 2 with PKCE:
+  `authorization`, `codeOf`, `exchange`, `tokenSource` (a `TokenSource`
+  the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`; `OAuthRedirect`,
+  each platform's way back (`Platform.oauth`: `apps/mobile/src/oauth.ts`,
+  `apps/desktop/src/main/oauth.ts`, `apps/web/src/oauth.ts` with
+  `public/oauth.html`).
+  → `plans/providers.md#D254`
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`
   - `syncAll` — the one sync entry every shell calls: every account (but
@@ -173,13 +237,26 @@ When you add a package, app or module, add its line here in the same PR.
     `removeAccount` keep an account with its credentials.
     → `plans/foundation.md#D90`; `hasFiles`, whether an account has files,
     and `accountFiles` (`files.ts`, `@astrotime/sync/files`, loaded with
-    the file picker), them opened with its saved credentials.
-    → `plans/foundation.md#D231`
+    the file picker), them opened with its saved credentials; `noFilesOf`
+    there, why an account has none. → `plans/foundation.md#D231`,
+    `plans/design.md#D237`
     → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
     mention. → `plans/design.md#D208`
+  - `calendars.ts` (`@astrotime/sync/calendars`) — `makeCalendar`, a
+    calendar or task list made on an account's server now and kept here
+    (a sync removes only the calendars it had before it listed);
+    `makesCalendars`, which accounts can. → `plans/providers.md#D275`
+  - `subscriptions.ts` (`@astrotime/sync/subscriptions`) — adding a
+    subscription, opening it for `syncAll`, its hourly reads, applying a
+    held removal; `syncs`, whether an account syncs with a server.
+    → `plans/providers.md#D263`
   - `test/budget.test.ts` — the requests each action costs a server, held
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
+  - `test/interop/` — the interop run's servers in containers (Baïkal,
+    Xandikos, DAViCal, Davis, Stalwart, Cyrus: `compose.yaml`), one chosen
+    by `ASTROTIME_INTEROP` (`.github/workflows/interop.yml`). → `plans/providers.md#D248`,
+    `plans/providers.md#D261`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
     Login Flow v2 approved in Chromium on Nextcloud's own pages, and on
@@ -212,7 +289,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/foundation.md#D92`, `plans/foundation.md#D122`,
       `plans/foundation.md#D123`, `plans/design.md#D137`
     - `tasks-screen.tsx` — the tasks screen, in the view's place on a wide
-      screen, from the top bar's calendar | tasks switch.
+      screen, from the top bar's calendar | tasks switch, its "+ New list"
+      (`plans/design.md#D276`).
       → `plans/design.md#D95`, `plans/design.md#D227`; `task-motion.ts`,
       its tasks sliding to where they are when they change, loaded with it.
       → `plans/design.md#D197`
@@ -225,7 +303,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D134`
     - `dialog-parts.tsx` — every dialog's backdrop and popup, which let a
       press through while they close, and their looks (`sheet`,
-      `dialogIcon`). → `plans/design.md#D136`
+      `dialogIcon`). → `plans/design.md#D136`; where a sheet or a centred
+      dialog stands, clear of a phone's system bars (`.sheet`, `.centred`
+      in `styles.css`). → `plans/design.md#D235`
     - `color-select.tsx`, `color-settings.tsx` — the colour dropdown with
       a dot left of each name; the default colours and the user's own in
       Settings, each in a dialog of its own. → `plans/design.md#D168`,
@@ -239,9 +319,11 @@ When you add a package, app or module, add its line here in the same PR.
       screen), from the drawer's foot. → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
     - `lazy.tsx` — dialogs that load with their first opening: the
-      details, the edit dialog, Settings, the Conflicts list, and the
-      copy's notice (`copy-notice.tsx`); and the Agenda with its first
-      showing. → `plans/foundation.md#D145`
+      details, the edit dialog, Settings, the Conflicts list, the sign-in
+      dialog (`plans/providers.md#D255`), and the copy's notice
+      (`copy-notice.tsx`); and the Agenda with its first showing.
+      → `plans/foundation.md#D145`
+    - `buttons.ts` — the filled and the text button every dialog shares.
     - `editing.tsx` — `useEditing`: any part of the UI opens an item's
       details or creates one, or gives an occurrence new times
       (`reschedule`); the details (`item-details.tsx`), the edit
@@ -281,15 +363,35 @@ When you add a package, app or module, add its line here in the same PR.
       that open, inline files saved on demand (`Platform.saveFile` where
       the platform saves files). → `plans/design.md#D230`
     - `attachments-field.tsx` — the edit dialog's attachments: each
-      taken off, a link added. → `plans/design.md#D233`
+      taken off, a link added, the three ways to attach in sight.
+      → `plans/design.md#D233`, `plans/design.md#D237`
     - `file-picker.tsx` — the account's files, a folder at a time, to
       attach one. → `plans/design.md#D234`
+    - `export-dialog.tsx` — Settings' "Export to a file": a calendar as one
+      `.ics`; `save-file.ts`, a file saved where the platform saves files
+      or downloaded, the attachments' too. → `plans/import.md#D274`
+    - `import-dialog.tsx` — Settings' "Import from a file" and its dialog:
+      the preview of each source, where it goes (a new calendar on an
+      account's server too), the question about items already there, the
+      progress and the summary; loaded with its first opening.
+      → `plans/import.md#D265`, `plans/import.md#D268`, `plans/import.md#D277`
+    - `new-list-dialog.tsx` — the tasks screen's "+ New list": a name and
+      where, made on the account's server or on this device; loaded with
+      its first opening. → `plans/design.md#D276`
     - `mention-field.tsx` — the edit dialog's description, where "@"
       offers the account's people and writes a mention.
       → `plans/design.md#D208`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
-      map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
+      map and its two icons at the end of the line, the map and the
+      address tappable. → `plans/design.md#D175`, `plans/design.md#D177`,
+      `plans/design.md#D238`
+  - `calendar/make.ts` — a calendar or list made where chosen (an
+    account's server through `@astrotime/sync/calendars`, or this device),
+    and why one was not, in a dialog's words (`calendar/place.ts`, with
+    `DEVICE`); `calendar/device-calendar.ts`, a calendar on this device's
+    account. Loaded with what makes one.
+    → `plans/design.md#D276`, `plans/import.md#D277`
   - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
     the UI shows them, the calendar on this device named in the language
     spoken now. → `plans/foundation.md#D122`
@@ -316,7 +418,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D155`
     - `editing.ts` — the edit dialog's form, the changes it makes, the
       scopes and calendars offered and the writes to the store
-      (`saveChanges`, a drag's too); `copy.ts` — "Make a copy" and "Copy
+      (`saveChanges`, a drag's too); `problems.ts`, its save problems as
+      catalog keys, a task's in its words (design D236); `copy.ts` — "Make a copy" and "Copy
       to…" (`saveCopy`, `copyToForm`, design D164), loaded with the menu;
       `when.ts` — when an item is, in words (the details' line, a move's
       announcement); `words.ts` — rules and reminders in
@@ -328,6 +431,17 @@ When you add a package, app or module, add its line here in the same PR.
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
       `moved`, `keyMove`), the slot and column under a point, the ghost's
       occurrence, when a press is a drag. → `plans/foundation.md#D113`
+  - `import/` — an import's logic, loaded with its dialog: `readImport`
+    (`read.ts`), a file's format told from its bytes and its sources;
+    `decodeText` (`decode.ts`), its charset; `unzip` (`zip.ts`, loaded for
+    a ZIP alone); `vcalendarToIcs` (`vcs.ts`, loaded for vCalendar 1.0
+    alone), a `.vcs` as iCalendar; `csvToIcs` (`csv.ts`, loaded for a CSV
+    alone), Outlook's, Thunderbird's and Google's columns as iCalendar;
+    `takeoutToIcs` (`takeout.ts`, loaded for Takeout's tasks alone)
+    (`plans/import.md#D272`);
+    `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`), where each
+    source goes, a new calendar on this device, and the writes in batches.
+    → `plans/import.md#D266`–`#D271`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in
     maps". `wikipediaPhotos` (`photos.ts`), a place's photo from
@@ -359,8 +473,16 @@ When you add a package, app or module, add its line here in the same PR.
     "Reminders" setting in Settings and a tapped reminder opening its day
     and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
-  - `i18n/` — i18next and the English and Russian catalogs; `pictures.ts`,
-    the strings of the pictures' parts that load later.
+  - `i18n/` — i18next and the English and Russian catalogs; strings that
+    load later with their part (`later.ts`): `pictures.ts`, the pictures',
+    `files.ts`, why the edit dialog's attachments have no files,
+    `tasks.ts`, a task's list in a task's words, `sign-in.ts`, the
+    sign-in dialog's word on an address in clear
+    (`plans/providers.md#D262`), `subscribe.ts`, the sign-in dialog's
+    subscription and a held removal (`plans/providers.md#D263`), `data.ts`
+    and `import.ts`, Settings' "Data" group's and the import dialog's
+    (`plans/import.md#D273`), `new-list.ts`, "+ New list"'s
+    (`plans/design.md#D276`).
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
@@ -400,7 +522,7 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D108`; `drag.spec.ts` drags, resizes and moves by
     keys (a finger through Chromium's touch input under `page.clock`),
     `drag-screenshots.spec.ts` takes the dragging evidence.
-    → `plans/design.md#D111`; `insets.spec.ts` keeps the shell clear of a
+    → `plans/design.md#D111`; `insets.spec.ts` keeps the shell and the dialogs clear of a
     phone's system bars. → `plans/android.md#D68`; `a11y.spec.ts` audits
     every view and dialog with axe-core (WCAG 2.2 AA) and checks focus,
     landmarks, reflow and reduced motion. → `plans/design.md#D119`;
@@ -413,6 +535,9 @@ When you add a package, app or module, add its line here in the same PR.
     brings the calendar back. → `plans/design.md#D227`;
     `files.spec.ts` attaches a file from a faked Nextcloud's files and
     sees the `ATTACH` it uploads. → `plans/design.md#D234`;
+    `import.spec.ts` imports files from Settings on a wide screen and a
+    phone, `import-screenshots.spec.ts` takes the import's evidence
+    (`import-files.ts`, the files they pick). → `plans/import.md#D265`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

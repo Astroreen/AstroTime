@@ -342,6 +342,7 @@ test("a completion or a star that did not land says so: the task gone meanwhile,
             calendars: () => local.calendars(),
             save: (...args) => local.save(...args),
             delete: (id) => local.delete(id),
+            withUids: (...args) => local.withUids(...args),
           }),
         );
       }
@@ -361,7 +362,7 @@ test("a completion or a star that did not land says so: the task gone meanwhile,
   await expect.element(report).toBeInTheDocument();
   (report.element() as HTMLElement).click();
   const notice = page.getByRole("alert");
-  await expect.element(notice.getByText(/^This is no longer on your calendar/)).toBeInTheDocument();
+  await expect.element(notice.getByText(/^This is no longer here/)).toBeInTheDocument();
   await page.getByRole("button", { name: "Dismiss" }).click();
   await expect.element(notice).not.toBeInTheDocument();
 

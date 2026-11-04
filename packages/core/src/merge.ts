@@ -1,6 +1,7 @@
 import ICAL from "ical.js";
 
 import { CalendarObject } from "./calendar-object.ts";
+import { exceptionOf } from "./task-edits.ts";
 import { fromIcalTime, type ItemTime } from "./time.ts";
 
 /**
@@ -158,7 +159,8 @@ function newest(component: ICAL.Component, sources: readonly (ICAL.Component | u
  * way.
  */
 export function mergeObjects(base: string, local: string, server: string): Merge {
-  const b = itemsOf(CalendarObject.parse(base));
+  const baseObject = CalendarObject.parse(base);
+  const b = itemsOf(baseObject);
   const l = itemsOf(CalendarObject.parse(local));
   const serverObject = CalendarObject.parse(server);
   const s = itemsOf(serverObject);
@@ -184,8 +186,10 @@ export function mergeObjects(base: string, local: string, server: string): Merge
     }
     if (!lc || !sc) continue;
 
+    // An exception both sides added started from the occurrence the series made.
+    const from = bc ?? occurrenceOf(baseObject, lc);
     const [bf, lf, sf] = [
-      bc ? fieldsOf(bc) : new Map<string, string>(),
+      from ? fieldsOf(from) : new Map<string, string>(),
       fieldsOf(lc),
       fieldsOf(sc),
     ];
@@ -202,6 +206,19 @@ export function mergeObjects(base: string, local: string, server: string): Merge
 
   addMissingTimezones(root, CalendarObject.parse(local).root);
   return { ics: serverObject.serialize(), conflict };
+}
+
+/** The occurrence an exception replaces as the object's series makes it; none without a series. */
+function occurrenceOf(
+  object: CalendarObject,
+  exception: ICAL.Component,
+): ICAL.Component | undefined {
+  const { master } = object.components;
+  const id = exception.getFirstPropertyValue("recurrence-id");
+  if (!master || !(id instanceof ICAL.Time)) return undefined;
+  if (!master.hasProperty("rrule") && !master.hasProperty("rdate")) return undefined;
+  if (!master.hasProperty("dtstart") && !master.hasProperty("due")) return undefined;
+  return exceptionOf(master, fromIcalTime(id));
 }
 
 function valuesOf(field: string | undefined): Set<string> {

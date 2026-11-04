@@ -2,7 +2,8 @@
 // Radicale on every run, Nextcloud in CI's nightly job, every request
 // recorded and held to a budget, so a change that sends more fails here
 // instead of on the user's server.
-import { CalDavProvider, fetchClient } from "@astrotime/caldav";
+import { fetchClient } from "@astrotime/caldav";
+import { CalDavProvider } from "@astrotime/caldav/provider";
 import { CalendarObject, type SecretStore } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";

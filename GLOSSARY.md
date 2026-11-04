@@ -4,14 +4,18 @@ One word per concept. Use these terms in code, docs, commits and UI.
 
 ## The product
 
-- **Account** — one sign-in to one server through one provider (a Nextcloud
-  user, for example). Holds its credentials and its calendars. Named
-  `user@host` in the UI.
+- **Account** — one sign-in to one service through one provider (a
+  Nextcloud user, a Google account), whatever APIs the provider uses
+  there. Holds its credentials and its calendars. Named `user@host` in the
+  UI.
 - **Calendar home** — the collection that holds an account's calendars on
   a CalDAV server, found by discovery (RFC 6764) and kept with the account
   (`homeUrl`).
 - **Provider** — the code that brings an account's calendars in and writes
-  changes back. CalDAV is the first; Google and system calendars come later.
+  changes back, one per kind of account (`Account.provider`): `caldav` (any
+  CalDAV server and the known services), and planned `ics` (subscriptions),
+  `google` (Google's CalDAV and Tasks API in one) and `microsoft` (Graph)
+  (providers D245–D253). System calendars are deferred (foundation D4).
 - **Calendar** — one collection on a server (a CalDAV calendar). It may hold
   events, tasks or both (`supported-calendar-component-set`).
 - **Rights** — what the user may do to a calendar's items: create, edit,
@@ -136,9 +140,20 @@ One word per concept. Use these terms in code, docs, commits and UI.
   of provider `local`: events and tasks with no server, never synced
   (foundation D122). It replaced the **first-run screen**, which asked for
   an account before showing the calendar.
+- **Import** — events and tasks read from a file into a calendar, from
+  Settings; each calendar or task list the file holds is a **source**,
+  put where the user picks (import D265, D269). **Export** is the way back:
+  a calendar as one `.ics` (import D274).
 - **Preset** — the CalDAV server and user name a single-user deployment
   names for whoever opens it, so signing in asks for the password alone
   (foundation D123).
+- **Known service** — a cloud CalDAV service the sign-in dialog offers by
+  name (iCloud, Fastmail, Yandex…): its address filled in, the user gives
+  their name and an app password. Its account is a CalDAV account, not a
+  provider of its own (providers D247, D250).
+- **Subscription** — a read-only calendar from an ICS address
+  (`webcal://`, `https://…ics`), kept fresh by a conditional `GET`
+  (providers D251).
 
 ## Sync
 
@@ -182,6 +197,13 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Proxy** — the stateless web proxy that lets the web app reach CalDAV
   servers despite CORS: in the dev server now, in the web app's Docker image
   later (`proxyHandler`).
+- **Interop run** — the CalDAV tests against every self-hostable server
+  in a container, run when the code that talks to servers or a server's
+  pinned version changes, weekly and by hand (providers D248); the
+  **cloud run** is the same against cloud services' test accounts.
+- **Recording** — a service's requests and answers, captured once from a
+  test account with every personal value replaced, that unit tests replay
+  (providers D249).
 
 ## Platforms
 

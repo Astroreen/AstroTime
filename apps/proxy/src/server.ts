@@ -9,9 +9,36 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { extname, join, resolve, sep } from "node:path";
 
-import { PLACES, proxyHandler, withPreset, type Preset } from "@astrotime/caldav";
+import { PLACES, proxyHandler, throughProxy, withPreset, type Preset } from "@astrotime/caldav";
 
 export const DAV_PROXY_PREFIX = "/dav-proxy/";
+
+/**
+ * A proxied request's failure in the log: its method, the server's origin
+ * and what went wrong, any address in the error's words cut to its origin.
+ * Never a path or a query: a subscription's address may hold a secret
+ * (docs/plans/providers.md#D251, foundation D39).
+ */
+function logProxyFailure(method: string | undefined, url: string, error: unknown): void {
+  let origin = "an unknown server";
+  try {
+    origin = new URL(throughProxy(DAV_PROXY_PREFIX).from(url)).origin;
+  } catch {
+    // Not an address of the proxy's: said as unknown.
+  }
+  const words = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  // Each address as its scheme and host alone: no user name, password,
+  // path or query, whatever the error's words hold.
+  const cut = words.replace(/\bhttps?:\/\/[^\s"'<>]+/gi, (address) => {
+    try {
+      const { protocol, host } = new URL(address);
+      return `${protocol}//${host}`;
+    } catch {
+      return "an address";
+    }
+  });
+  console.error(`AstroTime's proxy: ${method ?? "?"} ${origin}: ${cut}`);
+}
 
 /**
  * What Vite's build writes where the page's nonce goes (`html.cspNonce` in
@@ -466,7 +493,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
     // The cause goes to the log; the client learns only that it failed.
     const done = (error: unknown) => {
       if (overCap.has(req)) error = new TooLarge();
-      if (!(error instanceof TooLarge)) console.error(error);
+      if (!(error instanceof TooLarge)) logProxyFailure(req.method, url, error);
       if (!res.headersSent) {
         res.writeHead(
           error instanceof TooLarge ? 413 : 502,
@@ -517,7 +544,7 @@ function createAppHandler(options: ServerOptions, root: string): Server {
           Readable.fromWeb(response.body as NodeReadableStream)
             .on("error", (error) => {
               // A client that went away is ordinary, not an error to log.
-              if (!gone.signal.aborted) console.error(error);
+              if (!gone.signal.aborted) logProxyFailure(req.method, url, error);
               res.destroy(error);
             })
             .pipe(res);

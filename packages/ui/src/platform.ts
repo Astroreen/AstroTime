@@ -1,3 +1,4 @@
+import type { OAuthRedirect } from "@astrotime/oauth";
 import type { HttpClient, Preset } from "@astrotime/caldav";
 import type { ReminderScheduler, SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
@@ -69,16 +70,22 @@ export interface Platform {
   /** Opens a URL in the system browser: Login Flow v2's page (a new tab on the web). */
   readonly openExternal: (url: string) => void;
   /**
+   * Where an OAuth sign-in's answer comes back (providers D254); a platform
+   * without one offers no OAuth service.
+   */
+  readonly oauth?: OAuthRedirect;
+  /**
    * Saves a file the user asked to keep (an inline attachment, design D230)
    * where the platform keeps files: Android's "Save to" picker. Without it,
    * the browser downloads it (the web; the desktop, whose Electron asks
-   * where).
+   * where). False when the user turned the picker away; the platform says
+   * so where it knows (import D274).
    */
   readonly saveFile?: (file: {
     readonly name: string;
     readonly type: string;
     readonly bytes: Uint8Array;
-  }) => Promise<void>;
+  }) => Promise<boolean | void>;
   /**
    * Signing in to `server` (the address typed, or the one Nextcloud named)
    * begins; the function it returns ends it. A shell that sends plain http

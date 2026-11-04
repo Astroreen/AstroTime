@@ -440,3 +440,60 @@ test("an account signed out does not keep a hidden tab waking at holds' ends for
   page.elapse(122_000);
   expect(calls).toHaveLength(3);
 });
+
+test("a sync that began before a change does not count it sent: a hidden tab sends it at a hold's end (D129)", async () => {
+  const page = fakePage();
+  const pending: ((report: SyncAllReport) => void)[] = [];
+  const sync = () => new Promise<SyncAllReport>((resolve) => pending.push(resolve));
+  const scheduler = new SyncScheduler(sync, page.env);
+  /** Resolves once no sync runs. */
+  const settled = () =>
+    new Promise<void>((resolve) => {
+      const check = () => {
+        if (scheduler.status.running) return;
+        stop();
+        resolve();
+      };
+      const stop = scheduler.subscribe(check);
+      check();
+    });
+  const synced: SyncAllReport = {
+    accounts: [
+      {
+        accountId: "a",
+        status: "synced",
+        report: {
+          uploaded: 0,
+          downloaded: 0,
+          removed: 0,
+          conflicts: 0,
+          skipped: [],
+          errors: [],
+          dropped: [],
+        },
+      },
+    ],
+    finishedAt: 0,
+    retryAt: null,
+    held: [],
+  };
+  scheduler.start();
+  // A change is made while the first sync runs, which read the store before it.
+  scheduler.changed();
+  pending.shift()!(synced);
+  await settled();
+  // Its own sync finds the server busy, held for two minutes, and the tab is hidden.
+  page.hide();
+  page.tick(CHANGE_DEBOUNCE_MS);
+  expect(pending).toHaveLength(1);
+  pending.shift()!({
+    accounts: [{ accountId: "a", status: "offline", detail: "429", report: null }],
+    finishedAt: 0,
+    retryAt: page.env.now() + 120_000,
+    held: [],
+  });
+  await settled();
+  // The hold's end sends the change, which has not gone up.
+  page.elapse(122_000);
+  expect(pending).toHaveLength(1);
+});
