@@ -197,6 +197,13 @@ test("migration 7 gives a writable calendar every right and a read-only one none
     delete: false,
   });
   // …and marks one writable where this build had written no right: read_only wins that way too.
+  // A share this build wrote with some rights and no editing is as written.
+  await driver.query("UPDATE calendars SET rights = 'create,delete' WHERE id = 'shared'", []);
+  expect((await store.calendars()).find((c) => c.id === "shared")?.rights).toEqual({
+    create: true,
+    edit: false,
+    delete: true,
+  });
   await driver.query("UPDATE calendars SET read_only = 0 WHERE id = 'shared'", []);
   expect((await store.calendars()).find((c) => c.id === "shared")?.rights).toEqual({
     create: true,

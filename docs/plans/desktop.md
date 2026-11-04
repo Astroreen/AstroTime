@@ -436,6 +436,9 @@ were checked on 2026-11-01.
   reboot without opening the app ([D75](#D75), [D76](#D76)).
 - **Reminders while the app is not running** — a systemd user timer or a
   small resident helper ([D76](#D76)).
+- **A picture under `app://` in the e2e** — the CSP's `img-src` is
+  checked against `appFiles` over http (`app-protocol.test.ts`), not
+  through Electron's `protocol.handle` ([D71](#D71)).
 - **Other packages** — Flatpak (Flathub), rpm, AUR, Snap ([D78](#D78)).
 - **An AppImage without libfuse2 and with the sandbox** — electron-builder's
   static AppImage runtime (its `appimage` toolset 1.x, beta in 26.18) needs
