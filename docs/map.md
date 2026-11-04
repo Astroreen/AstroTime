@@ -238,8 +238,8 @@ When you add a package, app or module, add its line here in the same PR.
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
   - `test/interop/` — the interop run's servers in containers (Baïkal,
-    Xandikos, DAViCal: `compose.yaml`), one chosen by `ASTROTIME_INTEROP`
-    (`.github/workflows/interop.yml`). → `plans/providers.md#D248`,
+    Xandikos, DAViCal, Davis, Stalwart, Cyrus: `compose.yaml`), one chosen
+    by `ASTROTIME_INTEROP` (`.github/workflows/interop.yml`). → `plans/providers.md#D248`,
     `plans/providers.md#D261`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
