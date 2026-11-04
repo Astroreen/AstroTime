@@ -433,6 +433,8 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(result).toMatchObject({ events: 0, stopped: true });
     expect(result.made.size).toBe(0);
     expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
+    // Nor the account on this device made for it: nothing is left on it.
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
   });
 
   test("Update them: the file's changes over what is stored; what only the stored one has stays (D7)", async () => {
@@ -506,6 +508,7 @@ describe("an import written through the store (import D269–D271)", () => {
     }) as typeof store.saveCalendar;
     await expect(run(store, [one, two], destinations, duplicates)).rejects.toThrow("disk");
     expect((await store.calendars()).map((made) => made.name)).not.toContain("One");
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
   });
 
   test("an item deleted here, its deletion not yet on the server, is brought back by the file", async () => {

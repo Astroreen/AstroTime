@@ -192,6 +192,17 @@ async function addDeviceCalendar(
   });
 }
 
+/**
+ * A calendar the import made on this device, removed again: with the
+ * account it is on when that has no calendar left (one the import made
+ * for it, D122's account with nothing to show).
+ */
+async function unmake(store: Store, calendar: Calendar): Promise<void> {
+  await store.removeCalendar(calendar.id);
+  if ((await store.calendars(calendar.accountId)).length === 0)
+    await store.removeAccount(calendar.accountId);
+}
+
 export const BATCH = 200;
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve));
 
@@ -219,7 +230,7 @@ export async function runImport(run: Run): Promise<Imported> {
     }
   } catch (error) {
     // One that could not be made: the ones made before it go again, empty.
-    for (const calendar of made.values()) await store.removeCalendar(calendar.id);
+    for (const calendar of made.values()) await unmake(store, calendar);
     throw error;
   }
 
@@ -311,7 +322,7 @@ export async function runImport(run: Run): Promise<Imported> {
   // A calendar made for the import that got nothing (stopped, or failed, first) goes again.
   for (const [id, calendar] of made) {
     if (!written.some((write) => write.calendarId === calendar.id)) {
-      await store.removeCalendar(calendar.id);
+      await unmake(store, calendar);
       made.delete(id);
     }
   }
