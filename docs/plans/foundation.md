@@ -341,12 +341,11 @@ Decided while building PR 4.
   D38 applies. A refused write with no base keeps the server's version and
   lists ours as a conflict, unless both are the same. **What the user may
   do in a calendar** is its `rights`, kept with it in the store (migration
-  7): `create` a new item, `edit` one, `delete` one. In the store,
-  `read_only` alone decides editing, and `rights` decides creating and
-  deleting; `rights`' own `edit` is written but never read. This build
-  writes `read_only` as `!rights.edit`, and a tab of a build before
-  migration 7 on the same store ([D98](#D98)) writes only `read_only`, so
-  `read_only` is always the fresher of the two. The CalDAV provider reads
+  7): `create` a new item, `edit` one, `delete` one. This build writes
+  `read_only` beside them as `!rights.edit`; a tab of a build before
+  migration 7 on the same store ([D98](#D98)) writes only `read_only`.
+  Where the two disagree, that tab wrote last, and `read_only` grants all
+  three or none, as it did in that build. The CalDAV provider reads
   them from the calendar's `current-user-privilege-set` (RFC 3744):
   `bind` creates, `write-content` edits, `unbind` deletes, and `write` or
   `all` grant all three (Radicale lists `all` without its parts, Nextcloud

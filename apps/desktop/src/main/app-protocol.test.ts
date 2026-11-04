@@ -102,7 +102,15 @@ test("the pictures show under the page's policy: illustrations (design D219) and
   try {
     const page = await browser.newPage();
     let heard: (results: string[]) => void = () => {};
-    const drawn = new Promise<string[]>((resolve) => (heard = resolve));
+    const drawn = new Promise<string[]>((resolve, reject) => {
+      heard = resolve;
+      // A page that fails before it draws fails the test with its reason.
+      page.on("pageerror", reject);
+      page.on("console", (message) => {
+        if (/Refused to (load|execute) the script/.test(message.text()))
+          reject(new Error(message.text()));
+      });
+    });
     await page.exposeFunction("drawn", heard);
     await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
     expect(await drawn).toEqual(["loaded", "loaded"]);

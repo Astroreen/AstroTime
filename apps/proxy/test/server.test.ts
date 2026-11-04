@@ -641,7 +641,15 @@ describe("the Content Security Policy (D110)", () => {
     try {
       const page = await browser.newPage();
       let heard: (result: string) => void = () => {};
-      const drawn = new Promise<string>((resolve) => (heard = resolve));
+      const drawn = new Promise<string>((resolve, reject) => {
+        heard = resolve;
+        // A page that fails before it draws fails the test with its reason.
+        page.on("pageerror", reject);
+        page.on("console", (message) => {
+          if (/Refused to (load|execute) the script/.test(message.text()))
+            reject(new Error(message.text()));
+        });
+      });
       await page.exposeFunction("drawn", heard);
       await page.goto(url);
       expect(await drawn).toBe("loaded");

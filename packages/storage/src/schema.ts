@@ -39,7 +39,7 @@ export const calendars = sqliteTable(
     color: text("color"),
     /** `supported-calendar-component-set`, comma-separated: `VEVENT,VTODO`. */
     components: text("components").notNull(),
-    /** `!rights.edit`, kept for a tab of a build before migration 7; editing is read from it alone. */
+    /** `!rights.edit`, kept for a tab of a build before migration 7; where it disagrees with `rights`, it decides all three. */
     readOnly: integer("read_only", { mode: "boolean" }).notNull().default(false),
     /**
      * What the user may do in it, comma-separated: `create,edit,delete` or
