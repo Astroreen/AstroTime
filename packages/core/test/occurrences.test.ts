@@ -10,7 +10,11 @@ import {
   type Occurrence,
   type Range,
 } from "../src/index.ts";
+import { vtimezone } from "../src/vtimezone.ts";
 import { load } from "./support.ts";
+
+/** A VTIMEZONE for `timeZone` as AstroTime writes one, as content lines. */
+const zoneFor = (timeZone: string) => vtimezone(timeZone, 2026).toString().split("\r\n");
 
 const vilnius = (from: string, to: string): Range => ({ from, to, timeZone: "Europe/Vilnius" });
 const starts = (occurrences: Occurrence[], timeZone = "Europe/Vilnius") =>
@@ -544,6 +548,37 @@ describe("RFC 5545's corners", () => {
         "",
       ].join("\r\n"),
     );
+
+  test("a series between two zones that share an offset in its first occurrence only lasts as long as its first (D32)", () => {
+    // London and Lagos are both UTC+1 in summer, an hour apart in winter:
+    // 10:00 in London to 12:00 in Lagos is two hours in June, and every week after.
+    for (const zones of [[], zoneFor("Europe/London"), zoneFor("Africa/Lagos")]) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          ...zones,
+          "BEGIN:VEVENT",
+          "UID:shared",
+          "DTSTAMP:20260101T000000Z",
+          "DTSTART;TZID=Europe/London:20260601T100000",
+          "DTEND;TZID=Africa/Lagos:20260601T120000",
+          "RRULE:FREQ=WEEKLY",
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      const winter = occurrencesBetween(object, vilnius("2026-12-07", "2026-12-08"));
+      expect(
+        winter.map((o) =>
+          [o.start, o.end].map((t) => (t.type === "zoned" ? new Date(t.epochMs).toISOString() : t)),
+        ),
+        zones[1],
+      ).toEqual([["2026-12-07T10:00:00.000Z", "2026-12-07T12:00:00.000Z"]]);
+    }
+  });
 
   test("a series that ends in another zone than it starts lasts as long as its first (D32)", () => {
     // 10:00 in Berlin is 09:00Z; 13:00 in New York is 18:00Z: nine hours, each day.

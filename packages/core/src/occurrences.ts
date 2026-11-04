@@ -107,7 +107,10 @@ export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): 
 /**
  * Whether two zoned times read the same wall clocks in either's zone: one
  * zone (an alias too, which `Intl` may or may not resolve to one name), or
- * zones with the same offsets at both instants, which measure one length.
+ * zones with the same offsets at both instants (London and Lagos in summer).
+ * Those measure one length either way: each zone's offset is the same at
+ * both, so the wall clocks are as far apart as the instants, and every
+ * later occurrence adds that length to its own start's wall clock.
  */
 function sameClock(
   a: Extract<ItemTime, { type: "zoned" }>,
@@ -329,8 +332,9 @@ export function boundsOf(object: CalendarObject): Bounds {
   const span = master ? anchors(master) : null;
   if (master && span) {
     include(span.start, span.end);
-    // An RDATE before DTSTART shows too (`firstDay`): the bounds start there.
-    // One after it only widens them, and the walk below reaches it anyway.
+    // Every RDATE bounds the object: one before DTSTART shows too
+    // (`firstDay`), so the bounds start there; one after it widens them no
+    // further than the walk below, which reaches it too.
     for (const property of master.getAllProperties("rdate")) {
       for (const value of property.getValues()) {
         const start = value instanceof ICAL.Period ? value.start : value;
