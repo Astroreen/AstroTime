@@ -1,4 +1,4 @@
-import { XMLParser } from "fast-xml-parser";
+import { XMLParser, type EntityDecoderOptions } from "fast-xml-parser";
 
 // WebDAV's XML, as much of it as CalDAV needs. Namespaces are dropped on
 // parsing: the names CalDAV uses do not collide across DAV:, CalDAV,
@@ -46,15 +46,45 @@ const PREDEFINED = new Map(Object.entries({ lt: "<", gt: ">", amp: "&", quot: '"
  * 1.0 §4.1), which the parser's own decoder reads only together with HTML's
  * named entities, and the five predefined entities. Any other name
  * (`&nbsp;`, undeclared, so no well-formed document holds it) and a
- * reference to no character stay as written; a DTD's entities are not read.
+ * reference to no XML character (NUL, a lone surrogate, U+FFFE: XML 1.0
+ * §2.2's `Char`) stay as written; a DTD's entities are not read.
  */
 function decodeReferences(value: string): string {
   return value.replaceAll(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, dec, name) => {
     if (name !== undefined) return PREDEFINED.get(name) ?? reference;
     const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16);
-    return code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+    return isXmlChar(code) ? String.fromCodePoint(code) : reference;
   });
 }
+
+/** XML 1.0 §2.2: `#x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]`. */
+function isXmlChar(code: number): boolean {
+  return (
+    code === 0x9 ||
+    code === 0xa ||
+    code === 0xd ||
+    (code >= 0x20 && code <= 0xd7ff) ||
+    (code >= 0xe000 && code <= 0xfffd) ||
+    (code >= 0x10000 && code <= 0x10ffff)
+  );
+}
+
+/**
+ * fast-xml-parser's `EntityDecoderOptions` (its `src/fxp.d.ts`, pinned at
+ * 5.11.2 in `pnpm-workspace.yaml`'s catalog). Its `OrderedObjParser`
+ * calls `decode` on every text and attribute value, `reset` before each
+ * document, `setXmlVersion` and `addInputEntities` for its declaration
+ * and DTD (whose entities are not read here); `setExternalEntities` is
+ * for `addEntity`, unused. Typed with the library's own type, so an upgrade that changes the
+ * contract fails the typecheck.
+ */
+const entityDecoder: EntityDecoderOptions = {
+  decode: decodeReferences,
+  setExternalEntities: () => {},
+  addInputEntities: () => {},
+  reset: () => {},
+  setXmlVersion: () => {},
+};
 
 const parser = new XMLParser({
   // Attributes are kept for <comp name="VEVENT"/>, as `@_name`.
@@ -63,13 +93,7 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
-  entityDecoder: {
-    decode: decodeReferences,
-    setExternalEntities: () => {},
-    addInputEntities: () => {},
-    reset: () => {},
-    setXmlVersion: () => {},
-  },
+  entityDecoder,
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 

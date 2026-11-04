@@ -280,4 +280,13 @@ describe("references in a multistatus are read once, whatever value they are in"
     // document holds them; one that does keeps them as it spelt them.
     expect(calendar?.name).toBe("Café é &#13; &lt; <&> &nbsp;&eacute;&constructor;");
   });
+
+  test("a reference to no XML character (NUL, a lone surrogate, U+FFFE) stays as written (XML 1.0 §2.2)", async () => {
+    const none = "&#0;&#x1F;&#xD800;&#xDFFF;&#xFFFE;&#xFFFF;&#x110000;";
+    const chars = "&#9;&#xA;&#13;&#x20;&#xD7FF;&#xE000;&#xFFFD;&#x10000;&#x10FFFF;";
+    const changes = await changesOf(report("/cal/a.ics", `[${none}|${chars}]`));
+    expect(changes.changed.map((o) => o.ics)).toEqual([
+      `[${none}|\t\n\r \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}]`,
+    ]);
+  });
 });
