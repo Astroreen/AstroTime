@@ -37,7 +37,8 @@ not carry is said, not dropped in silence.
   it is read (its text is held whole while it is split); a ZIP is read to
   1000 files and 64 MiB in all, no file inflating past its stated size or
   1000 times its own, so a ZIP bomb costs nothing: what is past a limit is
-  named as unread.
+  named as unread, and so is an entry whose own header is not where the
+  archive's directory says, or names another file or method.
 
 - **D266. The formats, and the order they come in.** Surveyed on
   2026-11-04 from each format's specification and each exporter's
@@ -134,10 +135,16 @@ not carry is said, not dropped in silence.
   dialog asks once for all of them, "Update them", "Import as copies" (a
   new UID, the series with its exceptions) or "Skip them"; none is chosen
   for the user. An update lays the file's object over the stored one
-  (`overlay`): each of its components replaces the stored one of the same
-  occurrence, keeping what only the stored one has (an `X-` property, an
-  alarm, an attachment, [D7](foundation.md#D7)), and the stored one's
-  other exceptions stay. Copies made in one run name each other: a copied
+  (`overlay`): the file says what the item is, every property and
+  component iCalendar names (its start and its `DTEND` or `DURATION`,
+  its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
+  out is gone; the stored copy gives only what a file from another app
+  cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
+  not have, and its alarms and its attachments when the file has none of
+  them. An item deleted here whose deletion has not reached the server
+  yet is not there as the user sees it, so it is not asked about: the
+  file brings it back, as a change of it (the store revives it by UID,
+  [foundation D38](foundation.md#D38)). Copies made in one run name each other: a copied
   subtask's `RELATED-TO` names its copied parent.
 
 - **D271. Written through the store, in batches.** The objects become

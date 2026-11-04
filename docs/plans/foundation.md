@@ -936,7 +936,11 @@ Decided while building PR 5a-3.
     One that holds items stays beside the server's, as its own calendar,
     and its items move to a server's calendar one by one in the edit dialog
     ([D106](#D106)). Removing it asks first, and says its items are on no
-    server. Uploading them all at once is [Deferred](#deferred).
+    server. Other calendars on this device, the user's own (an import
+    makes them, [import D269](import.md#D269)), are on the same account
+    under addresses of their own: they keep their names and never step
+    aside, empty or not; the first one still steps aside alone when it is
+    empty, and the account goes once it has no calendar left. Uploading them all at once is [Deferred](#deferred).
   - Where a new item goes is one rule, `newItemCalendar` (on
     `firstCalendarFor`: the first calendar that takes it, visible before
     hidden, in list order), as calendars come and go while its dialog is

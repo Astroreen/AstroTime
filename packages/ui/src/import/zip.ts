@@ -58,11 +58,19 @@ export async function unzip(
       unread.push(name);
       continue;
     }
-    if (local + 30 > bytes.length) {
+    // The entry's own header, where the directory says it is: its signature,
+    // its method and its name the directory's, or the entry is not read.
+    const localName = local + 30 <= bytes.length ? view.getUint16(local + 26, true) : -1;
+    const sound =
+      localName >= 0 &&
+      view.getUint32(local, true) === 0x04034b50 &&
+      view.getUint16(local + 8, true) === method &&
+      names.decode(bytes.subarray(local + 30, local + 30 + localName)) === name;
+    if (!sound) {
       unread.push(name);
       continue;
     }
-    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+    const start = local + 30 + localName + view.getUint16(local + 28, true);
     const data = bytes.subarray(start, start + size);
     try {
       const read = method === 0 ? data : await inflate(data, inflated);

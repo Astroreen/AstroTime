@@ -3,7 +3,13 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { ALL_RIGHTS, NO_RIGHTS } from "@astrotime/core";
 
-import { LOCAL_SERVER, SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
+import {
+  LOCAL_CALENDAR_URL,
+  LOCAL_SERVER,
+  SCHEMA_VERSION,
+  Store,
+  type SqlDriver,
+} from "../src/index.ts";
 
 const vcal = (body: string) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\n${body}END:VCALENDAR\r\n`;
@@ -454,9 +460,19 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         components: ["VEVENT"],
         rights: ALL_RIGHTS,
       });
-      // Empty, and other calendars take new events and tasks: it stays all the same.
-      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      // The first calendar beside it, empty: it steps aside as D122 says, alone.
+      await store.saveCalendar({
+        accountId: local.id,
+        url: LOCAL_CALENDAR_URL,
+        name: "Personal",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      // Empty too, and other calendars take new events and tasks: it stays all the same.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(true);
       expect((await store.calendars(local.id)).map((c) => c.name)).toEqual(["Holidays"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
       // Its items are final, as the first one's are (D122).
       expect(
         (

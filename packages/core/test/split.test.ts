@@ -611,25 +611,78 @@ describe("an object under another UID (import D270)", () => {
 });
 
 describe("the file's object over the one stored (import D270, Update them)", () => {
-  test("each occurrence replaced, what only the stored one has kept, its other exceptions too", () => {
+  const vevents = (ics: string) =>
+    new ICAL.Component(ICAL.parse(ics)).getAllSubcomponents("vevent");
+
+  test("the file says what the item is: its end, its rule, its exceptions", () => {
     const stored = calendar(
-      event("s", ["RRULE:FREQ=DAILY;COUNT=5", "X-OTHER:keep", "ATTACH:https://e.com/a"]),
-      event("s", ["RECURRENCE-ID:20261106T090000Z", "DESCRIPTION:stored only"]),
-      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:old", "X-MINE:1"]),
+      event("s", [
+        "DTEND:20261105T100000Z",
+        "RRULE:FREQ=DAILY;COUNT=5",
+        "EXDATE:20261106T090000Z",
+        "LOCATION:Old room",
+      ]),
+      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:stored only"]),
     );
-    const incoming = calendar(
-      event("s", ["RRULE:FREQ=DAILY;COUNT=3", "DESCRIPTION:master new"]),
-      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:new"]),
+    // DURATION for DTEND, no rule, so no exceptions: a single event.
+    const incoming = calendar(event("s", ["DURATION:PT2H"]));
+    const merged = overlay(stored, incoming);
+    const [master, ...rest] = vevents(merged);
+    expect(rest).toEqual([]);
+    expect(master!.hasProperty("dtend")).toBe(false);
+    expect(master!.getFirstPropertyValue("duration")?.toString()).toBe("PT2H");
+    for (const gone of ["rrule", "exdate", "location"])
+      expect(master!.hasProperty(gone)).toBe(false);
+    CalendarObject.parse(merged);
+  });
+
+  test("its EXDATEs are the file's", () => {
+    const merged = overlay(
+      calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261106T090000Z"])),
+      calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261107T090000Z"])),
     );
-    const merged = CalendarObject.parse(overlay(stored, incoming));
-    expect(merged.master?.description).toBe("master new");
-    expect(merged.serialize()).toContain("RRULE:FREQ=DAILY;COUNT=3");
-    expect(merged.serialize()).toContain("X-OTHER:keep");
-    expect(merged.master?.attachments).toHaveLength(1);
-    expect(merged.exceptions.map((exception) => exception.description).toSorted()).toEqual([
-      "new",
-      "stored only",
+    expect(merged).toContain("EXDATE:20261107T090000Z");
+    expect(merged).not.toContain("EXDATE:20261106T090000Z");
+  });
+
+  test("what another app cannot know stays: X- properties, alarms and attachments the file has none of", () => {
+    const alarm = [
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      "TRIGGER:-PT10M",
+      "DESCRIPTION:Soon",
+      "END:VALARM",
+    ];
+    const stored = calendar([
+      ...event("s", ["X-MINE:1", "X-BOTH:stored", "ATTACH:https://e.com/a"]).slice(0, -1),
+      ...alarm,
+      "END:VEVENT",
     ]);
-    expect(merged.serialize()).toContain("X-MINE:1");
+    const kept = vevents(overlay(stored, calendar(event("s", ["X-BOTH:file"]))))[0]!;
+    expect(kept.getFirstPropertyValue("x-mine")).toBe("1");
+    expect(kept.getFirstPropertyValue("x-both")).toBe("file");
+    expect(kept.getFirstPropertyValue("attach")).toBe("https://e.com/a");
+    expect(kept.getAllSubcomponents("valarm")).toHaveLength(1);
+    // The file has its own: the stored ones go.
+    const own = vevents(
+      overlay(
+        stored,
+        calendar([
+          ...event("s", ["ATTACH:https://e.com/b"]).slice(0, -1),
+          "BEGIN:VALARM",
+          "ACTION:DISPLAY",
+          "TRIGGER:-PT1H",
+          "DESCRIPTION:Hour",
+          "END:VALARM",
+          "END:VEVENT",
+        ]),
+      ),
+    )[0]!;
+    expect(own.getAllProperties("attach").map((p) => p.getFirstValue())).toEqual([
+      "https://e.com/b",
+    ]);
+    expect(
+      own.getAllSubcomponents("valarm").map((a) => a.getFirstPropertyValue("description")),
+    ).toEqual(["Hour"]);
   });
 });

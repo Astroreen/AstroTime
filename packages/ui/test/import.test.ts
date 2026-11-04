@@ -215,6 +215,21 @@ describe("a file read into sources (import D268)", () => {
     expect(lying).toEqual({ entries: [], unread: ["x.ics"] });
   });
 
+  test("a ZIP entry whose own header is not where, or what, the directory says is not read", async () => {
+    const archive = zip({ "a.ics": calendar("A", event("a")), "b.ics": calendar("B", event("b")) });
+    // The first entry's local header signature broken.
+    const broken = archive.slice();
+    broken[0] = 0;
+    expect(await unzip(broken)).toEqual({
+      entries: [expect.objectContaining({ name: "b.ics" })],
+      unread: ["a.ics"],
+    });
+    // Its name in the local header another than the directory's.
+    const renamed = archive.slice();
+    renamed[30] = "x".charCodeAt(0);
+    expect((await unzip(renamed)).unread).toEqual(["a.ics"]);
+  });
+
   test("a file past the size AstroTime reads at once is refused before it is read", async () => {
     const error = await read("huge.ics", new Uint8Array(MAX_FILE_BYTES + 1)).catch((e) => e);
     expect(error).toBeInstanceOf(NotImportableError);
@@ -491,6 +506,27 @@ describe("an import written through the store (import D269–D271)", () => {
     }) as typeof store.saveCalendar;
     await expect(run(store, [one, two], destinations, duplicates)).rejects.toThrow("disk");
     expect((await store.calendars()).map((made) => made.name)).not.toContain("One");
+  });
+
+  test("an item deleted here, its deletion not yet on the server, is brought back by the file", async () => {
+    const { store, personal } = await setup();
+    const saved = await store.saveFromServer(personal.id, {
+      href: "https://cloud.example.com/dav/Personal/gone.ics",
+      etag: '"1"',
+      ics: calendar(null, event("gone")),
+    });
+    await store.deleteLocal(saved.id);
+    expect((await store.object(saved.id))?.pending).toBe("delete");
+    const source = await sourceOf(calendar("File", event("gone", "20261106T090000Z")));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    // Not asked about: it is not there any more, as the user sees it.
+    expect([duplicates.identical, duplicates.changed]).toEqual([0, 0]);
+    const { result } = await run(store, [source], destinations, duplicates);
+    expect(result.events).toBe(1);
+    const back = await store.object(saved.id);
+    expect(back?.pending).toBe("update");
+    expect(back?.startMs).toBe(Date.UTC(2026, 10, 6, 9));
   });
 
   test("a new calendar on this device, named and coloured as the source", async () => {

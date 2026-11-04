@@ -333,7 +333,7 @@ function calendarOf(header: readonly Line[], blocks: readonly Block[]): Calendar
     for (const property of properties) {
       try {
         const read = new ICAL.Component(ICAL.parse(wrap([property])) as unknown[]);
-        for (const one of [...read.getAllProperties()]) root.addProperty(one);
+        for (const one of read.getAllProperties().slice()) root.addProperty(one);
       } catch {
         own("invalid-property", CONTENT_LINE.exec(property)?.[1]?.toUpperCase() ?? null, false);
       }
@@ -638,48 +638,50 @@ export function withUid(
 }
 
 /**
- * The file's object over the one stored (import.md D270, "Update them"):
- * each of its components replaces the stored one of the same occurrence,
- * keeping what only the stored one has (an `X-` property, an alarm, an
- * attachment the file does not mention; foundation D7); the stored one's
- * exceptions the file does not have, and its time zones, stay.
+ * The file's object over the one stored (import.md D270, "Update them").
+ * The file says what the item is: every property and component iCalendar
+ * names (its times, `DTEND` or `DURATION`, its rule, its exceptions, its
+ * guests) is the file's, and what the file leaves out is gone. The stored
+ * copy gives only what a file from another app cannot know of it
+ * (foundation D7): its `X-` properties the file does not have, and its
+ * alarms and its attachments when the file has none of them. An exception
+ * the file does not have goes: the file's series is the series.
  */
 export function overlay(stored: string, incoming: string): string {
   const base = new ICAL.Component(ICAL.parse(stored) as unknown[]);
   const over = new ICAL.Component(ICAL.parse(incoming) as unknown[]);
   const occurrence = (component: ICAL.Component) =>
     `${component.name}|${component.getFirstProperty("recurrence-id")?.toICALString() ?? ""}`;
-  const kept = new Map(
+  const old = new Map(
     base
       .getAllSubcomponents()
       .filter((component) => component.name !== "vtimezone")
       .map((component) => [occurrence(component), component] as const),
   );
-  const result = new ICAL.Component(["vcalendar", base.toJSON()[1], []]);
-  const zones = new Map<string, ICAL.Component>();
-  for (const zone of [
-    ...over.getAllSubcomponents("vtimezone"),
-    ...base.getAllSubcomponents("vtimezone"),
-  ]) {
-    const tzid = String(zone.getFirstPropertyValue("tzid"));
-    if (!zones.has(tzid)) zones.set(tzid, zone);
-  }
-  for (const zone of zones.values()) result.addSubcomponent(zone);
-  for (const component of [...over.getAllSubcomponents()]) {
+  // Copies of ical.js's lists (`slice`): adding an item to one component takes it from the other.
+  for (const component of over.getAllSubcomponents().slice()) {
     if (component.name === "vtimezone") continue;
-    const old = kept.get(occurrence(component));
-    kept.delete(occurrence(component));
-    if (old) {
-      const names = new Set(component.getAllProperties().map((property) => property.name));
-      // Copies of the lists: adding one to the new component takes it from the old.
-      for (const property of [...old.getAllProperties()])
-        if (!names.has(property.name)) component.addProperty(property);
-      const children = new Set(component.getAllSubcomponents().map((child) => child.name));
-      for (const child of [...old.getAllSubcomponents()])
-        if (!children.has(child.name)) component.addSubcomponent(child);
+    const before = old.get(occurrence(component));
+    if (!before) continue;
+    const has = new Set(component.getAllProperties().map((property) => property.name));
+    for (const property of before.getAllProperties().slice()) {
+      const keep =
+        (property.name.startsWith("x-") && !has.has(property.name)) ||
+        (property.name === "attach" && !has.has("attach"));
+      if (keep) component.addProperty(property);
     }
-    result.addSubcomponent(component);
+    if (component.getAllSubcomponents("valarm").length === 0)
+      for (const alarm of before.getAllSubcomponents("valarm").slice())
+        component.addSubcomponent(alarm);
   }
-  for (const component of kept.values()) result.addSubcomponent(component);
-  return writeCalendar(result);
+  // A zone the result names that the file does not define: the stored one's.
+  const defined = new Set(
+    over.getAllSubcomponents("vtimezone").map((zone) => String(zone.getFirstPropertyValue("tzid"))),
+  );
+  const named = new Set(over.getAllSubcomponents().flatMap(tzidsOf));
+  for (const zone of base.getAllSubcomponents("vtimezone").slice()) {
+    const tzid = String(zone.getFirstPropertyValue("tzid"));
+    if (named.has(tzid) && !defined.has(tzid)) over.addSubcomponent(zone);
+  }
+  return writeCalendar(over);
 }

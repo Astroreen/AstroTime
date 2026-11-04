@@ -275,27 +275,17 @@ export class Store {
       if (!takes("VEVENT") || !takes("VTODO")) return false;
       let removed = false;
       for (const account of local) {
-        const [used] = await this.db
-          .select({ id: schema.objects.id })
-          .from(schema.objects)
-          .innerJoin(schema.calendars, eq(schema.objects.calendarId, schema.calendars.id))
-          .where(eq(schema.calendars.accountId, account.id))
-          .limit(1);
-        if (used) continue;
-        // A calendar the user made here (import D269) keeps its account.
-        const [own] = await this.db
-          .select({ id: schema.calendars.id })
-          .from(schema.calendars)
-          .where(
-            and(
-              eq(schema.calendars.accountId, account.id),
-              ne(schema.calendars.url, LOCAL_CALENDAR_URL),
-            ),
-          )
-          .limit(1);
-        if (own) continue;
+        // The first calendar steps aside when it holds nothing; one the user
+        // made here (an import's, import D269) stays, and keeps the account.
+        for (const calendar of await this.calendars(account.id)) {
+          const first = calendar.url === LOCAL_CALENDAR_URL;
+          if (first && !(await this.hasObjects([calendar.id]))) {
+            await this.db.delete(schema.calendars).where(eq(schema.calendars.id, calendar.id));
+            removed = true;
+          }
+        }
+        if ((await this.calendars(account.id)).length > 0) continue;
         await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
-        removed = true;
       }
       if (removed) this.undoneCache.clear();
       return removed;
