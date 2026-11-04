@@ -1389,6 +1389,30 @@ describe("deleting with a scope (D11)", () => {
     ]);
   });
 
+  test("this occurrence, the last that shows: the object goes (D142)", () => {
+    // Three Mondays: the first excluded, the second cancelled by an exception.
+    const three = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T100000",
+        "RRULE:FREQ=WEEKLY;COUNT=3",
+        "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261109T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261109T090000",
+        "DTEND;TZID=Europe/Vilnius:20261109T100000",
+        "STATUS:CANCELLED",
+      ],
+    );
+    expect(starts(three)).toEqual(["2026-11-16T09:00:00"]);
+    const last = { now: NOW, scope: "this", recurrenceId: vilnius("2026-11-16T09:00:00") } as const;
+    expect(deleteItem(CalendarObject.parse(three), last)).toBeNull();
+    // With one that still shows, the object stays.
+    const two = edit(three, [["STATUS:CANCELLED", null]]);
+    expect(starts(deleteItem(CalendarObject.parse(two), last)!)).toEqual(["2026-11-09T09:00:00"]);
+  });
+
   test("this occurrence of a series of dates: an EXDATE as a date", () => {
     const ics = deleteItem(load("tasksorg-task-recurring.ics"), {
       now: NOW,

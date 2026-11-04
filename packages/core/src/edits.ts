@@ -292,7 +292,8 @@ export function deleteItem(
   master.addProperty(exdate);
   setTime(exdate, inSeriesZone(recurrenceId, master), anchorTzid(master));
   significant(master, now);
-  return copy.serialize();
+  // The last occurrence that showed: the object goes, none is left with no occurrence (D142).
+  return showsAny(copy.root, master) ? copy.serialize() : null;
 }
 
 // The fields
@@ -712,6 +713,32 @@ function isFirst(root: ICAL.Component, master: ICAL.Component, recurrenceId: Ite
     const time = fromIcalTime(keepTzid(start, next));
     if (orderKey(time, anchor) >= split) return true;
     if (!removed.some((gone) => sameOccurrence(gone, time, anchor))) return false;
+  }
+}
+
+/**
+ * Whether any occurrence of the series shows: an exception not cancelled,
+ * or one its rule or RDATEs make that no EXDATE or cancelled exception
+ * removes. Ends as `isFirst` does: those remove finitely many.
+ */
+function showsAny(root: ICAL.Component, master: ICAL.Component): boolean {
+  const anchor = anchorOf(master);
+  const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
+  if (anchor === null || !(start instanceof ICAL.Time)) return true;
+  const removed = datesOf(master, "exdate");
+  for (const exception of exceptionsOf(root, master)) {
+    const id = recurrenceIdOf(exception);
+    if (id === null) continue;
+    const status = String(exception.getFirstPropertyValue("status") ?? "").toUpperCase();
+    if (status !== "CANCELLED") return true;
+    removed.push(id);
+  }
+  const nextStart = seriesStarts(master, start, null);
+  for (;;) {
+    const next = nextStart();
+    if (!next) return false;
+    const time = fromIcalTime(keepTzid(start, next));
+    if (!removed.some((gone) => sameOccurrence(gone, time, anchor))) return true;
   }
 }
 
