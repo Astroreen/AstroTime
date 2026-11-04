@@ -495,6 +495,22 @@ describe("RFC 5545's corners", () => {
       ].join("\r\n"),
     );
 
+  test("a series that ends in another zone than it starts lasts as long as its first (D32)", () => {
+    // 10:00 in Berlin is 09:00Z; 13:00 in New York is 18:00Z: nine hours, each day.
+    const ends = (start: string) =>
+      occurrencesBetween(
+        event(start, "DTEND;TZID=America/New_York:20261102T130000", "RRULE:FREQ=DAILY;COUNT=2"),
+        vilnius("2026-11-01", "2026-11-08"),
+      ).map((o) => (o.end.type === "zoned" ? new Date(o.end.epochMs).toISOString() : o.end));
+    // Neither zone defined (Google's way), and one of them UTC.
+    for (const start of [
+      "DTSTART;TZID=Europe/Berlin:20261102T100000",
+      "DTSTART:20261102T090000Z",
+    ]) {
+      expect(ends(start), start).toEqual(["2026-11-02T18:00:00.000Z", "2026-11-03T18:00:00.000Z"]);
+    }
+  });
+
   test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {
     // Google's way: a TZID and no VTIMEZONE. 09:00 in New York is 14:00Z, so
     // an UNTIL at 13:59:59Z on the 23rd ends the series the week before.

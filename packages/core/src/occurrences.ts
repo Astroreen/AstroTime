@@ -80,9 +80,22 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
     : null;
 }
 
-/** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
+/**
+ * The length from `start` to `end`, on the wall clock when both share a zone
+ * (so a 1-hour meeting stays 1 hour across DST), else the time between their
+ * instants (a flight from Berlin to New York). ical.js holds both of two
+ * zones the object does not define (D32) as wall clocks of one zone, so the
+ * zones are told apart as `fromIcalTime` reads them.
+ */
 export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+  const from = fromIcalTime(start);
+  const to = fromIcalTime(end);
+  const length =
+    from.type === "zoned" && to.type === "zoned" && from.timeZone !== to.timeZone
+      ? ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000))
+      : start.zone === end.zone
+        ? end.subtractDate(start)
+        : end.subtractDateTz(start);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
   return length.isNegative ? new ICAL.Duration({}) : length;
 }
