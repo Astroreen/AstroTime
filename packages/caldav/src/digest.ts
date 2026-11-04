@@ -36,7 +36,38 @@ export function answerChallenge(
     authorization.scheme = "basic";
     return true;
   }
-  return false;
+  // A scheme the server no longer takes (set up anew since an earlier sync
+  // learned it: Basic where it took Digest, or back) is asked again in the
+  // one this 401 names, once. The same scheme refused is the password
+  // refused, never sent twice (a brute-force guard counts the user's).
+  authorization.scheme = null;
+  return (
+    answerChallenge(authorization, response, null) &&
+    kindOf(authorization.scheme) !== kindOf(answered)
+  );
+}
+
+const kindOf = (scheme: Scheme) => (typeof scheme === "object" && scheme ? "digest" : scheme);
+
+/**
+ * A request to `url` sent again with the scheme a 401 taught (`answered`):
+ * kept for the account's syncs after once the server took it (a 2xx,
+ * D260), unless the answer came from elsewhere (where a redirect went). A
+ * wrong password's is not kept.
+ */
+export function taken(
+  authorization: Authorization,
+  url: string,
+  response: HttpResponse,
+  answered: Scheme,
+): void {
+  if (answered !== authorization.scheme || response.status < 200 || response.status > 299) return;
+  if (
+    answered &&
+    authorization.remembered &&
+    new URL(response.url || url).origin === new URL(url).origin
+  )
+    authorization.remembered.scheme = answered;
 }
 
 /**

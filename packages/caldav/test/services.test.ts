@@ -5,10 +5,9 @@
 // then. And the guard that keeps an account's values out of every file.
 import { readdirSync, readFileSync } from "node:fs";
 
-import { beforeEach, expect, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 
 import { digestChallenge, digestHeader } from "../src/digest.ts";
-import { forgetSchemes } from "../src/auth.ts";
 import { HttpError, type HttpRequest, type HttpResponse } from "../src/index.ts";
 import {
   digestParam,
@@ -20,9 +19,6 @@ import {
   type Recording,
 } from "./recording.ts";
 import { scenario } from "./scenario.ts";
-
-// Each test a run of its own: no scheme learned by another (D260).
-beforeEach(forgetSchemes);
 
 const folder = new URL("./fixtures/services/", import.meta.url);
 const recordings = readdirSync(folder)

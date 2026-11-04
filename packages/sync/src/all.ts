@@ -6,6 +6,7 @@ import {
   revokeAppPassword,
   type Credentials,
   type HttpClient,
+  type RememberedScheme,
 } from "@astrotime/caldav";
 import {
   AuthError,
@@ -53,13 +54,20 @@ const alone = <T>(context: Pick<SyncContext, "lock">, work: () => Promise<T>): P
 /** Opens the provider of an account with its credentials. */
 export type Connect = (account: Account, credentials: Credentials) => Promise<Provider>;
 
-/** CalDAV accounts through the platform's HTTP client, from the home discovery found. */
+/**
+ * CalDAV accounts through the platform's HTTP client, from the home
+ * discovery found; what each server took to authenticate is kept for the
+ * syncs after (providers D260).
+ */
 export function connectCalDav(http: HttpClient): Connect {
+  const schemes = new Map<string, RememberedScheme>();
   return async (account, credentials) => {
     const home =
       account.homeUrl ??
       (await CalDavProvider.discover(http, account.serverUrl, credentials)).homeUrl;
-    return new CalDavProvider(http, credentials, home);
+    const scheme = schemes.get(account.id) ?? {};
+    schemes.set(account.id, scheme);
+    return new CalDavProvider(http, credentials, home, scheme);
   };
 }
 

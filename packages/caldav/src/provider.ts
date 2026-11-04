@@ -14,7 +14,7 @@ import {
   type WriteResult,
 } from "@astrotime/core";
 
-import { Authorization, type TokenSource } from "./auth.ts";
+import { Authorization, type RememberedScheme, type TokenSource } from "./auth.ts";
 import {
   AuthError,
   CertificateError,
@@ -118,9 +118,15 @@ export class CalDavProvider implements Provider {
   private readonly authorization: Authorization;
   readonly homeUrl: string;
 
-  constructor(http: HttpClient, credentials: Credentials | TokenSource, homeUrl: string) {
+  /** `schemes`: what earlier syncs learned of how servers authenticate (D260). */
+  constructor(
+    http: HttpClient,
+    credentials: Credentials | TokenSource,
+    homeUrl: string,
+    schemes?: RememberedScheme,
+  ) {
     this.http = http;
-    this.authorization = new Authorization(credentials);
+    this.authorization = new Authorization(credentials, schemes);
     this.homeUrl = collection(homeUrl);
   }
 
@@ -490,8 +496,10 @@ export async function send(
     return { response, answered, sent: header };
   };
   let { response, answered, sent } = await signed();
-  if (response.status === 401 && (await authorization.challenged(response, answered, sent)))
-    ({ response } = await signed());
+  if (response.status === 401 && (await authorization.challenged(response, answered, sent))) {
+    ({ response, answered } = await signed());
+    await authorization.learned(request.url, response, answered);
+  }
   if (response.status === 401) throw new AuthError(request);
   // Rate limited, or down for a while: the sync stops and waits (D128).
   if ((response.status === 429 || response.status === 503) && !accept.includes(response.status))

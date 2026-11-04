@@ -3,10 +3,9 @@
 // server asks, through the web proxy too, and a wrong password refused
 // after one try, never a loop.
 import { AuthError } from "@astrotime/core";
-import { beforeEach, expect, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 
 import { challengesOf, digestChallenge, digestHeader, md5 } from "../src/digest.ts";
-import { forgetSchemes } from "../src/auth.ts";
 import { CHALLENGE } from "../src/proxy.ts";
 import {
   inClear,
@@ -17,10 +16,8 @@ import {
   throughProxy,
   type HttpClient,
   type HttpRequest,
+  type RememberedScheme,
 } from "../src/index.ts";
-
-// Each test a run of its own: no scheme learned by another (D260).
-beforeEach(forgetSchemes);
 
 test("MD5 is RFC 1321's", async () => {
   expect(await md5("")).toBe("d41d8cd98f00b204e9800998ecf8427e");
@@ -264,9 +261,7 @@ test("over plain http to another host, the first request goes without credential
   // No password in clear: nothing, then Digest.
   expect(digest.sent).toEqual(["none", "Digest"]);
 
-  // A Basic server there gets Basic once it asks, and from then on at once
-  // (another run: nothing learned of dav.example's Digest above).
-  forgetSchemes();
+  // A Basic server there gets Basic once it asks, and from then on at once.
   const sent: (string | null)[] = [];
   const basicOnly = fetchClient({
     fetch: (async (_input: URL | string, init: RequestInit) => {
@@ -317,76 +312,161 @@ test("what is in clear: plain http to another host, never https or this device, 
     expect(inClear(url), url).toBe(false);
 });
 
-test("a later sync recalls the scheme its server asked for: Digest answered at once, plain http's Basic without asking first", async () => {
+// The scheme an account's server took, kept for its later syncs (D260):
+// each test has its own, as each account in a `connectCalDav` has.
+const astro = { username: "astro", password: "secret" };
+
+/** A Basic-only server whose password can be changed, answering from `answeredFrom` (a redirect's end). */
+function basicServer(answeredFrom?: string) {
+  let password = "secret";
+  const sent: (string | null)[] = [];
+  const http: HttpClient = async (asked) => {
+    const header = asked.headers["Authorization"] ?? null;
+    sent.push(header?.split(" ")[0] ?? null);
+    const ok = header === `Basic ${btoa(`astro:${password}`)}`;
+    return {
+      status: ok ? 207 : 401,
+      url: answeredFrom ?? asked.url,
+      header: (name) =>
+        name.toLowerCase() === "www-authenticate" && !ok ? 'Basic realm="r"' : null,
+      body: "",
+    };
+  };
+  return { http, sent, change: (to: string) => (password = to) };
+}
+
+test("a Digest server taken once is answered at once by the next sync, its nonce's count going on", async () => {
   const digest = digestServer();
   const http = fetchClient({ fetch: digest.fetch });
-  const credentials = { username: "astro", password: "secret" };
-  await send(http, new Authorization(credentials), propfind("https://dav.example/dav.php/"), []);
+  const schemes: RememberedScheme = {};
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
   expect(digest.sent).toEqual(["Basic", "Digest"]);
-  // The next sync's provider: its first request answers the challenge as it was left.
   digest.sent.length = 0;
-  const next = new Authorization(credentials);
-  expect(
-    (await send(http, next, propfind("https://dav.example/dav.php/calendars/"), [])).status,
-  ).toBe(207);
+  const next = new Authorization(astro, schemes);
+  expect((await send(http, next, propfind("https://dav.example/dav.php/a/"), [])).status).toBe(207);
   expect(digest.sent).toEqual(["Digest"]);
-  expect(digest.counts.at(-1)).toBe(2);
-  // Its nonce gone meanwhile: the stale answer is taken up, as ever.
+  expect(digest.counts).toEqual([1, 2]);
+});
+
+test("a recalled Digest whose nonce went meanwhile takes up the new one", async () => {
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const schemes: RememberedScheme = {};
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
   digest.renew();
   digest.sent.length = 0;
-  await send(http, new Authorization(credentials), propfind("https://dav.example/dav.php/"), []);
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
   expect(digest.sent).toEqual(["Digest", "Digest"]);
-  // Another user of the same server learns it for themselves (a wrong password here).
+});
+
+test("a wrong password's scheme is not remembered: only one a server took is", async () => {
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const schemes: RememberedScheme = {};
+  const wrong = new Authorization({ username: "astro", password: "typo" }, schemes);
+  await expect(
+    send(http, wrong, propfind("https://dav.example/dav.php/"), []),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(schemes.scheme).toBeUndefined();
   digest.sent.length = 0;
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
+  expect(digest.sent).toEqual(["Basic", "Digest"]);
+  expect(schemes.scheme).toMatchObject({ nonce: "n1" });
+});
+
+test("a recalled scheme refused for the password is the password refused, sent once", async () => {
+  // Digest: the recalled challenge refused, no second handshake.
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const schemes: RememberedScheme = {};
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
+  digest.sent.length = 0;
+  const revoked = new Authorization({ username: "astro", password: "old" }, schemes);
+  await expect(
+    send(http, revoked, propfind("https://dav.example/dav.php/"), []),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(digest.sent).toEqual(["Digest"]);
+  // Basic: the same.
+  const server = basicServer();
+  const basicSchemes: RememberedScheme = {};
+  await send(
+    server.http,
+    new Authorization(astro, basicSchemes),
+    propfind("http://basic.example/"),
+    [],
+  );
+  server.change("new");
+  server.sent.length = 0;
   await expect(
     send(
-      http,
-      new Authorization({ username: "other", password: "x" }),
-      propfind("https://dav.example/"),
+      server.http,
+      new Authorization(astro, basicSchemes),
+      propfind("http://basic.example/"),
       [],
     ),
   ).rejects.toBeInstanceOf(AuthError);
-  expect(digest.sent[0]).toBe("Basic");
+  expect(server.sent).toEqual(["Basic"]);
+});
 
-  // Plain http to another host: Basic recalled, no request without credentials first.
-  const sent: (string | null)[] = [];
-  const basic = `Basic ${btoa("astro:secret")}`;
-  const basicOnly = fetchClient({
-    fetch: (async (_input: URL | string, init: RequestInit) => {
-      const header = new Headers(init.headers).get("authorization");
-      sent.push(header);
-      return header === basic
-        ? new Response("ok", { status: 207 })
-        : new Response("", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="r"' } });
-    }) as typeof fetch,
-  });
-  await send(basicOnly, new Authorization(credentials), propfind("http://basic.example/"), []);
-  await send(basicOnly, new Authorization(credentials), propfind("http://basic.example/"), []);
-  expect(sent).toEqual([null, basic, basic]);
+test("a later 401 after the recalled scheme worked is the password refused, not a scheme to learn again", async () => {
+  const server = basicServer();
+  const schemes: RememberedScheme = {};
+  await send(server.http, new Authorization(astro, schemes), propfind("http://basic.example/"), []);
+  server.sent.length = 0;
+  const next = new Authorization(astro, schemes);
+  await send(server.http, next, propfind("http://basic.example/a/"), []);
+  server.change("revoked meanwhile");
+  await expect(
+    send(server.http, next, propfind("http://basic.example/b/"), []),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(server.sent).toEqual(["Basic", "Basic"]);
+});
 
-  // A server set up anew, Basic only where it asked Digest: the recalled
-  // Digest refused is read as a first answer, not the password refused.
-  sent.length = 0;
-  const moved = fetchClient({
-    fetch: (async (input: URL | string, init: RequestInit) =>
-      basicOnly({
-        method: init.method ?? "GET",
-        url: String(input).replace("dav.example", "basic.example"),
-        headers: Object.fromEntries(new Headers(init.headers)),
-      }).then(
-        (answer) =>
-          new Response(answer.body, {
-            status: answer.status,
-            headers: { "WWW-Authenticate": 'Basic realm="r"' },
-          }),
-      )) as typeof fetch,
-  });
-  const recalled = await send(
-    moved,
-    new Authorization(credentials),
-    propfind("https://dav.example/dav.php/"),
+test("plain http's Basic recalled: no request without credentials first", async () => {
+  const server = basicServer();
+  const schemes: RememberedScheme = {};
+  await send(server.http, new Authorization(astro, schemes), propfind("http://basic.example/"), []);
+  await send(server.http, new Authorization(astro, schemes), propfind("http://basic.example/"), []);
+  expect(server.sent).toEqual([null, "Basic", "Basic"]);
+});
+
+test("what one account's server took is not another account's, nor an answer from where a redirect went", async () => {
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const schemes: RememberedScheme = {};
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/dav.php/"), []);
+  digest.sent.length = 0;
+  const another: RememberedScheme = {};
+  await send(http, new Authorization(astro, another), propfind("https://dav.example/dav.php/"), []);
+  expect(digest.sent).toEqual(["Basic", "Digest"]);
+  // Taken, but answered from elsewhere: not kept for the address asked.
+  const moved = basicServer("http://elsewhere.example/");
+  const movedSchemes: RememberedScheme = {};
+  await send(
+    moved.http,
+    new Authorization(astro, movedSchemes),
+    propfind("http://basic.example/"),
     [],
   );
-  expect(recalled.status).toBe(207);
-  expect(sent.map((header) => header?.split(" ")[0] ?? null)).toEqual(["Digest", "Basic"]);
+  expect(movedSchemes.scheme).toBeUndefined();
+});
+
+test("a server set up anew, Basic only where it took Digest: asked again in Basic, once", async () => {
+  const digest = digestServer();
+  const schemes: RememberedScheme = {};
+  await send(
+    fetchClient({ fetch: digest.fetch }),
+    new Authorization(astro, schemes),
+    propfind("https://dav.example/"),
+    [],
+  );
+  const server = basicServer();
+  const answer = await send(
+    server.http,
+    new Authorization(astro, schemes),
+    propfind("https://dav.example/"),
+    [],
+  );
+  expect(answer.status).toBe(207);
+  expect(server.sent).toEqual(["Digest", "Basic"]);
 });

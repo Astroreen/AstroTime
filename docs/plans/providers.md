@@ -694,20 +694,29 @@ marked _to be recorded_.
   password. A Digest answer's count (`nc`) is taken as it is signed,
   before anything is awaited, so no two share one; they may reach the
   server out of order, which a nonce's count allows (sabre/dav does not
-  order them). **The scheme is remembered** for the app's run, by the
-  server's origin and the user name (`auth.ts`, `known`): a later sync
-  answers a Digest server at once with its challenge as it was left (its
-  nonce and count; a nonce gone meanwhile is taken up as above), and
-  sends Basic to a plain-http server without the request that asks
-  first; the first sync after the app starts learns it again, one
-  request. It is not stored with the account: it is how the server
-  answers, not the user's data, and a stored one would be a migration
-  and the store's code on the first load to save one request a start. A
-  recalled scheme the server no longer takes (set up anew, Basic where
-  it asked Digest) is not the password refused: its 401 is read as the
-  first answer of a new run, once. The Baïkal recording shows it: its
-  scenario's later providers no longer send a refused Basic (15
-  exchanges to 13). The web proxy
+  order them). **The scheme is remembered** for the app's run, per
+  account: whoever makes the providers keeps the scheme each account's
+  server took (`connectCalDav`, a `RememberedScheme` per account; no
+  state of the module's own, nothing one account's shares with
+  another's), so a later sync answers a Digest server at once with its
+  challenge as it was left (its nonce and count; a nonce gone meanwhile
+  is taken up as above), and sends Basic to a plain-http server without
+  the request that asks first; the first sync after the app starts, and
+  the sign-in's discovery, learn it again, one request. A scheme is kept
+  when a 401 taught it and the request sent again with it was taken (a
+  2xx answered from the origin asked): one a wrong password only tried
+  is not, nor one whose answer came from where a redirect went. It is not stored
+  with the account: it is how the server answers, not the user's data,
+  and a stored one would be a migration and the store's code on the
+  first load to save one request a start. A scheme the server no longer
+  takes is asked again in the one its 401 names, once (set up anew since
+  an earlier sync learned it, Basic where it took Digest, or back); the
+  same scheme refused is the password refused, never sent twice (a
+  brute-force guard's count is the user's, not ours). Both load with
+  Digest (`digest.ts`, `taken` and `answerChallenge`), so the first load
+  grows by 87 bytes (127 500 to 127 587 on main `3b06719`). The Baïkal recording shows
+  it: after its discovery, its scenario sends no refused Basic (15
+  exchanges to 14). The web proxy
   passes the challenge as `x-astrotime-www-authenticate`, since a
   `WWW-Authenticate` on the app's own origin would make the browser ask
   for a password itself ([D39](foundation.md#D39)). MD5, which Web Crypto
