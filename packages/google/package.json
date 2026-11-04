@@ -1,0 +1,25 @@
+{
+  "name": "@astrotime/google",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Google: one account, its calendars over Google's CalDAV and its task lists over the Tasks API",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test"
+  },
+  "dependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@astrotime/storage": "workspace:*",
+    "@astrotime/sync": "workspace:*",
+    "@types/node": "catalog:"
+  }
+}

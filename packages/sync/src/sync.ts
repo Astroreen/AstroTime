@@ -24,6 +24,8 @@ export type Problem =
   | "calendar-gone-unsent"
   /** A subscription's file would remove most of it: held for the user (providers D263). */
   | "held-removal"
+  /** The service wrote the item without some of its details, which it cannot keep (providers D252). */
+  | "not-kept"
   | "failed";
 
 class SyncProblem extends Error {
@@ -145,6 +147,23 @@ function unchanged(kept: SyncState, listed: SyncState | undefined): boolean {
   if (!listed) return false;
   if (listed.syncToken !== null) return listed.syncToken === kept.syncToken;
   return listed.ctag !== null && listed.ctag === kept.ctag;
+}
+
+/**
+ * A write the service took without some of the item's details (Google
+ * Tasks keeps no priority, no reminders): said, by property. They stay on
+ * this device until the item changes there (providers D252).
+ */
+function notKept(
+  report: SyncReport,
+  result: { readonly href: string; readonly dropped?: readonly string[] },
+): void {
+  if (result.dropped && result.dropped.length > 0)
+    report.errors.push({
+      href: result.href,
+      problem: "not-kept",
+      detail: result.dropped.join(", "),
+    });
 }
 
 async function isolated(
@@ -278,6 +297,7 @@ async function upload(
     if (result.ok) {
       await store.markSynced(object.id, { href: result.href, etag: result.etag, ics: object.ics });
       report.uploaded++;
+      notKept(report, result);
       return;
     }
     // A creation has no server copy to be deleted (D38 does not apply): a
@@ -359,6 +379,7 @@ async function upload(
   if (result.ok) {
     await store.markSynced(object.id, { href: result.href, etag: result.etag, ics: uploaded });
     report.uploaded++;
+    notKept(report, result);
   } else {
     // Deleted on the server while we edited it: the deletion wins (D38).
     await store.removeObject(object.id);

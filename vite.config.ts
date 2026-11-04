@@ -101,6 +101,7 @@ export default defineConfig({
           "packages/caldav/src/**",
           "packages/ics/src/**",
           "packages/oauth/src/**",
+          "packages/google/src/**",
         ],
         rules: {
           "eslint/no-restricted-imports": [

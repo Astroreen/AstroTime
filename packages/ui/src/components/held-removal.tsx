@@ -1,6 +1,8 @@
-// A subscription's file that would remove most of its calendar, held until
-// the user lets it (docs/plans/providers.md#D263): how many would go, and
-// the way to let them. Loads only when a sync held one.
+// What a provider tells of a sync, in words that load with it: a
+// subscription's file that would remove most of its calendar, held until
+// the user lets it (docs/plans/providers.md#D263), how many would go and the
+// way to let them; and a write a service took without some of an item's
+// details (`NotKept`, D252).
 import { useTranslation } from "react-i18next";
 
 import { addSubscribeStrings } from "../i18n/subscribe.ts";
@@ -9,7 +11,25 @@ import { useAccounts } from "./accounts-context.tsx";
 /** Outside the component: the React Compiler does not compile an `import()` (design D194). */
 const subscriptions = () => import("@astrotime/sync/subscriptions");
 
-export default function HeldRemoval({
+/**
+ * Writes the service took without some of the items' details (providers
+ * D252): one line for all of a sync's, with what it could not keep.
+ */
+function NotKept({ errors }: { errors: readonly { readonly detail: string }[] }) {
+  const { t, i18n } = useTranslation();
+  addSubscribeStrings(i18n);
+  const count = errors.length;
+  const properties = [
+    ...new Set(errors.flatMap((error) => error.detail.split(", ").filter(Boolean))),
+  ];
+  return (
+    <p className="text-ink-muted">
+      {t("subscribe.notKept", { count, properties: properties.join(", ") })}
+    </p>
+  );
+}
+
+function HeldRemoval({
   accountId,
   held,
 }: {
@@ -37,5 +57,30 @@ export default function HeldRemoval({
         {t("subscribe.applyHeld")}
       </button>
     </p>
+  );
+}
+
+/** One sync's problem, as `SyncReport.errors` holds it. */
+interface Notice {
+  readonly problem: string;
+  readonly detail: string;
+  readonly held?: { readonly count: number; readonly version: string };
+}
+
+/** What providers told of an account's last sync: a held removal, and what a service did not keep. */
+export default function ProviderNotices({
+  accountId,
+  errors,
+}: {
+  accountId: string;
+  errors: readonly Notice[];
+}) {
+  const held = errors.find((error) => error.held)?.held;
+  const notKept = errors.filter((error) => error.problem === "not-kept");
+  return (
+    <>
+      {held && <HeldRemoval accountId={accountId} held={held} />}
+      {notKept.length > 0 && <NotKept errors={notKept} />}
+    </>
   );
 }

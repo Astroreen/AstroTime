@@ -58,7 +58,17 @@ export interface Changes extends SyncState {
 }
 
 export type WriteResult =
-  | { readonly ok: true; readonly href: string; readonly etag: string | null }
+  | {
+      readonly ok: true;
+      readonly href: string;
+      readonly etag: string | null;
+      /**
+       * What the item says that the service could not keep (Google Tasks
+       * keeps no priority, no reminders), by property: written without it,
+       * and said so (providers D252).
+       */
+      readonly dropped?: readonly string[];
+    }
   /** `conflict`: the object changed on the server first (412); `gone`: it no longer exists. */
   | { readonly ok: false; readonly reason: "conflict" | "gone" };
 
