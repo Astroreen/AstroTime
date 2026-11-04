@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { CalendarObject, type Event, type Task } from "@astrotime/core";
+import {
+  CalendarObject,
+  occurrencesBetween,
+  wallClockOf,
+  type Event,
+  type Task,
+} from "@astrotime/core";
+import { splitCalendars } from "@astrotime/core/split";
 import { describe, expect, test } from "vite-plus/test";
 
 import { readImport } from "../src/import/read.ts";
@@ -79,13 +86,16 @@ describe("a phone's vCalendar (import D266, D272)", () => {
 
   test("1.0's rules as iCalendar's, its alarm before the start with its snoozes", async () => {
     const { byUid } = await items("nokia.vcs");
-    const rule = (uid: string) => /^RRULE:(.*)$/m.exec(byUid.get(uid)!.serialize())?.[1];
+    // The item's own rule, not its zone's.
+    const rule = (uid: string) =>
+      /^RRULE:(.*)$/m.exec(byUid.get(uid)!.serialize().split("BEGIN:VEVENT")[1]!)?.[1];
     expect(rule("nokia-1")).toBe("FREQ=WEEKLY;BYDAY=MO,WE;COUNT=4");
     expect(rule("nokia-2")).toBe("FREQ=YEARLY;BYMONTH=12");
     expect(rule("nokia-3")).toBe("FREQ=MONTHLY;BYMONTHDAY=1,-1;COUNT=6");
-    expect(rule("nokia-4")).toBe("FREQ=MONTHLY;BYDAY=1TH;UNTIL=20270629T220000Z");
+    // Its end in UTC, as a zoned start asks (RFC 5545 §3.3.10).
+    expect(rule("nokia-4")).toBe("FREQ=MONTHLY;BYDAY=1TH;UNTIL=20270629T210000Z");
     const meeting = byUid.get("nokia-1")!;
-    expect(meeting.serialize()).toContain("EXDATE:20261026T080000Z");
+    expect(meeting.serialize()).toContain("EXDATE;TZID=Europe/Vilnius:20261026T100000");
     expect(meeting.master!.alarms).toEqual([
       expect.objectContaining({
         action: "AUDIO",
@@ -135,6 +145,7 @@ describe("1.0's corners", () => {
         "END:VEVENT",
         "END:VCALENDAR",
       ),
+      { timeZone: "UTC" },
     );
     expect(text).toContain("DTSTART:20261105T090000\r\n");
   });
@@ -154,6 +165,7 @@ describe("1.0's corners", () => {
         "END:VEVENT",
         "END:VCALENDAR",
       ),
+      { timeZone: "UTC" },
     );
     expect(text).not.toContain("RRULE");
     expect(text).toContain("X-FOO:a=b");
@@ -172,6 +184,7 @@ describe("1.0's corners", () => {
         "END:VEVENT",
         "END:VCALENDAR",
       ),
+      { timeZone: "UTC" },
     );
     expect(text).toContain("RRULE:FREQ=DAILY;INTERVAL=2;COUNT=2");
   });
@@ -188,6 +201,7 @@ describe("1.0's corners", () => {
         "END:VEVENT",
         "END:VCALENDAR",
       ),
+      { timeZone: "UTC" },
     );
     expect(text).toContain("SUMMARY:Lunch\\; then\\, coffee");
   });
@@ -210,5 +224,131 @@ describe("1.0's corners", () => {
     );
     expect(file.guessed).toBe("windows-1251");
     expect(CalendarObject.parse(file.sources[0]!.items[0]!.ics).master?.summary).toBe("Обед");
+  });
+});
+
+describe("#151's review", () => {
+  const vcal = (...content: string[]) =>
+    lines("BEGIN:VCALENDAR", "VERSION:1.0", ...content, "END:VCALENDAR");
+
+  test("a weekly series keeps its wall clock across a change of offset, in the user's zone", () => {
+    const { text } = vcalendarToIcs(
+      vcal(
+        "TZ:+02",
+        "DAYLIGHT:TRUE;+03;20260329T030000;20261025T040000;EET;EEST",
+        "BEGIN:VEVENT",
+        "UID:w",
+        "DTSTART:20261019T100000",
+        "RRULE:W1 MO #3",
+        "END:VEVENT",
+      ),
+      { timeZone: "Europe/Vilnius" },
+    );
+    const object = CalendarObject.parse(
+      splitCalendars(text, { newUid: () => "x" })[0]!.objects[0]!.ics,
+    );
+    const starts = occurrencesBetween(object, {
+      from: "2026-10-01",
+      to: "2026-11-30",
+      timeZone: "Europe/Vilnius",
+    }).map((occurrence) => wallClockOf(occurrence.start!, "Europe/Vilnius"));
+    // 19 October is summer time, the 26th and 2 November not: 10:00 all three.
+    expect(starts).toEqual(["2026-10-19T10:00:00", "2026-10-26T10:00:00", "2026-11-02T10:00:00"]);
+  });
+
+  test("a zone the user's is not: the file's TZ and DAYLIGHT as a VTIMEZONE of its own", () => {
+    const { text } = vcalendarToIcs(
+      vcal(
+        "TZ:+02",
+        "DAYLIGHT:TRUE;+03;20260329T030000;20261025T040000;EET;EEST",
+        "BEGIN:VEVENT",
+        "UID:w",
+        "DTSTART:20261019T100000",
+        "END:VEVENT",
+      ),
+      { timeZone: "America/New_York" },
+    );
+    expect(text).toContain("DTSTART;TZID=vCalendar +0200/+0300:20261019T100000");
+    const object = CalendarObject.parse(
+      splitCalendars(text, { newUid: () => "x" })[0]!.objects[0]!.ics,
+    );
+    expect(object.master!.start).toMatchObject({ epochMs: Date.UTC(2026, 9, 19, 7) });
+  });
+
+  test("a quoted-printable soft break before a line that starts with a space", () => {
+    const { text } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VEVENT",
+        "UID:q",
+        "DTSTART:20261105T090000Z",
+        "SUMMARY;ENCODING=QUOTED-PRINTABLE:Lunch with=  ",
+        " Anna",
+        "END:VEVENT",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(text).toContain("SUMMARY:Lunch with Anna\r\n");
+  });
+
+  test("an all-day event written in UTC is the user's day, its exceptions and end dates too", () => {
+    const { text } = vcalendarToIcs(
+      vcal(
+        "TZ:+03",
+        "BEGIN:VEVENT",
+        "UID:d",
+        "DTSTART:20261109T210000Z",
+        "DTEND:20261110T210000Z",
+        "RRULE:D1 20261115T210000Z",
+        "EXDATE:20261111T210000Z",
+        "X-MICROSOFT-CDO-ALLDAYEVENT:TRUE",
+        "END:VEVENT",
+      ),
+      { timeZone: "Europe/Moscow" },
+    );
+    expect(text).toContain("DTSTART;VALUE=DATE:20261110");
+    expect(text).toContain("DTEND;VALUE=DATE:20261111");
+    expect(text).toContain("EXDATE;VALUE=DATE:20261112");
+    expect(text).toContain("RRULE:FREQ=DAILY;UNTIL=20261116");
+  });
+
+  test("an alarm with no start: a task's before its due time; else in UTC, or named", () => {
+    const { text, notImported } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VTODO",
+        "UID:t",
+        "DUE:20261120T120000Z",
+        "DALARM:20261120T110000Z;;;Soon",
+        "END:VTODO",
+        "BEGIN:VEVENT",
+        "UID:u",
+        "DALARM:20261120T110000Z;;;Utc",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:f",
+        "DALARM:20261120T110000;;;Floating",
+        "END:VEVENT",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(text).toContain("TRIGGER;RELATED=END:-PT1H");
+    expect(text).toContain("TRIGGER;VALUE=DATE-TIME:20261120T110000Z");
+    expect(notImported).toEqual(["DALARM"]);
+  });
+
+  test("a component whose END never came is kept as far as it went, and named", () => {
+    const { text, notImported } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTART:20261105T090000Z",
+        "BEGIN:VEVENT",
+        "UID:b",
+        "DTSTART:20261106T090000Z",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(text.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(text.match(/END:VEVENT/g)).toHaveLength(2);
+    expect(notImported).toEqual(["VEVENT without END"]);
   });
 });

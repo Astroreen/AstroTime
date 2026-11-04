@@ -8,6 +8,7 @@ import ICAL from "ical.js";
 
 import { CalendarObject, writeCalendar } from "./calendar-object.ts";
 import { colorNameHex, hexColor } from "./colors.ts";
+import { vtimezone } from "./vtimezone.ts";
 
 /** One calendar object of a file: a master and its exceptions with the time zones they use. */
 export interface SplitObject {
@@ -599,6 +600,13 @@ function refreshOf(root: ICAL.Component): number | null {
   return null;
 }
 
+/** What an occurrence says, its bookkeeping (`SEQUENCE`, `DTSTAMP`, `LAST-MODIFIED`) aside. */
+function meaning(component: ICAL.Component): string {
+  const copy = new ICAL.Component(JSON.parse(JSON.stringify(component.toJSON())) as unknown[]);
+  for (const name of ["sequence", "dtstamp", "last-modified"]) copy.removeAllProperties(name);
+  return canonical(copy);
+}
+
 /**
  * A component's meaning as one string: its properties and subcomponents in
  * an order of their own, so two definitions written in another order (a
@@ -663,14 +671,8 @@ export function overlay(stored: string, incoming: string): string {
     if (component.name === "vtimezone") continue;
     const before = old.get(occurrence(component));
     if (!before) continue;
-    // A changed version of an item it had: SEQUENCE past both, so a
-    // scheduling client sees it as newer, never older (RFC 5546 §2.1.4).
-    const sequence = (one: ICAL.Component) =>
-      Number(one.getFirstPropertyValue("sequence") ?? 0) || 0;
-    component.updatePropertyWithValue(
-      "sequence",
-      Math.max(sequence(before), sequence(component)) + 1,
-    );
+    // What it said, read before what it keeps moves over to the file's.
+    const was = meaning(before);
     const has = new Set(component.getAllProperties().map((property) => property.name));
     for (const property of before.getAllProperties().slice()) {
       const keep =
@@ -681,6 +683,19 @@ export function overlay(stored: string, incoming: string): string {
     if (component.getAllSubcomponents("valarm").length === 0)
       for (const alarm of before.getAllSubcomponents("valarm").slice())
         component.addSubcomponent(alarm);
+    // SEQUENCE past both versions' where the occurrence changed, so a
+    // scheduling client sees it as newer (RFC 5546 §2.1.4); one the file
+    // gives again as it was keeps the stored one's.
+    const sequence = (one: ICAL.Component) =>
+      Number(one.getFirstPropertyValue("sequence") ?? 0) || 0;
+    if (meaning(component) !== was)
+      component.updatePropertyWithValue(
+        "sequence",
+        Math.max(sequence(before), sequence(component)) + 1,
+      );
+    else if (before.hasProperty("sequence"))
+      component.updatePropertyWithValue("sequence", sequence(before));
+    else component.removeAllProperties("sequence");
   }
   // A zone the result names that the file does not define: the stored one's.
   const defined = new Set(
@@ -692,4 +707,14 @@ export function overlay(stored: string, incoming: string): string {
     if (named.has(tzid) && !defined.has(tzid)) over.addSubcomponent(zone);
   }
   return writeCalendar(over);
+}
+
+/**
+ * A `VTIMEZONE` for an IANA zone, as text, its observances from the year
+ * before `year` (foundation D104): for a converted file whose local times
+ * are written in it (a vCalendar's, a CSV's), so each object defines the
+ * zone it names.
+ */
+export function zoneText(timeZone: string, year: number): string {
+  return vtimezone(timeZone, year).toString();
 }

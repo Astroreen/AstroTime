@@ -175,15 +175,19 @@ async function addDeviceCalendar(
     readonly color: string | null;
     readonly components: readonly Component[];
   },
+  /** Called with the account's id when this call made it. */
+  madeAccount: (id: string) => void,
 ): Promise<Calendar> {
-  const local =
-    (await store.accounts()).find((account) => account.provider === "local") ??
-    (await store.addAccount({
+  let local = (await store.accounts()).find((account) => account.provider === "local");
+  if (!local) {
+    local = await store.addAccount({
       provider: "local",
       name: names.account,
       serverUrl: LOCAL_SERVER,
       username: null,
-    }));
+    });
+    madeAccount(local.id);
+  }
   return store.saveCalendar({
     accountId: local.id,
     url: `${LOCAL_SERVER}${crypto.randomUUID()}/`,
@@ -196,12 +200,19 @@ async function addDeviceCalendar(
 
 /**
  * A calendar the import made on this device, removed again: with the
- * account it is on when that has no calendar left (one the import made
- * for it, D122's account with nothing to show).
+ * account it is on when the import made that account too and it has no
+ * calendar left; an account the user had stays, as the user had it.
  */
-async function unmake(store: Store, calendar: Calendar): Promise<void> {
+async function unmake(
+  store: Store,
+  calendar: Calendar,
+  ownAccounts: ReadonlySet<string>,
+): Promise<void> {
   await store.removeCalendar(calendar.id);
-  if ((await store.calendars(calendar.accountId)).length === 0)
+  if (
+    ownAccounts.has(calendar.accountId) &&
+    (await store.calendars(calendar.accountId)).length === 0
+  )
     await store.removeAccount(calendar.accountId);
 }
 
@@ -213,6 +224,8 @@ export async function runImport(run: Run): Promise<Imported> {
   const pause = run.pause ?? yieldToPage;
   // A new calendar on this device per source that asks for one, taking what goes to it.
   const made = new Map<string, Calendar>();
+  /** The device accounts this run made, which alone it may take back. */
+  const ownAccounts = new Set<string>();
   try {
     for (const source of run.sources) {
       const to = run.destinations.get(source.id);
@@ -222,18 +235,23 @@ export async function runImport(run: Run): Promise<Imported> {
       if (components.length === 0) continue;
       made.set(
         source.id,
-        await addDeviceCalendar(store, {
-          account: run.accountName,
-          calendar: source.name,
-          color: source.color,
-          components,
-        }),
+        await addDeviceCalendar(
+          store,
+          {
+            account: run.accountName,
+            calendar: source.name,
+            color: source.color,
+            components,
+          },
+          (id) => ownAccounts.add(id),
+        ),
       );
     }
   } catch (error) {
     // One that could not be made: the ones made before it go again, empty;
     // one of those that cannot go does not hide why the import stopped.
-    for (const calendar of made.values()) await unmake(store, calendar).catch(() => {});
+    for (const calendar of made.values())
+      await unmake(store, calendar, ownAccounts).catch(() => {});
     throw error;
   }
 
@@ -318,6 +336,9 @@ export async function runImport(run: Run): Promise<Imported> {
       break;
     }
     const batch: typeof writes = [];
+    // Counted once the batch is written: a batch that fails wrote nothing.
+    let same = 0;
+    let left = 0;
     try {
       // A UID a sync brought into the calendar since the check: already
       // there, as the check would have found it (D270), so the answer given
@@ -337,12 +358,12 @@ export async function runImport(run: Run): Promise<Imported> {
         const found =
           write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
         if (!found) batch.push(write);
-        else if (sameObjects(found.ics, write.ics)) identical++;
+        else if (sameObjects(found.ics, write.ics)) same++;
         else if (choice === "copy")
           batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
         else if (choice === "update")
           batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
-        else skipped++;
+        else left++;
       }
       // The store finds an object of the same UID itself, and updates it
       // (D270); a batch is one transaction, so a failed one wrote nothing.
@@ -354,6 +375,8 @@ export async function runImport(run: Run): Promise<Imported> {
       break;
     }
     written.push(...batch);
+    identical += same;
+    skipped += left;
     done += Math.min(BATCH, writes.length - i);
     run.onProgress(done, writes.length);
     await pause();
@@ -364,7 +387,7 @@ export async function runImport(run: Run): Promise<Imported> {
   for (const [id, calendar] of made) {
     if (written.some((write) => write.calendarId === calendar.id)) continue;
     try {
-      await unmake(store, calendar);
+      await unmake(store, calendar, ownAccounts);
       made.delete(id);
     } catch (failure) {
       cleanup = failure instanceof Error ? failure.message : String(failure);

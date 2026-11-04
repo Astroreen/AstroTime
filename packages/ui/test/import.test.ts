@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { deflateRawSync } from "node:zlib";
 
 import { ALL_RIGHTS, CalendarObject } from "@astrotime/core";
-import { Store } from "@astrotime/storage";
+import { LOCAL_SERVER, Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -580,6 +580,46 @@ describe("an import written through the store (import D269–D271)", () => {
         expect(late.ics).toContain("X-SERVER:kept");
       }
     }
+  });
+
+  test("a batch that fails counts nothing of itself, what it found already there neither", async () => {
+    const { store, personal } = await setup();
+    const source = await sourceOf(calendar("File", event("twin"), event("fresh")));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    // Meanwhile a sync brings "twin" as it is in the file.
+    await store.saveManyFromServer(personal.id, [
+      {
+        href: "https://cloud.example.com/dav/Personal/twin.ics",
+        etag: '"1"',
+        ics: source.items.find((item) => item.uid === "twin")!.ics,
+      },
+    ]);
+    store.changeLocal = () => Promise.reject(new Error("The disk is full."));
+    const { result } = await run(store, [source], destinations, duplicates);
+    expect(result).toMatchObject({
+      events: 0,
+      identical: 0,
+      skipped: 0,
+      error: "The disk is full.",
+    });
+  });
+
+  test("a device account the user had stays when the calendar the import made on it goes", async () => {
+    const { store } = await setup();
+    const mine = await store.addAccount({
+      provider: "local",
+      name: "On this device",
+      serverUrl: LOCAL_SERVER,
+      username: null,
+    });
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 0);
+    expect(result).toMatchObject({ stopped: true, cleanup: null });
+    expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
+    expect((await store.accounts()).map((account) => account.id)).toContain(mine.id);
   });
 
   test("a new calendar on this device, named and coloured as the source", async () => {

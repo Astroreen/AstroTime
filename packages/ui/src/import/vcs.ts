@@ -6,6 +6,8 @@
 // start, 1.0's rule grammar as an `RRULE`; what has no home is named in
 // `notImported`, never written as something it is not. Loaded only for a
 // vCalendar 1.0 file.
+import { wallClockIn, zonedToEpoch } from "@astrotime/core";
+import { zoneText } from "@astrotime/core/split";
 
 export interface Converted {
   /** The file as iCalendar 2.0, for `splitCalendars`. */
@@ -22,25 +24,54 @@ interface Line {
   readonly value: string;
 }
 
-export function vcalendarToIcs(text: string): Converted {
+export function vcalendarToIcs(text: string, options: { readonly timeZone: string }): Converted {
   const notImported = new Set<string>();
   const out: string[] = [];
-  let zone: Zone = { offset: null, daylight: [] };
-  /** The component being converted: its kind, its start (for its alarms), its lines. */
+  let zone: Zone = { offset: null, daylight: [], tzid: null, definition: [] };
+  /** Whether the calendar's zone was settled (at its first component, after its `TZ` and `DAYLIGHT`). */
+  let settled = false;
+  /** The component being converted: its kind and its lines. */
   let component: { name: string; lines: Line[] } | null = null;
+  const convert = () => {
+    if (!component) return;
+    if (!settled) {
+      zone = settle(zone, options.timeZone);
+      settled = true;
+    }
+    out.push(
+      ...convertComponent(component.name, component.lines, zone, options.timeZone, notImported),
+    );
+    component = null;
+  };
+  /** One whose END never came: kept, as far as it went, and named (D272). */
+  const cutShort = () => {
+    if (!component) return;
+    notImported.add(`${component.name} without END`);
+    convert();
+  };
+  const close = () => {
+    cutShort();
+    if (zone.tzid !== null) out.push(...zone.definition);
+    out.push("END:VCALENDAR");
+  };
+  let open = false;
   for (const line of linesOf(text)) {
     if (line.name === "BEGIN" || line.name === "END") {
       const kind = line.value.trim().toUpperCase();
       if (line.name === "BEGIN" && kind === "VCALENDAR") {
-        zone = { offset: null, daylight: [] };
+        if (open) close();
+        open = true;
+        settled = false;
+        zone = { offset: null, daylight: [], tzid: null, definition: [] };
         out.push("BEGIN:VCALENDAR", "VERSION:2.0");
-      } else if (line.name === "END" && kind === "VCALENDAR") out.push("END:VCALENDAR");
-      else if (line.name === "BEGIN" && (kind === "VEVENT" || kind === "VTODO"))
+      } else if (line.name === "END" && kind === "VCALENDAR") {
+        close();
+        open = false;
+      } else if (line.name === "BEGIN" && (kind === "VEVENT" || kind === "VTODO")) {
+        cutShort();
         component = { name: kind, lines: [] };
-      else if (line.name === "END" && component && kind === component.name) {
-        out.push(...convertComponent(component.name, component.lines, zone, notImported));
-        component = null;
-      } else notImported.add(`${line.name}:${kind}`);
+      } else if (line.name === "END" && component && kind === component.name) convert();
+      else notImported.add(`${line.name}:${kind}`);
       continue;
     }
     if (component) {
@@ -67,6 +98,7 @@ export function vcalendarToIcs(text: string): Converted {
         else notImported.add(line.name);
     }
   }
+  if (open) close();
   return { text: `${out.join("\r\n")}\r\n`, notImported: [...notImported] };
 }
 
@@ -83,17 +115,19 @@ function linesOf(text: string): Line[] {
     current = "";
   };
   for (const piece of raw) {
+    // A quoted-printable value ending in "=" (white space after it allowed)
+    // goes on to the next line as it is, a space it starts with its text:
+    // asked first, so that space is not taken for a fold.
+    if (
+      /QUOTED-PRINTABLE/i.test(current.slice(0, current.indexOf(":") + 1)) &&
+      /=[ \t]*$/.test(current)
+    ) {
+      current = current.replace(/=[ \t]*$/, "") + piece;
+      continue;
+    }
     // Folded: a line that starts with white space goes on the one before (1.0 keeps the space).
     if (/^[ \t]/.test(piece) && current !== "") {
       current += piece;
-      continue;
-    }
-    // A quoted-printable value ending in "=" goes on to the next line.
-    if (
-      /QUOTED-PRINTABLE/i.test(current.slice(0, current.indexOf(":") + 1)) &&
-      current.endsWith("=")
-    ) {
-      current = current.slice(0, -1) + piece;
       continue;
     }
     flush();
@@ -158,7 +192,12 @@ const escape = (text: string) =>
 
 // Time
 
-/** The file's `TZ` (minutes east of UTC) and its `DAYLIGHT` periods. */
+/**
+ * The file's `TZ` (minutes east of UTC) and its `DAYLIGHT` periods, and,
+ * once settled, the zone its local times are written in: the user's own
+ * where its offsets are the file's, else one made of them (`definition`,
+ * its `VTIMEZONE`); none without a `TZ`, so they stay floating.
+ */
 interface Zone {
   readonly offset: number | null;
   readonly daylight: readonly {
@@ -166,6 +205,66 @@ interface Zone {
     readonly from: number;
     readonly to: number;
   }[];
+  readonly tzid: string | null;
+  /** Whether `tzid` is an IANA zone (the user's), whose rules hold for every year. */
+  readonly iana?: boolean;
+  readonly definition: readonly string[];
+}
+
+/** The offset of an IANA zone at an instant, in minutes east of UTC. */
+const offsetIn = (timeZone: string, utc: number) =>
+  Math.round((Date.parse(`${wallClockIn(utc, timeZone)}Z`) - utc) / 60_000);
+
+const DAY = 86_400_000;
+
+/** `+0300` for 180 minutes. */
+const offsetText = (minutes: number) =>
+  `${minutes < 0 ? "-" : "+"}${pad(Math.floor(Math.abs(minutes) / 60))}${pad(Math.abs(minutes) % 60)}`;
+
+/**
+ * The zone a calendar's local times are written in, so a series keeps its
+ * wall clock across a change of offset: the user's own (its rules for every
+ * year) where it has the file's offsets, in and out of each `DAYLIGHT`
+ * period; else a `VTIMEZONE` made of the file's `TZ` and `DAYLIGHT`s
+ * (exact for the years they name, the standard offset beyond).
+ */
+function settle(zone: Zone, timeZone: string): Zone {
+  if (zone.offset === null) return zone;
+  const std = zone.offset;
+  const year = new Date(zone.daylight[0]?.from ?? Date.UTC(2020, 0, 1)).getUTCFullYear();
+  const samples =
+    zone.daylight.length > 0
+      ? zone.daylight.flatMap((p) => [
+          [p.from - p.offset * 60_000 + DAY, p.offset],
+          [p.to - p.offset * 60_000 + DAY, std],
+        ])
+      : [
+          [Date.UTC(year, 0, 15), std],
+          [Date.UTC(year, 6, 15), std],
+        ];
+  if (samples.every(([utc, offset]) => offsetIn(timeZone, utc!) === offset)) {
+    const definition = zoneText(timeZone, year).split(/\r?\n/).filter(Boolean);
+    return { ...zone, tzid: timeZone, iana: true, definition };
+  }
+  const tzid = `vCalendar ${offsetText(std)}${zone.daylight.length > 0 ? `/${offsetText(zone.daylight[0]!.offset)}` : ""}`;
+  const observance = (kind: string, start: number, from: number, to: number) => [
+    `BEGIN:${kind}`,
+    `DTSTART:${stamp(start, false)}`,
+    `TZOFFSETFROM:${offsetText(from)}`,
+    `TZOFFSETTO:${offsetText(to)}`,
+    `END:${kind}`,
+  ];
+  const definition = [
+    "BEGIN:VTIMEZONE",
+    `TZID:${tzid}`,
+    ...observance("STANDARD", Date.UTC(1970, 0, 1), std, std),
+    ...zone.daylight.flatMap((p) => [
+      ...observance("DAYLIGHT", p.from, std, p.offset),
+      ...observance("STANDARD", p.to, p.offset, std),
+    ]),
+    "END:VTIMEZONE",
+  ];
+  return { ...zone, tzid, definition };
 }
 
 /** `-05`, `+03:00`, `+0530` as minutes east of UTC. */
@@ -202,26 +301,74 @@ const stamp = (ms: number, utc: boolean) => {
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}${utc ? "Z" : ""}`;
 };
 
+/** A 1.0 time as iCalendar writes it, and the instant it names (a floating one's wall clock read as UTC). */
+interface Time {
+  readonly kind: "date" | "utc" | "zoned" | "floating";
+  /** What follows the property's name: `;VALUE=DATE:…`, `;TZID=…:…`, or `:…`. */
+  readonly text: string;
+  /** Its value alone, as a list (`EXDATE`) or a rule's `UNTIL` takes it. */
+  readonly value: string;
+  readonly ms: number;
+}
+
 /**
- * A 1.0 time as an iCalendar one, with the instant it names in milliseconds:
- * UTC stays UTC; a local time goes through the file's `TZ` (and `DAYLIGHT`
- * where it falls in one) to UTC; with no `TZ` it stays floating.
+ * A 1.0 time as an iCalendar one: a date stays a date; UTC stays UTC; a
+ * local time keeps its wall clock in the calendar's zone (`settle`), its
+ * instant through the file's `TZ` (and the `DAYLIGHT` it falls in); with no
+ * `TZ` it stays floating.
  */
-function timeOf(value: string, zone: Zone): { text: string; ms: number } | null {
+function timeOf(value: string, zone: Zone): Time | null {
   const trimmed = value.trim();
   const ms = localMs(trimmed);
   if (ms === null) return null;
-  if (/^\d{8}$/.test(trimmed)) return { text: `VALUE=DATE:${trimmed}`, ms };
-  if (trimmed.endsWith("Z")) return { text: `:${stamp(ms, true)}`, ms };
-  if (zone.offset === null) return { text: `:${stamp(ms, false)}`, ms };
+  if (/^\d{8}$/.test(trimmed))
+    return { kind: "date", text: `;VALUE=DATE:${trimmed}`, value: trimmed, ms };
+  if (trimmed.endsWith("Z")) {
+    const utc = stamp(ms, true);
+    return { kind: "utc", text: `:${utc}`, value: utc, ms };
+  }
+  const local = stamp(ms, false);
+  if (zone.offset === null || zone.tzid === null)
+    return { kind: "floating", text: `:${local}`, value: local, ms };
+  // The instant by the zone's own rules where it is the user's, else by the file's offsets.
   const offset = zone.daylight.find((p) => ms >= p.from && ms < p.to)?.offset ?? zone.offset;
-  const utc = ms - offset * 60_000;
-  return { text: `:${stamp(utc, true)}`, ms: utc };
+  return {
+    kind: "zoned",
+    text: `;TZID=${zone.tzid}:${local}`,
+    value: local,
+    ms: zone.iana
+      ? zonedToEpoch(new Date(ms).toISOString().slice(0, 19), zone.tzid)
+      : ms - offset * 60_000,
+  };
 }
 
-/** A property of times: `NAME;VALUE=DATE:…` or `NAME:…`. */
-const timeLine = (name: string, time: { text: string }) =>
-  time.text.startsWith(":") ? `${name}${time.text}` : `${name};${time.text}`;
+/**
+ * The day a time falls on for the user: an all-day event's (Outlook writes
+ * local midnights, in UTC too: `…T210000Z` is the next day in UTC+3).
+ */
+function dayOf(value: string, zone: Zone, timeZone: string): string | null {
+  const time = timeOf(value, zone);
+  if (!time) return null;
+  if (time.kind === "date") return time.value;
+  if (time.kind === "floating") return time.value.slice(0, 8);
+  // The instant on the file's wall clock where it has one, else the user's.
+  const wall =
+    zone.offset !== null
+      ? new Date(time.ms + offsetAtUtc(zone, time.ms) * 60_000).toISOString()
+      : `${wallClockIn(time.ms, timeZone)}Z`;
+  return wall.slice(0, 10).replaceAll("-", "");
+}
+
+/** The file's offset at an instant: its `DAYLIGHT` where the instant falls in one. */
+function offsetAtUtc(zone: Zone, utc: number): number {
+  const daylight = zone.daylight.find(
+    (p) => utc + p.offset * 60_000 >= p.from && utc + p.offset * 60_000 < p.to,
+  );
+  return daylight?.offset ?? zone.offset ?? 0;
+}
+
+/** A property of times: `NAME;VALUE=DATE:…`, `NAME;TZID=…:…` or `NAME:…`. */
+const timeLine = (name: string, time: Time) => `${name}${time.text}`;
 
 /** Seconds as an iCalendar DURATION: `-PT15M`, `P1D`. */
 function duration(seconds: number): string {
@@ -271,16 +418,24 @@ function convertComponent(
   name: string,
   lines: readonly Line[],
   zone: Zone,
+  timeZone: string,
   notImported: Set<string>,
 ): string[] {
   const out = [`BEGIN:${name}`];
   const alarms: string[] = [];
-  const startLine = lines.find((line) => line.name === "DTSTART");
-  const start = startLine ? timeOf(startLine.value, zone) : null;
+  const at = (field: string) => {
+    const line = lines.find((one) => one.name === field);
+    return line ? timeOf(line.value, zone) : null;
+  };
+  const start = at("DTSTART");
+  // A task's alarms without a start are its due time's.
+  const due = name === "VTODO" ? at("DUE") : null;
   const allDay = lines.some(
     (line) =>
       line.name === "X-MICROSOFT-CDO-ALLDAYEVENT" && line.value.trim().toUpperCase() === "TRUE",
   );
+  /** How the start is written: an exception date or a rule's end is written the same way (RFC 5545). */
+  const startKind = allDay ? "date" : (start?.kind ?? "utc");
   let organizer = false;
   for (const line of lines) {
     const text = () => escape(textOf(line));
@@ -304,31 +459,37 @@ function convertComponent(
       case "LAST-MODIFIED":
       case "DCREATED": {
         const iname = line.name === "DCREATED" ? "CREATED" : line.name;
-        // Outlook's all-day event: from one local midnight to the next, as dates.
-        const date =
-          allDay && (iname === "DTSTART" || iname === "DTEND")
-            ? line.value.trim().slice(0, 8)
-            : null;
-        const time = date ? { text: `VALUE=DATE:${date}` } : timeOf(line.value, zone);
-        if (time) out.push(timeLine(iname, time));
-        else notImported.add(line.name);
+        // Outlook's all-day event: from one local midnight to the next, as the user's days.
+        if (allDay && (iname === "DTSTART" || iname === "DTEND")) {
+          const day = dayOf(line.value, zone, timeZone);
+          if (day) out.push(`${iname};VALUE=DATE:${day}`);
+          else notImported.add(line.name);
+          break;
+        }
+        const time = timeOf(line.value, zone);
+        // CREATED, LAST-MODIFIED and COMPLETED are UTC (RFC 5545); a local one through its zone.
+        const utc = iname === "CREATED" || iname === "LAST-MODIFIED" || iname === "COMPLETED";
+        if (!time || (utc && (time.kind === "date" || time.kind === "floating")))
+          notImported.add(line.name);
+        else out.push(utc ? `${iname}:${stamp(time.ms, true)}` : timeLine(iname, time));
         break;
       }
       case "EXDATE":
       case "RDATE": {
-        const times = line.value.split(";").map((value) => timeOf(value, zone));
-        if (times.some((time) => time === null) || times.length === 0) notImported.add(line.name);
-        else {
-          const dates = times.every((time) => time!.text.startsWith("VALUE=DATE"));
-          out.push(
-            `${line.name}${dates ? ";VALUE=DATE" : ""}:${times.map((time) => time!.text.replace(/^(VALUE=DATE)?:/, "")).join(",")}`,
-          );
-        }
+        const values = line.value.split(";").filter((value) => value.trim() !== "");
+        const list = timesLike(values, startKind, zone, timeZone);
+        if (list) out.push(`${line.name}${list}`);
+        else notImported.add(line.name);
         break;
       }
       case "RRULE":
       case "EXRULE": {
-        const rule = ruleOf(line.value, zone);
+        // A rule's end: UTC for a zoned start (RFC 5545 §3.3.10), else as the start is written.
+        const rule = ruleOf(line.value, (until) => {
+          if (startKind !== "zoned") return timesLike([until], startKind, zone, timeZone);
+          const time = timeOf(until, zone);
+          return time ? stamp(time.ms, true) : null;
+        });
         if (rule) out.push(`${line.name}:${rule}`);
         else notImported.add(line.name);
         break;
@@ -384,7 +545,7 @@ function convertComponent(
       case "AALARM":
       case "DALARM":
       case "MALARM": {
-        const alarm = alarmOf(line, start, zone);
+        const alarm = alarmOf(line, start, due, zone);
         if (alarm) alarms.push(...alarm);
         else notImported.add(line.name);
         break;
@@ -420,13 +581,21 @@ function personOf(value: string): { name: string | null; address: string | null 
  * mail alarm's content its address then its note) as a `VALARM`, its time
  * relative to the start, so each occurrence of a series has it.
  */
-function alarmOf(line: Line, start: { ms: number } | null, zone: Zone): string[] | null {
+function alarmOf(line: Line, start: Time | null, due: Time | null, zone: Zone): string[] | null {
   const [run = "", snooze = "", repeat = "", ...content] = textOf(line).split(";");
   const time = timeOf(run, zone);
   if (!time) return null;
+  // Relative to the start, else a task's due time; else at its instant,
+  // which iCalendar writes in UTC alone (RFC 5545 §3.8.6.3): a floating or
+  // dated one has none, and is named as not carried over.
   const trigger = start
     ? `TRIGGER:${duration((time.ms - start.ms) / 1000)}`
-    : timeLine("TRIGGER;VALUE=DATE-TIME", time);
+    : due
+      ? `TRIGGER;RELATED=END:${duration((time.ms - due.ms) / 1000)}`
+      : time.kind === "utc" || time.kind === "zoned"
+        ? `TRIGGER;VALUE=DATE-TIME:${stamp(time.ms, true)}`
+        : null;
+  if (!trigger) return null;
   const out = ["BEGIN:VALARM"];
   if (line.name === "AALARM") out.push("ACTION:AUDIO", trigger);
   else if (line.name === "DALARM")
@@ -449,6 +618,45 @@ function alarmOf(line: Line, start: { ms: number } | null, zone: Zone): string[]
   return out;
 }
 
+/**
+ * Times written as the start is (RFC 5545: an `EXDATE`'s, an `RDATE`'s, a
+ * rule's `UNTIL`): what follows the property's name, `;VALUE=DATE:…`,
+ * `;TZID=…:…` or `:…`, values comma-separated. Null for one that cannot be
+ * read. A rule's `UNTIL` for a zoned start is written in UTC by `until`'s caller.
+ */
+function timesLike(
+  values: readonly string[],
+  startKind: Time["kind"],
+  zone: Zone,
+  timeZone: string,
+): string | null {
+  const written: string[] = [];
+  for (const value of values) {
+    if (startKind === "date") {
+      const day = dayOf(value, zone, timeZone);
+      if (!day) return null;
+      written.push(day);
+      continue;
+    }
+    const time = timeOf(value, zone);
+    if (!time) return null;
+    written.push(
+      startKind === "floating"
+        ? time.kind === "utc"
+          ? stamp(time.ms, false)
+          : time.value
+        : startKind === "zoned" && time.kind === "zoned"
+          ? time.value
+          : stamp(time.ms, true),
+    );
+  }
+  if (written.length === 0) return null;
+  if (startKind === "date") return `;VALUE=DATE:${written.join(",")}`;
+  if (startKind === "zoned" && zone.tzid !== null && written.every((w) => !w.endsWith("Z")))
+    return `;TZID=${zone.tzid}:${written.join(",")}`;
+  return `:${written.join(",")}`;
+}
+
 const WEEKDAY = /^(SU|MO|TU|WE|TH|FR|SA)\$?$/;
 const FREQUENCY: Record<string, string> = {
   D: "DAILY",
@@ -464,7 +672,7 @@ const FREQUENCY: Record<string, string> = {
  * as an iCalendar `RRULE`; null for what it cannot say (a rule of several
  * parts, a modifier it does not know).
  */
-function ruleOf(value: string, zone: Zone): string | null {
+function ruleOf(value: string, until: (value: string) => string | null): string | null {
   const tokens = value.trim().split(/\s+/);
   const head = /^(D|W|MP|MD|YM|YD)(\d+)$/.exec(tokens[0] ?? "");
   if (!head) return null;
@@ -481,9 +689,10 @@ function ruleOf(value: string, zone: Zone): string | null {
       end = token === "#0" ? "" : `COUNT=${token.slice(1)}`;
       continue;
     }
-    const until = /^\d{8}(T\d{4,6}Z?)?$/.test(token) ? timeOf(token, zone) : null;
-    if (until) {
-      end = `UNTIL=${until.text.replace(/^(VALUE=DATE)?:/, "")}`;
+    // Its end as its start is written: a date, UTC for a zoned or UTC start, floating for a floating one.
+    const last = /^\d{8}(T\d{4,6}Z?)?$/.test(token) ? until(token) : null;
+    if (last) {
+      end = `UNTIL=${last.replace(/^.*:/, "")}`;
       continue;
     }
     const day = WEEKDAY.exec(token);

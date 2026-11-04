@@ -103,7 +103,7 @@ export async function readImport(
       let text = decoded.text;
       // vCalendar 1.0: its converter loads for it alone.
       if (/^VERSION:1\.0[ \t]*$/im.test(text) && /^BEGIN:VCALENDAR/im.test(text)) {
-        const converted = (await import("./vcs.ts")).vcalendarToIcs(text);
+        const converted = (await import("./vcs.ts")).vcalendarToIcs(text, options);
         text = converted.text;
         notImported = converted.notImported;
       }
