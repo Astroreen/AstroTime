@@ -133,7 +133,12 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D2`, `plans/foundation.md#D127`; `people`, RFC
     3744's principal search asked of the calendar home.
     → `plans/design.md#D208`
-  - `startLoginFlow` — Nextcloud Login Flow v2. → `plans/foundation.md#D19`;
+  - `Authorization` (`auth.ts`) — a request's credentials: Basic, or
+    Digest once the server asks (`digest.ts`, loaded then).
+    → `plans/providers.md#D260`
+  - `startLoginFlow` (`@astrotime/caldav/login-flow`, loaded with the
+    first sign-in, `plans/providers.md#D260`) — Nextcloud Login Flow v2.
+    → `plans/foundation.md#D19`;
     `resumeLoginFlow`, one a page before this one started, from its
     `LoginFlowState` → `plans/foundation.md#D121`;
     `revokeAppPassword`, the app password it gave revoked when its account
@@ -180,6 +185,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `test/budget.test.ts` — the requests each action costs a server, held
     to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
+  - `test/interop/` — the interop run's servers in containers (Baïkal,
+    Xandikos, DAViCal: `compose.yaml`), one chosen by `ASTROTIME_INTEROP`
+    (`.github/workflows/interop.yml`). → `plans/providers.md#D248`,
+    `plans/providers.md#D261`
   - `test/servers.test.ts` — the provider and the engine against Radicale
     (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
     Login Flow v2 approved in Chromium on Nextcloud's own pages, and on

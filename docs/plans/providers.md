@@ -1,7 +1,7 @@
 # Providers plan
 
 Status: **in progress** — the survey, the order and the testing policy are
-decided; nothing of them is built yet. This plan owns which calendar and
+decided; the interop matrix ([PR P2](#pr-p2--the-interop-matrix)) is built. This plan owns which calendar and
 task services AstroTime syncs with beyond Nextcloud, how each is reached,
 and how each is tested against the real thing. Foundation owns the
 provider interface and the sync engine: [D2](foundation.md#D2) (generic
@@ -143,8 +143,8 @@ marked _to be recorded_.
   that touch only the UI, which is most of them; and a server's behaviour
   changes when its release or AstroTime's protocol code changes, which
   the filters and the weekly run catch. Cloud services also cost the
-  services something and can lock an account that signs in too often
-  (Cloudflare limited the owner's own host once), so they are recorded
+  services something and can lock an account that signs in too often,
+  so they are recorded
   ([D249](#D249)) and run live rarely.
 
 - **D249. Recordings: what every PR replays.** A service whose real
@@ -428,7 +428,72 @@ marked _to be recorded_.
   told about another, and none is reached unless the user added an
   account there.
 
+### Decided while building
+
+- **D260. Digest, when a server asks for it.** The interop run's first
+  finding: Baïkal authenticates with HTTP Digest by default (its
+  `dav_auth_type`), and AstroTime sent Basic only, so a Baïkal of
+  default settings refused every sign-in as a wrong password. The CalDAV
+  provider now sends Basic first, as every other server takes it, and a
+  `401` whose `WWW-Authenticate` offers Digest (RFC 7616: MD5, SHA-256
+  and their `-sess` forms, `qop=auth` or none) is answered once; the
+  account's provider then stays on Digest, counting the nonce's uses, a
+  stale nonce (`stale=true`) answered again, and a second refusal is the
+  credentials refused, never a loop (`Authorization`, `auth.ts`). It
+  costs a Digest server one request more per sync (the first, refused);
+  remembering the scheme with the account would save it, when a budget
+  test on a Digest server asks ([Deferred](#deferred)). The web proxy
+  passes the challenge as `x-astrotime-www-authenticate`, since a
+  `WWW-Authenticate` on the app's own origin would make the browser ask
+  for a password itself ([D39](foundation.md#D39)). MD5, which Web Crypto
+  lacks, and the challenge's parsing are a chunk of their own
+  (`digest.ts`, 1.4 KiB), loaded at a server's first `401`. **The room on
+  the first load** ([D255](#D255)) came from Nextcloud's Login Flow v2:
+  `startLoginFlow` and `resumeLoginFlow` load with the first sign-in
+  (`@astrotime/caldav/login-flow`), `revokeAppPassword`, which removing
+  an account needs, staying (`app-password.ts`); the flow imports the
+  core's `provider.ts` alone, not its index, so its chunk splits nothing
+  else off the first load. AstroTime's own first load went from 132 492
+  to 132 312 bytes (129.4 to 129.2 KiB).
+
+- **D261. The interop matrix, as built.** `packages/sync/test/interop/`:
+  `compose.yaml` pins each server, `servers.ts` names where each listens
+  (the address a user would type) and makes the tests' calendars where
+  discovery finds the home, so nothing in it knows a server's paths;
+  `servers.test.ts` adds the server `ASTROTIME_INTEROP` names to Radicale
+  (and Nextcloud, nightly). What joined, and what each taught:
+  - **Baïkal 0.10.1, with Digest and with Basic** (`ckulka/baikal`),
+    configured without its install wizard: `baikal/setup.sh` writes the
+    `baikal.yaml` the wizard would, its SQLite database from its own
+    schema and the user. Its nginx answers `.well-known/caldav` with an
+    absolute redirect naming the port nginx listens on, so a deployment
+    whose public port differs (a container mapped `8080:80`) redirects to
+    a port that does not answer: there AstroTime is offline on Android and
+    the desktop and told "another server" on the web, and the user signs
+    in with the `…/dav.php/` address instead. The setup listens on the
+    mapped port, as a deployment that redirects correctly does.
+  - **Xandikos 0.4.10**, as its documentation deploys it: authentication
+    is its reverse proxy's (its own `--htpasswd` needs TLS), so it takes
+    any credentials.
+  - **DAViCal** on PostgreSQL 16 (`tuxnvape/davical-standalone`, pinned
+    by digest: it has no version tags), its administrator as the user.
+    Its `.well-known/caldav` answers `405`; discovery goes on from the
+    address, `…/caldav.php/`, as D2's fallback does.
+
+  On each the whole suite passes (discovery, both ways between two
+  devices, series split, deletion, `sync-collection`, offline edits,
+  merges and conflicts, the web proxy, the round trip of every property).
+  What did not join is in [Deferred](#deferred).
+
 ## Deferred
+
+- **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
+  starts in a bootstrap mode whose setup is its web wizard, writing a
+  JSON configuration; an unattended one is to be written from its
+  documentation. **Cyrus IMAP**, **SOGo** (with its database and
+  users) and **Davis** (sabre/dav, as Baïkal) were not tried this round.
+- **The scheme remembered with the account** ([D260](#D260)) — a Digest
+  server's first request of each sync is a refused Basic one.
 
 - **Import of an ICS file** — a file from the device (Tuta's export, an
   invitation) read into a calendar once ([D256](#D256)); a subscription
@@ -467,6 +532,9 @@ changes `packages/caldav/**` and not on one that changes only
 `packages/ui/**`; Dependabot's config names the compose file; each
 server that could not join is in Deferred with the reason; `docs/map.md`
 names `packages/sync/test/interop/`.
+
+_Built:_ [D260](#D260) (Digest, the first finding) and
+[D261](#D261) (Baïkal with Digest and with Basic, Xandikos, DAViCal).
 
 ### PR P3 — Known services
 
