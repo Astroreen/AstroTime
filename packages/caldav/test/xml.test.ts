@@ -2,7 +2,8 @@
 // serializer may escape a CR or a non-ASCII letter (XML 1.0 §4.1).
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, type HttpClient } from "../src/index.ts";
+import { type HttpClient } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 import { parseMultistatus, text } from "../src/xml.ts";
 
 test("character references are read as the characters they stand for", () => {

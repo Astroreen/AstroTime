@@ -1869,7 +1869,9 @@ optimization is lacking").
     menu's choice (`calendar/copy.ts`, `@astrotime/core/copy`); after #78
     AstroTime's own code at once was 130.3 KiB, past the budget, and it is
     123.5 KiB with them out of the first load.
-    The sync stack stays in the first load ([Deferred](#deferred)).
+    The sync stack stays in the first load ([Deferred](#deferred)); _since
+    round 5_ but for CalDAV's provider and XML parser, which load with an
+    account's first sync or sign-in ([providers D255](providers.md#D255)).
     _Since round 5:_ the sign-in dialog loads the same way, with its
     first opening (its forms and Base UI's tabs, 5.4 KiB; the buttons every
     dialog shares in `components/buttons.ts`), for the room
@@ -1884,7 +1886,8 @@ optimization is lacking").
     AstroTime's own code in them 130 KiB (120); a PR that needs more raises
     the budget, saying why.
     _Exceptions the owner delegated:_ #158's
-    +138 bytes, 36 over a PR's +0.1 KiB (a remembered scheme bound to its
+    +146 bytes (127 559 to 127 705 on main `937fdb8`), 44 over a PR's
+    +0.1 KiB (a remembered scheme bound to its
     origin and pruned with its account, [providers D260](providers.md#D260)),
     paid back by [providers D255](providers.md#D255)'s lazy CalDAV
     (`perf/lazy-caldav`, −3.1 KiB measured).
@@ -2401,10 +2404,11 @@ task?"
 - **An `RDATE` period moved with its series** — a series moved keeps its
   `RDATE`s of periods where they were, and one made all-day keeps them
   timed ([D142](#D142)).
-- **The sync stack with its first use** — CalDAV, the XML parser and the
-  `SignIn` steps still load at once ([D145](#D145)); they belong to the
-  accounts' code, which was being rewritten when D145 was measured. The
-  sign-in dialog itself loads with its first opening since round 5
+- **The sync stack with its first use** — the engine and the `SignIn`
+  steps still load at once ([D145](#D145)); they belong to the accounts'
+  code, which was being rewritten when D145 was measured. The sign-in
+  dialog itself loads with its first opening since round 5, and CalDAV's
+  provider and XML parser with an account's first sync or sign-in
   ([providers D255](providers.md#D255)).
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).

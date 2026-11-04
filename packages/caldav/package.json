@@ -20,6 +20,10 @@
     "./bearer": {
       "types": "./src/bearer.ts",
       "import": "./src/bearer.ts"
+    },
+    "./provider": {
+      "types": "./src/provider.ts",
+      "import": "./src/provider.ts"
     }
   },
   "scripts": {

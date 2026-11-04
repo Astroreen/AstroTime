@@ -3,7 +3,7 @@
 // SHA-256 is Web Crypto's.
 import type { Authorization, DigestChallenge, Scheme } from "./auth.ts";
 import type { HttpRequest, HttpResponse } from "./http.ts";
-import type { Credentials } from "./provider.ts";
+import type { Credentials } from "./home.ts";
 
 /**
  * Learns from a 401 to a request signed with `answered` (`null`: sent

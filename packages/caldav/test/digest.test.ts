@@ -12,12 +12,12 @@ import {
   Authorization,
   fetchClient,
   proxyHandler,
-  send,
   throughProxy,
   type HttpClient,
   type HttpRequest,
   type RememberedScheme,
 } from "../src/index.ts";
+import { send } from "../src/provider.ts";
 
 test("MD5 is RFC 1321's", async () => {
   expect(await md5("")).toBe("d41d8cd98f00b204e9800998ecf8427e");
@@ -638,4 +638,24 @@ test("an OAuth account given a slot a password filled signs with its token, reca
   );
   expect(answer.status).toBe(207);
   expect(sent).toEqual(["Bearer t"]);
+});
+
+test("requests in flight together on one remembered challenge never share a count, whichever Authorization signs them", async () => {
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const slot: RememberedScheme = {};
+  const first = new Authorization(astro, slot);
+  await send(http, first, propfind("https://dav.example/"), []);
+  // The slot holds the very challenge `first` signs with (`taken` keeps it, not a copy).
+  expect(slot.scheme).toBe(first.scheme);
+  const next = new Authorization(astro, slot);
+  const urls = ["a/", "b/", "c/", "d/"].map((path) => propfind(`https://dav.example/${path}`));
+  const answers = await Promise.all(
+    urls.flatMap((asked) => [send(http, first, asked, []), send(http, next, asked, [])]),
+  );
+  expect(answers.every((answer) => answer.status === 207)).toBe(true);
+  // Basic, then nine Digest answers on one nonce: nine counts, each once.
+  expect(digest.counts).toHaveLength(9);
+  expect(new Set(digest.counts).size).toBe(9);
+  expect(digest.counts.toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 });

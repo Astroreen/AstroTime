@@ -1,4 +1,4 @@
-# Stalwart 0.16 configured without its web admin (docs/plans/providers.md#D248):
+# Stalwart 0.15 configured without its web admin (docs/plans/providers.md#D248):
 # plain http on one port, its data in RocksDB inside the container, and one
 # user, `astro` with the password `secret`, in a directory kept in this file.
 # Its log's "Failed to fetch spam filter" is its mail side's, and harmless here.

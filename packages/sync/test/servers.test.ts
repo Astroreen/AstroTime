@@ -1,7 +1,6 @@
 // The sync engine and the CalDAV provider against real servers: Radicale on
 // every run, Nextcloud in CI's nightly job (docs/plans/foundation.md#pr-4--caldav-provider).
 import {
-  CalDavProvider,
   fetchClient,
   keepsFiles,
   proxyHandler,
@@ -9,6 +8,7 @@ import {
   throughProxy,
   type HttpClient,
 } from "@astrotime/caldav";
+import { CalDavProvider } from "@astrotime/caldav/provider";
 import { startLoginFlow } from "@astrotime/caldav/login-flow";
 import {
   AuthError,

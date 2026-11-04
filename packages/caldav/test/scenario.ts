@@ -9,12 +9,11 @@
 // replay given it sends the requests the recording holds.
 import {
   Authorization,
-  CalDavProvider,
-  send,
   type Credentials,
   type HttpClient,
   type RememberedScheme,
 } from "../src/index.ts";
+import { CalDavProvider, send } from "../src/provider.ts";
 
 /** What the recordings' calendars are named from: a run's own name follows it. */
 const PREFIX = "astrotime-recording-";

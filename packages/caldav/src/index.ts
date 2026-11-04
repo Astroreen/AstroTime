@@ -12,15 +12,10 @@ export { revokeAppPassword } from "./app-password.ts";
 // The flow itself is `@astrotime/caldav/login-flow`, loaded with its first use.
 export type { LoginFlow, LoginFlowState } from "./login-flow.ts";
 export { Authorization, inClear, type RememberedScheme, type TokenSource } from "./auth.ts";
-export {
-  CalDavProvider,
-  canonicalHref,
-  keepsFiles,
-  NoCalendarHomeError,
-  send,
-  type Credentials,
-  type Discovery,
-} from "./provider.ts";
+// The provider itself (`CalDavProvider`, `send`, its XML) is
+// `@astrotime/caldav/provider`, which the apps load with their first sync
+// or sign-in (providers D255): nothing here imports it.
+export { keepsFiles, NoCalendarHomeError, type Credentials, type Discovery } from "./home.ts";
 export {
   PLACES,
   PLACES_OFF,

@@ -4,7 +4,8 @@
 // that iCalendar cannot say (a task's position, its links) is never touched.
 // What a VTODO says that Google cannot keep is written without it and said
 // (`WriteResult.dropped`).
-import { Authorization, send, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { Authorization, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { send } from "@astrotime/caldav/provider";
 import {
   ALL_RIGHTS,
   type Changes,

@@ -2,7 +2,8 @@ import { expect, test } from "vite-plus/test";
 
 import { OfflineError, retryAfter, ServerBusyError } from "@astrotime/core";
 
-import { CalDavProvider, type HttpClient } from "../src/index.ts";
+import { type HttpClient } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 
 test("a 429 or a 503 stops the sync as when offline, with the server's Retry-After (D128)", async () => {
   for (const [status, header, expected] of [

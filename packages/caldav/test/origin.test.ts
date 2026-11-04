@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, canonicalHref, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { type HttpClient, type HttpRequest } from "../src/index.ts";
+import { CalDavProvider, canonicalHref } from "../src/provider.ts";
 
 /** A request's body as text: the provider sends text to CalDAV. */
 const bodyText = (request: { readonly body?: string | Uint8Array }) =>

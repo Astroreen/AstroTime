@@ -16,6 +16,7 @@ import {
 } from "@astrotime/core";
 
 import { Authorization, type RememberedScheme, type TokenSource } from "./auth.ts";
+import { NoCalendarHomeError, type Credentials, type Discovery } from "./home.ts";
 import {
   AuthError,
   CertificateError,
@@ -38,32 +39,9 @@ import {
   type DavResponse,
 } from "./xml.ts";
 
-export interface Credentials {
-  readonly username: string;
-  /** A password, or a Nextcloud app password (docs/plans/foundation.md#D19). */
-  readonly password: string;
-}
-
-/** Where discovery found an account's calendars. */
-export interface Discovery {
-  readonly principalUrl: string;
-  readonly homeUrl: string;
-}
-
-/** The address answers, but no CalDAV calendar home was found there (RFC 6764). */
-export class NoCalendarHomeError extends Error {
-  override name = "NoCalendarHomeError";
-}
-
 const MULTIGET_BATCH = 100;
 /** Truncated sync-collection answers followed before falling back to a full listing. */
 const MAX_SYNC_PAGES = 50;
-
-/** Where Nextcloud keeps a calendar home: its server's root, and the user's name in the path. */
-export const NEXTCLOUD_HOME = /^(.*)\/remote\.php\/dav\/calendars\/([^/]+)\/?$/;
-
-/** Whether a calendar home's server keeps the user's files beside it (Nextcloud's, foundation D231). */
-export const keepsFiles = (homeUrl: string) => NEXTCLOUD_HOME.test(homeUrl);
 
 /** `#RRGGBBAA` (Apple, Nextcloud) to `#RRGGBB`; anything else as it is. */
 function color(value: string | null): string | null {

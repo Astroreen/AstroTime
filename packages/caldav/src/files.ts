@@ -13,7 +13,8 @@ import type { FileStore, NewAttachment, RemoteFile } from "@astrotime/core";
 
 import type { HttpClient, HttpRequest } from "./http.ts";
 import { Authorization } from "./auth.ts";
-import { NEXTCLOUD_HOME, send, type Credentials } from "./provider.ts";
+import { NEXTCLOUD_HOME, type Credentials } from "./home.ts";
+import { send } from "./provider.ts";
 import { children, parseMultistatus, text, type DavResponse } from "./xml.ts";
 
 const PROPS = `<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:prop><d:resourcetype/><d:getcontenttype/><d:getcontentlength/><oc:size/><oc:fileid/><oc:share-types/><nc:has-preview/></d:prop></d:propfind>`;

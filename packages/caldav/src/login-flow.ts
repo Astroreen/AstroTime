@@ -3,7 +3,7 @@
 import { retryAfter, ServerBusyError } from "@astrotime/core/provider";
 
 import type { HttpClient } from "./http.ts";
-import type { Credentials } from "./provider.ts";
+import type { Credentials } from "./home.ts";
 
 /** Server errors in a row after which a poll gives up. */
 const SERVER_ERRORS = 5;

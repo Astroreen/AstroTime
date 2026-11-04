@@ -1,5 +1,4 @@
 import {
-  CalDavProvider,
   HttpError,
   keepsFiles,
   ProxyRefusedError,
@@ -64,10 +63,12 @@ export type Connect = (
 /**
  * CalDAV accounts through the platform's HTTP client, from the home
  * discovery found; what each server took to authenticate is kept for the
- * syncs after (providers D260).
+ * syncs after (providers D260); the provider and its XML parser load with
+ * the first account's sync (providers D255).
  */
 export function connectCalDav(http: HttpClient): Connect {
   return async (account, credentials, remembered) => {
+    const { CalDavProvider } = await import("@astrotime/caldav/provider");
     const home =
       account.homeUrl ??
       (await CalDavProvider.discover(http, account.serverUrl, credentials, remembered)).homeUrl;

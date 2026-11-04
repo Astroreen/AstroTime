@@ -150,9 +150,13 @@ When you add a package, app or module, add its line here in the same PR.
   - `test/store.contract.ts` — the store's behaviour, run on every driver.
 
 - `packages/caldav` (`@astrotime/caldav`) — the CalDAV provider.
-  - `CalDavProvider` — discovery (`/.well-known/caldav`), calendars with
-    their sync tokens, `sync-collection` with the objects' data and a full
-    listing as fallback, multiget, writes with ETags.
+  - `CalDavProvider`, `send` (`@astrotime/caldav/provider`, loaded with an
+    account's first sync or sign-in, with its XML parser; the index exports
+    `home.ts`'s credentials, `NoCalendarHomeError` and `keepsFiles` for the
+    first load) → `plans/providers.md#D255` — discovery
+    (`/.well-known/caldav`), calendars with their sync tokens,
+    `sync-collection` with the objects' data and a full listing as
+    fallback, multiget, writes with ETags.
     → `plans/foundation.md#D2`, `plans/foundation.md#D127`; `people`, RFC
     3744's principal search asked of the calendar home.
     → `plans/design.md#D208`; `makeCalendar`, one `MKCALENDAR` in the

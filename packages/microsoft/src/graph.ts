@@ -3,7 +3,8 @@
 // to Graph only; every time asked in UTC and every body as text (`Prefer`),
 // each time read by its own zone all the same; pages followed by their
 // `@odata.nextLink`; writes against the item's `@odata.etag` (`If-Match`).
-import { Authorization, send, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { Authorization, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { send } from "@astrotime/caldav/provider";
 import { ianaName, isKnownTimeZone, wallClockIn, zonedToEpoch } from "@astrotime/core/time";
 
 export const GRAPH = "https://graph.microsoft.com/v1.0/";
