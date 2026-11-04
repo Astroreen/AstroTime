@@ -879,14 +879,14 @@ describe("a calendar made on an account's server (providers D275)", () => {
     };
     const syncing = syncAll(context, { fresh: true });
     await listed.opened;
-    const made = makeCalendar(context, account.id, {
+    // Made and kept while the sync holds a listing without it.
+    const calendar = await makeCalendar(context, account.id, {
       name: "Plans",
       color: null,
       component: "VEVENT",
     });
     later.open();
-    await syncing;
-    const calendar = await made;
+    expect((await syncing).accounts.map((one) => one.status)).toEqual(["synced"]);
     expect((await store.calendars(account.id)).map((c) => c.id)).toContain(calendar.id);
   });
 

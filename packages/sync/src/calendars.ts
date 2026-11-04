@@ -6,7 +6,7 @@ import type { NewCalendar } from "@astrotime/core";
 import type { HttpClient } from "@astrotime/caldav";
 import type { Account, Calendar } from "@astrotime/storage";
 
-import { afterSyncs, connectCalDav, type Connect, type SyncContext } from "./all.ts";
+import { connectCalDav, type Connect, type SyncContext } from "./all.ts";
 import { readSecret } from "./secret.ts";
 
 /**
@@ -26,12 +26,13 @@ export class CannotMakeCalendarError extends Error {
  * Makes a calendar or task list on the account's server, now, and keeps it
  * here as the next sync will list it; the new calendar comes back. It
  * needs the server: offline, its `OfflineError` is thrown and nothing is
- * made (D275). Saved once no sync is listing, so none removes it.
+ * made (D275). A sync whose listing came before it leaves it be: it
+ * removes only calendars it had kept before it listed.
  */
 export async function makeCalendar(
   // The platform's HTTP, through which this opens the account's provider as
   // a sync does; or the provider's opening itself (a test's).
-  context: Pick<SyncContext, "store" | "secrets" | "lock"> &
+  context: Pick<SyncContext, "store" | "secrets"> &
     ({ readonly http: HttpClient } | { readonly connect: Connect }),
   accountId: string,
   calendar: NewCalendar,
@@ -46,5 +47,5 @@ export async function makeCalendar(
   if (!provider.makeCalendar)
     throw new CannotMakeCalendarError("This account's server makes no calendars.");
   const { state: _, ...made } = await provider.makeCalendar(calendar);
-  return afterSyncs(context, () => context.store.saveCalendar({ accountId, ...made }));
+  return context.store.saveCalendar({ accountId, ...made });
 }

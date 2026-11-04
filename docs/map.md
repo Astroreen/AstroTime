@@ -237,9 +237,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
     mention. → `plans/design.md#D208`
   - `calendars.ts` (`@astrotime/sync/calendars`) — `makeCalendar`, a
-    calendar or task list made on an account's server now and kept here,
-    saved after any sync listing (`afterSyncs`); `makesCalendars`, which
-    accounts can. → `plans/providers.md#D275`
+    calendar or task list made on an account's server now and kept here
+    (a sync removes only the calendars it had before it listed);
+    `makesCalendars`, which accounts can. → `plans/providers.md#D275`
   - `subscriptions.ts` (`@astrotime/sync/subscriptions`) — adding a
     subscription, opening it for `syncAll`, its hourly reads, applying a
     held removal; `syncs`, whether an account syncs with a server.

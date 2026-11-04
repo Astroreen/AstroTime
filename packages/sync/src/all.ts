@@ -146,21 +146,6 @@ function runsOf(store: Store): Runs {
 
 const ignore = () => {};
 
-/**
- * Runs `work` once no sync of this store is listing calendars: after this
- * instance's running sync and, with the context's `lock`, another's. A
- * calendar just made on the server, saved by `work`, is then never removed
- * by a sync whose listing came before it (docs/plans/providers.md#D275);
- * a sync that starts later lists it.
- */
-export async function afterSyncs<T>(
-  context: Pick<SyncContext, "store" | "lock">,
-  work: () => Promise<T>,
-): Promise<T> {
-  await runsOf(context.store).current?.then(ignore, ignore);
-  return alone(context, work);
-}
-
 /** Whether an account syncs with a server: CalDAV, or a subscription (providers D251). */
 export const syncs = (account: Account) =>
   account.provider === "caldav" || account.provider === "ics";

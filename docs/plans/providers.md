@@ -817,10 +817,11 @@ marked _to be recorded_.
   calendar in the store; offline, or refused, nothing is made, and the
   error is the caller's to say. A calendar is not a pending local change
   like an item: one made offline, with items in it, would wait on a
-  server that may refuse it (a read-only home, a quota). It is saved once
-  no sync is listing calendars (`afterSyncs`: this instance's running sync,
-  and another's through the context's `lock`), so a sync whose listing
-  came before it never removes it; a sync that starts later lists it.
+  server that may refuse it (a read-only home, a quota). **A sync removes
+  only the calendars it had kept before it listed** (read from the store
+  first), so one made while a sync runs, in this instance or another
+  tab's, is never taken for a calendar deleted on the server: it is on
+  the server before it is kept, and the next listing names it.
   `makesCalendars` says which accounts can: a CalDAV account's (the
   calendar on this device is the store's own, a subscription makes none;
   Google and Microsoft once wired). **CalDAV**: one `MKCALENDAR` (RFC 4791
@@ -832,8 +833,8 @@ marked _to be recorded_.
   Cyrillic name the random part alone), so two of one name never meet; a
   405 (taken) is tried again elsewhere, three times at most. Its code
   (`make.ts`) loads when a calendar is made, as Digest's does: the first
-  load grows by 24 bytes (124 531 to 124 555 on main `50a5593`), the
-  provider's method and `afterSyncs`. A control
+  load grows by 35 bytes (124 531 to 124 566 on main `50a5593`), the
+  provider's method and the sync's look before it lists. A control
   character in the name is dropped (XML 1.0 cannot carry it). Proven on
   Radicale, Baïkal (Digest and Basic), Xandikos, DAViCal and Nextcloud
   (`servers.test.ts`), the calendars deleted after: **DAViCal keeps a
