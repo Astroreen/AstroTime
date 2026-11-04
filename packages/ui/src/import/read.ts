@@ -43,10 +43,22 @@ export interface ReadFile {
   readonly unread: readonly string[];
 }
 
-/** Why a file cannot be imported: it is no format AstroTime reads, or it holds nothing. */
+/** Why a file cannot be imported: it is no format AstroTime reads, holds nothing, or is too big. */
 export class NotImportableError extends Error {
   override name = "NotImportableError";
+  readonly tooBig: boolean;
+  constructor(message: string, options?: ErrorOptions & { readonly tooBig?: boolean }) {
+    super(message, options);
+    this.tooBig = options?.tooBig ?? false;
+  }
 }
+
+/**
+ * The largest file read: its text is held whole while it is split, twice
+ * over as a string, so a phone's page is not the one to read a bigger one.
+ * Ten years of a busy calendar is a few megabytes.
+ */
+export const MAX_FILE_BYTES = 64 * 1024 * 1024;
 
 export interface ReadOptions {
   readonly language: string;
@@ -63,6 +75,8 @@ export async function readImport(
   file: { readonly name: string; readonly bytes: Uint8Array },
   options: ReadOptions,
 ): Promise<ReadFile> {
+  if (file.bytes.length > MAX_FILE_BYTES)
+    throw new NotImportableError(`${file.name} is too big.`, { tooBig: true });
   const sources: Source[] = [];
   const unread: string[] = [];
   let guessed: string | null = null;

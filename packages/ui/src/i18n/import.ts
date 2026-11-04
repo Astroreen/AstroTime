@@ -71,7 +71,12 @@ export const importStrings = {
     "import.sameSkipped_other": "{{count}} already there, skipped",
     "import.differentSkipped_one": "{{count}} that differs, skipped",
     "import.differentSkipped_other": "{{count}} that differ, skipped",
+    "import.again_one": "{{count}} given twice in the file, imported once",
+    "import.again_other": "{{count}} given twice in the file, imported once",
     "import.failed": "The import stopped: {{message}}",
+    "import.failedPart":
+      "The import stopped on an error: {{message}}. What was imported before it stays.",
+    "import.tooBig": "{{file}} is larger than AstroTime reads at once ({{size}} MB at most).",
   },
   ru: {
     "import.title": "Импорт",
@@ -170,7 +175,13 @@ export const importStrings = {
     "import.differentSkipped_few": "{{count}} отличающиеся пропущены",
     "import.differentSkipped_many": "{{count}} отличающихся пропущены",
     "import.differentSkipped_other": "{{count}} отличающиеся пропущены",
+    "import.again_one": "{{count}} дана в файле дважды, импортирована один раз",
+    "import.again_few": "{{count}} даны в файле дважды, импортированы один раз",
+    "import.again_many": "{{count}} даны в файле дважды, импортированы один раз",
+    "import.again_other": "{{count}} даны в файле дважды, импортированы один раз",
     "import.failed": "Импорт остановлен: {{message}}",
+    "import.failedPart": "Импорт остановлен ошибкой: {{message}}. Импортированное до неё остаётся.",
+    "import.tooBig": "{{file}} больше, чем AstroTime читает за раз (не больше {{size}} МБ).",
   },
 } as const satisfies Record<"en" | "ru", Record<string, string>>;
 

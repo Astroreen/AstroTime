@@ -33,7 +33,11 @@ not carry is said, not dropped in silence.
   [D232](foundation.md#D232): an `<input type="file">`, which opens the
   system's picker on Android and the file dialog on the desktop), read in
   the page, and goes nowhere but into the store: no server sees it but the
-  user's own, through the sync, once imported.
+  user's own, through the sync, once imported. A file over 64 MiB is refused before
+  it is read (its text is held whole while it is split); a ZIP is read to
+  1000 files and 64 MiB in all, no file inflating past its stated size or
+  1000 times its own, so a ZIP bomb costs nothing: what is past a limit is
+  named as unread.
 
 - **D266. The formats, and the order they come in.** Surveyed on
   2026-11-04 from each format's specification and each exporter's
@@ -138,7 +142,13 @@ not carry is said, not dropped in silence.
   200 objects a transaction, the page given back between batches, the
   progress shown as a count; "Stop" ends it after the batch in flight, and
   what landed stays, the dialog says how much. A sync is asked for once,
-  at the end.
+  at the end. One import runs at a time: a second tap on "Import" or on an
+  answer before the first came back does nothing, and a run writes a UID
+  to a calendar once (the same UID in two sources or two files of a ZIP is
+  counted as given twice). A write that fails ends the run: the batch is
+  one transaction, so what landed before stays and is counted, and the
+  error is said. A calendar made for the import that got nothing (stopped
+  or failed before its first write) is removed again.
 
 - **D272. Nothing lost, and what a conversion cannot carry, said.** An
   iCalendar or jCal object is stored as the file wrote it

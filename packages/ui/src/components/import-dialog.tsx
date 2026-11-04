@@ -22,7 +22,13 @@ import {
   type Duplicates,
   type Imported,
 } from "../import/plan.ts";
-import { NotImportableError, readImport, type ReadFile, type Source } from "../import/read.ts";
+import {
+  MAX_FILE_BYTES,
+  NotImportableError,
+  readImport,
+  type ReadFile,
+  type Source,
+} from "../import/read.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { Dot } from "./color-select.tsx";
 import { CheckCircleIcon, CloseIcon, PlusIcon } from "./icons.tsx";
@@ -58,15 +64,26 @@ export function ImportDialog({
   const [step, setStep] = useState<Step>({ name: "reading" });
   const [destinations, setDestinations] = useState<ReadonlyMap<string, Destination>>(new Map());
   const stop = useRef(false);
+  /**
+   * Where the import stands, kept apart from what is drawn: a second tap on
+   * "Import" or on an answer, before the first's await came back, finds it
+   * taken and does nothing, so one file is never written twice.
+   */
+  const phase = useRef<"idle" | "checking" | "asked" | "running">("idle");
+  const [checking, setChecking] = useState(false);
   const titleId = useId();
 
   // The file read once it is picked; a closing leaves what a late read brings.
   useEffect(() => {
     if (!file) return;
     let current = true;
+    phase.current = "idle";
     setStep({ name: "reading" });
     void (async () => {
       try {
+        // Not even read into memory past the limit.
+        if (file.size > MAX_FILE_BYTES)
+          throw new NotImportableError(`${file.name} is too big.`, { tooBig: true });
         const read = await readImport(
           { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },
           {
@@ -87,9 +104,11 @@ export function ImportDialog({
         setStep({
           name: "failed",
           message:
-            error instanceof NotImportableError
-              ? t("import.notCalendar", { file: file.name })
-              : t("import.unreadable", { file: file.name, message: String(error) }),
+            error instanceof NotImportableError && error.tooBig
+              ? t("import.tooBig", { file: file.name, size: MAX_FILE_BYTES / 1024 / 1024 })
+              : error instanceof NotImportableError
+                ? t("import.notCalendar", { file: file.name })
+                : t("import.unreadable", { file: file.name, message: String(error) }),
         });
       }
     })();
@@ -100,6 +119,8 @@ export function ImportDialog({
   }, [file]);
 
   const start = async (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
+    if (phase.current !== "checking" && phase.current !== "asked") return;
+    phase.current = "running";
     stop.current = false;
     setStep({ name: "importing", done: 0, total: 0 });
     try {
@@ -123,12 +144,24 @@ export function ImportDialog({
   };
 
   const proceed = async (read: ReadFile) => {
-    const duplicates = await duplicatesOf(store, read.sources, destinations);
-    if (duplicates.changed > 0) setStep({ name: "asking", read, duplicates });
-    else await start(read, duplicates, "skip");
+    if (phase.current !== "idle") return;
+    phase.current = "checking";
+    setChecking(true);
+    try {
+      const duplicates = await duplicatesOf(store, read.sources, destinations);
+      if (duplicates.changed > 0) {
+        phase.current = "asked";
+        setStep({ name: "asking", read, duplicates });
+      } else await start(read, duplicates, "skip");
+    } catch (error) {
+      setStep({ name: "failed", message: t("import.failed", { message: String(error) }) });
+    } finally {
+      setChecking(false);
+    }
   };
 
-  const busy = step.name === "importing";
+  // Closing waits for the import's own end: a check under way goes on into writes.
+  const busy = step.name === "importing" || checking;
   return (
     <Dialog.Root open={file !== null} onOpenChange={(next) => !next && !busy && onClose()}>
       <Dialog.Portal>
@@ -187,7 +220,9 @@ export function ImportDialog({
                 <button
                   type="button"
                   className={primaryButton}
-                  disabled={step.read.sources.every((source) => source.items.length === 0)}
+                  disabled={
+                    checking || step.read.sources.every((source) => source.items.length === 0)
+                  }
                   onClick={() => void proceed(step.read)}
                 >
                   {t("import.start")}
@@ -198,7 +233,10 @@ export function ImportDialog({
                 <button
                   type="button"
                   className={textButton}
-                  onClick={() => setStep({ name: "preview", read: step.read })}
+                  onClick={() => {
+                    phase.current = "idle";
+                    setStep({ name: "preview", read: step.read });
+                  }}
                 >
                   {t("import.back")}
                 </button>
@@ -456,6 +494,7 @@ function Done({ result }: { result: Imported }) {
     result.copies > 0 ? t("import.copies", { count: result.copies }) : null,
     result.identical > 0 ? t("import.sameSkipped", { count: result.identical }) : null,
     result.skipped > 0 ? t("import.differentSkipped", { count: result.skipped }) : null,
+    result.again > 0 ? t("import.again", { count: result.again }) : null,
   ].filter((line) => line !== null);
   return (
     <div role="status" className="flex flex-col items-center gap-2 py-6 text-center">
@@ -467,6 +506,11 @@ function Done({ result }: { result: Imported }) {
         </p>
       ))}
       {result.stopped ? <p className="text-note text-ink-muted">{t("import.stopped")}</p> : null}
+      {result.error ? (
+        <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
+          {t("import.failedPart", { message: result.error })}
+        </p>
+      ) : null}
     </div>
   );
 }

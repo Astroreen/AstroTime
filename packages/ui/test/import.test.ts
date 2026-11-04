@@ -16,7 +16,8 @@ import {
   type Choice,
   type Destination,
 } from "../src/import/plan.ts";
-import { NotImportableError, readImport, type Source } from "../src/import/read.ts";
+import { MAX_FILE_BYTES, NotImportableError, readImport, type Source } from "../src/import/read.ts";
+import { unzip } from "../src/import/zip.ts";
 
 const exportOf = (name: string) =>
   readFileSync(new URL(`../../core/test/fixtures/exports/${name}`, import.meta.url));
@@ -53,7 +54,7 @@ const calendar = (name: string | null, ...components: string[][]) =>
   );
 
 /** A ZIP archive of these files, deflated, as Google's export writes one. */
-function zip(files: Record<string, string>): Uint8Array {
+function zip(files: Record<string, string>, stated?: (size: number) => number): Uint8Array {
   const parts: Uint8Array[] = [];
   const central: Uint8Array[] = [];
   let offset = 0;
@@ -64,13 +65,13 @@ function zip(files: Record<string, string>): Uint8Array {
     local.setUint32(0, 0x04034b50, true);
     local.setUint16(8, 8, true);
     local.setUint32(18, data.length, true);
-    local.setUint32(22, encode(text).length, true);
+    local.setUint32(22, stated ? stated(encode(text).length) : encode(text).length, true);
     local.setUint16(26, nameBytes.length, true);
     const entry = new DataView(new ArrayBuffer(46));
     entry.setUint32(0, 0x02014b50, true);
     entry.setUint16(10, 8, true);
     entry.setUint32(20, data.length, true);
-    entry.setUint32(24, encode(text).length, true);
+    entry.setUint32(24, stated ? stated(encode(text).length) : encode(text).length, true);
     entry.setUint16(28, nameBytes.length, true);
     entry.setUint32(42, offset, true);
     parts.push(new Uint8Array(local.buffer), nameBytes, data);
@@ -190,6 +191,34 @@ describe("a file read into sources (import D268)", () => {
       ["home", 2],
     ]);
     expect(file.unread).toEqual(["readme.txt"]);
+  });
+
+  test("a ZIP bomb costs nothing: too many files, too many bytes, an entry past its stated size", async () => {
+    const big = calendar("Big", ...Array.from({ length: 50 }, (_, i) => event(`b${i}`)));
+    const files = {
+      "a.ics": calendar("A", event("a")),
+      "b.ics": big,
+      "c.ics": calendar("C", event("c")),
+    };
+    // So many files at most.
+    const few = await unzip(zip(files), { entries: 2, total: 1 << 20, ratio: 1000 });
+    expect(few.entries.map((entry) => entry.name)).toEqual(["a.ics", "b.ics"]);
+    expect(few.unread).toEqual(["c.ics"]);
+    // So many bytes in all: the big one is left out, what fits is read.
+    const small = await unzip(zip(files), { entries: 10, total: 1000, ratio: 1000 });
+    expect(small.unread).toEqual(["b.ics"]);
+    // Inflating past its own size so many times over.
+    const squeezed = await unzip(zip(files), { entries: 10, total: 1 << 20, ratio: 5 });
+    expect(squeezed.unread).toEqual(["b.ics"]);
+    // An entry that says it is small and inflates past it is refused as it grows.
+    const lying = await unzip(zip({ "x.ics": big }, () => 100));
+    expect(lying).toEqual({ entries: [], unread: ["x.ics"] });
+  });
+
+  test("a file past the size AstroTime reads at once is refused before it is read", async () => {
+    const error = await read("huge.ics", new Uint8Array(MAX_FILE_BYTES + 1)).catch((e) => e);
+    expect(error).toBeInstanceOf(NotImportableError);
+    expect((error as NotImportableError).tooBig).toBe(true);
   });
 
   test("several calendars in one file are several sources", async () => {
@@ -343,6 +372,52 @@ describe("an import written through the store (import D269–D271)", () => {
       expect(starts("same")).toHaveLength(1);
       expect(starts("fresh")).toHaveLength(1);
     }
+  });
+
+  test("a UID this run already wrote to a calendar is written once (two sources, two files)", async () => {
+    const { store, personal } = await setup();
+    const one = await sourceOf(calendar("One", event("same"), event("a")));
+    const two = { ...(await sourceOf(calendar("Two", event("same"), event("b")))), id: "two" };
+    const destinations = new Map([
+      [one.id, { events: personal.id, tasks: null }],
+      [two.id, { events: personal.id, tasks: null }],
+    ]);
+    const duplicates = await duplicatesOf(store, [one, two], destinations);
+    const { result } = await run(store, [one, two], destinations, duplicates);
+    expect(result).toMatchObject({ events: 3, again: 1 });
+    expect((await store.pending(personal.id)).map((object) => object.uid).toSorted()).toEqual([
+      "a",
+      "b",
+      "same",
+    ]);
+  });
+
+  test("a write that fails ends it: what landed stays and is counted, the error is said", async () => {
+    const { store, personal } = await setup();
+    const many = Array.from({ length: BATCH * 2 }, (_, i) => event(`e${i}`));
+    const source = await sourceOf(calendar("Big", ...many));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const real = store.changeLocal.bind(store);
+    let calls = 0;
+    store.changeLocal = ((change) => {
+      if (++calls === 2) return Promise.reject(new Error("The disk is full."));
+      return real(change);
+    }) as typeof store.changeLocal;
+    const { result } = await run(store, [source], destinations, duplicates);
+    expect(result).toMatchObject({ events: BATCH, stopped: false, error: "The disk is full." });
+    expect(await store.pending(personal.id)).toHaveLength(BATCH);
+  });
+
+  test("a calendar made for the import that got nothing, stopped first, goes again", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 0);
+    expect(result).toMatchObject({ events: 0, stopped: true });
+    expect(result.made.size).toBe(0);
+    expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
   });
 
   test("a new calendar on this device, named and coloured as the source", async () => {

@@ -126,8 +126,12 @@ export interface Imported {
   readonly identical: number;
   /** Differing, and skipped as asked. */
   readonly skipped: number;
+  /** Given again in the file under a UID this run already wrote to the same calendar. */
+  readonly again: number;
   /** Stopped before the end: what came before stays. */
   readonly stopped: boolean;
+  /** Why it ended before the end, if a write failed: what came before stays. */
+  readonly error: string | null;
   /** The calendars made on this device, by source. */
   readonly made: ReadonlyMap<string, Calendar>;
 }
@@ -178,8 +182,16 @@ export async function runImport(run: Run): Promise<Imported> {
     as: "new" | "update" | "copy";
   }[] = [];
   let skipped = 0;
+  let again = 0;
+  /** What this run writes, by calendar and UID: one UID a calendar, once (two sources, two files of a ZIP). */
+  const writing = new Set<string>();
   for (const { item, source, target } of placed(run.sources, run.destinations)) {
     const calendarId = target === NEW ? made.get(source.id)!.id : target;
+    if (writing.has(keyOf(calendarId, item.uid))) {
+      again++;
+      continue;
+    }
+    writing.add(keyOf(calendarId, item.uid));
     const key = keyOf(target, item.uid);
     if (duplicates.same.has(key)) continue;
     if (duplicates.existing.has(key)) {
@@ -199,6 +211,7 @@ export async function runImport(run: Run): Promise<Imported> {
 
   let done = 0;
   let stopped = false;
+  let error: string | null = null;
   run.onProgress(0, writes.length);
   for (let i = 0; i < writes.length; i += BATCH) {
     if (run.stopped()) {
@@ -206,15 +219,28 @@ export async function runImport(run: Run): Promise<Imported> {
       break;
     }
     const batch = writes.slice(i, i + BATCH);
-    // The store finds an object of the same UID itself, and updates it (D270).
-    await store.changeLocal(async (local) => {
-      for (const write of batch) await local.save(write.calendarId, write.ics);
-    });
+    try {
+      // The store finds an object of the same UID itself, and updates it
+      // (D270); a batch is one transaction, so a failed one wrote nothing.
+      await store.changeLocal(async (local) => {
+        for (const write of batch) await local.save(write.calendarId, write.ics);
+      });
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+      break;
+    }
     done += batch.length;
     run.onProgress(done, writes.length);
     await pause();
   }
   const written = writes.slice(0, done);
+  // A calendar made for the import that got nothing (stopped, or failed, first) goes again.
+  for (const [id, calendar] of made) {
+    if (!written.some((write) => write.calendarId === calendar.id)) {
+      await store.removeCalendar(calendar.id);
+      made.delete(id);
+    }
+  }
   const count = (kind: "event" | "task") => written.filter((write) => write.kind === kind).length;
   return {
     events: count("event"),
@@ -223,7 +249,9 @@ export async function runImport(run: Run): Promise<Imported> {
     copies: written.filter((write) => write.as === "copy").length,
     identical: duplicates.identical,
     skipped,
+    again,
     stopped,
+    error,
     made,
   };
 }

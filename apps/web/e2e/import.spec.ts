@@ -66,6 +66,41 @@ test("wide, English: a file's events and a task, one already there, into Work an
   ).toBeChecked();
 });
 
+test("a double tap on Import imports once: one new calendar, each event once", async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await importFile(page, /^Import from a file/, "team.ics", TEAM);
+  const dialog = page.getByRole("dialog", { name: "Import" });
+  const team = dialog.getByRole("region", { name: "Team" });
+  await choose(
+    team.getByRole("combobox", { name: "Events go to" }),
+    "New calendar on this device: Team",
+  );
+  await choose(
+    team.getByRole("combobox", { name: "Tasks go to" }),
+    "New list on this device: Team",
+  );
+  // Two taps in one task, before React draws the button off: only the first imports.
+  await dialog.getByRole("button", { name: "Import", exact: true }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(dialog.getByRole("status")).toContainText("2 events · 1 task");
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await expect(settings.getByRole("checkbox", { name: "Team" })).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("list", { name: "Thursday, November 5" }).getByRole("listitem", {
+      name: /^Planning poker/,
+    }),
+  ).toHaveCount(1);
+});
+
 test.describe("on a phone, in Russian", () => {
   test.use({ locale: "ru-RU", hasTouch: true, isMobile: true });
 
