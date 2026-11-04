@@ -267,6 +267,9 @@ class Session {
     } catch {
       throw new BadRequestError("The path is no percent-encoding.");
     }
+    // A name is one segment: `%2F` would make one that no href can name again.
+    if (segments.some((segment) => segment.includes("/")))
+      throw new BadRequestError("A path segment holds an encoded slash.");
     const [area, owner, slug, name, ...more] = segments;
     if (area === undefined) return { kind: "root" };
     if (owner === undefined)

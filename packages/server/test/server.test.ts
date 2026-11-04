@@ -127,15 +127,28 @@ describe("signing in (D282)", () => {
     );
     expect(answers.filter((a) => a.status === 401)).toHaveLength(10);
     expect(answers.filter((a) => a.status === 429)).toHaveLength(4);
-    // The right password, sent with them, is not counted against the address.
-    const mixed = { address: "198.51.100.10" };
-    await Promise.all([
-      ...Array.from({ length: 9 }, (_, i) =>
-        send("PROPFIND", HOME, { ...mixed, as: ["astro", `x${i}`] }),
+    expect((await send("PROPFIND", HOME, from)).status).toBe(429);
+  });
+
+  test("a success forgives no failure: guesses between good requests still meet the limit", async () => {
+    const from = { address: "198.51.100.10" };
+    for (let i = 0; i < 10; i++) {
+      expect((await send("PROPFIND", HOME, from)).status).toBe(207);
+      expect((await send("PROPFIND", HOME, { ...from, as: ["other", `guess${i}`] })).status).toBe(
+        401,
+      );
+    }
+    expect((await send("PROPFIND", HOME, from)).status).toBe(429);
+  });
+
+  test("a client's many requests at once with one password are one check, never limited", async () => {
+    const from = { address: "198.51.100.11" };
+    const answers = await Promise.all(
+      Array.from({ length: 30 }, () =>
+        send("PROPFIND", HOME, { ...from, headers: { Depth: "0" } }),
       ),
-      send("PROPFIND", HOME, mixed),
-    ]);
-    expect((await send("PROPFIND", HOME, mixed)).status).toBe(207);
+    );
+    expect(new Set(answers.map((a) => a.status))).toEqual(new Set([207]));
   });
 
   test("a changed password is asked for at once, though the old one was checked before", async () => {
@@ -444,6 +457,8 @@ describe("writes the server refuses", () => {
       ).status,
     ).toBe(412);
     expect((await send("PUT", `${HOME}missing/x.ics`, { body: event("x") })).status).toBe(409);
+    // One segment is one name: an encoded slash would make one no href names again.
+    expect((await send("PUT", `${personal}a%2Fb.ics`, { body: event("slash") })).status).toBe(400);
     expect((await send("MKCALENDAR", personal)).status).toBe(405);
   });
 });
