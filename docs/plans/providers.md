@@ -410,7 +410,18 @@ marked _to be recorded_.
   its own `iCalUId`), `MicrosoftTodo`
   (lists and tasks the same way, a task with no ETag on either side
   fetched again ([D37](foundation.md#D37)), `importance` as `PRIORITY`,
-  what To Do has no field for said not kept), `rruleOf` and `recurrenceOf` (each of
+  each time read in the zone its value names, `Prefer` heeded or not, a
+  due day written as the user's midnight, what To Do has no field for
+  said not kept). Both send the token to Graph's own origin over https
+  only: a page link elsewhere is refused unsent, and a listing that
+  repeats a page or runs past 1000 pages is refused, never taken as the
+  whole (what it missed would be removed here). Graph's ETags are weak
+  (`W/"…"`), its only ones, and its `If-Match` takes them; the engine
+  writes without one for a weak ETag once it has compared Graph's
+  version with the base, a window for an edit made there meanwhile, so
+  they are kept as `~"…"` and sent back as `W/"…"`, Graph refusing a
+  write over such an edit (`412`, merged by the sync); a write with no
+  ETag kept is a conflict, never one against the version just read, `rruleOf` and `recurrenceOf` (each of
   Graph's patterns both ways) and `MicrosoftProvider`, the composite
   routing by address with one side failing leaving the other syncing, as
   Google's ([D252](#D252)); iCalendar's lines from `@astrotime/core/lines`.

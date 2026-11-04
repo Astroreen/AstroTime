@@ -324,7 +324,7 @@ test("a series: its master's edit is a PATCH of the master; an occurrence's own 
   expect(await provider.update(href, renamed, read.etag)).toEqual({
     ok: true,
     href,
-    etag: expect.stringContaining('W/"x1"'),
+    etag: expect.stringContaining('~"x1"'),
   });
   expect(JSON.parse(String(api.asked.findLast((r) => r.method === "PATCH")!.body))).toEqual({
     subject: "Daily",
@@ -830,4 +830,155 @@ test("a create whose answer was lost, sent again, is the event Graph made then: 
   expect(await store.pending(calendar!.id)).toEqual([]);
   const [href] = await store.hrefs(calendar!.id);
   expect(href!.href).toBe(`${GRAPH}me/calendars/work/events/e1`);
+});
+
+test("the bearer goes to Graph only: a page link elsewhere is refused unsent; a link repeated or pages without end are refused, nothing removed", async () => {
+  const api = graphApi();
+  api.keep(api.events, {
+    id: "e1",
+    iCalUId: "u1",
+    subject: "Kept",
+    start: at("2026-11-04T09:00:00.0000000"),
+    end: at("2026-11-04T10:00:00.0000000"),
+    type: "singleInstance",
+  });
+  let next: (url: URL) => string | null = () => null;
+  const http: HttpClient = async (request) => {
+    const response = await api.http(request);
+    const url = new URL(request.url);
+    if (!url.pathname.endsWith("/events") || request.method !== "GET") return response;
+    const link = next(url);
+    const body = JSON.parse(String(response.body)) as Record<string, unknown>;
+    return {
+      ...response,
+      body: JSON.stringify({ ...body, ...(link ? { "@odata.nextLink": link } : {}) }),
+    };
+  };
+  const provider = new OutlookCalendars(new Graph(http, tokens), () => Date.UTC(2026, 10, 4));
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "m",
+    serverUrl: GRAPH,
+    username: null,
+  });
+  await syncAccount(store, provider, account.id);
+  const [calendar] = await store.calendars(account.id);
+  for (const [name, link] of [
+    ["elsewhere", () => "https://graph.example.com/v1.0/me/calendars/work/events?$skip=2"],
+    ["plain http", () => "http://graph.microsoft.com/v1.0/me/calendars/work/events?$skip=2"],
+    ["repeated", (url: URL) => url.href],
+    [
+      "without end",
+      (url: URL) =>
+        `${GRAPH}me/calendars/work/events?page=${Number(url.searchParams.get("page") ?? "0") + 1}`,
+    ],
+  ] as const) {
+    next = link;
+    const before = api.asked.length;
+    const report = await syncAccount(store, provider, account.id);
+    expect(report.errors, name).toEqual([
+      expect.objectContaining({ problem: "failed", href: calendar!.url }),
+    ]);
+    expect((await store.hrefs(calendar!.id)).length, name).toBe(1);
+    // Nothing sent anywhere but Graph's own origin over https.
+    expect(
+      api.asked.slice(before).every((r) => r.url.startsWith("https://graph.microsoft.com/")),
+      name,
+    ).toBe(true);
+    if (name === "without end") expect(api.asked.length - before, name).toBeLessThanOrEqual(1001);
+  }
+});
+
+test("To Do's times are read in the zone each names, whatever Prefer asked; a due day written is the user's midnight", async () => {
+  const api = graphApi();
+  api.keep(api.tasks, {
+    id: "k1",
+    title: "Zoned",
+    status: "completed",
+    dueDateTime: { dateTime: "2026-11-30T00:00:00.0000000", timeZone: "FLE Standard Time" },
+    completedDateTime: { dateTime: "2026-11-04T12:00:00.0000000", timeZone: "Tokyo Standard Time" },
+  });
+  api.keep(api.tasks, {
+    id: "k2",
+    title: "In UTC",
+    status: "notStarted",
+    dueDateTime: at("2026-11-29T22:00:00.0000000"),
+  });
+  const todo = new MicrosoftTodo(new Graph(api.http, tokens), "Europe/Vilnius");
+  const url = `${GRAPH}me/todo/lists/tasks/tasks/`;
+  const zoned = (await todo.fetch(`${url}k1`))!;
+  expect(zoned.ics).toContain("DUE;VALUE=DATE:20261130\r\n");
+  expect(zoned.ics).toContain("COMPLETED:20261104T030000Z\r\n");
+  expect((await todo.fetch(`${url}k2`))!.ics).toContain("DUE;VALUE=DATE:20261130\r\n");
+  // A rename sends the title alone: the due day read back is the one that would be written.
+  expect(
+    await todo.update(
+      `${url}k1`,
+      zoned.ics.replace("SUMMARY:Zoned", "SUMMARY:Renamed"),
+      zoned.etag,
+    ),
+  ).toMatchObject({ ok: true });
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "PATCH")!.body))).toEqual({
+    title: "Renamed",
+  });
+  await todo.create(`${url}new`, zoned.ics.replace("UID:k1", "UID:made-here"));
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "POST")!.body))).toMatchObject({
+    dueDateTime: { dateTime: "2026-11-30T00:00:00", timeZone: "Europe/Vilnius" },
+  });
+});
+
+test("no ETag kept is no licence: Graph's just read is not borrowed; an edit made in To Do meanwhile is merged, not overwritten", async () => {
+  const api = graphApi();
+  api.keep(api.tasks, { id: "k1", title: "Pay rent", status: "notStarted", importance: "normal" });
+  api.keep(api.events, {
+    id: "e1",
+    iCalUId: "u1",
+    subject: "Lunch",
+    start: at("2026-11-04T12:00:00.0000000"),
+    end: at("2026-11-04T13:00:00.0000000"),
+    type: "singleInstance",
+  });
+  const graph = new Graph(api.http, tokens);
+  const todo = new MicrosoftTodo(graph);
+  const calendars = new OutlookCalendars(graph);
+  const task = `${GRAPH}me/todo/lists/tasks/tasks/k1`;
+  const event = `${GRAPH}me/calendars/work/events/e1`;
+  const patches = () => api.asked.filter((r) => r.method === "PATCH").length;
+  const taskIcs = (await todo.fetch(task))!.ics.replace("SUMMARY:Pay rent", "SUMMARY:Pay the rent");
+  expect(await todo.update(task, taskIcs, null)).toEqual({ ok: false, reason: "conflict" });
+  const eventIcs = (await calendars.fetch(event))!.ics.replace(
+    "SUMMARY:Lunch",
+    "SUMMARY:Late lunch",
+  );
+  expect(await calendars.update(event, eventIcs, null)).toEqual({ ok: false, reason: "conflict" });
+  expect(patches()).toBe(0);
+
+  // Through the engine: renamed here, made important in To Do before the sync.
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "m",
+    serverUrl: GRAPH,
+    username: null,
+  });
+  await syncAccount(store, todo, account.id);
+  const [list] = await store.calendars(account.id);
+  const [stored] = await store.tasks([list!.id]);
+  expect(stored!.etag).toMatch(/^~"\d+"$/);
+  await store.saveLocal(
+    list!.id,
+    stored!.ics.replace("SUMMARY:Pay rent", "SUMMARY:Pay the rent"),
+    stored!.href!,
+  );
+  api.keep(api.tasks, { ...api.tasks.get("k1")!, importance: "high" });
+  const report = await syncAccount(store, todo, account.id);
+  expect(report.errors).toEqual([]);
+  const sent = api.asked.filter((r) => r.method === "PATCH");
+  // The first write named the version the device had, and Graph refused it; the merge went second.
+  expect(sent.map((r) => r.headers["If-Match"])).toEqual([
+    stored!.etag!.replace("~", "W/"),
+    expect.stringMatching(/^W\//),
+  ]);
+  expect(api.tasks.get("k1")).toMatchObject({ title: "Pay the rent", importance: "high" });
 });

@@ -23,9 +23,18 @@ import {
   type Component,
 } from "@astrotime/core/lines";
 import { zoneText } from "@astrotime/core/split";
-import { ianaName, isKnownTimeZone, wallClockIn, zonedToEpoch } from "@astrotime/core/time";
+import { ianaName, wallClockIn, zonedToEpoch } from "@astrotime/core/time";
 
-import { GRAPH, utcOf, type Graph, type GraphTime } from "./graph.ts";
+import {
+  dayIn,
+  GRAPH,
+  keptEtag,
+  sentEtag,
+  utcOf,
+  zoneOf,
+  type Graph,
+  type GraphTime,
+} from "./graph.ts";
 
 /** An event as Graph gives it (only what AstroTime reads). */
 export interface GraphEvent {
@@ -101,17 +110,6 @@ const isoOf = (value: string) =>
   value.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z");
 const compact = (date: string) => date.slice(0, 10).replaceAll("-", "");
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-
-/**
- * The IANA zone a Graph zone name stands for (an IANA name, a Windows one);
- * `UTC` for Graph's own (`tzone://Microsoft/Utc`) and for one no zone
- * database knows (`Customized Time Zone`).
- */
-function zoneOf(name: string | undefined): string {
-  if (!name) return "UTC";
-  const iana = ianaName(name);
-  return iana !== "UTC" && isKnownTimeZone(iana) ? iana : "UTC";
-}
 
 /** A UTC instant (RFC 3339) as a DATE-TIME's value and parameter in `zone`: `;TZID=…:…` or `:…Z`. */
 function zonedText(instant: string, zone: string): string {
@@ -274,19 +272,6 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
     default:
       return null;
   }
-}
-
-/**
- * An all-day event's day: Graph gives its midnight as an instant (`Prefer`
- * in UTC), so the day is that instant's in the event's own zone; Vilnius's
- * 6 November starts on the 5th in UTC. A zone not known here (UTC in its
- * place) takes the nearest midnight, right for every offset within 12 hours.
- */
-function dayIn(instant: string, zone: string): string {
-  const epoch = Date.parse(instant);
-  return compact(
-    zone === "UTC" ? new Date(epoch + 12 * 3_600_000).toISOString() : wallClockIn(epoch, zone),
-  );
 }
 
 /** The zones an event's start and end are written in: its own, as Outlook shows it. */
@@ -523,9 +508,9 @@ const WINDOW_AFTER_MS = 2 * 365 * 86_400_000;
 
 /** An object's ETag: the event's own, then its exceptions' (an edit of one changes it). */
 const etagOf = (event: GraphEvent, exceptions: readonly GraphEvent[]) =>
-  [event["@odata.etag"] ?? "", ...exceptions.map((e) => e["@odata.etag"] ?? "")].join(" ");
-/** The event's own `@odata.etag`, for its `If-Match`. */
-const ownEtag = (etag: string | null) => (etag ? etag.split(" ")[0]! : null);
+  [event, ...exceptions].map((one) => keptEtag(one["@odata.etag"]) ?? "").join(" ");
+/** The event's own `@odata.etag`, as Graph gave it, for its `If-Match`. */
+const ownEtag = (etag: string | null) => sentEtag(etag?.split(" ")[0] || null);
 
 /** A Microsoft account's Outlook calendars, as a provider. */
 export class OutlookCalendars implements Provider {
@@ -659,9 +644,12 @@ export class OutlookCalendars implements Provider {
         ([key, value]) => JSON.stringify(before[key] ?? null) !== JSON.stringify(value),
       ),
     );
-    const own = ownEtag(etag) ?? current.value["@odata.etag"] ?? null;
+    const own = ownEtag(etag);
     let event = current.value;
     if (Object.keys(changed).length > 0) {
+      // No ETag kept here: Graph's just read is no proof our base was it
+      // (D37), so the sync fetches, merges and writes against that one.
+      if (own === null && current.value["@odata.etag"]) return { ok: false, reason: "conflict" };
       const patched = await this.graph.json<GraphEvent>("PATCH", this.itemUrl(href), {
         body: changed,
         etag: own,
