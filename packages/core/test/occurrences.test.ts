@@ -711,7 +711,9 @@ describe("RFC 5545's corners", () => {
   });
 
   test("a series whose ends name one zone two ways, each with its VTIMEZONE, keeps its wall-clock length (D32)", () => {
-    // As above, with each name defined: ical.js holds two zone objects.
+    // As above, with each name defined: ical.js holds two zone objects. Two
+    // names only their VTIMEZONEs know (Outlook numbers its custom zones)
+    // are one zone too, by ical.js's reading of both clocks.
     const zone = (tzid: string) => [
       "BEGIN:VTIMEZONE",
       `TZID:${tzid}`,
@@ -729,28 +731,33 @@ describe("RFC 5545's corners", () => {
       "END:STANDARD",
       "END:VTIMEZONE",
     ];
-    const object = CalendarObject.parse(
-      [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//test//EN",
-        ...zone("Europe/Kyiv"),
-        ...zone("Europe/Kiev"),
-        "BEGIN:VEVENT",
-        "UID:aliases",
-        "DTSTAMP:20261001T000000Z",
-        "DTSTART;TZID=Europe/Kyiv:20261024T220000",
-        "DTEND;TZID=Europe/Kiev:20261025T060000",
-        "RRULE:FREQ=DAILY;COUNT=2",
-        "END:VEVENT",
-        "END:VCALENDAR",
-        "",
-      ].join("\r\n"),
-    );
-    const ends = occurrencesBetween(object, vilnius("2026-10-20", "2026-10-31")).map((o) =>
-      wallClockOf(o.end, "Europe/Kyiv"),
-    );
-    expect(ends).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+    for (const [from, to] of [
+      ["Europe/Kyiv", "Europe/Kiev"],
+      ["Customized Time Zone", "Customized Time Zone 1"],
+    ] as const) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          ...zone(from),
+          ...zone(to),
+          "BEGIN:VEVENT",
+          "UID:aliases",
+          "DTSTAMP:20261001T000000Z",
+          `DTSTART;TZID=${from}:20261024T220000`,
+          `DTEND;TZID=${to}:20261025T060000`,
+          "RRULE:FREQ=DAILY;COUNT=2",
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      const ends = occurrencesBetween(object, vilnius("2026-10-20", "2026-10-31")).map((o) =>
+        wallClockOf(o.end, "Europe/Kyiv"),
+      );
+      expect(ends, `${from} to ${to}`).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+    }
   });
 
   test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {

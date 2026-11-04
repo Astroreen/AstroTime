@@ -583,6 +583,20 @@ describe("the repeat rule", () => {
     });
   });
 
+  test("an end in UTC is read on its UTC day in a zone nothing knows, which is floating (D32)", () => {
+    // No VTIMEZONE, no IANA or Windows name: the start is a wall clock, and
+    // 23:00Z on 9 November is that day.
+    const series = calendar([
+      "DTSTART;TZID=Nowhere Standard Time:20261102T090000",
+      "DTEND;TZID=Nowhere Standard Time:20261102T100000",
+      "RRULE:FREQ=DAILY;UNTIL=20261109T230000Z",
+    ]);
+    expect(repeatOf(CalendarObject.parse(series))?.repeat.end).toEqual({
+      type: "until",
+      until: "2026-11-09",
+    });
+  });
+
   test("an end in UTC is read on the day of a zone only the object's VTIMEZONE knows (D32)", () => {
     // Outlook's own name for a zone, UTC+2 in winter: 23:00Z on 9 November is 01:00 on the 10th.
     const ics = [
