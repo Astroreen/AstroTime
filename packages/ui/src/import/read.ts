@@ -27,7 +27,7 @@ export interface ImportItem {
 /** A calendar or task list of the file (D268). */
 export interface Source {
   readonly id: string;
-  /** The file's name for it, else the file's own name. */
+  /** The file's name for it, else (none, or blank) the file's own name. */
   readonly name: string;
   readonly color: string | null;
   readonly items: readonly ImportItem[];
@@ -208,7 +208,9 @@ async function sourceOf(
   }
   return {
     id: String(index),
-    name: calendar.name ?? fileName,
+    // A name of spaces alone is none: the file's, which a new calendar
+    // made for it, here or on a server, is named by (D277).
+    name: calendar.name?.trim() || fileName,
     color: calendar.color,
     items,
     others,

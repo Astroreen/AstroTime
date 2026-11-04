@@ -2437,7 +2437,9 @@ own (below).
   status), or an error; never an error's own English. Closed while a list is
   being made, the dialog keeps it: opened again it says it is still being
   made, with "Create" off (no second list), and the list is shown once
-  made. When the accounts cannot be read (or what makes a list on a
+  made. The accounts are read live while it is open, as the import's
+  are; a failure said goes once the name or the place changes. When the
+  accounts cannot be read (or what makes a list on a
   server did not load), it says so and offers this device alone, made by
   the store without that code, through the one path a list on this device
   takes (`makeDeviceCalendar`, its name as `calendarNameOf` sends it). `DEVICE` and the reasons are

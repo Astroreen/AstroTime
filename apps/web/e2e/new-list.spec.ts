@@ -103,17 +103,20 @@ test.describe("wide, English, on Radicale", () => {
       if (answer.request().method() === "MKCALENDAR" && answer.status() === 201)
         made.push(answer.url());
     });
-    // Three items go up once made: the sync after the import (D5).
-    const uploads = Promise.all(
-      [0, 1, 2].map(() =>
-        page.waitForResponse(
-          (answer) => answer.request().method() === "PUT" && answer.status() === 201,
-        ),
-      ),
-    );
+    // Three items go up once made, each to its own address: the sync after
+    // the import (D5). Counted as they come, each upload once.
+    const put = new Set<string>();
+    let uploaded: () => void = () => {};
+    const uploads = new Promise<void>((resolve) => (uploaded = resolve));
+    page.on("response", (answer) => {
+      if (answer.request().method() !== "PUT" || answer.status() !== 201) return;
+      put.add(answer.url());
+      if (put.size === 3) uploaded();
+    });
     await dialog.getByRole("button", { name: "Import", exact: true }).click();
     await expect(dialog.getByRole("status")).toContainText("2 events · 1 task");
     await uploads;
+    expect(put.size).toBe(3);
     // One calendar a kind (providers D275), both named as the file's.
     expect(made).toHaveLength(2);
     for (const url of made) expect(await displayName(radicale, url)).toBe("Team");
