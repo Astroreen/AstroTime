@@ -4,14 +4,18 @@ One word per concept. Use these terms in code, docs, commits and UI.
 
 ## The product
 
-- **Account** — one sign-in to one server through one provider (a Nextcloud
-  user, for example). Holds its credentials and its calendars. Named
-  `user@host` in the UI.
+- **Account** — one sign-in to one service through one provider (a
+  Nextcloud user, a Google account), whatever APIs the provider uses
+  there. Holds its credentials and its calendars. Named `user@host` in the
+  UI.
 - **Calendar home** — the collection that holds an account's calendars on
   a CalDAV server, found by discovery (RFC 6764) and kept with the account
   (`homeUrl`).
 - **Provider** — the code that brings an account's calendars in and writes
-  changes back. CalDAV is the first; Google and system calendars come later.
+  changes back, one per kind of account (`Account.provider`): `caldav` (any
+  CalDAV server and the known services), and planned `ics` (subscriptions),
+  `google` (Google's CalDAV and Tasks API in one) and `microsoft` (Graph)
+  (providers D245–D253). System calendars are deferred (foundation D4).
 - **Calendar** — one collection on a server (a CalDAV calendar). It may hold
   events, tasks or both (`supported-calendar-component-set`).
 - **Rights** — what the user may do to a calendar's items: create, edit,

@@ -191,19 +191,45 @@ marked _to be recorded_.
   last `Last-Modified`): a `304` changes nothing; a `200` is split into
   one calendar object per `UID` (a series with its exceptions together,
   with the file's `VTIMEZONE`s each needs), each kept as its own object
-  in the store with an href made from its UID, and objects whose UID is
-  gone are removed. It syncs with the others, at most hourly unless the
+  in the store under the href `<the address>#<the UID, percent-encoded>`
+  (one per UID, never sent anywhere: the file is the only resource), its
+  ETag the hash of its text, and objects whose UID is gone are removed.
+  **A bad answer never empties a calendar.** A `200` is applied only when
+  its body parses as one `VCALENDAR` (whatever its `Content-Type`: many
+  servers send `text/plain` or `application/octet-stream`); an HTML page
+  (a sign-in page, a captive portal), a truncated file (no `END:VCALENDAR`)
+  or anything that does not parse is a failed sync that changes nothing,
+  reported in words. A parsed file that would remove every object of a
+  calendar that had some, or more than half of one with at least 20, is
+  held: nothing is removed, the account's sync status says how many would
+  go, and the user applies it ("Remove N events") or leaves it; the next
+  answer that does not remove so many applies as usual. It syncs with the others, at most hourly unless the
   user asks ("Sync now"), or as the file's `REFRESH-INTERVAL` (RFC 7986)
   or `X-PUBLISHED-TTL` asks, if longer. Nothing is ever written back. A
   secret in the URL (Google's "secret address", Outlook's published
   calendar) is a credential: it is kept in the secret store, not the
   account's row, and shown in the UI with its path cut. On the web it
   goes through the proxy like any server, so it must be on its allowlist;
-  Android and the desktop reach it directly.
+  Android and the desktop reach it directly. The proxy's URL space
+  ([D39](foundation.md#D39)) puts the whole address in the request's
+  path, so the proxy logs no request's path or query: its own log names a
+  failure by method and origin only, and the image documents that a
+  reverse proxy in front of it should not log `/dav-proxy/` paths either
+  (P4 tests the first and fixes any log line that names a path).
 
 ### OAuth providers
 
-- **D252. Google: events over Google's CalDAV, tasks over the Tasks API.**
+- **D252. Google: one account, one provider, two APIs: events over
+  Google's CalDAV, tasks over the Tasks API.** A Google account is one
+  account of provider `google` (`Account.provider` stays one key per
+  account). Its provider is a composite: each `Provider` call names a
+  calendar or an href, and the provider sends it on by its URL, a
+  calendar under `apidata.googleusercontent.com/caldav/v2/` to the CalDAV
+  provider with a bearer token, a task list under
+  `tasks.googleapis.com/tasks/v1/lists/` to the Tasks code. Its
+  `calendars()` is both lists in one. So the sync engine and the store see
+  one account, as the user does, and nothing outside the package knows
+  there are two APIs (AGENTS.md rule 4).
   Google Calendar's CalDAV endpoint takes an OAuth 2 bearer token, not a
   password, and speaks the CalDAV the provider already speaks, so events
   stay iCalendar end to end ([D7](foundation.md#D7)) and reuse every test
@@ -213,7 +239,7 @@ marked _to be recorded_.
   recorded_ in P5 before anything is written through it; if a recording
   shows a write that loses properties, events move to the Calendar REST
   API, mapped and written field by field as Google Tasks is below, and
-  this decision says so. Google Tasks has no CalDAV: a provider `google-tasks` maps the
+  this decision says so. Google Tasks has no CalDAV: the provider's Tasks code maps the
   Tasks API (`tasklists`, `tasks`: title, notes, due as a date, status,
   completed, parent, position, links) to `VTODO`s in the store and back,
   each task list a calendar of `VTODO`s. A write sends only what the user
@@ -223,8 +249,12 @@ marked _to be recorded_.
   What a `VTODO` says that Google Tasks cannot keep (a time on the due,
   a start, priority, categories, reminders, recurrence) is not offered by
   the edit dialog for such a list, as a read-only field is not
-  ([design D159](design.md#D159) shows what a task has). One sign-in adds
-  both: one Google account, with its calendars and its task lists.
+  ([design D159](design.md#D159) shows what a task has). A task's
+  `VTODO` in the store holds what Google gave and nothing else, and after
+  each write it is made again from Google's answer, so the store never
+  holds a property Google dropped (D7 locally: what is in the store is
+  what the server keeps). One sign-in adds both: one Google account, with
+  its calendars and its task lists.
   Changes are found with CalDAV's `sync-collection` for events and the
   Tasks API's `updatedMin` with `showDeleted` for tasks. Google's APIs
   answer CORS, its CalDAV does not: on the web events go through the
@@ -239,8 +269,8 @@ marked _to be recorded_.
   Microsoft To Do have no CalDAV; Microsoft Graph carries both
   (`/me/calendars/{id}/events`, `/me/todo/lists/{id}/tasks`) and answers
   CORS. A provider `microsoft` maps Graph's events and tasks to
-  iCalendar in the store and back, with Graph's `delta` queries
-  (`calendarView/delta`, `tasks/delta`) for changes, and writes only
+  iCalendar in the store and back, with Graph's `delta` queries for
+  changes, and writes only
   what changed (`PATCH`), as [D252](#D252) does for Google Tasks. The
   store keeps iCalendar only, as for every provider
   ([D5](foundation.md#D5)): no second copy of an item in Graph's JSON,
@@ -254,9 +284,23 @@ marked _to be recorded_.
   online meeting's link, the item's page in Outlook) are read into the
   `X-` properties Outlook's own iCalendar export writes for them
   (`X-MICROSOFT-SKYPETEAMSMEETINGURL`, …), and are never written back:
-  Graph sets them itself. Graph's `changeKey` is the object's ETag. A series is read with its exceptions (`instances`), and an
-  edit of one occurrence writes that occurrence's own event, as Outlook
-  does. It comes after Google ([D246](#D246)).
+  Graph sets them itself. Graph's `changeKey` is the object's ETag.
+  **Series.** `calendarView/delta` lists occurrences in a window, not
+  the series, so it is not used: a calendar's events come from
+  `/me/calendars/{id}/events/delta` (single events and series masters,
+  `type: seriesMaster` with its `recurrence`, which maps to an `RRULE`),
+  and each changed master's changed and cancelled occurrences from
+  `/events/{id}/instances` over the range the store keeps, which become
+  its `RECURRENCE-ID` exceptions and `EXDATE`s in one calendar object, as
+  CalDAV keeps a series. Writes go the same way back: an edit of the
+  series is a `PATCH` of the master; an edit of one occurrence is a
+  `PATCH` of that occurrence's own event (`type: exception`), and a
+  deleted occurrence a `DELETE` of it, as Outlook does. Whether
+  `events/delta` returns masters for every calendar kind (shared, group
+  calendars) and how `instances` pages a long series is _to be recorded_
+  in P6 before anything is written; what does not hold is recorded here.
+  Tasks come from `/me/todo/lists/{id}/tasks/delta`. It comes after
+  Google ([D246](#D246)).
 
 - **D254. OAuth 2 on every platform: the authorization code with PKCE.**
   One flow, `@astrotime/oauth` (isomorphic, AGENTS.md rule 1): the
@@ -269,7 +313,8 @@ marked _to be recorded_.
   refresh (revoked access) is the account's "signed out", as a refused
   password is. The redirect, per platform:
   - **Android**: a custom scheme (`io.github.astroreen.astrotime:/oauth`,
-    the app's id, as Google asks of Android clients), through a Custom
+    the app's id, as Google asks of Android clients; Microsoft takes the
+    same URI, so Android has one redirect for both), through a Custom
     Tab, back by an intent filter;
   - **the desktop**: a loopback address on a free port
     (`http://127.0.0.1:<port>/oauth`), opened by the main process for
@@ -318,8 +363,9 @@ marked _to be recorded_.
     possible without Proton's own client.
   - **Tuta** keeps calendars end-to-end encrypted with no API; it exports
     ICS files only, which an import could read (Deferred).
-  - **Exchange on premises** speaks EWS (and Microsoft retires EWS for
-    Exchange Online in 2026); an on-premises Exchange is Deferred until
+  - **Exchange on premises** speaks EWS (Microsoft began retiring EWS
+    for Exchange Online on 1 October 2026, so Graph is the only way to
+    Exchange Online now); an on-premises Exchange is Deferred until
     someone asks.
   - **EteSync** speaks its own end-to-end protocol (Etebase); Deferred.
   - **Android's system calendars** stay foundation's
@@ -360,7 +406,8 @@ marked _to be recorded_.
      directory and personal Microsoft accounts".
   2. Platforms: **Single-page application** with the owner's deployment's
      `<origin>/oauth` and `http://localhost:5180/oauth`; **Mobile and
-     desktop applications** with `io.github.astroreen.astrotime://oauth`
+     desktop applications** with `io.github.astroreen.astrotime:/oauth`
+     (the one form every platform and both services use, [D254](#D254))
      and `http://localhost`; "Allow public client flows" on.
   3. API permissions, delegated: `Calendars.ReadWrite`,
      `Tasks.ReadWrite`, `offline_access`, `User.Read`. A work account's
@@ -440,8 +487,12 @@ D255.
 
 Done when: tests show that a `304` changes nothing in the store; a `200`
 adds a new UID's object, changes a changed one's and removes one whose
-UID left the file; a series keeps its exceptions in one object; nothing
-is ever written to the server; the URL's secret is in the secret store,
+UID left the file; a series keeps its exceptions in one object; a `200`
+that is an HTML page, empty, truncated or unparsable changes nothing and
+reports a failure; a file that would remove every object, or more than
+half of 20 or more, is held until the user applies it; hrefs are
+`<address>#<UID>`; nothing is ever written to the server; a failed
+request to a secret address logs nothing of its path; the URL's secret is in the secret store,
 not the account's row; the CalDAV provider is imported only when a
 CalDAV account exists (a test of the registry); the first load grows by
 at most 0.1 KiB net; `docs/map.md` names `@astrotime/ics` and the
@@ -450,7 +501,8 @@ registry.
 ### PR P5 — OAuth and Google
 
 `@astrotime/oauth`, the bearer credentials of the CalDAV provider, the
-redirect on each platform, `google-tasks`; against a fake OAuth server
+redirect on each platform, the composite `google` provider (CalDAV
+events, Tasks API task lists); against a fake OAuth server
 and recordings until the owner's clients exist ([D257](#D257)). D252,
 D254.
 
@@ -459,17 +511,18 @@ redirect ends with a refresh token in the secret store, an expired access
 token is refreshed once, and a refused refresh signs the account out;
 Google's CalDAV recording (series and exceptions included) replays
 through a sync, and a Tasks recording maps to `VTODO`s and back with a
-`PATCH` of the changed fields only; the owner's steps (D257) are sent to
+`PATCH` of the changed fields only; one Google account in the store holds
+both its calendars and its task lists, each call routed by URL; the owner's steps (D257) are sent to
 the orchestrator, and once the owner has made them the cloud run passes
 on the test account; `docs/map.md` names `@astrotime/oauth` and
-`google-tasks`.
+the `google` provider.
 
 ### PR P6 — Microsoft
 
 The `microsoft` provider, on P5's OAuth. D253, D258.
 
-Done when: Graph recordings of events (a series with an exception
-included) and of To Do tasks replay through a sync into iCalendar; an
+Done when: Graph recordings of events (a series master with a changed
+and a cancelled occurrence, read through `events/delta` and `instances`) and of To Do tasks replay through a sync into iCalendar; an
 edit sends a `PATCH` of the changed fields only, and a field the store
 does not hold is never sent; the owner's steps (D258) are sent to the
 orchestrator, and once made the cloud run passes on the test account;
