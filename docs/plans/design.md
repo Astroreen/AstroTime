@@ -939,7 +939,8 @@ an event or a task." What is written and which services are asked:
   OpenStreetMap's tiles 144 px high across the card, the place in its
   middle under a pin, "© OpenStreetMap" in its corner linking to the
   copyright page; the tiles load as the card shows (`loading="lazy"`), and
-  one that does not come leaves the map's ground. Two actions under it:
+  one that does not come leaves the map's ground. Two actions (since [D238](#D238),
+  icons at the end of the address's line):
   - **Open in maps**: OpenStreetMap's page with a marker on the place
     (`openstreetmap.org/?mlat=…&mlon=…#map=17/…`); on Android a `geo:` URI
     with the point and its text (its parentheses escaped, as the label sits
@@ -2392,8 +2393,30 @@ own (below).
   install under a path, `/.well-known/caldav` redirected; and the real
   servers' homes in `packages/sync/test/servers.test.ts`). A CalDAV
   account whose home is not saved gets no reason: its cause is not known
-  (`noFilesOf`, `@astrotime/sync`). The owner's case, and attaching a
+  (`noFilesOf`, `@astrotime/sync/files`). The owner's case, and attaching a
   file inline where there are no files: [Deferred](#deferred).
+- **D238. The place's line, two icons at its end** (the owner's 5, round
+  5: "'Open on map' and 'Copy address' I would make plain icons on the
+  same line as the address, two icons at the end of the line. Tapping
+  the map does the same as 'Open on map', tapping the address text does
+  the same as 'Copy address'"). The
+  details' place (D177) puts "Open in maps" and "Copy address" as icon
+  buttons at the end of its first line, 48 px each (Material's 48 dp
+  touch target), each with its tooltip; the place's first line and its
+  row's pin sit level with the icons' middle, by one value
+  (`PLACE_LINE`). Copied, the copy icon
+  turns to a tick for two seconds and a status says "Copied" once (the
+  button keeps its name); a copy again while it shows says it again.
+  A tap on the map opens it in maps, as the icon does (on Android the
+  same `geo:` intent, which the emulator's maps app took); a single tap
+  or click on the address copies it once 300 ms pass with no second
+  click and none of the address selected (text selected elsewhere, in
+  the description, stops nothing), while a long press, a drag, a double or a
+  triple click selects its text as any text, and copies nothing. The map's tap
+  target lies over it out of the keyboard's order and the accessibility
+  tree, and the address is text: the icon buttons are the actions for
+  keys and screen readers. OpenStreetMap's credit stays a link of its
+  own over the map. The details' picture (D216, D221) is untouched.
 
 ## Deferred
 

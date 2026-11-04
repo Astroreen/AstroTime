@@ -92,6 +92,8 @@ export interface EditorState {
   readonly form: Form;
   /** Why the form cannot be saved, or why saving it did not work. */
   readonly problem: SaveProblem | null;
+  /** The kind the problem was met with, its words kept if the kind switches meanwhile (design D236). */
+  readonly problemKind?: Form["kind"];
   readonly saving: boolean;
 }
 
@@ -203,7 +205,7 @@ export function ItemEditor({
                   role="alert"
                   className="mt-4 rounded-xl bg-danger-soft p-3 text-body text-danger"
                 >
-                  {t(problemKey(state.problem, form?.kind ?? "event"))}
+                  {t(problemKey(state.problem, state.problemKind ?? form?.kind ?? "event"))}
                 </p>
               )}
             </form>

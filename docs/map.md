@@ -314,7 +314,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D208`
     - `place-field.tsx` — the edit dialog's Location, searching places as
       the user types; `place-card.tsx`, a place in the details with its
-      map and actions. → `plans/design.md#D175`, `plans/design.md#D177`
+      map and its two icons at the end of the line, the map and the
+      address tappable. → `plans/design.md#D175`, `plans/design.md#D177`,
+      `plans/design.md#D238`
   - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
     the UI shows them, the calendar on this device named in the language
     spoken now. → `plans/foundation.md#D122`

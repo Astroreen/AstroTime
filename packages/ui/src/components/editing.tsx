@@ -369,7 +369,7 @@ export function useEditingState({
     const { target, initial, state } = editing;
     const problem = problemOf(state.form, initial);
     if (problem) {
-      setEditing({ ...editing, state: { ...state, problem } });
+      setEditing({ ...editing, state: { ...state, problem, problemKind: state.form.kind } });
       return;
     }
     const run = (scope: "this" | "following" | "all") => {
@@ -411,7 +411,13 @@ export function useEditingState({
             (current) =>
               current && {
                 ...current,
-                state: { ...current.state, saving: false, problem: failure },
+                // In the words of what was saved, whatever the form says now.
+                state: {
+                  ...current.state,
+                  saving: false,
+                  problem: failure,
+                  problemKind: state.form.kind,
+                },
               },
           );
         },
@@ -419,7 +425,11 @@ export function useEditingState({
     };
     const scopes = scopesFor(target, initial, state.form, rightsOf(byId(state.form.calendarId)));
     // Only a split could save it, and its calendar takes no new items (D37).
-    if (scopes === null) setEditing({ ...editing, state: { ...state, problem: "noSplit" } });
+    if (scopes === null)
+      setEditing({
+        ...editing,
+        state: { ...state, problem: "noSplit", problemKind: state.form.kind },
+      });
     else if (scopes.length === 0) run("all");
     else setAsking({ action: "edit", kind: state.form.kind, scopes, run });
   };

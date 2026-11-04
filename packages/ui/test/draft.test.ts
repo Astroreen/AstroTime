@@ -241,8 +241,10 @@ describe("where the dialog stands beside the draft (design D187)", () => {
       side: "right",
       width: 400,
     });
-    // A cutout at the left tips a tie to the right, and narrows the left.
-    expect(besideOf({ left: 432, right: 568 }, 1000, 16, { left: 32, right: 0 })).toEqual({
+    // 408 px on the left, 400 on the right: the left, until a 32 px cutout
+    // there leaves it 376, and the dialog stands right.
+    expect(besideOf({ left: 440, right: 568 }, 1000)).toEqual({ side: "left", width: 408 });
+    expect(besideOf({ left: 440, right: 568 }, 1000, 16, { left: 32, right: 0 })).toEqual({
       side: "right",
       width: 400,
     });
