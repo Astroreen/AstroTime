@@ -1487,6 +1487,13 @@ describe("in words", () => {
     expect(
       repeatWords({ ...monthly, monthlyWeekday: { nth: -1, weekday: "FR" } }, start, en, formats),
     ).toBe("Every month on the last Friday");
+    // RRULE allows any of the last five; each has its word, never a catalog key.
+    expect(
+      repeatWords({ ...monthly, monthlyWeekday: { nth: -2, weekday: "FR" } }, start, en, formats),
+    ).toBe("Every month on the second-to-last Friday");
+    expect(
+      repeatWords({ ...monthly, monthlyWeekday: { nth: -2, weekday: "FR" } }, start, ru, ruFormats),
+    ).toBe("Каждый месяц в предпоследнюю пятницу");
     expect(repeatWords({ ...monthly, frequency: "YEARLY" }, start, ru, ruFormats)).toBe(
       "Каждый год, 4 ноября",
     );

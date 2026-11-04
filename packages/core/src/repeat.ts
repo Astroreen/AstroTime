@@ -6,7 +6,7 @@
 import ICAL from "ical.js";
 
 import type { CalendarObject } from "./calendar-object.ts";
-import { fromIcalTime, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
+import { fromIcalTime, wallClockNear, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
 
 export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
 export const WEEKDAYS: readonly Weekday[] = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
@@ -83,7 +83,8 @@ function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): R
     if (weekdays.length !== byDay.length || byMonthDay.length > 0 || byMonth.length > 0)
       exact = false;
   } else if (frequency === "MONTHLY") {
-    const match = byDay.length === 1 ? /^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/.exec(byDay[0]!) : null;
+    const match =
+      byDay.length === 1 ? /^([+-]?[1-5])?(MO|TU|WE|TH|FR|SA|SU)$/.exec(byDay[0]!) : null;
     if (match?.[1]) monthlyWeekday = { nth: Number(match[1]), weekday: match[2] as Weekday };
     const onItsDay =
       byDay.length === 0 &&
@@ -103,10 +104,8 @@ function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): R
   let end: RepeatEnd = { type: "never" };
   if (rule.count) end = { type: "count", count: rule.count };
   else if (rule.until) {
-    const until = fromIcalTime(rule.until);
     // A UTC end names the series' last moment: its day is the one in the series' zone.
-    const zone = anchor?.type === "zoned" ? anchor.timeZone : "UTC";
-    end = { type: "until", until: wallClockOf(until, zone).slice(0, 10) };
+    end = { type: "until", until: dayIn(fromIcalTime(rule.until), anchor) };
   }
   return {
     repeat: {
@@ -264,10 +263,18 @@ export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.
   // the series ends on the same day, written in the new type. A series keeps
   // its zone when it moves (D104), so a zoned UNTIL stays as it is.
   if (rule.until && from.type !== to.type) {
-    const zone = from.type === "zoned" ? from.timeZone : "UTC";
-    moved.until = untilOf(wallClockOf(fromIcalTime(rule.until), zone).slice(0, 10), to);
+    moved.until = untilOf(dayIn(fromIcalTime(rule.until), from), to);
   }
   return moved;
+}
+
+/** The day a time falls on in the zone of `anchor` (a series' start), else in UTC. */
+function dayIn(time: ItemTime, anchor: ItemTime | null): string {
+  const local =
+    time.type === "zoned" && anchor?.type === "zoned"
+      ? wallClockNear(time.epochMs, anchor)
+      : wallClockOf(time, "UTC");
+  return local.slice(0, 10);
 }
 
 /**

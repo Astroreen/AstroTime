@@ -50,6 +50,7 @@ const PREDEFINED = new Map(Object.entries({ lt: "<", gt: ">", amp: "&", quot: '"
  * §2.2's `Char`) stay as written; a DTD's entities are not read.
  */
 function decodeReferences(value: string): string {
+  if (!value.includes("&")) return value;
   return value.replaceAll(
     /&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g,
     (reference, hex, dec, name) => {

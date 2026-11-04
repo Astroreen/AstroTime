@@ -40,3 +40,23 @@ test("the edit dialog's code that did not arrive is asked for again", async ({ p
   await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
   await expect(failed).toHaveCount(0);
 });
+
+test("the sign-in dialog is no part of the first load: the app opens without it, and it comes with its first opening (providers D255)", async ({
+  page,
+}) => {
+  // Its chunk never arrives until the test lets it: the calendar opens all
+  // the same, so nothing the first load needs is in it.
+  const signIn = /\/assets\/sign-in-dialog-[\w-]+\.js/;
+  await page.route(signIn, (route) => route.abort("internetdisconnected"));
+  await openApp(page);
+  await expect(page.getByRole("button", { name: /^Accounts/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Accounts/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add account" }).click();
+  const failed = page.getByRole("alertdialog", { name: /Could not load this part of AstroTime/ });
+  await expect(failed).toBeVisible();
+  await page.unroute(signIn);
+  const loaded = page.waitForResponse(signIn);
+  await failed.getByRole("button", { name: "Try again" }).click();
+  await loaded;
+  await expect(page.getByRole("dialog", { name: "Add an account" })).toBeVisible();
+});

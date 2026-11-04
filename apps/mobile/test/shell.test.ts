@@ -75,12 +75,19 @@ test("a file is handed to the shell's picker in base64, a big one too (design D2
       return { saved: true };
     },
   });
-  await save({
-    name: "figures.txt",
-    type: "text/plain",
-    bytes: new TextEncoder().encode("Q1: 12 000\n"),
-  });
+  expect(
+    await save({
+      name: "figures.txt",
+      type: "text/plain",
+      bytes: new TextEncoder().encode("Q1: 12 000\n"),
+    }),
+  ).toBe(true);
   expect(asked).toEqual([{ name: "figures.txt", type: "text/plain", data: "UTE6IDEyIDAwMAo=" }]);
+  // Its dialog turned away: said, so no "saved" is shown (import D274).
+  const refused = saveFile({ setBars: async () => {}, saveFile: async () => ({ saved: false }) });
+  expect(await refused({ name: "a.ics", type: "text/calendar", bytes: new Uint8Array([1]) })).toBe(
+    false,
+  );
   // Past one piece of 32 KiB: every byte, in order.
   const big = Uint8Array.from({ length: 100_000 }, (_, i) => i % 251);
   expect(Uint8Array.from(atob(base64Of(big)), (c) => c.charCodeAt(0))).toEqual(big);

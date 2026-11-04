@@ -291,8 +291,11 @@ test("an item moved to another account while its file uploads: not attached, sai
     await chooser
   ).setFiles({ name: "minutes.txt", mimeType: "text/plain", buffer: Buffer.from("Minutes") });
   await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
-  // Meanwhile the item goes to the calendar on this device, which has no files.
+  // Meanwhile the item goes to the calendar on this device, which has no
+  // files: the ways turn off, the upload goes on (its input stays, D237).
   await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
+  await expect(edit.getByRole("button", { name: "From this device" })).toBeDisabled();
+  await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
   answer();
   await expect(edit.getByRole("alert")).toHaveText(
     "minutes.txt was uploaded to the Calendar folder of your files, but is not attached while the item is in another account's calendar: move it back to attach it.",
@@ -388,6 +391,153 @@ for (const [language, theme, size, viewport] of [
     await page.screenshot({
       path: join(directory!, `editor-file-${theme}-${language}-${size}.png`),
     });
+    await context.close();
+  });
+}
+
+// The owner's 3 (round 5): "Add a link" hid the other ways (design D237).
+test("the three ways stay in sight: with a link being typed, files and the device are one tap away", async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  await fakeNextcloud(page);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  const files = edit.getByRole("button", { name: "From your files" });
+  const device = edit.getByRole("button", { name: "From this device" });
+  await expect(files).toBeEnabled();
+  await expect(device).toBeEnabled();
+
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  const link = edit.getByRole("textbox", { name: "Link" });
+  await expect(link).toBeFocused();
+  await expect(files).toBeEnabled();
+  await expect(device).toBeEnabled();
+  // Cancel goes back to the three, nothing added.
+  await link.fill("example.org/half");
+  await edit.getByRole("button", { name: "Cancel" }).click();
+  await expect(link).toHaveCount(0);
+  await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
+
+  // From the link's field straight to the files.
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  await files.click();
+  await expect(page.getByRole("dialog", { name: "Choose a file" })).toBeVisible();
+});
+
+for (const [language, words] of [
+  [
+    "en",
+    {
+      create: "Create",
+      event: /^New (event|task)$/,
+      task: "Task",
+      files: "From your files",
+      device: "From this device",
+      calendar: "Files need a Nextcloud account: this calendar is on this device.",
+      attachments: "Attachments",
+      list: "Files need a Nextcloud account: this list is on this device.",
+    },
+  ],
+  [
+    "ru",
+    {
+      create: "Создать",
+      event: /^(Новое мероприятие|Новая задача)$/,
+      task: "Задача",
+      files: "Из ваших файлов",
+      device: "С этого устройства",
+      calendar: "Файлы есть только у аккаунта Nextcloud: этот календарь — на этом устройстве.",
+      attachments: "Вложения",
+      list: "Файлы есть только у аккаунта Nextcloud: этот список — на этом устройстве.",
+    },
+  ],
+] as const) {
+  test.describe(language, () => {
+    test.use({ locale: language === "en" ? "en-US" : "ru-RU" });
+
+    // The calendar on this device keeps no files: the ways are there, off, with why (design D237).
+    test("on the calendar on this device the file ways are off and say why", async ({ page }) => {
+      await page.setViewportSize(PHONE);
+      await page.clock.setFixedTime(NOW);
+      await page.goto("/");
+      await page.getByRole("button", { name: words.create }).click();
+      const edit = page.getByRole("dialog", { name: words.event });
+      const files = edit.getByRole("button", { name: words.files });
+      const device = edit.getByRole("button", { name: words.device });
+      await expect(files).toBeDisabled();
+      await expect(device).toBeDisabled();
+      await expect(files).toHaveAccessibleDescription(words.calendar);
+      await expect(edit.getByText(words.calendar)).toBeVisible();
+      // The system's file dialog stays in the page, and a file it gives here goes nowhere.
+      await edit.locator('input[type="file"]').setInputFiles({
+        name: "minutes.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("Minutes"),
+      });
+      await expect(edit.getByRole("status")).toHaveCount(0);
+      await expect(edit.getByRole("list", { name: words.attachments })).toHaveCount(0);
+      // A task's calendar is its list (design D236).
+      await edit.getByRole("radio", { name: words.task }).click();
+      await expect(device).toHaveAccessibleDescription(words.list);
+    });
+  });
+}
+
+// A Nextcloud whose sync is off keeps its files, but AstroTime does not
+// reach them: the file ways say so (design D237), in both languages.
+for (const language of ["en", "ru"] as const) {
+  test(`a Nextcloud account with its sync off turns the file ways off and says why, ${language}`, async ({
+    browser,
+  }) => {
+    const ru = language === "ru";
+    const context = await browser.newContext({
+      locale: ru ? "ru-RU" : "en-US",
+      timezoneId: "Europe/Vilnius",
+      viewport: WIDE,
+    });
+    const page = await context.newPage();
+    await page.clock.setFixedTime(NOW);
+    await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+    await fakeNextcloud(page);
+    await page.goto("/");
+    await signIn(page, language);
+    await page
+      .getByRole("navigation", { name: ru ? "Главное меню" : "Main menu" })
+      .getByRole("button", { name: ru ? "Настройки" : "Settings" })
+      .click();
+    const settings = page.getByRole("dialog", { name: ru ? "Настройки" : "Settings" });
+    await settings
+      .getByRole("region", { name: `${USER}@cloud.example.com` })
+      .getByRole("switch", { name: ru ? "Синхронизация" : "Sync" })
+      .click();
+    await page.keyboard.press("Escape");
+    await expect(settings).toBeHidden();
+
+    await page.getByRole("button", { name: /^Quarterly review, / }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: ru ? "Изменить" : "Edit" })
+      .click();
+    const edit = page.getByRole("dialog", { name: ru ? "Изменить мероприятие" : "Edit event" });
+    const files = edit.getByRole("button", { name: ru ? "Из ваших файлов" : "From your files" });
+    await expect(files).toBeDisabled();
+    await expect(files).toHaveAccessibleDescription(
+      ru
+        ? "Для файлов включите синхронизацию этого аккаунта в настройках."
+        : "Files need this account's sync on, in Settings.",
+    );
     await context.close();
   });
 }

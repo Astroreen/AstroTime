@@ -15,9 +15,19 @@ const PEOPLE: Record<string, { name: string; email: string }[]> = {
   home: [{ name: "Anna Home", email: "anna@home.example" }],
 };
 const asked: string[] = [];
+/**
+ * The "home" server answers when the test lets it: the test sees the field
+ * between the switch and that answer, whatever the machine's speed.
+ */
+let homeAnswers = Promise.resolve();
+let homeAsked = () => {};
 vi.mock("@astrotime/sync/people", () => ({
   peopleOf: async (_context: unknown, accountId: string, query: string) => {
     asked.push(`${accountId} ${query}`);
+    if (accountId === "home") {
+      homeAsked();
+      await homeAnswers;
+    }
     return PEOPLE[accountId] ?? [];
   },
 }));
@@ -33,6 +43,8 @@ const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   asked.length = 0;
+  homeAnswers = Promise.resolve();
+  homeAsked = () => {};
 });
 
 let switchTo: (accountId: string) => void = () => {};
@@ -69,13 +81,22 @@ function render() {
 test("switched to another account's calendar, its own people are offered, never the first's", async () => {
   render();
   const field = page.getByRole("textbox", { name: "Description" });
-  await userEvent.type(field, "@ann");
   const list = page.getByRole("listbox", { name: "People" });
+  // A query on the way, as slow typing asks one ("an", then "ann"): always here.
+  await userEvent.type(field, "@an");
   await expect.element(list.getByRole("option", { name: /Anna Work/ })).toBeVisible();
+  await userEvent.type(field, "n");
+  await expect.element(list.getByRole("option", { name: /Anna Work/ })).toBeVisible();
+  expect(asked).toContain("work an");
+  let answer = () => {};
+  homeAnswers = new Promise((resolve) => (answer = resolve));
+  const askedHome = new Promise<void>((resolve) => (homeAsked = resolve));
   switchTo("home");
-  // The first account's people go at once, before the other is even asked.
+  // The first account's people go at once; the other's have not answered yet.
   await expect.element(list.getByRole("option", { name: /Anna Work/ })).not.toBeInTheDocument();
-  expect(asked).toEqual(["work ann"]);
+  await askedHome;
+  expect(document.querySelectorAll('[role="option"]')).toHaveLength(0);
+  answer();
   await expect.element(list.getByRole("option", { name: /Anna Home/ })).toBeVisible();
   expect(
     list
@@ -83,7 +104,7 @@ test("switched to another account's calendar, its own people are offered, never 
       .elements()
       .map((option) => option.textContent),
   ).toEqual(["Anna Homeanna@home.example"]);
-  expect(asked).toEqual(["work ann", "home ann"]);
+  expect(asked.filter((query) => query.startsWith("home"))).toEqual(["home ann"]);
 });
 
 test("Enter picks; Tab leaves the field and picks nothing", async () => {

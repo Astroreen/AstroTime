@@ -194,6 +194,47 @@
 
 @layer components {
   /*
+   * Where a dialog stands (design D235), clear of the system bars a phone
+   * drawn edge to edge puts over the page (android D68). A sheet (`sheet`
+   * in dialog-parts.tsx: the details, the edit dialog, Settings) covers the
+   * whole screen on a phone, its bar and content padded clear of the bars,
+   * and is a card in the middle of the room they leave on a wide screen;
+   * `--room-*` is what its padding keeps, for what sits absolutely in it. A
+   * centred dialog (`centred`: signing in, the alerts) stays inside that
+   * room too, scrolling when it is taller. Each sets its own width; the
+   * room caps it.
+   */
+  .sheet {
+    --room-top: var(--inset-top);
+    --room-left: var(--inset-left);
+    position: fixed;
+    inset: 0;
+    padding: var(--inset-top) var(--inset-right) var(--inset-bottom) var(--inset-left);
+  }
+  .centred {
+    position: fixed;
+    top: calc(50% + (var(--inset-top) - var(--inset-bottom)) / 2);
+    left: calc(50% + (var(--inset-left) - var(--inset-right)) / 2);
+    translate: -50% -50%;
+    max-width: calc(100vw - 2rem - var(--inset-left) - var(--inset-right));
+    max-height: calc(100dvh - 2rem - var(--inset-top) - var(--inset-bottom));
+    overflow-y: auto;
+  }
+  /* Tailwind's `sm`. */
+  @media (width >= 40rem) {
+    .sheet {
+      --room-top: 0px;
+      --room-left: 0px;
+      inset: auto;
+      top: calc(50% + (var(--inset-top) - var(--inset-bottom)) / 2);
+      left: calc(50% + (var(--inset-left) - var(--inset-right)) / 2);
+      translate: -50% -50%;
+      max-width: calc(100vw - 2rem - var(--inset-left) - var(--inset-right));
+      max-height: min(44rem, calc(100dvh - 2rem - var(--inset-top) - var(--inset-bottom)));
+      padding: 0;
+    }
+  }
+  /*
    * An item filled in its colour (`--item`, design D47, D50), with white
    * text, as the reference draws it. A done task is muted and struck through
    * (design D51).

@@ -228,16 +228,23 @@ describe("an address is never a place to look up (design D220)", () => {
     "ул. Ленина",
     "Тверская улица",
     "Baker Street",
+    "Main St",
+    "St",
     "Flat 4B",
     "",
   ])("%s reads as an address", (name) => {
     expect(isAddress(name)).toBe(true);
   });
 
-  test.each(["Brandenburger Tor", "Красная площадь", "Times Square", "Louvre", "Café Einstein"])(
-    "%s is a place with a name of its own",
-    (name) => {
-      expect(isAddress(name)).toBe(false);
-    },
-  );
+  test.each([
+    "Brandenburger Tor",
+    "Красная площадь",
+    "Times Square",
+    "Louvre",
+    "Café Einstein",
+    "St Paul's Cathedral",
+    "St. Peter's Basilica",
+  ])("%s is a place with a name of its own", (name) => {
+    expect(isAddress(name)).toBe(false);
+  });
 });

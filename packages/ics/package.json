@@ -1,0 +1,23 @@
+{
+  "name": "@astrotime/ics",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Subscriptions: a read-only calendar from an ICS address, kept fresh by a conditional GET",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

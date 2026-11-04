@@ -4,7 +4,9 @@ import {
   mergeObjects,
   OfflineError,
   sameObjects,
+  type PartialListing,
   type Provider,
+  type RemoteCalendar,
   type RemoteObject,
   type SyncState,
   type WriteResult,
@@ -22,6 +24,10 @@ export type Problem =
   | "no-place"
   | "taken-unreadable"
   | "calendar-gone-unsent"
+  /** A subscription's file would remove most of it: held for the user (providers D263). */
+  | "held-removal"
+  /** The service wrote the item without some of its details, which it cannot keep (providers D252). */
+  | "not-kept"
   | "failed";
 
 class SyncProblem extends Error {
@@ -46,7 +52,13 @@ export interface SyncReport {
    * What failed for one object or one calendar without stopping the rest
    * (D37); a failed change stays pending for the next sync.
    */
-  errors: { href: string; problem: Problem; detail: string }[];
+  errors: {
+    href: string;
+    problem: Problem;
+    detail: string;
+    /** For `held-removal`: how many items would go, and the file's version to apply. */
+    held?: { readonly count: number; readonly version: string };
+  }[];
   /** Local changes dropped because the server deleted their object (D38), so the UI can say so. */
   dropped: string[];
 }
@@ -91,14 +103,37 @@ export async function syncAccount(
 }
 
 async function run(store: Store, provider: Provider, accountId: string, report: SyncReport) {
-  const remote = await provider.calendars();
+  let remote: readonly RemoteCalendar[];
+  let unread: PartialListing["unread"] = [];
+  // The calendars kept before the listing: one made meanwhile (providers
+  // D275), on the server before it was kept, is not one the listing missed.
+  const before = new Set((await store.calendars(accountId)).map((calendar) => calendar.id));
+  try {
+    remote = await provider.calendars();
+  } catch (error) {
+    // Part of the account read (a `PartialListing`, known by its fields: the
+    // engine imports no provider): that part syncs; the rest stays as it is,
+    // said. A part signed out or offline is the account's, thrown by
+    // `isolated` as any `AuthError` or `OfflineError` is.
+    const part = error as Partial<PartialListing> | null;
+    if (!part?.calendars || !part.unread) throw error;
+    remote = part.calendars;
+    unread = part.unread;
+    for (const { prefix, error: why } of unread)
+      await isolated(report, prefix, () => Promise.reject(why));
+  }
   const listed = new Map(remote.map((calendar) => [calendar.url, calendar.state]));
   const urls = new Set(listed.keys());
   // The listing's state is not the device's: it is kept only once the calendar is downloaded.
   for (const { state: _, ...calendar } of remote)
     await store.saveCalendar({ accountId, ...calendar });
   for (const calendar of await store.calendars(accountId)) {
-    if (urls.has(calendar.url)) continue;
+    if (
+      !before.has(calendar.id) ||
+      urls.has(calendar.url) ||
+      unread.some(({ prefix }) => calendar.url.startsWith(prefix))
+    )
+      continue;
     // A calendar deleted on the server goes with its objects (D38). One that
     // only went missing from a listing must not take unsent changes with it:
     // it stays, reported, until a listing without it finds it has none.
@@ -140,6 +175,23 @@ function unchanged(kept: SyncState, listed: SyncState | undefined): boolean {
   return listed.ctag !== null && listed.ctag === kept.ctag;
 }
 
+/**
+ * A write the service took without some of the item's details (Google
+ * Tasks keeps no priority, no reminders): said, by property. They stay on
+ * this device until the item changes there (providers D252).
+ */
+function notKept(
+  report: SyncReport,
+  result: { readonly href: string; readonly dropped?: readonly string[] },
+): void {
+  if (result.dropped && result.dropped.length > 0)
+    report.errors.push({
+      href: result.href,
+      problem: "not-kept",
+      detail: result.dropped.join(", "),
+    });
+}
+
 async function isolated(
   report: SyncReport,
   href: string,
@@ -149,10 +201,20 @@ async function isolated(
     await work();
   } catch (error) {
     if (error instanceof OfflineError || error instanceof AuthError) throw error;
+    // A problem the error names (`SyncProblem`, a subscription's
+    // `HeldRemovalError` with what it holds): the engine imports no provider.
+    // Whatever was thrown (`undefined` too) stays this calendar's (D37).
+    const named =
+      error !== null && typeof error === "object"
+        ? (error as Partial<SyncReport["errors"][number]>)
+        : {};
+    const problem = typeof named.problem === "string" ? named.problem : "failed";
+    const held = named.held;
     report.errors.push({
       href,
-      problem: error instanceof SyncProblem ? error.problem : "failed",
+      problem,
       detail: error instanceof Error ? error.message : String(error),
+      ...(held ? { held } : {}),
     });
   }
 }
@@ -241,14 +303,17 @@ async function upload(
         : etag === GONE
           ? { ok: true, href, etag: null }
           : await provider.remove(href, etag);
+    // Removed only if still our deletion: an edit made meanwhile revived it (D38)
+    // and stays pending; the next sync finds it gone and reports it dropped.
+    const removeOurs = () => store.removeManyFromServer([{ id: object.id, pending: "delete" }]);
     if (result.ok) {
-      await store.removeObject(object.id);
+      await removeOurs();
       report.uploaded++;
     } else {
       // Changed on the server since: the change wins over our deletion (D38).
       const server = await provider.fetch(href);
       if (server) await saveServerVersion(store, calendar, server, report, object);
-      else await store.removeObject(object.id);
+      else await removeOurs();
     }
     return;
   }
@@ -258,6 +323,7 @@ async function upload(
     if (result.ok) {
       await store.markSynced(object.id, { href: result.href, etag: result.etag, ics: object.ics });
       report.uploaded++;
+      notKept(report, result);
       return;
     }
     // A creation has no server copy to be deleted (D38 does not apply): a
@@ -339,6 +405,7 @@ async function upload(
   if (result.ok) {
     await store.markSynced(object.id, { href: result.href, etag: result.etag, ics: uploaded });
     report.uploaded++;
+    notKept(report, result);
   } else {
     // Deleted on the server while we edited it: the deletion wins (D38).
     await store.removeObject(object.id);
@@ -383,9 +450,12 @@ async function download(
     string,
     { id: string; etag: string | null; pending: StoredObject["pending"] }
   >();
+  /** Creations not known to have reached the server, kept under an href relative to it. */
+  const creating = new Set<string>();
   for (const entry of await store.hrefs(calendar.id)) {
     // A creation that has not reached the server is not the server's to remove.
     if (entry.pending !== "create") local.set(absolute(calendar, entry.href), entry);
+    else creating.add(absolute(calendar, entry.href));
   }
   const known = new Map([...local].map(([href, entry]) => [href, entry.etag]));
 
@@ -394,6 +464,12 @@ async function download(
   /** The server's versions of objects with no change of ours: stored in batches. */
   const plain: RemoteObject[] = [];
   for (const object of changes.changed) {
+    // Our creation, there already though its upload failed: not stored as a
+    // second row; the next sync's upload finds it taken and recognises it.
+    if (creating.has(object.href)) {
+      keepToken = true;
+      continue;
+    }
     const mine = local.get(object.href);
     if (mine && mine.pending !== "none") {
       // Our own change is still pending (its upload was refused); it is

@@ -58,7 +58,17 @@ export interface Changes extends SyncState {
 }
 
 export type WriteResult =
-  | { readonly ok: true; readonly href: string; readonly etag: string | null }
+  | {
+      readonly ok: true;
+      readonly href: string;
+      readonly etag: string | null;
+      /**
+       * What the item says that the service could not keep (Google Tasks
+       * keeps no priority, no reminders), by property: written without it,
+       * and said so (providers D252).
+       */
+      readonly dropped?: readonly string[];
+    }
   /** `conflict`: the object changed on the server first (412); `gone`: it no longer exists. */
   | { readonly ok: false; readonly reason: "conflict" | "gone" };
 
@@ -71,8 +81,25 @@ export interface Person {
   readonly email: string | null;
 }
 
+/** A calendar or task list to make on an account's server (docs/plans/providers.md#D275). */
+export interface NewCalendar {
+  readonly name: string;
+  /** `#rrggbb`; a service whose colours are its own (Graph's, Google's) is given none. */
+  readonly color: string | null;
+  /** What it holds: events, or tasks (a task list). */
+  readonly component: "VEVENT" | "VTODO";
+}
+
 export interface Provider {
   calendars(): Promise<RemoteCalendar[]>;
+  /**
+   * Makes a calendar or task list on the server, at once, and gives it as
+   * `calendars()` will list it (docs/plans/providers.md#D275); its name is
+   * `calendarNameOf`'s (`@astrotime/core/new-calendar`). A provider that
+   * makes none leaves it out; one whose server, or part, turns out to make
+   * none rejects with `CannotMakeCalendarError` (`unsupported`).
+   */
+  makeCalendar?(calendar: NewCalendar): Promise<RemoteCalendar>;
   /**
    * People whose name or e-mail holds `query`, as the server finds them;
    * none where it finds nobody (design D208). A provider without people
@@ -124,6 +151,28 @@ export interface FileStore {
    * taken; resolves with the file as listed.
    */
   upload(name: string, type: string, bytes: Uint8Array): Promise<RemoteFile>;
+}
+
+/**
+ * A listing of calendars that could read only part of an account (one of
+ * its APIs failing: Google's Tasks API not enabled, a scope not given):
+ * what it read, and the address prefixes of what it could not, which the
+ * sync leaves as they are, said (docs/plans/providers.md#D252).
+ */
+export class PartialListing extends Error {
+  override name = "PartialListing";
+  readonly calendars: readonly RemoteCalendar[];
+  readonly unread: readonly { readonly prefix: string; readonly error: unknown }[];
+  constructor(
+    calendars: readonly RemoteCalendar[],
+    unread: readonly { readonly prefix: string; readonly error: unknown }[],
+  ) {
+    super(
+      `Part of the account could not be listed: ${unread.map((part) => part.prefix).join(", ")}.`,
+    );
+    this.calendars = calendars;
+    this.unread = unread;
+  }
 }
 
 /** A provider could not reach its server; local changes wait for the next sync. */

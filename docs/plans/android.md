@@ -624,8 +624,9 @@ were checked on 2026-11-01.
     injects zero insets, and the bars show the window's background; from 140
     the page draws under the bars and the UI pads its shell, drawer, search
     and tasks screen by `--inset-*` (`styles.css`: the injected
-    `--safe-area-inset-*`, else `env()`), which `apps/web/e2e/insets.spec.ts`
-    checks.
+    `--safe-area-inset-*`, else `env()`), and every dialog stands clear
+    of them (design [D235](design.md#D235)), which
+    `apps/web/e2e/insets.spec.ts` checks.
   - **Splash screen:** not built; it stays with the app's icon in
     [Deferred](#deferred) (the launch theme's placeholder shows until the
     WebView draws).
@@ -696,6 +697,10 @@ were checked on 2026-11-01.
 
 ## Deferred
 
+- **An inexact alarm Doze delayed, then moved** — a reminder whose alarm
+  Doze held past its time and which moved meanwhile gets a new id; the
+  old alarm is not in the set's `gone` and may still show, until the next
+  set cancels it as an orphan. Seen in the code, not on a device.
 - **Signed Android release** — foundation's Deferred; a release key held
   in the repository's secrets, then F-Droid and Google Play ([D69](#D69)).
 - **Emulator tests in CI** — `android-emulator-runner` on a KVM runner, a

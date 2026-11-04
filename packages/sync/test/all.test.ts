@@ -2,19 +2,30 @@
 // docs/plans/foundation.md#D90), and the accounts it syncs.
 import type { HttpClient } from "@astrotime/caldav";
 import {
+  ALL_RIGHTS,
   AuthError,
   OfflineError,
   ServerBusyError,
+  type NewCalendar,
   type Provider,
   type SecretStore,
 } from "@astrotime/core";
-import { Store } from "@astrotime/storage";
+import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
-import { accountFiles } from "../src/files.ts";
+import { CannotMakeCalendarError, makeCalendar } from "../src/calendars.ts";
+import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
-import { removeAccount, saveAccount, syncAll, type Connect, type SyncLock } from "../src/index.ts";
+import {
+  connectCalDav,
+  hasFiles,
+  removeAccount,
+  saveAccount,
+  syncAll,
+  type Connect,
+  type SyncLock,
+} from "../src/index.ts";
 import { memoryServer, type MemoryServer } from "./memory-provider.ts";
 
 const task = (uid: string) =>
@@ -871,4 +882,239 @@ test("people for a mention are not asked of an account whose sync is off (D171)"
   await store.updateAccount(account.id, { syncOff: true });
   expect(await peopleOf(context, account.id, "ann")).toEqual([]);
   expect([asked, net.connections]).toEqual([[], []]);
+});
+
+describe("why an account has no files to attach from (design D237)", () => {
+  const account = (fields: Partial<Account>): Account => ({
+    id: "a",
+    provider: "caldav",
+    name: "astro",
+    serverUrl: "https://cloud.example.com",
+    username: "astro",
+    homeUrl: "https://cloud.example.com/remote.php/dav/calendars/astro/",
+    syncOff: false,
+    createdAt: 0,
+    ...fields,
+  });
+
+  test("a Nextcloud that syncs has files; with its sync off, that is why", () => {
+    expect([hasFiles(account({})), noFilesOf(account({}))]).toEqual([true, null]);
+    expect([hasFiles(account({ syncOff: true })), noFilesOf(account({ syncOff: true }))]).toEqual([
+      false,
+      "syncOff",
+    ]);
+  });
+
+  test("a server that is no Nextcloud keeps none, synced or not", () => {
+    const radicale = {
+      serverUrl: "http://127.0.0.1:5232/",
+      homeUrl: "http://127.0.0.1:5232/astro/",
+    };
+    expect(noFilesOf(account(radicale))).toBe("server");
+    expect(noFilesOf(account({ ...radicale, syncOff: true }))).toBe("server");
+  });
+
+  test("the calendar on this device is on this device; a cause not known is not guessed", () => {
+    expect(noFilesOf(account({ provider: "local", homeUrl: null, username: null }))).toBe("device");
+    // A CalDAV account whose home was never saved, and the demo's: no reason given.
+    expect(noFilesOf(account({ homeUrl: null }))).toBeNull();
+    expect(noFilesOf(account({ provider: "demo" }))).toBeNull();
+  });
+});
+
+test("each account's remembered scheme is its own, kept across syncs, and forgotten when its user changes or it goes (providers D260)", async () => {
+  const { store, secrets, a, add } = await setup();
+  const given: { account: string; remembered: object | undefined }[] = [];
+  const connect: Connect = async (account, _credentials, remembered) => {
+    given.push({ account: account.id, remembered });
+    return a;
+  };
+  const context = { store, secrets, connect };
+  const { account: first } = await add("a.example");
+  const { account: second } = await add("b.example");
+  await syncAll(context);
+  await syncAll(context);
+  const of = (id: string) => given.filter((one) => one.account === id).map((one) => one.remembered);
+  // One slot per account, the same at each sync, never another account's.
+  expect(of(first.id)[0]).toBeDefined();
+  expect(of(first.id)[1]).toBe(of(first.id)[0]);
+  expect(of(second.id)[0]).not.toBe(of(first.id)[0]);
+  // Its user changed: what was learned for the old one is not the new one's.
+  await store.updateAccount(first.id, { username: "someone-else" });
+  await syncAll(context);
+  expect(of(first.id)[2]).not.toBe(of(first.id)[0]);
+  expect(of(first.id)[2]).not.toHaveProperty("scheme");
+  // Not synced (its sync turned off, as a removed account is not): forgotten,
+  // so when it syncs again its slot is a new one; the other's stays.
+  await store.updateAccount(second.id, { syncOff: true });
+  await syncAll(context);
+  await store.updateAccount(second.id, { syncOff: false });
+  await syncAll(context);
+  expect(of(second.id).at(-1)).not.toBe(of(second.id)[0]);
+  expect(of(second.id).at(-1)).toEqual({ by: expect.any(String) });
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
+  // Removed: the same, the other account's slot kept.
+  await removeAccount({ ...context, revokeWaitMs: 0 }, second.id);
+  await syncAll(context);
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
+});
+
+describe("a calendar made on an account's server (providers D275)", () => {
+  /** The server makes what it is asked, and lists it from then on. */
+  const making = (server: MemoryServer, url: string) => {
+    const asked: NewCalendar[] = [];
+    server.makeCalendar = async (calendar) => {
+      asked.push(calendar);
+      const made = {
+        url,
+        name: calendar.name,
+        color: calendar.color,
+        components: [calendar.component],
+        rights: ALL_RIGHTS,
+      };
+      server.calendarList = [...server.calendarList, made];
+      return made;
+    };
+    return asked;
+  };
+
+  test("made there and kept here, as the next sync lists it", async () => {
+    const { store, a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    const asked = making(a, "https://a.example/plans/");
+    const made = await makeCalendar(context, account.id, {
+      name: "Plans",
+      color: "#4f8fd6",
+      component: "VTODO",
+    });
+    expect(asked).toEqual([{ name: "Plans", color: "#4f8fd6", component: "VTODO" }]);
+    expect(made).toMatchObject({
+      accountId: account.id,
+      url: "https://a.example/plans/",
+      name: "Plans",
+      components: ["VTODO"],
+    });
+    await syncAll(context);
+    // One calendar, the one made: the listing names the address it was kept under.
+    expect(
+      (await store.calendars(account.id)).filter((c) => c.name === "Plans").map((c) => c.id),
+    ).toEqual([made.id]);
+  });
+
+  test("a sync that listed the calendars before it was made does not remove it", async () => {
+    const { store, a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    await syncAll(context);
+    making(a, "https://a.example/plans/");
+    // The sync lists, then waits; the calendar is made meanwhile.
+    const listed = gate();
+    const later = gate();
+    const list = a.calendars.bind(a);
+    a.calendars = async () => {
+      const before = await list();
+      listed.open();
+      await later.opened;
+      return before;
+    };
+    const syncing = syncAll(context, { fresh: true });
+    await listed.opened;
+    // Made and kept while the sync holds a listing without it.
+    const calendar = await makeCalendar(context, account.id, {
+      name: "Plans",
+      color: null,
+      component: "VEVENT",
+    });
+    later.open();
+    expect((await syncing).accounts.map((one) => one.status)).toEqual(["synced"]);
+    expect((await store.calendars(account.id)).map((c) => c.id)).toContain(calendar.id);
+  });
+
+  test("none where it cannot be: no server, no credentials, a server that makes none; offline, nothing made", async () => {
+    const { store, secrets, a, context, add } = await setup();
+    const ask = { name: "Plans", color: null, component: "VEVENT" } as const;
+    const local = await store.addAccount({
+      provider: "local",
+      name: "On this device",
+      serverUrl: "local:",
+      username: "",
+    });
+    const refused = (reason: CannotMakeCalendarError["reason"]) =>
+      expect.objectContaining({ name: "CannotMakeCalendarError", reason });
+    await expect(makeCalendar(context, local.id, ask)).rejects.toEqual(refused("no-server"));
+    const account = (await add("a.example")).account;
+    // The memory server makes none until told how.
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("unsupported"));
+    const asked = making(a, "https://a.example/plans/");
+    // A name that is nothing once trimmed is refused before anything is sent.
+    for (const name of ["", "   ", "\u0007\t\u0000"])
+      await expect(makeCalendar(context, account.id, { ...ask, name })).rejects.toEqual(
+        refused("no-name"),
+      );
+    expect(asked).toEqual([]);
+    a.offline = true;
+    const makeOffline = a.makeCalendar!;
+    a.makeCalendar = async (calendar) => {
+      if (a.offline) throw new OfflineError("offline");
+      return makeOffline(calendar);
+    };
+    await expect(makeCalendar(context, account.id, ask)).rejects.toThrow(OfflineError);
+    expect((await store.calendars(account.id)).map((c) => c.name)).not.toContain("Plans");
+    await secrets.delete(`account:${account.id}`);
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("signed-out"));
+  });
+
+  test("the name is sent trimmed, its control characters gone", async () => {
+    const { a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    const asked = making(a, "https://a.example/plans/");
+    const made = await makeCalendar(context, account.id, {
+      name: "  Plans\u0007 2027 ",
+      color: null,
+      component: "VTODO",
+    });
+    expect(asked.map((calendar) => calendar.name)).toEqual(["Plans 2027"]);
+    expect(made.name).toBe("Plans 2027");
+  });
+});
+
+test("connectCalDav hands each account's slot to its provider, which fills it once the server took a scheme (providers D260)", async () => {
+  const { store, secrets } = await setup();
+  const sent: (string | null)[] = [];
+  // A plain-http server elsewhere, Basic only: its first answer teaches the scheme.
+  const http: HttpClient = async (request) => {
+    const header = request.headers["Authorization"] ?? null;
+    sent.push(header?.split(" ")[0] ?? null);
+    const ok = header === `Basic ${btoa("astro:right")}`;
+    return {
+      status: ok ? 207 : 401,
+      url: request.url,
+      header: (name) =>
+        name.toLowerCase() === "www-authenticate" && !ok ? 'Basic realm="r"' : null,
+      body: ok ? '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>' : "",
+    };
+  };
+  const real = connectCalDav(http);
+  const slots: (object | undefined)[] = [];
+  const context = {
+    store,
+    secrets,
+    connect: ((account, credentials, remembered) => {
+      slots.push(remembered);
+      return real(account, credentials, remembered);
+    }) satisfies Connect,
+  };
+  await saveAccount(context, {
+    name: "astro@dav.example",
+    serverUrl: "http://dav.example/",
+    homeUrl: "http://dav.example/calendars/astro/",
+    credentials: { username: "astro", password: "right" },
+  });
+  await syncAll(context);
+  expect(sent).toEqual([null, "Basic"]);
+  expect(slots[0]).toMatchObject({ scheme: "basic", origin: "http://dav.example" });
+  // The next sync answers at once: no request without credentials first.
+  sent.length = 0;
+  await syncAll(context);
+  expect(slots[1]).toBe(slots[0]);
+  expect(sent).toEqual(["Basic"]);
 });

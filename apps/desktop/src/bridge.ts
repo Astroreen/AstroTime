@@ -19,6 +19,14 @@ export const CHANNELS = {
   secretsDelete: "astrotime:secrets-delete",
   /** Opens an http(s) URL in the system browser. */
   openExternal: "astrotime:open-external",
+  /**
+   * An OAuth sign-in's loopback redirect (providers D254): begun (its
+   * redirect URI), its page opened in the system browser and the answer
+   * awaited, or left.
+   */
+  oauthBegin: "astrotime:oauth-begin",
+  oauthOpen: "astrotime:oauth-open",
+  oauthCancel: "astrotime:oauth-cancel",
   /** Asks for a port to the store's process; it comes back on the same channel (D73). */
   store: "astrotime:store",
   /** The page's reminders, the whole set, for the main process to show (D76). */
@@ -83,6 +91,12 @@ export interface Bridge {
     delete(key: string): Promise<void>;
   };
   openExternal(url: string): void;
+  readonly oauth: {
+    begin(): Promise<{ readonly id: string; readonly redirectUri: string }>;
+    /** The redirect's URL once the browser came back; `null` when left. */
+    open(id: string, url: string): Promise<string | null>;
+    cancel(id: string): void;
+  };
   /** The port arrives as a window message from the app's own origin, data `STORE_PORT`. */
   connectStore(): void;
   readonly reminders: {

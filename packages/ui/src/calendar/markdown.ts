@@ -132,9 +132,12 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       const mark = fence[1]!;
       // Closed by a fence of its own character, as long or longer, alone on its line.
       const closing = new RegExp(`^ {0,3}${mark[0]}{${mark.length},}[ \t]*$`);
+      // Each line loses as many of its spaces as the fence is indented, no more.
+      const indent = new RegExp(`^ {0,${fence[0].length - mark.length}}`);
       const body: string[] = [];
       i++;
-      while (i < lines.length && !closing.test(lines[i]!)) body.push(lines[i++]!);
+      while (i < lines.length && !closing.test(lines[i]!))
+        body.push(lines[i++]!.replace(indent, ""));
       i++;
       out.push({ type: "code", text: body.join("\n") });
       continue;
@@ -198,11 +201,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // Its content's column, its marker's indent and width included (as
     // CommonMark's): a line under it belongs to it from this column on.
     // Five spaces or more after the marker start an indented line of the
-    // item: its column is then one past the marker.
+    // item, and an empty item has no content to take the column from: its
+    // column is then one past the marker.
     const marked = indentOf(marker[1]! + marker[2]!.replace(/./g, " ") + "x");
     const spaces = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
-    const indent = spaces >= 5 ? marked + 1 : marked + spaces;
     const body = [lines[i]!.slice(marker[0].length)];
+    const indent = spaces >= 5 || BLANK.test(body[0]!) ? marked + 1 : marked + spaces;
     i++;
     while (i < lines.length) {
       const next = lines[i]!;
@@ -217,7 +221,9 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
         break;
       }
       if (indentOf(next) >= indent) body.push(dropColumns(next, indent));
-      else if (ITEM.test(next) || interrupts(next)) break;
+      // The list's next item ends this one; any other list only where it may
+      // cut a paragraph short ("2019. was a good year" carries it on).
+      else if (sibling(next, ordered) || interrupts(next)) break;
       // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
       else if (body.at(-1)?.trim()) body.push(next);
       else break;
@@ -233,6 +239,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     if (i < lines.length && BLANK.test(lines[i]!) && ITEM.test(lines[i + 1] ?? "")) i++;
   }
   return [{ type: "list", start: ordered ? Number.parseInt(first[2]!, 10) : null, items }, i];
+}
+
+/** Whether a line is an item of the same kind of list: bulleted, or numbered. */
+function sibling(line: string, ordered: boolean): boolean {
+  const marker = ITEM.exec(line);
+  return marker !== null && /\d/.test(marker[2]!) === ordered;
 }
 
 /** The schemes a link may have: the web, mail and the phone. */
@@ -302,7 +314,7 @@ function hiddenIn(text: string): Uint8Array {
     }
     let length = 1;
     while (text[at + length] === "`") length++;
-    const end = unclosed.has(length) ? -1 : text.indexOf("`".repeat(length), at + length);
+    const end = unclosed.has(length) ? -1 : runOf(text, length, at + length);
     if (end < 0) {
       unclosed.add(length);
       at += length;
@@ -320,6 +332,22 @@ function hiddenIn(text: string): Uint8Array {
     }
   }
   return hidden;
+}
+
+/**
+ * Where a run of exactly `length` backticks starts in `text` from `from`, the
+ * one that closes a code span opened by as many; -1 when none does.
+ */
+function runOf(text: string, length: number, from: number): number {
+  const run = "`".repeat(length);
+  let at = text.indexOf(run, from);
+  while (at >= 0) {
+    let end = at + length;
+    while (text[end] === "`") end++;
+    if (end - at === length) return at;
+    at = text.indexOf(run, end);
+  }
+  return -1;
 }
 
 /** The first of `sorted` at or after `from`, by halves. */
@@ -389,7 +417,7 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       let length = 1;
       while (text[i + length] === "`") length++;
       const run = "`".repeat(length);
-      const end = (unclosed.get(length) ?? -1) > i ? -1 : text.indexOf(run, i + length);
+      const end = (unclosed.get(length) ?? -1) > i ? -1 : runOf(text, length, i + length);
       if ((unclosed.get(length) ?? -1) <= i) work.steps += (end > 0 ? end : text.length) - i;
       if (end > 0) {
         push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });
@@ -484,7 +512,7 @@ function emphasisAt(
 /**
  * `[text](href)` at `i`, closed at `close`: the target's parentheses
  * balanced (`…/wiki/Foo_(bar)`), or in angle brackets, then an optional
- * title in quotes.
+ * title in quotes or parentheses.
  */
 function linkAt(
   text: string,
@@ -520,8 +548,10 @@ function linkAt(
     href = text.slice(start, at).replace(/\\([!-/:-@[-`{-~])/g, "$1");
   }
   skip();
-  if (text[at] === '"') {
-    const end = findBefore(text, '"', at + 1, limit);
+  // A title in double or single quotes, or in parentheses.
+  const closer = text[at] === "(" ? ")" : text[at] === '"' || text[at] === "'" ? text[at]! : null;
+  if (closer) {
+    const end = findBefore(text, closer, at + 1, limit);
     if (end < 0) return null;
     at = end + 1;
     skip();

@@ -21,6 +21,17 @@ export function desktopPlatform(bridge: Bridge, store: Promise<Store>): Platform
     secrets: desktopSecrets(bridge.secrets, unprotectedPrompt),
     unprotectedPrompt,
     openExternal: (url) => bridge.openExternal(url),
+    // OAuth's answer comes back to a loopback address of the main process (providers D254).
+    oauth: {
+      async begin() {
+        const { id, redirectUri } = await bridge.oauth.begin();
+        return {
+          redirectUri,
+          open: (url) => bridge.oauth.open(id, url),
+          cancel: () => bridge.oauth.cancel(id),
+        };
+      },
+    },
     preferences: localPreferences,
     reminders: desktopReminders(bridge.reminders),
     shell: (state) => bridge.shell(state),

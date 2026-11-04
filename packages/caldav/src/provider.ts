@@ -6,6 +6,7 @@ import {
   ServerBusyError,
   type CalendarRights,
   type Changes,
+  type NewCalendar,
   type Person,
   type Provider,
   type RemoteCalendar,
@@ -14,6 +15,8 @@ import {
   type WriteResult,
 } from "@astrotime/core";
 
+import { Authorization, type RememberedScheme, type TokenSource } from "./auth.ts";
+import { NoCalendarHomeError, type Credentials, type Discovery } from "./home.ts";
 import {
   AuthError,
   CertificateError,
@@ -36,38 +39,9 @@ import {
   type DavResponse,
 } from "./xml.ts";
 
-export interface Credentials {
-  readonly username: string;
-  /** A password, or a Nextcloud app password (docs/plans/foundation.md#D19). */
-  readonly password: string;
-}
-
-/** Where discovery found an account's calendars. */
-export interface Discovery {
-  readonly principalUrl: string;
-  readonly homeUrl: string;
-}
-
-/** The address answers, but no CalDAV calendar home was found there (RFC 6764). */
-export class NoCalendarHomeError extends Error {
-  override name = "NoCalendarHomeError";
-}
-
 const MULTIGET_BATCH = 100;
 /** Truncated sync-collection answers followed before falling back to a full listing. */
 const MAX_SYNC_PAGES = 50;
-
-/** Where Nextcloud keeps a calendar home: its server's root, and the user's name in the path. */
-export const NEXTCLOUD_HOME = /^(.*)\/remote\.php\/dav\/calendars\/([^/]+)\/?$/;
-
-/** Whether a calendar home's server keeps the user's files beside it (Nextcloud's, foundation D231). */
-export const keepsFiles = (homeUrl: string) => NEXTCLOUD_HOME.test(homeUrl);
-
-/** The `Authorization` header of HTTP Basic for these credentials. */
-export function basic({ username, password }: Credentials): string {
-  const bytes = new TextEncoder().encode(`${username}:${password}`);
-  return `Basic ${btoa(Array.from(bytes, (byte) => String.fromCodePoint(byte)).join(""))}`;
-}
 
 /** `#RRGGBBAA` (Apple, Nextcloud) to `#RRGGBB`; anything else as it is. */
 function color(value: string | null): string | null {
@@ -120,12 +94,18 @@ function collection(url: string): string {
  */
 export class CalDavProvider implements Provider {
   private readonly http: HttpClient;
-  private readonly authorization: string;
+  private readonly authorization: Authorization;
   readonly homeUrl: string;
 
-  constructor(http: HttpClient, credentials: Credentials, homeUrl: string) {
+  /** `schemes`: what earlier syncs learned of how servers authenticate (D260). */
+  constructor(
+    http: HttpClient,
+    credentials: Credentials | TokenSource,
+    homeUrl: string,
+    schemes?: RememberedScheme,
+  ) {
     this.http = http;
-    this.authorization = basic(credentials);
+    this.authorization = new Authorization(credentials, schemes);
     this.homeUrl = collection(homeUrl);
   }
 
@@ -137,9 +117,10 @@ export class CalDavProvider implements Provider {
   static async discover(
     http: HttpClient,
     serverUrl: string,
-    credentials: Credentials,
+    credentials: Credentials | TokenSource,
+    remembered?: RememberedScheme,
   ): Promise<Discovery> {
-    const authorization = basic(credentials);
+    const authorization = new Authorization(credentials, remembered);
     const candidates = [new URL("/.well-known/caldav", serverUrl).href, serverUrl];
     let lastError: unknown;
     for (const candidate of candidates) {
@@ -205,6 +186,15 @@ export class CalDavProvider implements Provider {
         .filter((r) => this.own(r.href, response.url) !== null)
         .map((r) => toCalendar(r, response.url))
     );
+  }
+
+  /**
+   * A new calendar in the home (`MKCALENDAR`, providers D275), its code
+   * loaded when one is made (`make.ts`).
+   */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const { mkcalendar } = await import("./make.ts");
+    return mkcalendar(this.homeUrl, (request, accept) => this.request(request, accept), calendar);
   }
 
   async changes(
@@ -475,16 +465,33 @@ export class CalDavProvider implements Provider {
   }
 }
 
+/**
+ * Sends a request with the account's credentials, as its server asks for
+ * them (Basic, or Digest after a 401 that asks for it: providers D260), and
+ * turns the answers a caller does not `accept` into errors.
+ */
 export async function send(
   http: HttpClient,
-  authorization: string,
+  authorization: Authorization,
   request: HttpRequest,
   accept: readonly number[],
 ): Promise<HttpResponse> {
-  const response = await http({
-    ...request,
-    headers: { ...request.headers, Authorization: authorization },
-  });
+  const signed = async () => {
+    const { header, answered } = await authorization.sign(request);
+    const response = await http({
+      ...request,
+      headers: header === null ? request.headers : { ...request.headers, Authorization: header },
+    });
+    return { response, answered, sent: header };
+  };
+  let { response, answered, sent } = await signed();
+  if (
+    response.status === 401 &&
+    (await authorization.challenged(response, answered, sent, request.url))
+  ) {
+    ({ response, answered } = await signed());
+    await authorization.learned(request.url, response, answered);
+  }
   if (response.status === 401) throw new AuthError(request);
   // Rate limited, or down for a while: the sync stops and waits (D128).
   if ((response.status === 429 || response.status === 503) && !accept.includes(response.status))
@@ -499,7 +506,7 @@ export async function send(
 
 async function propfindOne(
   http: HttpClient,
-  authorization: string,
+  authorization: Authorization,
   url: string,
   props: readonly string[],
 ): Promise<{ url: string; response: DavResponse | undefined }> {
@@ -517,13 +524,21 @@ async function propfindOne(
   return { url: response.url, response: parseMultistatus(response.body).responses[0] };
 }
 
+/** A path's last segment decoded; as written when it is no percent-encoding (a stray `%`). */
+function lastSegment(path: string): string {
+  const segment = path.split("/").findLast(Boolean) ?? "";
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 function toCalendar(response: DavResponse, base: string): RemoteCalendar {
   const components = componentsOf(response.props["supported-calendar-component-set"]);
   return {
     url: collection(canonicalHref(response.href, base)),
-    name:
-      text(response.props["displayname"]) ??
-      decodeURIComponent(new URL(response.href, base).pathname.split("/").findLast(Boolean) ?? ""),
+    name: text(response.props["displayname"]) ?? lastSegment(new URL(response.href, base).pathname),
     color: color(text(response.props["calendar-color"])),
     components,
     rights: rightsOf(response.props["current-user-privilege-set"]),

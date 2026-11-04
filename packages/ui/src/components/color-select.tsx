@@ -1,5 +1,6 @@
 // Choosing a colour (design D168): a dropdown whose entries are a dot of
-// the colour left of its name: "The calendar's colour" first, then the
+// the colour left of its name: "The calendar's colour" (a task's: "The
+// list's colour") first, then the
 // palette, then the user's own colours (D173), and the item's own colour
 // when it is none of them.
 import { colorNameHex } from "@astrotime/core";
@@ -8,6 +9,7 @@ import { useTranslation } from "react-i18next";
 
 import { colorName } from "../calendar/color-names.ts";
 import type { Language } from "../i18n/index.ts";
+import { addTaskStrings } from "../i18n/tasks.ts";
 import { OWN, useSettings } from "../settings.ts";
 import { Select, type SelectOption } from "./select.tsx";
 
@@ -62,6 +64,7 @@ export function ColorSelect({
   onChange,
   calendarColor,
   ownById = false,
+  task = false,
   className,
 }: {
   label: string;
@@ -71,14 +74,21 @@ export function ColorSelect({
   calendarColor: string | null;
   /** Own colours chosen by their id (a default in Settings, D172), not their hex. */
   ownById?: boolean;
+  /** A task's colour: its first entry is its list's colour (design D236). */
+  task?: boolean;
   className?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  addTaskStrings(i18n);
   const { settings } = useSettings();
   const nameOf = useOwnColorName();
   const language = useColorLanguage();
   const options: SelectOption[] = [
-    { value: "", label: t("edit.colorDefault"), leading: <Dot color={calendarColor} /> },
+    {
+      value: "",
+      label: t(task ? "edit.colorList" : "edit.colorDefault"),
+      leading: <Dot color={calendarColor} />,
+    },
     ...PALETTE.map((color) => ({
       value: color,
       label: t(`color.${color}`),

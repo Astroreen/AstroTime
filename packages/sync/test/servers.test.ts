@@ -1,14 +1,15 @@
 // The sync engine and the CalDAV provider against real servers: Radicale on
 // every run, Nextcloud in CI's nightly job (docs/plans/foundation.md#pr-4--caldav-provider).
 import {
-  CalDavProvider,
   fetchClient,
+  keepsFiles,
   proxyHandler,
   revokeAppPassword,
-  startLoginFlow,
   throughProxy,
   type HttpClient,
 } from "@astrotime/caldav";
+import { CalDavProvider } from "@astrotime/caldav/provider";
+import { startLoginFlow } from "@astrotime/caldav/login-flow";
 import {
   AuthError,
   CalendarObject,
@@ -25,6 +26,7 @@ import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { syncAccount } from "../src/index.ts";
+import { interopServer } from "./interop/servers.ts";
 import { externalServer, startRadicale, type CalDavServer, type Credentials } from "./servers.ts";
 
 const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
@@ -32,6 +34,9 @@ const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
 ];
 const nextcloud = externalServer("nextcloud");
 if (nextcloud) servers.push({ name: "Nextcloud", start: async () => nextcloud });
+// The interop run's server, when it names one (docs/plans/providers.md#D248).
+const interop = interopServer();
+if (interop) servers.push({ name: interop.name, start: async () => interop });
 
 const event = (uid: string, fields: Record<string, string> = {}) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTAMP:20261101T080000Z\r\nDTSTART:20261102T090000Z\r\nDTEND:20261102T100000Z\r\n${Object.entries(
@@ -117,6 +122,40 @@ describe.each(servers)(
         components: ["VTODO"],
         rights: { create: true, edit: true, delete: true },
       });
+      // The home discovery ends at says whether the server keeps files
+      // (foundation D231, design D237): Nextcloud's does, Radicale's not.
+      expect(keepsFiles(a.provider.homeUrl)).toBe(serverName === "Nextcloud");
+    });
+
+    test("a calendar and a task list made here are on the server, listed where they were kept, with their names, colour and kind (providers D275)", async () => {
+      const a = await device(server, calendarName());
+      const name = calendarName();
+      const asked = [
+        { name: `${name} Работа & co`, color: "#4f8fd6", component: "VEVENT" },
+        { name: `${name} list`, color: null, component: "VTODO" },
+      ] as const;
+      const made = [];
+      try {
+        for (const calendar of asked) made.push(await a.provider.makeCalendar(calendar));
+        const listed = await a.provider.calendars();
+        for (const [i, calendar] of made.entries()) {
+          const found = listed.find((one) => one.url === calendar.url);
+          expect(found, calendar.url).toBeDefined();
+          // DAViCal keeps `&` and `<` as the XML spelled them (`&amp;`), whatever
+          // sets the name (MKCALENDAR, PROPPATCH): its own, said in D275.
+          expect(found!.name).toBe(
+            serverName === "DAViCal" ? asked[i]!.name.replace("&", "&amp;") : asked[i]!.name,
+          );
+          expect(found!.components).toContain(asked[i]!.component);
+          expect(found!.rights).toEqual({ create: true, edit: true, delete: true });
+        }
+        // A server that keeps Apple's colour keeps the one asked.
+        const [events] = made;
+        const colour = listed.find((one) => one.url === events!.url)!.color;
+        if (colour !== null) expect(colour.toLowerCase()).toBe("#4f8fd6");
+      } finally {
+        for (const calendar of made) await server.deleteCalendar(calendar.url);
+      }
     });
 
     // Nextcloud only: the tests know its sharing; Radicale's rights are a config file (fixtures cover them).

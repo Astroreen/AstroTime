@@ -3,7 +3,7 @@ import ICAL from "ical.js";
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
-import { fromIcalTime, keepTzid, wallClockOf, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, sameOrigin, wallClockOf, type ItemTime } from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
 export interface Occurrence {
@@ -49,7 +49,7 @@ export class ExpansionLimitError extends Error {
 function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
   const span = rawAnchors(component);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
-  if (span && span.end.compare(span.start) < 0) return { start: span.start, end: span.start };
+  if (span && signedLength(span).isNegative) return { start: span.start, end: span.start };
   return span;
 }
 
@@ -81,10 +81,21 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
 }
 
 /** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
-export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  const length = start.zone === end.zone ? end.subtractDate(start) : end.subtractDateTz(start);
+export function lengthOf(span: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
+  const length = signedLength(span);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
   return length.isNegative ? new ICAL.Duration({}) : length;
+}
+
+function signedLength({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
+  if (start.zone === end.zone && sameOrigin(start, end)) return end.subtractDate(start);
+  // Two zones the object does not define are both a wall clock to ical.js (a
+  // flight from Berlin to New York): their instants tell the length.
+  const from = fromIcalTime(start);
+  const to = fromIcalTime(end);
+  if (from.type === "zoned" && to.type === "zoned")
+    return ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000));
+  return end.subtractDateTz(start);
 }
 
 function bounds(range: Range) {

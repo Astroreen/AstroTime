@@ -76,14 +76,22 @@ export class CalendarObject {
 
   /** The iCalendar text, with CRLF line endings as RFC 5545 requires. */
   serialize(): string {
-    // `foldLength` is ical.js's global; it is set only while this object is written.
-    const previous = ICAL.foldLength;
-    ICAL.foldLength = FOLD_LENGTH;
-    try {
-      return `${this.root.toString()}\r\n`;
-    } finally {
-      ICAL.foldLength = previous;
-    }
+    return writeCalendar(this.root);
+  }
+}
+
+/**
+ * @internal A `VCALENDAR` as text, CRLF-ended and folded at 75 octets
+ * (RFC 5545 §3.1); the same component always gives the same text.
+ */
+export function writeCalendar(root: ICAL.Component): string {
+  // `foldLength` is ical.js's global; it is set only while this object is written.
+  const previous = ICAL.foldLength;
+  ICAL.foldLength = FOLD_LENGTH;
+  try {
+    return `${root.toString()}\r\n`;
+  } finally {
+    ICAL.foldLength = previous;
   }
 }
 

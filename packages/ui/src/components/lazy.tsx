@@ -18,7 +18,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 
 /** What every deferred dialog takes: whether it is open is read from the rest. */
 interface Closable {
@@ -231,4 +231,12 @@ export const ItemDetails = deferred(
   () => import("./item-details.tsx"),
   (module) => module.ItemDetails,
   (props: ComponentProps<typeof import("./item-details.tsx").ItemDetails>) => props.target !== null,
+);
+
+/** The add-account dialog (docs/plans/providers.md#D255): its forms load with its first opening. */
+export const SignInDialog = deferred(
+  () => import("./sign-in-dialog.tsx"),
+  (module) => module.SignInDialog,
+  (props: ComponentProps<typeof import("./sign-in-dialog.tsx").SignInDialog>) =>
+    props.request !== null,
 );

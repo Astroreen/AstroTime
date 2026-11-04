@@ -2,7 +2,7 @@
 // (docs/plans/foundation.md#D91, D92): the scheduler of the UI's syncs, its
 // status, the conflicts count, and the sign-in and removal dialogs.
 import type { Account, Store } from "@astrotime/storage";
-import { connectCalDav, removeAccount, syncAll, type SyncContext } from "@astrotime/sync";
+import { connectCalDav, removeAccount, syncAll, syncs, type SyncContext } from "@astrotime/sync";
 import {
   createContext,
   useContext,
@@ -20,7 +20,8 @@ import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
 import { KEYS } from "../preferences.ts";
 import { RemoveAccountDialog } from "./remove-account.tsx";
-import { SignInDialog, type SignInRequest } from "./sign-in-dialog.tsx";
+import { SignInDialog } from "./lazy.tsx";
+import type { SignInRequest } from "./sign-in-dialog.tsx";
 
 export interface AccountsValue {
   readonly platform: Platform;
@@ -73,6 +74,7 @@ export function AccountsProvider({
     store,
     secrets: platform.secrets,
     connect: connectCalDav(platform.http),
+    http: platform.http,
     ...(platform.syncLock ? { lock: platform.syncLock } : {}),
   }));
   const [scheduler] = useState(
@@ -266,7 +268,7 @@ export function AccountsProvider({
       whileShown(store),
       async () => {
         const accounts = await store.accounts();
-        if (accounts.some((account) => account.provider === "caldav")) return true;
+        if (accounts.some(syncs)) return true;
         const local = new Set(
           accounts.filter((account) => account.provider === "local").map((account) => account.id),
         );

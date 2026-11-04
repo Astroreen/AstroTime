@@ -272,8 +272,8 @@ the project.
   - a list's tasks can be completed or starred only where it allows edits,
     and "Add a task" shows only where it takes new items
     ([foundation D37](foundation.md#D37));
-  - "+ New list" and the card's menu are drawn but disabled until lists can
-    be made and changed ([Deferred](#deferred)); the "+" button is the
+  - "+ New list" makes a list ([D276](#D276)); the card's menu is drawn
+    but disabled until lists can be changed ([Deferred](#deferred)); the "+" button is the
     calendar's, disabled until PR 6 (_since PR 6a_ it makes a task in the
     list shown, [D109](#D109));
   - on a phone the screen covers the calendar, with a back arrow; from
@@ -939,7 +939,8 @@ an event or a task." What is written and which services are asked:
   OpenStreetMap's tiles 144 px high across the card, the place in its
   middle under a pin, "© OpenStreetMap" in its corner linking to the
   copyright page; the tiles load as the card shows (`loading="lazy"`), and
-  one that does not come leaves the map's ground. Two actions under it:
+  one that does not come leaves the map's ground. Two actions (since [D238](#D238),
+  icons at the end of the address's line):
   - **Open in maps**: OpenStreetMap's page with a marker on the place
     (`openstreetmap.org/?mlat=…&mlon=…#map=17/…`); on Android a `geo:` URI
     with the point and its text (its parentheses escaped, as the label sits
@@ -1850,9 +1851,12 @@ reminders, its description and mentions in it.
     before it (`https://example.com/a_`).
   - **As CommonMark where text is plain:** only a bullet or a list from 1
     cuts a paragraph short, so a wrapped line "2019. was a good year" stays
-    words; a backtick fence has no backtick after it on its line ("Run
-    `npm i` now" is inline code) and closes only on a fence of its own
-    character, as long or longer; a tab indents to the next stop of 4
+    words, in a list item too (only its own list's next item ends it); a
+    code span closes on a run of as many backticks (`` `a``b` `` is one); a
+    link's title may be in double or single quotes or in parentheses; a
+    backtick fence has no backtick after it on its line ("Run `npm i` now"
+    is inline code) and closes only on a fence of its own character, as
+    long or longer; a tab indents to the next stop of 4
     (and stays a tab inside code); a written link's target keeps balanced
     parentheses (`…/wiki/Foo_(bar)`); a code span wins over emphasis, and
     no mark closes inside a bare link; a lone `#` is text; an empty item
@@ -2239,7 +2243,8 @@ own (below).
   house it has no name for; or a street's word, "Baker Street", "ул.
   Ленина") is not looked up, nor one with no name at all: a home or an
   office sends nothing, only a named place (a museum, a restaurant, a
-  park) goes out (`isAddress`). A name's short words count too ("Ox
+  park) goes out (`isAddress`). A first "St" is a saint's ("St Paul's
+  Cathedral"), after a name a street's. A name's short words count too ("Ox
   Bar"); a name with nothing left to search for asks nothing and notes
   nothing.
   **When**: a card asks once it nears the screen (an intersection with the
@@ -2327,8 +2332,149 @@ own (below).
   - **For one item**, a picture of its own: [Deferred](#deferred); it
     would need the item to carry it to other devices and clients.
 
+### Decided in round 5: Android and the dialogs
+
+- **D235. Every dialog clear of a phone's system bars** (the owner's 1
+  and 2, round 5: on the owner's phone the details' and the edit dialog's bars
+  sat under the status bar). A WebView of Chromium 140 or newer draws the
+  page under the bars (android [D68](android.md#D68)); the shell, drawer
+  and tasks screen kept clear of them, the dialogs did not. Now the
+  dialogs stand in CSS, `styles.css`'s `.sheet` and `.centred` (named by
+  `dialog-parts.tsx`'s `sheet` and by each centred popup), so a new one
+  inherits it:
+  - a **sheet** (the details, the edit dialog, Settings, the Conflicts
+    list, the file picker) covers the whole phone screen, the system
+    bars' room padded on all four sides (portrait and landscape), its own
+    colour under the status bar; the details' picture header starts below
+    it. On a wide screen it is a card centred in the room the bars leave,
+    no taller or wider than that room;
+  - a **centred dialog** (signing in, the colour and picture dialogs, the
+    alerts) is centred in the same room, no wider than it, and scrolls
+    when taller;
+  - the edit dialog beside its draft (D155, D187) keeps its outer margin
+    from the bar on its side, narrower by it, and stands aside only where
+    the room past the bar holds a phone's width; the notices at the foot
+    (copied, a change failed) sit above the gesture bar.
+    `apps/web/e2e/insets.spec.ts` emulates the insets SystemBars injects
+    (a phone upright; on its side, with a cutout at the left and the
+    navigation bar at the right, wide enough for the card and too narrow
+    for it), and `packages/ui/test/draft.test.ts` the dialog beside its
+    draft.
+    The picture drawn under a transparent status bar, as Google Calendar
+    does: [Deferred](#deferred) (the status bar's icons would then need
+    the picture's lightness, not the theme's).
+- **D236. A task's list is a list** (the owner's 4, round 5: creating a
+  task, its colour field offered "The calendar's colour"). Where the edit
+  dialog speaks of a task's list, it says list, as its List field already
+  did: the colour's first entry is "The list's colour" («Цвет списка»),
+  in the edit dialog and for Settings' "Colour of new tasks"; for a task
+  the edit dialog's problems that name the calendar (none here holds it,
+  it no longer takes it, it takes no new ones to split a series) name
+  the list (`problemKey`, `packages/ui/test/task-words.test.ts`). The
+  notices any item can get say neither: "This is no longer here", "Look
+  again". An event keeps the calendar's words. The details already name
+  a task's list "List".
+- **D237. The three ways to attach, all in sight** (the owner's 3, round
+  5: "the add-file button only lets me type a link"). The edit dialog's
+  attachments show "Add a link", "From your files" (D234) and "From this
+  device" (foundation [D232](foundation.md#D232)) together. "Add a link"
+  opens its field above them and becomes "Cancel"; the other two stay one
+  tap away. Where the item's calendar has no files, the two file ways are
+  there but turned off, with the reason beneath them (their accessible
+  description too): the calendar or list is on this device; its server
+  keeps none (Radicale, any CalDAV server that is not Nextcloud); or its
+  Nextcloud account's sync is off. A calendar of the demo shows neither.
+  A task's reason names its list (D236). The reasons load with the
+  attachments (`i18n/files.ts`, beside `pictures.ts` through `later.ts`),
+  not with the app (foundation [D145](foundation.md#D145)). A Nextcloud is
+  known by the calendar home discovery ends at, whatever address Login
+  Flow v2 or the user gave (`packages/caldav/test/nextcloud-home.test.ts`:
+  a trailing slash, `index.php`, an app's page, `remote.php/dav`, an
+  install under a path, `/.well-known/caldav` redirected; and the real
+  servers' homes in `packages/sync/test/servers.test.ts`). A CalDAV
+  account whose home is not saved gets no reason: its cause is not known
+  (`noFilesOf`, `@astrotime/sync/files`). The owner's case, and attaching a
+  file inline where there are no files: [Deferred](#deferred).
+- **D238. The place's line, two icons at its end** (the owner's 5, round
+  5: "'Open on map' and 'Copy address' I would make plain icons on the
+  same line as the address, two icons at the end of the line. Tapping
+  the map does the same as 'Open on map', tapping the address text does
+  the same as 'Copy address'"). The
+  details' place (D177) puts "Open in maps" and "Copy address" as icon
+  buttons at the end of its first line, 48 px each (Material's 48 dp
+  touch target), each with its tooltip; the place's first line and its
+  row's pin sit level with the icons' middle, by one value
+  (`PLACE_LINE`). Copied, the copy icon
+  turns to a tick for two seconds and a status says "Copied" once (the
+  button keeps its name); a copy again while it shows says it again.
+  A tap on the map opens it in maps, as the icon does (on Android the
+  same `geo:` intent, which the emulator's maps app took); a single tap
+  or click on the address copies it once 300 ms pass with no second
+  click and none of the address selected (text selected elsewhere, in
+  the description, stops nothing), while a long press, a drag, a double or a
+  triple click selects its text as any text, and copies nothing. The map's tap
+  target lies over it out of the keyboard's order and the accessibility
+  tree, and the address is text: the icon buttons are the actions for
+  keys and screen readers. OpenStreetMap's credit stays a link of its
+  own over the map. The details' picture (D216, D221) is untouched.
+
+### Decided in round 5: lists made here
+
+- **D276. "+ New list".** The tasks screen's "+ New list" opens a dialog
+  (`new-list-dialog.tsx`, loaded with its first opening, its strings in
+  `i18n/new-list.ts`) with the list's name and, when there is more than one
+  place, "Where": each account a list can be made on (a CalDAV account's,
+  [providers D275](providers.md#D275)) and "On this device"; the account of
+  the list shown is offered first, else the first such account. "Create" is
+  off until the name holds more than spaces. On a server the list is made at
+  once, through `makeCalendar` (a calendar of `VTODO`, as Nextcloud Tasks
+  makes one); on this device it joins the device's account (made if there is
+  none, as an import's new calendar is). The dialog closes and the list made
+  is the one shown. One that cannot be made keeps the dialog open and says
+  why, naming the account: it cannot be reached, its server makes no lists,
+  it did not allow it, it is busy, sign in to it again, it answered with an
+  error (its status), or an error; never an error's own English. Closed
+  while a list is being made, the dialog keeps it: opened again it says it
+  is still being made, with "Create" off (no second list), and the list is
+  shown once made. The accounts are read live while it is open, as the
+  import's are; a failure said goes once the name or the place changes. When
+  the accounts cannot be read (or what makes a list on a server did not
+  load), it says so and offers this device alone, made by the store without
+  that code, through the one path a list on this device takes
+  (`makeDeviceCalendar`, its name as `calendarNameOf` sends it). `DEVICE`
+  and the reasons are `calendar/place.ts`, which loads with the dialog
+  without `make.ts`. On a phone the tasks screen is a dialog itself, so this
+  one draws its own backdrop. Proven on Radicale (one `MKCALENDAR`, the
+  server naming it as typed) and on a phone in Russian with no account
+  (`apps/web/e2e/new-list.spec.ts`). **Its weight on the first load is 0.24
+  KiB, past [foundation D145](foundation.md#D145)'s 0.1 a change**, accepted
+  by the orchestrator, to whom the owner gave the size calls of round 5; the
+  budget's line (130 KiB) is not raised: the button and its dialog's loader
+  on the tasks screen (0.03 KiB for the button, 0.15 for the dialog's chunk
+  and what it preloads, named in the first load's list of chunks), and 0.05
+  in the shared part for the chunk that makes a calendar
+  (`@astrotime/core/new-calendar`, shared by CalDAV's `make.ts` and the
+  dialogs). The dialog loads what makes a list (`calendar/make.ts`) when it
+  opens, so that chunk is not named in the first load too. Grouping these
+  chunks into one through the build's chunk groups pulled the app's own code
+  into it (+15 KiB), so it was not done.
+
 ## Deferred
 
+- **`1.` and `1)` as one list** ([D207](#D207)) — the Markdown parser
+  tells a numbered list from a bulleted one, not one delimiter from the
+  other, so `1. a` then `2) b` is one list where CommonMark makes two.
+- **The details' picture under the status bar** ([D235](#D235)), edge to
+  edge as Google Calendar draws it: the bars' icons would follow the
+  picture's lightness rather than the theme.
+- **Why the owner's phone showed only "Add a link"** ([D237](#D237)):
+  not reproduced: on the emulator, the test user on the same server
+  with the same APK, signed in through CalDAV and through Login Flow v2,
+  had both file ways. The three ways are now in sight with a reason when
+  off, which shows the cause the next time it happens.
+- **A file attached inline where the calendar has no files** ([D237](#D237)):
+  `ATTACH;VALUE=BINARY` (core's `inlineFile`) for the calendar on this
+  device and servers without files; the reason shows instead for now.
 - **The React Compiler's other bail-outs** ([D194](#D194)), known when
   its check came, each in its owner's area: `accounts-context.tsx` (a
   `try` with `finally`, a counter changed in a callback),
@@ -2498,9 +2644,9 @@ own (below).
 - **A full-text index for search** — `LIKE` over the folded titles reads
   every row of the visible calendars; SQLite's FTS5 (on both drivers) when
   a store grows past what that answers at once ([D97](#D97)).
-- **Making, renaming and deleting task lists** — "+ New list" and the
-  card's menu are disabled: a list is a calendar on the server, made with
-  `MKCALENDAR` through the provider and the sync engine ([D95](#D95)).
+- **Renaming and deleting task lists** — the card's menu is disabled: a
+  list's name and its removal are the server's (`PROPPATCH`, `DELETE`
+  through the provider); "+ New list" makes one ([D276](#D276)).
 - **Advancing a series instead of an exception per occurrence** —
   completing a repeating task writes one exception per occurrence
   ([D94](#D94)); Tasks.org moves the series' start instead, which keeps
