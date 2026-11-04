@@ -545,9 +545,10 @@ describe("the repeat rule", () => {
       );
     // The second last Monday: no nth the picker names (1–5, or the last).
     expect(monthly("BYDAY=-2MO")).toMatchObject({ exact: false, repeat: { monthlyWeekday: null } });
-    // The fourth Monday, only when it is the 22nd to the 24th: some months have none.
-    // Read as close as it goes, the fourth Monday: inexact, the edit dialog
-    // keeps it as written ("kept") and the details say it is another app's.
+    // The fourth Monday only when it is the 22nd to the 24th (some months
+    // have none) is read as close as it goes, the fourth Monday, and marked
+    // inexact: the edit dialog keeps it as written ("kept"), and the details
+    // say it is another app's.
     expect(monthly("BYDAY=4MO;BYMONTHDAY=22,23,24")).toMatchObject({
       exact: false,
       repeat: { monthlyWeekday: { nth: 4, weekday: "MO" } },

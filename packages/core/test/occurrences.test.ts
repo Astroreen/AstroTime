@@ -402,6 +402,73 @@ describe("bounds (for the local store's date index)", () => {
     }
   });
 
+  test("an RDATE of every kind before DTSTART starts the bounds (D36)", () => {
+    const SLACK = 14 * 3_600_000;
+    const bounded = (zones: string[], start: string, end: string, rdate: string) =>
+      boundsOf(
+        CalendarObject.parse(
+          [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//test//EN",
+            ...zones,
+            "BEGIN:VEVENT",
+            "UID:kinds",
+            "DTSTAMP:20261001T000000Z",
+            start,
+            end,
+            rdate,
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+          ].join("\r\n"),
+        ),
+      );
+    // A wall clock with no zone, and a date: widened by the furthest zones.
+    expect(
+      bounded([], "DTSTART:20261110T090000", "DTEND:20261110T100000", "RDATE:20261103T090000"),
+    ).toEqual({
+      startMs: Date.parse("2026-11-03T09:00:00Z") - SLACK,
+      endMs: Date.parse("2026-11-10T10:00:00Z") + SLACK,
+    });
+    expect(
+      bounded(
+        [],
+        "DTSTART;VALUE=DATE:20261110",
+        "DTEND;VALUE=DATE:20261111",
+        "RDATE;VALUE=DATE:20261103",
+      ),
+    ).toEqual({
+      startMs: Date.parse("2026-11-03T00:00:00Z") - SLACK,
+      endMs: Date.parse("2026-11-11T00:00:00Z") + SLACK,
+    });
+    // In a zone, defined or not (Google's way): 11:00 in Vilnius is 09:00Z.
+    for (const zones of [[], zoneFor("Europe/Vilnius")]) {
+      const start = "DTSTART;TZID=Europe/Vilnius:20261110T110000";
+      const end = "DTEND;TZID=Europe/Vilnius:20261110T120000";
+      const label = zones.length > 0 ? "defined" : "undefined";
+      expect(
+        bounded(zones, start, end, "RDATE;TZID=Europe/Vilnius:20261103T110000"),
+        label,
+      ).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-10T10:00:00Z"),
+      });
+      expect(
+        bounded(
+          zones,
+          start,
+          end,
+          "RDATE;VALUE=PERIOD;TZID=Europe/Vilnius:20261103T110000/20261120T110000",
+        ),
+        `${label} period`,
+      ).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-20T09:00:00Z"),
+      });
+    }
+  });
+
   test("an unending series is open; an undated task has no bounds", () => {
     expect(boundsOf(load("tasksorg-task-recurring.ics")).endMs).toBeNull();
     expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
@@ -549,7 +616,7 @@ describe("RFC 5545's corners", () => {
       ].join("\r\n"),
     );
 
-  test("a series between two zones that share an offset in its first occurrence only lasts as long as its first (D32)", () => {
+  test("a series between two zones that share an offset only in its first occurrence keeps that length (D32)", () => {
     // London and Lagos are both UTC+1 in summer, an hour apart in winter:
     // 10:00 in London to 12:00 in Lagos is two hours in June, and every week after.
     for (const zones of [[], zoneFor("Europe/London"), zoneFor("Africa/Lagos")]) {
