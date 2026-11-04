@@ -7,7 +7,7 @@ import { AuthError, type SecretStore } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { syncAccount, syncAll } from "../src/index.ts";
-import { addSubscription, applyHeld } from "../src/subscriptions.ts";
+import { addSubscription, applyHeld, settle } from "../src/subscriptions.ts";
 import { expect, test } from "vite-plus/test";
 
 import {
@@ -394,4 +394,38 @@ test("whatever a provider throws, undefined too, stays that calendar's problem (
   // The other calendar synced: its token is kept.
   const [, b] = await store.calendars(account.id);
   expect(b?.syncToken).toBe("t");
+});
+
+test("a removal applied while a sync runs is not cleared by that sync's end", async () => {
+  const files = server(file(event("a", "Planning")));
+  const store = await Store.open(nodeDriver());
+  const secrets = memorySecrets();
+  const { account } = (await addSubscription({ store, secrets, http: files.http }, ADDRESS))!;
+  const key = [...secrets.values.keys()][0]!;
+  // This sync used version "v-old"; meanwhile the user applied "v-new".
+  secrets.values.set(key, JSON.stringify({ subscription: ADDRESS, apply: "v-new" }));
+  const provider = new IcsProvider(files.http, { url: ADDRESS, apply: "v-old" }, "ics:x", null);
+  await settle({ secrets }, account.id, provider);
+  expect(JSON.parse(secrets.values.get(key)!)).toEqual({ subscription: ADDRESS, apply: "v-new" });
+  // The version it used, still there, is cleared.
+  secrets.values.set(key, JSON.stringify({ subscription: ADDRESS, apply: "v-old" }));
+  await settle({ secrets }, account.id, provider);
+  expect(JSON.parse(secrets.values.get(key)!)).toEqual({ subscription: ADDRESS, apply: null });
+});
+
+test("what is held is counted among the items the calendar shows: journals the file holds do not dilute it", async () => {
+  const events = Array.from({ length: 20 }, (_, i) => event(`e${i}`, `Event ${i}`));
+  const journals = Array.from(
+    { length: 30 },
+    (_, i) =>
+      `BEGIN:VJOURNAL\r\nUID:j${i}\r\nDTSTAMP:20261101T080000Z\r\nDTSTART:20261110\r\nSUMMARY:Note ${i}\r\nEND:VJOURNAL\r\n`,
+  );
+  const feed = await subscribed(file(...events, ...journals));
+  await feed.sync();
+  expect(await feed.summaries()).toHaveLength(20);
+  // Eleven of the twenty events go, the thirty journals stay: more than half
+  // of what the calendar shows, held.
+  feed.files.serve(file(...events.slice(0, 9), ...journals));
+  expect((await feed.sync()).errors[0]?.problem).toBe("held-removal");
+  expect(await feed.summaries()).toHaveLength(20);
 });
