@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type ICAL from "ical.js";
 
-import { CalendarObject } from "../src/index.ts";
+import { CalendarObject, occurrencesBetween } from "../src/index.ts";
 import { fromIcalTime, wallClockIn, zonedToEpoch, zoneOrigin } from "../src/time.ts";
 import { WINDOWS_ZONES } from "../src/windows-zones.ts";
 
@@ -28,6 +28,28 @@ describe("zoned wall clocks (RFC 5545 §3.3.5)", () => {
     expect(zonedToEpoch("2026-10-25T03:30:00", "Europe/Vilnius")).toBe(
       Date.parse("2026-10-25T00:30:00Z"),
     );
+  });
+
+  test("a year before 1000 keeps its four digits, so wall clocks still compare (D33)", () => {
+    expect(wallClockIn(Date.parse("0999-06-01T12:00:00Z"), "UTC")).toBe("0999-06-01T12:00:00");
+    expect(zonedToEpoch("0999-06-01T12:00:00", "UTC")).toBe(Date.parse("0999-06-01T12:00:00Z"));
+    const object = CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//test//EN",
+        "BEGIN:VEVENT",
+        "UID:old",
+        "DTSTAMP:20261001T000000Z",
+        "DTSTART:09990601T120000Z",
+        "DTEND:09990601T130000Z",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+    const range = { from: "0999-06-01", to: "0999-06-02", timeZone: "Europe/Vilnius" };
+    expect(occurrencesBetween(object, range)).toHaveLength(1);
   });
 });
 
