@@ -2422,41 +2422,42 @@ own (below).
 
 - **D276. "+ New list".** The tasks screen's "+ New list" opens a dialog
   (`new-list-dialog.tsx`, loaded with its first opening, its strings in
-  `i18n/new-list.ts`) with the list's name and, when there is more than
-  one place, "Where": each account a list can be made on (a CalDAV
-  account's, [providers D275](providers.md#D275)) and "On this device";
-  the account of the list shown is offered first, else the first such
-  account. "Create" is off until the name holds more than spaces. On a
-  server the list is made at once, through `makeCalendar` (a calendar of
-  `VTODO`, as Nextcloud Tasks makes one); on this device it joins the
-  device's account (made if there is none, as an import's new calendar
-  is). The dialog closes and the list made is the one shown. One that
-  cannot be made keeps the dialog open and says why, naming the account:
-  it cannot be reached, its server makes no lists, it did not allow it,
-  it is busy, sign in to it again, it answered with an error (its
-  status), or an error; never an error's own English. Closed while a list is
-  being made, the dialog keeps it: opened again it says it is still being
-  made, with "Create" off (no second list), and the list is shown once
-  made. When the accounts cannot be read (or what makes a list on a
-  server did not load), it says so and offers this device alone, made by
-  the store without that code, through the one path a list on this device
-  takes (`makeDeviceCalendar`, its name as `calendarNameOf` sends it). `DEVICE` and the reasons are
-  `calendar/place.ts`, which loads with the dialog without `make.ts`. On a phone the tasks screen is a
-  dialog itself, so this one draws its own backdrop. Proven on Radicale
-  (one `MKCALENDAR`, the server naming it as typed) and on a phone in
-  Russian with no account (`apps/web/e2e/new-list.spec.ts`). **Its weight
-  on the first load is 0.24 KiB, past [foundation D145](foundation.md#D145)'s
-  0.1 a change**, accepted by the orchestrator, to whom the owner gave the
-  size calls of round 5; the budget's line (130 KiB) is not raised: the
-  button and its dialog's loader on the tasks screen (0.03 KiB for the
-  button, 0.15 for the dialog's chunk and what it preloads, named in the
-  first load's list of chunks), and 0.05 in the shared part for the chunk
-  that makes a calendar (`@astrotime/core/new-calendar`, shared by
-  CalDAV's `make.ts` and the dialogs). The dialog loads what makes a list
-  (`calendar/make.ts`) when it opens, so that chunk is not named in the
-  first load too. Grouping these chunks into one through the build's
-  chunk groups pulled the app's own code into it (+15 KiB), so it was
-  not done.
+  `i18n/new-list.ts`) with the list's name and, when there is more than one
+  place, "Where": each account a list can be made on (a CalDAV account's,
+  [providers D275](providers.md#D275)) and "On this device"; the account of
+  the list shown is offered first, else the first such account. "Create" is
+  off until the name holds more than spaces. On a server the list is made at
+  once, through `makeCalendar` (a calendar of `VTODO`, as Nextcloud Tasks
+  makes one); on this device it joins the device's account (made if there is
+  none, as an import's new calendar is). The dialog closes and the list made
+  is the one shown. One that cannot be made keeps the dialog open and says
+  why, naming the account: it cannot be reached, its server makes no lists,
+  it did not allow it, it is busy, sign in to it again, it answered with an
+  error (its status), or an error; never an error's own English. Closed
+  while a list is being made, the dialog keeps it: opened again it says it
+  is still being made, with "Create" off (no second list), and the list is
+  shown once made. The accounts are read live while it is open, as the
+  import's are; a failure said goes once the name or the place changes. When
+  the accounts cannot be read (or what makes a list on a server did not
+  load), it says so and offers this device alone, made by the store without
+  that code, through the one path a list on this device takes
+  (`makeDeviceCalendar`, its name as `calendarNameOf` sends it). `DEVICE`
+  and the reasons are `calendar/place.ts`, which loads with the dialog
+  without `make.ts`. On a phone the tasks screen is a dialog itself, so this
+  one draws its own backdrop. Proven on Radicale (one `MKCALENDAR`, the
+  server naming it as typed) and on a phone in Russian with no account
+  (`apps/web/e2e/new-list.spec.ts`). **Its weight on the first load is 0.24
+  KiB, past [foundation D145](foundation.md#D145)'s 0.1 a change**, accepted
+  by the orchestrator, to whom the owner gave the size calls of round 5; the
+  budget's line (130 KiB) is not raised: the button and its dialog's loader
+  on the tasks screen (0.03 KiB for the button, 0.15 for the dialog's chunk
+  and what it preloads, named in the first load's list of chunks), and 0.05
+  in the shared part for the chunk that makes a calendar
+  (`@astrotime/core/new-calendar`, shared by CalDAV's `make.ts` and the
+  dialogs). The dialog loads what makes a list (`calendar/make.ts`) when it
+  opens, so that chunk is not named in the first load too. Grouping these
+  chunks into one through the build's chunk groups pulled the app's own code
+  into it (+15 KiB), so it was not done.
 
 ## Deferred
 

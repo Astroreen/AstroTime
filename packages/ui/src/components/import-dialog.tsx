@@ -184,7 +184,10 @@ export function ImportDialog({
       },
       (error: unknown) => {
         setChecking(false);
-        setStep({ name: "failed", message: t("import.failed", { message: String(error) }) });
+        setStep({
+          name: "failed",
+          message: failureWords(t, i18n.resolvedLanguage ?? i18n.language, error, nameOf),
+        });
       },
     );
   };

@@ -236,7 +236,12 @@ not carry is said, not dropped in silence.
   cause), and in what came of an import that ended on a write's error or
   was stopped (`Imported.onServer`), each "“Team” on <account>", joined
   as the language joins a list (`Intl.ListFormat`). A calendar made on
-  this device for the same run goes again as before. A new calendar
+  this device for the same run goes again as before. A source named with
+  spaces alone (or not at all) takes its file's name, which a new
+  calendar for it is named by. A stopped import says why in the
+  catalog's words (cannot be reached, busy, sign in again, refused, an
+  error), never an error's
+  own English. A new calendar
   chosen on an account removed meanwhile goes back to one on this device
   (the accounts are read live while the dialog is open). On Radicale in
   the e2e (`new-list.spec.ts`): two `MKCALENDAR`, both named as the file,

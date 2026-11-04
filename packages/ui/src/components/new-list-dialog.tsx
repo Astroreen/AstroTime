@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { makeDeviceCalendar } from "../calendar/device-calendar.ts";
+import { liveQuery } from "../calendar/live.ts";
 import { DEVICE, whyNotMade, type NotMade } from "../calendar/place.ts";
 import { addNewListStrings } from "../i18n/new-list.ts";
 import { accountName } from "./accounts.tsx";
@@ -67,18 +68,29 @@ export function NewListDialog({
   useEffect(() => {
     if (!open) return;
     let current = true;
-    Promise.all([loadMake(), store.accounts()]).then(
-      ([module, all]) => {
+    let stop = () => {};
+    loadMake().then(
+      (module) => {
         maker.current = module;
         if (!current) return;
-        setUnloaded(false);
-        setAccounts(module.placesOf(all));
+        // Live, as the import's: an account added or removed meanwhile is
+        // offered or not, as Settings shows it.
+        stop = liveQuery(
+          store,
+          () => store.accounts(),
+          (all) => {
+            setUnloaded(false);
+            setAccounts(module.placesOf(all));
+          },
+          () => setUnloaded(true),
+        );
       },
-      // Not loaded (offline, a release replaced it), or no accounts read.
+      // Not loaded (offline, a release replaced it).
       () => current && setUnloaded(true),
     );
     return () => {
       current = false;
+      stop();
     };
   }, [open, store]);
   const places = [
@@ -91,6 +103,10 @@ export function NewListDialog({
     places[0]!.value;
   const placeName = places.find((one) => one.value === place)!.label;
   const named = name.trim() !== "";
+  /** A failure said is about what was asked: another name or place clears it. */
+  const forgetFailure = () => {
+    if (step.name === "failed") setStep({ name: "idle" });
+  };
   const ready = accounts !== null || unloaded;
 
   // Closed while a list is being made, the dialog keeps it: it opens again
@@ -159,7 +175,10 @@ export function NewListDialog({
                 id={nameId}
                 className={input}
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  forgetFailure();
+                }}
                 autoFocus
                 required
                 maxLength={200}
@@ -170,7 +189,10 @@ export function NewListDialog({
                 label={t("newList.where")}
                 labelClassName="text-small font-medium text-ink-muted"
                 value={place}
-                onChange={setChosen}
+                onChange={(value) => {
+                  setChosen(value);
+                  forgetFailure();
+                }}
                 options={places}
                 className="h-10 w-full min-w-0 rounded-lg bg-canvas pr-1 pl-2"
               />

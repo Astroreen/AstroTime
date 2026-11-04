@@ -910,4 +910,34 @@ describe("an import written through the store (import D269–D271)", () => {
     expect((failure as ImportStoppedError).cause).toBe(full);
     expect((failure as ImportStoppedError).kept.map((one) => one.name)).toEqual(["Holidays"]);
   });
+
+  test("a calendar named with spaces alone is named as its file, and so is its new calendar (D277)", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = (await read("Holidays 2027.ics", encode(calendar("   ", event("new-year")))))
+      .sources[0]!;
+    expect(source.name).toBe("Holidays 2027");
+    const asked: string[] = [];
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: null }]]);
+    await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      async (accountId, wanted) => {
+        asked.push(wanted.name);
+        return store.saveCalendar({
+          accountId,
+          url: "https://cloud.example.com/dav/holidays-2027/",
+          name: wanted.name,
+          color: wanted.color,
+          components: [wanted.component],
+          rights: ALL_RIGHTS,
+        });
+      },
+    );
+    expect(asked).toEqual(["Holidays 2027"]);
+  });
 });

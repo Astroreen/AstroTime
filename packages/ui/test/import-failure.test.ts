@@ -25,8 +25,10 @@ describe("a stopped import, in words (import D277)", () => {
       calendar("Team"),
     ]);
     expect(words("en", error)).toBe(
-      "The import stopped: Error: The disk is full. Made for this import, and kept: “Holidays” on Nextcloud and “Team” on Nextcloud.",
+      "The import stopped because of an error. Made for this import, and kept: “Holidays” on Nextcloud and “Team” on Nextcloud.",
     );
+    // The error's own English is never said.
+    expect(words("en", error)).not.toContain("disk");
     expect(words("ru", error)).toContain(
       "Созданы для этого импорта и остались: «Holidays» в Nextcloud и «Team» в Nextcloud.",
     );
@@ -41,6 +43,19 @@ describe("a stopped import, in words (import D277)", () => {
     // Nothing made before it: the reason alone.
     expect(words("en", new CalendarNotMadeError("nc", busy, []))).toBe(
       "Nextcloud is busy, so nothing was imported. Try again later.",
+    );
+  });
+
+  test("a stop with no calendar made: its reason in the UI's words, none of the error's", () => {
+    const offline = Object.assign(new Error("fetch failed"), { name: "OfflineError" });
+    expect(words("en", offline)).toBe("The import stopped: the server cannot be reached.");
+    expect(words("ru", new Error("SQLITE_FULL"))).toBe("Импорт остановлен из-за ошибки.");
+    // What the user can act on is said so.
+    expect(words("en", Object.assign(new Error("401"), { name: "AuthError" }))).toBe(
+      "The import stopped: the server refused the account's sign-in. Sign in to it again.",
+    );
+    expect(words("en", Object.assign(new Error("403"), { name: "HttpError", status: 403 }))).toBe(
+      "The import stopped: the server did not allow it.",
     );
   });
 });

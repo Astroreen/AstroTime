@@ -38,9 +38,19 @@ export function failureWords(
     return kept ? `${said} ${kept}` : said;
   }
   if (error instanceof ImportStoppedError) {
-    const said = t("import.failed", { message: String(error.cause) });
+    const said = stoppedWords(t, error.cause);
     const kept = keptWords(t, language, error.kept, nameOf, "import.keptOnServer");
     return kept ? `${said} ${kept}` : said;
   }
-  return t("import.failed", { message: String(error) });
+  return stoppedWords(t, error);
+}
+
+/** Why an import stopped, in the catalog's words: no error's English reaches the user. */
+function stoppedWords(t: TFunction, cause: unknown): string {
+  const { why } = whyNotMade(cause);
+  return t(
+    why === "offline" || why === "busy" || why === "signed-out" || why === "refused"
+      ? `import.stopped.${why}`
+      : "import.stopped.failed",
+  );
 }

@@ -15,6 +15,8 @@ import { createI18n } from "../src/i18n/index.ts";
 const NEXTCLOUD = { id: "nc", provider: "caldav", name: "Nextcloud" };
 let accounts: () => Promise<unknown[]> = async () => [NEXTCLOUD];
 const saved: unknown[] = [];
+/** The store's listeners, told of a write as the store tells its live queries. */
+const listeners = new Set<() => void>();
 /** What the sync's `makeCalendar` does next, set by each test. */
 let make: (accountId: string, calendar: unknown) => Promise<unknown> = async () => ({});
 const asked: unknown[] = [];
@@ -30,6 +32,10 @@ vi.mock("../src/components/accounts-context.tsx", () => {
   const value = {
     store: {
       accounts: () => accounts(),
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
       addAccount: async (account: object) => ({ ...account, id: "device" }),
       saveCalendar: async (calendar: object) => {
         saved.push(calendar);
@@ -207,4 +213,47 @@ test("the accounts not read: said, and the list can still be made on this device
   await expect.element(page.getByText("closed")).toBeInTheDocument();
   expect(saved).toMatchObject([{ name: "Packing", components: ["VTODO"] }]);
   expect(made.map((calendar) => calendar.id)).toEqual(["made-here"]);
+});
+
+test("an account added while the dialog is open is offered at once", async () => {
+  accounts = async () => [];
+  render();
+  await expect.element(dialog().getByRole("textbox", { name: "Name" })).toBeVisible();
+  await expect.element(dialog().getByRole("combobox")).not.toBeInTheDocument();
+  accounts = async () => [NEXTCLOUD];
+  for (const listener of listeners) listener();
+  await expect
+    .element(dialog().getByRole("combobox", { name: "Where" }))
+    .toHaveTextContent("Nextcloud");
+});
+
+test("a failure said goes once the name is changed", async () => {
+  make = async () => {
+    throw Object.assign(new Error("offline"), { name: "OfflineError" });
+  };
+  render();
+  const field = dialog().getByRole("textbox", { name: "Name" });
+  await userEvent.fill(field, "Errands");
+  await press(create());
+  await expect.element(dialog().getByRole("alert")).toBeInTheDocument();
+  await userEvent.fill(field, "Errands 2");
+  await expect.element(dialog().getByRole("alert")).not.toBeInTheDocument();
+});
+
+test("a failure said goes once the place changes", async () => {
+  make = async () => {
+    throw Object.assign(new Error("offline"), { name: "OfflineError" });
+  };
+  render();
+  await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Errands");
+  await press(create());
+  await expect.element(dialog().getByRole("alert")).toBeInTheDocument();
+  const where = dialog().getByRole("combobox", { name: "Where" });
+  (where.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  const device = page.getByRole("option", { name: "On this device" });
+  await expect.element(device).toBeVisible();
+  (device.element() as HTMLElement).click();
+  await expect.element(where).toHaveTextContent("On this device");
+  await expect.element(dialog().getByRole("alert")).not.toBeInTheDocument();
 });

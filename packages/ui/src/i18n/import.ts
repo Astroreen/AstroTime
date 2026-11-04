@@ -116,7 +116,12 @@ export const importStrings = {
     "import.differentSkipped_other": "{{count}} that differ, skipped",
     "import.again_one": "{{count}} given twice in the file, imported once",
     "import.again_other": "{{count}} given twice in the file, imported once",
-    "import.failed": "The import stopped: {{message}}",
+    "import.stopped.offline": "The import stopped: the server cannot be reached.",
+    "import.stopped.busy": "The import stopped: the server is busy. Try again later.",
+    "import.stopped.signed-out":
+      "The import stopped: the server refused the account's sign-in. Sign in to it again.",
+    "import.stopped.refused": "The import stopped: the server did not allow it.",
+    "import.stopped.failed": "The import stopped because of an error.",
     "import.cleanupFailed":
       "A calendar made for this import holds nothing and could not be removed: {{message}}. You can remove it in Settings.",
     "import.failedPart":
@@ -276,7 +281,12 @@ export const importStrings = {
     "import.again_few": "{{count}} даны в файле дважды, импортированы один раз",
     "import.again_many": "{{count}} даны в файле дважды, импортированы один раз",
     "import.again_other": "{{count}} даны в файле дважды, импортированы один раз",
-    "import.failed": "Импорт остановлен: {{message}}",
+    "import.stopped.offline": "Импорт остановлен: сервер недоступен.",
+    "import.stopped.busy": "Импорт остановлен: сервер занят. Попробуйте позже.",
+    "import.stopped.signed-out":
+      "Импорт остановлен: сервер не принял вход в аккаунт. Войдите в него снова.",
+    "import.stopped.refused": "Импорт остановлен: сервер этого не разрешил.",
+    "import.stopped.failed": "Импорт остановлен из-за ошибки.",
     "import.cleanupFailed":
       "Календарь, созданный для этого импорта, пуст, и его не удалось убрать: {{message}}. Его можно удалить в настройках.",
     "import.failedPart": "Импорт остановлен ошибкой: {{message}}. Импортированное до неё остаётся.",
