@@ -91,10 +91,13 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
 export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
   const from = fromIcalTime(start);
   const to = fromIcalTime(end);
+  const zoned = from.type === "zoned" && to.type === "zoned";
+  // `subtractDate` measures the wall clocks, whichever zone objects ical.js
+  // holds them in (two VTIMEZONEs of one zone's two names are two).
   const length =
-    from.type === "zoned" && to.type === "zoned" && !sameClock(from, to)
+    zoned && !sameClock(from, to)
       ? ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000))
-      : start.zone === end.zone
+      : zoned || start.zone === end.zone
         ? end.subtractDate(start)
         : end.subtractDateTz(start);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.

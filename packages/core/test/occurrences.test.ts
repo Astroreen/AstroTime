@@ -608,6 +608,49 @@ describe("RFC 5545's corners", () => {
     }
   });
 
+  test("a series whose ends name one zone two ways, each with its VTIMEZONE, keeps its wall-clock length (D32)", () => {
+    // As above, with each name defined: ical.js holds two zone objects.
+    const zone = (tzid: string) => [
+      "BEGIN:VTIMEZONE",
+      `TZID:${tzid}`,
+      "BEGIN:DAYLIGHT",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "DTSTART:19700329T030000",
+      "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+      "END:DAYLIGHT",
+      "BEGIN:STANDARD",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "DTSTART:19701025T040000",
+      "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    const object = CalendarObject.parse(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//test//EN",
+        ...zone("Europe/Kyiv"),
+        ...zone("Europe/Kiev"),
+        "BEGIN:VEVENT",
+        "UID:aliases",
+        "DTSTAMP:20261001T000000Z",
+        "DTSTART;TZID=Europe/Kyiv:20261024T220000",
+        "DTEND;TZID=Europe/Kiev:20261025T060000",
+        "RRULE:FREQ=DAILY;COUNT=2",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+      ].join("\r\n"),
+    );
+    const ends = occurrencesBetween(object, vilnius("2026-10-20", "2026-10-31")).map((o) =>
+      wallClockOf(o.end, "Europe/Kyiv"),
+    );
+    expect(ends).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+  });
+
   test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {
     // Google's way: a TZID and no VTIMEZONE. 09:00 in New York is 14:00Z, so
     // an UNTIL at 13:59:59Z on the 23rd ends the series the week before.
