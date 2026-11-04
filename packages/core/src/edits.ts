@@ -1052,6 +1052,8 @@ function endBefore(
     const rule = property.getFirstValue() as ICAL.Recur;
     const until = untilBefore(recurrenceId, anchor);
     if (rule.until && rule.until.compare(until) <= 0) continue;
+    // A COUNT spent before the occurrence (one of an RDATE after it) ends there already.
+    if (rule.count && countBefore(master, rule, recurrenceId) >= rule.count) continue;
     rule.count = null;
     rule.until = until;
     property.setValue(rule);

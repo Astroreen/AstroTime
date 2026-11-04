@@ -678,6 +678,46 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     expect(split).toContain("RRULE:FREQ=WEEKLY;COUNT=6;BYDAY=TU,TH\r\n");
   });
 
+  test("this and following: a COUNT spent before the occurrence stays, so the series gains none", () => {
+    // Two Mondays, then an RDATE on December 7: its COUNT ended before it.
+    const twice = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "SUMMARY:Gym",
+      "RRULE:FREQ=WEEKLY;COUNT=2",
+      "RDATE;TZID=Europe/Vilnius:20261207T090000",
+    ]);
+    const recurrenceId = vilnius("2026-12-07T09:00:00");
+    const deleted = deleteItem(CalendarObject.parse(twice), {
+      now: NOW,
+      scope: "following",
+      recurrenceId,
+    })!;
+    expect(deleted).toContain("RRULE:FREQ=WEEKLY;COUNT=2\r\n");
+    expect(starts(deleted)).toEqual(["2026-11-02T09:00:00", "2026-11-09T09:00:00"]);
+    // Of two rules, the one spent stays; the other ends before the occurrence.
+    const gym = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "SUMMARY:Gym",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      "RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(gym),
+      { location: "Hall" },
+      { now: NOW, scope: "following", recurrenceId: vilnius("2026-11-23T09:00:00"), newUid: "v2" },
+    );
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU\r\n");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-03T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-10T09:00:00",
+      "2026-11-16T09:00:00",
+    ]);
+  });
+
   test("this and following moves the exceptions and EXDATEs after it to the new series", () => {
     const { ics, split } = editItem(
       series(),
