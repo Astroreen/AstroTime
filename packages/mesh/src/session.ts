@@ -71,6 +71,9 @@ export class Session {
   private sent = 0;
   private received = 0;
   private outbox: Promise<void> = Promise.resolve();
+  private inbox: Promise<void> = Promise.resolve();
+  /** The other side answered this side's hello with its batch (D285). */
+  answered = false;
   private state: "handshake" | "open" | "closed" = "handshake";
   private refusal: Refusal | undefined;
   private readonly me: string;
@@ -119,7 +122,12 @@ export class Session {
     };
     this.connection.send(JSON.stringify(challenge));
     return {
-      message: (text) => this.receive(text),
+      message: (text) => {
+        // One frame at a time, whatever the transport does: the handshake and
+        // the sealed frames' counters depend on the order.
+        this.inbox = this.inbox.then(() => this.receive(text));
+        return this.inbox;
+      },
       closed: () => this.closed(),
     };
   }
@@ -167,7 +175,6 @@ export class Session {
   }
 
   private closed(): void {
-    if (this.state === "handshake") this.refusal ??= "refused";
     this.state = "closed";
     this.events.ended(this, this.refusal);
   }

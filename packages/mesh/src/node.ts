@@ -156,7 +156,6 @@ export class MeshNode {
     if (session.address !== undefined) {
       const dial = this.dial(session.address);
       dial.peer = peer;
-      dial.failures = 0;
     }
     const existing = this.sessions.get(peer);
     if (existing && this.keeps(existing, session)) return session.close();
@@ -221,7 +220,12 @@ export class MeshNode {
     const fresh = await this.exclusive(() =>
       this.options.store.transaction((tx) => apply(tx, versions, vector)),
     );
-    if (vector) session.learn(vector);
+    if (vector) {
+      session.learn(vector);
+      // The connection served: its address's backoff starts over.
+      session.answered = true;
+      if (session.address !== undefined) this.dial(session.address).failures = 0;
+    }
     await this.relay(fresh, session);
   }
 
@@ -308,9 +312,12 @@ export class MeshNode {
     if (session.address !== undefined) {
       const dial = this.dial(session.address);
       dial.busy = false;
-      // Refused (in the handshake or after): again only after a wait.
+      // Refused, or closed before it served a batch (a drop in the handshake, a
+      // peer that crashes once connected): again only after a wait. Closed after
+      // a batch (a restart): again at once.
+      const elsewhere = session.peer !== undefined && this.sessions.has(session.peer);
       if (refusal === "self") this.selves.add(session.address);
-      else if (refusal) this.retry(session.address, dial);
+      else if ((refusal || !session.answered) && !elsewhere) this.retry(session.address, dial);
     }
     this.dialAll();
   }

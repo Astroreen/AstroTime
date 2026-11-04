@@ -227,11 +227,15 @@ alone needs nothing else.
     reaches the other side in the batch or as a push after it.
   - **Two connections with one peer** (two listeners dialling each other):
     both keep the one dialled by the smaller peer id.
-  - **Redial**: a dial that fails, or a connection refused (a wrong
-    secret, a clock off, a frame that does not open), waits 1 s, doubled
-    per failure up to a minute; an established connection that closes
-    otherwise is redialled at once. An address
-    that answers with this very peer is never dialled again.
+  - **Redial**: a dial that fails, a connection refused (a wrong secret,
+    a clock off, a frame that does not open), or one that closed before
+    the other side answered its hello with a batch (a drop, a peer that
+    crashes once connected) waits 1 s, doubled per failure up to a
+    minute; the count starts over with a batch received, and a
+    connection that closes after one is redialled at once. Only a
+    `refusal` frame, sent or received, is a refusal (`onRefused`): a bare
+    close in the handshake is a drop. An address that answers with this
+    very peer is never dialled again.
   - **Keys**: the secret is only HKDF's root; the proofs' HMAC key and
     each direction's AES-GCM key are derived from it with labels of their
     own (`astrotime-mesh.1 proof`, `astrotime-mesh.1 seal`).
@@ -247,8 +251,9 @@ alone needs nothing else.
     `setVector`, `current`, `put`, `notCoveredBy`) plus the known
     addresses, so `@astrotime/storage` applies a batch in one SQLite
     transaction; `MeshTransport.dial` and `MeshNode.accept` take a
-    connection of ordered text frames, a WebSocket's. A frame's handler
-    returns a promise and the next frame waits for it.
+    connection of ordered text frames, a WebSocket's. A session handles
+    its frames one at a time whatever the transport does: a transport may
+    hand over the next frame before the last one's promise settles.
 
 ## Deferred
 
@@ -266,12 +271,6 @@ alone needs nothing else.
   quarantine it, instead of every connection refusing it ([D293](#D293)).
 - Limits on a mesh frame, a batch and an address list (a batch could be
   chunked); within a mesh whose peers all hold the secret ([D293](#D293)).
-- The shells' transports (M2's WebSocket, M3's listeners) must hand a
-  connection's frames to `ConnectionHandlers.message` one at a time, each
-  after the last one's promise settles: the handshake and the sealed
-  frames' counters depend on it, and `MemoryNetwork` does it, so the
-  package's tests cannot catch a shell that does not; M2's and M3's own
-  tests must ([D293](#D293)).
 
 ## PR plan
 

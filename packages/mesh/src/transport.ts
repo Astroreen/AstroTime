@@ -12,7 +12,10 @@ export interface MeshConnection {
 
 /** What a peer does with a connection's frames. */
 export interface ConnectionHandlers {
-  /** A frame from the other side; the next waits until this one's promise settles. */
+  /**
+   * A frame from the other side, in order. A transport need not wait for
+   * the promise before handing over the next: the session queues them.
+   */
   message(text: string): Promise<void> | void;
   /** The connection closed, from either side or the network. */
   closed(): void;

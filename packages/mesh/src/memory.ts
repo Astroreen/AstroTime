@@ -72,7 +72,10 @@ export interface Frame {
 interface End {
   readonly name: string;
   handlers?: ConnectionHandlers;
+  /** Settles once everything delivered to this end is handled. */
   inbox: Promise<void>;
+  /** Settles once the last frame's handler was called. */
+  called: Promise<void>;
 }
 
 interface Link {
@@ -88,6 +91,11 @@ interface Link {
 export class MemoryNetwork {
   /** Sees every frame before it arrives, and may change it. */
   tap?: (frame: Frame) => string;
+  /**
+   * Hands each frame over as soon as the one before was handed over, not
+   * handled: a transport that does not wait for a handler's promise.
+   */
+  concurrent = false;
   private pending = 0;
   private waiting: (() => void)[] = [];
   private readonly listeners = new Map<
@@ -120,8 +128,12 @@ export class MemoryNetwork {
             handlers.failed(new Error(`${address} does not answer ${name}`));
             return;
           }
-          const dialling: End = { name, inbox: Promise.resolve() };
-          const accepting: End = { name: listener.name, inbox: Promise.resolve() };
+          const dialling: End = { name, inbox: Promise.resolve(), called: Promise.resolve() };
+          const accepting: End = {
+            name: listener.name,
+            inbox: Promise.resolve(),
+            called: Promise.resolve(),
+          };
           const link: Link = { ends: [dialling, accepting], closed: false };
           this.links.add(link);
           accepting.handlers = listener.accept(this.connection(link, accepting, dialling));
@@ -164,11 +176,15 @@ export class MemoryNetwork {
       send: (text) => {
         if (link.closed) return;
         // A frame sent before a close still arrives, as over a WebSocket.
-        this.deliver(to, async () => {
-          await to.handlers?.message(
-            this.tap ? this.tap({ from: from.name, to: to.name, text }) : text,
-          );
-        });
+        this.deliver(
+          to,
+          async () => {
+            await to.handlers?.message(
+              this.tap ? this.tap({ from: from.name, to: to.name, text }) : text,
+            );
+          },
+          !this.concurrent,
+        );
       },
       close: () => this.close(link),
     };
@@ -178,13 +194,29 @@ export class MemoryNetwork {
     if (link.closed) return;
     link.closed = true;
     this.links.delete(link);
-    for (const end of link.ends) this.deliver(end, () => end.handlers?.closed());
+    for (const end of link.ends) this.deliver(end, async () => end.handlers?.closed());
   }
 
   /** Runs `step` on an end after everything delivered to it before. */
-  private deliver(end: End, step: () => Promise<void> | void): void {
+  private deliver(end: End, step: () => Promise<void>, waits = true): void {
     const before = end.inbox;
-    end.inbox = this.work(() => before.then(step));
+    if (waits) {
+      end.inbox = this.work(() => before.then(step));
+      end.called = end.inbox;
+      return;
+    }
+    // After the frame before was handed over; its handling may still be under way.
+    const previous = end.called;
+    let called!: () => void;
+    end.called = new Promise((resolve) => (called = resolve));
+    const handled = this.work(() =>
+      previous.then(() => {
+        const result = step();
+        called();
+        return result;
+      }),
+    );
+    end.inbox = Promise.all([before, handled]).then(() => undefined);
   }
 
   /** Counts work in flight until it settles. */

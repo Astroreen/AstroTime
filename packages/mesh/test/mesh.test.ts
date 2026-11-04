@@ -4,8 +4,25 @@
 // tampered with or replayed does not open.
 import { describe, expect, test } from "vite-plus/test";
 
-import { compareVersions, type Item, itemKey, newMesh, type Version } from "../src/index.ts";
-import type { Frame } from "../src/memory.ts";
+import {
+  compareVersions,
+  type Item,
+  itemKey,
+  MeshNode,
+  newMesh,
+  type Version,
+} from "../src/index.ts";
+import {
+  base64url,
+  fromBase64url,
+  proofKey,
+  prove,
+  randomBytes,
+  seal,
+  sealingKey,
+} from "../src/crypto.ts";
+import { type Frame, ManualTimers, MemoryMeshStore, MemoryNetwork } from "../src/memory.ts";
+import { PROTOCOL } from "../src/protocol.ts";
 import { addressOf, Harness } from "./harness.ts";
 
 const lunch: Item = { calendar: "personal", object: "lunch@astrotime" };
@@ -299,11 +316,15 @@ const byItem = (a: Version, b: Version) => {
 };
 
 describe("five peers through random partitions, outages and edits", () => {
-  test.each([1, 2, 3, 4, 5, 6, 7, 8])(
-    "seed %i: every store ends equal, each item at its newest version",
-    async (seed) => {
+  // Each seed twice: a transport that waits for each frame's handling, and one that does not.
+  test.each(
+    [1, 2, 3, 4, 5, 6, 7, 8].flatMap((seed) => [[seed, false] as const, [seed, true] as const]),
+  )(
+    "seed %i (frames handed over concurrently: %s): every store ends equal, each item at its newest version",
+    async (seed, concurrent) => {
       const rng = random(seed);
       const mesh = new Harness();
+      mesh.network.concurrent = concurrent;
       const names = ["peer-0", "peer-1", "peer-2", "peer-3", "peer-4"];
       for (const [index, name] of names.entries()) {
         // Three listen (a server, two desktops); two only dial (a browser, a phone).
@@ -459,4 +480,148 @@ test("a node stopped while a redial waits dials again when it starts", async () 
   await a.start();
   await mesh.settle();
   expect(a.peers()).toEqual(["peer-c"]);
+});
+
+test("a transport that hands frames over before the last is handled: the handshake still holds", async () => {
+  const mesh = new Harness();
+  mesh.network.concurrent = true;
+  mesh.add("peer-c", { listens: true, invitedBy: [] });
+  mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+  mesh.add("peer-b", { listens: false, invitedBy: ["peer-c"] });
+  await mesh.up("peer-c");
+  await mesh.up("peer-a");
+  await mesh.settle();
+  const edit = await mesh.node("peer-a").change(lunch, event("Lunch"));
+  await mesh.up("peer-b");
+  await mesh.settle();
+  expect(mesh.versions("peer-b")).toEqual([edit]);
+  expect(mesh.refusals).toEqual([]);
+  expect(mesh.errors).toEqual([]);
+});
+
+describe("a listener that drops connections", () => {
+  /** C's node behind a listener that closes each connection at its `drop`th frame. */
+  async function dropping(drop: number) {
+    const network = new MemoryNetwork();
+    const timers = new ManualTimers();
+    const mesh = newMesh();
+    const refusals: string[] = [];
+    let accepted = 0;
+    const c = new MeshNode({
+      peer: "peer-c",
+      mesh,
+      store: new MemoryMeshStore(),
+      transport: network.transport("peer-c"),
+      timers,
+    });
+    await c.start();
+    network.listen("mem://peer-c", "peer-c", (connection) => {
+      accepted += 1;
+      const handlers = c.accept(connection);
+      let frames = 0;
+      return {
+        message: (text) => {
+          frames += 1;
+          if (frames === drop) return connection.close();
+          return handlers.message(text);
+        },
+        closed: () => handlers.closed(),
+      };
+    });
+    const a = new MeshNode({
+      peer: "peer-a",
+      mesh,
+      store: new MemoryMeshStore(["mem://peer-c"]),
+      transport: network.transport("peer-a"),
+      timers,
+      onRefused: (reason) => refusals.push(reason),
+    });
+    await a.start();
+    await network.quiet();
+    return { network, timers, refusals, accepted: () => accepted };
+  }
+
+  test("a drop in the handshake is no refusal, and is redialled after a wait", async () => {
+    const { timers, refusals, accepted } = await dropping(1);
+    expect(refusals).toEqual([]);
+    expect(accepted()).toBe(1);
+    expect(timers.size).toBe(1);
+  });
+
+  test("a peer that drops once connected, before its batch, is redialled with backoff, not at once", async () => {
+    // Frames to C: challenge, proof, then the sealed hello, where it drops.
+    const { network, timers, refusals, accepted } = await dropping(3);
+    expect(accepted()).toBe(1);
+    expect(timers.size).toBe(1);
+    for (let round = 0; round < 3; round += 1) {
+      timers.fire();
+      await network.quiet();
+    }
+    expect(accepted()).toBe(4);
+    expect(refusals).toEqual([]);
+  });
+});
+
+test("a sealed hello that comes while the proof before it is still being checked is not refused", async () => {
+  const network = new MemoryNetwork();
+  network.concurrent = true;
+  const mesh = newMesh();
+  const errors: unknown[] = [];
+  const refusals: string[] = [];
+  const c = new MeshNode({
+    peer: "peer-c",
+    mesh,
+    store: new MemoryMeshStore(),
+    transport: network.transport("peer-c"),
+    timers: new ManualTimers(),
+    onError: (error) => errors.push(error),
+    onRefused: (reason) => refusals.push(reason),
+  });
+  await c.start();
+  network.listen("mem://peer-c", "peer-c", (connection) => c.accept(connection));
+
+  // A hand-driven peer: its proof and its sealed hello go out back to back.
+  const nonce = randomBytes(32);
+  const clock = Date.now();
+  network.transport("peer-z").dial("mem://peer-c", {
+    failed: (error) => errors.push(error),
+    opened: (connection) => {
+      connection.send(
+        JSON.stringify({
+          type: "challenge",
+          protocol: PROTOCOL,
+          mesh: mesh.id,
+          peer: "peer-z",
+          nonce: base64url(nonce),
+          clock,
+        }),
+      );
+      return {
+        closed: () => undefined,
+        message: async (text) => {
+          const frame = JSON.parse(text) as { type: string; nonce: string; clock: number };
+          if (frame.type !== "challenge") return;
+          const theirs = fromBase64url(frame.nonce)!;
+          const parts = ["proof", PROTOCOL, mesh.id, "peer-z", base64url(nonce), clock];
+          const proof = await prove(
+            await proofKey(mesh.secret),
+            [...parts, "peer-c", frame.nonce, frame.clock].map(String),
+          );
+          const key = await sealingKey(mesh.secret, nonce, theirs);
+          const hello = await seal(
+            key,
+            0,
+            JSON.stringify({ type: "hello", vector: {}, addresses: [] }),
+          );
+          connection.send(JSON.stringify({ type: "proof", proof }));
+          connection.send(JSON.stringify({ type: "sealed", data: hello }));
+        },
+      };
+    },
+  });
+  await network.quiet();
+
+  expect(errors).toEqual([]);
+  expect(refusals).toEqual([]);
+  expect(c.peers()).toEqual(["peer-z"]);
 });
