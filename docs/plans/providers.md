@@ -548,6 +548,22 @@ marked _to be recorded_.
   merges and conflicts, the web proxy, the round trip of every property).
   What did not join is in [Deferred](#deferred).
 
+- **D262. The sign-in dialog says when an address is in clear.** Under
+  the server's address, as soon as it is typed, an `http://` address of
+  another host than this device ([D260](#D260)'s `inClear`: not https,
+  not `localhost`, `*.localhost`, a literal IPv4 of 127.0.0.0/8 or
+  `[::1]`; `127.evil.example.com` is another host) gets one line in the
+  danger colour: "This address is not encrypted: your password could be
+  read on the way. Use https:// if the server offers it." It is the
+  field's description for a screen reader. It shows on both tabs, the
+  field being one: over Nextcloud's Login Flow the user types the
+  password on Nextcloud's own page at that address, and the app password
+  it gives comes back the same way, both in clear. It warns, it does not refuse:
+  a server on the user's own network, or behind a VPN such as a tailnet,
+  may serve only http, and that is the user's choice. The words load with
+  the dialog (`i18n/sign-in.ts`, a catalog of their own), so the first
+  load grows by 35 bytes (on main `02a577c`), `inClear` alone.
+
 ## Deferred
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0

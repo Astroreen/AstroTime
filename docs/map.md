@@ -140,7 +140,8 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/design.md#D208`
   - `Authorization` (`auth.ts`) — a request's credentials: Basic, or
     Digest once the server asks (`digest.ts`, loaded then).
-    → `plans/providers.md#D260`
+    → `plans/providers.md#D260`; `inClear`, whether an address sends them
+    unencrypted, for the sign-in dialog's word. → `plans/providers.md#D262`
   - `startLoginFlow` (`@astrotime/caldav/login-flow`, loaded with the
     first sign-in, `plans/providers.md#D260`) — Nextcloud Login Flow v2.
     → `plans/foundation.md#D19`;
@@ -386,9 +387,10 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
   - `i18n/` — i18next and the English and Russian catalogs; strings that
     load later with their part (`later.ts`): `pictures.ts`, the pictures',
-    `files.ts`, why the edit dialog's attachments have no files, and
-    `tasks.ts`, a task's list in a task's words.
-    → `plans/foundation.md#D17`
+    `files.ts`, why the edit dialog's attachments have no files,
+    `tasks.ts`, a task's list in a task's words, and `sign-in.ts`, the
+    sign-in dialog's word on an address in clear
+    (`plans/providers.md#D262`). → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
   - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev

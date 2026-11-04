@@ -2,6 +2,7 @@
 // Login Flow v2, or any CalDAV server by password. Signing in again to an
 // account opens it with the account's address and user name. A single-user
 // deployment's preset (D123) asks for the password alone.
+import { inClear } from "@astrotime/caldav";
 import type { Account } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
@@ -15,7 +16,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { SignIn } from "../accounts/sign-in.ts";
+import { serverAddress, SignIn } from "../accounts/sign-in.ts";
+import { addSignInStrings } from "../i18n/sign-in.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
@@ -82,7 +84,8 @@ function SignInForm({
   onCancel: () => void;
   onDone: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  addSignInStrings(i18n);
   const { platform, store } = useAccounts();
   const [signIn] = useState(
     () =>
@@ -187,21 +190,32 @@ function SignInForm({
       </button>
     </div>
   );
+  // A password to this address would cross the network unencrypted (D260).
+  const typed = serverAddress(server);
+  const inClearAddress = typed !== null && inClear(typed);
   const serverField = (
     <Field label={t("signIn.server")}>
       {(id) => (
-        <input
-          id={id}
-          className={input}
-          value={server}
-          onChange={(event) => setServer(event.target.value)}
-          placeholder={t("signIn.serverPlaceholder")}
-          inputMode="url"
-          autoComplete="url"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-        />
+        <>
+          <input
+            id={id}
+            className={input}
+            value={server}
+            onChange={(event) => setServer(event.target.value)}
+            placeholder={t("signIn.serverPlaceholder")}
+            inputMode="url"
+            autoComplete="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            aria-describedby={inClearAddress ? `${id}-clear` : undefined}
+          />
+          {inClearAddress && (
+            <p id={`${id}-clear`} className="text-small text-danger">
+              {t("signIn.inClear")}
+            </p>
+          )}
+        </>
       )}
     </Field>
   );
