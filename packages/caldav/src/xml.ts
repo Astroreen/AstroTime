@@ -45,7 +45,14 @@ function decodeXml(raw: string): string {
   return raw.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, decimal, name) => {
     if (name !== undefined) return NAMED[name] ?? reference;
     const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16);
-    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    // XML 1.0's Char: a reference to anything else is not decoded.
+    const valid =
+      code === 0x9 ||
+      code === 0xa ||
+      code === 0xd ||
+      (code >= 0x20 && code <= 0xd7ff) ||
+      (code >= 0xe000 && code <= 0xfffd) ||
+      (code >= 0x10000 && code <= 0x10ffff);
     return valid ? String.fromCodePoint(code) : reference;
   });
 }
@@ -59,7 +66,8 @@ const parser = new XMLParser({
   trimValues: false,
   // XML's own references only: its five entities and character references
   // (`&#13;`, `&#xE9;`), which fast-xml-parser decodes only together with
-  // HTML's. Anything else (`&nbsp;`) stays as written.
+  // HTML's. Anything else (`&nbsp;`) stays as written. The interface is
+  // fast-xml-parser 5.11.2's, pinned exactly in pnpm-workspace.yaml.
   entityDecoder: {
     decode: decodeXml,
     setExternalEntities: () => {},

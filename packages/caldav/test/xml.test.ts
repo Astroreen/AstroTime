@@ -15,9 +15,11 @@ test("character references are read as the characters they stand for", () => {
 
 test("only XML's references are decoded: an HTML entity stays as written, an escaped one is text", () => {
   const { responses } = parseMultistatus(
-    `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/cal/a.ics</d:href><d:propstat><d:prop><d:displayname>a&nbsp;b &amp;nbsp; &amp;#13; &#0; &lt;x&gt; &quot;&apos;</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
+    `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/cal/a.ics</d:href><d:propstat><d:prop><d:displayname>a&nbsp;b &amp;nbsp; &amp;#13; &#0; &lt;x&gt; &quot;&apos; &#1;&#x1F;&#xFFFE;&#xD800; a&#9;b</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
   );
-  expect(text(responses[0]!.props["displayname"])).toBe(`a&nbsp;b &nbsp; &#13; &#0; <x> "'`);
+  expect(text(responses[0]!.props["displayname"])).toBe(
+    `a&nbsp;b &nbsp; &#13; &#0; <x> "' &#1;&#x1F;&#xFFFE;&#xD800; a\tb`,
+  );
 });
 
 test("a calendar with no name and a stray % in its href is named by its href as written", async () => {
