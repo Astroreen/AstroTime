@@ -1,10 +1,8 @@
 // The strings of the pictures' parts that load later: the user's own
 // pictures in Settings (design D222, D223), a place photo's credit (D221),
-// in a catalog of their own that loads with them, not with the app
-// (foundation D145): `addPictureStrings` adds them to the app's i18next when
-// one of them first draws. Their keys are part of the app's `Catalog`
-// type (`index.ts`), so `t` checks them as it checks the others.
-import type { i18n } from "i18next";
+// in a catalog of their own (`later.ts`): `addPictureStrings` adds them to
+// the app's i18next when one of them first draws.
+import { laterStrings } from "./later.ts";
 
 export const pictureStrings = {
   en: {
@@ -45,12 +43,5 @@ export const pictureStrings = {
   },
 } as const satisfies Record<"en" | "ru", Record<string, string>>;
 
-const added = new WeakSet<i18n>();
-
-/** Adds the strings to `instance` in every language, once. */
-export function addPictureStrings(instance: i18n): void {
-  if (added.has(instance)) return;
-  added.add(instance);
-  for (const [language, strings] of Object.entries(pictureStrings))
-    instance.addResources(language, "translation", strings);
-}
+/** Adds the strings to an i18next instance in every language, once. */
+export const addPictureStrings = laterStrings(pictureStrings);

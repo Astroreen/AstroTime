@@ -433,6 +433,7 @@ function Fields({
           calendar={calendars.find((c) => c.id === form.calendarId)}
           onChange={(attachments) => set({ attachments })}
           field={field}
+          task={!event}
         />
       </Section>
     </div>
