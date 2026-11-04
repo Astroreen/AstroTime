@@ -262,6 +262,24 @@ When you add a package, app or module, add its line here in the same PR.
     Login Flow v2 approved in Chromium on Nextcloud's own pages, and on
     Nextcloud a second user made for the run with calendars shared to it.
 
+- `packages/mesh` (`@astrotime/mesh`) — a mesh of AstroTime peers, no
+  server between (isomorphic, WebCrypto). → `plans/server.md#D283`
+  - `version.ts` — `Version` (an item's text or a tombstone), `HybridClock`,
+    the order of versions, version vectors. → `plans/server.md#D284`
+  - `replica.ts` — `change` (a version made here) and `apply` (versions
+    from a peer, in one transaction) over a `MeshStore` (`store.ts`).
+    → `plans/server.md#D284`, `plans/server.md#D293`
+  - `MeshNode` (`node.ts`) — a peer: anti-entropy, live pushes and their
+    relay, dialling with backoff, addresses gossiped; `session.ts`, one
+    connection's handshake and AES-GCM sealing; `protocol.ts`, its
+    messages; `MeshTransport` (`transport.ts`), how frames travel.
+    → `plans/server.md#D285`, `plans/server.md#D286`, `plans/server.md#D293`
+  - `invite.ts` — `newMesh`, `formatInvite`, `parseInvite`.
+    → `plans/server.md#D287`
+  - `memory.ts` (`@astrotime/mesh/memory`) — the tests' store, network
+    (partitions, `quiet`) and hand-wound timers; `test/mesh.test.ts`, the
+    proof of the mesh. → `plans/server.md#D290`
+
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
