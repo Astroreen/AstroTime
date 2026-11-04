@@ -56,7 +56,12 @@ logic worth borrowing.
   unchanged in meaning, not byte for byte: a line keeps its name, value and
   parameters, but ical.js may write the parameters in another order, quote
   or fold it otherwise, none of which carries meaning (RFC 5545 §3.1, §3.2);
-  the round-trip tests compare lines so (`canonicalLine`). The UI exposes a
+  the round-trip tests compare lines so (`canonicalLine`). A multistatus
+  reads its references as XML spells them, once: character references to
+  a legal `Char` and the five predefined entities (XML 1.0 §2.2, §4.1,
+  §4.6), any other left as written, by a decoder of our own given to
+  fast-xml-parser (`EntityDecoderOptions`, its version pinned in the
+  catalog). The UI exposes a
   subset that grows over time ([D9](#D9), [D10](#D10)).
 - **D8. ical.js for iCalendar.** Parsing, time zones and recurrence
   expansion use Mozilla's `ical.js` (also used by Nextcloud Calendar),

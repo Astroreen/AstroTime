@@ -50,11 +50,14 @@ const PREDEFINED = new Map(Object.entries({ lt: "<", gt: ">", amp: "&", quot: '"
  * §2.2's `Char`) stay as written; a DTD's entities are not read.
  */
 function decodeReferences(value: string): string {
-  return value.replaceAll(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, dec, name) => {
-    if (name !== undefined) return PREDEFINED.get(name) ?? reference;
-    const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16);
-    return isXmlChar(code) ? String.fromCodePoint(code) : reference;
-  });
+  return value.replaceAll(
+    /&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g,
+    (reference, hex, dec, name) => {
+      if (name !== undefined) return PREDEFINED.get(name) ?? reference;
+      const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16);
+      return isXmlChar(code) ? String.fromCodePoint(code) : reference;
+    },
+  );
 }
 
 /** XML 1.0 §2.2: `#x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]`. */
