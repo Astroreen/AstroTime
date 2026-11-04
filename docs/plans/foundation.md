@@ -2308,16 +2308,21 @@ task?"
   object as its own (or another's, which then wins and ours goes to the
   Conflicts list); a server that keeps refusing the write (a 500, a 403)
   makes each sync a full listing for as long, with no cap or backoff.
+  The token is kept on purpose: advanced, the server's object would never
+  be listed again, and a local deletion of the pending creation (which
+  removes it at once, D38) would leave it unseen on this device.
 - **A second edit made while an update's server copy is found gone**
   ([D38](#D38)) — the server's deletion wins and the href is reported in
   `dropped`, but that second edit goes with it, not left pending as a
   deletion in flight leaves one.
-- **A VTIMEZONE-only zone across DST, moved** ([D32](#D32)) — a zone
-  `Intl` does not know (`Customized Time Zone`) is read on a wall clock
-  with the series' own offset (`wallClockNear`, `epochNear`), so a series
-  moved, or its `UNTIL`'s day, is an hour off on the far side of a DST
-  change; reading through the object's VTIMEZONE (ical.js's
-  `convertToZone`) would be exact.
+- **A VTIMEZONE-only zone across DST** ([D32](#D32)) — a zone `Intl`
+  does not know (`Customized Time Zone`) is read on a wall clock with the
+  series' own offset (`wallClockNear`, `epochNear`), wherever `edits.ts`
+  and `repeat.ts` need one: a series moved, a RECURRENCE-ID in UTC put on
+  its clock and ordered, the `UNTIL` before an occurrence, the day an
+  `UNTIL` ends on. On the far side of a DST change each is an hour off;
+  reading through the object's VTIMEZONE (ical.js's `convertToZone`) would
+  be exact. Before, each of these threw.
 - **A weekly series with ends in two undefined zones across DST**
   ([D32](#D32)) — its length is the first occurrence's, by instant, so
   in the weeks where the two zones' DST rules differ (Europe's and the US'
