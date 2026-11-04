@@ -2,7 +2,7 @@
   "service": "baikal-digest",
   "recorded": "2026-11-04",
   "server": "http://127.0.0.1:5601/dav.php/",
-  "calendar": "astrotime-recording-mw1fqo0d-81e9002f",
+  "calendar": "astrotime-recording-mw1nhf9c-ba1a78f3",
   "exchanges": [
     {
       "request": {
@@ -22,7 +22,7 @@
         "headers": {
           "content-type": "application/xml; charset=utf-8",
           "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing",
-          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea899d753b9\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
+          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aeabc6b29008\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
         },
         "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}read on </s:message>\n</d:error>\n"
       }
@@ -77,29 +77,6 @@
         "method": "PROPFIND",
         "path": "/dav.php/calendars/user/",
         "depth": "1",
-        "scheme": "Basic",
-        "headers": {
-          "Content-Type": "application/xml; charset=utf-8"
-        },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:resourcetype/><d:displayname/><ic:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><nc:deleted-at/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
-      },
-      "response": {
-        "status": 401,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/",
-        "headers": {
-          "content-type": "application/xml; charset=utf-8",
-          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing",
-          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea899d795c1\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
-        },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}read on calendars/user</s:message>\n</d:error>\n"
-      }
-    },
-    {
-      "request": {
-        "origin": "http://127.0.0.1:5601",
-        "method": "PROPFIND",
-        "path": "/dav.php/calendars/user/",
-        "depth": "1",
         "scheme": "Digest",
         "headers": {
           "Content-Type": "application/xml; charset=utf-8"
@@ -120,39 +97,17 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "MKCALENDAR",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
-        "depth": null,
-        "scheme": "Basic",
-        "headers": {
-          "Content-Type": "application/xml; charset=utf-8"
-        },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1fqo0d-81e9002f</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
-      },
-      "response": {
-        "status": 401,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
-        "headers": {
-          "content-type": "application/xml; charset=utf-8",
-          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea899d7b472\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
-        },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}bind on calendars/user</s:message>\n</d:error>\n"
-      }
-    },
-    {
-      "request": {
-        "origin": "http://127.0.0.1:5601",
-        "method": "MKCALENDAR",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "depth": null,
         "scheme": "Digest",
         "headers": {
           "Content-Type": "application/xml; charset=utf-8"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1fqo0d-81e9002f</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording-mw1nhf9c-ba1a78f3</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
       },
       "response": {
         "status": 201,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "headers": {
           "content-type": "text/html; charset=UTF-8"
         },
@@ -163,7 +118,7 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "PUT",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Digest",
         "headers": {
@@ -174,7 +129,7 @@
       },
       "response": {
         "status": 201,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "headers": {
           "content-type": "text/html; charset=UTF-8",
           "etag": "\"03e6c49f1931ed67583d6fd17d0702ec\""
@@ -186,7 +141,7 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "PUT",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-task.ics",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-task.ics",
         "depth": null,
         "scheme": "Digest",
         "headers": {
@@ -197,7 +152,7 @@
       },
       "response": {
         "status": 201,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-task.ics",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-task.ics",
         "headers": {
           "content-type": "text/html; charset=UTF-8",
           "etag": "\"7c0bdbcae540da91efa3b659e6b5ef1b\""
@@ -209,7 +164,7 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "PROPFIND",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "depth": "1",
         "scheme": "Digest",
         "headers": {
@@ -219,40 +174,40 @@
       },
       "response": {
         "status": 207,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "headers": {
           "content-type": "application/xml; charset=utf-8",
           "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing"
         },
-        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:sync-token>http://sabre.io/ns/sync/3</d:sync-token><cs:getctag>http://sabre.io/ns/sync/3</cs:getctag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getetag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>\n"
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:sync-token>http://sabre.io/ns/sync/3</d:sync-token><cs:getctag>http://sabre.io/ns/sync/3</cs:getctag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getetag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>\n"
       }
     },
     {
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "REPORT",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "depth": "1",
         "scheme": "Digest",
         "headers": {
           "Content-Type": "application/xml; charset=utf-8"
         },
-        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics</d:href><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics</d:href><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
       },
       "response": {
         "status": 207,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "headers": {
           "content-type": "application/xml; charset=utf-8"
         },
-        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VTODO\nUID:astrotime-recording-vtodo\nDTSTAMP:20261104T080000Z\nDUE:20261110T170000Z\nSUMMARY:Recorded task\nEND:VTODO\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>\n"
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VTODO\nUID:astrotime-recording-vtodo\nDTSTAMP:20261104T080000Z\nDUE:20261110T170000Z\nSUMMARY:Recorded task\nEND:VTODO\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>\n"
       }
     },
     {
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "PUT",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Digest",
         "headers": {
@@ -263,7 +218,7 @@
       },
       "response": {
         "status": 204,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "headers": {
           "content-type": "text/html; charset=UTF-8",
           "etag": "\"c335d57f751d1ae188a13e90d9358648\""
@@ -275,7 +230,7 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "REPORT",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "depth": "1",
         "scheme": "Digest",
         "headers": {
@@ -285,18 +240,18 @@
       },
       "response": {
         "status": 207,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "headers": {
           "content-type": "application/xml; charset=utf-8"
         },
-        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\">\n <d:response>\n  <d:href>/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics</d:href>\n  <d:propstat>\n   <d:prop>\n    <d:getetag>&quot;c335d57f751d1ae188a13e90d9358648&quot;</d:getetag>\n    <cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event changed\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data>\n   </d:prop>\n   <d:status>HTTP/1.1 200 OK</d:status>\n  </d:propstat>\n </d:response>\n <d:sync-token>http://sabre.io/ns/sync/4</d:sync-token>\n</d:multistatus>\n"
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\">\n <d:response>\n  <d:href>/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics</d:href>\n  <d:propstat>\n   <d:prop>\n    <d:getetag>&quot;c335d57f751d1ae188a13e90d9358648&quot;</d:getetag>\n    <cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event changed\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data>\n   </d:prop>\n   <d:status>HTTP/1.1 200 OK</d:status>\n  </d:propstat>\n </d:response>\n <d:sync-token>http://sabre.io/ns/sync/4</d:sync-token>\n</d:multistatus>\n"
       }
     },
     {
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "DELETE",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "depth": null,
         "scheme": "Digest",
         "headers": {
@@ -306,7 +261,7 @@
       },
       "response": {
         "status": 204,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/astrotime-recording-event.ics",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/astrotime-recording-event.ics",
         "headers": {
           "content-type": "text/html; charset=UTF-8"
         },
@@ -317,7 +272,7 @@
       "request": {
         "origin": "http://127.0.0.1:5601",
         "method": "DELETE",
-        "path": "/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "path": "/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "depth": null,
         "scheme": "Digest",
         "headers": {},
@@ -325,7 +280,7 @@
       },
       "response": {
         "status": 204,
-        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1fqo0d-81e9002f/",
+        "url": "http://127.0.0.1:5601/dav.php/calendars/user/astrotime-recording-mw1nhf9c-ba1a78f3/",
         "headers": {
           "content-type": "text/html; charset=UTF-8"
         },

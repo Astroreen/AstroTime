@@ -694,10 +694,20 @@ marked _to be recorded_.
   password. A Digest answer's count (`nc`) is taken as it is signed,
   before anything is awaited, so no two share one; they may reach the
   server out of order, which a nonce's count allows (sabre/dav does not
-  order them). It
-  costs a Digest server one request more per sync (the first, refused);
-  remembering the scheme with the account would save it, when a budget
-  test on a Digest server asks ([Deferred](#deferred)). The web proxy
+  order them). **The scheme is remembered** for the app's run, by the
+  server's origin and the user name (`auth.ts`, `known`): a later sync
+  answers a Digest server at once with its challenge as it was left (its
+  nonce and count; a nonce gone meanwhile is taken up as above), and
+  sends Basic to a plain-http server without the request that asks
+  first; the first sync after the app starts learns it again, one
+  request. It is not stored with the account: it is how the server
+  answers, not the user's data, and a stored one would be a migration
+  and the store's code on the first load to save one request a start. A
+  recalled scheme the server no longer takes (set up anew, Basic where
+  it asked Digest) is not the password refused: its 401 is read as the
+  first answer of a new run, once. The Baïkal recording shows it: its
+  scenario's later providers no longer send a refused Basic (15
+  exchanges to 13). The web proxy
   passes the challenge as `x-astrotime-www-authenticate`, since a
   `WWW-Authenticate` on the app's own origin would make the browser ask
   for a password itself ([D39](foundation.md#D39)). MD5, which Web Crypto
@@ -825,7 +835,14 @@ marked _to be recorded_.
   an occurrence's edit and deletion written to its own event. An event
   made here takes Graph's `iCalUId` (Graph sets it, read-only) once
   Graph's version comes down; keeping the UID made here (an extended
-  property read back as `UID`) is decided then too.
+  property read back as `UID`) is decided then too. And from #157's
+  review: the weak-ETag fallback and the rule that a write with no ETag
+  kept is a conflict must agree (the fallback's unconditional `PATCH`
+  only after the engine's comparison, never on a null ETag alone); a
+  write redirected (307, 308) to another host is refused before its body
+  is sent again, not only its answer; and the `~"…"` ETag becomes the
+  engine's contract, named in foundation's D37 with a test of its own,
+  rather than one provider's convention.
 
 - **Graph's national clouds** ([D253](#D253)) — `graph.microsoft.us`,
   `microsoftgraph.chinacloudapi.cn` and the like are refused as another
@@ -837,9 +854,6 @@ marked _to be recorded_.
   JSON configuration; an unattended one is to be written from its
   documentation. **Cyrus IMAP**, **SOGo** (with its database and
   users) and **Davis** (sabre/dav, as Baïkal) were not tried this round.
-- **The scheme remembered with the account** ([D260](#D260)) — a Digest
-  server's first request of each sync is a refused Basic one (or, over
-  plain http elsewhere, one without credentials).
 - **Revoking an app password over plain http** ([D260](#D260)) —
   `revokeAppPassword` (Nextcloud's OCS, not CalDAV) still sends Basic at
   once; Nextcloud takes Basic only, and an app password over plain http

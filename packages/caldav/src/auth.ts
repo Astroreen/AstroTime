@@ -71,6 +71,17 @@ export function inClear(url: string): boolean {
  */
 const basicFirst = (url: string) => !inClear(url);
 
+/**
+ * The scheme each server asked of each user, for the app's run (D260): a
+ * later sync answers a Digest server at once, with its challenge (nonce,
+ * count) as it was left, and sends Basic to a plain-http one without first
+ * asking. Not stored: a restart learns it again, for one request.
+ */
+const known = new Map<string, Scheme>();
+
+/** Forgets every scheme learned (tests, each starting as a new run). */
+export const forgetSchemes = (): void => known.clear();
+
 /** One account's credentials, and the scheme its server asked for. */
 export class Authorization {
   /** A password's account's credentials; `null` for an OAuth account, which has `tokens`. */
@@ -78,6 +89,9 @@ export class Authorization {
   /** How its server is answered (`digest.ts` learns it from a 401). */
   scheme: Scheme = null;
   private readonly tokens: TokenSource | null;
+  /** Where `known` keeps this server's scheme; set while `scheme` came from it untried. */
+  private key = "";
+  private recalled = false;
 
   /** A password's credentials, or a source of OAuth tokens (D254). */
   constructor(credentials: Credentials | TokenSource) {
@@ -101,8 +115,14 @@ export class Authorization {
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
   ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
+    if (this.credentials) {
+      this.key = `${new URL(request.url).origin} ${this.credentials.username}`;
+      if (this.scheme === null)
+        this.recalled = (this.scheme = known.get(this.key) ?? null) !== null;
+    }
     if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
     const scheme = this.scheme;
+    if (this.key && scheme) known.set(this.key, scheme);
     if (scheme === null) return { header: null, answered: null };
     if (scheme === "bearer")
       return {
@@ -129,7 +149,14 @@ export class Authorization {
     // A refused token is renewed once, unless another request renewed it
     // already; a refused renewal throws AuthError.
     if (answered === "bearer") return (await bearer()).renewBearer(this.tokens!, header);
-    return (await digest()).answerChallenge(this, response, answered);
+    const { answerChallenge } = await digest();
+    if (answerChallenge(this, response, answered)) return true;
+    // A scheme recalled from an earlier sync that the server no longer takes
+    // (set up anew): this 401 read as the first answer of a new run, once.
+    if (!this.recalled) return false;
+    this.recalled = false;
+    this.scheme = null;
+    return answerChallenge(this, response, null);
   }
 }
 

@@ -3,9 +3,10 @@
 // server asks, through the web proxy too, and a wrong password refused
 // after one try, never a loop.
 import { AuthError } from "@astrotime/core";
-import { expect, test } from "vite-plus/test";
+import { beforeEach, expect, test } from "vite-plus/test";
 
 import { challengesOf, digestChallenge, digestHeader, md5 } from "../src/digest.ts";
+import { forgetSchemes } from "../src/auth.ts";
 import { CHALLENGE } from "../src/proxy.ts";
 import {
   inClear,
@@ -17,6 +18,9 @@ import {
   type HttpClient,
   type HttpRequest,
 } from "../src/index.ts";
+
+// Each test a run of its own: no scheme learned by another (D260).
+beforeEach(forgetSchemes);
 
 test("MD5 is RFC 1321's", async () => {
   expect(await md5("")).toBe("d41d8cd98f00b204e9800998ecf8427e");
@@ -260,7 +264,9 @@ test("over plain http to another host, the first request goes without credential
   // No password in clear: nothing, then Digest.
   expect(digest.sent).toEqual(["none", "Digest"]);
 
-  // A Basic server there gets Basic once it asks, and from then on at once.
+  // A Basic server there gets Basic once it asks, and from then on at once
+  // (another run: nothing learned of dav.example's Digest above).
+  forgetSchemes();
   const sent: (string | null)[] = [];
   const basicOnly = fetchClient({
     fetch: (async (_input: URL | string, init: RequestInit) => {
@@ -309,4 +315,78 @@ test("what is in clear: plain http to another host, never https or this device, 
     "http://[::1]:8080/",
   ])
     expect(inClear(url), url).toBe(false);
+});
+
+test("a later sync recalls the scheme its server asked for: Digest answered at once, plain http's Basic without asking first", async () => {
+  const digest = digestServer();
+  const http = fetchClient({ fetch: digest.fetch });
+  const credentials = { username: "astro", password: "secret" };
+  await send(http, new Authorization(credentials), propfind("https://dav.example/dav.php/"), []);
+  expect(digest.sent).toEqual(["Basic", "Digest"]);
+  // The next sync's provider: its first request answers the challenge as it was left.
+  digest.sent.length = 0;
+  const next = new Authorization(credentials);
+  expect(
+    (await send(http, next, propfind("https://dav.example/dav.php/calendars/"), [])).status,
+  ).toBe(207);
+  expect(digest.sent).toEqual(["Digest"]);
+  expect(digest.counts.at(-1)).toBe(2);
+  // Its nonce gone meanwhile: the stale answer is taken up, as ever.
+  digest.renew();
+  digest.sent.length = 0;
+  await send(http, new Authorization(credentials), propfind("https://dav.example/dav.php/"), []);
+  expect(digest.sent).toEqual(["Digest", "Digest"]);
+  // Another user of the same server learns it for themselves (a wrong password here).
+  digest.sent.length = 0;
+  await expect(
+    send(
+      http,
+      new Authorization({ username: "other", password: "x" }),
+      propfind("https://dav.example/"),
+      [],
+    ),
+  ).rejects.toBeInstanceOf(AuthError);
+  expect(digest.sent[0]).toBe("Basic");
+
+  // Plain http to another host: Basic recalled, no request without credentials first.
+  const sent: (string | null)[] = [];
+  const basic = `Basic ${btoa("astro:secret")}`;
+  const basicOnly = fetchClient({
+    fetch: (async (_input: URL | string, init: RequestInit) => {
+      const header = new Headers(init.headers).get("authorization");
+      sent.push(header);
+      return header === basic
+        ? new Response("ok", { status: 207 })
+        : new Response("", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="r"' } });
+    }) as typeof fetch,
+  });
+  await send(basicOnly, new Authorization(credentials), propfind("http://basic.example/"), []);
+  await send(basicOnly, new Authorization(credentials), propfind("http://basic.example/"), []);
+  expect(sent).toEqual([null, basic, basic]);
+
+  // A server set up anew, Basic only where it asked Digest: the recalled
+  // Digest refused is read as a first answer, not the password refused.
+  sent.length = 0;
+  const moved = fetchClient({
+    fetch: (async (input: URL | string, init: RequestInit) =>
+      basicOnly({
+        method: init.method ?? "GET",
+        url: String(input).replace("dav.example", "basic.example"),
+        headers: Object.fromEntries(new Headers(init.headers)),
+      }).then(
+        (answer) =>
+          new Response(answer.body, {
+            status: answer.status,
+            headers: { "WWW-Authenticate": 'Basic realm="r"' },
+          }),
+      )) as typeof fetch,
+  });
+  const recalled = await send(
+    moved,
+    new Authorization(credentials),
+    propfind("https://dav.example/dav.php/"),
+    [],
+  );
+  expect(recalled.status).toBe(207);
+  expect(sent.map((header) => header?.split(" ")[0] ?? null)).toEqual(["Digest", "Basic"]);
 });
