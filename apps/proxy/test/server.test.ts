@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PLACES, placesFrom, presetFrom, throughProxy } from "@astrotime/caldav";
+import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { compress } from "../src/compress.ts";
@@ -264,7 +265,7 @@ test("the place search a deployment names, or none, in the page and its policy (
     "connect-src 'self' https://photon.example.org:8443 https://en.wikipedia.org https://ru.wikipedia.org;",
   );
   const off = contentSecurityPolicy(undefined, null);
-  expect([off.includes("connect-src 'self';"), off.includes("img-src 'self';")]).toEqual([
+  expect([off.includes("connect-src 'self';"), off.includes("img-src 'self' blob:;")]).toEqual([
     true,
     true,
   ]);
@@ -565,7 +566,7 @@ describe("the Content Security Policy (D110)", () => {
       "connect-src 'self' https://photon.komoot.io https://en.wikipedia.org https://ru.wikipedia.org",
       "worker-src 'self'",
       "manifest-src 'self'",
-      "img-src 'self' https://tile.openstreetmap.org https://upload.wikimedia.org https://thumb.wikimedia.org",
+      "img-src 'self' blob: https://tile.openstreetmap.org https://upload.wikimedia.org https://thumb.wikimedia.org",
       "base-uri 'none'",
       "form-action 'none'",
       "frame-ancestors 'none'",
@@ -614,6 +615,39 @@ describe("the Content Security Policy (D110)", () => {
     });
     expect([answer.status, (await answer.json()).method]).toEqual([207, "PROPFIND"]);
     expect(answer.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+  });
+
+  test("the user's own pictures (design D222), drawn from blob: URLs, break no rule of the policy", async () => {
+    // A page of the app's own, under its policy, that draws a picture as the
+    // user's own are drawn (`pictures/own.ts`): an object URL of its bytes.
+    const root = mkdtempSync(join(tmpdir(), "astrotime-web-"));
+    mkdirSync(join(root, "assets"));
+    writeFileSync(
+      join(root, "index.html"),
+      `<!doctype html><script type="module" src="/assets/own.js" nonce="${NONCE_PLACEHOLDER}"></script>`,
+    );
+    writeFileSync(
+      join(root, "assets", "own.js"),
+      `const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>';
+      const image = new Image();
+      image.onload = () => window.drawn("loaded");
+      image.onerror = () => window.drawn("refused");
+      image.src = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));`,
+    );
+    const server = createAppServer({ root, allow: [dav] });
+    servers.push(server);
+    const url = await listen(server);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      let heard: (result: string) => void = () => {};
+      const drawn = new Promise<string>((resolve) => (heard = resolve));
+      await page.exposeFunction("drawn", heard);
+      await page.goto(url);
+      expect(await drawn).toBe("loaded");
+    } finally {
+      await browser.close();
+    }
   });
 
   test("the health check carries no policy", async () => {

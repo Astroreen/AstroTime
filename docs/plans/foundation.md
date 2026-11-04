@@ -482,6 +482,9 @@ Decided while building PR 7.
     `/dav-proxy/` ([D39](#D39)); and the place search's Photon
     ([D178](#D178));
   - `worker-src 'self'`: the store's worker, a file of the app's own;
+  - `img-src 'self' blob:` (added with [D124](#D124) and the pictures,
+    design D219, D222): the icons and illustrations, and the user's own
+    pictures, drawn from object URLs, which `'self'` does not match;
   - `base-uri 'none'`, `form-action 'none'` (no form is ever submitted to
     a URL), `frame-ancestors 'none'` (no other site frames the app).
 
