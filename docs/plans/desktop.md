@@ -78,20 +78,20 @@ were checked on 2026-11-01.
   and nothing but the app's own page, under the CSP, runs there.
   The CSP is the web's ([foundation D110](foundation.md#D110)) without what
   only the web needs: `default-src 'none'; script-src 'self'; style-src
-  'self' 'nonce-…'; img-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors
-  'none'`, with a fresh nonce each time `app://` serves the page (for the
-  styles Base UI adds). No `connect-src`: the renderer reaches no network
-  itself, every request goes through the main process; no `worker-src` and
-  no `'wasm-unsafe-eval'`, since the store runs in its own process
-  ([D73](#D73)). _Changed in PR D1:_ this said `default-src 'self'` with
-  `connect-src 'self'` and `object-src 'none'`, written before D110 built
-  the web's policy from what the app does. Navigation away from `app://` and
-  new windows are refused (links open in the system browser), permission
-  requests are denied, and the fuses are set at packaging: `RunAsNode`,
-  `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`
-  and `GrantFileProtocolExtraPrivileges` off, `EnableCookieEncryption` and
-  `OnlyLoadAppFromAsar` on (`EnableEmbeddedAsarIntegrityValidation` does
-  nothing on Linux).
+  'self' 'nonce-…'; img-src 'self' blob:; base-uri 'none'; form-action
+  'none'; frame-ancestors 'none'`, with a fresh nonce each time `app://`
+  serves the page (for the styles Base UI adds). No `connect-src`: the
+  renderer reaches no network itself, every request goes through the main
+  process; no `worker-src` and no `'wasm-unsafe-eval'`, since the store
+  runs in its own process ([D73](#D73)). _Changed in PR D1:_ this said
+  `default-src 'self'` with `connect-src 'self'` and `object-src 'none'`,
+  written before D110 built the web's policy from what the app does.
+  Navigation away from `app://` and new windows are refused (links open in
+  the system browser), permission requests are denied, and the fuses are
+  set at packaging: `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`,
+  `EnableNodeCliInspectArguments` and `GrantFileProtocolExtraPrivileges`
+  off, `EnableCookieEncryption` and `OnlyLoadAppFromAsar` on
+  (`EnableEmbeddedAsarIntegrityValidation` does nothing on Linux).
 
 ### Platform adapters
 
