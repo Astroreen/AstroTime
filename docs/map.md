@@ -164,6 +164,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `NoCalendarHomeError` — an address that answers but is no CalDAV server.
   - `CertificateError` — a server certificate the platform refused (Android's
     plugin tells it apart). → `plans/android.md#D62`
+  - `test/recording.ts`, `test/scenario.ts` — a service's requests and
+    answers recorded (`scripts/record-caldav-service.ts`, the account's
+    values put out) and replayed strictly by `test/services.test.ts`; the
+    recordings in `test/fixtures/services/`. → `plans/providers.md#D249`
   - `test/fixtures/` — calendar homes' `PROPFIND` answers from Nextcloud
     (owned, shared read-only and read-write) and Radicale, for the rights
     read from `current-user-privilege-set`; where each comes from:
