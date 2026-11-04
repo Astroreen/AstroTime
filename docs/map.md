@@ -98,7 +98,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
       → `plans/foundation.md#D122`; another calendar there (an import's,
-      made in `import/plan.ts`) is never removed.
+      made in `import/plan.ts`) is never removed; `withUids`, a
+      calendar's objects by UID, an import's last look before each batch.
       → `plans/import.md#D269`, `plans/import.md#D270`
     - `subscribe` — hears every write that changed a row, for live
       queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`

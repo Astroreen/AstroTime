@@ -149,7 +149,10 @@ not carry is said, not dropped in silence.
   them. An item deleted here whose deletion has not reached the server
   yet is not there as the user sees it, so it is not asked about: the
   file brings it back, as a change of it (the store revives it by UID,
-  [foundation D38](foundation.md#D38)). Copies made in one run name each other: a copied
+  [foundation D38](foundation.md#D38)). The check is made again before each batch
+  for the items it found new: one a sync brought into the calendar
+  meanwhile is already there, and the answer given (or "skip" where none
+  was asked) decides, so nothing is overwritten unasked. Copies made in one run name each other: a copied
   subtask's `RELATED-TO` names its copied parent.
 
 - **D271. Written through the store, in batches.** The objects become

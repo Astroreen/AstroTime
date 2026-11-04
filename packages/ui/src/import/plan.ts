@@ -239,6 +239,8 @@ export async function runImport(run: Run): Promise<Imported> {
 
   const writes: {
     calendarId: string;
+    /** The UID the file gave it. */
+    uid: string;
     ics: string;
     kind: "event" | "task";
     as: "new" | "update" | "copy";
@@ -281,12 +283,19 @@ export async function runImport(run: Run): Promise<Imported> {
         choice === "copy"
           ? {
               calendarId,
+              uid: item.uid,
               ics: withUid(item.ics, uids!.get(item.uid)!, uids),
               kind: item.kind,
               as: "copy",
             }
           : // The file's changes over what is stored: what only it has stays (D7).
-            { calendarId, ics: overlay(there.ics, item.ics), kind: item.kind, as: "update" },
+            {
+              calendarId,
+              uid: item.uid,
+              ics: overlay(there.ics, item.ics),
+              kind: item.kind,
+              as: "update",
+            },
       );
       continue;
     }
@@ -294,20 +303,47 @@ export async function runImport(run: Run): Promise<Imported> {
     const uids = copied.get(calendarId);
     const ics =
       uids && /^RELATED-TO/m.test(item.ics) ? withUid(item.ics, item.uid, uids) : item.ics;
-    writes.push({ calendarId, ics, kind: item.kind, as: "new" });
+    writes.push({ calendarId, uid: item.uid, ics, kind: item.kind, as: "new" });
   }
 
   let done = 0;
   let stopped = false;
   let error: string | null = null;
+  let identical = duplicates.identical;
+  const written: typeof writes = [];
   run.onProgress(0, writes.length);
   for (let i = 0; i < writes.length; i += BATCH) {
     if (run.stopped()) {
       stopped = true;
       break;
     }
-    const batch = writes.slice(i, i + BATCH);
+    const batch: typeof writes = [];
     try {
+      // A UID a sync brought into the calendar since the check: already
+      // there, as the check would have found it (D270), so the answer given
+      // (or "skip", where none was asked) decides, and an update overlays.
+      const fresh = writes.slice(i, i + BATCH);
+      const there = new Map<string, StoredObject>();
+      for (const calendarId of new Set(
+        fresh.filter((w) => w.as === "new").map((w) => w.calendarId),
+      )) {
+        const uids = fresh
+          .filter((w) => w.as === "new" && w.calendarId === calendarId)
+          .map((w) => w.uid);
+        for (const object of await store.withUids(calendarId, uids))
+          there.set(keyOf(calendarId, object.uid), object);
+      }
+      for (const write of fresh) {
+        const found =
+          write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
+        if (!found) batch.push(write);
+        else if (sameObjects(found.ics, write.ics)) identical++;
+        else if (choice === "copy")
+          batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
+        else if (choice === "update")
+          batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
+        else skipped++;
+      }
       // The store finds an object of the same UID itself, and updates it
       // (D270); a batch is one transaction, so a failed one wrote nothing.
       await store.changeLocal(async (local) => {
@@ -317,11 +353,11 @@ export async function runImport(run: Run): Promise<Imported> {
       error = failure instanceof Error ? failure.message : String(failure);
       break;
     }
-    done += batch.length;
+    written.push(...batch);
+    done += Math.min(BATCH, writes.length - i);
     run.onProgress(done, writes.length);
     await pause();
   }
-  const written = writes.slice(0, done);
   // A calendar made for the import that got nothing (stopped, or failed, first)
   // goes again; if it cannot, that is said beside what was imported, not instead.
   let cleanup: string | null = null;
@@ -340,7 +376,7 @@ export async function runImport(run: Run): Promise<Imported> {
     tasks: count("task"),
     updated: written.filter((write) => write.as === "update").length,
     copies: written.filter((write) => write.as === "copy").length,
-    identical: duplicates.identical,
+    identical,
     skipped,
     again,
     stopped,

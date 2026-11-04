@@ -517,10 +517,18 @@ function Done({ result }: { result: Imported }) {
   ].filter((line) => line !== null);
   return (
     <div role="status" className="flex flex-col items-center gap-2 py-6 text-center">
-      <CheckCircleIcon className="size-10 text-accent" />
-      <p className="text-title">{t("import.done")}</p>
-      {lines.map((line) => (
-        <p key={line} className="text-body text-ink-muted">
+      {result.stopped || result.error ? null : <CheckCircleIcon className="size-10 text-accent" />}
+      <p className="text-title">
+        {t(
+          result.error
+            ? "import.endedOnError"
+            : result.stopped
+              ? "import.endedStopped"
+              : "import.done",
+        )}
+      </p>
+      {lines.map((line, n) => (
+        <p key={n} className="text-body text-ink-muted">
           {line}
         </p>
       ))}

@@ -436,6 +436,23 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.accounts()).toEqual([server]);
     });
 
+    test("objects found by UID in one calendar, a deletion not yet uploaded aside (import D270)", async () => {
+      const { store, calendar } = await setup();
+      await store.saveLocal(calendar.id, task("a"));
+      const gone = await store.saveFromServer(calendar.id, {
+        href: "https://cloud.example.com/gone.ics",
+        etag: '"1"',
+        ics: task("gone"),
+      });
+      await store.deleteLocal(gone.id);
+      const other = await store.saveCalendar({ ...calendar, url: `${calendar.url}other/` });
+      await store.saveLocal(other.id, task("c"));
+      const many = Array.from({ length: 1200 }, (_, i) => `x${i}`);
+      const found = await store.withUids(calendar.id, ["a", "c", "gone", ...many]);
+      expect(found.map((object) => object.uid)).toEqual(["a"]);
+      expect(await store.withUids(calendar.id, [])).toEqual([]);
+    });
+
     test("an account on this device with no calendar left goes, and that is said (D122)", async () => {
       const { store } = await setup();
       await store.saveCalendar({

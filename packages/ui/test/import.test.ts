@@ -547,6 +547,41 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(back?.startMs).toBe(Date.UTC(2026, 10, 6, 9));
   });
 
+  test("a UID a sync brought in after the check is already there: the answer decides, nothing overwritten unasked", async () => {
+    for (const choice of ["skip", "update"] as const) {
+      const { store, personal } = await setup();
+      const source = await sourceOf(
+        calendar("File", event("late", "20261106T090000Z"), event("twin"), event("fresh")),
+      );
+      const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+      const duplicates = await duplicatesOf(store, [source], destinations);
+      expect(duplicates.existing.size).toBe(0);
+      // Meanwhile a sync brings "late" (another version) and "twin" (the same item).
+      await store.saveManyFromServer(personal.id, [
+        {
+          href: "https://cloud.example.com/dav/Personal/late.ics",
+          etag: '"1"',
+          ics: calendar(null, event("late", "20261105T090000Z", ["X-SERVER:kept"])),
+        },
+        {
+          href: "https://cloud.example.com/dav/Personal/twin.ics",
+          etag: '"1"',
+          ics: source.items.find((item) => item.uid === "twin")!.ics,
+        },
+      ]);
+      const { result } = await run(store, [source], destinations, duplicates, choice);
+      const late = (await store.withUids(personal.id, ["late"]))[0]!;
+      if (choice === "skip") {
+        expect(result).toMatchObject({ events: 1, skipped: 1, identical: 1 });
+        expect(late.pending).toBe("none");
+      } else {
+        expect(result).toMatchObject({ events: 2, updated: 1, identical: 1 });
+        expect(late.startMs).toBe(Date.UTC(2026, 10, 6, 9));
+        expect(late.ics).toContain("X-SERVER:kept");
+      }
+    }
+  });
+
   test("a new calendar on this device, named and coloured as the source", async () => {
     const { store } = await setup();
     const source = await sourceOf(

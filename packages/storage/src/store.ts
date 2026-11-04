@@ -940,6 +940,30 @@ export class Store {
     );
   }
 
+  /**
+   * The objects of a calendar with any of these UIDs, a deletion not yet
+   * uploaded aside (docs/plans/import.md#D270): an import's last look
+   * before each batch, for one a sync brought meanwhile.
+   */
+  async withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]> {
+    const found: StoredObject[] = [];
+    for (let i = 0; i < uids.length; i += IN_LIMIT) {
+      found.push(
+        ...(await this.db
+          .select()
+          .from(schema.objects)
+          .where(
+            and(
+              eq(schema.objects.calendarId, calendarId),
+              inArray(schema.objects.uid, uids.slice(i, i + IN_LIMIT)),
+              ne(schema.objects.pending, "delete"),
+            ),
+          )),
+      );
+    }
+    return found;
+  }
+
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */
   hrefs(
     calendarId: string,
