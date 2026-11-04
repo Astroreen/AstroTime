@@ -384,7 +384,9 @@ When you add a package, app or module, add its line here in the same PR.
     (`read.ts`), a file's format told from its bytes and its sources;
     `decodeText` (`decode.ts`), its charset; `unzip` (`zip.ts`, loaded for
     a ZIP alone); `vcalendarToIcs` (`vcs.ts`, loaded for vCalendar 1.0
-    alone), a `.vcs` as iCalendar (`plans/import.md#D272`);
+    alone), a `.vcs` as iCalendar; `csvToIcs` (`csv.ts`, loaded for a CSV
+    alone), Outlook's, Thunderbird's and Google's columns as iCalendar
+    (`plans/import.md#D272`);
     `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`), where each
     source goes, a new calendar on this device, and the writes in batches.
     → `plans/import.md#D266`–`#D271`

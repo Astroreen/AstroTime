@@ -1,0 +1,4 @@
+﻿"Subject","Start Date","Start Time","End Date","End Time","All day event","Reminder on/off","Reminder Date","Reminder Time","Meeting Organizer","Required Attendees","Optional Attendees","Meeting Resources","Billing Information","Categories","Description","Location","Mileage","Priority","Private","Sensitivity","Show time as"
+"Design review","11/4/2026","10:00:00 AM","11/4/2026","11:30:00 AM","False","True","11/4/2026","9:45:00 AM","Anna Berg","marta@example.com;Team","","Room 4","","Work;Design","Bring the mock-ups.
+And the numbers.","Room 4","12 km","High","False","Normal","2"
+"Day off","11/10/2026","12:00:00 AM","11/11/2026","12:00:00 AM","True","False","","","","","","","","","","","","Normal","False","Private","0"

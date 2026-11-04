@@ -2,7 +2,7 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2) and vCalendar 1.0 (PR I3) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3) and CSV (PR I4) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -265,6 +265,21 @@ inside its value. Each `VCALENDAR` of a file is read by its own version:
 a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
 
 ### PR I4 — CSV (Outlook's and Google's columns)
+
+`csvToIcs` (`packages/ui/src/import/csv.ts`), loaded for a CSV alone:
+RFC 4180 with the delimiter its first line uses (`,`, `;`, a tab);
+Outlook's columns in English and Russian (calendar and tasks),
+Thunderbird's (Outlook's names) and the ones Google Calendar's import
+documents; each row an item at the user's wall clock in their zone, with
+a `VTIMEZONE` (`zoneText`); its UID made from the row, so the same file
+imported again finds its items there (D270). Dates: year first is ISO; a
+part past 12 tells day from month; else the user's language decides,
+said in the preview as guessed. An all-day event's end: Google's
+columns name its last day, Outlook's the day after. A reminder becomes
+an alarm before the start (a task's at its time); a guest or organizer
+named without an address, and a column with no place in iCalendar
+(`Mileage`, `Total Work`), are named as not carried over, its default
+values (`0`, `False`, `Normal`) aside. D266, D272.
 
 ### PR I5 — Google Takeout Tasks
 

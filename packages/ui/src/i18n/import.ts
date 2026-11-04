@@ -9,13 +9,15 @@ export const importStrings = {
     "import.close": "Close",
     "import.reading": "Reading {{file}}…",
     "import.notCalendar":
-      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), vCalendar (.vcs), jCal (.json) and ZIP archives of them.",
+      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV from Outlook, Thunderbird or Google, and ZIP archives of them.",
     "import.unreadable": "{{file}} could not be read: {{message}}",
     "import.events_one": "{{count}} event",
     "import.events_other": "{{count}} events",
     "import.tasks_one": "{{count}} task",
     "import.tasks_other": "{{count}} tasks",
     "import.nothing": "No events or tasks",
+    "import.datesGuessed":
+      "The file does not tell the day from the month: its dates were read as {{example}}.",
     "import.notImported": "Not carried over, iCalendar has no place for them: {{names}}",
     "import.others_one": "{{count}} note or other entry AstroTime does not keep is left out",
     "import.others_other": "{{count}} notes or other entries AstroTime does not keep are left out",
@@ -90,7 +92,7 @@ export const importStrings = {
     "import.close": "Закрыть",
     "import.reading": "Читаем {{file}}…",
     "import.notCalendar":
-      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), vCalendar (.vcs), jCal (.json) и их ZIP-архивы.",
+      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV из Outlook, Thunderbird или Google и их ZIP-архивы.",
     "import.unreadable": "Не удалось прочитать {{file}}: {{message}}",
     "import.events_one": "{{count}} событие",
     "import.events_few": "{{count}} события",
@@ -101,6 +103,8 @@ export const importStrings = {
     "import.tasks_many": "{{count}} задач",
     "import.tasks_other": "{{count}} задачи",
     "import.nothing": "Ни событий, ни задач",
+    "import.datesGuessed":
+      "По файлу не понять, где день, а где месяц: даты прочитаны как {{example}}.",
     "import.notImported": "Не перенесено, в iCalendar для этого нет места: {{names}}",
     "import.others_one":
       "{{count}} заметка или другая запись, которую AstroTime не хранит, пропущена",

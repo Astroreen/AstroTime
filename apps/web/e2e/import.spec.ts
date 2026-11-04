@@ -5,7 +5,7 @@
 // phone in Russian.
 import { expect, test } from "@playwright/test";
 
-import { BIG, HOLIDAYS, importFile, NOKIA, TEAM } from "./import-files.ts";
+import { BIG, HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TEAM } from "./import-files.ts";
 import { choose, NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 test("wide, English: a file's events and a task, one already there, into Work and a new list", async ({
@@ -214,5 +214,32 @@ test.describe("on a phone, in Russian", () => {
     await expect(phone).toContainText("Не перенесено, в iCalendar для этого нет места: PALARM");
     await dialog.getByRole("button", { name: "Импортировать" }).click();
     await expect(dialog.getByRole("status")).toContainText("4 события · 1 задача");
+  });
+
+  test("Russian Outlook's CSV: read as Windows-1251, day first, into the views", async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openDemo(page, "agenda");
+    await page.getByRole("button", { name: "Главное меню" }).click();
+    await page
+      .getByRole("dialog", { name: "Главное меню" })
+      .getByRole("button", { name: "Настройки" })
+      .click();
+    await importFile(page, /^Импорт из файла/, "Календарь.csv", OUTLOOK_RU);
+    const dialog = page.getByRole("dialog", { name: "Импорт" });
+    await expect(dialog).toContainText(
+      "Файл не указывает кодировку: он прочитан как windows-1251.",
+    );
+    const source = dialog.getByRole("region", { name: "Календарь" });
+    await expect(source).toContainText("2 события · 5–9 нояб. 2026 г.");
+    await dialog.getByRole("button", { name: "Импортировать" }).click();
+    await expect(dialog.getByRole("status")).toContainText("2 события");
+    await dialog.getByRole("button", { name: "Закрыть" }).last().click();
+    await page
+      .getByRole("dialog", { name: "Настройки" })
+      .getByRole("button", { name: "Закрыть настройки" })
+      .click();
+    await expect(page.getByRole("listitem", { name: /^Планёрка/ }).first()).toBeVisible();
   });
 });

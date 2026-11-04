@@ -7,7 +7,7 @@
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e import-screenshots
 import { expect, test } from "@playwright/test";
 
-import { HOLIDAYS, importFile, NOKIA, TEAM } from "./import-files.ts";
+import { HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TEAM } from "./import-files.ts";
 import { choose, openDemo } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
@@ -102,12 +102,14 @@ for (const language of ["en", "ru"] as const) {
   }
 }
 
-// vCalendar 1.0 (import D266, D272): a phone's file, what was not carried over said.
-for (const [language, theme, size, viewport] of [
-  ["ru", "light", "phone", PHONE],
-  ["en", "dark", "wide", WIDE],
+// vCalendar 1.0 and CSV (import D266, D272): a phone's file, what was not
+// carried over said; Russian Outlook's CSV, its encoding guessed.
+for (const [format, language, theme, size, viewport] of [
+  ["vcs", "ru", "light", "phone", PHONE],
+  ["vcs", "en", "dark", "wide", WIDE],
+  ["csv", "ru", "dark", "phone", PHONE],
 ] as const) {
-  test(`vcs ${language} ${theme} ${size}`, async ({ browser }) => {
+  test(`${format} ${language} ${theme} ${size}`, async ({ browser }) => {
     const words = WORDS[language];
     const context = await browser.newContext({
       locale: words.locale,
@@ -130,10 +132,13 @@ for (const [language, theme, size, viewport] of [
         .getByRole("button", { name: words.settings })
         .click();
     }
-    await importFile(page, words.entry, "nokia.vcs", NOKIA);
+    if (format === "vcs") await importFile(page, words.entry, "nokia.vcs", NOKIA);
+    else await importFile(page, words.entry, "Календарь.csv", OUTLOOK_RU);
     const dialog = page.getByRole("dialog", { name: words.dialog });
     await expect(dialog.getByRole("region").first()).toBeVisible();
-    await page.screenshot({ path: `${directory}/import-vcs-${language}-${theme}-${size}.png` });
+    await page.screenshot({
+      path: `${directory}/import-${format}-${language}-${theme}-${size}.png`,
+    });
     await context.close();
   });
 }
