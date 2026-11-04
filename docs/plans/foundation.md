@@ -2278,6 +2278,13 @@ task?"
 
 ## Deferred
 
+- **"This and following" from an RDATE its rule does not make**
+  ([D105](#D105)) — the new series starts on the RDATE's day, and an
+  `RRULE` that leaves its days to `DTSTART` (no `BYDAY`, `BYMONTHDAY`,
+  `BYMONTH`) moves to that day: Mondays split at a Wednesday RDATE become
+  Wednesdays. Its `COUNT` is one short too, since `DTSTART` counts as an
+  occurrence of the rule. Writing those parts out from the old start, and
+  counting the start, waits; AstroTime itself writes no RDATEs.
 - **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
   in the user's `/Calendar`, attached to nothing; attaching it to the item
   if that was saved meanwhile, or removing it, waits for an upload that
