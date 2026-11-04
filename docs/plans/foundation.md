@@ -341,8 +341,12 @@ Decided while building PR 4.
   D38 applies. A refused write with no base keeps the server's version and
   lists ours as a conflict, unless both are the same. **What the user may
   do in a calendar** is its `rights`, kept with it in the store (migration
-  7): `create` a new item, `edit` one, `delete` one. The CalDAV provider
-  reads them from the calendar's `current-user-privilege-set` (RFC 3744):
+  7): `create` a new item, `edit` one, `delete` one. Editing is read from
+  `read_only` alone, which this build writes as `!rights.edit`: a tab of a
+  build before migration 7 on the same store ([D98](#D98)) writes only
+  `read_only`, so where the two disagree it is the fresher, either way (a
+  row whose `rights` lack `edit` with `read_only` 0 edits; this build never
+  writes that). The CalDAV provider reads them from the calendar's `current-user-privilege-set` (RFC 3744):
   `bind` creates, `write-content` edits, `unbind` deletes, and `write` or
   `all` grant all three (Radicale lists `all` without its parts, Nextcloud
   lists the parts too); `write-properties` (a share's own name and colour)
@@ -483,8 +487,9 @@ Decided while building PR 7.
     ([D178](#D178));
   - `worker-src 'self'`: the store's worker, a file of the app's own;
   - `img-src 'self' blob:` (added with [D124](#D124) and the pictures,
-    design D219, D222): the icons and illustrations, and the user's own
-    pictures, drawn from object URLs, which `'self'` does not match;
+    design [D219](design.md#D219), [D222](design.md#D222)): the icons and
+    illustrations, and the user's own pictures, drawn from object URLs,
+    which `'self'` does not match;
   - `base-uri 'none'`, `form-action 'none'` (no form is ever submitted to
     a URL), `frame-ancestors 'none'` (no other site frames the app).
 
