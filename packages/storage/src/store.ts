@@ -56,6 +56,8 @@ export interface LocalChange {
   calendars(): Promise<Calendar[]>;
   save(calendarId: string, ics: string, href?: string): Promise<StoredObject>;
   delete(id: string): Promise<void>;
+  /** As `Store.withUids`, read in the same transaction as the writes. */
+  withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]>;
 }
 
 /** A task that rolls over to today, with the occurrence it counts by (design D51). */
@@ -573,6 +575,7 @@ export class Store {
         calendars: () => this.calendars(),
         save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
         delete: (id) => this.deleteLocalNow(id),
+        withUids: (calendarId, uids) => this.withUids(calendarId, uids),
       }),
     );
   }
@@ -938,6 +941,30 @@ export class Store {
         // Changes made in the same millisecond keep the order their rows were made in.
         .orderBy(schema.objects.updatedAt, sql`rowid`)
     );
+  }
+
+  /**
+   * The objects of a calendar with any of these UIDs, a deletion not yet
+   * uploaded aside (docs/plans/import.md#D270): an import's last look
+   * before each batch, for one a sync brought meanwhile.
+   */
+  async withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]> {
+    const found: StoredObject[] = [];
+    for (let i = 0; i < uids.length; i += IN_LIMIT) {
+      found.push(
+        ...(await this.db
+          .select()
+          .from(schema.objects)
+          .where(
+            and(
+              eq(schema.objects.calendarId, calendarId),
+              inArray(schema.objects.uid, uids.slice(i, i + IN_LIMIT)),
+              ne(schema.objects.pending, "delete"),
+            ),
+          )),
+      );
+    }
+    return found;
   }
 
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */

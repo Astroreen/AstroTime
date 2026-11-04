@@ -98,7 +98,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
       → `plans/foundation.md#D122`; another calendar there (an import's,
-      made in `import/plan.ts`) is never removed.
+      made in `import/plan.ts`) is never removed; `withUids`, a
+      calendar's objects by UID, an import's last look before each batch.
       → `plans/import.md#D269`, `plans/import.md#D270`
     - `subscribe` — hears every write that changed a row, for live
       queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`
@@ -382,9 +383,10 @@ When you add a package, app or module, add its line here in the same PR.
   - `import/` — an import's logic, loaded with its dialog: `readImport`
     (`read.ts`), a file's format told from its bytes and its sources;
     `decodeText` (`decode.ts`), its charset; `unzip` (`zip.ts`, loaded for
-    a ZIP alone); `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`),
-    where each source goes, a new calendar on this device, and the writes
-    in batches.
+    a ZIP alone); `vcalendarToIcs` (`vcs.ts`, loaded for vCalendar 1.0
+    alone), a `.vcs` as iCalendar (`plans/import.md#D272`);
+    `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`), where each
+    source goes, a new calendar on this device, and the writes in batches.
     → `plans/import.md#D266`–`#D271`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in

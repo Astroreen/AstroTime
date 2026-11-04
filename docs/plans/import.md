@@ -1,8 +1,8 @@
 # Import plan
 
 Status: **in progress** — the formats, their order and the flow are
-decided; the splitter (PR I1) and the import flow for iCalendar, jCal and
-ZIP (PR I2) are built. This plan owns reading calendars
+decided; the splitter (PR I1), the import flow for iCalendar, jCal and
+ZIP (PR I2) and vCalendar 1.0 (PR I3) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -140,13 +140,23 @@ not carry is said, not dropped in silence.
   component iCalendar names (its start and its `DTEND` or `DURATION`,
   its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
   out is gone: the user chose the file's version, so this is their edit,
-  not a sync that drops what it does not understand. The stored copy
+  not a sync that drops what it does not understand. So its `STATUS`,
+  `COMPLETED` and the guests' `PARTSTAT` follow the file too, by the
+  user's choice; an occurrence that changed gets a `SEQUENCE` one past
+  the larger of the two, so a scheduling client never sees it go back (RFC
+  5546), and one the file gives as it was (what the stored copy keeps
+  aside) keeps the stored one's. The stored copy
   gives only what a file from another app cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
   not have, and its alarms and its attachments when the file has none of
   them. An item deleted here whose deletion has not reached the server
   yet is not there as the user sees it, so it is not asked about: the
   file brings it back, as a change of it (the store revives it by UID,
-  [foundation D38](foundation.md#D38)). Copies made in one run name each other: a copied
+  [foundation D38](foundation.md#D38)). The check is made again for the items it
+  found new, inside each batch's own transaction (`LocalChange.withUids`,
+  [foundation D99](foundation.md#D99)): one a sync brought into the
+  calendar meanwhile is already there, and the answer given (or "skip"
+  where none was asked) decides; no sync writes between that look and the
+  batch's writes, so nothing is overwritten unasked. Copies made in one run name each other: a copied
   subtask's `RELATED-TO` names its copied parent.
 
 - **D271. Written through the store, in batches.** The objects become
@@ -162,8 +172,10 @@ not carry is said, not dropped in silence.
   counted as given twice). A write that fails ends the run: the batch is
   one transaction, so what landed before stays and is counted, and the
   error is said. A calendar made for the import that got nothing (stopped
-  or failed before its first write) is removed again, and so are those
-  made before one that could not be made.
+  or failed before its first write) is removed again, with its account on
+  this device if nothing is left on it, and so are those made before one
+  that could not be made; a removal that fails is said beside what was
+  imported, never instead of it.
 
 - **D272. Nothing lost, and what a conversion cannot carry, said.** An
   iCalendar or jCal object is stored as the file wrote it
@@ -231,6 +243,26 @@ new one on this device, stops one in the middle, and sees the items in the
 views; the first load grows by at most 0.1 KiB.
 
 ### PR I3 — vCalendar 1.0
+
+`vcalendarToIcs` (`packages/ui/src/import/vcs.ts`), loaded for a 1.0 file
+alone: quoted-printable text in its charset (a soft break read before a
+fold); local times keep their wall clock in a zone, so a series does not
+move an hour when the offset changes: the user's own, its rules for every
+year, where its offsets are the file's `TZ` and `DAYLIGHT`s; else a
+`VTIMEZONE` made of them (exact for the years the file's `DAYLIGHT`s name,
+its standard offset beyond); floating with no `TZ`. An all-day event's
+days are the user's (`…T210000Z` is the next day in UTC+3), its exception
+dates and rule's end dates too; a rule's end is UTC for a zoned start; `AALARM`/`DALARM`/`MALARM` as alarms relative to the
+start (a task's to its due time; else at their instant in UTC, or named
+when they have none), 1.0's rule grammar (`D`, `W`, `MD`, `MP`, `YM`, `YD`, `#n` or an
+end date, two occurrences when none is given) as an `RRULE`, `PRIORITY`
+1–3 as 1, 5, 9, Outlook's all-day flag as dates; a rule of several parts,
+a procedure alarm (`PALARM`), any property iCalendar has no place for,
+and a component whose `END` never came (kept as far as it went) are
+named as not carried over; a component AstroTime does not read
+(`VJOURNAL`) is skipped whole and named once. A `;` 1.0 escapes stays
+inside its value. Each `VCALENDAR` of a file is read by its own version:
+a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
 
 ### PR I4 — CSV (Outlook's and Google's columns)
 

@@ -7,7 +7,7 @@
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e import-screenshots
 import { expect, test } from "@playwright/test";
 
-import { HOLIDAYS, importFile, TEAM } from "./import-files.ts";
+import { HOLIDAYS, importFile, NOKIA, TEAM } from "./import-files.ts";
 import { choose, openDemo } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
@@ -100,4 +100,40 @@ for (const language of ["en", "ru"] as const) {
       });
     }
   }
+}
+
+// vCalendar 1.0 (import D266, D272): a phone's file, what was not carried over said.
+for (const [language, theme, size, viewport] of [
+  ["ru", "light", "phone", PHONE],
+  ["en", "dark", "wide", WIDE],
+] as const) {
+  test(`vcs ${language} ${theme} ${size}`, async ({ browser }) => {
+    const words = WORDS[language];
+    const context = await browser.newContext({
+      locale: words.locale,
+      colorScheme: theme,
+      viewport,
+      ...(size === "phone" ? { hasTouch: true, isMobile: true } : {}),
+      timezoneId: "Europe/Vilnius",
+    });
+    const page = await context.newPage();
+    await openDemo(page, "week");
+    if (size === "phone") {
+      await page.getByRole("button", { name: words.menu }).click();
+      await page
+        .getByRole("dialog", { name: words.menu })
+        .getByRole("button", { name: words.settings })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: words.menu })
+        .getByRole("button", { name: words.settings })
+        .click();
+    }
+    await importFile(page, words.entry, "nokia.vcs", NOKIA);
+    const dialog = page.getByRole("dialog", { name: words.dialog });
+    await expect(dialog.getByRole("region").first()).toBeVisible();
+    await page.screenshot({ path: `${directory}/import-vcs-${language}-${theme}-${size}.png` });
+    await context.close();
+  });
 }

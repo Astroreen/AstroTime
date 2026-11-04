@@ -636,6 +636,31 @@ describe("the file's object over the one stored (import D270, Update them)", () 
     CalendarObject.parse(merged);
   });
 
+  test("SEQUENCE goes past both versions' where an occurrence changed, and only there", () => {
+    const seq = (stored: string[], file: string[]) =>
+      vevents(
+        overlay(calendar(event("s", stored)), calendar(event("s", file))),
+      )[0]!.getFirstPropertyValue("sequence");
+    // Changed: past both.
+    expect(seq(["SEQUENCE:3"], ["SEQUENCE:1", "LOCATION:Moved"])).toBe(4);
+    expect(seq(["SEQUENCE:1"], ["SEQUENCE:5", "LOCATION:Moved"])).toBe(6);
+    expect(seq([], ["LOCATION:Moved"])).toBe(1);
+    // The same but for what the stored copy keeps (its X- properties): the stored one's.
+    expect(seq(["SEQUENCE:3", "X-MINE:1"], ["SEQUENCE:1"])).toBe(3);
+    expect(seq(["X-MINE:1"], [])).toBeNull();
+  });
+
+  test("an exception the file gives as it was keeps its SEQUENCE while its series moves on", () => {
+    const exception = ["RECURRENCE-ID:20261106T090000Z", "SEQUENCE:2", "DESCRIPTION:Moved"];
+    const merged = vevents(
+      overlay(
+        calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=3", "SEQUENCE:2"]), event("s", exception)),
+        calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=4", "SEQUENCE:2"]), event("s", exception)),
+      ),
+    );
+    expect(merged.map((one) => one.getFirstPropertyValue("sequence"))).toEqual([3, 2]);
+  });
+
   test("its EXDATEs are the file's", () => {
     const merged = overlay(
       calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261106T090000Z"])),

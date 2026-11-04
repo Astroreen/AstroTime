@@ -140,6 +140,8 @@ export interface Imported {
   readonly stopped: boolean;
   /** Why it ended before the end, if a write failed: what came before stays. */
   readonly error: string | null;
+  /** Why a calendar made for it and left empty could not be removed again. */
+  readonly cleanup: string | null;
   /** The calendars made on this device, by source. */
   readonly made: ReadonlyMap<string, Calendar>;
 }
@@ -173,15 +175,19 @@ async function addDeviceCalendar(
     readonly color: string | null;
     readonly components: readonly Component[];
   },
+  /** Called with the account's id when this call made it. */
+  madeAccount: (id: string) => void,
 ): Promise<Calendar> {
-  const local =
-    (await store.accounts()).find((account) => account.provider === "local") ??
-    (await store.addAccount({
+  let local = (await store.accounts()).find((account) => account.provider === "local");
+  if (!local) {
+    local = await store.addAccount({
       provider: "local",
       name: names.account,
       serverUrl: LOCAL_SERVER,
       username: null,
-    }));
+    });
+    madeAccount(local.id);
+  }
   return store.saveCalendar({
     accountId: local.id,
     url: `${LOCAL_SERVER}${crypto.randomUUID()}/`,
@@ -192,6 +198,24 @@ async function addDeviceCalendar(
   });
 }
 
+/**
+ * A calendar the import made on this device, removed again: with the
+ * account it is on when the import made that account too and it has no
+ * calendar left; an account the user had stays, as the user had it.
+ */
+async function unmake(
+  store: Store,
+  calendar: Calendar,
+  ownAccounts: ReadonlySet<string>,
+): Promise<void> {
+  await store.removeCalendar(calendar.id);
+  if (
+    ownAccounts.has(calendar.accountId) &&
+    (await store.calendars(calendar.accountId)).length === 0
+  )
+    await store.removeAccount(calendar.accountId);
+}
+
 export const BATCH = 200;
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve));
 
@@ -200,6 +224,8 @@ export async function runImport(run: Run): Promise<Imported> {
   const pause = run.pause ?? yieldToPage;
   // A new calendar on this device per source that asks for one, taking what goes to it.
   const made = new Map<string, Calendar>();
+  /** The device accounts this run made, which alone it may take back. */
+  const ownAccounts = new Set<string>();
   try {
     for (const source of run.sources) {
       const to = run.destinations.get(source.id);
@@ -209,22 +235,35 @@ export async function runImport(run: Run): Promise<Imported> {
       if (components.length === 0) continue;
       made.set(
         source.id,
-        await addDeviceCalendar(store, {
-          account: run.accountName,
-          calendar: source.name,
-          color: source.color,
-          components,
-        }),
+        await addDeviceCalendar(
+          store,
+          {
+            account: run.accountName,
+            calendar: source.name,
+            color: source.color,
+            components,
+          },
+          (id) => ownAccounts.add(id),
+        ),
       );
     }
   } catch (error) {
-    // One that could not be made: the ones made before it go again, empty.
-    for (const calendar of made.values()) await store.removeCalendar(calendar.id);
+    // One that could not be made: the ones made before it go again, empty;
+    // one of those that cannot go does not hide why the import stopped.
+    for (const calendar of made.values())
+      await unmake(store, calendar, ownAccounts).catch(() => {});
+    // An account made just before its calendar could not be: it goes too.
+    for (const id of ownAccounts) {
+      const left = await store.calendars(id).catch(() => [null]);
+      if (left.length === 0) await store.removeAccount(id).catch(() => {});
+    }
     throw error;
   }
 
   const writes: {
     calendarId: string;
+    /** The UID the file gave it. */
+    uid: string;
     ics: string;
     kind: "event" | "task";
     as: "new" | "update" | "copy";
@@ -267,12 +306,19 @@ export async function runImport(run: Run): Promise<Imported> {
         choice === "copy"
           ? {
               calendarId,
+              uid: item.uid,
               ics: withUid(item.ics, uids!.get(item.uid)!, uids),
               kind: item.kind,
               as: "copy",
             }
           : // The file's changes over what is stored: what only it has stays (D7).
-            { calendarId, ics: overlay(there.ics, item.ics), kind: item.kind, as: "update" },
+            {
+              calendarId,
+              uid: item.uid,
+              ics: overlay(there.ics, item.ics),
+              kind: item.kind,
+              as: "update",
+            },
       );
       continue;
     }
@@ -280,39 +326,80 @@ export async function runImport(run: Run): Promise<Imported> {
     const uids = copied.get(calendarId);
     const ics =
       uids && /^RELATED-TO/m.test(item.ics) ? withUid(item.ics, item.uid, uids) : item.ics;
-    writes.push({ calendarId, ics, kind: item.kind, as: "new" });
+    writes.push({ calendarId, uid: item.uid, ics, kind: item.kind, as: "new" });
   }
 
   let done = 0;
   let stopped = false;
   let error: string | null = null;
+  let identical = duplicates.identical;
+  const written: typeof writes = [];
   run.onProgress(0, writes.length);
   for (let i = 0; i < writes.length; i += BATCH) {
     if (run.stopped()) {
       stopped = true;
       break;
     }
-    const batch = writes.slice(i, i + BATCH);
+    let batch: typeof writes = [];
+    // Counted once the batch is written: a batch that fails wrote nothing.
+    let same = 0;
+    let left = 0;
     try {
-      // The store finds an object of the same UID itself, and updates it
-      // (D270); a batch is one transaction, so a failed one wrote nothing.
+      // In the batch's own transaction (D99): a UID a sync brought into the
+      // calendar since the check is already there, as the check would have
+      // found it (D270), so the answer given (or "skip", where none was
+      // asked) decides, and an update overlays; no sync writes in between.
+      const fresh = writes.slice(i, i + BATCH);
       await store.changeLocal(async (local) => {
+        batch = [];
+        same = 0;
+        left = 0;
+        const there = new Map<string, StoredObject>();
+        for (const calendarId of new Set(
+          fresh.filter((w) => w.as === "new").map((w) => w.calendarId),
+        )) {
+          const uids = fresh
+            .filter((w) => w.as === "new" && w.calendarId === calendarId)
+            .map((w) => w.uid);
+          for (const object of await local.withUids(calendarId, uids))
+            there.set(keyOf(calendarId, object.uid), object);
+        }
+        for (const write of fresh) {
+          const found =
+            write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
+          if (!found) batch.push(write);
+          else if (sameObjects(found.ics, write.ics)) same++;
+          else if (choice === "copy")
+            batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
+          else if (choice === "update")
+            batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
+          else left++;
+        }
+        // The store finds an object of the same UID itself, and updates it
+        // (D270); a batch is one transaction, so a failed one wrote nothing.
         for (const write of batch) await local.save(write.calendarId, write.ics);
       });
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
       break;
     }
-    done += batch.length;
+    written.push(...batch);
+    identical += same;
+    skipped += left;
+    done += Math.min(BATCH, writes.length - i);
     run.onProgress(done, writes.length);
     await pause();
   }
-  const written = writes.slice(0, done);
-  // A calendar made for the import that got nothing (stopped, or failed, first) goes again.
+  // A calendar made for the import that got nothing (stopped, or failed, first)
+  // goes again; if it cannot, that is said beside what was imported, not instead.
+  let cleanup: string | null = null;
   for (const [id, calendar] of made) {
-    if (!written.some((write) => write.calendarId === calendar.id)) {
-      await store.removeCalendar(calendar.id);
+    if (written.some((write) => write.calendarId === calendar.id)) continue;
+    try {
+      await unmake(store, calendar, ownAccounts);
       made.delete(id);
+    } catch (failure) {
+      cleanup = failure instanceof Error ? failure.message : String(failure);
     }
   }
   const count = (kind: "event" | "task") => written.filter((write) => write.kind === kind).length;
@@ -321,11 +408,12 @@ export async function runImport(run: Run): Promise<Imported> {
     tasks: count("task"),
     updated: written.filter((write) => write.as === "update").length,
     copies: written.filter((write) => write.as === "copy").length,
-    identical: duplicates.identical,
+    identical,
     skipped,
     again,
     stopped,
     error,
+    cleanup,
     made,
   };
 }

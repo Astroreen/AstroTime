@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { deflateRawSync } from "node:zlib";
 
 import { ALL_RIGHTS, CalendarObject } from "@astrotime/core";
-import { Store } from "@astrotime/storage";
+import { LOCAL_SERVER, Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -433,6 +433,8 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(result).toMatchObject({ events: 0, stopped: true });
     expect(result.made.size).toBe(0);
     expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
+    // Nor the account on this device made for it: nothing is left on it.
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
   });
 
   test("Update them: the file's changes over what is stored; what only the stored one has stays (D7)", async () => {
@@ -489,6 +491,21 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(copy("child").serialize()).toContain(`RELATED-TO:${copy("parent").uid}`);
   });
 
+  test("a calendar that cannot be removed again is said beside what was imported, not instead", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    store.removeCalendar = () => Promise.reject(new Error("The store is closed."));
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 0);
+    expect(result).toMatchObject({
+      events: 0,
+      stopped: true,
+      error: null,
+      cleanup: "The store is closed.",
+    });
+  });
+
   test("a new calendar that cannot be made: the ones made before it go again", async () => {
     const { store } = await setup();
     const one = await sourceOf(calendar("One", event("a")));
@@ -506,6 +523,7 @@ describe("an import written through the store (import D269–D271)", () => {
     }) as typeof store.saveCalendar;
     await expect(run(store, [one, two], destinations, duplicates)).rejects.toThrow("disk");
     expect((await store.calendars()).map((made) => made.name)).not.toContain("One");
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
   });
 
   test("an item deleted here, its deletion not yet on the server, is brought back by the file", async () => {
@@ -527,6 +545,97 @@ describe("an import written through the store (import D269–D271)", () => {
     const back = await store.object(saved.id);
     expect(back?.pending).toBe("update");
     expect(back?.startMs).toBe(Date.UTC(2026, 10, 6, 9));
+  });
+
+  test("a UID a sync brought in after the check is already there: the answer decides, nothing overwritten unasked", async () => {
+    for (const choice of ["skip", "update", "copy"] as const) {
+      const { store, personal } = await setup();
+      const source = await sourceOf(
+        calendar("File", event("late", "20261106T090000Z"), event("twin"), event("fresh")),
+      );
+      const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+      const duplicates = await duplicatesOf(store, [source], destinations);
+      expect(duplicates.existing.size).toBe(0);
+      // Meanwhile a sync brings "late" (another version) and "twin" (the same item).
+      await store.saveManyFromServer(personal.id, [
+        {
+          href: "https://cloud.example.com/dav/Personal/late.ics",
+          etag: '"1"',
+          ics: calendar(null, event("late", "20261105T090000Z", ["X-SERVER:kept"])),
+        },
+        {
+          href: "https://cloud.example.com/dav/Personal/twin.ics",
+          etag: '"1"',
+          ics: source.items.find((item) => item.uid === "twin")!.ics,
+        },
+      ]);
+      const { result } = await run(store, [source], destinations, duplicates, choice);
+      const late = (await store.withUids(personal.id, ["late"]))[0]!;
+      if (choice === "skip") {
+        expect(result).toMatchObject({ events: 1, skipped: 1, identical: 1 });
+        expect(late.pending).toBe("none");
+      } else if (choice === "update") {
+        expect(result).toMatchObject({ events: 2, updated: 1, identical: 1 });
+        expect(late.startMs).toBe(Date.UTC(2026, 10, 6, 9));
+        expect(late.ics).toContain("X-SERVER:kept");
+      } else {
+        // The synced one as it came, the file's beside it under a UID of its own.
+        expect(result).toMatchObject({ events: 2, copies: 1, identical: 1 });
+        expect(late.pending).toBe("none");
+        const starts = (await store.pending(personal.id)).map((object) => object.startMs);
+        expect(starts).toContain(Date.UTC(2026, 10, 6, 9));
+      }
+    }
+  });
+
+  test("a batch that fails counts nothing of itself, what it found already there neither", async () => {
+    const { store, personal } = await setup();
+    const source = await sourceOf(calendar("File", event("twin"), event("fresh")));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    // Meanwhile a sync brings "twin" as it is in the file.
+    await store.saveManyFromServer(personal.id, [
+      {
+        href: "https://cloud.example.com/dav/Personal/twin.ics",
+        etag: '"1"',
+        ics: source.items.find((item) => item.uid === "twin")!.ics,
+      },
+    ]);
+    store.changeLocal = () => Promise.reject(new Error("The disk is full."));
+    const { result } = await run(store, [source], destinations, duplicates);
+    expect(result).toMatchObject({
+      events: 0,
+      identical: 0,
+      skipped: 0,
+      error: "The disk is full.",
+    });
+  });
+
+  test("an account made for a calendar that then could not be made goes with it", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    store.saveCalendar = () => Promise.reject(new Error("The disk is full."));
+    await expect(run(store, [source], destinations, duplicates)).rejects.toThrow("disk");
+    expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
+  });
+
+  test("a device account the user had stays when the calendar the import made on it goes", async () => {
+    const { store } = await setup();
+    const mine = await store.addAccount({
+      provider: "local",
+      name: "On this device",
+      serverUrl: LOCAL_SERVER,
+      username: null,
+    });
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 0);
+    expect(result).toMatchObject({ stopped: true, cleanup: null });
+    expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
+    expect((await store.accounts()).map((account) => account.id)).toContain(mine.id);
   });
 
   test("a new calendar on this device, named and coloured as the source", async () => {

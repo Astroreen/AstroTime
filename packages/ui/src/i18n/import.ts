@@ -9,13 +9,14 @@ export const importStrings = {
     "import.close": "Close",
     "import.reading": "Reading {{file}}…",
     "import.notCalendar":
-      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), jCal (.json) and ZIP archives of them.",
+      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), vCalendar (.vcs), jCal (.json) and ZIP archives of them.",
     "import.unreadable": "{{file}} could not be read: {{message}}",
     "import.events_one": "{{count}} event",
     "import.events_other": "{{count}} events",
     "import.tasks_one": "{{count}} task",
     "import.tasks_other": "{{count}} tasks",
     "import.nothing": "No events or tasks",
+    "import.notImported": "Not carried over, iCalendar has no place for them: {{names}}",
     "import.others_one": "{{count}} note or other entry AstroTime does not keep is left out",
     "import.others_other": "{{count}} notes or other entries AstroTime does not keep are left out",
     "import.lost_one": "{{count}} entry cannot be imported",
@@ -64,6 +65,8 @@ export const importStrings = {
     "import.progress": "Imported {{done}} of {{total}}",
     "import.stop": "Stop",
     "import.done": "Imported",
+    "import.endedStopped": "Stopped",
+    "import.endedOnError": "Stopped on an error",
     "import.stopped": "Stopped. What was imported before stays.",
     "import.updated_one": "{{count}} updated",
     "import.updated_other": "{{count}} updated",
@@ -76,6 +79,8 @@ export const importStrings = {
     "import.again_one": "{{count}} given twice in the file, imported once",
     "import.again_other": "{{count}} given twice in the file, imported once",
     "import.failed": "The import stopped: {{message}}",
+    "import.cleanupFailed":
+      "A calendar made for this import holds nothing and could not be removed: {{message}}. You can remove it in Settings.",
     "import.failedPart":
       "The import stopped on an error: {{message}}. What was imported before it stays.",
     "import.tooBig": "{{file}} is larger than AstroTime reads at once ({{size}} MB at most).",
@@ -85,7 +90,7 @@ export const importStrings = {
     "import.close": "Закрыть",
     "import.reading": "Читаем {{file}}…",
     "import.notCalendar":
-      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), jCal (.json) и их ZIP-архивы.",
+      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), vCalendar (.vcs), jCal (.json) и их ZIP-архивы.",
     "import.unreadable": "Не удалось прочитать {{file}}: {{message}}",
     "import.events_one": "{{count}} событие",
     "import.events_few": "{{count}} события",
@@ -96,6 +101,7 @@ export const importStrings = {
     "import.tasks_many": "{{count}} задач",
     "import.tasks_other": "{{count}} задачи",
     "import.nothing": "Ни событий, ни задач",
+    "import.notImported": "Не перенесено, в iCalendar для этого нет места: {{names}}",
     "import.others_one":
       "{{count}} заметка или другая запись, которую AstroTime не хранит, пропущена",
     "import.others_few":
@@ -162,6 +168,8 @@ export const importStrings = {
     "import.progress": "Импортировано {{done}} из {{total}}",
     "import.stop": "Остановить",
     "import.done": "Импортировано",
+    "import.endedStopped": "Остановлено",
+    "import.endedOnError": "Остановлено ошибкой",
     "import.stopped": "Остановлено. Импортированное до этого остаётся.",
     "import.updated_one": "{{count}} обновлена",
     "import.updated_few": "{{count}} обновлены",
@@ -184,6 +192,8 @@ export const importStrings = {
     "import.again_many": "{{count}} даны в файле дважды, импортированы один раз",
     "import.again_other": "{{count}} даны в файле дважды, импортированы один раз",
     "import.failed": "Импорт остановлен: {{message}}",
+    "import.cleanupFailed":
+      "Календарь, созданный для этого импорта, пуст, и его не удалось убрать: {{message}}. Его можно удалить в настройках.",
     "import.failedPart": "Импорт остановлен ошибкой: {{message}}. Импортированное до неё остаётся.",
     "import.tooBig": "{{file}} больше, чем AstroTime читает за раз (не больше {{size}} МБ).",
   },

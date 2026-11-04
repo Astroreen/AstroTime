@@ -1,5 +1,7 @@
 // The files import's tests pick (docs/plans/import.md): one as Google
 // Calendar exports one, one as broken as exporters get, and the picking.
+import { readFileSync } from "node:fs";
+
 import type { Page } from "@playwright/test";
 
 const lines = (...content: string[]) => `${content.join("\r\n")}\r\n`;
@@ -66,7 +68,7 @@ export const HOLIDAYS = lines(
 );
 
 /** Picks `text` as `name` in Settings' "Import from a file". */
-export async function importFile(page: Page, entry: RegExp, name: string, text: string) {
+export async function importFile(page: Page, entry: RegExp, name: string, text: string | Buffer) {
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: entry }).click();
   await (await chooser).setFiles({ name, mimeType: "text/calendar", buffer: Buffer.from(text) });
@@ -95,4 +97,9 @@ export const BIG = lines(
     "END:VEVENT",
   ]).flat(),
   "END:VCALENDAR",
+);
+
+/** An old phone's vCalendar 1.0 export, the converter's own fixture (packages/ui/test/fixtures/import). */
+export const NOKIA = readFileSync(
+  new URL("../../../packages/ui/test/fixtures/import/nokia.vcs", import.meta.url),
 );

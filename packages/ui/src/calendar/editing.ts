@@ -755,6 +755,7 @@ export async function changeLocal(
       change({
         object: (id) => local.object(id),
         calendars: () => local.calendars(),
+        withUids: (calendarId, uids) => local.withUids(calendarId, uids),
         async save(calendarId, ics, href) {
           const row = await local.save(calendarId, ics, href);
           written.push({ id: row.id, ics });

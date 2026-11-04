@@ -40,3 +40,15 @@ otherwise as Wikipedia sent them. Each search asked `generator=search`,
 | `wikipedia-ru-search.json`      | ru: `gsrsearch=Красная площадь nearcoord:1km,55.754,37.622`                            |
 | `wikipedia-en-search-none.json` | en: `gsrsearch=Kavine Pas Jona nearcoord:1km,54.687,25.28` (no pages)                  |
 | `wikipedia-en-imageinfo.json`   | en: `titles=File:Brandenburger_Tor_abends.jpg`, `prop=imageinfo`, `iiprop=extmetadata` |
+
+## `import/`
+
+Files from other apps, for the import's converters (`../import.test.ts`,
+docs/plans/import.md#D266). All **synthetic**: written by hand in the
+shape each exporter is documented to write, since no such app or phone was
+at hand; each line's form follows the vCalendar 1.0 specification (versit, 1996) and the exporters' published samples.
+
+| File          | In the shape of                                                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `outlook.vcs` | Outlook's "vCalendar format" (`Save As`): UTC times, quoted-printable text with soft breaks, `PRIORITY` 1–3, `AALARM`/`DALARM`, an all-day event as local midnights                             |
+| `nokia.vcs`   | an older phone's export (Nokia S60, Samsung): `TZ` and `DAYLIGHT`, local times, Windows-1251 and UTF-8 quoted-printable, 1.0's rules (`W1 MO WE #4`, `YM1`, `MD1 … LD`, `MP1 1+ TH`), a `VTODO` |

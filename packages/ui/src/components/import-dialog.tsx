@@ -388,6 +388,11 @@ function SourceCard({
           </p>
         </div>
       </div>
+      {source.notImported.length > 0 ? (
+        <p className="text-note text-ink-muted">
+          {t("import.notImported", { names: source.notImported.join(", ") })}
+        </p>
+      ) : null}
       {source.others > 0 ? (
         <p className="text-note text-ink-muted">{t("import.others", { count: source.others })}</p>
       ) : null}
@@ -512,14 +517,27 @@ function Done({ result }: { result: Imported }) {
   ].filter((line) => line !== null);
   return (
     <div role="status" className="flex flex-col items-center gap-2 py-6 text-center">
-      <CheckCircleIcon className="size-10 text-accent" />
-      <p className="text-title">{t("import.done")}</p>
-      {lines.map((line) => (
-        <p key={line} className="text-body text-ink-muted">
+      {result.stopped || result.error ? null : <CheckCircleIcon className="size-10 text-accent" />}
+      <p className="text-title">
+        {t(
+          result.error
+            ? "import.endedOnError"
+            : result.stopped
+              ? "import.endedStopped"
+              : "import.done",
+        )}
+      </p>
+      {lines.map((line, n) => (
+        <p key={n} className="text-body text-ink-muted">
           {line}
         </p>
       ))}
       {result.stopped ? <p className="text-note text-ink-muted">{t("import.stopped")}</p> : null}
+      {result.cleanup ? (
+        <p className="text-note text-ink-muted">
+          {t("import.cleanupFailed", { message: result.cleanup })}
+        </p>
+      ) : null}
       {result.error ? (
         <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
           {t("import.failedPart", { message: result.error })}
