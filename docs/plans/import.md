@@ -230,7 +230,8 @@ not carry is said, not dropped in silence.
   (`CalendarNotMadeError`: only a calendar's making is blamed on its
   account, never a later failure);
   calendars already made on a server stay there, as made (AstroTime does
-  not delete calendars), and a calendar made on this device for the same
+  not delete calendars), and the error names them (`kept`), as the dialog
+  does ("Made before that, and kept on its server: “Team” (astro@…)"), and a calendar made on this device for the same
   run goes again as before. `Imported.onServer` lists them. On Radicale in
   the e2e (`new-list.spec.ts`): two `MKCALENDAR`, both named as the file,
   then its three items uploaded.
@@ -400,7 +401,7 @@ import's "new calendar on <account>" ([D277](#D277)), through PR I7.
 Done when: "+ New list" makes a list on Radicale (one `MKCALENDAR`) and
 shows it, and on this device with no account; an import makes its new
 calendar and list on Radicale and uploads its items to them; the first
-load grows by what [design D276](design.md#D276) records (0.23 KiB, an
+load grows by what [design D276](design.md#D276) records (0.24 KiB, an
 exception the orchestrator accepted for the owner), not the usual 0.1.
 
 Each converter's PR: its recorded or documented sample files, what maps

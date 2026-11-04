@@ -807,4 +807,42 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(again).toBe(full);
     expect(again).not.toBeInstanceOf(CalendarNotMadeError);
   });
+
+  test("one calendar made on the server, the next not: the error names the one made, kept there", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([
+      [source.id, { events: newOn(account.id), tasks: newOn(account.id) }],
+    ]);
+    const busy = Object.assign(new Error("busy"), { name: "ServerBusyError" });
+    const make: Run["make"] = async (accountId, wanted) => {
+      if (wanted.component === "VTODO") throw busy;
+      return store.saveCalendar({
+        accountId,
+        url: "https://cloud.example.com/dav/holidays/",
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    };
+    const failure = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      make,
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(CalendarNotMadeError);
+    const { accountId, cause, kept } = failure as CalendarNotMadeError;
+    expect({ accountId, cause }).toEqual({ accountId: account.id, cause: busy });
+    expect(kept.map((one) => [one.name, one.url])).toEqual([
+      ["Holidays", "https://cloud.example.com/dav/holidays/"],
+    ]);
+    // Nothing written to it.
+    expect(await store.pending(kept[0]!.id)).toEqual([]);
+  });
 });

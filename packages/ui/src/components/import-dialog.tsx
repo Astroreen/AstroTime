@@ -133,6 +133,16 @@ export function ImportDialog({
     const account = servers.find((one) => one.id === accountId);
     return account ? accountName(account, t) : accountId;
   };
+  /** Why a new calendar was not made, and what this run made before it and kept, in words. */
+  const notMade = (error: CalendarNotMadeError) => {
+    const { why, status } = whyNotMade(error.cause);
+    const said = t(`import.notMade.${why}`, { account: nameOf(error.accountId), status });
+    if (error.kept.length === 0) return said;
+    const names = error.kept
+      .map((calendar) => `“${calendar.name}” (${nameOf(calendar.accountId)})`)
+      .join(", ");
+    return `${said} ${t("import.notMade.kept", { count: error.kept.length, names })}`;
+  };
   const start = (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
     if (phase.current !== "checking" && phase.current !== "asked") return;
     phase.current = "running";
@@ -161,10 +171,7 @@ export function ImportDialog({
           name: "failed",
           message:
             error instanceof CalendarNotMadeError
-              ? t(`import.notMade.${whyNotMade(error.cause)}`, {
-                  account: nameOf(error.accountId),
-                  message: error.cause instanceof Error ? error.cause.message : String(error.cause),
-                })
+              ? notMade(error)
               : t("import.failed", { message: String(error) }),
         }),
     );

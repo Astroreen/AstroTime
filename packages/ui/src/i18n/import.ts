@@ -74,8 +74,15 @@ export const importStrings = {
       "{{account}} did not allow the new calendar, so nothing was imported.",
     "import.notMade.signed-out":
       "Sign in to {{account}} again: its new calendar was not made, and nothing was imported.",
+    "import.notMade.busy": "{{account}} is busy, so nothing was imported. Try again later.",
+    "import.notMade.no-name": "A new calendar needs a name, so nothing was imported.",
+    "import.notMade.no-server": "Calendars cannot be made on {{account}}, so nothing was imported.",
+    "import.notMade.answered":
+      "{{account}} answered with an error ({{status}}), so nothing was imported.",
     "import.notMade.failed":
-      "The new calendar on {{account}} was not made, so nothing was imported: {{message}}",
+      "The new calendar on {{account}} was not made because of an error, so nothing was imported.",
+    "import.notMade.kept_one": "Made before that, and kept on its server: {{names}}.",
+    "import.notMade.kept_other": "Made before that, and kept on their servers: {{names}}.",
     "import.start": "Import",
     "import.cancel": "Cancel",
     "import.duplicates_one":
@@ -204,8 +211,17 @@ export const importStrings = {
     "import.notMade.refused": "{{account}} не разрешил создать календарь, ничего не импортировано.",
     "import.notMade.signed-out":
       "Войдите в {{account}} снова: новый календарь не создан, ничего не импортировано.",
+    "import.notMade.busy": "{{account}} занят, ничего не импортировано. Попробуйте позже.",
+    "import.notMade.no-name": "У нового календаря должно быть название, ничего не импортировано.",
+    "import.notMade.no-server":
+      "В {{account}} нельзя создавать календари, ничего не импортировано.",
+    "import.notMade.answered": "{{account}} ответил ошибкой ({{status}}), ничего не импортировано.",
     "import.notMade.failed":
-      "Новый календарь в {{account}} не создан, ничего не импортировано: {{message}}",
+      "Новый календарь в {{account}} не создан из-за ошибки, ничего не импортировано.",
+    "import.notMade.kept_one": "Создан до этого и остался на своём сервере: {{names}}.",
+    "import.notMade.kept_few": "Созданы до этого и остались на своих серверах: {{names}}.",
+    "import.notMade.kept_many": "Созданы до этого и остались на своих серверах: {{names}}.",
+    "import.notMade.kept_other": "Созданы до этого и остались на своих серверах: {{names}}.",
     "import.start": "Импортировать",
     "import.cancel": "Отмена",
     "import.duplicates_one":

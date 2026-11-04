@@ -186,13 +186,19 @@ async function unmake(
     await store.removeAccount(calendar.accountId);
 }
 
-/** A new calendar on an account's server was not made (D277): nothing was written; `cause` says why. */
+/**
+ * A new calendar on an account's server was not made (D277): nothing was
+ * written; `cause` says why, and `kept` names the calendars this run made
+ * on servers before it, which stay there.
+ */
 export class CalendarNotMadeError extends Error {
   override name = "CalendarNotMadeError";
   readonly accountId: string;
-  constructor(accountId: string, cause: unknown) {
+  readonly kept: readonly Calendar[];
+  constructor(accountId: string, cause: unknown, kept: readonly Calendar[]) {
     super(`No calendar was made on ${accountId}.`, { cause });
     this.accountId = accountId;
+    this.kept = kept;
   }
 }
 
@@ -223,7 +229,7 @@ export async function runImport(run: Run): Promise<Imported> {
       const calendar = await run
         .make(account, { name: source.name, color: source.color, component })
         .catch((error: unknown) => {
-          throw new CalendarNotMadeError(account, error);
+          throw new CalendarNotMadeError(account, error, [...onServer.values()]);
         });
       onServer.set(`${source.id}\n${kind}`, calendar);
     }

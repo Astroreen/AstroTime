@@ -7,7 +7,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { addDeviceCalendar } from "../calendar/device-calendar.ts";
+import { makeDeviceCalendar } from "../calendar/device-calendar.ts";
 import { DEVICE, whyNotMade, type NotMade } from "../calendar/place.ts";
 import { addNewListStrings } from "../i18n/new-list.ts";
 import { accountName } from "./accounts.tsx";
@@ -35,7 +35,7 @@ type Step =
       readonly name: "failed";
       readonly why: NotMade;
       readonly account: string;
-      readonly message: string;
+      readonly status: number;
     };
 
 export function NewListDialog({
@@ -115,13 +115,7 @@ export function NewListDialog({
         setChosen(null);
         onClose();
       },
-      (error: unknown) =>
-        setStep({
-          name: "failed",
-          why: whyNotMade(error),
-          account: placeName,
-          message: error instanceof Error ? error.message : String(error),
-        }),
+      (error: unknown) => setStep({ name: "failed", ...whyNotMade(error), account: placeName }),
     );
   };
 
@@ -192,7 +186,7 @@ export function NewListDialog({
               </p>
             ) : step.name === "failed" ? (
               <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
-                {t(`newList.${step.why}`, { account: step.account, message: step.message })}
+                {t(`newList.${step.why}`, { account: step.account, status: step.status })}
               </p>
             ) : null}
             <div className="flex justify-end gap-2">
@@ -215,30 +209,20 @@ export function NewListDialog({
 }
 
 /**
- * A list of tasks at `place`: on this device by the store alone (so it can
- * be made when what makes one on a server did not load), else on the
- * account's server through `make.ts`.
+ * A list of tasks at `place`: on this device by the store alone, as
+ * `makeCalendarAt` makes one (so it can be made when what makes one on a
+ * server did not load), else on the account's server through `make.ts`.
  */
 function makeList(
-  store: Parameters<typeof addDeviceCalendar>[0],
+  store: Parameters<typeof makeDeviceCalendar>[0],
   platform: Parameters<Make["makeCalendarAt"]>[1],
   maker: Make | null,
   place: string,
   name: string,
   deviceAccount: string,
 ): Promise<Calendar> {
-  if (place === DEVICE)
-    return addDeviceCalendar(
-      store,
-      { account: deviceAccount, calendar: name.trim(), color: null, components: ["VTODO"] },
-      () => {},
-    );
+  const list = { name, color: null, component: "VTODO" } as const;
+  if (place === DEVICE) return makeDeviceCalendar(store, deviceAccount, list);
   if (!maker) return Promise.reject(new Error("What makes a list on a server did not load."));
-  return maker.makeCalendarAt(
-    store,
-    platform,
-    place,
-    { name, color: null, component: "VTODO" },
-    deviceAccount,
-  );
+  return maker.makeCalendarAt(store, platform, place, list, deviceAccount);
 }

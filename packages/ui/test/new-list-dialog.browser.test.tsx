@@ -107,7 +107,8 @@ test("made on the account's server, a list of tasks; the list made is the one sh
   await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "  Errands ");
   await press(create());
   await expect.element(page.getByRole("status")).toHaveTextContent("closed");
-  expect(asked).toEqual([["nc", { name: "Errands", color: null, component: "VTODO" }]]);
+  // As typed: the sync's `makeCalendar` sends it trimmed (`calendarNameOf`, providers D275).
+  expect(asked).toEqual([["nc", { name: "  Errands ", color: null, component: "VTODO" }]]);
   expect(made.map((calendar) => calendar.id)).toEqual(["made"]);
 });
 

@@ -1,6 +1,7 @@
 // A calendar or list made on this device, by the import and by "+ New
 // list" (docs/plans/import.md#D269, docs/plans/design.md#D276); loaded with them.
-import { ALL_RIGHTS } from "@astrotime/core";
+import { ALL_RIGHTS, type NewCalendar } from "@astrotime/core";
+import { calendarNameOf, CannotMakeCalendarError } from "@astrotime/core/new-calendar";
 import { LOCAL_SERVER, type Calendar, type Component, type Store } from "@astrotime/storage";
 
 /**
@@ -40,4 +41,29 @@ export async function addDeviceCalendar(
     components: names.components,
     rights: ALL_RIGHTS,
   });
+}
+
+/**
+ * A calendar or list asked for (`NewCalendar`) made on this device: its
+ * name as a server's would be sent (`calendarNameOf`), the one path for
+ * "+ New list" and `makeCalendarAt` alike.
+ */
+export function makeDeviceCalendar(
+  store: Store,
+  deviceAccount: string,
+  calendar: NewCalendar,
+): Promise<Calendar> {
+  const name = calendarNameOf(calendar.name);
+  if (name === null)
+    return Promise.reject(new CannotMakeCalendarError("no-name", "A calendar needs a name."));
+  return addDeviceCalendar(
+    store,
+    {
+      account: deviceAccount,
+      calendar: name,
+      color: calendar.color,
+      components: [calendar.component],
+    },
+    () => {},
+  );
 }
