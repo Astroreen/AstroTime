@@ -22,8 +22,10 @@ export const subscribeStrings = {
     "subscribe.held_one": "The calendar's file would remove {{count}} item.",
     "subscribe.held_other": "The calendar's file would remove {{count}} items.",
     "subscribe.applyHeld": "Remove them",
-    "subscribe.notKept":
-      "The service keeps only some of an item's details; the rest stays on this device until it changes there.",
+    "subscribe.notKept_one":
+      "{{count}} item: the service did not keep {{properties}}; it stays on this device until the item changes there.",
+    "subscribe.notKept_other":
+      "{{count}} items: the service did not keep {{properties}}; it stays on this device until the items change there.",
   },
   ru: {
     "signIn.kind.ics": "Подписка",
@@ -43,8 +45,14 @@ export const subscribeStrings = {
     "subscribe.held_many": "Файл календаря удалил бы {{count}} записей.",
     "subscribe.held_other": "Файл календаря удалил бы {{count}} записи.",
     "subscribe.applyHeld": "Удалить их",
-    "subscribe.notKept":
-      "Сервис хранит только часть сведений записи; остальное остаётся на этом устройстве, пока запись не изменится там.",
+    "subscribe.notKept_one":
+      "{{count}} запись: сервис не сохранил {{properties}}; это остаётся на этом устройстве, пока запись не изменится там.",
+    "subscribe.notKept_few":
+      "{{count}} записи: сервис не сохранил {{properties}}; это остаётся на этом устройстве, пока записи не изменятся там.",
+    "subscribe.notKept_many":
+      "{{count}} записей: сервис не сохранил {{properties}}; это остаётся на этом устройстве, пока записи не изменятся там.",
+    "subscribe.notKept_other":
+      "{{count}} записи: сервис не сохранил {{properties}}; это остаётся на этом устройстве, пока записи не изменятся там.",
   },
 } as const satisfies Record<"en" | "ru", Record<string, string>>;
 

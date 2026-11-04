@@ -11,14 +11,25 @@ import { useAccounts } from "./accounts-context.tsx";
 /** Outside the component: the React Compiler does not compile an `import()` (design D194). */
 const subscriptions = () => import("@astrotime/sync/subscriptions");
 
-/** A write the service took without some of the item's details (providers D252). */
-export function NotKept() {
+/**
+ * Writes the service took without some of the items' details (providers
+ * D252): one line for all of a sync's, with what it could not keep.
+ */
+function NotKept({ errors }: { errors: readonly { readonly detail: string }[] }) {
   const { t, i18n } = useTranslation();
   addSubscribeStrings(i18n);
-  return <>{t("subscribe.notKept")}</>;
+  const count = errors.length;
+  const properties = [
+    ...new Set(errors.flatMap((error) => error.detail.split(", ").filter(Boolean))),
+  ];
+  return (
+    <p className="text-ink-muted">
+      {t("subscribe.notKept", { count, properties: properties.join(", ") })}
+    </p>
+  );
 }
 
-export default function HeldRemoval({
+function HeldRemoval({
   accountId,
   held,
 }: {
@@ -46,5 +57,30 @@ export default function HeldRemoval({
         {t("subscribe.applyHeld")}
       </button>
     </p>
+  );
+}
+
+/** One sync's problem, as `SyncReport.errors` holds it. */
+interface Notice {
+  readonly problem: string;
+  readonly detail: string;
+  readonly held?: { readonly count: number; readonly version: string };
+}
+
+/** What providers told of an account's last sync: a held removal, and what a service did not keep. */
+export default function ProviderNotices({
+  accountId,
+  errors,
+}: {
+  accountId: string;
+  errors: readonly Notice[];
+}) {
+  const held = errors.find((error) => error.held)?.held;
+  const notKept = errors.filter((error) => error.problem === "not-kept");
+  return (
+    <>
+      {held && <HeldRemoval accountId={accountId} held={held} />}
+      {notKept.length > 0 && <NotKept errors={notKept} />}
+    </>
   );
 }

@@ -69,11 +69,14 @@ function StatusLine({ account, value }: { account: Account; value: AccountsValue
   return <>{t("sync.syncedAt", { time })}</>;
 }
 
-/** A subscription's held removal, with its words, loads when one is held (providers D263). */
-const HeldRemoval = lazy(() => import("./held-removal.tsx"));
-const NotKept = lazy(() =>
-  import("./held-removal.tsx").then((module) => ({ default: module.NotKept })),
-);
+/**
+ * What providers tell of a sync (a held removal, providers D263; what a
+ * service did not keep, D252), with its words, loads when there is some.
+ */
+const ProviderNotices = lazy(() => import("./held-removal.tsx"));
+
+/** The problems said on their own, not in the list of what failed: the writes went through. */
+const NOTICES = new Set<Problem>(["held-removal", "not-kept"]);
 
 /**
  * What the last sync could not do for an account's items, in words (D37);
@@ -83,22 +86,20 @@ const NotKept = lazy(() =>
 function Problems({ last }: { last: AccountSync | undefined }) {
   const { t } = useTranslation();
   const all = last?.report?.errors ?? [];
-  const held = all.find((error) => error.held);
-  // The held removal is said on its own; every other problem in the list.
   const errors = all.filter(
     (
       error,
     ): error is (typeof all)[number] & {
-      problem: Exclude<Problem, "held-removal">;
-    } => error.problem !== "held-removal",
+      problem: Exclude<Problem, "held-removal" | "not-kept">;
+    } => !NOTICES.has(error.problem),
   );
   const dropped = last?.report?.dropped.length ?? 0;
   if (all.length === 0 && dropped === 0) return null;
   return (
     <div className="flex flex-col gap-1 text-note text-danger">
-      {held?.held && last && (
+      {last && errors.length < all.length && (
         <Suspense fallback={null}>
-          <HeldRemoval accountId={last.accountId} held={held.held} />
+          <ProviderNotices accountId={last.accountId} errors={all} />
         </Suspense>
       )}
       {errors.length > 0 && (
@@ -107,18 +108,9 @@ function Problems({ last }: { last: AccountSync | undefined }) {
             {t("sync.problems", { count: errors.length })}
           </summary>
           <ul className="mt-1 list-disc pl-5 text-ink-muted">
-            {errors.map((error, i) =>
-              // What a service could not keep says so in words that load with it (providers D252).
-              error.problem === "not-kept" ? (
-                <li key={i}>
-                  <Suspense fallback={null}>
-                    <NotKept />
-                  </Suspense>
-                </li>
-              ) : (
-                <li key={i}>{t(`sync.problem.${error.problem}`)}</li>
-              ),
-            )}
+            {errors.map((error, i) => (
+              <li key={i}>{t(`sync.problem.${error.problem}`)}</li>
+            ))}
           </ul>
         </details>
       )}

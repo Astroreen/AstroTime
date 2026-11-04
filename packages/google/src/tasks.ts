@@ -57,11 +57,28 @@ const unescape = (text: string) =>
     char === "n" || char === "N" ? "\n" : char,
   );
 
-/** RFC 5545 §3.1: lines over 75 octets folded (by characters here, which is within it). */
+const utf8 = new TextEncoder();
+
+/**
+ * RFC 5545 §3.1: a line of more than 75 octets folded, counted in UTF-8 (a
+ * Cyrillic letter is two), never inside a character: the first part 75
+ * octets at most, each next one 74 after its leading space.
+ */
 const fold = (line: string) => {
-  if (line.length <= 74) return line;
-  const parts = [line.slice(0, 74)];
-  for (let at = 74; at < line.length; at += 73) parts.push(line.slice(at, at + 73));
+  const parts: string[] = [];
+  let part = "";
+  let octets = 0;
+  for (const char of line) {
+    const size = utf8.encode(char).length;
+    if (octets + size > (parts.length === 0 ? 75 : 74)) {
+      parts.push(part);
+      part = "";
+      octets = 0;
+    }
+    part += char;
+    octets += size;
+  }
+  parts.push(part);
   return parts.join("\r\n ");
 };
 
@@ -129,6 +146,8 @@ function propertiesOf(ics: string): { name: string; params: string; value: strin
  */
 export function taskFieldsOf(ics: string): {
   readonly fields: Record<string, string | null>;
+  /** `RELATED-TO`: the parent, which the Tasks API sets by `insert`'s and `move`'s `parent`, not a field. */
+  readonly parent: string | null;
   readonly dropped: readonly string[];
 } {
   const properties = propertiesOf(ics);
@@ -150,7 +169,10 @@ export function taskFieldsOf(ics: string): {
       notes: first("DESCRIPTION") ? unescape(first("DESCRIPTION")!.value) : null,
       due: dueDay,
       status: status === "COMPLETED" ? "completed" : "needsAction",
+      // Reopened: Google keeps the old time until it is cleared.
+      ...(status === "COMPLETED" ? {} : { completed: null }),
     },
+    parent: first("RELATED-TO")?.value ?? null,
     dropped: [...dropped],
   };
 }
@@ -162,12 +184,9 @@ const listUrl = (id: string) => `${TASKS_API}lists/${encodeURIComponent(id)}/tas
 export class GoogleTasks implements Provider {
   private readonly http: HttpClient;
   private readonly authorization: Authorization;
-  private readonly clock: () => number;
-
-  constructor(http: HttpClient, tokens: TokenSource, clock: () => number = Date.now) {
+  constructor(http: HttpClient, tokens: TokenSource) {
     this.http = http;
     this.authorization = new Authorization(tokens);
-    this.clock = clock;
   }
 
   private async json<T>(
@@ -223,15 +242,17 @@ export class GoogleTasks implements Provider {
   /**
    * What changed since `state`'s time (the Tasks API's `updatedMin`, deleted
    * ones among them); without one, every task, and what the device has that
-   * Google no longer lists is removed. The next state is the time this
-   * listing began, so nothing written meanwhile is missed.
+   * Google no longer lists is removed. The next state is the latest
+   * `updated` this listing saw, Google's own clock, never the device's
+   * (a device ahead of Google would skip what changed in between);
+   * `updatedMin` takes it in, so that task is listed again, unchanged.
    */
   async changes(
     calendarUrl: string,
     state: SyncState,
     known: ReadonlyMap<string, string | null>,
   ): Promise<Changes> {
-    const began = new Date(this.clock()).toISOString();
+    let latest = state.syncToken;
     const changed: RemoteObject[] = [];
     const removed: string[] = [];
     const listed = new Set<string>();
@@ -252,6 +273,7 @@ export class GoogleTasks implements Provider {
         url.href,
       );
       for (const task of value?.items ?? []) {
+        if (task.updated && (!latest || task.updated > latest)) latest = task.updated;
         const href = `${calendarUrl}${encodeURIComponent(task.id)}`;
         if (task.deleted) {
           if (known.has(href)) removed.push(href);
@@ -265,7 +287,7 @@ export class GoogleTasks implements Provider {
     } while (page);
     if (!state.syncToken)
       for (const href of known.keys()) if (!listed.has(href)) removed.push(href);
-    return { changed, removed, syncToken: began, ctag: null };
+    return { changed, removed, syncToken: latest, ctag: null };
   }
 
   async fetch(href: string): Promise<RemoteObject | null> {
@@ -274,12 +296,17 @@ export class GoogleTasks implements Provider {
     return { href, etag: value.etag ?? null, ics: vtodoOf(value) };
   }
 
-  /** Inserted in the list `href` names; Google gives its id, and its href with it. */
+  /**
+   * Inserted in the list `href` names, under its parent (`insert`'s `parent`);
+   * Google gives its id, and its href with it.
+   */
   async create(href: string, ics: string): Promise<WriteResult> {
     const list = href.slice(0, href.lastIndexOf("/") + 1);
-    const { fields, dropped } = taskFieldsOf(ics);
+    const { fields, parent, dropped } = taskFieldsOf(ics);
     const body = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== null));
-    const { value } = await this.json<GoogleTask>("POST", list, body);
+    const url = new URL(list);
+    if (parent) url.searchParams.set("parent", parent);
+    const { value } = await this.json<GoogleTask>("POST", url.href, body);
     if (!value) throw new Error("The Tasks API gave no task back.");
     return {
       ok: true,
@@ -295,13 +322,22 @@ export class GoogleTasks implements Provider {
    * takes no `If-Match`, so the last write wins (D252).
    */
   async update(href: string, ics: string): Promise<WriteResult> {
-    const { fields, dropped } = taskFieldsOf(ics);
-    const { status, value } = await this.json<GoogleTask>("PATCH", href, fields, [404]);
-    if (status === 404 || !value) return { ok: false, reason: "gone" };
+    const { fields, parent, dropped } = taskFieldsOf(ics);
+    const patched = await this.json<GoogleTask>("PATCH", href, fields, [404]);
+    if (patched.status === 404 || !patched.value) return { ok: false, reason: "gone" };
+    let task = patched.value;
+    // A parent changed here goes as Google takes it: a move (none: to the top).
+    if ((task.parent ?? null) !== parent) {
+      const url = new URL(`${href}/move`);
+      if (parent) url.searchParams.set("parent", parent);
+      const moved = await this.json<GoogleTask>("POST", url.href, undefined, [404]);
+      if (moved.status === 404 || !moved.value) return { ok: false, reason: "gone" };
+      task = moved.value;
+    }
     return {
       ok: true,
       href,
-      etag: value.etag ?? null,
+      etag: task.etag ?? null,
       ...(dropped.length > 0 ? { dropped } : {}),
     };
   }
