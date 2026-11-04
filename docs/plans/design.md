@@ -2401,13 +2401,15 @@ own (below).
   details' place (D177) puts "Open in maps" and "Copy address" as icon
   buttons at the end of its first line, 48 px each (Material's 48 dp
   touch target), each with its tooltip; the place's first line and its
-  row's icon sit level with the icons' middle. Copied, the copy icon
+  row's pin sit level with the icons' middle, by one value
+  (`PLACE_LINE`). Copied, the copy icon
   turns to a tick for two seconds and a status says "Copied" once (the
   button keeps its name); a copy again while it shows says it again.
   A tap on the map opens it in maps, as the icon does (on Android the
-  same `geo:` intent, which the emulator's maps app took); a plain tap
-  or click on the address copies it, while a long press or a drag
-  selects its text as any text, and copies nothing. The map's tap
+  same `geo:` intent, which the emulator's maps app took); a single tap
+  or click on the address copies it once 300 ms pass with no second
+  click and nothing selected, while a long press, a drag, a double or a
+  triple click selects its text as any text, and copies nothing. The map's tap
   target lies over it out of the keyboard's order and the accessibility
   tree, and the address is text: the icon buttons are the actions for
   keys and screen readers. OpenStreetMap's credit stays a link of its

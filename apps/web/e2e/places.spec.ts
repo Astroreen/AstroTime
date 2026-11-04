@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 const recorded = readFileSync(
   new URL("../../../packages/ui/test/fixtures/photon-en.json", import.meta.url),
@@ -96,10 +96,21 @@ for (const [name, device] of [
       );
       const opened = page.waitForEvent("popup");
       const map = details.getByRole("img", { name: "Map of Brandenburg Gate" });
-      // The map's own link lies over it, out of the accessibility tree: the
-      // tap goes where the map is drawn, as a finger's does.
-      if (name === "phone") await map.tap({ force: true });
-      else await map.click({ force: true });
+      // The map's own link lies over it, out of the accessibility tree: what
+      // a finger meets in the map's middle is that link, to maps.
+      const drawn = await map.boundingBox();
+      if (!drawn) throw new Error("not drawn");
+      const middle = { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 };
+      expect(
+        await page.evaluate(
+          ({ x, y }) => document.elementFromPoint(x, y)?.closest("a")?.getAttribute("href"),
+          middle,
+        ),
+      ).toBe(
+        "https://www.openstreetmap.org/?mlat=52.51627&mlon=13.377703#map=17/52.51627/13.377703",
+      );
+      if (name === "phone") await page.touchscreen.tap(middle.x, middle.y);
+      else await page.mouse.click(middle.x, middle.y);
       const maps = await opened;
       await maps.waitForLoadState();
       expect(maps.url()).toBe(
@@ -158,6 +169,8 @@ test("Copy address copies the text and says so; refused, the notice says it was 
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // A tap on the address waits for a second click: the clock runs on, no wait.
+  await page.clock.install({ time: NOW });
   await openDemo(page, "day");
   const open = async () => {
     await page
@@ -204,12 +217,14 @@ test("Copy address copies the text and says so; refused, the notice says it was 
   const tapped = await open();
   const text = tapped.getByText("Room 4, second floor");
   await text.click();
+  await page.clock.runFor(500);
   await expect(tapped.getByRole("status")).toHaveText("Copied");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
   await page.keyboard.press("Escape");
   await expect(tapped).toHaveCount(0);
 
-  // A drag across it selects it, as text, and copies nothing.
+  // A drag across it, a double or a triple click select it, as text,
+  // and copy nothing.
   const selecting = await open();
   await page.evaluate(() => {
     const write = navigator.clipboard.writeText.bind(navigator.clipboard);
@@ -219,14 +234,26 @@ test("Copy address copies the text and says so; refused, the notice says it was 
       return write(data);
     };
   });
-  const line = await selecting.getByText("Room 4, second floor").boundingBox();
+  const address = selecting.getByText("Room 4, second floor");
+  const line = await address.boundingBox();
   if (!line) throw new Error("not drawn");
+  const selected = async () => {
+    await page.clock.runFor(500);
+    const selection = (await page.evaluate(() => getSelection()?.toString()))?.trim() ?? "";
+    expect(selection.length).toBeGreaterThan(0);
+    expect("Room 4, second floor").toContain(selection);
+    expect(await page.evaluate(() => (window as unknown as { writes: number }).writes)).toBe(0);
+    await page.evaluate(() => getSelection()?.removeAllRanges());
+  };
   await page.mouse.move(line.x + 1, line.y + line.height / 2);
   await page.mouse.down();
   await page.mouse.move(line.x + line.width - 1, line.y + line.height / 2, { steps: 5 });
   await page.mouse.up();
-  expect(await page.evaluate(() => getSelection()?.toString())).toContain("second floor");
-  expect(await page.evaluate(() => (window as unknown as { writes: number }).writes)).toBe(0);
+  await selected();
+  await address.dblclick();
+  await selected();
+  await address.click({ clickCount: 3 });
+  await selected();
   await page.keyboard.press("Escape");
   await expect(selecting).toHaveCount(0);
 

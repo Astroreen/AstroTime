@@ -35,7 +35,7 @@ import {
 } from "./icons.tsx";
 import { AttachmentList, AttachmentsIcon } from "./attachments.tsx";
 import { DetailsPicture } from "./item-picture.tsx";
-import { PlaceCard } from "./place-card.tsx";
+import { PLACE_LINE, PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
 import { primaryButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
@@ -267,8 +267,8 @@ function Body({
             </Row>
           )}
           {item.location && (
-            // Level with the place's first line, under its 48 px icons (design D238).
-            <Row icon={<PlaceIcon className="mt-3 size-5" />} label={t("edit.location")}>
+            // Level with the place's first line, beside its 48 px icons (design D238).
+            <Row icon={<PlaceIcon className={`${PLACE_LINE} size-5`} />} label={t("edit.location")}>
               <PlaceCard
                 location={item.location}
                 geo={item.geo}

@@ -6,7 +6,7 @@
 // with no point shows as it always did. The map loads only once the
 // details show it, and not at all with places turned off.
 import type { Geo } from "@astrotime/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { mapsLink, nameAndAddress, tilesAround } from "../places/map.ts";
@@ -19,7 +19,17 @@ const BOX = { width: 512, height: 144 } as const;
 
 /** An icon button at the end of the place's line: 48 px, a finger's target (Material's 48 dp). */
 const action =
-  "grid size-12 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-raised-hover hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent";
+  "grid size-12 shrink-0 place-items-center rounded-full hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent";
+const quiet = "text-ink-muted hover:text-ink";
+
+/**
+ * How far down the place's first line sits, level with its 48 px icons'
+ * middle (design D238); the details' pin beside it sits as far.
+ */
+export const PLACE_LINE = "mt-3";
+
+/** How long a click on the address waits for a second, which selects text and copies nothing (D238). */
+const SECOND_CLICK_MS = 300;
 
 /** How long the tick shows after a copy. */
 const COPIED_MS = 2000;
@@ -42,6 +52,9 @@ export function PlaceCard({
   const places = settings.places ? platform.places : undefined;
   // Copies made, each said once (design D238); 0 when the tick is gone.
   const [copied, setCopied] = useState(0);
+  // A click on the address on its way to copying it, until a second comes.
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(pending.current), []);
   // Only a place with a point is split: free text shows whole, commas and all.
   const { name, address } = geo ? nameAndAddress(location, label) : { name: location, address: "" };
   useEffect(() => {
@@ -62,12 +75,17 @@ export function PlaceCard({
     <div className="flex flex-col gap-2">
       <div className="flex items-start">
         {/* Its first line level with the icons' middle; a tap on it copies
-            the address, a long press or a drag selects as text does (design
-            D238). Keys and screen readers have the button at the end. */}
+            the address, while a long press, a drag or a double or triple
+            click selects it as text does (design D238). Keys and screen
+            readers have the button at the end. */}
         <div
-          className={`min-w-0 flex-1 pt-3 ${clipboard ? "cursor-copy" : ""}`}
-          onClick={() => {
-            if (document.getSelection()?.isCollapsed !== false) copy();
+          className={`min-w-0 flex-1 ${PLACE_LINE} ${clipboard ? "cursor-copy" : ""}`}
+          onClick={(event) => {
+            clearTimeout(pending.current);
+            if (event.detail !== 1) return;
+            pending.current = setTimeout(() => {
+              if (document.getSelection()?.isCollapsed !== false) copy();
+            }, SECOND_CLICK_MS);
           }}
         >
           <p className="flex flex-col">
@@ -81,7 +99,7 @@ export function PlaceCard({
           rel="noopener noreferrer"
           aria-label={t("places.open")}
           title={t("places.open")}
-          className={action}
+          className={`${action} ${quiet}`}
         >
           <MapIcon className="size-5" />
         </a>
@@ -91,7 +109,7 @@ export function PlaceCard({
             onClick={copy}
             aria-label={t("places.copy")}
             title={t("places.copy")}
-            className={`${action} ${copied ? "text-accent" : ""}`}
+            className={`${action} ${copied ? "text-accent" : quiet}`}
           >
             {copied ? <CheckIcon className="size-5" /> : <CopyIcon className="size-5" />}
           </button>
