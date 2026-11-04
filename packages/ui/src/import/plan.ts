@@ -4,9 +4,15 @@
 // the UIDs already there found first; then the writes through the store, as
 // changes made here (D5), a batch a transaction, the page given back
 // between batches, stopped between them when asked.
-import { sameObjects } from "@astrotime/core";
+import { ALL_RIGHTS, sameObjects } from "@astrotime/core";
 import { overlay, withUid } from "@astrotime/core/split";
-import type { Calendar, Component, Store, StoredObject } from "@astrotime/storage";
+import {
+  LOCAL_SERVER,
+  type Calendar,
+  type Component,
+  type Store,
+  type StoredObject,
+} from "@astrotime/storage";
 
 import { calendarsFor, firstCalendarFor } from "../calendar/editing.ts";
 import type { ImportItem, Source } from "./read.ts";
@@ -80,6 +86,9 @@ export interface Duplicates {
 
 const keyOf = (target: string, uid: string) => `${target}\n${uid}`;
 
+/** Every day a stored object can start on. */
+const EVER = { from: "0001-01-01", to: "9999-12-31", timeZone: "UTC" };
+
 export async function duplicatesOf(
   store: Store,
   sources: readonly Source[],
@@ -94,14 +103,13 @@ export async function duplicatesOf(
   const same = new Set<string>();
   let changed = 0;
   for (const [target, items] of byTarget) {
-    const found = new Map(
-      (
-        await store.withUids(
-          target,
-          items.map((item) => item.uid),
-        )
-      ).map((o) => [o.uid, o]),
-    );
+    // Every object of the calendar, dated or not, by the store's own reads:
+    // no query of its own on the first load for an import (foundation D145).
+    const stored = [
+      ...(await store.objectsBetween([target], EVER)),
+      ...(await store.undated([target])),
+    ];
+    const found = new Map(stored.map((object) => [object.uid, object]));
     for (const item of items) {
       const there = found.get(item.uid);
       if (!there) continue;
@@ -150,6 +158,40 @@ export interface Run {
   readonly pause?: () => Promise<void>;
 }
 
+/**
+ * A new calendar on this device (D269): on the account of provider `local`,
+ * made (named `names.account`) when there is none, under an address of its
+ * own, so it keeps its name and never steps aside as the first one does
+ * (`Store.removeLocalCalendarIfUnused`, foundation D122). Here, with the
+ * import, not in the store, which loads with the app.
+ */
+async function addDeviceCalendar(
+  store: Store,
+  names: {
+    readonly account: string;
+    readonly calendar: string;
+    readonly color: string | null;
+    readonly components: readonly Component[];
+  },
+): Promise<Calendar> {
+  const local =
+    (await store.accounts()).find((account) => account.provider === "local") ??
+    (await store.addAccount({
+      provider: "local",
+      name: names.account,
+      serverUrl: LOCAL_SERVER,
+      username: null,
+    }));
+  return store.saveCalendar({
+    accountId: local.id,
+    url: `${LOCAL_SERVER}${crypto.randomUUID()}/`,
+    name: names.calendar,
+    color: names.color,
+    components: names.components,
+    rights: ALL_RIGHTS,
+  });
+}
+
 export const BATCH = 200;
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve));
 
@@ -167,7 +209,7 @@ export async function runImport(run: Run): Promise<Imported> {
       if (components.length === 0) continue;
       made.set(
         source.id,
-        await store.addDeviceCalendar({
+        await addDeviceCalendar(store, {
           account: run.accountName,
           calendar: source.name,
           color: source.color,

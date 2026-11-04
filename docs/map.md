@@ -97,8 +97,8 @@ When you add a package, app or module, add its line here in the same PR.
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
-      → `plans/foundation.md#D122`; `addDeviceCalendar`, one more there
-      for an import, never removed; `withUids`, a calendar's objects by UID.
+      → `plans/foundation.md#D122`; another calendar there (an import's,
+      made in `import/plan.ts`) is never removed.
       → `plans/import.md#D269`, `plans/import.md#D270`
     - `subscribe` — hears every write that changed a row, for live
       queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`
@@ -375,7 +375,8 @@ When you add a package, app or module, add its line here in the same PR.
     (`read.ts`), a file's format told from its bytes and its sources;
     `decodeText` (`decode.ts`), its charset; `unzip` (`zip.ts`, loaded for
     a ZIP alone); `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`),
-    where each source goes and the writes in batches.
+    where each source goes, a new calendar on this device, and the writes
+    in batches.
     → `plans/import.md#D266`–`#D271`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in

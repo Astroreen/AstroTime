@@ -483,12 +483,12 @@ describe("an import written through the store (import D269–D271)", () => {
       [two.id, { events: NEW, tasks: null }],
     ]);
     const duplicates = await duplicatesOf(store, [one, two], destinations);
-    const real = store.addDeviceCalendar.bind(store);
+    const real = store.saveCalendar.bind(store);
     let calls = 0;
-    store.addDeviceCalendar = ((names) => {
+    store.saveCalendar = ((input) => {
       if (++calls === 2) return Promise.reject(new Error("The disk is full."));
-      return real(names);
-    }) as typeof store.addDeviceCalendar;
+      return real(input);
+    }) as typeof store.saveCalendar;
     await expect(run(store, [one, two], destinations, duplicates)).rejects.toThrow("disk");
     expect((await store.calendars()).map((made) => made.name)).not.toContain("One");
   });

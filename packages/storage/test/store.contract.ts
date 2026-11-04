@@ -3,7 +3,7 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { ALL_RIGHTS, NO_RIGHTS } from "@astrotime/core";
 
-import { SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
+import { LOCAL_SERVER, SCHEMA_VERSION, Store, type SqlDriver } from "../src/index.ts";
 
 const vcal = (body: string) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\n${body}END:VCALENDAR\r\n`;
@@ -430,7 +430,7 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.accounts()).toEqual([server]);
     });
 
-    test("a calendar made on this device for an import is the user's: it never steps aside (import D269)", async () => {
+    test("a calendar the user made on this device is the user's: it never steps aside (import D269)", async () => {
       const { store, account: server } = await setup();
       await store.saveCalendar({
         accountId: server.id,
@@ -440,37 +440,23 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
         components: ["VTODO"],
         rights: ALL_RIGHTS,
       });
-      // No account on this device yet: one is made for it.
-      const holidays = await store.addDeviceCalendar({
-        account: "On this device",
-        calendar: "Holidays",
-        color: "#d50000",
-        components: ["VEVENT"],
+      const local = await store.addAccount({
+        provider: "local",
+        name: "On this device",
+        serverUrl: LOCAL_SERVER,
+        username: null,
       });
-      expect(holidays).toMatchObject({
+      const holidays = await store.saveCalendar({
+        accountId: local.id,
+        url: `${LOCAL_SERVER}holidays/`,
         name: "Holidays",
         color: "#d50000",
         components: ["VEVENT"],
         rights: ALL_RIGHTS,
       });
-      const local = (await store.accounts()).find((a) => a.provider === "local")!;
-      expect(local.name).toBe("On this device");
-      expect(holidays.accountId).toBe(local.id);
-      // A second goes on the same account, under an address of its own.
-      const birthdays = await store.addDeviceCalendar({
-        account: "ignored",
-        calendar: "Birthdays",
-        color: null,
-        components: ["VEVENT", "VTODO"],
-      });
-      expect(birthdays.accountId).toBe(local.id);
-      expect(birthdays.url).not.toBe(holidays.url);
       // Empty, and other calendars take new events and tasks: it stays all the same.
       expect(await store.removeLocalCalendarIfUnused()).toBe(false);
-      expect((await store.calendars(local.id)).map((c) => c.name)).toEqual([
-        "Birthdays",
-        "Holidays",
-      ]);
+      expect((await store.calendars(local.id)).map((c) => c.name)).toEqual(["Holidays"]);
       // Its items are final, as the first one's are (D122).
       expect(
         (
@@ -480,18 +466,6 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
           )
         ).pending,
       ).toBe("none");
-    });
-
-    test("objects found by UID in one calendar (import D270)", async () => {
-      const { store, calendar } = await setup();
-      await store.saveLocal(calendar.id, task("a"));
-      await store.saveLocal(calendar.id, task("b"));
-      const other = await store.saveCalendar({ ...calendar, url: `${calendar.url}other/` });
-      await store.saveLocal(other.id, task("c"));
-      const many = Array.from({ length: 1200 }, (_, i) => `x${i}`);
-      const found = await store.withUids(calendar.id, ["a", "c", ...many]);
-      expect(found.map((object) => object.uid)).toEqual(["a"]);
-      expect(await store.withUids(calendar.id, [])).toEqual([]);
     });
 
     test("the calendar on this device stays beside a server's account while it holds items (D122)", async () => {
