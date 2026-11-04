@@ -9,7 +9,7 @@ import type { Calendar, Store } from "@astrotime/storage";
 import { Checkbox } from "@base-ui/react/checkbox";
 import { Menu } from "@base-ui/react/menu";
 import { Tabs } from "@base-ui/react/tabs";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 
 import { liveQuery, sameResult, whileShown } from "../calendar/live.ts";
@@ -31,6 +31,7 @@ import { useCalendar } from "./context.ts";
 import { Pager, type Page } from "./pager.tsx";
 import { EmptyState } from "./empty-state.tsx";
 import { targetOf, useEditing } from "./editing.tsx";
+import { deferred } from "./lazy.tsx";
 import {
   BackIcon,
   CheckCircleIcon,
@@ -65,6 +66,13 @@ const lessMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const HOLD_MS = 160;
 
 type Motion = typeof import("./task-motion.ts");
+
+/** "+ New list"'s dialog, loaded with its first opening (design D276). */
+const NewListDialog = deferred(
+  () => import("./new-list-dialog.tsx"),
+  (module) => module.NewListDialog,
+  (props: ComponentProps<typeof import("./new-list-dialog.tsx").NewListDialog>) => props.open,
+);
 
 /** How far the tab strip fades out on a side that hides tabs, in px (design D135). */
 const FADE = 40;
@@ -107,6 +115,7 @@ export function TasksScreen({
   );
   const selected = lists.some((list) => list.id === chosen) ? chosen : (lists[0]?.id ?? null);
   const [found, setFound] = useState<string | null>(null);
+  const [making, setMaking] = useState(false);
   useEffect(() => {
     if (!focus) return;
     setChosen(focus.calendarId);
@@ -421,15 +430,20 @@ export function TasksScreen({
                 })}
                 <Tabs.Indicator className="absolute bottom-0 left-0 h-[3px] w-(--active-tab-width) translate-x-(--active-tab-left) rounded-t-full bg-accent transition-[translate,width] duration-150" />
               </Tabs.List>
-              {/* Creating a list on the server is later work (docs/plans/design.md#deferred). */}
               <button
                 type="button"
-                disabled
-                className="flex h-12 items-center gap-1.5 px-4 text-row whitespace-nowrap text-ink-muted"
+                onClick={() => setMaking(true)}
+                className="flex h-12 items-center gap-1.5 px-4 text-row whitespace-nowrap text-ink-muted -outline-offset-2 hover:text-ink focus-visible:bg-raised"
               >
                 <PlusIcon className="size-5" />
                 {t("tasks.newList")}
               </button>
+              <NewListDialog
+                open={making}
+                onClose={() => setMaking(false)}
+                onMade={(calendar) => setChosen(calendar.id)}
+                near={lists.find((list) => list.id === selected)?.accountId ?? null}
+              />
             </div>
           </div>
           {/* The stage the tasks move on: rows that left are drawn on its layer (design D197). */}

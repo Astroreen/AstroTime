@@ -189,6 +189,7 @@ export class SyncScheduler {
   /** Something changed on this device: it goes up shortly, in one sync per burst. */
   changed(): void {
     this.#unsent = true;
+    this.#changes++;
     this.#cancelChange?.();
     this.#cancelChange = this.#environment.after(CHANGE_DEBOUNCE_MS, () => {
       this.#cancelChange = null;
@@ -216,6 +217,8 @@ export class SyncScheduler {
   #stopped = false;
   /** A change made here may not have gone up yet: the last syncs since did not all go through. */
   #unsent = false;
+  /** The changes made here so far: a sync sends only those made before it began. */
+  #changes = 0;
 
   /** Whether an automatic trigger syncs: the last sync is a minute old, or found a server offline. */
   #due(): boolean {
@@ -224,6 +227,7 @@ export class SyncScheduler {
 
   async #run(request: SyncRequest): Promise<void> {
     this.#lastStart = this.#environment.now();
+    const changes = this.#changes;
     this.#running++;
     this.#update({ running: true });
     try {
@@ -236,8 +240,12 @@ export class SyncScheduler {
       // A change made here is sent once every account that can sync took
       // one. One signed out (none saved, or its password refused and held)
       // or refused by the proxy waits for the user, not for a sync: a
-      // hold's end would only wake a hidden tab for nothing.
-      if (report.accounts.every((account) => account.status === "synced" || waitsForUser(account)))
+      // hold's end would only wake a hidden tab for nothing. A change made
+      // after this sync began is not in it.
+      if (
+        changes === this.#changes &&
+        report.accounts.every((account) => account.status === "synced" || waitsForUser(account))
+      )
         this.#unsent = false;
       this.#retryAt(report.retryAt);
       // Every account syncAll knows is in its report: one removed meanwhile drops out.

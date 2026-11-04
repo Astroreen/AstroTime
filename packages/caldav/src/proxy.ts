@@ -26,6 +26,12 @@ export const UNREACHABLE = "x-astrotime-unreachable";
  * (D20); `other-server <origin>`, the server redirects to another one (D39).
  */
 export const REFUSED = "x-astrotime-refused";
+/**
+ * The server's `WWW-Authenticate`, under a name the browser does not act
+ * on (see RETURNED), so the app can answer a Digest challenge
+ * (docs/plans/providers.md#D260); `digest.ts` reads it there.
+ */
+export const CHALLENGE = "x-astrotime-www-authenticate";
 
 /** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
@@ -39,8 +45,10 @@ export interface ProxyOptions {
   /** Where proxied URLs start on the app's origin, `/dav-proxy/`. */
   readonly prefix: string;
   /**
-   * Origins the proxy may reach (`https://cloud.example.com`). `"*"` allows
-   * any, for a dev server only it listens to; never in production.
+   * Origins the proxy may reach (`https://cloud.example.com`); an `http://`
+   * one with no port lets its host's `https://` through too, as its upgrade
+   * redirect is passed on (D39). `"*"` allows any, for a dev server only it
+   * listens to; never in production.
    */
   readonly allow: readonly string[] | "*";
   readonly fetch?: typeof fetch;
@@ -96,7 +104,11 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
     }
     if (!/^https?:$/.test(target.protocol))
       return new Response("Not a proxied URL.", { status: 400 });
-    if (options.allow !== "*" && !allowed.has(target.origin)) {
+    // An http server on the list is reached over https too: the proxy passes
+    // its upgrade redirect on (below), so the next request must not be refused.
+    const upgraded =
+      target.protocol === "https:" && target.port === "" && allowed.has(`http://${target.host}`);
+    if (options.allow !== "*" && !allowed.has(target.origin) && !upgraded) {
       return new Response(`${target.origin} is not on this proxy's allowlist.`, {
         status: 403,
         headers: { [REFUSED]: "not-allowed" },
@@ -168,6 +180,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       }
       returned.set(name, via.to(location.href));
     }
+    const challenge = answer.headers.get("www-authenticate");
+    if (challenge !== null) returned.set(CHALLENGE, challenge);
     // Someone's calendar, fetched with their credentials: never kept by a cache.
     returned.set("cache-control", "no-store");
     // Streamed through: a calendar's multiget answer can be megabytes.

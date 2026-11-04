@@ -75,8 +75,13 @@ export function useDraftAside(open: boolean): Placed | null {
     if (!open) return;
     const draft = floating ? shownDraft() : null;
     const rect = draft?.getBoundingClientRect();
-    const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const beside = rect ? besideOf(rect, window.innerWidth, rem) : null;
+    const root = getComputedStyle(document.documentElement);
+    const rem = Number.parseFloat(root.fontSize) || 16;
+    // A phone's system bars at the sides (design D235), in CSS pixels.
+    const inset = (side: "left" | "right") =>
+      Number.parseFloat(root.getPropertyValue(`--inset-${side}`)) || 0;
+    const insets = { left: inset("left"), right: inset("right") };
+    const beside = rect ? besideOf(rect, window.innerWidth, rem, insets) : null;
     const next =
       beside && rect
         ? { ...beside, draft: `${Math.round(rect.left)},${Math.round(rect.right)}` }
@@ -91,27 +96,36 @@ export function useDraftAside(open: boolean): Placed | null {
   return floating ? aside : null;
 }
 
-/** Where a dialog fits beside `draft` on a screen `screen` wide, with the root font `rem` px (design D187). */
+/**
+ * Where a dialog fits beside `draft` on a screen `screen` wide, with the
+ * root font `rem` px (design D187), clear of the system bars `insets` at
+ * the screen's sides (D235): the room a bar takes is no room for it.
+ */
 export function besideOf(
   draft: { left: number; right: number },
   screen: number,
   rem = 16,
+  insets = { left: 0, right: 0 },
 ): Aside | null {
   if (screen < FLOATS_REM * rem) return null;
-  const left = draft.left - MARGIN - GAP;
-  const right = screen - draft.right - MARGIN - GAP;
+  const left = draft.left - MARGIN - GAP - insets.left;
+  const right = screen - draft.right - MARGIN - GAP - insets.right;
   // A tie goes right, as the dialog reads from the left edge of the screen otherwise.
   const side = right >= left ? "right" : "left";
   const width = Math.floor(Math.min(WIDEST_REM * rem, side === "right" ? right : left));
   return width >= NARROWEST ? { side, width } : null;
 }
 
-/** The dialog's place and width beside the draft, over the sheet's middle (design D187). */
+/**
+ * The dialog's place and width beside the draft, over the sheet's middle
+ * (design D187): its outer edge clear of a system bar at that side too
+ * (D235), its width already narrowed by it (`besideOf`).
+ */
 export function asideStyle({ side, width }: Aside): CSSProperties {
   return {
     width,
-    left: side === "left" ? MARGIN : "auto",
-    right: side === "right" ? MARGIN : "auto",
+    [side]: `calc(${MARGIN}px + var(--inset-${side}))`,
+    [side === "left" ? "right" : "left"]: "auto",
     translate: "0 -50%",
   };
 }

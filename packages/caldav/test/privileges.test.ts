@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, type HttpClient } from "../src/index.ts";
+import { type HttpClient } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 
 const ALL = { create: true, edit: true, delete: true };
 const NONE = { create: false, edit: false, delete: false };

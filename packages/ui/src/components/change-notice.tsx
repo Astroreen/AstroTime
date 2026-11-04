@@ -26,7 +26,7 @@ export function ChangeNotice({ notice, onClose }: { notice: Notice | null; onClo
   return createPortal(
     <div
       role="alert"
-      className="fixed bottom-4 left-1/2 z-[120] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-2 rounded-2xl bg-danger-soft p-3 text-body text-danger shadow-lg"
+      className="fixed bottom-[calc(1rem+var(--inset-bottom))] left-1/2 z-[120] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-2 rounded-2xl bg-danger-soft p-3 text-body text-danger shadow-lg"
     >
       <p className="flex-1 py-1">{t(KEYS[notice])}</p>
       <button

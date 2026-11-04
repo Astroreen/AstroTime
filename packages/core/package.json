@@ -12,6 +12,26 @@
     "./copy": {
       "types": "./src/copy.ts",
       "import": "./src/copy.ts"
+    },
+    "./new-calendar": {
+      "types": "./src/new-calendar.ts",
+      "import": "./src/new-calendar.ts"
+    },
+    "./provider": {
+      "types": "./src/provider.ts",
+      "import": "./src/provider.ts"
+    },
+    "./split": {
+      "types": "./src/split.ts",
+      "import": "./src/split.ts"
+    },
+    "./lines": {
+      "types": "./src/lines.ts",
+      "import": "./src/lines.ts"
+    },
+    "./time": {
+      "types": "./src/time.ts",
+      "import": "./src/time.ts"
     }
   },
   "scripts": {

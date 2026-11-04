@@ -259,3 +259,71 @@ test("a server this AstroTime does not carry is named as the administrator's cho
     "This AstroTime's administrator has not allowed this server.",
   );
 });
+
+test("an http:// address to another host says the password would cross unencrypted; https and this device do not (providers D260)", async ({
+  page,
+}) => {
+  await openApp(page);
+  const dialog = await addAccount(page);
+  const address = dialog.getByRole("textbox", { name: "Server address" });
+  const warning =
+    "This address is not encrypted: your password could be read on the way. Use https:// if the server offers it.";
+  await address.fill("http://dav.example.net/dav.php/");
+  await expect(address).toHaveAccessibleDescription(warning);
+  await expect(dialog.getByText(warning)).toBeVisible();
+  for (const safe of ["dav.example.net", "https://dav.example.net/", "http://127.0.0.1:5232/"]) {
+    await address.fill(safe);
+    await expect(dialog.getByText(warning)).toHaveCount(0);
+  }
+});
+
+test("in Russian the same warning says the same (providers D262)", async ({ browser }) => {
+  const context = await browser.newContext({ locale: "ru-RU" });
+  const page = await context.newPage();
+  await openApp(page);
+  const dialog = await addAccount(page, "nextcloud", RU_ADD_ACCOUNT);
+  const address = dialog.getByRole("textbox", { name: "Адрес сервера" });
+  await address.fill("http://dav.example.net/");
+  await expect(address).toHaveAccessibleDescription(
+    "Этот адрес не зашифрован: пароль могут перехватить по дороге. Используйте https://, если сервер его поддерживает.",
+  );
+  await context.close();
+});
+
+test("a calendar subscribed to by its address shows its events, read-only; an address that is no calendar says so (providers D251)", async ({
+  page,
+}) => {
+  const feed = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//Feed//EN\r\nX-WR-CALNAME:Team holidays\r\nBEGIN:VEVENT\r\nUID:offsite\r\nDTSTAMP:20261101T080000Z\r\nDTSTART;TZID=Europe/Vilnius:20261104T120000\r\nDTEND;TZID=Europe/Vilnius:20261104T130000\r\nSUMMARY:Team offsite\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+  // The feed's server, at the dev server's proxy: a calendar at one address, a sign-in page at another.
+  await page.route("**/dav-proxy/https%3A%2F%2Fcalendar.example.org/**", (route) =>
+    route.request().url().endsWith("/team.ics")
+      ? route.fulfill({ status: 200, contentType: "text/calendar", body: feed })
+      : route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: "<!doctype html><title>Sign in</title>",
+        }),
+  );
+  await openApp(page);
+  const dialog = await addAccount(page);
+  await dialog.getByRole("tab", { name: "Subscribe" }).click();
+  const panel = dialog.getByRole("tabpanel", { name: "Subscribe" });
+  const address = panel.getByRole("textbox", { name: "Calendar address" });
+  await address.fill("webcal://calendar.example.org/login");
+  await panel.getByRole("button", { name: "Subscribe" }).click();
+  await expect(panel.getByRole("alert")).toHaveText(
+    "This address answers, but not with a calendar: a web page, or nothing at all.",
+  );
+  await address.fill("webcal://calendar.example.org/team.ics");
+  await panel.getByRole("button", { name: "Subscribe" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(wednesday(page).getByRole("listitem", { name: /^Team offsite, / })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Team holidays" })).toBeChecked();
+  // Read-only: its details offer no edit.
+  await wednesday(page)
+    .getByRole("listitem", { name: /^Team offsite, / })
+    .click();
+  const details = page.getByRole("dialog", { name: "Team offsite" });
+  await expect(details).toBeVisible();
+  await expect(details.getByRole("button", { name: "Edit" })).toHaveCount(0);
+});

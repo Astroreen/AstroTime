@@ -78,6 +78,16 @@ export default defineConfig({
             { name: "drizzle", test: /node_modules[\\/]drizzle-orm[\\/]/, tags: initial },
             { name: "i18n", test: /node_modules[\\/](i18next|react-i18next)[\\/]/ },
             { name: "vendor", test: /node_modules[\\/]/, tags: initial },
+            // AstroTime's own packages that load at once, in one chunk: a part
+            // loaded later that needs some of them (the subscriptions' file
+            // splitter, which needs the iCalendar core) takes them from it,
+            // rather than cutting them into a chunk of their own, which
+            // compresses worse (docs/plans/providers.md#D255).
+            {
+              name: "app",
+              test: /packages[\\/](core|caldav|storage|sync)[\\/]src[\\/]/,
+              tags: initial,
+            },
           ],
         },
       },

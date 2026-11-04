@@ -70,6 +70,7 @@ test("the app starts sandboxed on app://, keeps its store in a utility process, 
     bridge: [
       "connectStore",
       "http",
+      "oauth",
       "onSyncRequest",
       "openExternal",
       "reminders",

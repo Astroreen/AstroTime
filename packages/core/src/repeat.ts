@@ -6,7 +6,7 @@
 import ICAL from "ical.js";
 
 import type { CalendarObject } from "./calendar-object.ts";
-import { fromIcalTime, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
+import { fromIcalTime, wallClockNear, wallClockOf, zonedToEpoch, type ItemTime } from "./time.ts";
 
 export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
 export const WEEKDAYS: readonly Weekday[] = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
@@ -25,7 +25,7 @@ export interface Repeat {
   readonly interval: number;
   /** A weekly rule's days; empty for the start's own weekday. */
   readonly weekdays: readonly Weekday[];
-  /** A monthly rule on the nth weekday (1–5, or −1 for the last); `null`: on the start's day of the month. */
+  /** A monthly rule on the nth weekday (1–5, or −1 to −5 from the last); `null`: on the start's day of the month. */
   readonly monthlyWeekday: { readonly nth: number; readonly weekday: Weekday } | null;
   readonly end: RepeatEnd;
 }
@@ -60,16 +60,10 @@ export function repeatOf(object: CalendarObject): RepeatRule | null {
   if (!(first instanceof ICAL.Recur)) return null;
   const start = master.getFirstPropertyValue("dtstart") ?? master.getFirstPropertyValue("due");
   const anchor = start instanceof ICAL.Time ? fromIcalTime(start) : null;
-  const single = rules.length === 1 && !master.hasProperty("rdate");
-  return readRule(first, anchor, single, start instanceof ICAL.Time ? start : undefined);
+  return readRule(first, anchor, rules.length === 1 && !master.hasProperty("rdate"));
 }
 
-function readRule(
-  rule: ICAL.Recur,
-  anchor: ItemTime | null,
-  single: boolean,
-  start?: ICAL.Time,
-): RepeatRule {
+function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): RepeatRule {
   const frequency = (["DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const).find(
     (f) => f === rule.freq,
   );
@@ -89,12 +83,9 @@ function readRule(
     if (weekdays.length !== byDay.length || byMonthDay.length > 0 || byMonth.length > 0)
       exact = false;
   } else if (frequency === "MONTHLY") {
-    const match = byDay.length === 1 ? /^([+-]?\d)?(MO|TU|WE|TH|FR|SA|SU)$/.exec(byDay[0]!) : null;
-    const nth = Number(match?.[1]);
-    // The nths a `Repeat` holds: 1–5, or −1 for the last (`-2MO` is none of them).
-    if (match?.[1] && ((nth >= 1 && nth <= 5) || nth === -1)) {
-      monthlyWeekday = { nth, weekday: match[2] as Weekday };
-    }
+    const match =
+      byDay.length === 1 ? /^([+-]?[1-5])?(MO|TU|WE|TH|FR|SA|SU)$/.exec(byDay[0]!) : null;
+    if (match?.[1]) monthlyWeekday = { nth: Number(match[1]), weekday: match[2] as Weekday };
     const onItsDay =
       byDay.length === 0 &&
       (byMonthDay.length === 0 ||
@@ -114,7 +105,10 @@ function readRule(
 
   let end: RepeatEnd = { type: "never" };
   if (rule.count) end = { type: "count", count: rule.count };
-  else if (rule.until) end = { type: "until", until: untilDayOf(rule.until, anchor, start) };
+  else if (rule.until) {
+    // A UTC end names the series' last moment: its day is the one in the series' zone.
+    end = { type: "until", until: dayIn(fromIcalTime(rule.until), anchor) };
+  }
   return {
     repeat: {
       frequency: frequency ?? "DAILY",
@@ -125,27 +119,6 @@ function readRule(
     },
     exact,
   };
-}
-
-/**
- * The day an `UNTIL` ends on. A UTC end names the series' last moment: its
- * day is the one in the series' zone, as `Intl` knows it, or as the
- * object's VTIMEZONE does for a zone `Intl` does not know (`Customized Time
- * Zone`, D32).
- */
-function untilDayOf(until: ICAL.Time, anchor: ItemTime | null, start?: ICAL.Time): string {
-  const zone = anchor?.type === "zoned" ? anchor.timeZone : "UTC";
-  const written = fromIcalTime(until);
-  try {
-    return wallClockOf(written, zone).slice(0, 10);
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    // Only a UTC end is an instant to place; any other is its day as written.
-    if (!start?.zone || until.zone !== ICAL.Timezone.utcTimezone)
-      return localOf(written).slice(0, 10);
-    const day = until.convertToZone(start.zone);
-    return `${String(day.year).padStart(4, "0")}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
-  }
 }
 
 function localOf(time: ItemTime): string {
@@ -292,10 +265,18 @@ export function movedRule(rule: ICAL.Recur, from: ItemTime, to: ItemTime): ICAL.
   // the series ends on the same day, written in the new type. A series keeps
   // its zone when it moves (D104), so a zoned UNTIL stays as it is.
   if (rule.until && from.type !== to.type) {
-    const zone = from.type === "zoned" ? from.timeZone : "UTC";
-    moved.until = untilOf(wallClockOf(fromIcalTime(rule.until), zone).slice(0, 10), to);
+    moved.until = untilOf(dayIn(fromIcalTime(rule.until), from), to);
   }
   return moved;
+}
+
+/** The day a time falls on in the zone of `anchor` (a series' start), else in UTC. */
+function dayIn(time: ItemTime, anchor: ItemTime | null): string {
+  const local =
+    time.type === "zoned" && anchor?.type === "zoned"
+      ? wallClockNear(time.epochMs, anchor)
+      : wallClockOf(time, "UTC");
+  return local.slice(0, 10);
 }
 
 /**

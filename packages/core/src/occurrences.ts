@@ -3,7 +3,15 @@ import ICAL from "ical.js";
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
-import { fromIcalTime, keepTzid, wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
+import {
+  fromIcalTime,
+  keepTzid,
+  sameOrigin,
+  wallClockIn,
+  wallClockOf,
+  zoneOrigin,
+  type ItemTime,
+} from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
 export interface Occurrence {
@@ -49,7 +57,7 @@ export class ExpansionLimitError extends Error {
 function anchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Time } | null {
   const span = rawAnchors(component);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
-  if (span && span.end.compare(span.start) < 0) return { start: span.start, end: span.start };
+  if (span && signedLength(span).isNegative) return { start: span.start, end: span.start };
   return span;
 }
 
@@ -80,51 +88,57 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
     : null;
 }
 
-/**
- * The length from `start` to `end`, on the wall clock when both share a zone
- * (so a 1-hour meeting stays 1 hour across DST), else the time between their
- * instants (a flight from Berlin to New York). ical.js holds both of two
- * zones the object does not define (D32) as wall clocks of one zone, so the
- * zones are told apart as `fromIcalTime` reads them, and by their clocks:
- * one zone under two names (`Europe/Kiev` and `Europe/Kyiv`) is one zone.
- */
-export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  const from = fromIcalTime(start);
-  const to = fromIcalTime(end);
-  const zoned = from.type === "zoned" && to.type === "zoned";
-  // `subtractDate` measures the wall clocks, whichever zone objects ical.js
-  // holds them in (two VTIMEZONEs of one zone's two names are two).
-  const length =
-    zoned && !sameClock(from, to)
-      ? ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000))
-      : zoned || start.zone === end.zone
-        ? end.subtractDate(start)
-        : end.subtractDateTz(start);
+/** The length from `start` to `end`, on the wall clock when both share a zone (so a 1-hour meeting stays 1 hour across DST). */
+export function lengthOf(span: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
+  const length = signedLength(span);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
   return length.isNegative ? new ICAL.Duration({}) : length;
 }
 
+function signedLength({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
+  if (start.zone === end.zone && sameOrigin(start, end)) return end.subtractDate(start);
+  // Two zones the object does not define are both a wall clock to ical.js (a
+  // flight from Berlin to New York): their instants tell the length, unless
+  // both name one zone (`sameClock`), whose wall clocks tell it.
+  const from = fromIcalTime(start);
+  const to = fromIcalTime(end);
+  if (from.type === "zoned" && to.type === "zoned") {
+    return sameClock(start, end)
+      ? end.subtractDate(start)
+      : ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000));
+  }
+  return end.subtractDateTz(start);
+}
+
 /**
- * Whether two zoned times read the same wall clocks in either's zone: one
- * zone (an alias too, which `Intl` may or may not resolve to one name), or
- * zones with the same offsets at both instants (London and Lagos in summer).
- * Those measure one length either way: each zone's offset is the same at
- * both, so the wall clocks are as far apart as the instants, and every
- * later occurrence adds that length to its own start's wall clock.
+ * Whether two zoned times read the same wall clocks in either's zone (D32):
+ * one zone under two names (an alias, a Windows name beside its IANA one,
+ * two VTIMEZONEs of one zone), or zones with the same offsets at both
+ * instants (London and Lagos in summer). Those measure one length either
+ * way: each zone's offset is the same at both, so the wall clocks are as far
+ * apart as the instants, and every later occurrence adds that length to its
+ * own start's wall clock.
  */
-function sameClock(
-  a: Extract<ItemTime, { type: "zoned" }>,
-  b: Extract<ItemTime, { type: "zoned" }>,
-): boolean {
+function sameClock(start: ICAL.Time, end: ICAL.Time): boolean {
+  const a = fromIcalTime(start);
+  const b = fromIcalTime(end);
+  if (a.type !== "zoned" || b.type !== "zoned") return false;
   if (a.timeZone === b.timeZone) return true;
   try {
     return (
       wallClockIn(a.epochMs, b.timeZone) === a.local &&
       wallClockIn(b.epochMs, a.timeZone) === b.local
     );
-  } catch {
-    // A zone `Intl` does not know (a VTIMEZONE's own name): another zone.
-    return false;
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // A zone only its VTIMEZONE knows (`Customized Time Zone`): ical.js reads
+    // its clock, when both ends have a VTIMEZONE (or are UTC).
+    const defined = (time: ICAL.Time) => ["defined", "utc"].includes(zoneOrigin(time).kind);
+    if (!defined(start) || !defined(end)) return false;
+    return (
+      start.convertToZone(end.zone).toString().slice(0, 19) === a.local &&
+      end.convertToZone(start.zone).toString().slice(0, 19) === b.local
+    );
   }
 }
 

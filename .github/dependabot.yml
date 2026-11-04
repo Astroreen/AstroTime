@@ -1,6 +1,8 @@
 # docs/plans/foundation.md, D27: proposes the updates of the actions every
 # workflow pins to a commit SHA, with the release in the comment; and D41:
-# of the Dockerfile's base images, pinned by digest with the tag kept.
+# of the Dockerfile's base images, pinned by digest with the tag kept; and
+# docs/plans/providers.md, D248: of the interop run's servers, whose bump
+# runs the interop run on exactly the change that may break it.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -33,3 +35,25 @@ updates:
           - "*"
     commit-message:
       prefix: build
+  - package-ecosystem: docker-compose
+    directory: /packages/sync/test/interop
+    schedule:
+      interval: weekly
+      day: monday
+    # DAViCal's database: its major goes with DAViCal's own, by hand.
+    ignore:
+      - dependency-name: postgres
+        update-types:
+          - version-update:semver-major
+      # Stalwart from 0.16 on keeps its configuration in its store, set by
+      # its web wizard: the interop run stays on 0.15's file (providers D261).
+      - dependency-name: stalwartlabs/stalwart
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+    groups:
+      interop:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: test

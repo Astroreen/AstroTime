@@ -37,6 +37,26 @@ export interface Multistatus {
   readonly syncToken: string | null;
 }
 
+const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/** Text with XML's references decoded, in one pass: `&amp;#13;` is `&#13;` as text. */
+function decodeXml(raw: string): string {
+  if (!raw.includes("&")) return raw;
+  return raw.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, decimal, name) => {
+    if (name !== undefined) return NAMED[name] ?? reference;
+    const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16);
+    // XML 1.0's Char: a reference to anything else is not decoded.
+    const valid =
+      code === 0x9 ||
+      code === 0xa ||
+      code === 0xd ||
+      (code >= 0x20 && code <= 0xd7ff) ||
+      (code >= 0xe000 && code <= 0xfffd) ||
+      (code >= 0x10000 && code <= 0x10ffff);
+    return valid ? String.fromCodePoint(code) : reference;
+  });
+}
+
 const parser = new XMLParser({
   // Attributes are kept for <comp name="VEVENT"/>, as `@_name`.
   ignoreAttributes: false,
@@ -44,6 +64,17 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
+  // XML's own references only: its five entities and character references
+  // (`&#13;`, `&#xE9;`), which fast-xml-parser decodes only together with
+  // HTML's. Anything else (`&nbsp;`) stays as written. The interface is
+  // fast-xml-parser 5.11.2's, pinned exactly in pnpm-workspace.yaml.
+  entityDecoder: {
+    decode: decodeXml,
+    setExternalEntities: () => {},
+    addInputEntities: () => {},
+    reset: () => {},
+    setXmlVersion: () => {},
+  },
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 

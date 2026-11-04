@@ -1,0 +1,41 @@
+# Stalwart 0.15 configured without its web admin (docs/plans/providers.md#D248):
+# plain http on one port, its data in RocksDB inside the container, and one
+# user, `astro` with the password `secret`, in a directory kept in this file.
+# Its log's "Failed to fetch spam filter" is its mail side's, and harmless here.
+[server]
+hostname = "localhost"
+
+[server.listener.http]
+bind = ["[::]:8080"]
+protocol = "http"
+
+[storage]
+data = "rocksdb"
+fts = "rocksdb"
+blob = "rocksdb"
+lookup = "rocksdb"
+directory = "memory"
+
+[store.rocksdb]
+type = "rocksdb"
+path = "/opt/stalwart/data"
+compression = "lz4"
+
+[directory.memory]
+type = "memory"
+
+[[directory.memory.principals]]
+name = "astro"
+class = "individual"
+secret = "secret"
+email = ["astro@example.com"]
+
+[authentication.fallback-admin]
+user = "admin"
+secret = "admin-password"
+
+[tracer.stdout]
+type = "stdout"
+level = "info"
+enable = true
+

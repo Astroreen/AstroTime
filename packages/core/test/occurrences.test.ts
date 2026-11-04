@@ -864,6 +864,38 @@ describe("RFC 5545's corners", () => {
     ]);
   });
 
+  test("a date UNTIL on a series of times keeps its day's occurrence, as libical reads it", () => {
+    const lastDay = (dtstart: string, dtend: string) =>
+      starts(
+        occurrencesBetween(
+          event(dtstart, dtend, "RRULE:FREQ=DAILY;UNTIL=20261110"),
+          vilnius("2026-11-01", "2026-12-01"),
+        ),
+      ).at(-1);
+    // A zone the object does not define, a floating time, and one it defines.
+    expect(
+      lastDay(
+        "DTSTART;TZID=Europe/Vilnius:20261105T100000",
+        "DTEND;TZID=Europe/Vilnius:20261105T110000",
+      ),
+    ).toBe("2026-11-10T10:00:00");
+    expect(lastDay("DTSTART:20261105T100000", "DTEND:20261105T110000")).toBe("2026-11-10T10:00:00");
+    const defined = starts(
+      occurrencesBetween(
+        CalendarObject.parse(
+          load("nextcloud-event-recurring.ics")
+            .serialize()
+            .replace(
+              "RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=4",
+              "RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20261110",
+            ),
+        ),
+        vilnius("2026-10-01", "2026-12-31"),
+      ),
+    );
+    expect(defined.at(-1)).toBe("2026-11-10T10:00:00");
+  });
+
   test("an RDATE at DTSTART is the one occurrence, with an RRULE or alone", () => {
     const withRule = event(
       "DTSTART;TZID=Europe/Vilnius:20261102T090000",

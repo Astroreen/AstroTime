@@ -35,9 +35,9 @@ import {
 } from "./icons.tsx";
 import { AttachmentList, AttachmentsIcon } from "./attachments.tsx";
 import { DetailsPicture } from "./item-picture.tsx";
-import { PlaceCard } from "./place-card.tsx";
+import { PLACE_LINE, PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
-import { primaryButton } from "./sign-in-dialog.tsx";
+import { primaryButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 /**
@@ -122,7 +122,7 @@ export function ItemDetails({
             />
           )}
           <Dialog.Close
-            className={`${dialogIcon} absolute top-2 left-2`}
+            className={`${dialogIcon} absolute top-[calc(0.5rem+var(--room-top))] left-[calc(0.5rem+var(--room-left))]`}
             aria-label={t("details.close")}
           >
             <CloseIcon className="size-5" />
@@ -267,7 +267,8 @@ function Body({
             </Row>
           )}
           {item.location && (
-            <Row icon={<PlaceIcon className="size-5" />} label={t("edit.location")}>
+            // Level with the place's first line, beside its 48 px icons (design D238).
+            <Row icon={<PlaceIcon className={`${PLACE_LINE} size-5`} />} label={t("edit.location")}>
               <PlaceCard
                 location={item.location}
                 geo={item.geo}

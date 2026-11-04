@@ -25,12 +25,13 @@ docker run -d -p 8080:8080 \
 ```
 
 `ASTROTIME_PROXY_ALLOW` is required: the comma-separated origins of the
-CalDAV servers the proxy may reach. Put the container behind your usual
-reverse proxy for TLS, next to your Nextcloud. The proxy serves the app's own
-pages only and checks this by host, so the reverse proxy must pass the
-original `Host`, port included, on (nginx: `proxy_set_header Host
-$http_host;` — `$host` drops the port; Caddy and Traefik pass it by
-default).
+CalDAV servers the proxy may reach. An `http://` origin with no port lets
+its host's `https://` through too, so its redirect to https is followed.
+Put the container behind your usual reverse proxy for TLS, next to your
+Nextcloud. The proxy serves the app's own pages only and checks this by
+host, so the reverse proxy must pass the original `Host`, port included,
+on (nginx: `proxy_set_header Host $http_host;` — `$host` drops the port;
+Caddy and Traefik pass it by default).
 
 `ASTROTIME_PUBLIC_HOST` is optional: the comma-separated host names the
 container answers for, such as `calendar.example.com` (any port) or

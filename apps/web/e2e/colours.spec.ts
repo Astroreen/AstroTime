@@ -98,9 +98,11 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   const dialog = page.getByRole("dialog", { name: /^New (event|task)$/ });
   const colour = dialog.getByRole("combobox", { name: "Colour" });
   await expect(colour).toHaveText("Dusty rose");
-  // A task starts in the calendar's colour: its own default is unset.
+  // A task starts in its list's colour: its own default is unset. A task's
+  // list is a list, not a calendar (design D236, the owner's 4 in round 5).
   await dialog.getByRole("radio", { name: "Task" }).click();
-  await expect(colour).toHaveText("The calendar's colour");
+  await expect(colour).toHaveText("The list's colour");
+  await expect(dialog.getByRole("combobox", { name: "List" })).toBeVisible();
   await dialog.getByRole("radio", { name: "Event" }).click();
   await expect(colour).toHaveText("Dusty rose");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Pottery");
@@ -180,4 +182,21 @@ test("a colour chosen in the dialog stays through a switch of kind, the default'
   await page.getByRole("option", { name: "Rose one", exact: true }).click();
   await dialog.getByRole("radio", { name: "Task" }).click();
   await expect(colour).toHaveText("Rose one");
+});
+
+test.describe("in Russian", () => {
+  test.use({ locale: "ru-RU" });
+
+  // The owner's 4 (round 5): a task's colour spoke of a calendar (design D236).
+  test("a task's colour is its list's, an event's its calendar's", async ({ page }) => {
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Создать" }).click();
+    const dialog = page.getByRole("dialog", { name: /^Новое мероприятие$|^Новая задача$/ });
+    const colour = dialog.getByRole("combobox", { name: "Цвет" });
+    await dialog.getByRole("radio", { name: "Задача" }).click();
+    await expect(colour).toHaveText("Цвет списка");
+    await expect(dialog.getByRole("combobox", { name: "Список" })).toBeVisible();
+    await dialog.getByRole("radio", { name: "Мероприятие" }).click();
+    await expect(colour).toHaveText("Цвет календаря");
+  });
 });

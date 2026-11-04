@@ -13,7 +13,7 @@ import { addPicture, NotAPictureError, removePicture, usePictureUrl } from "../p
 import { useSettings, type OwnWord } from "../settings.ts";
 import { useCalendar } from "./context.ts";
 import { CloseIcon, PlusIcon } from "./icons.tsx";
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
 const row =
@@ -132,7 +132,7 @@ export function PictureSettings() {
 }
 
 const popup =
-  "fixed top-1/2 left-1/2 z-[150] max-h-[calc(100dvh-2rem)] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0";
+  "centred z-[150] w-[min(26rem,calc(100vw-2rem))] rounded-3xl bg-raised p-4 text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0";
 const backdrop =
   "fixed inset-0 z-[140] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0";
 

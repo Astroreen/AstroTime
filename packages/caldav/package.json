@@ -12,6 +12,18 @@
     "./files": {
       "types": "./src/files.ts",
       "import": "./src/files.ts"
+    },
+    "./login-flow": {
+      "types": "./src/login-flow.ts",
+      "import": "./src/login-flow.ts"
+    },
+    "./bearer": {
+      "types": "./src/bearer.ts",
+      "import": "./src/bearer.ts"
+    },
+    "./provider": {
+      "types": "./src/provider.ts",
+      "import": "./src/provider.ts"
     }
   },
   "scripts": {

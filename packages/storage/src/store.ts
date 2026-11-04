@@ -56,6 +56,8 @@ export interface LocalChange {
   calendars(): Promise<Calendar[]>;
   save(calendarId: string, ics: string, href?: string): Promise<StoredObject>;
   delete(id: string): Promise<void>;
+  /** As `Store.withUids`, read in the same transaction as the writes. */
+  withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]>;
 }
 
 /** A task that rolls over to today, with the occurrence it counts by (design D51). */
@@ -164,31 +166,35 @@ export class Store {
    * The CalDAV account at this calendar home for this user, or a new one: the
    * lookup and the insert are one transaction (docs/plans/foundation.md#D90,
    * D99), so two sign-ins to one account at once, in two tabs too, add it once.
+   * With `provider: "ics"`, a subscription, its `homeUrl` its calendar's
+   * address (providers D251).
    */
   findOrAddAccount(
     input: Omit<Account, "id" | "createdAt" | "provider" | "homeUrl" | "syncOff"> & {
       homeUrl: string;
+      provider?: "caldav" | "ics";
     },
   ): Promise<{ readonly account: Account; readonly added: boolean }> {
+    const { provider = "caldav", ...fields } = input;
     return this.exclusive(async () => {
       const [existing] = await this.db
         .select()
         .from(schema.accounts)
         .where(
           and(
-            eq(schema.accounts.provider, "caldav"),
-            eq(schema.accounts.homeUrl, input.homeUrl),
-            input.username === null
+            eq(schema.accounts.provider, provider),
+            eq(schema.accounts.homeUrl, fields.homeUrl),
+            fields.username === null
               ? isNull(schema.accounts.username)
-              : eq(schema.accounts.username, input.username),
+              : eq(schema.accounts.username, fields.username),
           ),
         )
         .orderBy(schema.accounts.createdAt)
         .limit(1);
       if (existing) return { account: existing, added: false };
       const account = {
-        ...input,
-        provider: "caldav" as const,
+        ...fields,
+        provider,
         syncOff: false,
         id: crypto.randomUUID(),
         createdAt: Date.now(),
@@ -231,7 +237,7 @@ export class Store {
       await this.db.insert(schema.calendars).values({
         id: crypto.randomUUID(),
         accountId: account.id,
-        url: `${LOCAL_SERVER}personal/`,
+        url: LOCAL_CALENDAR_URL,
         name: names.calendar,
         color: names.color,
         components: "VEVENT,VTODO",
@@ -271,13 +277,16 @@ export class Store {
       if (!takes("VEVENT") || !takes("VTODO")) return false;
       let removed = false;
       for (const account of local) {
-        const [used] = await this.db
-          .select({ id: schema.objects.id })
-          .from(schema.objects)
-          .innerJoin(schema.calendars, eq(schema.objects.calendarId, schema.calendars.id))
-          .where(eq(schema.calendars.accountId, account.id))
-          .limit(1);
-        if (used) continue;
+        // The first calendar steps aside when it holds nothing; one the user
+        // made here (an import's, import D269) stays, and keeps the account.
+        for (const calendar of await this.calendars(account.id)) {
+          const first = calendar.url === LOCAL_CALENDAR_URL;
+          if (first && !(await this.hasObjects([calendar.id]))) {
+            await this.db.delete(schema.calendars).where(eq(schema.calendars.id, calendar.id));
+            removed = true;
+          }
+        }
+        if ((await this.calendars(account.id)).length > 0) continue;
         await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
         removed = true;
       }
@@ -566,6 +575,7 @@ export class Store {
         calendars: () => this.calendars(),
         save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
         delete: (id) => this.deleteLocalNow(id),
+        withUids: (calendarId, uids) => this.withUids(calendarId, uids),
       }),
     );
   }
@@ -933,6 +943,30 @@ export class Store {
     );
   }
 
+  /**
+   * The objects of a calendar with any of these UIDs, a deletion not yet
+   * uploaded aside (docs/plans/import.md#D270): an import's last look
+   * before each batch, for one a sync brought meanwhile.
+   */
+  async withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]> {
+    const found: StoredObject[] = [];
+    for (let i = 0; i < uids.length; i += IN_LIMIT) {
+      found.push(
+        ...(await this.db
+          .select()
+          .from(schema.objects)
+          .where(
+            and(
+              eq(schema.objects.calendarId, calendarId),
+              inArray(schema.objects.uid, uids.slice(i, i + IN_LIMIT)),
+              ne(schema.objects.pending, "delete"),
+            ),
+          )),
+      );
+    }
+    return found;
+  }
+
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */
   hrefs(
     calendarId: string,
@@ -1068,8 +1102,10 @@ const IN_LIMIT = 500;
 /** Rows in one multi-row `INSERT`: 15 columns each, 1 500 bound values. */
 const ROWS_PER_INSERT = 100;
 
-/** The calendar on this device's address: no server's, only unique (D122). */
-const LOCAL_SERVER = "local:";
+/** The calendar on this device's account's address: no server's, only unique (D122). */
+export const LOCAL_SERVER = "local:";
+/** The calendar on this device the store makes itself (D122); the user's own have others. */
+export const LOCAL_CALENDAR_URL = `${LOCAL_SERVER}personal/`;
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they

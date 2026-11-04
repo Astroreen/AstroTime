@@ -30,8 +30,14 @@ export function base64Of(bytes: Uint8Array): string {
 /** `Platform.saveFile` through the shell's picker (design D230). */
 export const saveFile =
   (shell: NativeShell) =>
-  async (file: { name: string; type: string; bytes: Uint8Array }): Promise<void> => {
-    await shell.saveFile({ name: file.name, type: file.type, data: base64Of(file.bytes) });
+  async (file: { name: string; type: string; bytes: Uint8Array }): Promise<boolean> => {
+    // False when the user turned the picker away: nothing was written.
+    const { saved } = await shell.saveFile({
+      name: file.name,
+      type: file.type,
+      data: base64Of(file.bytes),
+    });
+    return saved;
   };
 
 /** What the shell uses of `@capacitor/app`. */

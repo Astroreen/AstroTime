@@ -1,0 +1,419 @@
+# Import plan
+
+Status: **in progress** — the formats, their order and the flow are
+decided; the splitter (PR I1), the import flow for iCalendar, jCal and
+ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4), Google Takeout's tasks
+(PR I5) and export (PR I6) are built. This plan owns reading calendars
+and tasks from files into AstroTime, and writing them out again. It builds
+on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
+the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
+[D37](foundation.md#D37) (what the user may do in a calendar),
+[D122](foundation.md#D122) (the calendar on this device) and
+[D145](foundation.md#D145) (the first load's budget), and on the
+providers plan's [D251](providers.md#D251) (subscriptions), which shares
+its splitter. Its decisions are D265–D274.
+
+## Goal
+
+The owner: "In the app's settings, make it possible to import calendars
+and tasks from files. There is some special format for it, I think. But
+the more formats we support, the better."
+
+So: whatever file another calendar or task app gave the user, AstroTime
+reads it on the device, shows what is in it, and puts it in the calendar
+or list the user picks, as if made here; the sync uploads it as usual.
+Nothing in the file is lost on the way, and what a converted format could
+not carry is said, not dropped in silence.
+
+## Decisions
+
+- **D265. Import is in Settings, and reads on the device.** Settings gets
+  a "Data" group with "Import from a file" (and, with [D274](#D274),
+  "Export"). The file is picked as the edit dialog picks one from the
+  device (design [D233](design.md#D233), foundation
+  [D232](foundation.md#D232): an `<input type="file">`, which opens the
+  system's picker on Android and the file dialog on the desktop), read in
+  the page, and goes nowhere but into the store: no server sees it but the
+  user's own, through the sync, once imported. A file over 64 MiB is refused before
+  it is read (its text is held whole while it is split); a ZIP is read to
+  1000 files and 64 MiB in all, no file inflating past its stated size or
+  1000 times its own, so a ZIP bomb costs nothing: what is past a limit is
+  named as unread, and so is an entry whose own header is not where the
+  archive's directory says, or names another file or method.
+
+- **D266. The formats, and the order they come in.** Surveyed on
+  2026-11-04 from each format's specification and each exporter's
+  documentation:
+
+  | Format                              | Who writes it                                                                                                                                       | Carries                                    | When                  |
+  | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------- |
+  | iCalendar `.ics` (RFC 5545)         | every calendar app's export: Google Calendar, Nextcloud, Apple Calendar, Thunderbird, Outlook ("Save calendar"), Proton, Fastmail, Radicale's `GET` | events, tasks, series, alarms, time zones  | I2                    |
+  | jCal `.json` (RFC 7265)             | CalDAV servers on request, a few web apps                                                                                                           | as iCalendar, spelt in JSON                | I2 (ical.js reads it) |
+  | ZIP of the above                    | Google Calendar's "Export" (one `.ics` per calendar), Google Takeout                                                                                | many calendars at once                     | I2                    |
+  | vCalendar 1.0 `.vcs`                | older phones (Samsung, Nokia, Sony), Outlook's "vCalendar format"                                                                                   | events, tasks; a rule syntax of its own    | I3                    |
+  | CSV, Outlook's columns              | Outlook's "Export to a file" (calendar and tasks), Thunderbird's CSV export (the same columns)                                                      | events or tasks, no series, local times    | I4                    |
+  | CSV, Google's columns               | the layout Google Calendar's own import documents (`Subject`, `Start Date`, …), which spreadsheets are made in                                      | events, no series                          | I4                    |
+  | Google Takeout Tasks (`Tasks.json`) | Google Takeout                                                                                                                                      | task lists, subtasks, due dates, done      | I5                    |
+  | xCal (RFC 6321)                     | no common exporter found                                                                                                                            | as iCalendar, spelt in XML                 | [Deferred](#deferred) |
+  | Todoist CSV                         | Todoist's project template export                                                                                                                   | tasks; dates as free English ("every day") | [Deferred](#deferred) |
+  | Microsoft To Do, Apple Reminders    | no export file at all; their tasks reach a file through Outlook's CSV, or sync over CalDAV (providers plan)                                         | —                                          | not a format          |
+
+  iCalendar first: every app exports it, and it carries everything
+  AstroTime keeps. Then what older and non-calendar tools leave people
+  with, by how many people have such a file.
+
+- **D267. One file, many objects: the splitter.** `splitCalendars`
+  (`@astrotime/core/split`) cuts a file into calendar objects, one per
+  UID: a series with its exceptions wherever they stand in the file, with
+  the `VTIMEZONE`s its times name and no others, and every property of the
+  file's calendar but `METHOD` (a calendar object resource has none, RFC
+  4791 §4.1). Each component is read on its own, so one value ical.js
+  refuses costs that component, not the file, and one whose `END` never
+  came ends where the next component begins or the calendar ends, so it
+  never takes the rest of the file with it; what it said is kept when it
+  reads whole, and named either way (one cut by the file's end is not
+  kept: its last line may be cut too). An `END` with no `BEGIN` is named
+  as one and left out. It forgives what exporters
+  get wrong: a byte order mark, LF or CR line ends, blank lines, several
+  `VCALENDAR`s one after another, a file cut short (what came whole is
+  kept), a component with no UID (it gets one). Any line that starts as a content
+  line (a name of letters, digits and "-", in any case, then ";" or ":",
+  RFC 5545 §3.1) is a property, one AstroTime knows or not, and kept
+  ([D7](foundation.md#D7)); a line that does not ("PIN 1234", "Dial in:
+  555 0100") after a text value (`DESCRIPTION`, `SUMMARY`, `LOCATION`,
+  `COMMENT`, `CONTACT`, `RESOURCES`, an `X-` property) is that value broken
+  without folding, joined as the line break it meant; anywhere else it is
+  a stray line, left out; both are named. A content line after a text
+  value whose name iCalendar does not have ("Meeting-ID:123") may be that
+  value's: it is kept as the property it reads as, and named. The
+  same component twice under one UID (Google's and Outlook's exports do
+  it) is kept once; a second, different master, or a component of another
+  kind under a UID taken, is kept as an object of its own under a new UID
+  (`<UID>-2`, or the next suffix no UID of the file has, where the caller
+  gives none, so a subscription's stays the same on every run); a series'
+  exceptions stay with its first master, and an exception of another kind
+  goes with the object of its kind that left the UID; a component given
+  again is kept once, wherever its first went. An object that cannot be
+  read loses only the components that cannot be read alone (an exception
+  with a broken `RECURRENCE-ID`), each named; its series and its other
+  exceptions are kept. Objects come in the order of their first component
+  in the file.
+  Nothing is dropped unnamed: what cannot be kept (no UID where none can
+  be given, unreadable, never ended) is a problem with its place in the
+  file, and so is what was kept but changed. A `VTIMEZONE` that cannot be
+  read is named, and the objects naming it go without it: a definition
+  ical.js cannot read cannot be stored either, and the time model reads
+  the TZID ([D32](foundation.md#D32)); a missing one likewise. A TZID
+  defined twice, differently, in one calendar: every object takes the
+  first definition, the same on every run, and the second is named. A calendar
+  property that cannot be read is named and left out, the others kept.
+  `splitCalendar`, the same with a strict outer shape
+  (exactly one whole `VCALENDAR`, else `NotCalendarError`), is D251's.
+  Text is decoded as UTF-8 (UTF-16 by its byte order mark); a file that
+  is not UTF-8 is read in the charset it names (vCalendar's `CHARSET`),
+  else Windows-1251 when the user speaks Russian and Windows-1252
+  otherwise, and the preview says the encoding was guessed.
+
+- **D268. What the file holds, before anything is written.** The import
+  dialog shows each source of the file (a `VCALENDAR`, a CSV, a Takeout
+  task list) with its name (the file's, else the file name), how many
+  events and tasks it has, the days they span, and its problems in words,
+  counted by kind, with the first few named. Components AstroTime does not
+  keep (`VJOURNAL`, `VFREEBUSY`) are counted as not imported.
+
+- **D269. Where each source goes.** Per source, its events go to one
+  calendar and its tasks to one list (the same one when it takes both):
+  any calendar the user may create in ([D37](foundation.md#D37)) that
+  holds that kind, or a **new calendar on this device** named after the
+  source, with the source's colour. The first offered is a calendar of
+  the same name if one exists, else the one new items go to. A new
+  calendar on a server account: [D277](#D277).
+
+- **D270. The same UID already there.** In the target calendar, an object
+  with the same UID that is the same item ([`sameObjects`](foundation.md#D107))
+  is skipped, silently counted. One that differs is a duplicate: the
+  dialog asks once for all of them, "Use the file's version" (which says
+  what it keeps), "Import as copies" (a
+  new UID, the series with its exceptions) or "Skip them"; none is chosen
+  for the user. An update lays the file's object over the stored one
+  (`overlay`): the file says what the item is, every property and
+  component iCalendar names (its start and its `DTEND` or `DURATION`,
+  its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
+  out is gone: the user chose the file's version, so this is their edit,
+  not a sync that drops what it does not understand. So its `STATUS`,
+  `COMPLETED` and the guests' `PARTSTAT` follow the file too, by the
+  user's choice; an occurrence that changed gets a `SEQUENCE` one past
+  the larger of the two, so a scheduling client never sees it go back (RFC
+  5546), and one the file gives as it was (what the stored copy keeps
+  aside) keeps the stored one's. The stored copy
+  gives only what a file from another app cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
+  not have, and its alarms and its attachments when the file has none of
+  them. An item deleted here whose deletion has not reached the server
+  yet is not there as the user sees it, so it is not asked about: the
+  file brings it back, as a change of it (the store revives it by UID,
+  [foundation D38](foundation.md#D38)). The check is made again for the items it
+  found new, inside each batch's own transaction (`LocalChange.withUids`,
+  [foundation D99](foundation.md#D99)): one a sync brought into the
+  calendar meanwhile is already there, and the answer given (or "skip"
+  where none was asked) decides; no sync writes between that look and the
+  batch's writes, so nothing is overwritten unasked. Copies made in one run name each other: a copied
+  subtask's `RELATED-TO` names its copied parent.
+
+- **D271. Written through the store, in batches.** The objects become
+  local changes (`changeLocal`, pending creates or updates), as an edit
+  made here would, so the sync uploads them ([D5](foundation.md#D5)); on
+  the calendar on this device they are final ([D122](foundation.md#D122)).
+  200 objects a transaction, the page given back between batches, the
+  progress shown as a count; "Stop" ends it after the batch in flight, and
+  what landed stays, the dialog says how much. A sync is asked for once,
+  at the end. One import runs at a time: a second tap on "Import" or on an
+  answer before the first came back does nothing, and a run writes a UID
+  to a calendar once (the same UID in two sources or two files of a ZIP is
+  counted as given twice). A write that fails ends the run: the batch is
+  one transaction, so what landed before stays and is counted, and the
+  error is said. A calendar made for the import that got nothing (stopped
+  or failed before its first write) is removed again, with its account on
+  this device if nothing is left on it, and so are those made before one
+  that could not be made; a removal that fails is said beside what was
+  imported, never instead of it.
+
+- **D272. Nothing lost, and what a conversion cannot carry, said.** An
+  iCalendar or jCal object is stored as the file wrote it
+  ([D7](foundation.md#D7)), `METHOD` aside. A converted format (vCalendar,
+  CSV, Takeout) maps each field it has a home for; what has none (a CSV
+  column such as Outlook's "Mileage", a vCalendar 1.0 rule iCalendar
+  cannot say) is named in the preview as not imported, never written as
+  something it is not. It is named as the file names it, not translated:
+  a CSV's column as its header says, a vCalendar property, a Takeout
+  field (`parent`, `links.description`); the sentence around the names is
+  the UI's, in its language.
+
+- **D273. It weighs nothing until it is opened.** Settings' entry is a
+  line in Settings' chunk; the import dialog is a chunk of its own, loaded
+  when it is first opened ([D145](foundation.md#D145)); each converter
+  (vCalendar, CSV, Takeout, ZIP) a chunk of its own, loaded for its
+  format; the splitter loads with the dialog (and with a subscription's
+  sync), never with the app, importing the core modules it needs and not
+  the package's index. The strings load with the dialog. The first load
+  grows by nothing.
+
+- **D274. Export: a calendar or list as one `.ics`.** "Export" in the same
+  group writes a calendar's objects, as stored, into one `VCALENDAR` as
+  Nextcloud's export does (each `VTIMEZONE` once, `X-WR-CALNAME` and the
+  colour), saved with `Platform.saveFile` where the platform saves files
+  and as a download elsewhere. Any calendar or list can be exported, one
+  hidden from the views too. It says "saved" only when the platform says
+  the file was written, "not saved" when its dialog was turned away, and of
+  a download only that it has begun (a browser does not say more); the
+  answer of a save still on its way when the dialog closed or the calendar
+  changed is not shown. A calendar with nothing readable in it writes no
+  file (a `VCALENDAR` with no component is no calendar) and says there is
+  nothing to export. Two
+  objects defining one `TZID` differently keep both: the later one's is
+  renamed (`Office-2`) in that object. The file is named after the
+  calendar, made safe on every system (no control or reserved characters,
+  no trailing dot or space, no `CON` or `NUL` before its first dot in any
+  case, `COM` and `LPT` with superscript digits too, at most 100 characters,
+  else `calendar.ics`). Built last (I6), as it is cheap once import exists.
+
+- **D277. A new calendar on an account's server.** Beside "New calendar
+  on this device", each kind's choice offers "New calendar on <account>"
+  ("New list on <account>" for tasks) for every account a calendar can be
+  made on ([providers D275](providers.md#D275)'s `makesCalendars`: a
+  CalDAV account's), named and coloured as the source. They are made when
+  "Import" is pressed, before anything is written, one calendar a kind
+  (a CalDAV calendar holds one component, as D275 makes it), through
+  `makeCalendar`; the items then go to them as changes made here, which
+  the sync uploads ([D5](foundation.md#D5)). One that cannot be made
+  (offline, a server that makes none, refused, signed out) stops the
+  import before anything is written, said in words naming the account
+  (`CalendarNotMadeError`: only a calendar's making is blamed on its
+  account, never a later failure);
+  on any failure, the calendars already made on a server stay there, as
+  made (AstroTime does not delete calendars), and are named with it: on a
+  calendar not made (`CalendarNotMadeError`), on anything else that stops
+  the import (`ImportStoppedError`, the base, with the failure as its
+  cause), and in what came of an import that ended on a write's error or
+  was stopped (`Imported.onServer`), each "“Team” on <account>", joined
+  as the language joins a list (`Intl.ListFormat`). A calendar made on
+  this device for the same run goes again as before. A source named with
+  spaces alone (or not at all) takes its file's name, which a new
+  calendar for it is named by. A stopped import says why in the
+  catalog's words (cannot be reached, busy, sign in again, refused, an
+  error), never an error's
+  own English. A new calendar
+  chosen on an account removed meanwhile goes back to one on this device
+  (the accounts are read live while the dialog is open). On Radicale in
+  the e2e (`new-list.spec.ts`): two `MKCALENDAR`, both named as the file,
+  then its three items uploaded.
+
+## Deferred
+
+- **xCal (RFC 6321)** (D266): no exporter people use writes it; it would
+  need an XML reader in the import chunk. Comes when a user has such a
+  file.
+- **Takeout's link titles** (D272): a task's links come over as their
+  addresses (`ATTACH`); their `description` (a mail's subject) and `type`
+  have no place in an `ATTACH` AstroTime reads, and are not carried over
+  (the preview names `links.description`). An `X-` parameter could keep them
+  once the details show one. A task's `hidden` (Google's "cleared" done
+  task) is not kept: the task comes over done, shown as done tasks are.
+- **Recorded fixtures for the converters** (D266): the vCalendar, CSV and
+  Takeout fixtures are written by hand from each format's documentation
+  (`packages/ui/test/fixtures/README.md`); a real export of each (an old
+  phone's `.vcs`, Outlook's and Google's CSV, a Takeout `Tasks.json`)
+  replaces them as one is at hand, the first that differs from its
+  documentation a test of its own.
+- **Todoist's CSV** (D266): its dates are free English ("every other
+  Monday", "tomorrow at 5pm"), which needs Todoist's own grammar to read;
+  titles and subtasks alone would import tasks without their dates.
+  Revisit if Todoist documents a dated export.
+
+## PR plan
+
+### PR I1 — This plan and the splitter
+
+D265–D274 written here; `splitCalendar` and `splitCalendars`
+(`@astrotime/core/split`), with exports recorded from Radicale and made in
+each exporter's shape. D267.
+
+Done when: every export in `packages/core/test/fixtures/exports/` splits
+into objects that hold every component of the file unchanged, a series'
+exceptions with it, only the zones each uses, byte for byte the same on
+every run; the broken files (byte order mark, LF and CR, blank lines, a
+broken fold, a cut file, no UID, two masters, mixed kinds, a value ical.js
+refuses, ten thousand events) behave as D267 says; HTML, empty, cut and
+doubled texts throw for `splitCalendar`; nothing on the first load imports
+it.
+
+### PR I2 — The import flow, iCalendar and jCal
+
+The "Data" group, the import dialog, the preview, the targets, the
+duplicates, the batches, `.ics`, `.json` (jCal) and `.zip`. D265, D268–D271,
+D273.
+
+Done when: e2e on a phone and a wide screen, English and Russian, imports
+a file with events, tasks, a series and a duplicate into a calendar and a
+new one on this device, stops one in the middle, and sees the items in the
+views; the first load grows by at most 0.1 KiB.
+
+### PR I3 — vCalendar 1.0
+
+`vcalendarToIcs` (`packages/ui/src/import/vcs.ts`), loaded for a 1.0 file
+alone: quoted-printable text in its charset (a soft break read before a
+fold); local times keep their wall clock in a zone, so a series does not
+move an hour when the offset changes: the user's own, its rules for every
+year, where its offsets are the file's `TZ` and `DAYLIGHT`s; else a
+`VTIMEZONE` made of them (exact for the years the file's `DAYLIGHT`s name,
+its standard offset beyond); floating with no `TZ`. An all-day event's
+days are the user's (`…T210000Z` is the next day in UTC+3), its exception
+dates and rule's end dates too; a rule's end is UTC for a zoned start; `AALARM`/`DALARM`/`MALARM` as alarms relative to the
+start (a task's to its due time; else at their instant in UTC, or named
+when they have none), 1.0's rule grammar (`D`, `W`, `MD`, `MP`, `YM`, `YD`, `#n` or an
+end date, two occurrences when none is given) as an `RRULE`, `PRIORITY`
+1–3 as 1, 5, 9, Outlook's all-day flag as dates; a rule of several parts,
+a procedure alarm (`PALARM`), any property iCalendar has no place for,
+and a component whose `END` never came (kept as far as it went) are
+named as not carried over; a component AstroTime does not read
+(`VJOURNAL`) is skipped whole and named once. A `;` 1.0 escapes stays
+inside its value. Each `VCALENDAR` of a file is read by its own version:
+a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
+
+Done when: `outlook.vcs` and `nokia.vcs` convert with every field the
+plan names mapped and what has no place named (unit tests); a weekly
+series across a change of offset keeps its wall clock; an all-day event
+in UTC lands on the user's day; the e2e imports the phone's file on a
+phone in Russian and sees its events, its task and what was not carried
+over; the first load grows by at most 0.1 KiB.
+
+### PR I4 — CSV (Outlook's and Google's columns)
+
+`csvToIcs` (`packages/ui/src/import/csv.ts`), loaded for a CSV alone:
+RFC 4180 with the delimiter its first line uses (`,`, `;`, a tab);
+Outlook's columns in English and Russian (calendar and tasks),
+Thunderbird's (Outlook's names) and the ones Google Calendar's import
+documents; each row an item at the user's wall clock in their zone, with
+a `VTIMEZONE` (`zoneText`, from the file's earliest year); its UID made from the row, so the same file
+imported again finds its items there (D270). Dates: year first is ISO; a
+part past 12 tells day from month; else the user's language decides,
+said in the preview as guessed (and so when the file has both kinds of
+evidence: the rows the order chosen cannot read are named). An all-day
+event's end: a row that ends the day it starts is one day; another's
+end date is its last day in Google's documented layout and the day after
+it in Outlook's and Thunderbird's, told by the columns (any only Outlook
+writes: reminder, guests, "Show time as"), a row at a time, never one
+row deciding for the file. A date the month has not (31.02) is no date,
+and named. This rests on the formats' documentation, not on recordings. A timed event's
+end: its end day at its end time; with no end time, its end day at its
+start's time; with no end day, the start's day, or the next where the
+end is not after the start; an end still before its start is left
+out (the event an instant) and named, an all-day row's (one day) too; a start or end time that cannot be
+read is named, the day kept. Outlook's task statuses that are still to
+do but say more ("Waiting on someone else", "Deferred") are
+`NEEDS-ACTION`, Outlook's word kept as `X-OUTLOOK-STATUS`. A row given again is another item (a series written
+out a row an occurrence), its place among its likes in its UID, the same
+on every import. A reminder becomes an alarm before the start, counted
+in real time in the user's zone (a task's at its time); a guest or
+organizer named without an address, and a column with no place in
+iCalendar (`Mileage`, `Total Work`), are named as not carried over, its
+default values (`0`, `False`, `Normal`) aside. D266, D272.
+
+### PR I5 — Google Takeout Tasks
+
+`takeoutToIcs` (`packages/ui/src/import/takeout.ts`), loaded for such a
+file alone: Takeout's `Tasks.json` (the Tasks API's `tasks#taskLists`),
+alone or in Takeout's ZIP; each list a source named as it, each task a
+`VTODO` with its notes, its due day (Google keeps the day alone), its
+status and completion, its parent as `RELATED-TO`, its links as
+attachments, its place as `X-GOOGLE-TASKS-POSITION`, its UID made from
+Google's id so a second import finds it. A task the user deleted, which
+Takeout keeps, is left out as Google Tasks leaves it out. The file is
+told by its own `kind`, not by a word inside it; a value of the wrong
+shape is left out, never a crash, and one of the wrong shape at the top
+is a file that is not Takeout's. No value can become a line of its own:
+text escaped and its control characters dropped, a link parsed as an
+http(s) URL and refused with a control character in it, a place digits
+alone, an id letters, digits, `-` and `_`; the same holds for a
+vCalendar's `URL`, `ATTACH` and a guest's name. A subtask whose parent
+was deleted or is not in the file names no parent (a link to nothing),
+and that is said. A task with no readable `updated` gets the fixed
+`DTSTAMP` 1970-01-01, so the same file gives the same text on every
+import; `DTSTAMP` is bookkeeping a re-import's comparison ignores.
+D266, D272.
+
+### PR I6 — Export
+
+"Export to a file" in Settings' "Data" group, its dialog loaded with its
+first opening (`components/export-dialog.tsx`): a calendar or list, as
+stored on this device (changes not yet synced too), joined by
+`joinCalendar` (`@astrotime/core/split`) into one `.ics` with its name
+and colour and each zone once, saved through `saveFile`
+(`components/save-file.ts`, which the attachments' save now shares).
+D274.
+
+Done when: the e2e exports a demo calendar, reads the download, and
+imports it back to find every item already there.
+
+### PR I7 — Calendars made on a server account
+
+`Provider.makeCalendar` with CalDAV's `MKCALENDAR`, Graph's and Google's
+creates, and `makeCalendar` in `@astrotime/sync/calendars`, which keeps
+the calendar here. [providers D275](providers.md#D275).
+
+Done when: a calendar and a task list are made on Radicale, Baïkal,
+Xandikos, DAViCal and Nextcloud and listed where they were kept; a sync
+whose listing came first does not remove one; nothing is made offline.
+
+### PR I8 — "+ New list" and a new calendar on an account
+
+The tasks screen's "+ New list" ([design D276](design.md#D276)) and
+import's "new calendar on <account>" ([D277](#D277)), through PR I7.
+
+Done when: "+ New list" makes a list on Radicale (one `MKCALENDAR`) and
+shows it, and on this device with no account; an import makes its new
+calendar and list on Radicale and uploads its items to them; the first
+load grows by what [design D276](design.md#D276) records (0.24 KiB, an
+exception the orchestrator accepted for the owner), not the usual 0.1.
+
+Each converter's PR: its recorded or documented sample files, what maps
+and what is said as not imported (D272), its own chunk (D273).

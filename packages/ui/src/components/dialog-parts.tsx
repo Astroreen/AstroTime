@@ -44,6 +44,10 @@ export function AlertDialogPopup({
 export const dialogIcon =
   "grid size-10 shrink-0 place-items-center rounded-full text-ink hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 
-/** The popup of the details and edit dialogs: the whole screen on a phone, a card on a wide one. */
+/**
+ * The popup of the details and edit dialogs: the whole screen on a phone,
+ * clear of its system bars, a card on a wide one (`.sheet` in styles.css,
+ * design D235).
+ */
 export const sheet =
-  "fixed inset-0 flex flex-col overflow-hidden bg-raised text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:max-h-[min(44rem,calc(100dvh-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl data-ending-style:sm:scale-95 data-starting-style:sm:scale-95";
+  "sheet flex flex-col overflow-hidden bg-raised text-ink shadow-2xl transition-[scale,opacity] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 sm:rounded-3xl data-ending-style:sm:scale-95 data-starting-style:sm:scale-95";

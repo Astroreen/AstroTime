@@ -2,13 +2,8 @@ import { expect, test } from "vite-plus/test";
 
 import { OfflineError } from "@astrotime/core";
 
-import {
-  resumeLoginFlow,
-  revokeAppPassword,
-  startLoginFlow,
-  type HttpClient,
-  type HttpRequest,
-} from "../src/index.ts";
+import { revokeAppPassword, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { resumeLoginFlow, startLoginFlow } from "../src/login-flow.ts";
 
 /** Nextcloud's Login Flow v2 as its documentation shows it, the user approving after the first poll. */
 function nextcloud(): { http: HttpClient; requests: HttpRequest[] } {

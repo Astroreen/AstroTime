@@ -13,6 +13,7 @@
     "@aparajita/capacitor-secure-storage": "catalog:",
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
+    "@astrotime/oauth": "workspace:*",
     "@astrotime/storage": "workspace:*",
     "@astrotime/sync": "workspace:*",
     "@astrotime/ui": "workspace:*",
