@@ -29,6 +29,8 @@ export interface SyncContext {
   readonly store: Store;
   readonly secrets: SecretStore;
   readonly connect: Connect;
+  /** The platform's HTTP, for subscriptions (providers D251); without it they do not sync. */
+  readonly http?: HttpClient;
   /**
    * Keeps the syncs of one store apart where several instances of it share
    * one database (the web's tabs, docs/plans/foundation.md#D91); without it,
@@ -144,6 +146,10 @@ function runsOf(store: Store): Runs {
 
 const ignore = () => {};
 
+/** Whether an account syncs with a server: CalDAV, or a subscription (providers D251). */
+export const syncs = (account: Account) =>
+  account.provider === "caldav" || account.provider === "ics";
+
 /**
  * Syncs every account, one after another, and reports how each went; it
  * never throws for an account (docs/plans/foundation.md#D90). A call while a
@@ -202,8 +208,7 @@ async function everyAccount(
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone; an account whose sync the
     // user turned off asks nothing of its server (D171), and is not reported.
-    if (account.provider !== "caldav" || account.syncOff || state.removing.has(account.id))
-      continue;
+    if (!syncs(account) || account.syncOff || state.removing.has(account.id)) continue;
     known.add(account.id);
     const result = await syncOne(context, state.holds, account, retry);
     // Held now, by this run's own answer too: its next sync waits for the hold.
@@ -233,8 +238,14 @@ async function syncOne(
   let secret: string | null = null;
   try {
     secret = await context.secrets.get(keyOf(accountId));
+    // A subscription's provider loads with it (providers D255), and reads its
+    // file at most hourly unless the user asks (D251).
+    const subscriptions = account.provider === "ics" ? await import("./subscriptions.ts") : null;
+    const early = subscriptions?.recent(context.store, accountId, now(), retry);
+    if (early) return { sync: early, held: false };
+    const subscription = await subscriptions?.open(context, account, secret);
     const credentials = parseSecret(secret)?.credentials ?? null;
-    if (!credentials) {
+    if (!credentials && !subscription) {
       const sync: AccountSync = {
         accountId,
         status: "signed-out",
@@ -248,15 +259,27 @@ async function syncOne(
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
     if (held && !retry && (held.refused === secret || now() < held.until))
       return { sync: held.last, held: true };
-    const provider = await context.connect(account, credentials);
+    const provider = subscription ?? (await context.connect(account, credentials!));
     const result: AccountSync = {
       accountId,
       status: "synced",
       report: await syncAccount(context.store, provider, accountId),
     };
+    if (subscription) {
+      subscriptions!.remember(context.store, result, subscription, now());
+      await subscriptions!.settle(context, accountId, subscription);
+    }
     holds.delete(accountId);
     return { sync: result, held: false };
   } catch (error) {
+    // A subscription that failed is read again at the next chance (D263);
+    // its code not arriving (offline, a new release) is this sync's failure
+    // already, said below: an account's sync never throws (D90).
+    if (account.provider === "ics")
+      await import("./subscriptions.ts").then(
+        (subscriptions) => subscriptions.forget(context.store, accountId),
+        () => {},
+      );
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
     const status =

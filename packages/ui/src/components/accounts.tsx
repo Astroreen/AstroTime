@@ -3,11 +3,11 @@
 // account's section in the drawer with its calendars and menu, and the sync
 // status. The calendar on this device (D122) is an account here too.
 import type { Account, Calendar } from "@astrotime/storage";
-import type { AccountSync } from "@astrotime/sync";
+import { syncs, type AccountSync, type Problem } from "@astrotime/sync";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AccountStatus } from "../accounts/scheduler.ts";
@@ -18,8 +18,6 @@ import { CloseIcon } from "./icons.tsx";
 import { ConflictsDialog } from "./lazy.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { DialogPopup, dialogIcon } from "./dialog-parts.tsx";
-
-const syncs = (account: Account) => account.provider === "caldav";
 
 /** An account's name; the calendar on this device's in the language spoken now (D122). */
 export const accountName = (account: Account, t: TFunction) =>
@@ -71,14 +69,32 @@ function StatusLine({ account, value }: { account: Account; value: AccountsValue
   return <>{t("sync.syncedAt", { time })}</>;
 }
 
-/** What the last sync could not do for an account's items, in words (D37). */
+/** A subscription's held removal, with its words, loads when one is held (providers D263). */
+const HeldRemoval = lazy(() => import("./held-removal.tsx"));
+
+/**
+ * What the last sync could not do for an account's items, in words (D37);
+ * a subscription's file that would remove most of it, with the way to let
+ * it (providers D263).
+ */
 function Problems({ last }: { last: AccountSync | undefined }) {
   const { t } = useTranslation();
-  const errors = last?.report?.errors ?? [];
+  const all = last?.report?.errors ?? [];
+  const held = all.find((error) => error.held);
+  // The held removal is said on its own; every other problem in the list.
+  const errors = all.filter(
+    (error): error is (typeof all)[number] & { problem: Exclude<Problem, "held-removal"> } =>
+      error.problem !== "held-removal",
+  );
   const dropped = last?.report?.dropped.length ?? 0;
-  if (errors.length === 0 && dropped === 0) return null;
+  if (all.length === 0 && dropped === 0) return null;
   return (
     <div className="flex flex-col gap-1 text-note text-danger">
+      {held?.held && last && (
+        <Suspense fallback={null}>
+          <HeldRemoval accountId={last.accountId} held={held.held} />
+        </Suspense>
+      )}
       {errors.length > 0 && (
         <details>
           <summary className="cursor-pointer">
@@ -96,11 +112,14 @@ function Problems({ last }: { last: AccountSync | undefined }) {
   );
 }
 
-/** Signing in again opens on Nextcloud's tab for a Nextcloud account. */
+/** Signing in again opens on Nextcloud's tab for a Nextcloud account, the subscription's for one. */
 const againRequest = (account: Account) => ({
-  kind: account.homeUrl?.includes("/remote.php/dav/")
-    ? ("nextcloud" as const)
-    : ("caldav" as const),
+  kind:
+    account.provider === "ics"
+      ? ("ics" as const)
+      : account.homeUrl?.includes("/remote.php/dav/")
+        ? ("nextcloud" as const)
+        : ("caldav" as const),
   account,
 });
 

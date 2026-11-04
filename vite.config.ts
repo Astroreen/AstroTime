@@ -96,7 +96,7 @@ export default defineConfig({
       {
         // AGENTS.md rule 1: the core and the providers run unchanged in the
         // browser, Capacitor and Electron. tsconfig `types: []` enforces the same.
-        files: ["packages/core/src/**", "packages/caldav/src/**"],
+        files: ["packages/core/src/**", "packages/caldav/src/**", "packages/ics/src/**"],
         rules: {
           "eslint/no-restricted-imports": [
             "error",

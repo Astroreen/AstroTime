@@ -9,6 +9,7 @@ import { Tabs } from "@base-ui/react/tabs";
 import {
   useEffect,
   useEffectEvent,
+  useRef,
   useId,
   useState,
   useSyncExternalStore,
@@ -18,11 +19,12 @@ import { useTranslation } from "react-i18next";
 
 import { serverAddress, SignIn } from "../accounts/sign-in.ts";
 import { addSignInStrings } from "../i18n/sign-in.ts";
+import { addSubscribeStrings } from "../i18n/subscribe.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
-type SignInKind = "nextcloud" | "caldav";
+type SignInKind = "nextcloud" | "caldav" | "ics";
 
 export interface SignInRequest {
   /** `preset`: the deployment's server and user (D123); the full form without one. */
@@ -86,6 +88,8 @@ function SignInForm({
 }) {
   const { t, i18n } = useTranslation();
   addSignInStrings(i18n);
+  // The subscription tab's name is among them (providers D251).
+  addSubscribeStrings(i18n);
   const { platform, store } = useAccounts();
   const [signIn] = useState(
     () =>
@@ -301,9 +305,9 @@ function SignInForm({
     <Tabs.Root value={kind} onValueChange={(value: SignInKind) => setKind(value)}>
       <Tabs.List
         aria-label={t("signIn.kind")}
-        className="mb-4 grid grid-cols-2 rounded-full bg-canvas p-1 text-body font-medium"
+        className="mb-4 grid grid-cols-3 rounded-full bg-canvas p-1 text-body font-medium"
       >
-        {(["nextcloud", "caldav"] as const).map((value) => (
+        {(["nextcloud", "caldav", "ics"] as const).map((value) => (
           <Tabs.Tab
             key={value}
             value={value}
@@ -368,7 +372,117 @@ function SignInForm({
           {actions(t("signIn.submit"))}
         </form>
       </Tabs.Panel>
+      <Tabs.Panel value="ics">
+        <SubscribeForm onCancel={onCancel} onDone={onDone} />
+      </Tabs.Panel>
     </Tabs.Root>
+  );
+}
+
+/** Outside the component: the React Compiler does not compile an `import()` (design D194). */
+const subscriptions = () => import("@astrotime/sync/subscriptions");
+
+type SubscribeProblem = "address" | "not-calendar" | "refused" | "failed";
+
+/** A subscription's problem, by the error's name: the classes load with the subscription's code. */
+const subscribeProblem = (
+  error: unknown,
+): SubscribeProblem | "offline" | "not-allowed" | "certificate" => {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "NotCalendarError") return "not-calendar";
+  if (name === "AuthError") return "refused";
+  if (name === "OfflineError" || name === "ServerBusyError") return "offline";
+  if (name === "ProxyRefusedError") return "not-allowed";
+  if (name === "CertificateError") return "certificate";
+  return "failed";
+};
+
+/**
+ * Subscribing to a calendar at an address (providers D251): the file is read
+ * once before anything is kept, so a wrong address is said here.
+ */
+function SubscribeForm({ onCancel, onDone }: { onCancel: () => void; onDone: () => void }) {
+  const { t, i18n } = useTranslation();
+  addSubscribeStrings(i18n);
+  const { platform, store } = useAccounts();
+  const [address, setAddress] = useState("");
+  const [state, setState] = useState<
+    | { readonly step: "idle" | "checking" }
+    | { readonly step: "failed"; readonly problem: ReturnType<typeof subscribeProblem> }
+  >({ step: "idle" });
+  // A reading the user left (Cancel, or the dialog closed) says nothing after.
+  const attempt = useRef(0);
+  useEffect(() => () => void (attempt.current += 1), []);
+  if (state.step === "checking") {
+    return (
+      <Busy
+        onCancel={() => {
+          attempt.current += 1;
+          setState({ step: "idle" });
+        }}
+      >
+        <p>{t("subscribe.checking")}</p>
+      </Busy>
+    );
+  }
+  const subscribe = async () => {
+    const mine = ++attempt.current;
+    setState({ step: "checking" });
+    try {
+      const { addSubscription } = await subscriptions();
+      const found = await addSubscription(
+        { store, secrets: platform.secrets, http: platform.http },
+        address,
+      );
+      if (mine !== attempt.current) return;
+      if (found) onDone();
+      else setState({ step: "failed", problem: "address" });
+    } catch (error) {
+      if (mine === attempt.current) setState({ step: "failed", problem: subscribeProblem(error) });
+    }
+  };
+  const problem = state.step === "failed" ? state.problem : null;
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void subscribe();
+      }}
+    >
+      <p className="text-body text-ink-muted">{t("subscribe.help")}</p>
+      <Field label={t("subscribe.address")}>
+        {(id) => (
+          <input
+            id={id}
+            className={input}
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            placeholder={t("subscribe.placeholder")}
+            inputMode="url"
+            autoComplete="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
+        )}
+      </Field>
+      {problem && (
+        <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-body text-danger">
+          {problem === "offline" || problem === "not-allowed" || problem === "certificate"
+            ? t(`signIn.problem.${problem}`)
+            : t(`subscribe.problem.${problem}`)}
+        </p>
+      )}
+      <div className="mt-2 flex justify-end gap-2">
+        <button type="button" className={textButton} onClick={onCancel}>
+          {t("signIn.cancel")}
+        </button>
+        <button type="submit" className={primaryButton}>
+          {t("subscribe.submit")}
+        </button>
+      </div>
+    </form>
   );
 }
 

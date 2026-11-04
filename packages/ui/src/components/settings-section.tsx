@@ -9,6 +9,7 @@
 // closing the window quits
 // (desktop D75). Each applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
+import { syncs } from "@astrotime/sync";
 import { Dialog } from "@base-ui/react/dialog";
 import { Switch } from "@base-ui/react/switch";
 import { useId, type ReactNode } from "react";
@@ -205,7 +206,7 @@ function SettingsGroups({
                 <AccountRow account={account} onLeave={onLeave} />
               </div>
               {/* Whether it syncs at all (foundation D171); off, its calendars stay. */}
-              {account.provider === "caldav" && (
+              {syncs(account) && (
                 <Toggle
                   label={t("accounts.sync")}
                   checked={!account.syncOff}

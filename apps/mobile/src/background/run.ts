@@ -5,7 +5,7 @@
 // Capacitor's plugins.
 import type { SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
-import { connectCalDav, syncAll, type AccountSync, type SyncLock } from "@astrotime/sync";
+import { connectCalDav, syncAll, syncs, type AccountSync, type SyncLock } from "@astrotime/sync";
 import type { Preferences } from "@astrotime/ui";
 import { scheduleReminders } from "@astrotime/ui/background";
 
@@ -46,7 +46,7 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
   const store = await context.openStore();
   try {
     // Signed out of everything: nothing to sync, and the app emptied the set.
-    if (!(await store.accounts()).some((account) => account.provider === "caldav")) {
+    if (!(await store.accounts()).some(syncs)) {
       return { accounts: [], reminders: null };
     }
     const http = nativeClient(
@@ -59,6 +59,7 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
       store,
       secrets: backgroundSecrets(native),
       connect: connectCalDav(http),
+      http,
       lock: context.syncLock,
     });
     const set = await scheduleReminders({
