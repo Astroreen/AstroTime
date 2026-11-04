@@ -75,10 +75,13 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
         if (completed) lines.push(`COMPLETED:${completed}`);
       } else lines.push("STATUS:NEEDS-ACTION");
       // Its parent, when the file has it; a parent deleted or not in the file
-      // would leave a link to nothing: left out, and named.
+      // would leave a link to nothing: left out, and named. None at all
+      // (absent, null, empty) is a task of the list's own, nothing lost.
+      const given =
+        task["parent"] !== undefined && task["parent"] !== null && task["parent"] !== "";
       const parent = idOf(task["parent"]);
       if (parent && kept.has(parent)) lines.push(`RELATED-TO:google-task-${parent}`);
-      else if (task["parent"] !== undefined) notImported.add("parent");
+      else if (given) notImported.add("parent");
       if (typeof task["position"] === "string" && /^\d+$/.test(task["position"]))
         lines.push(`X-GOOGLE-TASKS-POSITION:${task["position"]}`);
       for (const link of Array.isArray(task["links"]) ? (task["links"] as unknown[]) : []) {

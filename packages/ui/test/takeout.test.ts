@@ -184,4 +184,20 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
     expect(c!.ics).toContain("RELATED-TO:google-task-a");
     expect(file.sources[0]!.notImported).toEqual(["parent"]);
   });
+
+  test("a task with no parent (absent, null, empty) is the list's own: nothing said lost", async () => {
+    const file = await fromJson(
+      list([
+        task({ id: "a", title: "None" }),
+        task({ id: "b", title: "Null", parent: null }),
+        task({ id: "c", title: "Empty", parent: "" }),
+      ]),
+    );
+    expect(file.sources[0]!.items.map((item) => item.ics.includes("RELATED-TO"))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(file.sources[0]!.notImported).toEqual([]);
+  });
 });

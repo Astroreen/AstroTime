@@ -732,9 +732,11 @@ function renameTzids(component: ICAL.Component, names: ReadonlyMap<string, strin
 /**
  * Calendar objects as one calendar file (import.md D274), as Nextcloud's
  * export writes one: the calendar's name (`NAME`, `X-WR-CALNAME`) and colour
- * (`X-APPLE-CALENDAR-COLOR`), each time zone once (the first definition of
- * a TZID), then every object's components as stored. An object that cannot
- * be read is left out and counted in `left`.
+ * (`X-APPLE-CALENDAR-COLOR`), each time zone once (a second, different
+ * definition of a TZID under a name of its own), then every object's
+ * components as stored. An object that cannot be read is left out and
+ * counted in `left`. With none read the calendar holds no component, which
+ * RFC 5545 does not allow: no such file is to be written.
  */
 export function joinCalendar(
   objects: readonly string[],

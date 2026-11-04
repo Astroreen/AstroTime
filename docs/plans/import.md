@@ -201,11 +201,16 @@ not carry is said, not dropped in silence.
   colour), saved with `Platform.saveFile` where the platform saves files
   and as a download elsewhere. It says "saved" only when the platform says
   the file was written, "not saved" when its dialog was turned away, and of
-  a download only that it has begun (a browser does not say more). Two
+  a download only that it has begun (a browser does not say more); the
+  answer of a save still on its way when the dialog closed or the calendar
+  changed is not shown. A calendar with nothing readable in it writes no
+  file (a `VCALENDAR` with no component is no calendar) and says there is
+  nothing to export. Two
   objects defining one `TZID` differently keep both: the later one's is
   renamed (`Office-2`) in that object. The file is named after the
   calendar, made safe on every system (no control or reserved characters,
-  no trailing dot or space, no `CON` or `NUL`, at most 100 characters,
+  no trailing dot or space, no `CON` or `NUL` before its first dot in any
+  case, `COM` and `LPT` with superscript digits too, at most 100 characters,
   else `calendar.ics`). Built last (I6), as it is cheap once import exists.
 
 ## Deferred
