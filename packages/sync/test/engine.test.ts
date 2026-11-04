@@ -703,6 +703,11 @@ test("a deletion of ours the server made too is no dropped change (D38)", async 
   const report = await sync();
   expect([report.removed, report.dropped]).toEqual([1, []]);
   expect(await store.objectAt(calendar.id, `${calendarUrl}a.ics`)).toBeUndefined();
+  // The deletion is done: the next sync, the server answering again, sends nothing.
+  const writes: string[] = [];
+  server.beforeWrite = (method, href) => void writes.push(`${method} ${href}`);
+  expect(await sync()).toMatchObject({ uploaded: 0, removed: 0, errors: [] });
+  expect([writes, await store.pending(calendar.id)]).toEqual([[], []]);
 });
 
 test("an edit of ours whose object the server removed is still a dropped change (D38)", async () => {
