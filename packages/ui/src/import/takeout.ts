@@ -88,9 +88,10 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
         const url = isObject(link) ? linkOf(link["link"]) : null;
         if (url) lines.push(`ATTACH:${url}`);
         else notImported.add("links");
-        // Its title ("Appointment confirmation") has no place in an ATTACH AstroTime reads.
+        // Its title ("Appointment confirmation") has no place in an ATTACH
+        // AstroTime reads; named by Takeout's own field, as D272 names each.
         if (url && isObject(link) && typeof link["description"] === "string" && link["description"])
-          notImported.add("link titles");
+          notImported.add("links.description");
       }
       lines.push("END:VTODO");
       out.push(...lines);

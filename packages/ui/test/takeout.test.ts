@@ -45,7 +45,7 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
       false,
     );
     // The mail link's title has no place in an ATTACH: said.
-    expect(file.sources[0]!.notImported).toEqual(["link titles"]);
+    expect(file.sources[0]!.notImported).toEqual(["links.description"]);
   });
 
   test("one predicate tells Takeout's tasks, for the import and its converter alike", () => {

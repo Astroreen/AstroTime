@@ -184,7 +184,10 @@ not carry is said, not dropped in silence.
   CSV, Takeout) maps each field it has a home for; what has none (a CSV
   column such as Outlook's "Mileage", a vCalendar 1.0 rule iCalendar
   cannot say) is named in the preview as not imported, never written as
-  something it is not.
+  something it is not. It is named as the file names it, not translated:
+  a CSV's column as its header says, a vCalendar property, a Takeout
+  field (`parent`, `links.description`); the sentence around the names is
+  the UI's, in its language.
 
 - **D273. It weighs nothing until it is opened.** Settings' entry is a
   line in Settings' chunk; the import dialog is a chunk of its own, loaded
@@ -199,7 +202,8 @@ not carry is said, not dropped in silence.
   group writes a calendar's objects, as stored, into one `VCALENDAR` as
   Nextcloud's export does (each `VTIMEZONE` once, `X-WR-CALNAME` and the
   colour), saved with `Platform.saveFile` where the platform saves files
-  and as a download elsewhere. It says "saved" only when the platform says
+  and as a download elsewhere. Any calendar or list can be exported, one
+  hidden from the views too. It says "saved" only when the platform says
   the file was written, "not saved" when its dialog was turned away, and of
   a download only that it has begun (a browser does not say more); the
   answer of a save still on its way when the dialog closed or the calendar
@@ -224,7 +228,7 @@ not carry is said, not dropped in silence.
 - **Takeout's link titles** (D272): a task's links come over as their
   addresses (`ATTACH`); their `description` (a mail's subject) and `type`
   have no place in an `ATTACH` AstroTime reads, and are not carried over
-  (the preview names "link titles"). An `X-` parameter could keep them
+  (the preview names `links.description`). An `X-` parameter could keep them
   once the details show one. A task's `hidden` (Google's "cleared" done
   task) is not kept: the task comes over done, shown as done tasks are.
 - **Recorded fixtures for the converters** (D266): the vCalendar, CSV and
