@@ -20,13 +20,14 @@ export function answerChallenge(
   authorization: Authorization,
   response: HttpResponse,
   answered: Scheme,
+  url: string,
 ): boolean {
   if (authorization.scheme !== answered) return true;
   // Through the web proxy, the server's challenge comes under its own name
   // (proxy.ts's CHALLENGE, spelled here so this chunk imports nothing).
-  const found = digestChallenge(
-    response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate"),
-  );
+  const header =
+    response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate");
+  const found = digestChallenge(header);
   const answeredDigest = typeof answered === "object" && answered !== null ? answered : null;
   if (found && (!answeredDigest || found.stale || found.challenge.nonce !== answeredDigest.nonce)) {
     authorization.scheme = { ...found.challenge, count: 0 };
@@ -36,7 +37,48 @@ export function answerChallenge(
     authorization.scheme = "basic";
     return true;
   }
-  return false;
+  // Digest refused by a server that asks for Basic now and no Digest at all
+  // (set up anew since an earlier sync learned it): Basic once, when the
+  // request itself (`url`) went over https and the 401 came from its
+  // origin, not from where a redirect went (providers D264). A 401 that
+  // still offers Digest, a bare one, or one over plain http is the
+  // password refused: a forged 401 never gets the password in clear.
+  // Basic refused where Digest is asked was taken up above; the same
+  // scheme refused is the password refused, never sent twice.
+  if (
+    !answeredDigest ||
+    found ||
+    !url.startsWith("https:") ||
+    new URL(response.url || url).origin !== new URL(url).origin ||
+    !challengesOf(header ?? "").some(({ scheme }) => scheme === "basic")
+  )
+    return false;
+  authorization.scheme = "basic";
+  return true;
+}
+
+/**
+ * A request to `url` sent again with the scheme a 401 taught (`answered`):
+ * kept for the account's syncs after once the server took it (a 2xx,
+ * D260), unless the answer came from elsewhere (where a redirect went). A
+ * wrong password's is not kept.
+ */
+export function taken(
+  authorization: Authorization,
+  url: string,
+  response: HttpResponse,
+  answered: Scheme,
+): void {
+  if (answered !== authorization.scheme || response.status < 200 || response.status > 299) return;
+  const { origin } = new URL(url);
+  // Basic or a Digest challenge only: a bearer is an OAuth account's, never kept.
+  if (
+    answered &&
+    answered !== "bearer" &&
+    authorization.remembered &&
+    new URL(response.url || url).origin === origin
+  )
+    Object.assign(authorization.remembered, { scheme: answered, origin });
 }
 
 /**

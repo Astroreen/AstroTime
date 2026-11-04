@@ -13,6 +13,7 @@ import {
   send,
   type Credentials,
   type HttpClient,
+  type RememberedScheme,
 } from "../src/index.ts";
 
 /** What the recordings' calendars are named from: a run's own name follows it. */
@@ -56,10 +57,13 @@ export async function scenario(
   credentials: Credentials,
   options: { readonly tasks: boolean; readonly calendar: string },
 ): Promise<ScenarioResult> {
+  // One app's run after the sign-in: what its first sync learns of the
+  // scheme, the rest answers at once (D260).
+  const schemes: RememberedScheme = {};
   const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
-  const provider = new CalDavProvider(http, credentials, homeUrl);
+  const provider = new CalDavProvider(http, credentials, homeUrl, schemes);
   const listed = await provider.calendars();
-  const authorization = new Authorization(credentials);
+  const authorization = new Authorization(credentials, schemes);
   // Twice at most: a cleanup the server answered with a failure is tried again.
   const remove = async (url: string) => {
     for (let attempt = 0; attempt < 2; attempt++) {

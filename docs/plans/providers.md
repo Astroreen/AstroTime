@@ -694,10 +694,37 @@ marked _to be recorded_.
   password. A Digest answer's count (`nc`) is taken as it is signed,
   before anything is awaited, so no two share one; they may reach the
   server out of order, which a nonce's count allows (sabre/dav does not
-  order them). It
-  costs a Digest server one request more per sync (the first, refused);
-  remembering the scheme with the account would save it, when a budget
-  test on a Digest server asks ([Deferred](#deferred)). The web proxy
+  order them). **The scheme is remembered** for the app's run, per
+  account: `syncAll` keeps the scheme each account's server took (a
+  `RememberedScheme` by the account, its address and user, handed to
+  `Connect`; no state of the module's own, nothing one account's shares
+  with another's, forgotten when the account's user changes or the
+  account goes), so a later sync answers a Digest server at once with
+  its challenge as it was left (its nonce and count; a nonce gone
+  meanwhile is taken up as above), and sends Basic to a plain-http
+  server without the request that asks first; the first sync after the
+  app starts, and the sign-in's discovery, learn it again, one request.
+  A scheme is kept with the origin that took it, and only there: a
+  request to another starts afresh. It is kept when a 401 taught it and
+  the request sent again with it was taken (a 2xx answered from the
+  origin asked): one a wrong password only tried is not, nor one whose
+  answer came from where a redirect went. It is not stored with the
+  account: it is how the server answers, not the user's data, and a
+  stored one would be a migration and the store's code on the first load
+  to save one request a start. **Never a downgrade:** a Digest refused
+  goes to Basic only as [D264](#D264) allows; otherwise it is the
+  password refused, so a forged 401 never gets the password in clear.
+  The same scheme refused is the password refused, never sent
+  twice (a brute-force guard's count is the user's, not ours). What is
+  kept, and that rule, load with Digest (`digest.ts`, `taken` and
+  `answerChallenge`), so the first load grows by 138 bytes (127 520 to 127 658 on main
+  `50a5593`), 36 over a PR's 0.1 KiB, an exception the owner delegated
+  ([foundation D145](foundation.md#D145)):
+  the price of a scheme bound to its origin and forgotten with its
+  account, which the review asked for; it is won back by CalDAV loading
+  with its first account ([D255](#D255)), the PR after this one. The Baïkal recording shows
+  it: after its discovery, its scenario sends no refused Basic (15
+  exchanges to 14). The web proxy
   passes the challenge as `x-astrotime-www-authenticate`, since a
   `WWW-Authenticate` on the app's own origin would make the browser ask
   for a password itself ([D39](foundation.md#D39)). MD5, which Web Crypto
@@ -823,6 +850,21 @@ marked _to be recorded_.
   main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
   KiB, and #144's 4.6).
 
+- **D264. Basic after a refused Digest, once, only as a server set up
+  anew asks.** A server that took Digest before (a scheme remembered,
+  [D260](#D260)) and now answers a Digest with a 401 asking for Basic and
+  no Digest at all (its administrator switched it, or a proxy now in
+  front of it asks) is sent the request again in Basic, once, when the
+  request itself went over https and the 401 came from the origin it was
+  sent to, not from where a redirect went. Anything else is the password
+  refused, as before remembering: a 401 that still offers Digest (a wrong
+  password), a bare 401, one over plain http, or one from elsewhere, so a
+  forged 401 never draws the password in clear, and a refused password
+  is never sent twice. Without it, a server switched to Basic would sign
+  the account out until the app restarts. The owner left this call to
+  the orchestrator in round 5, who made it (`digest.ts`,
+  `answerChallenge`).
+
 - **D275. Making a calendar or task list on an account's server.** A
   provider may make one (`Provider.makeCalendar`, with a `NewCalendar`:
   its name, colour and the one component it holds, `VEVENT` or `VTODO`)
@@ -894,7 +936,14 @@ marked _to be recorded_.
   an occurrence's edit and deletion written to its own event. An event
   made here takes Graph's `iCalUId` (Graph sets it, read-only) once
   Graph's version comes down; keeping the UID made here (an extended
-  property read back as `UID`) is decided then too.
+  property read back as `UID`) is decided then too. And from #157's
+  review: the weak-ETag fallback and the rule that a write with no ETag
+  kept is a conflict must agree (the fallback's unconditional `PATCH`
+  only after the engine's comparison, never on a null ETag alone); a
+  write redirected (307, 308) to another host is refused before its body
+  is sent again, not only its answer; and the `~"…"` ETag becomes the
+  engine's contract, named in foundation's D37 with a test of its own,
+  rather than one provider's convention.
 
 - **A calendar made offline** ([D275](#D275)) — kept here as a pending
   calendar and made by the next sync, its items after it; it needs a
@@ -918,9 +967,6 @@ marked _to be recorded_.
   their store, set by a web wizard: the run stays on 0.15 until an
   unattended setup of 1.0 is written from its documentation (its
   management API, after the bootstrap's temporary password).
-- **The scheme remembered with the account** ([D260](#D260)) — a Digest
-  server's first request of each sync is a refused Basic one (or, over
-  plain http elsewhere, one without credentials).
 - **Revoking an app password over plain http** ([D260](#D260)) —
   `revokeAppPassword` (Nextcloud's OCS, not CalDAV) still sends Basic at
   once; Nextcloud takes Basic only, and an app password over plain http

@@ -18,6 +18,7 @@ import { CannotMakeCalendarError, makeCalendar } from "../src/calendars.ts";
 import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
 import {
+  connectCalDav,
   hasFiles,
   removeAccount,
   saveAccount,
@@ -820,6 +821,43 @@ describe("why an account has no files to attach from (design D237)", () => {
   });
 });
 
+test("each account's remembered scheme is its own, kept across syncs, and forgotten when its user changes or it goes (providers D260)", async () => {
+  const { store, secrets, a, add } = await setup();
+  const given: { account: string; remembered: object | undefined }[] = [];
+  const connect: Connect = async (account, _credentials, remembered) => {
+    given.push({ account: account.id, remembered });
+    return a;
+  };
+  const context = { store, secrets, connect };
+  const { account: first } = await add("a.example");
+  const { account: second } = await add("b.example");
+  await syncAll(context);
+  await syncAll(context);
+  const of = (id: string) => given.filter((one) => one.account === id).map((one) => one.remembered);
+  // One slot per account, the same at each sync, never another account's.
+  expect(of(first.id)[0]).toBeDefined();
+  expect(of(first.id)[1]).toBe(of(first.id)[0]);
+  expect(of(second.id)[0]).not.toBe(of(first.id)[0]);
+  // Its user changed: what was learned for the old one is not the new one's.
+  await store.updateAccount(first.id, { username: "someone-else" });
+  await syncAll(context);
+  expect(of(first.id)[2]).not.toBe(of(first.id)[0]);
+  expect(of(first.id)[2]).not.toHaveProperty("scheme");
+  // Not synced (its sync turned off, as a removed account is not): forgotten,
+  // so when it syncs again its slot is a new one; the other's stays.
+  await store.updateAccount(second.id, { syncOff: true });
+  await syncAll(context);
+  await store.updateAccount(second.id, { syncOff: false });
+  await syncAll(context);
+  expect(of(second.id).at(-1)).not.toBe(of(second.id)[0]);
+  expect(of(second.id).at(-1)).toEqual({ by: expect.any(String) });
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
+  // Removed: the same, the other account's slot kept.
+  await removeAccount({ ...context, revokeWaitMs: 0 }, second.id);
+  await syncAll(context);
+  expect(of(first.id).at(-1)).toBe(of(first.id)[2]);
+});
+
 describe("a calendar made on an account's server (providers D275)", () => {
   /** The server makes what it is asked, and lists it from then on. */
   const making = (server: MemoryServer, url: string) => {
@@ -936,4 +974,46 @@ describe("a calendar made on an account's server (providers D275)", () => {
     expect(asked.map((calendar) => calendar.name)).toEqual(["Plans 2027"]);
     expect(made.name).toBe("Plans 2027");
   });
+});
+
+test("connectCalDav hands each account's slot to its provider, which fills it once the server took a scheme (providers D260)", async () => {
+  const { store, secrets } = await setup();
+  const sent: (string | null)[] = [];
+  // A plain-http server elsewhere, Basic only: its first answer teaches the scheme.
+  const http: HttpClient = async (request) => {
+    const header = request.headers["Authorization"] ?? null;
+    sent.push(header?.split(" ")[0] ?? null);
+    const ok = header === `Basic ${btoa("astro:right")}`;
+    return {
+      status: ok ? 207 : 401,
+      url: request.url,
+      header: (name) =>
+        name.toLowerCase() === "www-authenticate" && !ok ? 'Basic realm="r"' : null,
+      body: ok ? '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>' : "",
+    };
+  };
+  const real = connectCalDav(http);
+  const slots: (object | undefined)[] = [];
+  const context = {
+    store,
+    secrets,
+    connect: ((account, credentials, remembered) => {
+      slots.push(remembered);
+      return real(account, credentials, remembered);
+    }) satisfies Connect,
+  };
+  await saveAccount(context, {
+    name: "astro@dav.example",
+    serverUrl: "http://dav.example/",
+    homeUrl: "http://dav.example/calendars/astro/",
+    credentials: { username: "astro", password: "right" },
+  });
+  await syncAll(context);
+  expect(sent).toEqual([null, "Basic"]);
+  expect(slots[0]).toMatchObject({ scheme: "basic", origin: "http://dav.example" });
+  // The next sync answers at once: no request without credentials first.
+  sent.length = 0;
+  await syncAll(context);
+  expect(slots[1]).toBe(slots[0]);
+  expect(sent).toEqual(["Basic"]);
 });

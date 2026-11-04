@@ -11,7 +11,7 @@ export {
 export { revokeAppPassword } from "./app-password.ts";
 // The flow itself is `@astrotime/caldav/login-flow`, loaded with its first use.
 export type { LoginFlow, LoginFlowState } from "./login-flow.ts";
-export { Authorization, inClear, type TokenSource } from "./auth.ts";
+export { Authorization, inClear, type RememberedScheme, type TokenSource } from "./auth.ts";
 export {
   CalDavProvider,
   canonicalHref,

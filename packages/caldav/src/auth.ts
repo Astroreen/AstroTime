@@ -71,6 +71,19 @@ export function inClear(url: string): boolean {
  */
 const basicFirst = (url: string) => !inClear(url);
 
+/**
+ * The scheme an account's server took, for the app's run (D260): whoever
+ * makes the providers keeps one per account (`connectCalDav`), so a later
+ * sync answers a Digest server at once, with its challenge (nonce, count)
+ * as it was left, and sends Basic to a plain-http one without first
+ * asking. Not stored: a restart learns it again, for one request.
+ */
+export interface RememberedScheme {
+  scheme?: Scheme;
+  /** The origin that took it: a request elsewhere starts afresh. */
+  origin?: string;
+}
+
 /** One account's credentials, and the scheme its server asked for. */
 export class Authorization {
   /** A password's account's credentials; `null` for an OAuth account, which has `tokens`. */
@@ -78,9 +91,14 @@ export class Authorization {
   /** How its server is answered (`digest.ts` learns it from a 401). */
   scheme: Scheme = null;
   private readonly tokens: TokenSource | null;
+  readonly remembered: RememberedScheme | undefined;
 
-  /** A password's credentials, or a source of OAuth tokens (D254). */
-  constructor(credentials: Credentials | TokenSource) {
+  /**
+   * A password's credentials, or a source of OAuth tokens (D254);
+   * `remembered`, what earlier syncs learned.
+   */
+  constructor(credentials: Credentials | TokenSource, remembered?: RememberedScheme) {
+    this.remembered = remembered;
     if ("token" in credentials) {
       this.tokens = credentials;
       this.credentials = null;
@@ -101,6 +119,15 @@ export class Authorization {
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
   ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
+    // A password's account recalls a password's scheme only: never a bearer,
+    // whose token it has not, and an OAuth account none (it signs with its token).
+    if (
+      this.scheme === null &&
+      this.credentials &&
+      this.remembered?.origin === new URL(request.url).origin &&
+      this.remembered.scheme !== "bearer"
+    )
+      this.scheme = this.remembered.scheme ?? null;
     if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
     const scheme = this.scheme;
     if (scheme === null) return { header: null, answered: null };
@@ -124,12 +151,22 @@ export class Authorization {
   async challenged(
     response: HttpResponse,
     answered: Scheme,
-    header: string | null = null,
+    header: string | null,
+    url: string,
   ): Promise<boolean> {
     // A refused token is renewed once, unless another request renewed it
     // already; a refused renewal throws AuthError.
     if (answered === "bearer") return (await bearer()).renewBearer(this.tokens!, header);
-    return (await digest()).answerChallenge(this, response, answered);
+    return (await digest()).answerChallenge(this, response, answered, url);
+  }
+
+  /**
+   * A request sent again with the scheme a 401 taught, as `answered`: kept
+   * for the next sync once the server took it (`digest.ts`, `taken`).
+   */
+  async learned(url: string, response: HttpResponse, answered: Scheme): Promise<void> {
+    if (this.remembered && answered !== "bearer")
+      (await digest()).taken(this, url, response, answered);
   }
 }
 
