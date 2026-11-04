@@ -410,6 +410,14 @@ describe("after #94's review (design D207)", () => {
     ]);
   });
 
+  test("an indented fence's lines lose as much of their indent as the fence has", () => {
+    // As CommonMark's: up to the fence's own three spaces, no more.
+    expect(parseMarkdown("   ```\n   a\n    b\n  c\n   ```")).toEqual([
+      { type: "code", text: "a\n b\nc" },
+    ]);
+    expect(parseMarkdown(" ~~~\n\tx\n ~~~")).toEqual([{ type: "code", text: "\tx" }]);
+  });
+
   test("a tab inside fenced code stays a tab, at the top and in a list", () => {
     expect(parseMarkdown("```\n\tindented\ta\n```")).toEqual([
       { type: "code", text: "\tindented\ta" },

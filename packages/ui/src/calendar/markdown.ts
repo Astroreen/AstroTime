@@ -132,9 +132,12 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       const mark = fence[1]!;
       // Closed by a fence of its own character, as long or longer, alone on its line.
       const closing = new RegExp(`^ {0,3}${mark[0]}{${mark.length},}[ \t]*$`);
+      // Each line loses as many of its spaces as the fence is indented, no more.
+      const indent = new RegExp(`^ {0,${fence[0].length - mark.length}}`);
       const body: string[] = [];
       i++;
-      while (i < lines.length && !closing.test(lines[i]!)) body.push(lines[i++]!);
+      while (i < lines.length && !closing.test(lines[i]!))
+        body.push(lines[i++]!.replace(indent, ""));
       i++;
       out.push({ type: "code", text: body.join("\n") });
       continue;
