@@ -315,4 +315,42 @@ describe("#153's review", () => {
     const { notImported } = convert("Subject,Start Date\nA,5 Nov 2026\nB,11/05/2026\n");
     expect(notImported).toEqual(["Start Date"]);
   });
+
+  test("the zone is defined from the earliest year of the file, not its first row's", () => {
+    const [late, early] = objects(
+      [
+        header,
+        "Late,11/05/2026,9:00 AM,,10:00 AM,False",
+        "Early,11/05/2019,9:00 AM,,10:00 AM,False",
+      ].join("\n"),
+      "America/New_York",
+    );
+    // 2019 is read in its own rules: 9:00 in New York on 5 November 2019 is 14:00 UTC.
+    expect(early!.master!.start).toMatchObject({ epochMs: Date.UTC(2019, 10, 5, 14) });
+    expect(late!.master!.start).toMatchObject({ epochMs: Date.UTC(2026, 10, 5, 14) });
+    const zone = /BEGIN:VTIMEZONE[\s\S]*?END:VTIMEZONE/.exec(
+      convert(
+        [
+          header,
+          "Late,11/05/2026,9:00 AM,,10:00 AM,False",
+          "Early,11/05/2019,9:00 AM,,10:00 AM,False",
+        ].join("\n"),
+        "America/New_York",
+      ).text,
+    )![0];
+    expect(zone).toMatch(/DTSTART:2018/);
+  });
+
+  test("an all-day row ending before it starts is one day, its end column named", () => {
+    const { notImported } = convert(
+      "Subject,Start Date,End Date,All Day Event\nA,11/09/2026,11/05/2026,True",
+    );
+    expect(notImported).toEqual(["End Date"]);
+    expect(
+      (
+        objects("Subject,Start Date,End Date,All Day Event\nA,11/09/2026,11/05/2026,True")[0]!
+          .master as Event
+      ).end,
+    ).toEqual({ type: "date", date: "2026-11-10" });
+  });
 });

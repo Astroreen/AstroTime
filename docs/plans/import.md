@@ -279,7 +279,7 @@ RFC 4180 with the delimiter its first line uses (`,`, `;`, a tab);
 Outlook's columns in English and Russian (calendar and tasks),
 Thunderbird's (Outlook's names) and the ones Google Calendar's import
 documents; each row an item at the user's wall clock in their zone, with
-a `VTIMEZONE` (`zoneText`); its UID made from the row, so the same file
+a `VTIMEZONE` (`zoneText`, from the file's earliest year); its UID made from the row, so the same file
 imported again finds its items there (D270). Dates: year first is ISO; a
 part past 12 tells day from month; else the user's language decides,
 said in the preview as guessed (and so when the file has both kinds of
@@ -293,7 +293,7 @@ and named. This rests on the formats' documentation, not on recordings. A timed 
 end: its end day at its end time; with no end time, its end day at its
 start's time; with no end day, the start's day, or the next where the
 end is not after the start; an end still before its start is left
-out (the event an instant) and named; a start or end time that cannot be
+out (the event an instant) and named, an all-day row's (one day) too; a start or end time that cannot be
 read is named, the day kept. Outlook's task statuses that are still to
 do but say more ("Waiting on someone else", "Deferred") are
 `NEEDS-ACTION`, Outlook's word kept as `X-OUTLOOK-STATUS`. A row given again is another item (a series written
