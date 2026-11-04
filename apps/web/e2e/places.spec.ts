@@ -235,8 +235,22 @@ test("Copy address copies the text and says so; refused, the notice says it was 
     };
   });
   const address = selecting.getByText("Room 4, second floor");
-  const line = await address.boundingBox();
-  if (!line) throw new Error("not drawn");
+  // Measured where the details end, not mid-way through their opening scale.
+  await expect(selecting).not.toHaveAttribute("data-starting-style");
+  await selecting.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  /** The middle of `word` in the address, wherever the font puts it. */
+  const middleOf = (word: string) =>
+    address.evaluate((element, wanted) => {
+      const node = element.firstChild!;
+      const range = document.createRange();
+      const at = node.textContent!.indexOf(wanted);
+      range.setStart(node, at);
+      range.setEnd(node, at + wanted.length);
+      const { x, y, width, height } = range.getBoundingClientRect();
+      return { x: x + width / 2, y: y + height / 2 };
+    }, word);
   const selected = async () => {
     await page.clock.runFor(500);
     const selection = (await page.evaluate(() => getSelection()?.toString()))?.trim() ?? "";
@@ -245,14 +259,18 @@ test("Copy address copies the text and says so; refused, the notice says it was 
     expect(await page.evaluate(() => (window as unknown as { writes: number }).writes)).toBe(0);
     await page.evaluate(() => getSelection()?.removeAllRanges());
   };
-  await page.mouse.move(line.x + 1, line.y + line.height / 2);
+  // From the middle of "Room" to the middle of "floor".
+  const [from, to] = [await middleOf("Room"), await middleOf("floor")];
+  await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.mouse.move(line.x + line.width - 1, line.y + line.height / 2, { steps: 5 });
+  await page.mouse.move(to.x, to.y, { steps: 5 });
   await page.mouse.up();
   await selected();
-  await address.dblclick();
+  // A double and a triple click on the word "second".
+  const word = await middleOf("second");
+  await page.mouse.dblclick(word.x, word.y);
   await selected();
-  await address.click({ clickCount: 3 });
+  await page.mouse.click(word.x, word.y, { clickCount: 3 });
   await selected();
   await page.keyboard.press("Escape");
   await expect(selecting).toHaveCount(0);
