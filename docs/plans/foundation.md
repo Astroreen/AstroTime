@@ -448,6 +448,9 @@ Decided while building PR 7.
   `ASTROTIME_PROXY_ALLOW` is required and holds origins only; the server
   refuses to start without it. TLS is the job of the reverse proxy in front;
   the hosts it answers for can be listed in the image too ([D81](#D81)).
+  _Since the server plan ([D281](server.md#D281)):_ with
+  `ASTROTIME_SERVER_DATA` the image keeps state on a volume and serves
+  CalDAV itself under `/dav/`.
   Proxied answers are streamed and sent `Cache-Control: no-store`; requests
   are capped at 10 MB (413, refused before reading when announced), and slow
   ones are cut off. A missing file under `assets/` is a 404, never the app,
@@ -1031,6 +1034,8 @@ Decided while building PR 5a-3.
     must not say so names the server only. The password goes, as ever, from
     the browser through the stateless proxy to the server ([D20](#D20)),
     and the browser's password manager is offered the user name with it.
+  - _Since the server plan ([D281](server.md#D281)):_ in server mode the
+    preset names the image's own `/dav/`.
 
 ### The store across tabs
 

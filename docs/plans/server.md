@@ -72,7 +72,10 @@ alone needs nothing else.
   server mounts the handler under `/dav/` on the app's own origin, keeps
   `server.sqlite` there, and presets the sign-in to its own `/dav/`
   ([D123](foundation.md#D123)): the page reaches its own origin directly,
-  no proxy between. Off, the image is as before.
+  no proxy between. Off, the image is as before. This amends
+  [D40](foundation.md#D40) (the image keeps state: the volume) and
+  [D123](foundation.md#D123) (the preset may name the image's own
+  `/dav/`); both carry a note pointing here.
 
 - **D282. Users and passwords.** Users live in the server's database,
   passwords hashed with scrypt (`node:crypto`, N=2¹⁵, r=8, p=1, 16-byte
@@ -110,6 +113,11 @@ alone needs nothing else.
   versions arrive in. Tombstones are kept (an item's id and its version,
   a few bytes); collecting them is [deferred](#deferred). Calendars
   (name, colour, components) are versioned the same way.
+  A clock that runs ahead would win every conflict, so the handshake
+  carries each side's wall clock, and a peer more than five minutes off
+  is refused with the reason said ("this device's clock is off"), as
+  Kerberos and TOTP bound drift; a version stamped more than five minutes
+  ahead of the receiver's clock closes the connection the same way.
   _Why last-writer-wins:_ CouchDB's and Syncthing's choice for documents
   edited on devices offline: deterministic, no coordinator. Two offline
   edits of one item to different fields keep only the newer; a field
@@ -172,7 +180,9 @@ alone needs nothing else.
   to fall quiet: no message in flight): the owner's scenario (A, B and C;
   C always up; A edits and goes down; B comes up and has A's edit from
   C); concurrent edits of one item converge on every peer to one
-  version; a seeded random run of five peers through random partitions
+  version, the peer id breaking an HLC tie; a deletion against an edit
+  and a calendar's rename on two peers converge the same way; a peer
+  whose clock is off by more than five minutes is refused; a seeded random run of five peers through random partitions
   and edits ends with every store equal.
 
 - **D291. Proof of the server.** `@astrotime/server`'s tests drive it
@@ -204,10 +214,17 @@ alone needs nothing else.
 
 The decisions above, the glossary's words, the library's route.
 
+Done when: `scripts/docs.test.ts` passes with the plan reachable from
+the trailhead, and D40 and D123 point here.
+
 ### PR S2 — `@astrotime/server`
 
 D279, D280, D282 (the database half), D291. The package, its schema, its
 handler and its tests; its line in `docs/map.md`.
+
+Done when: the CalDAV provider and `syncAccount` pass D291's run against
+it, within the request budget, and an `X-` property written by one
+client comes back byte for byte.
 
 ### PR S3 — Server mode in the image
 
@@ -216,11 +233,18 @@ mounts the server under `/dav/` when `ASTROTIME_SERVER_DATA` is set, the
 image's volume, the preset to its own origin, README's self-hosting
 section, an e2e run where the web app signs in to its own server.
 
+Done when: one `docker run` with a volume and a first user serves the app
+and `/dav/`; e2e signs in there, makes an event, and a second browser
+context sees it after its sync.
+
 ### PR M1 — `@astrotime/mesh`
 
 D283–D287 (the protocol half), D290. HLC, versions, vectors, the
 replica, the handshake and sealing, the in-memory transport, the
 convergence tests; its line in `docs/map.md`.
+
+Done when: every test of D290 passes over the in-memory transport, with
+no timeout in any of them.
 
 ### PR M2 — The mesh in the store and the shells
 
@@ -229,13 +253,24 @@ local change to a mesh calendar as a version, the WebSocket transport,
 `MeshNode` started by the UI for every mesh account and the secret in
 `SecretStore`.
 
+Done when: two stores on the node driver, joined by the WebSocket
+transport, converge on D290's scenario, and an edit in the UI's store
+reaches the other as a version.
+
 ### PR M3 — Listening peers
 
 D286 (the listeners). After M2 and S3. The image's `/mesh` endpoint and
 its peer's store, the desktop app's local-network listener and its
 Settings switch.
 
+Done when: a browser and the image's `/mesh`, and the desktop's listener
+and a second store, converge on an edit made while the other was down.
+
 ### PR M4 — The mesh in the UI
 
 D289, D292. After M2. Create and join, the invite as text and QR, the
 mesh account's row, en and ru.
+
+Done when: e2e in two browser contexts creates a mesh on one, joins it
+on the other by the invite, and sees an event made on one appear on the
+other; screenshots on a phone and a wide screen, English and Russian.
