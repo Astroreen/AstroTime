@@ -735,6 +735,22 @@ marked _to be recorded_.
     by digest: it has no version tags), its administrator as the user.
     Its `.well-known/caldav` answers `405`; discovery goes on from the
     address, `…/caldav.php/`, as D2's fallback does.
+  - **Davis 5.6.3** (`ghcr.io/tchapi/davis-standalone`, sabre/dav with
+    its own admin pages), on SQLite and Basic, configured without its
+    admin pages: `davis/setup.sh` runs its migrations and writes its user
+    as they would (a bcrypt hash and the principal), then the image's own
+    command. Nothing broke.
+  - **Stalwart 0.15.5** (`stalwartlabs/stalwart`), its own server for
+    mail, CalDAV and CardDAV, configured by `stalwart/config.toml` alone:
+    plain http, its data in RocksDB, the user in a directory kept in the
+    file. 0.15 is the last whose whole configuration a file can hold;
+    from 0.16 it keeps it in its store, set by its web wizard, so
+    Dependabot proposes its patch releases only. Its log's "Failed to
+    fetch spam filter" is its mail side's and harmless. Nothing broke.
+  - **Cyrus IMAP** (Fastmail's server), through its project's test server
+    (`ghcr.io/cyrusimap/cyrus-docker-test-server`, pinned by digest: it
+    has no version tags), which makes users `user1` to `user5` and takes
+    any password, as Xandikos does. Nothing broke.
 
   On each the whole suite passes (discovery, both ways between two
   devices, series split, deletion, `sync-collection`, offline edits,
@@ -894,11 +910,14 @@ marked _to be recorded_.
   origin; a government or China tenant would need its own endpoints
   and client, when someone asks.
 
-- **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
-  starts in a bootstrap mode whose setup is its web wizard, writing a
-  JSON configuration; an unattended one is to be written from its
-  documentation. **Cyrus IMAP**, **SOGo** (with its database and
-  users) and **Davis** (sabre/dav, as Baïkal) were not tried this round.
+- **More servers in the interop run** ([D261](#D261)): **SOGo** has no
+  image of its project's own (Alinto publishes packages; the images are
+  third parties' builds), and needs its database and a SQL source of
+  users besides; it joins when one is published, or as a build of its
+  packages here. **Stalwart 0.16 and 1.0** keep their configuration in
+  their store, set by a web wizard: the run stays on 0.15 until an
+  unattended setup of 1.0 is written from its documentation (its
+  management API, after the bootstrap's temporary password).
 - **The scheme remembered with the account** ([D260](#D260)) — a Digest
   server's first request of each sync is a refused Basic one (or, over
   plain http elsewhere, one without credentials).

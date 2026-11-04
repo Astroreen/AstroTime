@@ -34,6 +34,9 @@ on:
           - baikal-basic
           - xandikos
           - davical
+          - davis
+          - stalwart
+          - cyrus
 
 permissions:
   contents: read
@@ -49,7 +52,7 @@ jobs:
       # One server's failure names itself and hides no other's.
       fail-fast: false
       matrix:
-        server: ${{ fromJSON((inputs.server && inputs.server != 'all') && format('["{0}"]', inputs.server) || '["baikal-digest","baikal-basic","xandikos","davical"]') }}
+        server: ${{ fromJSON((inputs.server && inputs.server != 'all') && format('["{0}"]', inputs.server) || '["baikal-digest","baikal-basic","xandikos","davical","davis","stalwart","cyrus"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -70,6 +73,9 @@ jobs:
             baikal-basic) url=http://127.0.0.1:5602/dav.php/ user=astro ;;
             xandikos) url=http://127.0.0.1:5603/ user=astro ;;
             davical) url=http://127.0.0.1:5604/caldav.php/ user=admin ;;
+            davis) url=http://127.0.0.1:5605/dav/ user=astro ;;
+            stalwart) url=http://127.0.0.1:5606/dav/cal/ user=astro ;;
+            cyrus) url=http://127.0.0.1:5607/dav/calendars/user/user1/ user=user1 ;;
           esac
           curl -fsS -o /dev/null --retry 90 --retry-delay 2 --retry-all-errors \
             --anyauth -u "$user:secret" -X PROPFIND -H 'Depth: 0' "$url"
