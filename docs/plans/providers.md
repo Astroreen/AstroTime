@@ -360,7 +360,7 @@ marked _to be recorded_.
   `components/lazy.tsx`), its forms and Base UI's tabs in a chunk of 5.4
   KiB; the buttons every dialog shares moved to `components/buttons.ts`
   so the others need not load it. AstroTime's own first load went from
-  132 458 to 130 268 bytes (129.4 to 127.2 KiB), the room P4's registry
+  133 193 to 131 170 bytes (130.1, over the budget after #126 and #135, to 128.1 KiB), the room P4's registry
   and subscriptions come into. The `SignIn` steps (`accounts/sign-in.ts`)
   stay, as the accounts' context takes up a held approval with them.
 
