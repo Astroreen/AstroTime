@@ -430,6 +430,70 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.accounts()).toEqual([server]);
     });
 
+    test("a calendar made on this device for an import is the user's: it never steps aside (import D269)", async () => {
+      const { store, account: server } = await setup();
+      await store.saveCalendar({
+        accountId: server.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/tasks/",
+        name: "Tasks",
+        color: null,
+        components: ["VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      // No account on this device yet: one is made for it.
+      const holidays = await store.addDeviceCalendar({
+        account: "On this device",
+        calendar: "Holidays",
+        color: "#d50000",
+        components: ["VEVENT"],
+      });
+      expect(holidays).toMatchObject({
+        name: "Holidays",
+        color: "#d50000",
+        components: ["VEVENT"],
+        rights: ALL_RIGHTS,
+      });
+      const local = (await store.accounts()).find((a) => a.provider === "local")!;
+      expect(local.name).toBe("On this device");
+      expect(holidays.accountId).toBe(local.id);
+      // A second goes on the same account, under an address of its own.
+      const birthdays = await store.addDeviceCalendar({
+        account: "ignored",
+        calendar: "Birthdays",
+        color: null,
+        components: ["VEVENT", "VTODO"],
+      });
+      expect(birthdays.accountId).toBe(local.id);
+      expect(birthdays.url).not.toBe(holidays.url);
+      // Empty, and other calendars take new events and tasks: it stays all the same.
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+      expect((await store.calendars(local.id)).map((c) => c.name)).toEqual([
+        "Birthdays",
+        "Holidays",
+      ]);
+      // Its items are final, as the first one's are (D122).
+      expect(
+        (
+          await store.saveLocal(
+            holidays.id,
+            event("new-year", "20270101T000000Z", "20270101T010000Z"),
+          )
+        ).pending,
+      ).toBe("none");
+    });
+
+    test("objects found by UID in one calendar (import D270)", async () => {
+      const { store, calendar } = await setup();
+      await store.saveLocal(calendar.id, task("a"));
+      await store.saveLocal(calendar.id, task("b"));
+      const other = await store.saveCalendar({ ...calendar, url: `${calendar.url}other/` });
+      await store.saveLocal(other.id, task("c"));
+      const many = Array.from({ length: 1200 }, (_, i) => `x${i}`);
+      const found = await store.withUids(calendar.id, ["a", "c", ...many]);
+      expect(found.map((object) => object.uid)).toEqual(["a"]);
+      expect(await store.withUids(calendar.id, [])).toEqual([]);
+    });
+
     test("the calendar on this device stays beside a server's account while it holds items (D122)", async () => {
       const store = await Store.open(await driver());
       const local = await store.addLocalCalendarIfEmpty({

@@ -97,7 +97,9 @@ When you add a package, app or module, add its line here in the same PR.
     by date range. → `plans/foundation.md#D36`, `plans/foundation.md#D90`
     - `addLocalCalendarIfEmpty`, `removeLocalCalendarIfUnused` — the
       calendar on this device (provider `local`), whose changes are final.
-      → `plans/foundation.md#D122`
+      → `plans/foundation.md#D122`; `addDeviceCalendar`, one more there
+      for an import, never removed; `withUids`, a calendar's objects by UID.
+      → `plans/import.md#D269`, `plans/import.md#D270`
     - `subscribe` — hears every write that changed a row, for live
       queries. → `plans/foundation.md#D54`, `plans/foundation.md#D181`
     - `undoneTasksBefore` — the undone tasks due before today.
@@ -318,6 +320,10 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D233`, `plans/design.md#D237`
     - `file-picker.tsx` — the account's files, a folder at a time, to
       attach one. → `plans/design.md#D234`
+    - `import-dialog.tsx` — Settings' "Import from a file" and its dialog:
+      the preview of each source, where it goes, the question about items
+      already there, the progress and the summary; loaded with its first
+      opening. → `plans/import.md#D265`, `plans/import.md#D268`
     - `mention-field.tsx` — the edit dialog's description, where "@"
       offers the account's people and writes a mention.
       → `plans/design.md#D208`
@@ -365,6 +371,12 @@ When you add a package, app or module, add its line here in the same PR.
     - `drag.ts` — what a drag or a key writes on the wall clock (`dropped`,
       `moved`, `keyMove`), the slot and column under a point, the ghost's
       occurrence, when a press is a drag. → `plans/foundation.md#D113`
+  - `import/` — an import's logic, loaded with its dialog: `readImport`
+    (`read.ts`), a file's format told from its bytes and its sources;
+    `decodeText` (`decode.ts`), its charset; `unzip` (`zip.ts`, loaded for
+    a ZIP alone); `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`),
+    where each source goes and the writes in batches.
+    → `plans/import.md#D266`–`#D271`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in
     maps". `wikipediaPhotos` (`photos.ts`), a place's photo from
@@ -401,8 +413,10 @@ When you add a package, app or module, add its line here in the same PR.
     `files.ts`, why the edit dialog's attachments have no files,
     `tasks.ts`, a task's list in a task's words, `sign-in.ts`, the
     sign-in dialog's word on an address in clear
-    (`plans/providers.md#D262`), and `subscribe.ts`, the sign-in dialog's
-    subscription and a held removal (`plans/providers.md#D263`).
+    (`plans/providers.md#D262`), `subscribe.ts`, the sign-in dialog's
+    subscription and a held removal (`plans/providers.md#D263`), `data.ts`
+    and `import.ts`, Settings' "Data" group's and the import dialog's
+    (`plans/import.md#D273`).
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
@@ -455,6 +469,9 @@ When you add a package, app or module, add its line here in the same PR.
     brings the calendar back. → `plans/design.md#D227`;
     `files.spec.ts` attaches a file from a faked Nextcloud's files and
     sees the `ATTACH` it uploads. → `plans/design.md#D234`;
+    `import.spec.ts` imports files from Settings on a wide screen and a
+    phone, `import-screenshots.spec.ts` takes the import's evidence
+    (`import-files.ts`, the files they pick). → `plans/import.md#D265`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
     → `plans/foundation.md#D181`, `plans/foundation.md#D182`

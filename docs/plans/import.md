@@ -1,7 +1,8 @@
 # Import plan
 
 Status: **in progress** — the formats, their order and the flow are
-decided; the splitter is built (PR I1). This plan owns reading calendars
+decided; the splitter (PR I1) and the import flow for iCalendar, jCal and
+ZIP (PR I2) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -63,7 +64,10 @@ not carry is said, not dropped in silence.
   4791 §4.1). Each component is read on its own, so one value ical.js
   refuses costs that component, not the file, and one whose `END` never
   came ends where the next component begins or the calendar ends, so it
-  never takes the rest of the file with it. It forgives what exporters
+  never takes the rest of the file with it; what it said is kept when it
+  reads whole, and named either way (one cut by the file's end is not
+  kept: its last line may be cut too). An `END` with no `BEGIN` is named
+  as one and left out. It forgives what exporters
   get wrong: a byte order mark, LF or CR line ends, blank lines, several
   `VCALENDAR`s one after another, a file cut short (what came whole is
   kept), a component with no UID (it gets one). Any line that starts as a content
@@ -93,7 +97,9 @@ not carry is said, not dropped in silence.
   file, and so is what was kept but changed. A `VTIMEZONE` that cannot be
   read is named, and the objects naming it go without it: a definition
   ical.js cannot read cannot be stored either, and the time model reads
-  the TZID ([D32](foundation.md#D32)); a missing one likewise. A calendar
+  the TZID ([D32](foundation.md#D32)); a missing one likewise. A TZID
+  defined twice, differently, in one calendar: every object takes the
+  first definition, the same on every run, and the second is named. A calendar
   property that cannot be read is named and left out, the others kept.
   `splitCalendar`, the same with a strict outer shape
   (exactly one whole `VCALENDAR`, else `NotCalendarError`), is D251's.

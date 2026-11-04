@@ -235,7 +235,7 @@ export class Store {
       await this.db.insert(schema.calendars).values({
         id: crypto.randomUUID(),
         accountId: account.id,
-        url: `${LOCAL_SERVER}personal/`,
+        url: LOCAL_CALENDAR_URL,
         name: names.calendar,
         color: names.color,
         components: "VEVENT,VTODO",
@@ -243,6 +243,56 @@ export class Store {
         rights: RIGHTS.join(","),
       });
       return account;
+    });
+  }
+
+  /**
+   * A new calendar on this device (docs/plans/import.md#D269), for a file's
+   * calendar imported here: on the account of provider `local`, made (named
+   * `names.account`) when there is none. It is the user's own, so it never
+   * steps aside as the first one does (`removeLocalCalendarIfUnused`).
+   */
+  addDeviceCalendar(names: {
+    readonly account: string;
+    readonly calendar: string;
+    readonly color: string | null;
+    readonly components: readonly Component[];
+  }): Promise<Calendar> {
+    return this.exclusive(async () => {
+      let [account] = await this.db
+        .select({ id: schema.accounts.id })
+        .from(schema.accounts)
+        .where(eq(schema.accounts.provider, "local"))
+        .orderBy(schema.accounts.createdAt)
+        .limit(1);
+      if (!account) {
+        account = { id: crypto.randomUUID() };
+        await this.db.insert(schema.accounts).values({
+          id: account.id,
+          provider: "local",
+          name: names.account,
+          serverUrl: LOCAL_SERVER,
+          username: null,
+          homeUrl: null,
+          syncOff: false,
+          createdAt: Date.now(),
+        });
+      }
+      const id = crypto.randomUUID();
+      const [row] = await this.db
+        .insert(schema.calendars)
+        .values({
+          id,
+          accountId: account.id,
+          url: `${LOCAL_SERVER}${id}/`,
+          name: names.calendar,
+          color: names.color,
+          components: names.components.join(","),
+          readOnly: false,
+          rights: RIGHTS.join(","),
+        })
+        .returning();
+      return toCalendar(row!);
     });
   }
 
@@ -282,6 +332,18 @@ export class Store {
           .where(eq(schema.calendars.accountId, account.id))
           .limit(1);
         if (used) continue;
+        // A calendar the user made here (import D269) keeps its account.
+        const [own] = await this.db
+          .select({ id: schema.calendars.id })
+          .from(schema.calendars)
+          .where(
+            and(
+              eq(schema.calendars.accountId, account.id),
+              ne(schema.calendars.url, LOCAL_CALENDAR_URL),
+            ),
+          )
+          .limit(1);
+        if (own) continue;
         await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
         removed = true;
       }
@@ -937,6 +999,25 @@ export class Store {
     );
   }
 
+  /** The objects of a calendar with any of these UIDs (docs/plans/import.md#D270). */
+  async withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]> {
+    const found: StoredObject[] = [];
+    for (let i = 0; i < uids.length; i += IN_LIMIT) {
+      found.push(
+        ...(await this.db
+          .select()
+          .from(schema.objects)
+          .where(
+            and(
+              eq(schema.objects.calendarId, calendarId),
+              inArray(schema.objects.uid, uids.slice(i, i + IN_LIMIT)),
+            ),
+          )),
+      );
+    }
+    return found;
+  }
+
   /** Every href of a calendar with its ETag, for a sync without sync tokens. */
   hrefs(
     calendarId: string,
@@ -1072,8 +1153,10 @@ const IN_LIMIT = 500;
 /** Rows in one multi-row `INSERT`: 15 columns each, 1 500 bound values. */
 const ROWS_PER_INSERT = 100;
 
-/** The calendar on this device's address: no server's, only unique (D122). */
+/** The calendar on this device's account's address: no server's, only unique (D122). */
 const LOCAL_SERVER = "local:";
+/** The calendar on this device the store makes itself (D122); the user's own have others. */
+export const LOCAL_CALENDAR_URL = `${LOCAL_SERVER}personal/`;
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they

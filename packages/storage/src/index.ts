@@ -9,6 +9,7 @@ export {
 export { NewerSchemaError, SCHEMA_VERSION } from "./migrations.ts";
 export { foldForSearch } from "./search.ts";
 export {
+  LOCAL_CALENDAR_URL,
   Store,
   type Account,
   type Calendar,

@@ -1,0 +1,376 @@
+import { readFileSync } from "node:fs";
+import { deflateRawSync } from "node:zlib";
+
+import { ALL_RIGHTS, CalendarObject } from "@astrotime/core";
+import { Store } from "@astrotime/storage";
+import { nodeDriver } from "@astrotime/storage/node";
+import { describe, expect, test } from "vite-plus/test";
+
+import { decodeText } from "../src/import/decode.ts";
+import {
+  BATCH,
+  destinationOf,
+  duplicatesOf,
+  NEW,
+  runImport,
+  type Choice,
+  type Destination,
+} from "../src/import/plan.ts";
+import { NotImportableError, readImport, type Source } from "../src/import/read.ts";
+
+const exportOf = (name: string) =>
+  readFileSync(new URL(`../../core/test/fixtures/exports/${name}`, import.meta.url));
+
+let uids = 0;
+const options = {
+  language: "en",
+  timeZone: "Europe/Vilnius",
+  newUid: () => `new-${++uids}`,
+  pause: () => Promise.resolve(),
+};
+const read = (name: string, bytes: Uint8Array) => readImport({ name, bytes }, options);
+const encode = (text: string) => new TextEncoder().encode(text);
+
+const lines = (...content: string[]) => `${content.join("\r\n")}\r\n`;
+const event = (uid: string, start = "20261105T090000Z", extra: string[] = []) => [
+  "BEGIN:VEVENT",
+  `UID:${uid}`,
+  "DTSTAMP:20261101T080000Z",
+  `DTSTART:${start}`,
+  `SUMMARY:${uid}`,
+  ...extra,
+  "END:VEVENT",
+];
+const todo = (uid: string) => ["BEGIN:VTODO", `UID:${uid}`, `SUMMARY:${uid}`, "END:VTODO"];
+const calendar = (name: string | null, ...components: string[][]) =>
+  lines(
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Test//EN",
+    ...(name ? [`X-WR-CALNAME:${name}`] : []),
+    ...components.flat(),
+    "END:VCALENDAR",
+  );
+
+/** A ZIP archive of these files, deflated, as Google's export writes one. */
+function zip(files: Record<string, string>): Uint8Array {
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const nameBytes = encode(name);
+    const data = deflateRawSync(encode(text));
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(8, 8, true);
+    local.setUint32(18, data.length, true);
+    local.setUint32(22, encode(text).length, true);
+    local.setUint16(26, nameBytes.length, true);
+    const entry = new DataView(new ArrayBuffer(46));
+    entry.setUint32(0, 0x02014b50, true);
+    entry.setUint16(10, 8, true);
+    entry.setUint32(20, data.length, true);
+    entry.setUint32(24, encode(text).length, true);
+    entry.setUint16(28, nameBytes.length, true);
+    entry.setUint32(42, offset, true);
+    parts.push(new Uint8Array(local.buffer), nameBytes, data);
+    central.push(new Uint8Array(entry.buffer), nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const size = central.reduce((sum, part) => sum + part.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, Object.keys(files).length, true);
+  end.setUint16(10, Object.keys(files).length, true);
+  end.setUint32(12, size, true);
+  end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const bytes = new Uint8Array(all.reduce((sum, part) => sum + part.length, 0));
+  let at = 0;
+  for (const part of all) {
+    bytes.set(part, at);
+    at += part.length;
+  }
+  return bytes;
+}
+
+describe("a file's text (import D267)", () => {
+  test("UTF-8, with or without its byte order mark", () => {
+    expect(decodeText(encode("Встреча"), "en")).toEqual({ text: "Встреча", guessed: null });
+    expect(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, ...encode("a")]), "en").text).toBe("a");
+  });
+
+  test("UTF-16 by its byte order mark", () => {
+    const le = new Uint8Array([0xff, 0xfe, 0x41, 0x00, 0x14, 0x04]);
+    expect(decodeText(le, "en")).toEqual({ text: "AД", guessed: null });
+  });
+
+  test("a charset the file names, else the user's language's, said as guessed", () => {
+    // "Встреча" in Windows-1251.
+    const cp1251 = new Uint8Array([0xc2, 0xf1, 0xf2, 0xf0, 0xe5, 0xf7, 0xe0]);
+    expect(decodeText(cp1251, "ru")).toEqual({ text: "Встреча", guessed: "windows-1251" });
+    expect(decodeText(cp1251, "en").guessed).toBe("windows-1252");
+    const named = new Uint8Array([...encode("SUMMARY;CHARSET=windows-1251:"), ...cp1251]);
+    expect(decodeText(named, "en")).toEqual({
+      text: "SUMMARY;CHARSET=windows-1251:Встреча",
+      guessed: null,
+    });
+  });
+});
+
+describe("a file read into sources (import D268)", () => {
+  test("Google's export: its events with their days, named as the file names it", async () => {
+    const file = await read("work.ics", exportOf("google-export.ics"));
+    expect(file.sources).toHaveLength(1);
+    const [source] = file.sources;
+    expect(source).toMatchObject({ name: "Work", color: null, others: 0, problems: [] });
+    expect(
+      source!.items.map(({ uid, kind, first, last }) => [uid.slice(0, 4), kind, first, last]),
+    ).toEqual([
+      // A series and its exception: the days of both.
+      ["1r6a", "event", "2026-11-03", "2026-11-10"],
+      ["5h4g", "event", "2026-11-16", "2026-11-16"],
+      ["9q8w", "event", "2026-11-05", "2026-11-05"],
+    ]);
+  });
+
+  test("events and tasks of one file; a file with no name of its own is named by the file", async () => {
+    const file = await read("Thunderbird export.ics", exportOf("thunderbird-export.ics"));
+    expect(file.sources[0]!.name).toBe("Thunderbird export");
+    expect(file.sources[0]!.items.map((item) => item.kind)).toEqual(["event", "task"]);
+  });
+
+  test("components AstroTime does not keep are counted, problems kept", async () => {
+    const text = calendar(
+      "Mixed",
+      event("a"),
+      ["BEGIN:VJOURNAL", "UID:j", "END:VJOURNAL"],
+      event("b").slice(0, -1),
+    );
+    const [source] = (await read("x.ics", encode(text))).sources;
+    expect(source!.others).toBe(1);
+    expect(source!.problems.map((problem) => problem.reason)).toEqual(["unterminated"]);
+  });
+
+  test("jCal (RFC 7265), as the iCalendar it spells", async () => {
+    const jcal = [
+      "vcalendar",
+      [
+        ["version", {}, "text", "2.0"],
+        ["x-wr-calname", {}, "unknown", "From JSON"],
+      ],
+      [
+        [
+          "vevent",
+          [
+            ["uid", {}, "text", "j1"],
+            ["dtstamp", {}, "date-time", "2026-11-01T08:00:00Z"],
+            ["dtstart", { tzid: "Europe/Vilnius" }, "date-time", "2026-11-05T09:00:00"],
+            ["summary", {}, "text", "Planning"],
+          ],
+          [],
+        ],
+      ],
+    ];
+    const [source] = (await read("calendar.json", encode(JSON.stringify(jcal)))).sources;
+    expect(source).toMatchObject({ name: "From JSON" });
+    expect(source!.items.map(({ uid, first }) => [uid, first])).toEqual([["j1", "2026-11-05"]]);
+    expect(CalendarObject.parse(source!.items[0]!.ics).master?.summary).toBe("Planning");
+  });
+
+  test("a ZIP of calendars, as Google's export: one source each; other files named", async () => {
+    const archive = zip({
+      "work@example.com.ics": calendar("Work", event("w")),
+      "home.ics": calendar(null, event("h"), todo("t")),
+      "readme.txt": "not a calendar",
+    });
+    const file = await read("calendars.zip", archive);
+    expect(file.sources.map((source) => [source.name, source.items.length])).toEqual([
+      ["Work", 1],
+      ["home", 2],
+    ]);
+    expect(file.unread).toEqual(["readme.txt"]);
+  });
+
+  test("several calendars in one file are several sources", async () => {
+    const text = calendar("One", event("a")) + calendar("Two", event("b"));
+    expect((await read("x.ics", encode(text))).sources.map((source) => source.name)).toEqual([
+      "One",
+      "Two",
+    ]);
+  });
+
+  test("what is no calendar is said so", async () => {
+    await expect(read("page.ics", encode("<html><body>Sign in</body></html>"))).rejects.toThrow(
+      NotImportableError,
+    );
+    await expect(read("data.json", encode('{"items": []}'))).rejects.toThrow(NotImportableError);
+    await expect(read("empty.ics", new Uint8Array())).rejects.toThrow(NotImportableError);
+    await expect(read("x.zip", zip({ "a.txt": "x" }))).rejects.toThrow(NotImportableError);
+  });
+});
+
+describe("an import written through the store (import D269–D271)", () => {
+  async function setup() {
+    const store = await Store.open(nodeDriver());
+    const account = await store.addAccount({
+      provider: "caldav",
+      name: "Nextcloud",
+      serverUrl: "https://cloud.example.com/",
+      username: "astro",
+    });
+    const save = (name: string, components: ("VEVENT" | "VTODO")[], rights = ALL_RIGHTS) =>
+      store.saveCalendar({
+        accountId: account.id,
+        url: `https://cloud.example.com/dav/${name}/`,
+        name,
+        color: null,
+        components,
+        rights,
+      });
+    return {
+      store,
+      personal: await save("Personal", ["VEVENT", "VTODO"]),
+      work: await save("Work", ["VEVENT"]),
+      shared: await save("Shared", ["VEVENT"], { create: false, edit: false, delete: false }),
+    };
+  }
+  const sourceOf = async (text: string) => (await read("x.ics", encode(text))).sources[0]!;
+  const run = (
+    store: Store,
+    sources: Source[],
+    destinations: Map<string, Destination>,
+    duplicates: Awaited<ReturnType<typeof duplicatesOf>>,
+    choice: Choice = "skip",
+    stopAfter = Infinity,
+  ) => {
+    const progress: [number, number][] = [];
+    return runImport({
+      store,
+      sources,
+      destinations,
+      duplicates,
+      choice,
+      accountName: "On this device",
+      newUid: () => `copy-${++uids}`,
+      onProgress: (done, total) => progress.push([done, total]),
+      stopped: () => progress.length > stopAfter,
+      pause: () => Promise.resolve(),
+    }).then((result) => ({ result, progress }));
+  };
+
+  test("first offered: a calendar of the source's name, else the one new items go to", async () => {
+    const { store, personal, work } = await setup();
+    const calendars = await store.calendars();
+    const work1 = await sourceOf(calendar("work", event("a"), todo("t")));
+    expect(destinationOf(work1, calendars, new Set())).toEqual({
+      events: work.id,
+      tasks: personal.id,
+    });
+    const other = await sourceOf(calendar("Holidays", event("a")));
+    expect(destinationOf(other, calendars, new Set())).toEqual({
+      events: personal.id,
+      tasks: null,
+    });
+    // Nowhere that takes it: a new calendar on this device.
+    expect(destinationOf(other, [], new Set())).toEqual({ events: NEW, tasks: null });
+  });
+
+  test("new items become local changes the sync uploads, in batches", async () => {
+    const { store, personal } = await setup();
+    const many = Array.from({ length: BATCH * 2 + 5 }, (_, i) => event(`e${i}`));
+    const source = await sourceOf(calendar("Big", ...many, todo("t")));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: personal.id }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result, progress } = await run(store, [source], destinations, duplicates);
+    expect(result).toMatchObject({ events: BATCH * 2 + 5, tasks: 1, stopped: false });
+    expect(progress).toEqual([
+      [0, BATCH * 2 + 6],
+      [BATCH, BATCH * 2 + 6],
+      [BATCH * 2, BATCH * 2 + 6],
+      [BATCH * 2 + 6, BATCH * 2 + 6],
+    ]);
+    const pending = await store.pending(personal.id);
+    expect(pending).toHaveLength(BATCH * 2 + 6);
+    expect(new Set(pending.map((object) => object.pending))).toEqual(new Set(["create"]));
+    // Stored as the file wrote it (D272): the splitter's text, untouched.
+    expect(pending.find((object) => object.uid === "t")!.ics).toBe(
+      source.items.find((item) => item.uid === "t")!.ics,
+    );
+  });
+
+  test("stopped between batches: what landed stays, and says so", async () => {
+    const { store, personal } = await setup();
+    const many = Array.from({ length: BATCH * 3 }, (_, i) => event(`e${i}`));
+    const source = await sourceOf(calendar("Big", ...many));
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 1);
+    expect(result).toMatchObject({ events: BATCH, stopped: true });
+    expect(await store.pending(personal.id)).toHaveLength(BATCH);
+  });
+
+  test("a UID already there: the same item skipped; a changed one updated, copied or skipped", async () => {
+    for (const choice of ["update", "copy", "skip"] as const) {
+      const { store, personal } = await setup();
+      await store.saveLocal(personal.id, calendar(null, event("same")));
+      await store.saveLocal(personal.id, calendar(null, event("changed")));
+      const source = await sourceOf(
+        calendar("File", event("same"), event("changed", "20261106T090000Z"), event("fresh")),
+      );
+      const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+      const duplicates = await duplicatesOf(store, [source], destinations);
+      expect([duplicates.identical, duplicates.changed]).toEqual([1, 1]);
+      const { result } = await run(store, [source], destinations, duplicates, choice);
+      const objects = await store.pending(personal.id);
+      const starts = (uid: string) =>
+        objects
+          .filter((object) => CalendarObject.parse(object.ics).master?.summary === uid)
+          .map((object) => object.startMs);
+      if (choice === "update") {
+        expect(result).toMatchObject({ events: 2, updated: 1, copies: 0, identical: 1 });
+        expect(starts("changed")).toEqual([Date.UTC(2026, 10, 6, 9)]);
+      } else if (choice === "copy") {
+        expect(result).toMatchObject({ events: 2, updated: 0, copies: 1, identical: 1 });
+        expect(starts("changed").toSorted()).toEqual([
+          Date.UTC(2026, 10, 5, 9),
+          Date.UTC(2026, 10, 6, 9),
+        ]);
+      } else {
+        expect(result).toMatchObject({ events: 1, skipped: 1, identical: 1 });
+        expect(starts("changed")).toEqual([Date.UTC(2026, 10, 5, 9)]);
+      }
+      expect(starts("same")).toHaveLength(1);
+      expect(starts("fresh")).toHaveLength(1);
+    }
+  });
+
+  test("a new calendar on this device, named and coloured as the source", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "X-WR-CALNAME:Holidays",
+        "X-APPLE-CALENDAR-COLOR:#D50000FF",
+        ...event("new-year", "20270101T000000Z"),
+        ...todo("cards"),
+        "END:VCALENDAR",
+      ),
+    );
+    const destinations = new Map([[source.id, { events: NEW, tasks: NEW }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates);
+    const made = result.made.get(source.id)!;
+    expect(made).toMatchObject({
+      name: "Holidays",
+      color: "#d50000",
+      components: ["VEVENT", "VTODO"],
+    });
+    const local = (await store.accounts()).find((account) => account.provider === "local");
+    expect(made.accountId).toBe(local?.id);
+    // On this device a change is final: nothing waits for a sync (D122).
+    expect(await store.pending(made.id)).toEqual([]);
+    expect(await store.tasks([made.id])).toHaveLength(1);
+  });
+});

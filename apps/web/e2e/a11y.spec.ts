@@ -6,6 +6,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { HOLIDAYS, importFile } from "./import-files.ts";
 import { choose, openDemo, PHONE, WIDE } from "./support.ts";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"];
@@ -226,6 +227,15 @@ test.describe("the screens and dialogs", () => {
         await settings.getByRole("combobox", { name: "Colour of new events" }).click();
         await expect(page.getByRole("listbox")).toBeVisible();
         await audit(page, "the colour dropdown");
+        await page.keyboard.press("Escape");
+        // Import (import D268): the preview with a broken file's problems open, and the question.
+        await importFile(page, /^Import from a file/, "holidays.ics", HOLIDAYS);
+        const importing = page.getByRole("dialog", { name: "Import" });
+        await importing.locator("summary").click();
+        await audit(page, "the import preview");
+        await importing.getByRole("button", { name: "Import", exact: true }).click();
+        await expect(importing.getByRole("status")).toBeVisible();
+        await audit(page, "the import's summary");
       });
 
       test("search with results", async ({ page }) => {
