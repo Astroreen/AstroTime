@@ -139,6 +139,13 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Preset** — the CalDAV server and user name a single-user deployment
   names for whoever opens it, so signing in asks for the password alone
   (foundation D123).
+- **Known service** — a cloud CalDAV service the sign-in dialog offers by
+  name (iCloud, Fastmail, Yandex…): its address filled in, the user gives
+  their name and an app password. Its account is a CalDAV account, not a
+  provider of its own (providers D247, D250).
+- **Subscription** — a read-only calendar from an ICS address
+  (`webcal://`, `https://…ics`), kept fresh by a conditional `GET`
+  (providers D251).
 
 ## Sync
 
@@ -182,6 +189,13 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Proxy** — the stateless web proxy that lets the web app reach CalDAV
   servers despite CORS: in the dev server now, in the web app's Docker image
   later (`proxyHandler`).
+- **Interop run** — the CalDAV tests against every self-hostable server
+  in a container, run when the code that talks to servers or a server's
+  pinned version changes, weekly and by hand (providers D248); the
+  **cloud run** is the same against cloud services' test accounts.
+- **Recording** — a service's requests and answers, captured once from a
+  test account with every personal value replaced, that unit tests replay
+  (providers D249).
 
 ## Platforms
 
