@@ -562,7 +562,7 @@ marked _to be recorded_.
   a server on the user's own network, or behind a VPN such as a tailnet,
   may serve only http, and that is the user's choice. The words load with
   the dialog (`i18n/sign-in.ts`, a catalog of their own), so the first
-  load grows by 34 bytes, `inClear` alone.
+  load grows by 32 bytes, `inClear` alone.
 
 ## Deferred
 
