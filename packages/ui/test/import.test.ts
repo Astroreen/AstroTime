@@ -236,6 +236,27 @@ describe("a file read into sources (import D268)", () => {
     expect((error as NotImportableError).tooBig).toBe(true);
   });
 
+  test("Google Takeout's ZIP: its Tasks.json read as task lists", async () => {
+    const tasks = JSON.stringify({
+      kind: "tasks#taskLists",
+      items: [
+        {
+          kind: "tasks#taskList",
+          title: "My Tasks",
+          items: [{ kind: "tasks#task", id: "t1", title: "Milk" }],
+        },
+      ],
+    });
+    const file = await read(
+      "takeout.zip",
+      zip({ "Takeout/Tasks/Tasks.json": tasks, "Takeout/index.html": "<html>" }),
+    );
+    expect(
+      file.sources.map((source) => [source.name, source.items.map((item) => item.uid)]),
+    ).toEqual([["My Tasks", ["google-task-t1"]]]);
+    expect(file.unread).toEqual(["Takeout/index.html"]);
+  });
+
   test("several calendars in one file are several sources", async () => {
     const text = calendar("One", event("a")) + calendar("Two", event("b"));
     expect((await read("x.ics", encode(text))).sources.map((source) => source.name)).toEqual([

@@ -313,7 +313,14 @@ alone or in Takeout's ZIP; each list a source named as it, each task a
 status and completion, its parent as `RELATED-TO`, its links as
 attachments, its place as `X-GOOGLE-TASKS-POSITION`, its UID made from
 Google's id so a second import finds it. A task the user deleted, which
-Takeout keeps, is left out as Google Tasks leaves it out. D266, D272.
+Takeout keeps, is left out as Google Tasks leaves it out. The file is
+told by its own `kind`, not by a word inside it; a value of the wrong
+shape is left out, never a crash, and one of the wrong shape at the top
+is a file that is not Takeout's. No value can become a line of its own:
+text escaped and its control characters dropped, a link parsed as an
+http(s) URL and refused with a control character in it, a place digits
+alone, an id letters, digits, `-` and `_`; the same holds for a
+vCalendar's `URL`, `ATTACH` and a guest's name. D266, D272.
 
 ### PR I6 — Export
 
