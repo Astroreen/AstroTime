@@ -16,6 +16,10 @@
     "./provider": {
       "types": "./src/provider.ts",
       "import": "./src/provider.ts"
+    },
+    "./split": {
+      "types": "./src/split.ts",
+      "import": "./src/split.ts"
     }
   },
   "scripts": {

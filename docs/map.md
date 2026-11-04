@@ -60,6 +60,11 @@ When you add a package, app or module, add its line here in the same PR.
   - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
     `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its
     start's day. → `plans/foundation.md#D105`
+  - `splitCalendar`, `splitCalendars` (`split.ts`, `@astrotime/core/split`)
+    — a calendar file cut into one object per UID with the zones it uses;
+    strict for a subscription's answer, forgiving for a file from the
+    device; `jcalText`, jCal as iCalendar. Loaded with what needs it.
+    → `plans/import.md#D267`, `plans/providers.md#D251`
   - `vtimezone.ts` — a VTIMEZONE made from `Intl` for a zone the object
     does not define. → `plans/foundation.md#D104`
   - `mergeObjects` — the three-way merge of a refused write;
