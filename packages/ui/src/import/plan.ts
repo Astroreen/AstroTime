@@ -22,7 +22,8 @@ export const NEW = "new";
 const ON = "new:";
 export const newOn = (accountId: string) => `${ON}${accountId}`;
 /** The account a target makes its new calendar on; `null` for any other. */
-const accountOfNew = (target: Target) => (target.startsWith(ON) ? target.slice(ON.length) : null);
+export const accountOfNew = (target: Target) =>
+  target.startsWith(ON) ? target.slice(ON.length) : null;
 const isNew = (target: Target) => target === NEW || target.startsWith(ON);
 
 /** Per source, where its events and its tasks go; none for a kind it has not. */
@@ -187,18 +188,30 @@ async function unmake(
 }
 
 /**
+ * An import that stopped on a failure after it made calendars on servers
+ * (D277): `cause` is the failure; `kept` the calendars made, which stay
+ * there, empty.
+ */
+export class ImportStoppedError extends Error {
+  override name = "ImportStoppedError";
+  readonly kept: readonly Calendar[];
+  constructor(message: string, cause: unknown, kept: readonly Calendar[]) {
+    super(message, { cause });
+    this.kept = kept;
+  }
+}
+
+/**
  * A new calendar on an account's server was not made (D277): nothing was
  * written; `cause` says why, and `kept` names the calendars this run made
  * on servers before it, which stay there.
  */
-export class CalendarNotMadeError extends Error {
+export class CalendarNotMadeError extends ImportStoppedError {
   override name = "CalendarNotMadeError";
   readonly accountId: string;
-  readonly kept: readonly Calendar[];
   constructor(accountId: string, cause: unknown, kept: readonly Calendar[]) {
-    super(`No calendar was made on ${accountId}.`, { cause });
+    super(`No calendar was made on ${accountId}.`, cause, kept);
     this.accountId = accountId;
-    this.kept = kept;
   }
 }
 
@@ -206,17 +219,27 @@ export const BATCH = 200;
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve));
 
 export async function runImport(run: Run): Promise<Imported> {
+  // On a server, one calendar per kind (a CalDAV calendar holds one
+  // component, providers D275), made first: one that cannot be made stops
+  // the import before anything is written. One made stays on its server,
+  // as made there, whatever then stops the import, and is named with the
+  // failure (`ImportStoppedError`), or in what came of it (`onServer`).
+  const onServer = new Map<string, Calendar>();
+  try {
+    return await importInto(run, onServer);
+  } catch (error) {
+    if (onServer.size === 0 || error instanceof ImportStoppedError) throw error;
+    throw new ImportStoppedError("The import stopped.", error, [...onServer.values()]);
+  }
+}
+
+async function importInto(run: Run, onServer: Map<string, Calendar>): Promise<Imported> {
   const { store, duplicates, choice } = run;
   const pause = run.pause ?? yieldToPage;
   // A new calendar on this device per source that asks for one, taking what goes to it.
   const made = new Map<string, Calendar>();
   /** The device accounts this run made, which alone it may take back. */
   const ownAccounts = new Set<string>();
-  // On a server, one calendar per kind (a CalDAV calendar holds one
-  // component, providers D275), made first: one that cannot be made stops
-  // the import before anything is written. One made stays on its server,
-  // as made there, even if the import then stops.
-  const onServer = new Map<string, Calendar>();
   for (const source of run.sources) {
     const to = run.destinations.get(source.id);
     for (const [kind, component] of [

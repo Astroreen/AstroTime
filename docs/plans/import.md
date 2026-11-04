@@ -229,10 +229,16 @@ not carry is said, not dropped in silence.
   import before anything is written, said in words naming the account
   (`CalendarNotMadeError`: only a calendar's making is blamed on its
   account, never a later failure);
-  calendars already made on a server stay there, as made (AstroTime does
-  not delete calendars), and the error names them (`kept`), as the dialog
-  does ("Made before that, and kept on its server: “Team” (astro@…)"), and a calendar made on this device for the same
-  run goes again as before. `Imported.onServer` lists them. On Radicale in
+  on any failure, the calendars already made on a server stay there, as
+  made (AstroTime does not delete calendars), and are named with it: on a
+  calendar not made (`CalendarNotMadeError`), on anything else that stops
+  the import (`ImportStoppedError`, the base, with the failure as its
+  cause), and in what came of an import that ended on a write's error or
+  was stopped (`Imported.onServer`), each "“Team” on <account>", joined
+  as the language joins a list (`Intl.ListFormat`). A calendar made on
+  this device for the same run goes again as before. A new calendar
+  chosen on an account removed meanwhile goes back to one on this device
+  (the accounts are read live while the dialog is open). On Radicale in
   the e2e (`new-list.spec.ts`): two `MKCALENDAR`, both named as the file,
   then its three items uploaded.
 

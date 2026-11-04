@@ -11,6 +11,7 @@ import {
   BATCH,
   CalendarNotMadeError,
   destinationOf,
+  ImportStoppedError,
   duplicatesOf,
   NEW,
   newOn,
@@ -844,5 +845,69 @@ describe("an import written through the store (import D269–D271)", () => {
     ]);
     // Nothing written to it.
     expect(await store.pending(kept[0]!.id)).toEqual([]);
+  });
+
+  test("a write that fails after a calendar was made on the server: the calendar is named with the failure", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year")));
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: null }]]);
+    const make: Run["make"] = (accountId, wanted) =>
+      store.saveCalendar({
+        accountId,
+        url: "https://cloud.example.com/dav/holidays/",
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    store.changeLocal = (() =>
+      Promise.reject(new Error("The disk is full."))) as typeof store.changeLocal;
+    const { result } = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      make,
+    );
+    expect(result.error).toBe("The disk is full.");
+    expect(result.onServer.map((one) => one.name)).toEqual(["Holidays"]);
+  });
+
+  test("anything that stops the import after a calendar was made on the server carries it", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    // Events to a new calendar on the server, tasks to one on this device, which cannot be kept.
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: NEW }]]);
+    const real = store.saveCalendar.bind(store);
+    const full = new Error("The disk is full.");
+    store.saveCalendar = (async (wanted) =>
+      wanted.url.startsWith("local:")
+        ? Promise.reject(full)
+        : real(wanted)) as typeof store.saveCalendar;
+    const failure = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      (accountId, wanted) =>
+        store.saveCalendar({
+          accountId,
+          url: "https://cloud.example.com/dav/holidays/",
+          name: wanted.name,
+          color: wanted.color,
+          components: [wanted.component],
+          rights: ALL_RIGHTS,
+        }),
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ImportStoppedError);
+    expect(failure).not.toBeInstanceOf(CalendarNotMadeError);
+    expect((failure as ImportStoppedError).cause).toBe(full);
+    expect((failure as ImportStoppedError).kept.map((one) => one.name)).toEqual(["Holidays"]);
   });
 });

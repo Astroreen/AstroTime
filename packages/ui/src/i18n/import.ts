@@ -81,8 +81,11 @@ export const importStrings = {
       "{{account}} answered with an error ({{status}}), so nothing was imported.",
     "import.notMade.failed":
       "The new calendar on {{account}} was not made because of an error, so nothing was imported.",
-    "import.notMade.kept_one": "Made before that, and kept on its server: {{names}}.",
-    "import.notMade.kept_other": "Made before that, and kept on their servers: {{names}}.",
+    "import.notMade.kept_one": "Made before that, and kept: {{names}}.",
+    "import.notMade.kept_other": "Made before that, and kept: {{names}}.",
+    "import.keptOnServer_one": "Made for this import, and kept: {{names}}.",
+    "import.keptOnServer_other": "Made for this import, and kept: {{names}}.",
+    "import.keptItem": "“{{name}}” on {{account}}",
     "import.start": "Import",
     "import.cancel": "Cancel",
     "import.duplicates_one":
@@ -218,10 +221,15 @@ export const importStrings = {
     "import.notMade.answered": "{{account}} ответил ошибкой ({{status}}), ничего не импортировано.",
     "import.notMade.failed":
       "Новый календарь в {{account}} не создан из-за ошибки, ничего не импортировано.",
-    "import.notMade.kept_one": "Создан до этого и остался на своём сервере: {{names}}.",
-    "import.notMade.kept_few": "Созданы до этого и остались на своих серверах: {{names}}.",
-    "import.notMade.kept_many": "Созданы до этого и остались на своих серверах: {{names}}.",
-    "import.notMade.kept_other": "Созданы до этого и остались на своих серверах: {{names}}.",
+    "import.notMade.kept_one": "Создан до этого и остался: {{names}}.",
+    "import.notMade.kept_few": "Созданы до этого и остались: {{names}}.",
+    "import.notMade.kept_many": "Созданы до этого и остались: {{names}}.",
+    "import.notMade.kept_other": "Созданы до этого и остались: {{names}}.",
+    "import.keptOnServer_one": "Создан для этого импорта и остался: {{names}}.",
+    "import.keptOnServer_few": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptOnServer_many": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptOnServer_other": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptItem": "«{{name}}» в {{account}}",
     "import.start": "Импортировать",
     "import.cancel": "Отмена",
     "import.duplicates_one":

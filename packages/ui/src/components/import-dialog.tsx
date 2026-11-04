@@ -10,10 +10,12 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { makeCalendarAt, placesOf, whyNotMade } from "../calendar/make.ts";
+import { liveQuery } from "../calendar/live.ts";
+import { makeCalendarAt, placesOf } from "../calendar/make.ts";
 import { addImportStrings } from "../i18n/import.ts";
+import { failureWords, keptWords } from "../import/failure.ts";
 import {
-  CalendarNotMadeError,
+  accountOfNew,
   destinationOf,
   duplicatesOf,
   NEW,
@@ -81,14 +83,18 @@ export function ImportDialog({
 
   useEffect(() => {
     if (!file) return;
-    let current = true;
-    store.accounts().then(
-      (all) => current && setServers(placesOf(all)),
-      () => current && setServers([]),
+    // Live: an account removed meanwhile is no longer offered, and a new
+    // calendar chosen on it goes back to one on this device.
+    return liveQuery(
+      store,
+      () => store.accounts(),
+      (all) => {
+        const places = placesOf(all);
+        setServers(places);
+        setDestinations((chosen) => withoutGone(chosen, places));
+      },
+      () => setServers([]),
     );
-    return () => {
-      current = false;
-    };
   }, [file, store]);
 
   // The file read once it is picked; a closing leaves what a late read brings.
@@ -133,16 +139,6 @@ export function ImportDialog({
     const account = servers.find((one) => one.id === accountId);
     return account ? accountName(account, t) : accountId;
   };
-  /** Why a new calendar was not made, and what this run made before it and kept, in words. */
-  const notMade = (error: CalendarNotMadeError) => {
-    const { why, status } = whyNotMade(error.cause);
-    const said = t(`import.notMade.${why}`, { account: nameOf(error.accountId), status });
-    if (error.kept.length === 0) return said;
-    const names = error.kept
-      .map((calendar) => `“${calendar.name}” (${nameOf(calendar.accountId)})`)
-      .join(", ");
-    return `${said} ${t("import.notMade.kept", { count: error.kept.length, names })}`;
-  };
   const start = (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
     if (phase.current !== "checking" && phase.current !== "asked") return;
     phase.current = "running";
@@ -169,10 +165,7 @@ export function ImportDialog({
       (error: unknown) =>
         setStep({
           name: "failed",
-          message:
-            error instanceof CalendarNotMadeError
-              ? notMade(error)
-              : t("import.failed", { message: String(error) }),
+          message: failureWords(t, i18n.resolvedLanguage ?? i18n.language, error, nameOf),
         }),
     );
   };
@@ -248,7 +241,22 @@ export function ImportDialog({
             ) : null}
             {step.name === "asking" ? <Asking duplicates={step.duplicates} /> : null}
             {step.name === "importing" ? <Progress done={step.done} total={step.total} /> : null}
-            {step.name === "done" ? <Done result={step.result} /> : null}
+            {step.name === "done" ? (
+              <Done
+                result={step.result}
+                kept={
+                  step.result.error || step.result.stopped
+                    ? keptWords(
+                        t,
+                        i18n.resolvedLanguage ?? i18n.language,
+                        step.result.onServer,
+                        nameOf,
+                        "import.keptOnServer",
+                      )
+                    : null
+                }
+              />
+            ) : null}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line px-3 py-3 sm:px-5">
             {step.name === "preview" ? (
@@ -569,7 +577,28 @@ function Progress({ done, total }: { done: number; total: number }) {
   );
 }
 
-function Done({ result }: { result: Imported }) {
+/** Each source's destinations, a new calendar on an account no longer offered taken back to this device. */
+function withoutGone(
+  chosen: ReadonlyMap<string, Destination>,
+  places: readonly Account[],
+): ReadonlyMap<string, Destination> {
+  const kept = (target: string | null) => {
+    const account = target === null ? null : accountOfNew(target);
+    return account === null || places.some((one) => one.id === account) ? target : NEW;
+  };
+  let changed = false;
+  const next = new Map<string, Destination>();
+  for (const [id, destination] of chosen) {
+    const events = kept(destination.events);
+    const tasks = kept(destination.tasks);
+    changed ||= events !== destination.events || tasks !== destination.tasks;
+    next.set(id, { events, tasks });
+  }
+  return changed ? next : chosen;
+}
+
+/** What came of an import; `kept`, the calendars it made on servers before it ended early. */
+function Done({ result, kept }: { result: Imported; kept: string | null }) {
   const { t } = useTranslation();
   const lines = [
     [
@@ -612,6 +641,7 @@ function Done({ result }: { result: Imported }) {
           {t("import.failedPart", { message: result.error })}
         </p>
       ) : null}
+      {kept ? <p className="text-note text-ink-muted">{kept}</p> : null}
     </div>
   );
 }
