@@ -5,6 +5,7 @@ import { expect, test } from "vite-plus/test";
 import { catalogs, createI18n, LANGUAGES } from "../src/i18n/index.ts";
 import { fileStrings } from "../src/i18n/files.ts";
 import { pictureStrings } from "../src/i18n/pictures.ts";
+import { taskStrings } from "../src/i18n/tasks.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
 const base = (key: string) => key.replace(PLURAL, "");
@@ -70,8 +71,8 @@ test("plurals follow each language's rules", () => {
   ]);
 });
 
-test("the strings that load later have the same keys in every language (design D222, D237)", () => {
-  for (const later of [pictureStrings, fileStrings] as Record<
+test("the strings that load later have the same keys in every language (design D222, D236, D237)", () => {
+  for (const later of [pictureStrings, fileStrings, taskStrings] as Record<
     "en" | "ru",
     Record<string, string>
   >[]) {

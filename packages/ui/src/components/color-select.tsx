@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 
 import { colorName } from "../calendar/color-names.ts";
 import type { Language } from "../i18n/index.ts";
+import { addTaskStrings } from "../i18n/tasks.ts";
 import { OWN, useSettings } from "../settings.ts";
 import { Select, type SelectOption } from "./select.tsx";
 
@@ -77,7 +78,8 @@ export function ColorSelect({
   task?: boolean;
   className?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  addTaskStrings(i18n);
   const { settings } = useSettings();
   const nameOf = useOwnColorName();
   const language = useColorLanguage();

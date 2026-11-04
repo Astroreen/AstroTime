@@ -427,6 +427,27 @@ export function timesOfForm(form: Form): ItemTimes {
 
 export type Problem = "endBeforeStart" | "dueBeforeStart" | "untilBeforeStart" | "noDate";
 
+/** Why the edit dialog's form cannot be saved, or why saving it did not work. */
+export type SaveProblem =
+  | Problem
+  | "failed"
+  | "gone"
+  | "refused"
+  | "nowhere"
+  | "inDoubt"
+  | "noSplit";
+
+/** The problems that name the item's calendar, which for a task is its list (design D236). */
+const LISTED = new Set<SaveProblem>(["noSplit", "refused", "nowhere"]);
+
+/** A save problem's catalog key, in a task's words for a task (design D236). */
+export function problemKey(problem: SaveProblem, kind: "event" | "task") {
+  if (problem === "failed") return "edit.failed" as const;
+  if (kind === "task" && LISTED.has(problem))
+    return `edit.problem.task.${problem as "noSplit" | "refused" | "nowhere"}` as const;
+  return `edit.problem.${problem}` as const;
+}
+
 const localOf = (time: ItemTime) => (time.type === "date" ? `${time.date}T00:00:00` : time.local);
 
 /** Later (positive), earlier or the same: instants when both have one, else wall clocks. */

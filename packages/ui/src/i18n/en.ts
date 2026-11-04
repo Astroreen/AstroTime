@@ -369,7 +369,6 @@ export const en = {
   "edit.list": "List",
   "edit.color": "Colour",
   "edit.colorDefault": "The calendar's colour",
-  "edit.colorList": "The list's colour",
   "edit.location": "Location",
   "edit.description": "Description",
   "description.emptyItem": "An empty item",
@@ -385,7 +384,6 @@ export const en = {
   "edit.save": "Save",
   "edit.close": "Close without saving",
   "edit.noCalendar": "No calendar here can hold this item.",
-  "edit.noList": "No list here can hold this task.",
   "edit.failed": "The change could not be saved. Try again.",
   "edit.problem.endBeforeStart": "The end must be after the start.",
   "edit.problem.dueBeforeStart": "The due date cannot be before the start.",
@@ -394,15 +392,14 @@ export const en = {
   "edit.problem.noSplit":
     "This calendar takes no new items, so the series cannot be split here: change the date or the repeat, not both.",
   "edit.problem.gone":
-    "This is no longer on your calendar: it was deleted or moved elsewhere. Nothing was saved.",
+    "This is no longer here: it was deleted or moved elsewhere. Nothing was saved.",
   "edit.problem.refused":
     "This calendar no longer takes this item. Pick another calendar; nothing was saved.",
   "edit.problem.nowhere": "No calendar takes this item now. Nothing was saved.",
-  "edit.problem.nowhereList": "No list takes this task now. Nothing was saved.",
   "edit.problem.inDoubt":
     "It is not clear whether the change was saved. Check the item, and save again if it is not there.",
   "notice.deleteInDoubt":
-    "It is not clear whether it was deleted. Check your calendar, and delete it again if it is still there.",
+    "It is not clear whether it was deleted. Look again, and delete it again if it is still there.",
   "notice.deleteFailed": "It could not be deleted. Try again.",
   "notice.copyFailed": "The address could not be copied.",
   "notice.close": "Dismiss",

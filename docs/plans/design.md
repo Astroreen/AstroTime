@@ -2366,10 +2366,13 @@ own (below).
   task, its colour field offered "The calendar's colour"). Where the edit
   dialog speaks of a task's list, it says list, as its List field already
   did: the colour's first entry is "The list's colour" («Цвет списка»),
-  in the edit dialog and for Settings' "Colour of new tasks"; "No list
-  here can hold this task" and "No list takes this task now" replace the
-  calendar's words. An event keeps "The calendar's colour". The details
-  already name a task's list "List".
+  in the edit dialog and for Settings' "Colour of new tasks"; for a task
+  the edit dialog's problems that name the calendar (none here holds it,
+  it no longer takes it, it takes no new ones to split a series) name
+  the list (`problemKey`, `packages/ui/test/task-words.test.ts`). The
+  notices any item can get say neither: "This is no longer here", "Look
+  again". An event keeps the calendar's words. The details already name
+  a task's list "List".
 - **D237. The three ways to attach, all in sight** (the owner's 3, round
   5: "the add-file button only lets me type a link"). The edit dialog's
   attachments show "Add a link", "From your files" (D234) and "From this
