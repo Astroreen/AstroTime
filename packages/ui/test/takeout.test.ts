@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { CalendarObject, type Task } from "@astrotime/core";
 import { describe, expect, test } from "vite-plus/test";
 
+import { isTakeoutTasks } from "../src/import/kind.ts";
 import { NotImportableError, readImport } from "../src/import/read.ts";
 
 const bytes = readFileSync(new URL("fixtures/import/takeout-tasks.json", import.meta.url));
@@ -43,7 +44,18 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
     expect(file.sources[0]!.items.some((item) => item.ics.includes("Something deleted"))).toBe(
       false,
     );
-    expect(file.sources[0]!.notImported).toEqual([]);
+    // The mail link's title has no place in an ATTACH: said.
+    expect(file.sources[0]!.notImported).toEqual(["link titles"]);
+  });
+
+  test("one predicate tells Takeout's tasks, for the import and its converter alike", () => {
+    expect(isTakeoutTasks({ kind: "tasks#taskLists", items: [] })).toBe(true);
+    expect(isTakeoutTasks({ kind: "tasks#taskList" })).toBe(true);
+    expect(isTakeoutTasks([{ kind: "tasks#taskList" }])).toBe(true);
+    expect(isTakeoutTasks([])).toBe(false);
+    expect(isTakeoutTasks([{ kind: "tasks#taskList" }, null])).toBe(false);
+    expect(isTakeoutTasks(null)).toBe(false);
+    expect(isTakeoutTasks(["vcalendar", [], []])).toBe(false);
   });
 
   test("the same tasks give the same UIDs: a second import finds them there", async () => {

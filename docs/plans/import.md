@@ -212,8 +212,16 @@ not carry is said, not dropped in silence.
   file.
 - **Takeout's link titles** (D272): a task's links come over as their
   addresses (`ATTACH`); their `description` (a mail's subject) and `type`
-  have no place in an `ATTACH` AstroTime reads, and are not carried over.
-  An `X-` parameter could keep them once the details show one.
+  have no place in an `ATTACH` AstroTime reads, and are not carried over
+  (the preview names "link titles"). An `X-` parameter could keep them
+  once the details show one. A task's `hidden` (Google's "cleared" done
+  task) is not kept: the task comes over done, shown as done tasks are.
+- **Recorded fixtures for the converters** (D266): the vCalendar, CSV and
+  Takeout fixtures are written by hand from each format's documentation
+  (`packages/ui/test/fixtures/README.md`); a real export of each (an old
+  phone's `.vcs`, Outlook's and Google's CSV, a Takeout `Tasks.json`)
+  replaces them as one is at hand, the first that differs from its
+  documentation a test of its own.
 - **Todoist's CSV** (D266): its dates are free English ("every other
   Monday", "tomorrow at 5pm"), which needs Todoist's own grammar to read;
   titles and subtasks alone would import tasks without their dates.

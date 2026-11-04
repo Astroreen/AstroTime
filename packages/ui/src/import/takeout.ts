@@ -9,6 +9,8 @@
 
 import { NotCalendarError } from "@astrotime/core/split";
 
+import { isTakeoutTasks } from "./kind.ts";
+
 export interface TakeoutConverted {
   readonly text: string;
   readonly notImported: readonly string[];
@@ -16,17 +18,6 @@ export interface TakeoutConverted {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** Whether parsed JSON is Takeout's tasks: `tasks#taskLists`, one `tasks#taskList`, or a list of them. */
-export function isTakeoutTasks(json: unknown): boolean {
-  if (isObject(json))
-    return json["kind"] === "tasks#taskLists" || json["kind"] === "tasks#taskList";
-  return (
-    Array.isArray(json) &&
-    json.length > 0 &&
-    json.every((list) => isObject(list) && list["kind"] === "tasks#taskList")
-  );
-}
 
 /**
  * Takeout's `Tasks.json` as iCalendar. Whatever it holds is read as data:
@@ -94,6 +85,9 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
         const url = isObject(link) ? linkOf(link["link"]) : null;
         if (url) lines.push(`ATTACH:${url}`);
         else notImported.add("links");
+        // Its title ("Appointment confirmation") has no place in an ATTACH AstroTime reads.
+        if (url && isObject(link) && typeof link["description"] === "string" && link["description"])
+          notImported.add("link titles");
       }
       lines.push("END:VTODO");
       out.push(...lines);
