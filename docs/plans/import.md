@@ -66,16 +66,22 @@ not carry is said, not dropped in silence.
   never takes the rest of the file with it. It forgives what exporters
   get wrong: a byte order mark, LF or CR line ends, blank lines, several
   `VCALENDAR`s one after another, a file cut short (what came whole is
-  kept), a component with no UID (it gets one). A line broken without
-  folding is joined, as the line break it meant, only to a text value
-  (`DESCRIPTION`, `SUMMARY`, `LOCATION`, `COMMENT`, an `X-` property) and
-  only when it is no property of iCalendar's (Outlook's "Dial-in: 555
-  0100"); anywhere else it is a stray line, left out; both are named. The
+  kept), a component with no UID (it gets one). Any line that starts as a content
+  line (a name of letters, digits and "-", in any case, then ";" or ":",
+  RFC 5545 §3.1) is a property, one AstroTime knows or not, and kept
+  ([D7](foundation.md#D7)); a line that does not ("PIN 1234", "Dial in:
+  555 0100") after a text value (`DESCRIPTION`, `SUMMARY`, `LOCATION`,
+  `COMMENT`, `CONTACT`, `RESOURCES`, an `X-` property) is that value broken
+  without folding, joined as the line break it meant; anywhere else it is
+  a stray line, left out; both are named. The
   same component twice under one UID (Google's and Outlook's exports do
   it) is kept once; a second, different master, or a component of another
   kind under a UID taken, is kept as an object of its own under a new UID
-  (`<UID>-2` where the caller gives none, so a subscription's stays the
-  same on every run); a series' exceptions stay with its first master.
+  (`<UID>-2`, or the next suffix no UID of the file has, where the caller
+  gives none, so a subscription's stays the same on every run); a series'
+  exceptions stay with its first master, and an exception of another kind
+  goes with the object of its kind that left the UID; a component given
+  again is kept once, wherever its first went.
   Nothing is dropped unnamed: what cannot be kept (no UID where none can
   be given, unreadable, never ended) is a problem with its place in the
   file, and so is what was kept but changed. A `VTIMEZONE` that cannot be

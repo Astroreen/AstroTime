@@ -241,6 +241,46 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     expect(CalendarObject.parse(split!.objects[0]!.ics).exceptions).toHaveLength(1);
   });
 
+  test("a component given again after its UID had to be left is kept once; a new UID is none of the file's", () => {
+    const split = splitCalendar(
+      calendar(
+        event("u"),
+        event("u", ["DESCRIPTION:Second"]),
+        // The same as the one that left its UID: given twice.
+        event("u", ["DESCRIPTION:Second"]),
+        // A third master: under the next UID free, past the file's own u-2.
+        event("u", ["DESCRIPTION:Third"]),
+        event("u-2"),
+        event("u-3"),
+      ),
+    );
+    expect(split.objects.map((object) => object.uid)).toEqual(["u", "u-2", "u-3", "u-4", "u-5"]);
+    const description = (uid: string) =>
+      CalendarObject.parse(split.objects.find((object) => object.uid === uid)!.ics).master
+        ?.description;
+    expect([description("u-4"), description("u-5")]).toEqual(["Second", "Third"]);
+    expect(split.problems.map(({ index, reason }) => [index, reason])).toEqual([
+      [1, "several-masters"],
+      [2, "duplicate"],
+      [3, "several-masters"],
+    ]);
+  });
+
+  test("an exception of another kind goes with the object of its kind that left the UID", () => {
+    const split = splitCalendar(
+      calendar(
+        ["BEGIN:VTODO", "UID:m", "SUMMARY:A task", "END:VTODO"],
+        event("m", ["RRULE:FREQ=DAILY;COUNT=3"]),
+        event("m", ["RECURRENCE-ID:20261106T090000Z", "SUMMARY:Moved"]),
+      ),
+    );
+    expect(split.objects.map(({ uid, kind }) => [uid, kind])).toEqual([
+      ["m", "VTODO"],
+      ["m-2", "VEVENT"],
+    ]);
+    expect(CalendarObject.parse(split.objects[1]!.ics).exceptions).toHaveLength(1);
+  });
+
   test("a component whose END never came ends where the next begins; the rest of the file is read", () => {
     const text = calendar(event("a"), event("cut").slice(0, -1), event("b"), [
       "BEGIN:VTODO",
@@ -340,15 +380,37 @@ describe("a file from the device, forgiven what exporters get wrong (import D267
 
   test("a line broken without folding joins the text value before it as a line break", () => {
     const text = calendar(
-      event("a", ["DESCRIPTION:Call the office", "Dial-in: 555 0100", "PIN 1234"]),
+      event("a", ["DESCRIPTION:Call the office", "Dial in: 555 0100", "PIN 1234"]),
     );
     const [split] = splitCalendars(text, { newUid });
     expect(CalendarObject.parse(split!.objects[0]!.ics).master?.description).toBe(
-      "Call the office\nDial-in: 555 0100\nPIN 1234",
+      "Call the office\nDial in: 555 0100\nPIN 1234",
     );
     expect(split!.problems).toEqual([
       { index: 0, uid: "a", component: "VEVENT", reason: "joined-line", kept: true },
     ]);
+  });
+
+  test("any line that starts as a content line is a property, known to AstroTime or not (D7)", () => {
+    const after = [
+      "DESCRIPTION:Notes",
+      "LINK;LINKREL=latest-version:https://example.com/v2",
+      "CONCEPT:https://example.com/concepts/meeting",
+      "REFID:project-x",
+      "ESTIMATED-DURATION:PT1H",
+      "description:written in lower case",
+      "X-FOO;X-BAR=1:baz",
+      "Dial-in:555 0100",
+    ];
+    const [split] = splitCalendars(calendar(event("a", after)), { newUid });
+    expect(split!.problems).toEqual([]);
+    const names = new ICAL.Component(ICAL.parse(split!.objects[0]!.ics))
+      .getFirstSubcomponent("vevent")!
+      .getAllProperties()
+      .map((property) => property.name);
+    for (const name of ["link", "concept", "refid", "estimated-duration", "x-foo", "dial-in"])
+      expect(names, name).toContain(name);
+    expect(names.filter((name) => name === "description")).toHaveLength(2);
   });
 
   test("a stray line anywhere else is left out and named; nothing else changes", () => {

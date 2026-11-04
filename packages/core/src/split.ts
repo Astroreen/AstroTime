@@ -124,22 +124,13 @@ export function jcalText(json: unknown): string {
   }
 }
 
-/** A content line's start: a name, then its parameters or its value (RFC 5545 §3.1). */
+/**
+ * A content line's start (RFC 5545 §3.1): a name, an iana-token or an
+ * x-name (letters, digits, "-", in any case), then its parameters or its
+ * value. Any line that starts so is a property, known to AstroTime or not
+ * (D7).
+ */
 const CONTENT_LINE = /^([A-Za-z0-9-]+)[;:]/;
-
-/** The properties of RFC 5545 and its extensions (RFC 7986, 9073, 9074, 6638), and BEGIN and END. */
-const PROPERTIES = new Set(
-  (
-    "BEGIN END VERSION PRODID CALSCALE METHOD NAME DESCRIPTION UID LAST-MODIFIED URL " +
-    "REFRESH-INTERVAL SOURCE COLOR IMAGE CONFERENCE ATTACH CATEGORIES CLASS COMMENT GEO " +
-    "LOCATION PERCENT-COMPLETE PRIORITY RESOURCES STATUS SUMMARY COMPLETED DTEND DUE " +
-    "DTSTART DURATION FREEBUSY TRANSP TZID TZNAME TZOFFSETFROM TZOFFSETTO TZURL TZUNTIL " +
-    "TZID-ALIAS-OF ATTENDEE CONTACT ORGANIZER RECURRENCE-ID RELATED-TO EXDATE RDATE RRULE " +
-    "EXRULE ACTION REPEAT TRIGGER CREATED DTSTAMP SEQUENCE REQUEST-STATUS ACKNOWLEDGED " +
-    "PROXIMITY STRUCTURED-DATA STYLED-DESCRIPTION LOCATION-TYPE CALENDAR-ADDRESS " +
-    "PARTICIPANT-TYPE BUSYTYPE"
-  ).split(" "),
-);
 
 /** Properties whose value is free text, where a line break written as is belongs (RFC 5545 §3.3.11). */
 const TEXT = new Set(["SUMMARY", "DESCRIPTION", "LOCATION", "COMMENT", "CONTACT", "RESOURCES"]);
@@ -154,11 +145,11 @@ interface Line {
 
 /**
  * The text's lines, folds kept: a byte order mark, LF or CR line ends and
- * blank lines forgiven. A line that is no property of the calendar's
- * (a name not one of iCalendar's, upper case, or no name at all) after a
- * text value is that value's next line, broken without folding (Outlook's
- * descriptions, "Dial-in: 555 0100"): joined to it as the line break it
- * meant. Anywhere else it is a stray line, left out. Either is noted.
+ * blank lines forgiven. A line that is no content line (`CONTENT_LINE`)
+ * after a text value is that value's next line, broken without folding
+ * (Outlook's descriptions: "PIN 1234", "Dial in: 555 0100"): joined to it
+ * as the line break it meant. Anywhere else it is a stray line, left out.
+ * Either is noted.
  */
 function lines(text: string): Line[] {
   const result: Line[] = [];
@@ -174,16 +165,11 @@ function lines(text: string): Line[] {
       continue;
     }
     const name = CONTENT_LINE.exec(raw)?.[1];
-    const afterText = last !== null && isText(last.name);
-    const known =
-      name !== undefined &&
-      name === name.toUpperCase() &&
-      (PROPERTIES.has(name) || name.startsWith("X-"));
-    if (name !== undefined && (known || !afterText)) {
+    if (name !== undefined) {
       const line: Line = { text: raw, note: null };
       result.push(line);
       last = { line, name: name.toUpperCase() };
-    } else if (afterText) {
+    } else if (last !== null && isText(last.name)) {
       last!.line.text += `\\n${raw}`;
       last!.line.note = "joined";
     } else {
@@ -370,14 +356,21 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
   const groups = new Map<string, Group>();
   /** Objects of their own under a new UID: a second master, another kind. */
   const apart: Group[] = [];
+  /** Per UID of the file, the objects that left it, and every component seen under it. */
+  const families = new Map<string, { apart: Group[]; seen: Set<string> }>();
+  /** Every UID of the file, so one made for what left its own is none of them. */
+  const uids = new Set(
+    calendar.parts.map((part) => part.component?.getFirstPropertyValue("uid")).filter(Boolean),
+  );
   /** A UID for what had to leave its own: the caller's, else the same on every run. */
-  const taken = new Map<string, number>();
   const another = (uid: string) => {
     if (newUid) return newUid();
-    const n = (taken.get(uid) ?? 1) + 1;
-    taken.set(uid, n);
+    let n = 2;
+    while (uids.has(`${uid}-${n}`)) n++;
+    uids.add(`${uid}-${n}`);
     return `${uid}-${n}`;
   };
+  const isMaster = (component: ICAL.Component) => !component.hasProperty("recurrence-id");
   for (const part of calendar.parts) {
     const { component } = part;
     if (!component) {
@@ -395,32 +388,43 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
       problem(part, null, "no-uid", false);
       continue;
     }
+    const written = JSON.stringify(component.toJSON());
     const group = groups.get(uid);
     if (!group) {
       groups.set(uid, { uid, index: part.index, components: [component] });
+      families.set(uid, { apart: [], seen: new Set([written]) });
       continue;
     }
-    const written = JSON.stringify(component.toJSON());
-    if (group.components.some((other) => JSON.stringify(other.toJSON()) === written)) {
+    const family = families.get(uid)!;
+    // Given twice, under its own UID or as one that left it: kept once.
+    if (family.seen.has(written)) {
       problem(part, uid, "duplicate", true);
       continue;
     }
-    const master = !component.hasProperty("recurrence-id");
-    const reason =
-      component.name !== group.components[0]!.name
-        ? "mixed-kinds"
-        : master && group.components.some((other) => !other.hasProperty("recurrence-id"))
-          ? "several-masters"
-          : null;
-    if (!reason) {
+    family.seen.add(written);
+    // Its object: the first of its kind that takes it (an exception, or a
+    // master where there is none yet), the file's own first.
+    const home = [group, ...family.apart].find(
+      (one) =>
+        one.components[0]!.name === component.name &&
+        (!isMaster(component) || !one.components.some(isMaster)),
+    );
+    const reason = component.name !== group.components[0]!.name ? "mixed-kinds" : "several-masters";
+    if (home === group) {
       group.components.push(component);
       continue;
     }
     // Kept, as an object of its own: nothing the file says is lost (D272).
     problem(part, uid, reason, true);
-    const own = another(uid);
-    component.updatePropertyWithValue("uid", own);
-    apart.push({ uid: own, index: part.index, components: [component] });
+    if (home) {
+      component.updatePropertyWithValue("uid", home.uid);
+      home.components.push(component);
+      continue;
+    }
+    const own = { uid: another(uid), index: part.index, components: [component] };
+    component.updatePropertyWithValue("uid", own.uid);
+    family.apart.push(own);
+    apart.push(own);
   }
 
   const objects: SplitObject[] = [];
