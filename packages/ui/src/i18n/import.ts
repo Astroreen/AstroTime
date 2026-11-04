@@ -64,6 +64,18 @@ export const importStrings = {
     "import.tasksTo": "Tasks go to",
     "import.new": "New calendar on this device",
     "import.newList": "New list on this device",
+    "import.newOn": "New calendar on {{account}}",
+    "import.newListOn": "New list on {{account}}",
+    "import.notMade.offline":
+      "{{account}} cannot be reached, so its new calendar was not made and nothing was imported.",
+    "import.notMade.unsupported":
+      "The server of {{account}} makes no calendars, so nothing was imported.",
+    "import.notMade.refused":
+      "{{account}} did not allow the new calendar, so nothing was imported.",
+    "import.notMade.signed-out":
+      "Sign in to {{account}} again: its new calendar was not made, and nothing was imported.",
+    "import.notMade.failed":
+      "The new calendar on {{account}} was not made, so nothing was imported: {{message}}",
     "import.start": "Import",
     "import.cancel": "Cancel",
     "import.duplicates_one":
@@ -183,6 +195,17 @@ export const importStrings = {
     "import.tasksTo": "Задачи — в",
     "import.new": "Новый календарь на этом устройстве",
     "import.newList": "Новый список на этом устройстве",
+    "import.newOn": "Новый календарь в {{account}}",
+    "import.newListOn": "Новый список в {{account}}",
+    "import.notMade.offline":
+      "{{account}} недоступен: новый календарь не создан, ничего не импортировано.",
+    "import.notMade.unsupported":
+      "Сервер {{account}} не создаёт календари, ничего не импортировано.",
+    "import.notMade.refused": "{{account}} не разрешил создать календарь, ничего не импортировано.",
+    "import.notMade.signed-out":
+      "Войдите в {{account}} снова: новый календарь не создан, ничего не импортировано.",
+    "import.notMade.failed":
+      "Новый календарь в {{account}} не создан, ничего не импортировано: {{message}}",
     "import.start": "Импортировать",
     "import.cancel": "Отмена",
     "import.duplicates_one":

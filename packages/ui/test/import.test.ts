@@ -12,9 +12,11 @@ import {
   destinationOf,
   duplicatesOf,
   NEW,
+  newOn,
   runImport,
   type Choice,
   type Destination,
+  type Run,
 } from "../src/import/plan.ts";
 import { MAX_FILE_BYTES, NotImportableError, readImport, type Source } from "../src/import/read.ts";
 import { unzip } from "../src/import/zip.ts";
@@ -308,6 +310,7 @@ describe("an import written through the store (import D269–D271)", () => {
     duplicates: Awaited<ReturnType<typeof duplicatesOf>>,
     choice: Choice = "skip",
     stopAfter = Infinity,
+    make?: Run["make"],
   ) => {
     const progress: [number, number][] = [];
     return runImport({
@@ -317,6 +320,7 @@ describe("an import written through the store (import D269–D271)", () => {
       duplicates,
       choice,
       accountName: "On this device",
+      ...(make ? { make } : {}),
       newUid: () => `copy-${++uids}`,
       onProgress: (done, total) => progress.push([done, total]),
       stopped: () => progress.length > stopAfter,
@@ -720,5 +724,56 @@ describe("an import written through the store (import D269–D271)", () => {
     // On this device a change is final: nothing waits for a sync (D122).
     expect(await store.pending(made.id)).toEqual([]);
     expect(await store.tasks([made.id])).toHaveLength(1);
+  });
+
+  test("a new calendar on an account's server per kind, made first; its items go to it (D277)", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const asked: unknown[] = [];
+    const make: Run["make"] = async (accountId, wanted) => {
+      asked.push([accountId, wanted]);
+      return store.saveCalendar({
+        accountId,
+        url: `https://cloud.example.com/dav/made-${asked.length}/`,
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    };
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([
+      [source.id, { events: newOn(account.id), tasks: newOn(account.id) }],
+    ]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", Infinity, make);
+    // One calendar a kind: a CalDAV calendar holds one component (providers D275).
+    expect(asked).toEqual([
+      [account.id, { name: "Holidays", color: null, component: "VEVENT" }],
+      [account.id, { name: "Holidays", color: null, component: "VTODO" }],
+    ]);
+    const [events, tasks] = result.onServer;
+    expect(result).toMatchObject({ events: 1, tasks: 1 });
+    // Changes made here, which the sync uploads (D5).
+    expect((await store.pending(events!.id)).map((object) => object.uid)).toEqual(["new-year"]);
+    expect((await store.pending(tasks!.id)).map((object) => object.uid)).toEqual(["cards"]);
+    // Nothing made on this device.
+    expect(result.made.size).toBe(0);
+  });
+
+  test("a new calendar on a server that cannot be made: nothing is written, nothing made here", async () => {
+    const { store, personal } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: NEW }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const offline = Object.assign(new Error("offline"), { name: "OfflineError" });
+    await expect(
+      run(store, [source], destinations, duplicates, "skip", Infinity, async () => {
+        throw offline;
+      }),
+    ).rejects.toBe(offline);
+    expect(await store.pending(personal.id)).toEqual([]);
+    expect((await store.accounts()).map((one) => one.provider)).toEqual(["caldav"]);
   });
 });

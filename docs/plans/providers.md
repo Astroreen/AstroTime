@@ -879,10 +879,16 @@ marked _to be recorded_.
   only the calendars it had kept before it listed** (read from the store
   first), so one made while a sync runs, in this instance or another
   tab's, is never taken for a calendar deleted on the server: it is on
-  the server before it is kept, and the next listing names it.
+  the server before it is kept, and the next listing names it. **Its
+  limit**: a calendar kept by another sync after this one's look, and
+  then deleted on the server before this one's listing, stays until the
+  next sync removes it.
   `makesCalendars` says which accounts can: a CalDAV account's (the
-  calendar on this device is the store's own, a subscription makes none;
-  Google and Microsoft once wired). **CalDAV**: one `MKCALENDAR` (RFC 4791
+  calendar on this device is the store's own, a subscription makes none).
+  **Google's and Microsoft's `makeCalendar` are unreachable until they
+  are wired, on purpose**: `makesCalendars` stays CalDAV's, and
+  `makeCalendar` opens a provider with `connectCalDav`, until the sign-in
+  and `syncAll` take those accounts ([Deferred](#deferred)). **CalDAV**: one `MKCALENDAR` (RFC 4791
   §5.3.1) in the calendar home, with `displayname`, Apple's
   `calendar-color` and the `supported-calendar-component-set` of its one
   component, as Nextcloud's own apps make one (Calendar's calendars of
@@ -914,7 +920,9 @@ marked _to be recorded_.
   to Outlook. **Google**: its CalDAV makes none, so the Calendar API's
   `calendars.insert` (`summary`, under the `calendar` scope already asked)
   makes a calendar of events, at the address Google documents for its
-  collection (`/caldav/v2/<id>/events/`, to be recorded once wired); the
+  collection (`/caldav/v2/<id>/events/`), **to be recorded against
+  Google's CalDAV listing** once wired: a listing that spells it otherwise
+  would keep a second calendar and remove the one made; the
   Tasks API's `tasklists.insert` (`title`) a task list. Neither keeps the
   colour asked.
 
