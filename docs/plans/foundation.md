@@ -285,7 +285,12 @@ Decided while building PR 2.
   VTIMEZONE's rules differ from today's IANA data (an old or custom one, a
   historical date), the instant is the VTIMEZONE's and the wall clock in
   `timeZone` may differ from the written one, as for any VTIMEZONE named
-  with an IANA name.
+  with an IANA name. An item whose ends are in two zones ical.js holds as
+  wall clocks (a flight from Berlin to New York) lasts as long as their
+  instants say, not their wall clocks. A defined TZID `Intl` does not know
+  is read on a wall clock (a series moved, its `UNTIL`'s day) with the
+  series' own offset (`wallClockNear`, `epochNear` in `time.ts`): exact
+  but across a DST change between the two.
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
@@ -298,7 +303,11 @@ Decided while building PR 2.
   its occurrence, as Google shows it. A `RECURRENCE-ID` written as another
   kind of time than the series' start (a date for a zoned series, a floating
   time for a zoned one) matches by wall clock, or by day when one side is a
-  date.
+  date. An exception made for an occurrence (`exceptionOf`) names it on
+  the series' wall clock: at its instant when the occurrence is named in
+  another zone (an `RDATE` in UTC beside a series in Berlin), as written
+  in the series' own zone (an occurrence in a DST gap too); an end in a
+  zone of its own stays in that zone, at its instant.
 
 ### Sync
 
@@ -310,7 +319,12 @@ Decided while building PR 2.
   [D37](#D37)) a deletion of ours comes back, reported. A deletion of ours
   the server refuses because the object changed there is dropped: the object
   comes back as the server has it. An edit of an object deleted on this
-  device before the deletion is uploaded revives it as an update. Otherwise
+  device before the deletion is uploaded revives it as an update; one made
+  while the deletion is on its way stays, and the server's deletion then
+  drops it, reported. A creation of ours that a listing names before its
+  upload is known to have landed (the server stored it, then answered an
+  error) is not stored as a second object: the listing leaves it and keeps
+  its token, and the next upload finds the href taken by it. Otherwise
   the store never lets the
   server's version overwrite a pending local change; the sync engine (PR 4)
   is the one place that applies these rules.
@@ -373,8 +387,10 @@ Decided while building PR 4.
   `/dav-proxy/https%3A%2F%2Fcloud.example.com/remote.php/dav/` on its own
   origin. The handler (`proxyHandler` in `@astrotime/caldav`) passes only the
   headers CalDAV needs, maps redirects back into its URL space, and refuses
-  origins off its allowlist. It serves the app's own pages only: a request
-  with another `Origin`, or that the browser marks cross-site, is refused, so
+  origins off its allowlist (an `http://` origin on it, with no port, lets
+  its host's `https://` through too, as its upgrade redirect passes). It
+  serves the app's own pages only: a request with another `Origin`, or that
+  the browser marks cross-site, is refused, so
   a page elsewhere cannot use it to reach the servers behind it. The host is
   compared, not the scheme, so it works behind a TLS terminator. A caller
   that is not a browser sends neither header and passes: the check keeps
@@ -1120,7 +1136,9 @@ Decided while building PR 6's reminders as notifications ([D9](#D9),
   set computed on waking: each platform shows such a one within its own
   grace (the web 5 minutes, [D101](#D101); the desktop an hour,
   [desktop D76](desktop.md#D76)) and drops it after; one turned off,
-  deleted or edited away is not in the new set, so it never shows.
+  deleted or edited away is not in the new set, so it never shows. One
+  shown that leaves the set and comes back within its grace (a task ticked
+  done and unticked) is not shown again, on every platform.
   - **What notifies.** `ACTION:DISPLAY` and `AUDIO`; an alarm without
     `ACTION` reads as `DISPLAY`. `EMAIL` is not ours (a server such as
     Nextcloud sends it), `NONE` (RFC 9074, Apple's placeholder) and
@@ -1351,6 +1369,8 @@ Decided while building PR 6a.
     undefined). Weekdays shift by as many days (Monday, Wednesday and
     Friday a day later are Tuesday, Thursday and Saturday; "weekly on
     Tuesday" becomes "on Wednesday"); the start's nth weekday of its month
+    (the first to the fifth, or the last to the fifth from last; any other
+    `BYDAY` position is no preset, and the rule is kept as written)
     becomes the new day's, as the repeat menu names it (the 2nd Tuesday
     moved to the 18th is the 3rd Wednesday, a day in the month's last week
     the last); the start's day of the month (`BYMONTHDAY`) and a yearly
@@ -1767,8 +1787,12 @@ Found by the logic QA after v0.2.0 (the owner's feedback: "silly logic
 errors").
 
 - **D141. A series' set is RFC 5545's where ical.js strays.**
-  `seriesStarts` (`recurrence.ts`, [D118](#D118)) follows RFC 5545 in four
+  `seriesStarts` (`recurrence.ts`, [D118](#D118)) follows RFC 5545 in five
   places where ical.js does not:
+  - **A date `UNTIL` on a series of times** (RFC 5545 forbids it, older
+    clients write it) ends with its day, as libical reads it: ical.js ended
+    the series at that day's midnight, before its last occurrence, while
+    the edit dialog said "until" that day. The rule as written is kept.
   - **A UTC `UNTIL` bounds by its instant** in a zone the object does not
     define ([D32](#D32): Google's and Outlook's TZID with no VTIMEZONE).
     ical.js has such a `DTSTART` as a wall clock and compared the `UNTIL`
@@ -2278,6 +2302,32 @@ task?"
 
 ## Deferred
 
+- **A creation whose upload keeps failing, listed by the server**
+  ([D38](#D38)) — it stays pending and reported, and every sync keeps its
+  token and lists the calendar again until the upload recognises the
+  object as its own (or another's, which then wins and ours goes to the
+  Conflicts list); a server that keeps refusing the write (a 500, a 403)
+  makes each sync a full listing for as long, with no cap or backoff.
+  The token is kept on purpose: advanced, the server's object would never
+  be listed again, and a local deletion of the pending creation (which
+  removes it at once, D38) would leave it unseen on this device.
+- **A second edit made while an update's server copy is found gone**
+  ([D38](#D38)) — the server's deletion wins and the href is reported in
+  `dropped`, but that second edit goes with it, not left pending as a
+  deletion in flight leaves one.
+- **A VTIMEZONE-only zone across DST** ([D32](#D32)) — a zone `Intl`
+  does not know (`Customized Time Zone`) is read on a wall clock with the
+  series' own offset (`wallClockNear`, `epochNear`), wherever `edits.ts`
+  and `repeat.ts` need one: a series moved, a RECURRENCE-ID in UTC put on
+  its clock and ordered, the `UNTIL` before an occurrence, the day an
+  `UNTIL` ends on. On the far side of a DST change each is an hour off;
+  reading through the object's VTIMEZONE (ical.js's `convertToZone`) would
+  be exact. Before, each of these threw.
+- **A weekly series with ends in two undefined zones across DST**
+  ([D32](#D32)) — its length is the first occurrence's, by instant, so
+  in the weeks where the two zones' DST rules differ (Europe's and the US'
+  in March and October) an occurrence's end is an hour off its written
+  wall clock in the end's zone.
 - **"This and following" from an RDATE its rule does not make**
   ([D105](#D105)) — the new series starts on the RDATE's day, and an
   `RRULE` that leaves its days to `DTSTART` (no `BYDAY`, `BYMONTHDAY`,

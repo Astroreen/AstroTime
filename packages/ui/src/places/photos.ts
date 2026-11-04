@@ -172,7 +172,13 @@ const STREETS = new Set(
 export function isAddress(name: string): boolean {
   if (/\p{N}/u.test(name)) return true;
   const words = foldForSearch(name).match(/[\p{L}\p{N}-]+/gu) ?? [];
-  return words.length === 0 || words.some((word) => STREETS.has(word));
+  // "St" first is a saint's ("St Paul's Cathedral"); after a name, a street's.
+  return (
+    words.length === 0 ||
+    words.some(
+      (word, index) => STREETS.has(word) && !(index === 0 && word === "st" && words.length > 1),
+    )
+  );
 }
 
 /** The keys a place is kept under: its language, name and point rounded as asked. */

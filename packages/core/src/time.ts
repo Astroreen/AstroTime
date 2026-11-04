@@ -61,6 +61,14 @@ export function zoneOrigin(time: ICAL.Time): ZoneOrigin {
   return timeZone ? { kind: "undefined", timeZone } : { kind: "floating" };
 }
 
+/** @internal Whether two times' zones come from the same place, as `zoneOrigin` finds them. */
+export function sameOrigin(a: ICAL.Time, b: ICAL.Time): boolean {
+  const one = zoneOrigin(a);
+  const other = zoneOrigin(b);
+  if (one.kind !== other.kind) return false;
+  return !("timeZone" in one) || one.timeZone === (other as typeof one).timeZone;
+}
+
 /** Converts an ical.js time, its zone as `zoneOrigin` finds it. */
 export function fromIcalTime(time: ICAL.Time): ItemTime {
   const origin = zoneOrigin(time);
@@ -216,6 +224,27 @@ export function zonedToEpoch(local: string, timeZone: string): number {
 export function zonedTime(local: string, timeZone: string): Extract<ItemTime, { type: "zoned" }> {
   const epochMs = timeZone === "UTC" ? Date.parse(`${local}Z`) : zonedToEpoch(local, timeZone);
   return { type: "zoned", local, timeZone, epochMs };
+}
+
+/**
+ * @internal The wall clock of an instant in the zone of `reference`. A zone
+ * `Intl` does not know (a VTIMEZONE's own name, `Customized Time Zone`)
+ * takes the reference's offset: exact but across a DST change between them.
+ */
+export function wallClockNear(
+  epochMs: number,
+  reference: Extract<ItemTime, { type: "zoned" }>,
+): string {
+  if (isKnownTimeZone(reference.timeZone)) return wallClockIn(epochMs, reference.timeZone);
+  const offset = wallClockAsUtc(reference.local) - reference.epochMs;
+  return new Date(epochMs + offset).toISOString().slice(0, 19);
+}
+
+/** @internal The instant a wall clock names in the zone of `reference`, as `wallClockNear` reads one. */
+export function epochNear(local: string, reference: Extract<ItemTime, { type: "zoned" }>): number {
+  if (reference.timeZone === "UTC") return wallClockAsUtc(local);
+  if (isKnownTimeZone(reference.timeZone)) return zonedToEpoch(local, reference.timeZone);
+  return wallClockAsUtc(local) - (wallClockAsUtc(reference.local) - reference.epochMs);
 }
 
 /** The wall clock at which a time shows to a user in `timeZone`. */

@@ -251,6 +251,10 @@ export function androidReminders(options: {
     for (const [id, entry] of Object.entries(kept.scheduled)) {
       if (ids.has(id)) continue;
       gone.push(entry.id);
+      // Due already: its alarm is cancelled all the same (Doze may still hold
+      // an inexact one), and its record kept while a set could still hold it
+      // (the late window), so one that leaves and comes back is not shown twice.
+      if (entry.fireAt !== null && entry.fireAt < at && at - entry.fireAt <= LATE_MS) continue;
       forget.push(id);
     }
     // The plugin would ask on every set without the permission. What left

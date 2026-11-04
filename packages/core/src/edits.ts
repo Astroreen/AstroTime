@@ -14,7 +14,7 @@ import { point, readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
-import { fromIcalTime, keepTzid, wallClockIn, zonedToEpoch, type ItemTime } from "./time.ts";
+import { epochNear, fromIcalTime, keepTzid, wallClockNear, type ItemTime } from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
 
 /** Refuses a colour `COLOR` cannot take before anything is written (D174). */
@@ -577,12 +577,9 @@ function withLocal(template: ItemTime, local: string): ItemTime {
     type: "zoned",
     local,
     timeZone: template.timeZone,
-    epochMs: epochOf(local, template.timeZone),
+    epochMs: epochNear(local, template),
   };
 }
-
-const epochOf = (local: string, timeZone: string) =>
-  timeZone === "UTC" ? Date.parse(`${local}Z`) : zonedToEpoch(local, timeZone);
 
 /** A time's wall clock as milliseconds, read as if it were UTC; a date at its midnight. */
 const wallMs = (time: ItemTime) =>
@@ -640,7 +637,7 @@ function inFrameOf(time: ItemTime, frame: ItemTime): ItemTime {
     return time;
   return {
     type: "zoned",
-    local: wallClockIn(time.epochMs, frame.timeZone),
+    local: wallClockNear(time.epochMs, frame),
     timeZone: frame.timeZone,
     epochMs: time.epochMs,
   };
@@ -650,7 +647,7 @@ function inFrameOf(time: ItemTime, frame: ItemTime): ItemTime {
 function orderKey(time: ItemTime, frame: ItemTime | null): string {
   if (time.type === "date") return `${time.date}T00:00:00`;
   if (time.type === "zoned" && frame?.type === "zoned" && frame.timeZone !== time.timeZone) {
-    return wallClockIn(time.epochMs, frame.timeZone);
+    return wallClockNear(time.epochMs, frame);
   }
   return time.local;
 }
@@ -1108,7 +1105,7 @@ function untilBefore(recurrenceId: ItemTime, anchor: ItemTime): ICAL.Time {
     time.adjust(0, 0, 0, -1);
     return time;
   }
-  return utc((at.type === "zoned" ? at.epochMs : epochOf(local, anchor.timeZone)) - 1000);
+  return utc((at.type === "zoned" ? at.epochMs : epochNear(local, anchor)) - 1000);
 }
 
 /**

@@ -240,14 +240,17 @@ async function upload(
         : etag === GONE
           ? { ok: true, href, etag: null }
           : await provider.remove(href, etag);
+    // Removed only if still our deletion: an edit made meanwhile revived it (D38)
+    // and stays pending; the next sync finds it gone and reports it dropped.
+    const removeOurs = () => store.removeManyFromServer([{ id: object.id, pending: "delete" }]);
     if (result.ok) {
-      await store.removeObject(object.id);
+      await removeOurs();
       report.uploaded++;
     } else {
       // Changed on the server since: the change wins over our deletion (D38).
       const server = await provider.fetch(href);
       if (server) await saveServerVersion(store, calendar, server, report, object);
-      else await store.removeObject(object.id);
+      else await removeOurs();
     }
     return;
   }
@@ -382,9 +385,12 @@ async function download(
     string,
     { id: string; etag: string | null; pending: StoredObject["pending"] }
   >();
+  /** Creations not known to have reached the server, kept under an href relative to it. */
+  const creating = new Set<string>();
   for (const entry of await store.hrefs(calendar.id)) {
     // A creation that has not reached the server is not the server's to remove.
     if (entry.pending !== "create") local.set(absolute(calendar, entry.href), entry);
+    else creating.add(absolute(calendar, entry.href));
   }
   const known = new Map([...local].map(([href, entry]) => [href, entry.etag]));
 
@@ -393,6 +399,12 @@ async function download(
   /** The server's versions of objects with no change of ours: stored in batches. */
   const plain: RemoteObject[] = [];
   for (const object of changes.changed) {
+    // Our creation, there already though its upload failed: not stored as a
+    // second row; the next sync's upload finds it taken and recognises it.
+    if (creating.has(object.href)) {
+      keepToken = true;
+      continue;
+    }
     const mine = local.get(object.href);
     if (mine && mine.pending !== "none") {
       // Our own change is still pending (its upload was refused); it is

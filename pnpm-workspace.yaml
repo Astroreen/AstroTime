@@ -30,6 +30,8 @@ catalog:
   # The newest major nixpkgs has, so the dev shell runs the same one (docs/plans/desktop.md#D70).
   electron: 44.10.0
   electron-builder: 26.18.0
+  # Exact: packages/caldav/src/xml.ts passes its own entityDecoder, written to
+  # this version's interface; a bump re-checks it (and its tests in xml.test.ts).
   fast-xml-parser: 5.11.2
   i18next: 26.5.12
   "@sqlite.org/sqlite-wasm": 3.54.1-build1

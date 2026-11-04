@@ -221,7 +221,9 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
         break;
       }
       if (indentOf(next) >= indent) body.push(dropColumns(next, indent));
-      else if (ITEM.test(next) || interrupts(next)) break;
+      // The list's next item ends this one; any other list only where it may
+      // cut a paragraph short ("2019. was a good year" carries it on).
+      else if (sibling(next, ordered) || interrupts(next)) break;
       // A lazy line carries the item's paragraph on; an empty item has none ("-" then words).
       else if (body.at(-1)?.trim()) body.push(next);
       else break;
@@ -237,6 +239,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     if (i < lines.length && BLANK.test(lines[i]!) && ITEM.test(lines[i + 1] ?? "")) i++;
   }
   return [{ type: "list", start: ordered ? Number.parseInt(first[2]!, 10) : null, items }, i];
+}
+
+/** Whether a line is an item of the same kind of list: bulleted, or numbered. */
+function sibling(line: string, ordered: boolean): boolean {
+  const marker = ITEM.exec(line);
+  return marker !== null && /\d/.test(marker[2]!) === ordered;
 }
 
 /** The schemes a link may have: the web, mail and the phone. */
