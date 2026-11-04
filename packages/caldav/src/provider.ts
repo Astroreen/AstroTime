@@ -6,6 +6,7 @@ import {
   ServerBusyError,
   type CalendarRights,
   type Changes,
+  type NewCalendar,
   type Person,
   type Provider,
   type RemoteCalendar,
@@ -206,6 +207,15 @@ export class CalDavProvider implements Provider {
         .filter((r) => this.own(r.href, response.url) !== null)
         .map((r) => toCalendar(r, response.url))
     );
+  }
+
+  /**
+   * A new calendar in the home (`MKCALENDAR`, providers D275), its code
+   * loaded when one is made (`make.ts`).
+   */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const { mkcalendar } = await import("./make.ts");
+    return mkcalendar(this.homeUrl, (request, accept) => this.request(request, accept), calendar);
   }
 
   async changes(

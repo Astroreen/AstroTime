@@ -4,6 +4,7 @@
 import {
   ALL_RIGHTS,
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -158,6 +159,21 @@ export function todoFieldsOf(
 const todoIn = (ics: string) =>
   (componentsOf(ics)[0]?.components ?? []).find((component) => component.name === "VTODO") ?? null;
 
+/** A To Do list as Graph lists it (only what AstroTime reads). */
+interface TodoList {
+  readonly id: string;
+  readonly displayName?: string;
+}
+
+/** A To Do list as a calendar of tasks: listed and made alike. */
+const listOf = (list: TodoList): RemoteCalendar => ({
+  url: `${GRAPH}me/todo/lists/${encodeURIComponent(list.id)}/tasks/`,
+  name: list.displayName ?? "",
+  color: null,
+  components: ["VTODO"],
+  rights: ALL_RIGHTS,
+});
+
 /** A Microsoft account's To Do lists, as a provider. */
 export class MicrosoftTodo implements Provider {
   private readonly graph: Graph;
@@ -170,16 +186,17 @@ export class MicrosoftTodo implements Provider {
   }
 
   async calendars(): Promise<RemoteCalendar[]> {
-    const lists = await this.graph.all<{ id: string; displayName?: string }>(
-      `${GRAPH}me/todo/lists`,
-    );
-    return lists.map((list) => ({
-      url: `${GRAPH}me/todo/lists/${encodeURIComponent(list.id)}/tasks/`,
-      name: list.displayName ?? "",
-      color: null,
-      components: ["VTODO"],
-      rights: ALL_RIGHTS,
-    }));
+    const lists = await this.graph.all<TodoList>(`${GRAPH}me/todo/lists`);
+    return lists.map(listOf);
+  }
+
+  /** A new To Do list (`POST /me/todo/lists`, providers D275); To Do keeps no colour. */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const { value } = await this.graph.json<TodoList>("POST", `${GRAPH}me/todo/lists`, {
+      body: { displayName: calendar.name },
+    });
+    if (!value?.id) throw new Error("Graph made a list and named no id.");
+    return listOf(value);
   }
 
   async changes(

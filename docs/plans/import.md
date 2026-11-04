@@ -367,5 +367,20 @@ D274.
 Done when: the e2e exports a demo calendar, reads the download, and
 imports it back to find every item already there.
 
+### PR I7 — Calendars made on a server account
+
+`Provider.makeCalendar` with CalDAV's `MKCALENDAR`, Graph's and Google's
+creates, and `makeCalendar` in `@astrotime/sync/calendars`, which keeps
+the calendar here. [providers D275](providers.md#D275).
+
+Done when: a calendar and a task list are made on Radicale, Baïkal,
+Xandikos, DAViCal and Nextcloud and listed where they were kept; a sync
+whose listing came first does not remove one; nothing is made offline.
+
+### PR I8 — "+ New list" and a new calendar on an account
+
+The tasks screen's "+ New list" ([design D95](design.md#D95)) and
+import's "new calendar on <account>" ([D269](#D269)), through PR I7.
+
 Each converter's PR: its recorded or documented sample files, what maps
 and what is said as not imported (D272), its own chunk (D273).

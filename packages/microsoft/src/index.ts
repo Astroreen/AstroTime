@@ -3,9 +3,11 @@
 // Graph, in one provider that sends each call to the part whose address it
 // names. Loaded only with a Microsoft account (D255).
 import type { HttpClient, TokenSource } from "@astrotime/caldav";
+import { CannotMakeCalendarError } from "@astrotime/core/new-calendar";
 import {
   PartialListing,
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -61,6 +63,14 @@ export class MicrosoftProvider implements Provider {
     throw new PartialListing((tasks as PromiseFulfilledResult<RemoteCalendar[]>).value, [
       { prefix: CALENDARS, error: events.reason },
     ]);
+  }
+
+  /** Events in a new Outlook calendar, tasks in a new To Do list (providers D275). */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const part = calendar.component === "VTODO" ? this.tasks : this.events;
+    if (!part.makeCalendar)
+      throw new CannotMakeCalendarError("unsupported", "This part of the account makes none.");
+    return part.makeCalendar(calendar);
   }
 
   changes(

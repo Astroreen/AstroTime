@@ -127,6 +127,37 @@ describe.each(servers)(
       expect(keepsFiles(a.provider.homeUrl)).toBe(serverName === "Nextcloud");
     });
 
+    test("a calendar and a task list made here are on the server, listed where they were kept, with their names, colour and kind (providers D275)", async () => {
+      const a = await device(server, calendarName());
+      const name = calendarName();
+      const asked = [
+        { name: `${name} Работа & co`, color: "#4f8fd6", component: "VEVENT" },
+        { name: `${name} list`, color: null, component: "VTODO" },
+      ] as const;
+      const made = [];
+      try {
+        for (const calendar of asked) made.push(await a.provider.makeCalendar(calendar));
+        const listed = await a.provider.calendars();
+        for (const [i, calendar] of made.entries()) {
+          const found = listed.find((one) => one.url === calendar.url);
+          expect(found, calendar.url).toBeDefined();
+          // DAViCal keeps `&` and `<` as the XML spelled them (`&amp;`), whatever
+          // sets the name (MKCALENDAR, PROPPATCH): its own, said in D275.
+          expect(found!.name).toBe(
+            serverName === "DAViCal" ? asked[i]!.name.replace("&", "&amp;") : asked[i]!.name,
+          );
+          expect(found!.components).toContain(asked[i]!.component);
+          expect(found!.rights).toEqual({ create: true, edit: true, delete: true });
+        }
+        // A server that keeps Apple's colour keeps the one asked.
+        const [events] = made;
+        const colour = listed.find((one) => one.url === events!.url)!.color;
+        if (colour !== null) expect(colour.toLowerCase()).toBe("#4f8fd6");
+      } finally {
+        for (const calendar of made) await server.deleteCalendar(calendar.url);
+      }
+    });
+
     // Nextcloud only: the tests know its sharing; Radicale's rights are a config file (fixtures cover them).
     test.runIf(serverName === "Nextcloud")(
       "a calendar shared read-only grants nothing, one shared read-write everything; a new item in the first waits (D37)",
