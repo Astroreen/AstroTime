@@ -678,6 +678,46 @@ describe("the scope of an edit of one occurrence (D11)", () => {
     expect(split).toContain("RRULE:FREQ=WEEKLY;COUNT=6;BYDAY=TU,TH\r\n");
   });
 
+  test("this and following: a COUNT spent before the occurrence stays, so the series gains none", () => {
+    // Two Mondays, then an RDATE on December 7: its COUNT ended before it.
+    const twice = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "SUMMARY:Gym",
+      "RRULE:FREQ=WEEKLY;COUNT=2",
+      "RDATE;TZID=Europe/Vilnius:20261207T090000",
+    ]);
+    const recurrenceId = vilnius("2026-12-07T09:00:00");
+    const deleted = deleteItem(CalendarObject.parse(twice), {
+      now: NOW,
+      scope: "following",
+      recurrenceId,
+    })!;
+    expect(deleted).toContain("RRULE:FREQ=WEEKLY;COUNT=2\r\n");
+    expect(starts(deleted)).toEqual(["2026-11-02T09:00:00", "2026-11-09T09:00:00"]);
+    // Of two rules, the one spent stays; the other ends before the occurrence.
+    const gym = calendar([
+      "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+      "DTEND;TZID=Europe/Vilnius:20261102T100000",
+      "SUMMARY:Gym",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      "RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU",
+    ]);
+    const { ics } = editItem(
+      CalendarObject.parse(gym),
+      { location: "Hall" },
+      { now: NOW, scope: "following", recurrenceId: vilnius("2026-11-23T09:00:00"), newUid: "v2" },
+    );
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU\r\n");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-03T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-10T09:00:00",
+      "2026-11-16T09:00:00",
+    ]);
+  });
+
   test("this and following moves the exceptions and EXDATEs after it to the new series", () => {
     const { ics, split } = editItem(
       series(),
@@ -1349,6 +1389,56 @@ describe("deleting with a scope (D11)", () => {
     ]);
   });
 
+  test("this occurrence, the last that shows: the object goes (D142)", () => {
+    // Three Mondays: the first excluded, the second cancelled by an exception.
+    const three = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T100000",
+        "RRULE:FREQ=WEEKLY;COUNT=3",
+        "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261109T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261109T090000",
+        "DTEND;TZID=Europe/Vilnius:20261109T100000",
+        "STATUS:CANCELLED",
+      ],
+    );
+    expect(starts(three)).toEqual(["2026-11-16T09:00:00"]);
+    const last = { now: NOW, scope: "this", recurrenceId: vilnius("2026-11-16T09:00:00") } as const;
+    expect(deleteItem(CalendarObject.parse(three), last)).toBeNull();
+    // With one that still shows, the object stays.
+    const two = edit(three, [["STATUS:CANCELLED", null]]);
+    expect(starts(deleteItem(CalendarObject.parse(two), last)!)).toEqual(["2026-11-09T09:00:00"]);
+  });
+
+  test("this occurrence, the last of the rule's: an exception an EXDATE names too still shows, so the object stays (D34, D142)", () => {
+    // Two Mondays: the first excluded, yet an exception for it, moved to Tuesday, shows.
+    const two = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T100000",
+        "RRULE:FREQ=WEEKLY;COUNT=2",
+        "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261102T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261103T120000",
+        "DTEND;TZID=Europe/Vilnius:20261103T130000",
+      ],
+    );
+    expect(starts(two)).toEqual(["2026-11-03T12:00:00", "2026-11-09T09:00:00"]);
+    const ics = deleteItem(CalendarObject.parse(two), {
+      now: NOW,
+      scope: "this",
+      recurrenceId: vilnius("2026-11-09T09:00:00"),
+    });
+    // What deleting leaves is what the views show.
+    expect(ics).not.toBeNull();
+    expect(starts(ics!)).toEqual(["2026-11-03T12:00:00"]);
+  });
+
   test("this occurrence of a series of dates: an EXDATE as a date", () => {
     const ics = deleteItem(load("tasksorg-task-recurring.ics"), {
       now: NOW,
@@ -1533,6 +1623,111 @@ describe("a series' corners (D142)", () => {
     ]);
     // As the other client wrote it (AGENTS.md rule 2).
     expect(split).toContain("EXDATE;TZID=America/New_York:20261116T090000\r\n");
+  });
+
+  test("an occurrence named in UTC: this and following starts the new series at its instant, on the series' clock", () => {
+    // Another client's exception names 9 November at 9:00 in Vilnius as 7:00 UTC.
+    const named = object(
+      [...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=4"],
+      [
+        "RECURRENCE-ID:20261109T070000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261109T090000",
+        "DTEND;TZID=Europe/Vilnius:20261109T100000",
+        "SUMMARY:Lesson (own)",
+      ],
+    );
+    const recurrenceId = zonedTime("2026-11-09T07:00:00", "UTC");
+    const { ics, split } = editItem(
+      named,
+      { description: "Bring the book" },
+      { now: NOW, scope: "following", recurrenceId, newUid: "v2" },
+    );
+    expect(starts(ics)).toEqual(["2026-11-02T09:00:00"]);
+    expect(split).toContain("DTSTART;TZID=Europe/Vilnius:20261109T090000\r\n");
+    expect(starts(split!)).toEqual([
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+    // An exception made for an occurrence named in UTC is at that instant too.
+    const plain = object([...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=4"]);
+    const once = editItem(
+      plain,
+      { summary: "Lesson (once)" },
+      { now: NOW, scope: "this", recurrenceId: zonedTime("2026-11-16T07:00:00", "UTC") },
+    ).ics;
+    expect(once).toContain("RECURRENCE-ID;TZID=Europe/Vilnius:20261116T090000\r\n");
+    expect(starts(once)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-09T09:00:00",
+      "2026-11-16T09:00:00",
+      "2026-11-23T09:00:00",
+    ]);
+  });
+
+  test("all: a new end alone moves no EXDATE, RDATE or RECURRENCE-ID: each stays as written", () => {
+    const exdate = "EXDATE:20261116T070000Z,20261123T070000Z";
+    const rdate = "RDATE;TZID=America/New_York:20261104T090000";
+    const series = object(
+      [...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=6", exdate, rdate],
+      [
+        "RECURRENCE-ID:20261109T070000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261109T120000",
+        "DTEND;TZID=Europe/Vilnius:20261109T130000",
+        "LAST-MODIFIED:20261002T000000Z",
+        "SUMMARY:Lesson (moved)",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261130T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261130T090000",
+        "DTEND;TZID=Europe/Vilnius:20261130T100000",
+        "SUMMARY:Lesson (renamed)",
+      ],
+    );
+    const { ics } = editItem(
+      series,
+      { time: { start: vilnius("2026-11-02T09:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    const lines = contentLines(ics);
+    expect(lines).toContain(exdate);
+    expect(lines).toContain(rdate);
+    expect(lines).toContain("RECURRENCE-ID:20261109T070000Z");
+    // The exception moved on its own is not touched; the one that follows is two hours long too.
+    expect(lines).toContain("LAST-MODIFIED:20261002T000000Z");
+    expect(lines).toContain("DTEND;TZID=Europe/Vilnius:20261130T110000");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-04T16:00:00",
+      "2026-11-09T12:00:00",
+      "2026-11-30T09:00:00",
+      "2026-12-07T09:00:00",
+    ]);
+  });
+
+  test("all: an hour later moves the EXDATEs at a time, not those of a date, which stay as written (D35, D142)", () => {
+    // Another client excluded two Mondays by their date (D35), this one a third by its time.
+    const dates = "EXDATE;VALUE=DATE:20261116,20261130";
+    const series = object([
+      ...mondays,
+      "SUMMARY:Lesson",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      dates,
+      "EXDATE;TZID=Europe/Vilnius:20261123T090000",
+    ]);
+    const { ics } = editItem(
+      series,
+      { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    const lines = contentLines(ics);
+    expect(lines).toContain(dates);
+    expect(lines).toContain("EXDATE;TZID=Europe/Vilnius:20261123T100000");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T10:00:00",
+      "2026-11-09T10:00:00",
+      "2026-12-07T10:00:00",
+    ]);
   });
 
   test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
