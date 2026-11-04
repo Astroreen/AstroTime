@@ -127,8 +127,7 @@ not carry is said, not dropped in silence.
   holds that kind, or a **new calendar on this device** named after the
   source, with the source's colour. The first offered is a calendar of
   the same name if one exists, else the one new items go to. A new
-  calendar on a server account needs `MKCALENDAR`, which no provider has
-  yet: [Deferred](#deferred).
+  calendar on a server account: [D277](#D277).
 
 - **D270. The same UID already there.** In the target calendar, an object
   with the same UID that is the same item ([`sameObjects`](foundation.md#D107))
@@ -217,11 +216,34 @@ not carry is said, not dropped in silence.
   case, `COM` and `LPT` with superscript digits too, at most 100 characters,
   else `calendar.ics`). Built last (I6), as it is cheap once import exists.
 
+- **D277. A new calendar on an account's server.** Beside "New calendar
+  on this device", each kind's choice offers "New calendar on <account>"
+  ("New list on <account>" for tasks) for every account a calendar can be
+  made on ([providers D275](providers.md#D275)'s `makesCalendars`: a
+  CalDAV account's), named and coloured as the source. They are made when
+  "Import" is pressed, before anything is written, one calendar a kind
+  (a CalDAV calendar holds one component, as D275 makes it), through
+  `makeCalendar`; the items then go to them as changes made here, which
+  the sync uploads ([D5](foundation.md#D5)). One that cannot be made
+  (offline, a server that makes none, refused, signed out) stops the
+  import before anything is written, said in words naming the account
+  (`CalendarNotMadeError`: only a calendar's making is blamed on its
+  account, never a later failure);
+  on any failure, the calendars already made on a server stay there, as
+  made (AstroTime does not delete calendars), and are named with it: on a
+  calendar not made (`CalendarNotMadeError`), on anything else that stops
+  the import (`ImportStoppedError`, the base, with the failure as its
+  cause), and in what came of an import that ended on a write's error or
+  was stopped (`Imported.onServer`), each "“Team” on <account>", joined
+  as the language joins a list (`Intl.ListFormat`). A calendar made on
+  this device for the same run goes again as before. A new calendar
+  chosen on an account removed meanwhile goes back to one on this device
+  (the accounts are read live while the dialog is open). On Radicale in
+  the e2e (`new-list.spec.ts`): two `MKCALENDAR`, both named as the file,
+  then its three items uploaded.
+
 ## Deferred
 
-- **New calendars on a server account** (D269): `MKCALENDAR` for CalDAV,
-  each provider's own call for the others; import offers existing
-  calendars and new ones on this device until then.
 - **xCal (RFC 6321)** (D266): no exporter people use writes it; it would
   need an XML reader in the import chunk. Comes when a user has such a
   file.
@@ -379,8 +401,14 @@ whose listing came first does not remove one; nothing is made offline.
 
 ### PR I8 — "+ New list" and a new calendar on an account
 
-The tasks screen's "+ New list" ([design D95](design.md#D95)) and
-import's "new calendar on <account>" ([D269](#D269)), through PR I7.
+The tasks screen's "+ New list" ([design D276](design.md#D276)) and
+import's "new calendar on <account>" ([D277](#D277)), through PR I7.
+
+Done when: "+ New list" makes a list on Radicale (one `MKCALENDAR`) and
+shows it, and on this device with no account; an import makes its new
+calendar and list on Radicale and uploads its items to them; the first
+load grows by what [design D276](design.md#D276) records (0.24 KiB, an
+exception the orchestrator accepted for the owner), not the usual 0.1.
 
 Each converter's PR: its recorded or documented sample files, what maps
 and what is said as not imported (D272), its own chunk (D273).

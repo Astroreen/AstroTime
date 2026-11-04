@@ -4,17 +4,22 @@
 // already there that differ, writes through the store in batches with a
 // count and "Stop", and says what came of it. Loaded with its first opening
 // (D273), its strings with it.
-import type { Calendar } from "@astrotime/storage";
+import type { Account, Calendar } from "@astrotime/storage";
 import type { SplitProblem } from "@astrotime/core/split";
 import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { liveQuery } from "../calendar/live.ts";
+import { makeCalendarAt, placesOf } from "../calendar/make.ts";
 import { addImportStrings } from "../i18n/import.ts";
+import { failureWords, keptWords } from "../import/failure.ts";
 import {
+  accountOfNew,
   destinationOf,
   duplicatesOf,
   NEW,
+  newOn,
   runImport,
   targetsFor,
   type Choice,
@@ -29,6 +34,7 @@ import {
   type ReadFile,
   type Source,
 } from "../import/read.ts";
+import { accountName } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { Dot } from "./color-select.tsx";
 import { CheckCircleIcon, CloseIcon, PlusIcon } from "./icons.tsx";
@@ -60,7 +66,9 @@ export function ImportDialog({
 }) {
   const { t, i18n } = useTranslation();
   addImportStrings(i18n);
-  const { store, timeZone, scheduler } = useAccounts();
+  const { store, platform, timeZone, scheduler } = useAccounts();
+  // The accounts a new calendar can be made on, on their servers (D277).
+  const [servers, setServers] = useState<readonly Account[]>([]);
   const [step, setStep] = useState<Step>({ name: "reading" });
   const [destinations, setDestinations] = useState<ReadonlyMap<string, Destination>>(new Map());
   const stop = useRef(false);
@@ -72,6 +80,22 @@ export function ImportDialog({
   const phase = useRef<"idle" | "checking" | "asked" | "running">("idle");
   const [checking, setChecking] = useState(false);
   const titleId = useId();
+
+  useEffect(() => {
+    if (!file) return;
+    // Live: an account removed meanwhile is no longer offered, and a new
+    // calendar chosen on it goes back to one on this device.
+    return liveQuery(
+      store,
+      () => store.accounts(),
+      (all) => {
+        const places = placesOf(all);
+        setServers(places);
+        setDestinations((chosen) => withoutGone(chosen, places));
+      },
+      () => setServers([]),
+    );
+  }, [file, store]);
 
   // The file read once it is picked; a closing leaves what a late read brings.
   useEffect(() => {
@@ -110,6 +134,11 @@ export function ImportDialog({
     // Read once per file: the calendars offered later do not read it again.
   }, [file]);
 
+  /** An account's name, as the choices name it. */
+  const nameOf = (accountId: string) => {
+    const account = servers.find((one) => one.id === accountId);
+    return account ? accountName(account, t) : accountId;
+  };
   const start = (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
     if (phase.current !== "checking" && phase.current !== "asked") return;
     phase.current = "running";
@@ -122,6 +151,8 @@ export function ImportDialog({
       duplicates,
       choice,
       accountName: t("local.account"),
+      make: (accountId, calendar) =>
+        makeCalendarAt(store, platform, accountId, calendar, t("local.account")),
       newUid: () => crypto.randomUUID(),
       onProgress: (done, total) => setStep({ name: "importing", done, total }),
       stopped: () => stop.current,
@@ -132,7 +163,10 @@ export function ImportDialog({
         void scheduler.requested();
       },
       (error: unknown) =>
-        setStep({ name: "failed", message: t("import.failed", { message: String(error) }) }),
+        setStep({
+          name: "failed",
+          message: failureWords(t, i18n.resolvedLanguage ?? i18n.language, error, nameOf),
+        }),
     );
   };
 
@@ -197,6 +231,7 @@ export function ImportDialog({
               <Preview
                 read={step.read}
                 calendars={calendars}
+                servers={servers}
                 colorOf={colorOf}
                 destinations={destinations}
                 onChange={(id, destination) =>
@@ -206,7 +241,22 @@ export function ImportDialog({
             ) : null}
             {step.name === "asking" ? <Asking duplicates={step.duplicates} /> : null}
             {step.name === "importing" ? <Progress done={step.done} total={step.total} /> : null}
-            {step.name === "done" ? <Done result={step.result} /> : null}
+            {step.name === "done" ? (
+              <Done
+                result={step.result}
+                kept={
+                  step.result.error || step.result.stopped
+                    ? keptWords(
+                        t,
+                        i18n.resolvedLanguage ?? i18n.language,
+                        step.result.onServer,
+                        nameOf,
+                        "import.keptOnServer",
+                      )
+                    : null
+                }
+              />
+            ) : null}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line px-3 py-3 sm:px-5">
             {step.name === "preview" ? (
@@ -283,12 +333,14 @@ async function readPicked(
 function Preview({
   read,
   calendars,
+  servers,
   colorOf,
   destinations,
   onChange,
 }: {
   read: ReadFile;
   calendars: readonly Calendar[];
+  servers: readonly Account[];
   colorOf: (calendar: Calendar) => string;
   destinations: ReadonlyMap<string, Destination>;
   onChange: (id: string, destination: Destination) => void;
@@ -311,6 +363,7 @@ function Preview({
           key={source.id}
           source={source}
           calendars={calendars}
+          servers={servers}
           colorOf={colorOf}
           destination={destinations.get(source.id) ?? { events: null, tasks: null }}
           onChange={(destination) => onChange(source.id, destination)}
@@ -324,12 +377,14 @@ function Preview({
 function SourceCard({
   source,
   calendars,
+  servers,
   colorOf,
   destination,
   onChange,
 }: {
   source: Source;
   calendars: readonly Calendar[];
+  servers: readonly Account[];
   colorOf: (calendar: Calendar) => string;
   destination: Destination;
   onChange: (destination: Destination) => void;
@@ -367,6 +422,12 @@ function SourceCard({
       label: `${t(kind === "event" ? "import.new" : "import.newList")}: ${source.name}`,
       leading: <PlusIcon className="size-4 shrink-0 text-ink-muted" />,
     },
+    // On an account's server, made there when the import starts (D277).
+    ...servers.map((account) => ({
+      value: newOn(account.id),
+      label: `${t(kind === "event" ? "import.newOn" : "import.newListOn", { account: accountName(account, t) })}: ${source.name}`,
+      leading: <PlusIcon className="size-4 shrink-0 text-ink-muted" />,
+    })),
   ];
   const select = "h-10 w-full min-w-0 rounded-lg bg-raised pr-1 pl-2 sm:w-64";
   return (
@@ -516,7 +577,28 @@ function Progress({ done, total }: { done: number; total: number }) {
   );
 }
 
-function Done({ result }: { result: Imported }) {
+/** Each source's destinations, a new calendar on an account no longer offered taken back to this device. */
+function withoutGone(
+  chosen: ReadonlyMap<string, Destination>,
+  places: readonly Account[],
+): ReadonlyMap<string, Destination> {
+  const kept = (target: string | null) => {
+    const account = target === null ? null : accountOfNew(target);
+    return account === null || places.some((one) => one.id === account) ? target : NEW;
+  };
+  let changed = false;
+  const next = new Map<string, Destination>();
+  for (const [id, destination] of chosen) {
+    const events = kept(destination.events);
+    const tasks = kept(destination.tasks);
+    changed ||= events !== destination.events || tasks !== destination.tasks;
+    next.set(id, { events, tasks });
+  }
+  return changed ? next : chosen;
+}
+
+/** What came of an import; `kept`, the calendars it made on servers before it ended early. */
+function Done({ result, kept }: { result: Imported; kept: string | null }) {
   const { t } = useTranslation();
   const lines = [
     [
@@ -559,6 +641,7 @@ function Done({ result }: { result: Imported }) {
           {t("import.failedPart", { message: result.error })}
         </p>
       ) : null}
+      {kept ? <p className="text-note text-ink-muted">{kept}</p> : null}
     </div>
   );
 }

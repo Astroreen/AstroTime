@@ -4,22 +4,27 @@
 // the UIDs already there found first; then the writes through the store, as
 // changes made here (D5), a batch a transaction, the page given back
 // between batches, stopped between them when asked.
-import { ALL_RIGHTS, sameObjects } from "@astrotime/core";
+import { sameObjects, type NewCalendar } from "@astrotime/core";
 import { overlay, withUid } from "@astrotime/core/split";
-import {
-  LOCAL_SERVER,
-  type Calendar,
-  type Component,
-  type Store,
-  type StoredObject,
-} from "@astrotime/storage";
+import type { Calendar, Component, Store, StoredObject } from "@astrotime/storage";
 
+import { addDeviceCalendar } from "../calendar/device-calendar.ts";
 import { calendarsFor, firstCalendarFor } from "../calendar/editing.ts";
 import type { ImportItem, Source } from "./read.ts";
 
-/** An existing calendar's id, or `NEW`: a new calendar on this device named after the source. */
+/**
+ * An existing calendar's id; `NEW`, a new calendar on this device named
+ * after the source; or `newOn(account)`, a new one on that account's
+ * server (D277).
+ */
 type Target = string;
 export const NEW = "new";
+const ON = "new:";
+export const newOn = (accountId: string) => `${ON}${accountId}`;
+/** The account a target makes its new calendar on; `null` for any other. */
+export const accountOfNew = (target: Target) =>
+  target.startsWith(ON) ? target.slice(ON.length) : null;
+const isNew = (target: Target) => target === NEW || target.startsWith(ON);
 
 /** Per source, where its events and its tasks go; none for a kind it has not. */
 export interface Destination {
@@ -96,7 +101,7 @@ export async function duplicatesOf(
 ): Promise<Duplicates> {
   const byTarget = new Map<string, ImportItem[]>();
   for (const { item, target } of placed(sources, destinations)) {
-    if (target === NEW) continue;
+    if (isNew(target)) continue;
     byTarget.set(target, [...(byTarget.get(target) ?? []), item]);
   }
   const existing = new Map<string, StoredObject>();
@@ -144,6 +149,8 @@ export interface Imported {
   readonly cleanup: string | null;
   /** The calendars made on this device, by source. */
   readonly made: ReadonlyMap<string, Calendar>;
+  /** The calendars made on an account's server (D277): they stay there, as made. */
+  readonly onServer: readonly Calendar[];
 }
 
 export interface Run {
@@ -154,48 +161,12 @@ export interface Run {
   readonly choice: Choice;
   /** The account a new calendar on this device goes on, if none is there, is named so. */
   readonly accountName: string;
+  /** Makes a calendar on an account's server now (`makeCalendar`, providers D275), for `newOn`. */
+  readonly make?: (accountId: string, calendar: NewCalendar) => Promise<Calendar>;
   readonly newUid: () => string;
   readonly onProgress: (done: number, total: number) => void;
   readonly stopped: () => boolean;
   readonly pause?: () => Promise<void>;
-}
-
-/**
- * A new calendar on this device (D269): on the account of provider `local`,
- * made (named `names.account`) when there is none, under an address of its
- * own, so it keeps its name and never steps aside as the first one does
- * (`Store.removeLocalCalendarIfUnused`, foundation D122). Here, with the
- * import, not in the store, which loads with the app.
- */
-async function addDeviceCalendar(
-  store: Store,
-  names: {
-    readonly account: string;
-    readonly calendar: string;
-    readonly color: string | null;
-    readonly components: readonly Component[];
-  },
-  /** Called with the account's id when this call made it. */
-  madeAccount: (id: string) => void,
-): Promise<Calendar> {
-  let local = (await store.accounts()).find((account) => account.provider === "local");
-  if (!local) {
-    local = await store.addAccount({
-      provider: "local",
-      name: names.account,
-      serverUrl: LOCAL_SERVER,
-      username: null,
-    });
-    madeAccount(local.id);
-  }
-  return store.saveCalendar({
-    accountId: local.id,
-    url: `${LOCAL_SERVER}${crypto.randomUUID()}/`,
-    name: names.calendar,
-    color: names.color,
-    components: names.components,
-    rights: ALL_RIGHTS,
-  });
 }
 
 /**
@@ -216,16 +187,76 @@ async function unmake(
     await store.removeAccount(calendar.accountId);
 }
 
+/**
+ * An import that stopped on a failure after it made calendars on servers
+ * (D277): `cause` is the failure; `kept` the calendars made, which stay
+ * there, empty.
+ */
+export class ImportStoppedError extends Error {
+  override name = "ImportStoppedError";
+  readonly kept: readonly Calendar[];
+  constructor(message: string, cause: unknown, kept: readonly Calendar[]) {
+    super(message, { cause });
+    this.kept = kept;
+  }
+}
+
+/**
+ * A new calendar on an account's server was not made (D277): nothing was
+ * written; `cause` says why, and `kept` names the calendars this run made
+ * on servers before it, which stay there.
+ */
+export class CalendarNotMadeError extends ImportStoppedError {
+  override name = "CalendarNotMadeError";
+  readonly accountId: string;
+  constructor(accountId: string, cause: unknown, kept: readonly Calendar[]) {
+    super(`No calendar was made on ${accountId}.`, cause, kept);
+    this.accountId = accountId;
+  }
+}
+
 export const BATCH = 200;
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve));
 
 export async function runImport(run: Run): Promise<Imported> {
+  // On a server, one calendar per kind (a CalDAV calendar holds one
+  // component, providers D275), made first: one that cannot be made stops
+  // the import before anything is written. One made stays on its server,
+  // as made there, whatever then stops the import, and is named with the
+  // failure (`ImportStoppedError`), or in what came of it (`onServer`).
+  const onServer = new Map<string, Calendar>();
+  try {
+    return await importInto(run, onServer);
+  } catch (error) {
+    if (onServer.size === 0 || error instanceof ImportStoppedError) throw error;
+    throw new ImportStoppedError("The import stopped.", error, [...onServer.values()]);
+  }
+}
+
+async function importInto(run: Run, onServer: Map<string, Calendar>): Promise<Imported> {
   const { store, duplicates, choice } = run;
   const pause = run.pause ?? yieldToPage;
   // A new calendar on this device per source that asks for one, taking what goes to it.
   const made = new Map<string, Calendar>();
   /** The device accounts this run made, which alone it may take back. */
   const ownAccounts = new Set<string>();
+  for (const source of run.sources) {
+    const to = run.destinations.get(source.id);
+    for (const [kind, component] of [
+      ["events", "VEVENT"],
+      ["tasks", "VTODO"],
+    ] as const) {
+      const account = to?.[kind] ? accountOfNew(to[kind]) : null;
+      if (account === null) continue;
+      if (!run.make) throw new Error("No calendar can be made on a server here.");
+      const calendar = await run
+        .make(account, { name: source.name, color: source.color, component })
+        .catch((error: unknown) => {
+          throw new CalendarNotMadeError(account, error, [...onServer.values()]);
+        });
+      onServer.set(`${source.id}\n${kind}`, calendar);
+    }
+  }
   try {
     for (const source of run.sources) {
       const to = run.destinations.get(source.id);
@@ -272,7 +303,12 @@ export async function runImport(run: Run): Promise<Imported> {
   let again = 0;
   const all = placed(run.sources, run.destinations).map(({ item, source, target }) => ({
     item,
-    calendarId: target === NEW ? made.get(source.id)!.id : target,
+    calendarId:
+      target === NEW
+        ? made.get(source.id)!.id
+        : accountOfNew(target) !== null
+          ? onServer.get(`${source.id}\n${item.kind === "event" ? "events" : "tasks"}`)!.id
+          : target,
     key: keyOf(target, item.uid),
   }));
   // The copies' new UIDs, made first, so a copied subtask names its copied
@@ -446,5 +482,6 @@ export async function runImport(run: Run): Promise<Imported> {
     error,
     cleanup,
     made,
+    onServer: [...onServer.values()],
   };
 }

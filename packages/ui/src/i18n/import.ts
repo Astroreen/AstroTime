@@ -64,6 +64,28 @@ export const importStrings = {
     "import.tasksTo": "Tasks go to",
     "import.new": "New calendar on this device",
     "import.newList": "New list on this device",
+    "import.newOn": "New calendar on {{account}}",
+    "import.newListOn": "New list on {{account}}",
+    "import.notMade.offline":
+      "{{account}} cannot be reached, so its new calendar was not made and nothing was imported.",
+    "import.notMade.unsupported":
+      "The server of {{account}} makes no calendars, so nothing was imported.",
+    "import.notMade.refused":
+      "{{account}} did not allow the new calendar, so nothing was imported.",
+    "import.notMade.signed-out":
+      "Sign in to {{account}} again: its new calendar was not made, and nothing was imported.",
+    "import.notMade.busy": "{{account}} is busy, so nothing was imported. Try again later.",
+    "import.notMade.no-name": "A new calendar needs a name, so nothing was imported.",
+    "import.notMade.no-server": "Calendars cannot be made on {{account}}, so nothing was imported.",
+    "import.notMade.answered":
+      "{{account}} answered with an error ({{status}}), so nothing was imported.",
+    "import.notMade.failed":
+      "The new calendar on {{account}} was not made because of an error, so nothing was imported.",
+    "import.notMade.kept_one": "Made before that, and kept: {{names}}.",
+    "import.notMade.kept_other": "Made before that, and kept: {{names}}.",
+    "import.keptOnServer_one": "Made for this import, and kept: {{names}}.",
+    "import.keptOnServer_other": "Made for this import, and kept: {{names}}.",
+    "import.keptItem": "“{{name}}” on {{account}}",
     "import.start": "Import",
     "import.cancel": "Cancel",
     "import.duplicates_one":
@@ -183,6 +205,31 @@ export const importStrings = {
     "import.tasksTo": "Задачи — в",
     "import.new": "Новый календарь на этом устройстве",
     "import.newList": "Новый список на этом устройстве",
+    "import.newOn": "Новый календарь в {{account}}",
+    "import.newListOn": "Новый список в {{account}}",
+    "import.notMade.offline":
+      "{{account}} недоступен: новый календарь не создан, ничего не импортировано.",
+    "import.notMade.unsupported":
+      "Сервер {{account}} не создаёт календари, ничего не импортировано.",
+    "import.notMade.refused": "{{account}} не разрешил создать календарь, ничего не импортировано.",
+    "import.notMade.signed-out":
+      "Войдите в {{account}} снова: новый календарь не создан, ничего не импортировано.",
+    "import.notMade.busy": "{{account}} занят, ничего не импортировано. Попробуйте позже.",
+    "import.notMade.no-name": "У нового календаря должно быть название, ничего не импортировано.",
+    "import.notMade.no-server":
+      "В {{account}} нельзя создавать календари, ничего не импортировано.",
+    "import.notMade.answered": "{{account}} ответил ошибкой ({{status}}), ничего не импортировано.",
+    "import.notMade.failed":
+      "Новый календарь в {{account}} не создан из-за ошибки, ничего не импортировано.",
+    "import.notMade.kept_one": "Создан до этого и остался: {{names}}.",
+    "import.notMade.kept_few": "Созданы до этого и остались: {{names}}.",
+    "import.notMade.kept_many": "Созданы до этого и остались: {{names}}.",
+    "import.notMade.kept_other": "Созданы до этого и остались: {{names}}.",
+    "import.keptOnServer_one": "Создан для этого импорта и остался: {{names}}.",
+    "import.keptOnServer_few": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptOnServer_many": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptOnServer_other": "Созданы для этого импорта и остались: {{names}}.",
+    "import.keptItem": "«{{name}}» в {{account}}",
     "import.start": "Импортировать",
     "import.cancel": "Отмена",
     "import.duplicates_one":

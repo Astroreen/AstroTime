@@ -9,12 +9,16 @@ import { describe, expect, test } from "vite-plus/test";
 import { decodeText } from "../src/import/decode.ts";
 import {
   BATCH,
+  CalendarNotMadeError,
   destinationOf,
+  ImportStoppedError,
   duplicatesOf,
   NEW,
+  newOn,
   runImport,
   type Choice,
   type Destination,
+  type Run,
 } from "../src/import/plan.ts";
 import { MAX_FILE_BYTES, NotImportableError, readImport, type Source } from "../src/import/read.ts";
 import { unzip } from "../src/import/zip.ts";
@@ -308,6 +312,7 @@ describe("an import written through the store (import D269–D271)", () => {
     duplicates: Awaited<ReturnType<typeof duplicatesOf>>,
     choice: Choice = "skip",
     stopAfter = Infinity,
+    make?: Run["make"],
   ) => {
     const progress: [number, number][] = [];
     return runImport({
@@ -317,6 +322,7 @@ describe("an import written through the store (import D269–D271)", () => {
       duplicates,
       choice,
       accountName: "On this device",
+      ...(make ? { make } : {}),
       newUid: () => `copy-${++uids}`,
       onProgress: (done, total) => progress.push([done, total]),
       stopped: () => progress.length > stopAfter,
@@ -720,5 +726,188 @@ describe("an import written through the store (import D269–D271)", () => {
     // On this device a change is final: nothing waits for a sync (D122).
     expect(await store.pending(made.id)).toEqual([]);
     expect(await store.tasks([made.id])).toHaveLength(1);
+  });
+
+  test("a new calendar on an account's server per kind, made first; its items go to it (D277)", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const asked: unknown[] = [];
+    const make: Run["make"] = async (accountId, wanted) => {
+      asked.push([accountId, wanted]);
+      return store.saveCalendar({
+        accountId,
+        url: `https://cloud.example.com/dav/made-${asked.length}/`,
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    };
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([
+      [source.id, { events: newOn(account.id), tasks: newOn(account.id) }],
+    ]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "skip", Infinity, make);
+    // One calendar a kind: a CalDAV calendar holds one component (providers D275).
+    expect(asked).toEqual([
+      [account.id, { name: "Holidays", color: null, component: "VEVENT" }],
+      [account.id, { name: "Holidays", color: null, component: "VTODO" }],
+    ]);
+    const [events, tasks] = result.onServer;
+    expect(result).toMatchObject({ events: 1, tasks: 1 });
+    // Changes made here, which the sync uploads (D5).
+    expect((await store.pending(events!.id)).map((object) => object.uid)).toEqual(["new-year"]);
+    expect((await store.pending(tasks!.id)).map((object) => object.uid)).toEqual(["cards"]);
+    // Nothing made on this device.
+    expect(result.made.size).toBe(0);
+  });
+
+  test("a new calendar on a server that cannot be made: nothing is written, nothing made here", async () => {
+    const { store, personal } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: NEW }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const offline = Object.assign(new Error("offline"), { name: "OfflineError" });
+    await expect(
+      run(store, [source], destinations, duplicates, "skip", Infinity, async () => {
+        throw offline;
+      }),
+    ).rejects.toEqual(expect.objectContaining({ accountId: account.id, cause: offline }));
+    expect(await store.pending(personal.id)).toEqual([]);
+    expect((await store.accounts()).map((one) => one.provider)).toEqual(["caldav"]);
+  });
+
+  test("tried again elsewhere, a failure that is no calendar's making is not blamed on the account", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year")));
+    const onServer = new Map([[source.id, { events: newOn(account.id), tasks: null }]]);
+    const refused = await run(
+      store,
+      [source],
+      onServer,
+      await duplicatesOf(store, [source], onServer),
+      "skip",
+      Infinity,
+      async () => {
+        throw new Error("refused");
+      },
+    ).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(CalendarNotMadeError);
+    // Again, to a new calendar on this device, which cannot be kept: its own error.
+    const here = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const full = new Error("The disk is full.");
+    store.saveCalendar = async () => {
+      throw full;
+    };
+    const again = await run(store, [source], here, await duplicatesOf(store, [source], here)).catch(
+      (error: unknown) => error,
+    );
+    expect(again).toBe(full);
+    expect(again).not.toBeInstanceOf(CalendarNotMadeError);
+  });
+
+  test("one calendar made on the server, the next not: the error names the one made, kept there", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    const destinations = new Map([
+      [source.id, { events: newOn(account.id), tasks: newOn(account.id) }],
+    ]);
+    const busy = Object.assign(new Error("busy"), { name: "ServerBusyError" });
+    const make: Run["make"] = async (accountId, wanted) => {
+      if (wanted.component === "VTODO") throw busy;
+      return store.saveCalendar({
+        accountId,
+        url: "https://cloud.example.com/dav/holidays/",
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    };
+    const failure = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      make,
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(CalendarNotMadeError);
+    const { accountId, cause, kept } = failure as CalendarNotMadeError;
+    expect({ accountId, cause }).toEqual({ accountId: account.id, cause: busy });
+    expect(kept.map((one) => [one.name, one.url])).toEqual([
+      ["Holidays", "https://cloud.example.com/dav/holidays/"],
+    ]);
+    // Nothing written to it.
+    expect(await store.pending(kept[0]!.id)).toEqual([]);
+  });
+
+  test("a write that fails after a calendar was made on the server: the calendar is named with the failure", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year")));
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: null }]]);
+    const make: Run["make"] = (accountId, wanted) =>
+      store.saveCalendar({
+        accountId,
+        url: "https://cloud.example.com/dav/holidays/",
+        name: wanted.name,
+        color: wanted.color,
+        components: [wanted.component],
+        rights: ALL_RIGHTS,
+      });
+    store.changeLocal = (() =>
+      Promise.reject(new Error("The disk is full."))) as typeof store.changeLocal;
+    const { result } = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      make,
+    );
+    expect(result.error).toBe("The disk is full.");
+    expect(result.onServer.map((one) => one.name)).toEqual(["Holidays"]);
+  });
+
+  test("anything that stops the import after a calendar was made on the server carries it", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year"), todo("cards")));
+    // Events to a new calendar on the server, tasks to one on this device, which cannot be kept.
+    const destinations = new Map([[source.id, { events: newOn(account.id), tasks: NEW }]]);
+    const real = store.saveCalendar.bind(store);
+    const full = new Error("The disk is full.");
+    store.saveCalendar = (async (wanted) =>
+      wanted.url.startsWith("local:")
+        ? Promise.reject(full)
+        : real(wanted)) as typeof store.saveCalendar;
+    const failure = await run(
+      store,
+      [source],
+      destinations,
+      await duplicatesOf(store, [source], destinations),
+      "skip",
+      Infinity,
+      (accountId, wanted) =>
+        store.saveCalendar({
+          accountId,
+          url: "https://cloud.example.com/dav/holidays/",
+          name: wanted.name,
+          color: wanted.color,
+          components: [wanted.component],
+          rights: ALL_RIGHTS,
+        }),
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ImportStoppedError);
+    expect(failure).not.toBeInstanceOf(CalendarNotMadeError);
+    expect((failure as ImportStoppedError).cause).toBe(full);
+    expect((failure as ImportStoppedError).kept.map((one) => one.name)).toEqual(["Holidays"]);
   });
 });

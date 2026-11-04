@@ -285,7 +285,8 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/foundation.md#D92`, `plans/foundation.md#D122`,
       `plans/foundation.md#D123`, `plans/design.md#D137`
     - `tasks-screen.tsx` — the tasks screen, in the view's place on a wide
-      screen, from the top bar's calendar | tasks switch.
+      screen, from the top bar's calendar | tasks switch, its "+ New list"
+      (`plans/design.md#D276`).
       → `plans/design.md#D95`, `plans/design.md#D227`; `task-motion.ts`,
       its tasks sliding to where they are when they change, loaded with it.
       → `plans/design.md#D197`
@@ -366,9 +367,13 @@ When you add a package, app or module, add its line here in the same PR.
       `.ics`; `save-file.ts`, a file saved where the platform saves files
       or downloaded, the attachments' too. → `plans/import.md#D274`
     - `import-dialog.tsx` — Settings' "Import from a file" and its dialog:
-      the preview of each source, where it goes, the question about items
-      already there, the progress and the summary; loaded with its first
-      opening. → `plans/import.md#D265`, `plans/import.md#D268`
+      the preview of each source, where it goes (a new calendar on an
+      account's server too), the question about items already there, the
+      progress and the summary; loaded with its first opening.
+      → `plans/import.md#D265`, `plans/import.md#D268`, `plans/import.md#D277`
+    - `new-list-dialog.tsx` — the tasks screen's "+ New list": a name and
+      where, made on the account's server or on this device; loaded with
+      its first opening. → `plans/design.md#D276`
     - `mention-field.tsx` — the edit dialog's description, where "@"
       offers the account's people and writes a mention.
       → `plans/design.md#D208`
@@ -377,6 +382,12 @@ When you add a package, app or module, add its line here in the same PR.
       map and its two icons at the end of the line, the map and the
       address tappable. → `plans/design.md#D175`, `plans/design.md#D177`,
       `plans/design.md#D238`
+  - `calendar/make.ts` — a calendar or list made where chosen (an
+    account's server through `@astrotime/sync/calendars`, or this device),
+    and why one was not, in a dialog's words (`calendar/place.ts`, with
+    `DEVICE`); `calendar/device-calendar.ts`, a calendar on this device's
+    account. Loaded with what makes one.
+    → `plans/design.md#D276`, `plans/import.md#D277`
   - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
     the UI shows them, the calendar on this device named in the language
     spoken now. → `plans/foundation.md#D122`
@@ -466,7 +477,8 @@ When you add a package, app or module, add its line here in the same PR.
     (`plans/providers.md#D262`), `subscribe.ts`, the sign-in dialog's
     subscription and a held removal (`plans/providers.md#D263`), `data.ts`
     and `import.ts`, Settings' "Data" group's and the import dialog's
-    (`plans/import.md#D273`).
+    (`plans/import.md#D273`), `new-list.ts`, "+ New list"'s
+    (`plans/design.md#D276`).
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
