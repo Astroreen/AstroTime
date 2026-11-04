@@ -2397,7 +2397,9 @@ own (below).
   file inline where there are no files: [Deferred](#deferred).
 - **D238. The place's line, two icons at its end** (the owner's 5, round
   5: "'Open on map' and 'Copy address' I would make plain icons on the
-  same line as the address, two icons at the end of the line"). The
+  same line as the address, two icons at the end of the line. Tapping
+  the map does the same as 'Open on map', tapping the address text does
+  the same as 'Copy address'"). The
   details' place (D177) puts "Open in maps" and "Copy address" as icon
   buttons at the end of its first line, 48 px each (Material's 48 dp
   touch target), each with its tooltip; the place's first line and its
@@ -2408,7 +2410,8 @@ own (below).
   A tap on the map opens it in maps, as the icon does (on Android the
   same `geo:` intent, which the emulator's maps app took); a single tap
   or click on the address copies it once 300 ms pass with no second
-  click and nothing selected, while a long press, a drag, a double or a
+  click and none of the address selected (text selected elsewhere, in
+  the description, stops nothing), while a long press, a drag, a double or a
   triple click selects its text as any text, and copies nothing. The map's tap
   target lies over it out of the keyboard's order and the accessibility
   tree, and the address is text: the icon buttons are the actions for

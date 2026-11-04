@@ -223,6 +223,20 @@ test("Copy address copies the text and says so; refused, the notice says it was 
   await page.keyboard.press("Escape");
   await expect(tapped).toHaveCount(0);
 
+  // Text selected elsewhere, in the description, does not stop a tap on
+  // the address: only the address's own selection is selecting it.
+  await page.evaluate(() => navigator.clipboard.writeText(""));
+  const elsewhere = await open();
+  await elsewhere.getByText("Room 4, second floor").click();
+  await elsewhere.getByText(/^The new month view\./).evaluate((element) => {
+    getSelection()?.selectAllChildren(element);
+  });
+  await page.clock.runFor(500);
+  await expect(elsewhere.getByRole("status")).toHaveText("Copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  await page.keyboard.press("Escape");
+  await expect(elsewhere).toHaveCount(0);
+
   // A drag across it, a double or a triple click select it, as text,
   // and copy nothing.
   const selecting = await open();

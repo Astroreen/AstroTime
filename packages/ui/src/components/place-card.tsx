@@ -83,8 +83,13 @@ export function PlaceCard({
           onClick={(event) => {
             clearTimeout(pending.current);
             if (event.detail !== 1) return;
+            const line = event.currentTarget;
             pending.current = setTimeout(() => {
-              if (document.getSelection()?.isCollapsed !== false) copy();
+              // Only text selected in the address itself is the user selecting it.
+              const selection = document.getSelection();
+              const selecting =
+                selection !== null && !selection.isCollapsed && selection.containsNode(line, true);
+              if (!selecting) copy();
             }, SECOND_CLICK_MS);
           }}
         >
