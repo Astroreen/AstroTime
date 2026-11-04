@@ -720,7 +720,8 @@ marked _to be recorded_.
   twice (a brute-force guard's count is the user's, not ours). What is
   kept, and that rule, load with Digest (`digest.ts`, `taken` and
   `answerChallenge`), so the first load grows by 138 bytes (127 520 to 127 658 on main
-  `50a5593`), 36 over a PR's 0.1 KiB ([foundation D145](foundation.md#D145)):
+  `50a5593`), 36 over a PR's 0.1 KiB, an exception the owner delegated
+  ([foundation D145](foundation.md#D145)):
   the price of a scheme bound to its origin and forgotten with its
   account, which the review asked for; it is won back by CalDAV loading
   with its first account ([D255](#D255)), the PR after this one. The Baïkal recording shows

@@ -67,7 +67,13 @@ export function taken(
 ): void {
   if (answered !== authorization.scheme || response.status < 200 || response.status > 299) return;
   const { origin } = new URL(url);
-  if (answered && authorization.remembered && new URL(response.url || url).origin === origin)
+  // Basic or a Digest challenge only: a bearer is an OAuth account's, never kept.
+  if (
+    answered &&
+    answered !== "bearer" &&
+    authorization.remembered &&
+    new URL(response.url || url).origin === origin
+  )
     Object.assign(authorization.remembered, { scheme: answered, origin });
 }
 

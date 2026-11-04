@@ -540,3 +540,39 @@ test("a wrong password on a server whose 401 offers Digest and Basic: one Digest
   );
   expect(digest.sent).toEqual(["Basic", "Digest"]);
 });
+
+test("a bearer is never remembered: a renewed token leaves the slot empty, and a password recalling one sends no token", async () => {
+  let token = "old";
+  let renewed = 0;
+  const tokens = {
+    token: async () => token,
+    renew: async () => {
+      renewed += 1;
+      token = "new";
+      return true;
+    },
+  };
+  const sent: (string | null)[] = [];
+  const http: HttpClient = async (asked) => {
+    const header = asked.headers["Authorization"] ?? null;
+    sent.push(header);
+    const ok = header === "Bearer new" || header === `Basic ${btoa("astro:secret")}`;
+    return {
+      status: ok ? 207 : 401,
+      url: asked.url,
+      header: (name) =>
+        name.toLowerCase() === "www-authenticate" && !ok ? 'Bearer realm="r"' : null,
+      body: "",
+    };
+  };
+  const slot: RememberedScheme = {};
+  await send(http, new Authorization(tokens, slot), propfind("https://dav.example/"), []);
+  expect(sent).toEqual(["Bearer old", "Bearer new"]);
+  expect(slot).toEqual({});
+  // A slot holding one anyway (belt and braces): a password's account signs with Basic, no token asked.
+  sent.length = 0;
+  const odd: RememberedScheme = { scheme: "bearer", origin: "https://dav.example" };
+  await send(http, new Authorization(astro, odd), propfind("https://dav.example/"), []);
+  expect(sent).toEqual([`Basic ${btoa("astro:secret")}`]);
+  expect(renewed).toBe(1);
+});

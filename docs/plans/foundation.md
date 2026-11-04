@@ -1883,6 +1883,11 @@ optimization is lacking").
     at once and fails when they pass 340 KiB gzipped (318 at D145) or
     AstroTime's own code in them 130 KiB (120); a PR that needs more raises
     the budget, saying why.
+    _Exceptions the owner delegated:_ #158's
+    +138 bytes, 36 over a PR's +0.1 KiB (a remembered scheme bound to its
+    origin and pruned with its account, [providers D260](providers.md#D260)),
+    paid back by [providers D255](providers.md#D255)'s lazy CalDAV
+    (`perf/lazy-caldav`, −3.1 KiB measured).
   - **Measured by hand** with `scripts/bench-cold-start.ts`: the built app
     on the image's server, its store filled with `big-calendar.ts`'s 12 230
     objects (D118's), the median of five new tabs, the service worker passed

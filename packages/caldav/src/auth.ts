@@ -116,7 +116,12 @@ export class Authorization {
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
   ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
-    if (this.scheme === null && this.remembered?.origin === new URL(request.url).origin)
+    // A password's scheme only: never a bearer, whose token this account has not.
+    if (
+      this.scheme === null &&
+      this.remembered?.origin === new URL(request.url).origin &&
+      this.remembered.scheme !== "bearer"
+    )
       this.scheme = this.remembered.scheme ?? null;
     if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
     const scheme = this.scheme;
@@ -154,7 +159,8 @@ export class Authorization {
    * for the next sync once the server took it (`digest.ts`, `taken`).
    */
   async learned(url: string, response: HttpResponse, answered: Scheme): Promise<void> {
-    if (this.remembered) (await digest()).taken(this, url, response, answered);
+    if (this.remembered && answered !== "bearer")
+      (await digest()).taken(this, url, response, answered);
   }
 }
 
