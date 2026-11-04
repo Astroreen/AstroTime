@@ -163,8 +163,8 @@ export class MemoryNetwork {
     return {
       send: (text) => {
         if (link.closed) return;
+        // A frame sent before a close still arrives, as over a WebSocket.
         this.deliver(to, async () => {
-          if (link.closed) return;
           await to.handlers?.message(
             this.tap ? this.tap({ from: from.name, to: to.name, text }) : text,
           );

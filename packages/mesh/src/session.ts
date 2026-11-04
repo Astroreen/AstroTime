@@ -29,14 +29,24 @@ import { covers, vectorOf } from "./version.ts";
 export type Refusal =
   /** The other side is this very peer (its own address, gossiped back). */
   | "self"
-  /** Another mesh, a wrong proof, or a frame out of place. */
-  | "refused";
+  /** Another mesh, a wrong proof, or a frame out of place or that does not open. */
+  | "refused"
+  /** The two wall clocks differ by more than `MAX_DRIFT`, or a version came stamped further ahead. */
+  | "clock";
+
+/** How far two peers' wall clocks may differ, as Kerberos and TOTP bound drift (D284). */
+export const MAX_DRIFT = 5 * 60_000;
+
+/** A version stamped more than `MAX_DRIFT` ahead of this peer's clock (D284). */
+export class ClockAheadError extends Error {
+  override readonly name = "ClockAheadError";
+}
 
 export interface SessionEvents {
   /** Both sides proved the secret; sealed messages may flow. */
   established(session: Session): Promise<void>;
   message(session: Session, message: Message): Promise<void>;
-  /** The connection closed. `refusal` says why when it closed in the handshake. */
+  /** The connection closed. `refusal` says why when this side refused it, or the other in the handshake. */
   ended(session: Session, refusal?: Refusal): void;
   error(error: unknown): void;
 }
@@ -68,6 +78,9 @@ export class Session {
   private readonly proofKey: Promise<CryptoKey>;
   private readonly connection: MeshConnection;
   private readonly events: SessionEvents;
+  private readonly now: () => number;
+  /** The wall clock this side's challenge carried. */
+  private clock = 0;
   /** The address this side dialled; undefined for a connection it accepted. */
   readonly address: string | undefined;
 
@@ -77,8 +90,10 @@ export class Session {
     proofKey: Promise<CryptoKey>,
     connection: MeshConnection,
     events: SessionEvents,
+    now: () => number,
     address?: string,
   ) {
+    this.now = now;
     this.me = me;
     this.mesh = mesh;
     this.proofKey = proofKey;
@@ -100,6 +115,7 @@ export class Session {
       mesh: this.mesh.id,
       peer: this.me,
       nonce: base64url(this.nonce),
+      clock: (this.clock = Math.floor(this.now())),
     };
     this.connection.send(JSON.stringify(challenge));
     return {
@@ -141,7 +157,11 @@ export class Session {
 
   close(refusal?: Refusal): void {
     if (this.state === "closed") return;
-    if (this.state === "handshake") this.refusal ??= refusal;
+    // In the handshake, the other side is told why (in the clear: nothing secret).
+    if (this.state === "handshake" && (refusal === "clock" || refusal === "refused")) {
+      this.connection.send(JSON.stringify({ type: "refusal", reason: refusal }));
+    }
+    this.refusal ??= refusal;
     this.state = "closed";
     this.connection.close();
   }
@@ -149,7 +169,7 @@ export class Session {
   private closed(): void {
     if (this.state === "handshake") this.refusal ??= "refused";
     this.state = "closed";
-    this.events.ended(this, this.established ? undefined : this.refusal);
+    this.events.ended(this, this.refusal);
   }
 
   private async receive(text: string): Promise<void> {
@@ -165,19 +185,31 @@ export class Session {
           return this.close("refused");
         }
         if (frame.peer === this.me) return this.close("self");
+        if (Math.abs(frame.clock - this.now()) > MAX_DRIFT) return this.close("clock");
         this.theirs = frame;
         this.peer = frame.peer;
         const proof = await prove(
           await this.proofKey,
-          this.proofParts(this.me, frame.peer, frame.nonce, base64url(this.nonce)),
+          this.proofParts(
+            [this.me, base64url(this.nonce), this.clock],
+            [frame.peer, frame.nonce, frame.clock],
+          ),
         );
         if (!this.gone) this.connection.send(JSON.stringify({ type: "proof", proof }));
         return;
       }
+      if (frame.type === "refusal") {
+        // Said back by this side, it would only echo: the other side's reason is kept.
+        this.refusal ??= frame.reason;
+        return this.close();
+      }
       if (frame.type === "proof") {
         const theirs = this.theirs;
         if (!theirs || this.established) return this.close("refused");
-        const parts = this.proofParts(theirs.peer, this.me, base64url(this.nonce), theirs.nonce);
+        const parts = this.proofParts(
+          [theirs.peer, theirs.nonce, theirs.clock],
+          [this.me, base64url(this.nonce), this.clock],
+        );
         const theirNonce = fromBase64url(theirs.nonce)!;
         if (!(await verify(await this.proofKey, parts, frame.proof))) {
           return this.close("refused");
@@ -193,13 +225,16 @@ export class Session {
       await this.events.message(this, message);
     } catch (error) {
       this.events.error(error);
-      this.close("refused");
+      this.close(error instanceof ClockAheadError ? "clock" : "refused");
     }
   }
 
-  /** What a proof is over: the prover, the verifier and their nonces, in the verifier's first. */
-  private proofParts(prover: string, verifier: string, verifierNonce: string, proverNonce: string) {
-    return ["proof", PROTOCOL, this.mesh.id, prover, verifier, verifierNonce, proverNonce];
+  /** What a proof is over: the prover's and the verifier's peer id, nonce and clock. */
+  private proofParts(
+    prover: readonly [string, string, number],
+    verifier: readonly [string, string, number],
+  ) {
+    return ["proof", PROTOCOL, this.mesh.id, ...prover, ...verifier].map(String);
   }
 }
 

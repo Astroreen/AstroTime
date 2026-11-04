@@ -10,7 +10,7 @@ import { proofKey } from "./crypto.ts";
 import type { Mesh } from "./invite.ts";
 import type { Message } from "./protocol.ts";
 import { apply, change } from "./replica.ts";
-import { type Refusal, Session } from "./session.ts";
+import { ClockAheadError, MAX_DRIFT, type Refusal, Session } from "./session.ts";
 import type { MeshStore } from "./store.ts";
 import {
   type ConnectionHandlers,
@@ -38,6 +38,12 @@ export interface MeshNodeOptions {
   readonly timers?: Timers;
   /** The peers connected now, each time that changes (the account row's count, D289). */
   readonly onPeers?: (peers: readonly string[]) => void;
+  /**
+   * A connection this side refused, or the other in the handshake: `clock`
+   * when the two wall clocks are more than five minutes apart, which the UI
+   * says ("this device's clock is off", D284); `refused` for a wrong secret.
+   */
+  readonly onRefused?: (reason: "clock" | "refused", address: string | undefined) => void;
   /** A connection that failed: a frame that did not open, a store that threw. */
   readonly onError?: (error: unknown) => void;
 }
@@ -55,6 +61,7 @@ interface Dial {
 export class MeshNode {
   readonly peer: string;
   private readonly clock: HybridClock;
+  private readonly now: () => number;
   private readonly timers: Timers;
   private readonly proofKey: Promise<CryptoKey>;
   /** Every connection, in the handshake or established. */
@@ -72,7 +79,8 @@ export class MeshNode {
   constructor(options: MeshNodeOptions) {
     this.options = options;
     this.peer = options.peer;
-    this.clock = new HybridClock(options.peer, options.now ?? Date.now);
+    this.now = options.now ?? Date.now;
+    this.clock = new HybridClock(options.peer, this.now);
     this.timers = options.timers ?? realTimers;
     this.proofKey = proofKey(options.mesh.secret);
     this.own = new Set(options.listening);
@@ -123,6 +131,7 @@ export class MeshNode {
         ended: (ended, refusal) => this.ended(ended, refusal),
         error: (error) => this.options.onError?.(error),
       },
+      this.now,
       address,
     );
     this.connections.add(session);
@@ -198,6 +207,10 @@ export class MeshNode {
     versions: readonly Version[],
     vector?: Vector,
   ): Promise<void> {
+    const limit = this.now() + MAX_DRIFT;
+    if (versions.some((version) => version.hlc.wall > limit)) {
+      throw new ClockAheadError("A version came stamped more than five minutes ahead");
+    }
     for (const version of versions) {
       this.clock.observe(version.hlc);
       session.saw(version);
@@ -287,9 +300,12 @@ export class MeshNode {
       this.sessions.delete(session.peer);
       this.options.onPeers?.(this.peers());
     }
+    if (refusal === "clock" || refusal === "refused")
+      this.options.onRefused?.(refusal, session.address);
     if (session.address !== undefined) {
       const dial = this.dial(session.address);
       dial.busy = false;
+      // Refused (in the handshake or after): again only after a wait.
       if (refusal === "self") this.selves.add(session.address);
       else if (refusal) this.retry(session.address, dial);
     }

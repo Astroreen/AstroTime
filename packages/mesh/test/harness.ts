@@ -24,6 +24,9 @@ export class Harness {
   readonly stores = new Map<string, MemoryMeshStore>();
   readonly nodes = new Map<string, MeshNode>();
   readonly errors: { peer: string; error: unknown }[] = [];
+  readonly refusals: { peer: string; reason: string }[] = [];
+  /** Each peer's wall clock offset from the shared one, in milliseconds. */
+  readonly skews = new Map<string, number>();
   /** Each peer's connected peers, every time they changed. */
   readonly connections: { peer: string; peers: readonly string[] }[] = [];
   /** The shared wall clock. */
@@ -32,6 +35,7 @@ export class Harness {
 
   add(name: string, spec: PeerSpec): MemoryMeshStore {
     this.specs.set(name, spec);
+    this.skews.set(name, spec.skew ?? 0);
     const store = new MemoryMeshStore(spec.invitedBy.map(addressOf));
     this.stores.set(name, store);
     return store;
@@ -46,10 +50,11 @@ export class Harness {
       store: this.stores.get(name)!,
       transport: this.network.transport(name),
       ...(spec.listens ? { listening: [addressOf(name)] } : {}),
-      now: () => this.time + (spec.skew ?? 0),
+      now: () => this.time + this.skews.get(name)!,
       timers: this.timers,
       onPeers: (peers) => this.connections.push({ peer: name, peers }),
       onError: (error) => this.errors.push({ peer: name, error }),
+      onRefused: (reason) => this.refusals.push({ peer: name, reason }),
     });
     this.nodes.set(name, node);
     if (spec.listens)

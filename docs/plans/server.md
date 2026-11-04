@@ -8,7 +8,7 @@ that sync with each other. It builds on foundation's
 [D5](foundation.md#D5) (the store is the UI's truth, only the sync engine
 talks to servers), [D7](foundation.md#D7) (nothing lost),
 [D40](foundation.md#D40) (one small image) and [D123](foundation.md#D123)
-(a single-user deployment's preset). Its decisions are D278–D292.
+(a single-user deployment's preset). Its decisions are D278–D293.
 
 ## Goal
 
@@ -195,6 +195,50 @@ alone needs nothing else.
   once; a second invite of the same mesh id is the same account. A
   device can be in several meshes, each its own account.
 
+- **D293. The mesh protocol in detail.** What PR M1 settled inside
+  [D284](#D284)–[D287](#D287):
+  - **A vector counts only what has no gap.** A version is applied
+    whatever order it arrives in, but its author's count moves to it only
+    when every earlier one is covered; one that came out of order (through
+    two relays) is counted at the next anti-entropy, whose answer resends
+    it. So a vector never claims a version its peer lacks.
+  - **Only what changed something is passed on**: a version that won, or
+    one newly counted. A duplicate, or one older than what a peer has
+    and already counted, stops there, so pushes end in a mesh with cycles.
+  - **A change is stamped after its item's current version** (the clock
+    observes it first), so an edit made after a restart, with a wall clock
+    behind, still wins over the version it replaced.
+  - **The handshake is symmetric.** Each side sends `challenge` (protocol,
+    mesh id, peer id, a 32-byte nonce, its wall clock) on open; a mesh id
+    not its own, or a clock more than five minutes off its own
+    ([D284](#D284)), closes the connection there, after a `refusal` frame
+    with the reason (`clock` or `refused`) so the other side can say it
+    too (`MeshNode`'s `onRefused`). Each answers with `proof`,
+    HMAC-SHA-256 over `["proof", protocol, mesh id, prover's peer id,
+    nonce and clock, verifier's peer id, nonce and clock]`. Each
+    direction has its own AES-GCM key, HKDF with the sender's nonce then
+    the receiver's as salt; its IV counts that
+    direction's messages, so a frame tampered with, replayed, dropped or
+    reordered does not open and closes the connection.
+  - **Messages**: `hello` (vector, addresses), `batch` (the versions the
+    hello's vector does not cover, and the vector they were taken with),
+    `push` (one version), `addresses` (learnt since). A peer's batch is
+    taken and queued under one lock with its applies, so every version
+    reaches the other side in the batch or as a push after it.
+  - **Two connections with one peer** (two listeners dialling each other):
+    both keep the one dialled by the smaller peer id.
+  - **Redial**: a dial that fails, or a connection refused (a wrong
+    secret, a clock off, a frame that does not open), waits 1 s, doubled
+    per failure up to a minute; an established connection that closes
+    otherwise is redialled at once. An address
+    that answers with this very peer is never dialled again.
+  - **The seams for PR M2**: `MeshStore` is one transaction (`vector`,
+    `setVector`, `current`, `put`, `notCoveredBy`) plus the known
+    addresses, so `@astrotime/storage` applies a batch in one SQLite
+    transaction; `MeshTransport.dial` and `MeshNode.accept` take a
+    connection of ordered text frames, a WebSocket's. A frame's handler
+    returns a promise and the next frame waits for it.
+
 ## Deferred
 
 - Sharing a calendar between users of one AstroTime server.
@@ -239,7 +283,7 @@ context sees it after its sync.
 
 ### PR M1 — `@astrotime/mesh`
 
-D283–D287 (the protocol half), D290. HLC, versions, vectors, the
+D283–D287 (the protocol half), D290, D293. HLC, versions, vectors, the
 replica, the handshake and sealing, the in-memory transport, the
 convergence tests; its line in `docs/map.md`.
 

@@ -4,6 +4,7 @@
 export { formatInvite, type Invite, type Mesh, newMesh, newPeerId, parseInvite } from "./invite.ts";
 export { MeshNode, type MeshNodeOptions } from "./node.ts";
 export { type Message, PROTOCOL } from "./protocol.ts";
+export { MAX_DRIFT } from "./session.ts";
 export { apply, change } from "./replica.ts";
 export type { MeshStore, MeshTransaction } from "./store.ts";
 export type {

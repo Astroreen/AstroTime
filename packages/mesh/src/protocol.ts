@@ -13,6 +13,8 @@ export interface Challenge {
   readonly mesh: string;
   readonly peer: string;
   readonly nonce: string;
+  /** This side's wall clock in milliseconds, checked against the other's (D284). */
+  readonly clock: number;
 }
 
 /** In the clear: the answer to the other side's challenge, an HMAC with the mesh secret. */
@@ -27,7 +29,16 @@ interface Sealed {
   readonly data: string;
 }
 
-export type Frame = Challenge | Proof | Sealed;
+/**
+ * In the clear, in the handshake: why this side closes the connection, so
+ * the other can say so too (a clock off, D284; a wrong secret, D287).
+ */
+interface Refused {
+  readonly type: "refusal";
+  readonly reason: "clock" | "refused";
+}
+
+export type Frame = Challenge | Proof | Sealed | Refused;
 
 /** The first sealed message: this side's vector and the listening addresses it knows. */
 interface Hello {
@@ -124,11 +135,15 @@ export function parseFrame(text: string): Frame {
       isString(value.mesh) &&
       isString(value.peer) &&
       isId(value.peer) &&
-      isString(value.nonce)
+      isString(value.nonce) &&
+      isCount(value.clock)
     ) {
       return value as unknown as Challenge;
     }
     if (value.type === "proof" && isString(value.proof)) return value as unknown as Proof;
+    if (value.type === "refusal" && (value.reason === "clock" || value.reason === "refused")) {
+      return { type: "refusal", reason: value.reason };
+    }
     if (value.type === "sealed" && isString(value.data)) return value as unknown as Sealed;
   }
   throw new TypeError("Not a mesh frame");

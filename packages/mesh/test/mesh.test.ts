@@ -177,7 +177,7 @@ test("a wrong secret is refused before any sealed frame", async () => {
 
   expect(frames.length).toBeGreaterThan(0);
   expect(new Set(frames.map(({ text }) => (JSON.parse(text) as { type: string }).type))).toEqual(
-    new Set(["challenge", "proof"]),
+    new Set(["challenge", "proof", "refusal"]),
   );
   expect(mesh.versions("peer-x")).toEqual([]);
   expect(mesh.connections).toEqual([]);
@@ -199,7 +199,8 @@ test("a frame of another mesh id is refused before any proof", async () => {
   await mesh.up("peer-x");
   await mesh.settle(1);
   expect(types.length).toBeGreaterThan(0);
-  expect(types.every((type) => type === "challenge")).toBe(true);
+  expect(types.every((type) => type === "challenge" || type === "refusal")).toBe(true);
+  expect(types).toContain("refusal");
 });
 
 describe("a sealed frame changed on the way", () => {
@@ -359,4 +360,88 @@ describe("five peers through random partitions, outages and edits", () => {
       expect(mesh.errors).toEqual([]);
     },
   );
+});
+
+describe("clocks more than five minutes apart (D284)", () => {
+  test("a peer whose clock is off is refused in the handshake, and says why", async () => {
+    const mesh = new Harness();
+    mesh.add("peer-c", { listens: true, invitedBy: [] });
+    mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"], skew: 4 * 60_000 });
+    mesh.add("peer-x", { listens: false, invitedBy: ["peer-c"], skew: -(5 * 60_000 + 1) });
+    for (const name of ["peer-c", "peer-a", "peer-x"]) await mesh.up(name);
+    await mesh.node("peer-c").change(lunch, event("Lunch"));
+    await mesh.settle(2);
+
+    expect(mesh.node("peer-c").peers()).toEqual(["peer-a"]);
+    expect(mesh.versions("peer-x")).toEqual([]);
+    expect(new Set(mesh.refusals.map(({ peer, reason }) => `${peer} ${reason}`))).toEqual(
+      new Set(["peer-c clock", "peer-x clock"]),
+    );
+
+    // Its clock set right, it joins at its next redial.
+    mesh.skews.set("peer-x", 0);
+    await mesh.settle();
+    expect(mesh.versions("peer-x")).toEqual(mesh.versions("peer-c"));
+  });
+
+  test("a version stamped more than five minutes ahead closes the connection, unapplied", async () => {
+    const mesh = new Harness();
+    mesh.add("peer-c", { listens: true, invitedBy: [] });
+    mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+    await mesh.up("peer-c");
+    await mesh.up("peer-a");
+    await mesh.settle();
+
+    mesh.skews.set("peer-a", 10 * 60_000);
+    await mesh.node("peer-a").change(lunch, event("From the future"));
+    await mesh.settle(2);
+
+    expect(mesh.versions("peer-c")).toEqual([]);
+    expect(mesh.errors.map(({ peer, error }) => [peer, (error as Error).name])).toEqual([
+      ["peer-c", "ClockAheadError"],
+    ]);
+    expect(mesh.refusals.map(({ peer }) => peer)).toContain("peer-c");
+    expect(mesh.node("peer-c").peers()).toEqual([]);
+  });
+});
+
+test("a deletion against a concurrent older edit: the tombstone wins everywhere", async () => {
+  const mesh = new Harness();
+  mesh.add("peer-c", { listens: true, invitedBy: [] });
+  mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+  mesh.add("peer-b", { listens: false, invitedBy: ["peer-c"] });
+  for (const name of ["peer-c", "peer-a", "peer-b"]) await mesh.up(name);
+  await mesh.node("peer-c").change(lunch, event("Lunch"));
+  await mesh.settle();
+
+  mesh.network.partition(["peer-a"], ["peer-b", "peer-c"]);
+  await mesh.settle(1);
+  await mesh.node("peer-a").change(lunch, event("Lunch, moved"));
+  mesh.time += 1_000;
+  const deleted = await mesh.node("peer-b").change(lunch, null);
+  mesh.network.heal();
+  await mesh.settle();
+  for (const name of ["peer-a", "peer-b", "peer-c"]) expect(mesh.versions(name)).toEqual([deleted]);
+});
+
+test("a calendar renamed on two peers at once converges to the newer name", async () => {
+  const mesh = new Harness();
+  mesh.add("peer-c", { listens: true, invitedBy: [] });
+  mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+  mesh.add("peer-b", { listens: false, invitedBy: ["peer-c"] });
+  for (const name of ["peer-c", "peer-a", "peer-b"]) await mesh.up(name);
+  const work = { calendar: "work" };
+  await mesh.node("peer-c").change(work, '{"name":"Work"}');
+  await mesh.settle();
+
+  mesh.network.partition(["peer-a"], ["peer-b"], ["peer-c"]);
+  await mesh.settle(1);
+  mesh.time += 1_000;
+  const office = await mesh.node("peer-b").change(work, '{"name":"Office"}');
+  mesh.time += 1_000;
+  const job = await mesh.node("peer-a").change(work, '{"name":"Job"}');
+  expect(compareVersions(job, office)).toBeGreaterThan(0);
+  mesh.network.heal();
+  await mesh.settle();
+  for (const name of ["peer-a", "peer-b", "peer-c"]) expect(mesh.versions(name)).toEqual([job]);
 });
