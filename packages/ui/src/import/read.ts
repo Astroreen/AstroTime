@@ -112,6 +112,12 @@ export async function readImport(
         notImported = converted.notImported;
         dates = converted.dates;
       }
+      // Google Takeout's tasks: their converter loads for them alone.
+      if ((start.startsWith("{") || start.startsWith("[")) && text.includes('"tasks#taskList')) {
+        const converted = (await import("./takeout.ts")).takeoutToIcs(JSON.parse(text));
+        text = converted.text;
+        notImported = converted.notImported;
+      }
       // vCalendar 1.0, a calendar at a time (a file may hold 2.0 ones
       // beside it): its converter loads for such a calendar alone.
       const blocks = text.split(/(?=^BEGIN:VCALENDAR)/im);

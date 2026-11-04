@@ -2,7 +2,8 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2), vCalendar 1.0 (PR I3) and CSV (PR I4) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4) and Google Takeout's
+tasks (PR I5) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -304,6 +305,15 @@ iCalendar (`Mileage`, `Total Work`), are named as not carried over, its
 default values (`0`, `False`, `Normal`) aside. D266, D272.
 
 ### PR I5 — Google Takeout Tasks
+
+`takeoutToIcs` (`packages/ui/src/import/takeout.ts`), loaded for such a
+file alone: Takeout's `Tasks.json` (the Tasks API's `tasks#taskLists`),
+alone or in Takeout's ZIP; each list a source named as it, each task a
+`VTODO` with its notes, its due day (Google keeps the day alone), its
+status and completion, its parent as `RELATED-TO`, its links as
+attachments, its place as `X-GOOGLE-TASKS-POSITION`, its UID made from
+Google's id so a second import finds it. A task the user deleted, which
+Takeout keeps, is left out as Google Tasks leaves it out. D266, D272.
 
 ### PR I6 — Export
 

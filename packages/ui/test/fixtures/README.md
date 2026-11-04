@@ -44,7 +44,7 @@ otherwise as Wikipedia sent them. Each search asked `generator=search`,
 ## `import/`
 
 Files from other apps, for the import's converters (`../vcs.test.ts`,
-`../csv.test.ts`, docs/plans/import.md#D266). All **synthetic**: written by hand in the
+`../csv.test.ts`, `../takeout.test.ts`, docs/plans/import.md#D266). All **synthetic**: written by hand in the
 shape each exporter is documented to write, since no such app or phone was
 at hand; each line's form follows the vCalendar 1.0 specification (versit, 1996) and the exporters' published samples.
 
@@ -57,3 +57,4 @@ at hand; each line's form follows the vCalendar 1.0 specification (versit, 1996)
 | `outlook-calendar-ru.csv` | the same in Russian Outlook: its column names in Russian, `;` between columns (the Russian list separator), Windows-1251, `ДД.ММ.ГГГГ`, `Истина`/`Ложь`                                         |
 | `outlook-tasks.csv`       | Outlook's export of tasks: `Due Date`, `Date Completed`, `% Complete`, `Status`                                                                                                                 |
 | `thunderbird.csv`         | Thunderbird's CSV export of a calendar (Outlook's column names)                                                                                                                                 |
+| `takeout-tasks.json`      | Google Takeout's `Tasks/Tasks.json`: the Tasks API's `tasks#taskLists` with two lists, a subtask (`parent`), a done and hidden task, a deleted one, a link to a mail                            |

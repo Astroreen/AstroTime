@@ -9,7 +9,7 @@ export const importStrings = {
     "import.close": "Close",
     "import.reading": "Reading {{file}}…",
     "import.notCalendar":
-      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV from Outlook, Thunderbird or Google, and ZIP archives of them.",
+      "{{file}} is not a calendar AstroTime can read. It reads iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV from Outlook, Thunderbird or Google, Google Takeout's tasks, and ZIP archives of them.",
     "import.unreadable": "{{file}} could not be read: {{message}}",
     "import.events_one": "{{count}} event",
     "import.events_other": "{{count}} events",
@@ -92,7 +92,7 @@ export const importStrings = {
     "import.close": "Закрыть",
     "import.reading": "Читаем {{file}}…",
     "import.notCalendar":
-      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV из Outlook, Thunderbird или Google и их ZIP-архивы.",
+      "{{file}} — не календарь, который AstroTime умеет читать. Он читает iCalendar (.ics), vCalendar (.vcs), jCal (.json), CSV из Outlook, Thunderbird или Google, задачи из Google Takeout и их ZIP-архивы.",
     "import.unreadable": "Не удалось прочитать {{file}}: {{message}}",
     "import.events_one": "{{count}} событие",
     "import.events_few": "{{count}} события",
