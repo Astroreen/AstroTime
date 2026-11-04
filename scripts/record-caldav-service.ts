@@ -38,7 +38,9 @@ const tasks = process.env["ASTROTIME_RECORD_TASKS"] !== "false";
 // The user name of a local test server (the interop run's) is public, and
 // may stand in a recording; never a cloud account's.
 const local = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/.test(new URL(server).hostname);
-const publicUsername = local && process.env["ASTROTIME_RECORD_PUBLIC_USERNAME"] === "true";
+const publicUsername = process.env["ASTROTIME_RECORD_PUBLIC_USERNAME"] === "true";
+if (publicUsername && !local)
+  throw new Error("ASTROTIME_RECORD_PUBLIC_USERNAME is for a local test server only.");
 const calendar = calendarName();
 const { http, exchanges, sent } = recorder(fetchClient());
 const result = await scenario(http, server, credentials, { tasks, calendar });
