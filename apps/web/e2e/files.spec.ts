@@ -481,3 +481,50 @@ for (const [language, words] of [
     });
   });
 }
+
+// A Nextcloud whose sync is off keeps its files, but AstroTime does not
+// reach them: the file ways say so (design D237), in both languages.
+for (const language of ["en", "ru"] as const) {
+  test(`a Nextcloud account with its sync off turns the file ways off and says why, ${language}`, async ({
+    browser,
+  }) => {
+    const ru = language === "ru";
+    const context = await browser.newContext({
+      locale: ru ? "ru-RU" : "en-US",
+      timezoneId: "Europe/Vilnius",
+      viewport: WIDE,
+    });
+    const page = await context.newPage();
+    await page.clock.setFixedTime(NOW);
+    await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+    await fakeNextcloud(page);
+    await page.goto("/");
+    await signIn(page, language);
+    await page
+      .getByRole("navigation", { name: ru ? "Главное меню" : "Main menu" })
+      .getByRole("button", { name: ru ? "Настройки" : "Settings" })
+      .click();
+    const settings = page.getByRole("dialog", { name: ru ? "Настройки" : "Settings" });
+    await settings
+      .getByRole("region", { name: `${USER}@cloud.example.com` })
+      .getByRole("switch", { name: ru ? "Синхронизация" : "Sync" })
+      .click();
+    await page.keyboard.press("Escape");
+    await expect(settings).toBeHidden();
+
+    await page.getByRole("button", { name: /^Quarterly review, / }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: ru ? "Изменить" : "Edit" })
+      .click();
+    const edit = page.getByRole("dialog", { name: ru ? "Изменить мероприятие" : "Edit event" });
+    const files = edit.getByRole("button", { name: ru ? "Из ваших файлов" : "From your files" });
+    await expect(files).toBeDisabled();
+    await expect(files).toHaveAccessibleDescription(
+      ru
+        ? "Для файлов включите синхронизацию этого аккаунта в настройках."
+        : "Files need this account's sync on, in Settings.",
+    );
+    await context.close();
+  });
+}

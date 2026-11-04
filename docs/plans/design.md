@@ -2389,11 +2389,11 @@ own (below).
   known by the calendar home discovery ends at, whatever address Login
   Flow v2 or the user gave (`packages/caldav/test/nextcloud-home.test.ts`:
   a trailing slash, `index.php`, an app's page, `remote.php/dav`, an
-  install under a path, `/.well-known/caldav` redirected). On the
-  emulator, an account of the test user signed in through CalDAV and
-  through Login Flow v2 showed both file ways, so the owner's missing
-  buttons stay unexplained ([Deferred](#deferred)).
-  Attaching a file inline where there are no files: [Deferred](#deferred).
+  install under a path, `/.well-known/caldav` redirected; and the real
+  servers' homes in `packages/sync/test/servers.test.ts`). A CalDAV
+  account whose home is not saved gets no reason: its cause is not known
+  (`noFilesOf`, `@astrotime/sync`). The owner's case, and attaching a
+  file inline where there are no files: [Deferred](#deferred).
 
 ## Deferred
 
@@ -2404,9 +2404,10 @@ own (below).
   edge as Google Calendar draws it: the bars' icons would follow the
   picture's lightness rather than the theme.
 - **Why the owner's phone showed only "Add a link"** ([D237](#D237)):
-  not reproduced with the test user on the same server and APK; the
-  three ways are now in sight with a reason when off, which shows the
-  cause the next time it happens.
+  not reproduced: on the emulator, the test user on the same server
+  with the same APK, signed in through CalDAV and through Login Flow v2,
+  had both file ways. The three ways are now in sight with a reason when
+  off, which shows the cause the next time it happens.
 - **A file attached inline where the calendar has no files** ([D237](#D237)):
   `ATTACH;VALUE=BINARY` (core's `inlineFile`) for the calendar on this
   device and servers without files; the reason shows instead for now.

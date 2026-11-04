@@ -2,7 +2,11 @@
 // address Login Flow v2 or the user gave (a trailing slash, index.php, a
 // page of its web app, `/.well-known/caldav` redirected to remote.php, an
 // install under a path), discovery ends at the home Nextcloud names, and
-// `keepsFiles` sees it there (design D237).
+// `keepsFiles` sees it there (design D237). The answers here are written by
+// hand in the shapes Nextcloud gives; the real servers' own say the same in
+// `packages/sync/test/servers.test.ts` (Radicale on every run, Nextcloud in
+// the nightly job). Neither explains the owner's case (design D237's
+// Deferred).
 import { expect, test } from "vite-plus/test";
 
 import { CalDavProvider, followRedirects, keepsFiles, type HttpClient } from "../src/index.ts";
