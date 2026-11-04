@@ -2,7 +2,7 @@
 // shows a task, in both languages, says list where an event's says calendar.
 import { expect, test } from "vite-plus/test";
 
-import { problemKey, type SaveProblem } from "../src/calendar/editing.ts";
+import { problemKey, type SaveProblem } from "../src/calendar/problems.ts";
 import { catalogs as app } from "../src/i18n/index.ts";
 import { taskStrings } from "../src/i18n/tasks.ts";
 

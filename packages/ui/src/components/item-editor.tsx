@@ -23,7 +23,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   dueIsDate,
-  problemKey,
   switchKind,
   withAlarms,
   withAllDay,
@@ -34,7 +33,6 @@ import {
   type AlarmChoice,
   type Form,
   type RepeatChoice,
-  type SaveProblem,
   type Target,
 } from "../calendar/editing.ts";
 import type { DrawnDraft } from "../calendar/query.ts";
@@ -67,6 +65,7 @@ import { ColorSelect } from "./color-select.tsx";
 import { MentionField } from "./mention-field.tsx";
 import { PlaceField } from "./place-field.tsx";
 import { MenuButton, Select as Dropdown } from "./select.tsx";
+import { problemKey, type SaveProblem } from "../calendar/problems.ts";
 import { addTaskStrings } from "../i18n/tasks.ts";
 import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";

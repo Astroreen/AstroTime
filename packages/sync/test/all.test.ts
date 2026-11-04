@@ -12,11 +12,10 @@ import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
-import { accountFiles } from "../src/files.ts";
+import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
 import {
   hasFiles,
-  noFilesOf,
   removeAccount,
   saveAccount,
   syncAll,

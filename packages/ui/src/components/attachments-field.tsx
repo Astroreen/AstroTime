@@ -8,8 +8,8 @@
 // split the app's first chunks and cost the first load 0.3 KiB.
 import type { Attachment, NewAttachment } from "@astrotime/core";
 import type { Account, Calendar } from "@astrotime/storage";
-import { hasFiles, noFilesOf } from "@astrotime/sync";
-import { accountFiles } from "@astrotime/sync/files";
+import { hasFiles } from "@astrotime/sync";
+import { accountFiles, noFilesOf } from "@astrotime/sync/files";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 

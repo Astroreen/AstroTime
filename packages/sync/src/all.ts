@@ -343,19 +343,6 @@ export const hasFiles = (account: Account) =>
   keepsFiles(account.homeUrl);
 
 /**
- * Why an account has no files to attach from (design D237): its calendars
- * are on this device, its server keeps none, or it is a Nextcloud whose
- * sync is off; `null` when it has files, or when the cause is not known
- * (a CalDAV account whose home is not saved, the demo's).
- */
-export function noFilesOf(account: Account): "device" | "server" | "syncOff" | null {
-  if (hasFiles(account)) return null;
-  if (account.provider === "local") return "device";
-  if (account.provider !== "caldav" || !account.homeUrl) return null;
-  return keepsFiles(account.homeUrl) ? "syncOff" : "server";
-}
-
-/**
  * Keeps an account the user signed in to: the account in the store, its
  * credentials in the platform's secret store, with whether Login Flow v2
  * gave the password (an app password, revoked when the account goes).
