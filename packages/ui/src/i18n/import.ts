@@ -1,4 +1,4 @@
-// The strings of the import dialog (docs/plans/import.md#D268–#D271), in a
+// The strings of the import and export dialogs (docs/plans/import.md#D268–#D271, #D274), in a
 // catalog of its own (`later.ts`) that loads with it; Settings' entry has
 // its few in `data.ts`.
 import { laterStrings } from "./later.ts";
@@ -6,6 +6,20 @@ import { laterStrings } from "./later.ts";
 export const importStrings = {
   en: {
     "import.title": "Import",
+    "export.title": "Export to a file",
+    "export.calendar": "Calendar or list",
+    "export.hint":
+      "As it is on this device, changes not yet synced too, as one iCalendar file (.ics) any calendar app reads.",
+    "export.save": "Export",
+    "export.saved_one": "{{count}} item saved as {{file}}.",
+    "export.saved_other": "{{count}} items saved as {{file}}.",
+    "export.left_one": "{{count}} item could not be read and is not in it.",
+    "export.left_other": "{{count}} items could not be read and are not in it.",
+    "export.failed": "The file was not saved: {{message}}",
+    "export.empty": "Nothing to export: {{name}} holds no event or task.",
+    "export.cancelled": "Not saved: the file's place was not chosen.",
+    "export.downloading_one": "{{count}} item: the download of {{file}} has begun.",
+    "export.downloading_other": "{{count}} items: the download of {{file}} has begun.",
     "import.close": "Close",
     "import.reading": "Reading {{file}}…",
     "import.notCalendar":
@@ -89,6 +103,26 @@ export const importStrings = {
   },
   ru: {
     "import.title": "Импорт",
+    "export.title": "Экспорт в файл",
+    "export.calendar": "Календарь или список",
+    "export.hint":
+      "Как он есть на этом устройстве, включая ещё не синхронизированное, одним файлом iCalendar (.ics), который читает любое приложение календаря.",
+    "export.save": "Экспортировать",
+    "export.saved_one": "{{count}} запись сохранена в {{file}}.",
+    "export.saved_few": "{{count}} записи сохранены в {{file}}.",
+    "export.saved_many": "{{count}} записей сохранены в {{file}}.",
+    "export.saved_other": "{{count}} записи сохранены в {{file}}.",
+    "export.left_one": "{{count}} запись не читается, её в файле нет.",
+    "export.left_few": "{{count}} записи не читаются, их в файле нет.",
+    "export.left_many": "{{count}} записей не читаются, их в файле нет.",
+    "export.left_other": "{{count}} записи не читаются, их в файле нет.",
+    "export.failed": "Файл не сохранён: {{message}}",
+    "export.empty": "Экспортировать нечего: в {{name}} нет ни событий, ни задач.",
+    "export.cancelled": "Не сохранено: место для файла не выбрано.",
+    "export.downloading_one": "{{count}} запись: загрузка {{file}} началась.",
+    "export.downloading_few": "{{count}} записи: загрузка {{file}} началась.",
+    "export.downloading_many": "{{count}} записей: загрузка {{file}} началась.",
+    "export.downloading_other": "{{count}} записи: загрузка {{file}} началась.",
     "import.close": "Закрыть",
     "import.reading": "Читаем {{file}}…",
     "import.notCalendar":

@@ -65,7 +65,9 @@ When you add a package, app or module, add its line here in the same PR.
   - `splitCalendar`, `splitCalendars` (`split.ts`, `@astrotime/core/split`)
     — a calendar file cut into one object per UID with the zones it uses;
     strict for a subscription's answer, forgiving for a file from the
-    device; `jcalText`, jCal as iCalendar. Loaded with what needs it.
+    device; `jcalText`, jCal as iCalendar; `overlay`, a file's version
+    over a stored one; `joinCalendar`, objects as one calendar file.
+    Loaded with what needs it.
     → `plans/import.md#D267`, `plans/providers.md#D251`
   - `lines.ts` (`@astrotime/core/lines`) — iCalendar's lines for the
     providers that map another service's JSON: escaping, folding at 75
@@ -348,6 +350,9 @@ When you add a package, app or module, add its line here in the same PR.
       → `plans/design.md#D233`, `plans/design.md#D237`
     - `file-picker.tsx` — the account's files, a folder at a time, to
       attach one. → `plans/design.md#D234`
+    - `export-dialog.tsx` — Settings' "Export to a file": a calendar as one
+      `.ics`; `save-file.ts`, a file saved where the platform saves files
+      or downloaded, the attachments' too. → `plans/import.md#D274`
     - `import-dialog.tsx` — Settings' "Import from a file" and its dialog:
       the preview of each source, where it goes, the question about items
       already there, the progress and the summary; loaded with its first

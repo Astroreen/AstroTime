@@ -9,6 +9,8 @@
 
 import { NotCalendarError } from "@astrotime/core/split";
 
+import { isTakeoutTasks } from "./kind.ts";
+
 export interface TakeoutConverted {
   readonly text: string;
   readonly notImported: readonly string[];
@@ -16,17 +18,6 @@ export interface TakeoutConverted {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** Whether parsed JSON is Takeout's tasks: `tasks#taskLists`, one `tasks#taskList`, or a list of them. */
-export function isTakeoutTasks(json: unknown): boolean {
-  if (isObject(json))
-    return json["kind"] === "tasks#taskLists" || json["kind"] === "tasks#taskList";
-  return (
-    Array.isArray(json) &&
-    json.length > 0 &&
-    json.every((list) => isObject(list) && list["kind"] === "tasks#taskList")
-  );
-}
 
 /**
  * Takeout's `Tasks.json` as iCalendar. Whatever it holds is read as data:
@@ -49,6 +40,13 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
   for (const list of lists) {
     if (!isObject(list)) continue;
     const tasks = Array.isArray(list["items"]) ? (list["items"] as unknown[]) : [];
+    // The tasks kept: a subtask names its parent only when the parent is among them.
+    const kept = new Set(
+      tasks
+        .filter((task) => isObject(task) && task["deleted"] !== true)
+        .map((task) => idOf((task as Record<string, unknown>)["id"]))
+        .filter((id) => id !== null),
+    );
     out.push(
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -76,14 +74,24 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
         const completed = stamp(task["completed"]);
         if (completed) lines.push(`COMPLETED:${completed}`);
       } else lines.push("STATUS:NEEDS-ACTION");
+      // Its parent, when the file has it; a parent deleted or not in the file
+      // would leave a link to nothing: left out, and named. None at all
+      // (absent, null, empty) is a task of the list's own, nothing lost.
+      const given =
+        task["parent"] !== undefined && task["parent"] !== null && task["parent"] !== "";
       const parent = idOf(task["parent"]);
-      if (parent) lines.push(`RELATED-TO:google-task-${parent}`);
+      if (parent && kept.has(parent)) lines.push(`RELATED-TO:google-task-${parent}`);
+      else if (given) notImported.add("parent");
       if (typeof task["position"] === "string" && /^\d+$/.test(task["position"]))
         lines.push(`X-GOOGLE-TASKS-POSITION:${task["position"]}`);
       for (const link of Array.isArray(task["links"]) ? (task["links"] as unknown[]) : []) {
         const url = isObject(link) ? linkOf(link["link"]) : null;
         if (url) lines.push(`ATTACH:${url}`);
         else notImported.add("links");
+        // Its title ("Appointment confirmation") has no place in an ATTACH
+        // AstroTime reads; named by Takeout's own field, as D272 names each.
+        if (url && isObject(link) && typeof link["description"] === "string" && link["description"])
+          notImported.add("links.description");
       }
       lines.push("END:VTODO");
       out.push(...lines);

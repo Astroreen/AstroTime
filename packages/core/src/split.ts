@@ -718,3 +718,70 @@ export function overlay(stored: string, incoming: string): string {
 export function zoneText(timeZone: string, year: number): string {
   return vtimezone(timeZone, year).toString();
 }
+
+/** Every `TZID` parameter in a component and its subcomponents named anew where `names` says. */
+function renameTzids(component: ICAL.Component, names: ReadonlyMap<string, string>): void {
+  for (const property of component.getAllProperties()) {
+    const tzid = property.getParameter("tzid");
+    const name = typeof tzid === "string" ? names.get(tzid) : undefined;
+    if (name) property.setParameter("tzid", name);
+  }
+  for (const child of component.getAllSubcomponents()) renameTzids(child, names);
+}
+
+/**
+ * Calendar objects as one calendar file (import.md D274), as Nextcloud's
+ * export writes one: the calendar's name (`NAME`, `X-WR-CALNAME`) and colour
+ * (`X-APPLE-CALENDAR-COLOR`), each time zone once (a second, different
+ * definition of a TZID under a name of its own), then every object's
+ * components as stored. An object that cannot be read is left out and
+ * counted in `left`. With none read the calendar holds no component, which
+ * RFC 5545 does not allow: no such file is to be written.
+ */
+export function joinCalendar(
+  objects: readonly string[],
+  about: { readonly name: string; readonly color: string | null },
+): { readonly ics: string; readonly left: number } {
+  const root = new ICAL.Component("vcalendar");
+  root.addPropertyWithValue("version", "2.0");
+  root.addPropertyWithValue("prodid", "-//AstroTime//Export//EN");
+  root.addPropertyWithValue("name", about.name);
+  root.addPropertyWithValue("x-wr-calname", about.name);
+  const color = about.color && hexColor(about.color);
+  if (color) root.addPropertyWithValue("x-apple-calendar-color", color.toUpperCase());
+  /** Each TZID written, by its definition's meaning: a second, different one is written under a name of its own. */
+  const zones = new Map<string, string>();
+  const items: ICAL.Component[] = [];
+  let left = 0;
+  for (const ics of objects) {
+    let object: ICAL.Component;
+    try {
+      object = new ICAL.Component(ICAL.parse(ics) as unknown[]);
+    } catch {
+      left++;
+      continue;
+    }
+    // This object's TZIDs as written in the file: its own, or a new name
+    // where another object's zone of that TZID says otherwise (D7: each
+    // object keeps the zone it was written with).
+    const renamed = new Map<string, string>();
+    for (const zone of object.getAllSubcomponents("vtimezone").slice()) {
+      const tzid = String(zone.getFirstPropertyValue("tzid"));
+      const meant = canonical(zone);
+      let name = tzid;
+      for (let n = 2; zones.has(name) && zones.get(name) !== meant; n++) name = `${tzid}-${n}`;
+      if (name !== tzid) renamed.set(tzid, name);
+      if (zones.has(name)) continue;
+      zones.set(name, meant);
+      zone.updatePropertyWithValue("tzid", name);
+      root.addSubcomponent(zone);
+    }
+    for (const component of object.getAllSubcomponents().slice()) {
+      if (component.name === "vtimezone") continue;
+      if (renamed.size > 0) renameTzids(component, renamed);
+      items.push(component);
+    }
+  }
+  for (const item of items) root.addSubcomponent(item);
+  return { ics: writeCalendar(root), left };
+}

@@ -12,6 +12,7 @@ import {
 } from "@astrotime/core/split";
 
 import { decodeText } from "./decode.ts";
+import { isTakeoutTasks } from "./kind.ts";
 
 /** An event or a task of the file, as one calendar object. */
 export interface ImportItem {
@@ -114,13 +115,14 @@ export async function readImport(
       }
       // JSON: Google Takeout's tasks, told by their kind (their converter
       // loads for them alone); else jCal, below.
+      // Parsed once: Takeout's converted, jCal written as the iCalendar it spells.
       if (start.startsWith("{") || start.startsWith("[")) {
         const json: unknown = JSON.parse(text);
-        if (takeoutKind(json)) {
+        if (isTakeoutTasks(json)) {
           const converted = (await import("./takeout.ts")).takeoutToIcs(json);
           text = converted.text;
           notImported = converted.notImported;
-        }
+        } else text = jcalText(json);
       }
       // vCalendar 1.0, a calendar at a time (a file may hold 2.0 ones
       // beside it): its converter loads for such a calendar alone.
@@ -138,7 +140,7 @@ export async function readImport(
           .join("");
         notImported = [...names];
       }
-      calendars = splitCalendars(textOf(text), { newUid: options.newUid });
+      calendars = splitCalendars(text, { newUid: options.newUid });
     } catch (error) {
       if (!(error instanceof NotCalendarError || error instanceof SyntaxError)) throw error;
       // In an archive, one file AstroTime cannot read is named, not the archive's end.
@@ -162,26 +164,11 @@ export async function readImport(
   return { sources, guessed, unread };
 }
 
-/** Whether parsed JSON says it is Google Takeout's tasks, by its own `kind`. */
-function takeoutKind(json: unknown): boolean {
-  const kind = (value: unknown) =>
-    typeof value === "object" && value !== null ? (value as { kind?: unknown }).kind : undefined;
-  if (Array.isArray(json))
-    return json.length > 0 && json.every((list) => kind(list) === "tasks#taskList");
-  return kind(json) === "tasks#taskLists" || kind(json) === "tasks#taskList";
-}
-
 /** Whether a calendar's text is vCalendar 1.0: its `VERSION` before its first component. */
 function isVCalendar(block: string): boolean {
   if (!/^BEGIN:VCALENDAR/i.test(block)) return false;
   const head = block.split(/^BEGIN:V(?!CALENDAR)/im)[0]!;
   return /^VERSION:1\.0[ \t]*$/im.test(head);
-}
-
-/** iCalendar's text, from jCal's JSON (RFC 7265) when it is that. */
-function textOf(text: string): string {
-  const start = text.trimStart();
-  return start.startsWith("[") || start.startsWith("{") ? jcalText(JSON.parse(text)) : text;
 }
 
 const baseName = (name: string) => name.replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "") || name;

@@ -252,6 +252,7 @@ function SettingsGroups({
       ) : null}
       <Group title={t("settings.data")}>
         <ImportEntry calendars={calendars} hidden={hidden} colorOf={colorOf} />
+        <ExportEntry calendars={calendars} colorOf={colorOf} />
       </Group>
       <Group title={t("settings.notifications")}>
         <RemindersSwitch />
@@ -324,6 +325,47 @@ function ImportEntry({
         onClose={() => setFile(null)}
         calendars={calendars}
         hidden={hidden}
+        colorOf={colorOf}
+      />
+    </>
+  );
+}
+
+/** The export dialog, loaded with its first opening (import D274). */
+const ExportDialog = deferred(
+  () => import("./export-dialog.tsx"),
+  (module) => module.ExportDialog,
+  (props: ComponentProps<typeof import("./export-dialog.tsx").ExportDialog>) => props.open,
+);
+
+/** "Export to a file" (import D274): a calendar or list as one `.ics`. */
+function ExportEntry({
+  calendars,
+  colorOf,
+}: {
+  calendars: readonly Calendar[];
+  colorOf: (calendar: Calendar) => string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const hintId = useId();
+  return (
+    <>
+      <button
+        type="button"
+        aria-describedby={hintId}
+        onClick={() => setOpen(true)}
+        className="flex min-h-12 flex-col items-start justify-center gap-0.5 border-t border-line px-4 py-2 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        <span className="text-body text-accent">{t("settings.export")}</span>
+        <span id={hintId} className="text-note text-ink-muted">
+          {t("settings.export.hint")}
+        </span>
+      </button>
+      <ExportDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        calendars={calendars}
         colorOf={colorOf}
       />
     </>

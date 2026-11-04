@@ -3,6 +3,8 @@
 // asks about the items already there that differ, and writes them through
 // the store; the views show them. On a wide screen in English and on a
 // phone in Russian.
+import { readFileSync } from "node:fs";
+
 import { expect, test } from "@playwright/test";
 
 import { BIG, HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TAKEOUT, TEAM } from "./import-files.ts";
@@ -159,6 +161,38 @@ test("Google Takeout's tasks: each list a source, into the tasks screen", async 
   await expect(dialog.getByRole("region", { name: "Работа" })).toContainText("1 task");
   await dialog.getByRole("button", { name: "Import", exact: true }).click();
   await expect(dialog.getByRole("status")).toContainText("3 tasks");
+});
+
+test("export a calendar to a file, and import it back: every item already there (import D274)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  await page.getByRole("button", { name: /^Export to a file/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Export to a file" });
+  await choose(dialog.getByRole("combobox", { name: "Calendar or list" }), "Work");
+  const saving = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Export", exact: true }).click();
+  const download = await saving;
+  expect(download.suggestedFilename()).toBe("Work.ics");
+  const text = readFileSync(await download.path(), "utf8");
+  expect(text).toContain("X-WR-CALNAME:Work");
+  expect(text).toContain("SUMMARY:Design review");
+  // The web begins a download: said as begun, not as saved.
+  await expect(dialog.getByRole("status")).toContainText("the download of Work.ics has begun");
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+
+  await importFile(page, /^Import from a file/, "Work.ics", text);
+  const importing = page.getByRole("dialog", { name: "Import" });
+  const work = importing.getByRole("region", { name: "Work" });
+  // A calendar of its name is there: offered first.
+  await expect(work.getByRole("combobox", { name: "Events go to" })).toContainText("Work");
+  await importing.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(importing.getByRole("status")).toContainText("already there, skipped");
 });
 
 test.describe("on a phone, in Russian", () => {

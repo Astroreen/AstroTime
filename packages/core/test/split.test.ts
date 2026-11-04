@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { CalendarObject } from "../src/index.ts";
 import {
   jcalText,
+  joinCalendar,
   NotCalendarError,
   splitCalendar,
   splitCalendars,
@@ -709,5 +710,77 @@ describe("the file's object over the one stored (import D270, Update them)", () 
     expect(
       own.getAllSubcomponents("valarm").map((a) => a.getFirstPropertyValue("description")),
     ).toEqual(["Hour"]);
+  });
+});
+
+describe("objects as one calendar file (import D274, export)", () => {
+  test.each(exports)("%s, split and joined again, holds every component as written", (name) => {
+    const split = splitCalendar(fixture(`exports/${name}`));
+    const { ics, left } = joinCalendar(
+      split.objects.map((object) => object.ics),
+      { name: "Work", color: "#0b8043" },
+    );
+    expect(left).toBe(0);
+    const again = splitCalendar(ics);
+    expect(again).toMatchObject({ name: "Work", color: "#0b8043", problems: [] });
+    const components = (objects: readonly { ics: string }[]) =>
+      objects.flatMap((object) => componentsOf(object.ics)).toSorted();
+    expect(components(again.objects)).toEqual(components(split.objects));
+    // Each zone once.
+    const tzids = new ICAL.Component(ICAL.parse(ics))
+      .getAllSubcomponents("vtimezone")
+      .map((zone) => zone.getFirstPropertyValue("tzid"));
+    expect(new Set(tzids).size).toBe(tzids.length);
+  });
+
+  test("two definitions of one TZID: each object keeps its own, the later under a name of its own", () => {
+    const zone = (offset: string) => [
+      "BEGIN:VTIMEZONE",
+      "TZID:Office",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      `TZOFFSETFROM:${offset}`,
+      `TZOFFSETTO:${offset}`,
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    const at = (uid: string) => [
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      "DTSTAMP:20261101T080000Z",
+      "DTSTART;TZID=Office:20261105T090000",
+      "END:VEVENT",
+    ];
+    const { ics } = joinCalendar(
+      [
+        calendar(zone("+0200"), at("two")),
+        calendar(zone("+0500"), at("five")),
+        calendar(zone("+0200"), at("again")),
+      ],
+      { name: "Work", color: null },
+    );
+    const zones = new ICAL.Component(ICAL.parse(ics))
+      .getAllSubcomponents("vtimezone")
+      .map((one) => one.getFirstPropertyValue("tzid"));
+    expect(zones).toEqual(["Office", "Office-2"]);
+    const starts = Object.fromEntries(
+      splitCalendar(ics).objects.map((object) => {
+        const start = CalendarObject.parse(object.ics).master!.start as { epochMs: number };
+        return [object.uid, start.epochMs];
+      }),
+    );
+    expect(starts).toEqual({
+      two: Date.UTC(2026, 10, 5, 7),
+      five: Date.UTC(2026, 10, 5, 4),
+      again: Date.UTC(2026, 10, 5, 7),
+    });
+  });
+
+  test("an object that cannot be read is left out and counted", () => {
+    const { left } = joinCalendar(["not iCalendar", calendar(event("a"))], {
+      name: "A",
+      color: null,
+    });
+    expect(left).toBe(1);
   });
 });

@@ -2,8 +2,8 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4) and Google Takeout's
-tasks (PR I5) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4), Google Takeout's tasks
+(PR I5) and export (PR I6) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -184,7 +184,10 @@ not carry is said, not dropped in silence.
   CSV, Takeout) maps each field it has a home for; what has none (a CSV
   column such as Outlook's "Mileage", a vCalendar 1.0 rule iCalendar
   cannot say) is named in the preview as not imported, never written as
-  something it is not.
+  something it is not. It is named as the file names it, not translated:
+  a CSV's column as its header says, a vCalendar property, a Takeout
+  field (`parent`, `links.description`); the sentence around the names is
+  the UI's, in its language.
 
 - **D273. It weighs nothing until it is opened.** Settings' entry is a
   line in Settings' chunk; the import dialog is a chunk of its own, loaded
@@ -199,8 +202,20 @@ not carry is said, not dropped in silence.
   group writes a calendar's objects, as stored, into one `VCALENDAR` as
   Nextcloud's export does (each `VTIMEZONE` once, `X-WR-CALNAME` and the
   colour), saved with `Platform.saveFile` where the platform saves files
-  and as a download elsewhere. Built last (I6), as it is cheap once import
-  exists.
+  and as a download elsewhere. Any calendar or list can be exported, one
+  hidden from the views too. It says "saved" only when the platform says
+  the file was written, "not saved" when its dialog was turned away, and of
+  a download only that it has begun (a browser does not say more); the
+  answer of a save still on its way when the dialog closed or the calendar
+  changed is not shown. A calendar with nothing readable in it writes no
+  file (a `VCALENDAR` with no component is no calendar) and says there is
+  nothing to export. Two
+  objects defining one `TZID` differently keep both: the later one's is
+  renamed (`Office-2`) in that object. The file is named after the
+  calendar, made safe on every system (no control or reserved characters,
+  no trailing dot or space, no `CON` or `NUL` before its first dot in any
+  case, `COM` and `LPT` with superscript digits too, at most 100 characters,
+  else `calendar.ics`). Built last (I6), as it is cheap once import exists.
 
 ## Deferred
 
@@ -210,6 +225,18 @@ not carry is said, not dropped in silence.
 - **xCal (RFC 6321)** (D266): no exporter people use writes it; it would
   need an XML reader in the import chunk. Comes when a user has such a
   file.
+- **Takeout's link titles** (D272): a task's links come over as their
+  addresses (`ATTACH`); their `description` (a mail's subject) and `type`
+  have no place in an `ATTACH` AstroTime reads, and are not carried over
+  (the preview names `links.description`). An `X-` parameter could keep them
+  once the details show one. A task's `hidden` (Google's "cleared" done
+  task) is not kept: the task comes over done, shown as done tasks are.
+- **Recorded fixtures for the converters** (D266): the vCalendar, CSV and
+  Takeout fixtures are written by hand from each format's documentation
+  (`packages/ui/test/fixtures/README.md`); a real export of each (an old
+  phone's `.vcs`, Outlook's and Google's CSV, a Takeout `Tasks.json`)
+  replaces them as one is at hand, the first that differs from its
+  documentation a test of its own.
 - **Todoist's CSV** (D266): its dates are free English ("every other
   Monday", "tomorrow at 5pm"), which needs Todoist's own grammar to read;
   titles and subtasks alone would import tasks without their dates.
@@ -320,9 +347,25 @@ is a file that is not Takeout's. No value can become a line of its own:
 text escaped and its control characters dropped, a link parsed as an
 http(s) URL and refused with a control character in it, a place digits
 alone, an id letters, digits, `-` and `_`; the same holds for a
-vCalendar's `URL`, `ATTACH` and a guest's name. D266, D272.
+vCalendar's `URL`, `ATTACH` and a guest's name. A subtask whose parent
+was deleted or is not in the file names no parent (a link to nothing),
+and that is said. A task with no readable `updated` gets the fixed
+`DTSTAMP` 1970-01-01, so the same file gives the same text on every
+import; `DTSTAMP` is bookkeeping a re-import's comparison ignores.
+D266, D272.
 
 ### PR I6 — Export
+
+"Export to a file" in Settings' "Data" group, its dialog loaded with its
+first opening (`components/export-dialog.tsx`): a calendar or list, as
+stored on this device (changes not yet synced too), joined by
+`joinCalendar` (`@astrotime/core/split`) into one `.ics` with its name
+and colour and each zone once, saved through `saveFile`
+(`components/save-file.ts`, which the attachments' save now shares).
+D274.
+
+Done when: the e2e exports a demo calendar, reads the download, and
+imports it back to find every item already there.
 
 Each converter's PR: its recorded or documented sample files, what maps
 and what is said as not imported (D272), its own chunk (D273).

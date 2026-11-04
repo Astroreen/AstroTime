@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { CalendarObject, type Task } from "@astrotime/core";
 import { describe, expect, test } from "vite-plus/test";
 
+import { isTakeoutTasks } from "../src/import/kind.ts";
 import { NotImportableError, readImport } from "../src/import/read.ts";
 
 const bytes = readFileSync(new URL("fixtures/import/takeout-tasks.json", import.meta.url));
@@ -43,7 +44,18 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
     expect(file.sources[0]!.items.some((item) => item.ics.includes("Something deleted"))).toBe(
       false,
     );
-    expect(file.sources[0]!.notImported).toEqual([]);
+    // The mail link's title has no place in an ATTACH: said.
+    expect(file.sources[0]!.notImported).toEqual(["links.description"]);
+  });
+
+  test("one predicate tells Takeout's tasks, for the import and its converter alike", () => {
+    expect(isTakeoutTasks({ kind: "tasks#taskLists", items: [] })).toBe(true);
+    expect(isTakeoutTasks({ kind: "tasks#taskList" })).toBe(true);
+    expect(isTakeoutTasks([{ kind: "tasks#taskList" }])).toBe(true);
+    expect(isTakeoutTasks([])).toBe(false);
+    expect(isTakeoutTasks([{ kind: "tasks#taskList" }, null])).toBe(false);
+    expect(isTakeoutTasks(null)).toBe(false);
+    expect(isTakeoutTasks(["vcalendar", [], []])).toBe(false);
   });
 
   test("the same tasks give the same UIDs: a second import finds them there", async () => {
@@ -107,6 +119,13 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
   });
 
   test("a malformed file is refused or read as far as it goes, never a crash", async () => {
+    // Not JSON at all, though it starts as JSON does: said so, as before.
+    await expect(
+      readImport(
+        { name: "broken.json", bytes: new TextEncoder().encode('{"kind": "tasks#taskLists",') },
+        { language: "en", timeZone: "UTC", newUid: () => "x", pause: () => Promise.resolve() },
+      ),
+    ).rejects.toThrow(NotImportableError);
     // Not Takeout's shape at all.
     await expect(fromJson(null)).rejects.toThrow(NotImportableError);
     await expect(fromJson({ kind: "tasks#taskLists", items: null })).rejects.toThrow(
@@ -148,5 +167,37 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
     ];
     const file = await fromJson(jcal, "calendar.json");
     expect(file.sources[0]!.items.map((item) => item.uid)).toEqual(["j"]);
+  });
+
+  test("a subtask whose parent was deleted or is not in the file names no parent, and that is said", async () => {
+    const file = await fromJson(
+      list([
+        task({ id: "gone", title: "Gone", deleted: true }),
+        task({ id: "a", title: "Under a deleted one", parent: "gone" }),
+        task({ id: "b", title: "Under a stranger", parent: "elsewhere" }),
+        task({ id: "c", title: "Under a kept one", parent: "a" }),
+      ]),
+    );
+    const [a, b, c] = file.sources[0]!.items;
+    expect(a!.ics).not.toContain("RELATED-TO");
+    expect(b!.ics).not.toContain("RELATED-TO");
+    expect(c!.ics).toContain("RELATED-TO:google-task-a");
+    expect(file.sources[0]!.notImported).toEqual(["parent"]);
+  });
+
+  test("a task with no parent (absent, null, empty) is the list's own: nothing said lost", async () => {
+    const file = await fromJson(
+      list([
+        task({ id: "a", title: "None" }),
+        task({ id: "b", title: "Null", parent: null }),
+        task({ id: "c", title: "Empty", parent: "" }),
+      ]),
+    );
+    expect(file.sources[0]!.items.map((item) => item.ics.includes("RELATED-TO"))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(file.sources[0]!.notImported).toEqual([]);
   });
 });
