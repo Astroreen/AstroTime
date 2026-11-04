@@ -167,7 +167,13 @@ marked _to be recorded_.
   are now, `packages/caldav/test/fixtures/README.md`).
   _Built:_ `packages/caldav/test/recording.ts`: the recorder (each
   request's `Authorization` kept as its scheme alone, its values in
-  memory only), the stand-ins put in word by word, and **the guard**
+  memory only; each request's server too, as a service answers on several,
+  iCloud's `pNN-caldav`), the stand-ins put in word by word into the
+  values themselves, quotes, line breaks and non-ASCII as they are, never
+  the file's keys; the ids to put out found in every address the
+  recording holds (requests, answers, every `href`: owners, shares,
+  principals) and every other user's `mailto:`, from the recording alone,
+  with no request more to the account (`standInsFor`); and **the guard**
   (`leaks`), which looks at the file to be written on its own, whatever
   the stand-ins did, for every spelling of the account's values as a raw
   substring in any case: the user name and e-mail, the password, each
@@ -176,11 +182,16 @@ marked _to be recorded_.
   Digest `response` and `cnonce` sent; any of them found, nothing is
   written. Only a local test server's fixed user name (the interop run's
   `astro`) may be declared public. The strict replay answers in order,
-  checks each request's scheme, and recomputes a Digest answer against
-  the challenge whose nonce it names, so a replay proves Digest too.
+  checks each request's server, scheme and the headers that change what
+  it does (`Content-Type`, `If-Match`, `If-None-Match`, `Prefer`), and
+  recomputes a Digest answer against the challenge whose nonce it names
+  (a parameter read whole: `nonce`, never `cnonce`'s), so a replay proves
+  Digest too.
   `scenario.ts` makes a calendar named for the run (`astrotime-recording-`,
   a time and a random part), removes what an earlier run left under that
-  prefix first, and tries its cleanup twice. `scripts/record-caldav-service.ts`
+  prefix first, and tries its cleanup twice; a cleanup that fails after
+  the scenario failed is reported beside that failure, never in its
+  place. `scripts/record-caldav-service.ts`
   and `services.test.ts` complete it, first proven on the interop run's
   Baïkal (Digest), Xandikos and DAViCal (`fixtures/services/`). Recording
   Xandikos found AstroTime's own scenario writing a `SUMMARY` with an
