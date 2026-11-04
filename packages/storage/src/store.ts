@@ -1073,14 +1073,15 @@ const LOCAL_SERVER = "local:";
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
   // An older build's tab writes `read_only` and not `rights`: where they
-  // disagree on editing, the fresher `read_only` wins.
+  // disagree on editing, the fresher `read_only` wins, either way: this
+  // build writes it as `!rights.edit`.
   const granted = rights?.split(",") ?? (readOnly ? [] : RIGHTS);
   return {
     ...row,
     components: row.components.split(",").filter(Boolean) as Component[],
     rights: {
       create: granted.includes("create"),
-      edit: granted.includes("edit") && !readOnly,
+      edit: !readOnly,
       delete: granted.includes("delete"),
     },
   };
