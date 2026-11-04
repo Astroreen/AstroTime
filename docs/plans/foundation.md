@@ -2413,6 +2413,12 @@ task?"
 - **Attachments** — `ATTACH` is kept ([D7](#D7)), not shown or edited.
 - **A time-zone picker** — an item keeps its zone and a new one takes the
   user's ([D104](#D104)); writing an item in another zone needs a picker.
+- **A change of offset shorter than a week in a written VTIMEZONE** — for
+  a zone with no change in the year before the item's, `vtimezone` samples
+  the twenty years after weekly before scanning them day by day
+  ([D104](#D104)), so a change undone within a week is missed there. None
+  is known in the years ahead; a day-by-day scan costs some 7,300
+  `Intl` calls a VTIMEZONE.
 - **CalDAV `MOVE`** — a move to another calendar is a creation and a
   deletion ([D106](#D106)); `MOVE` would keep the server's own record of
   the item (its history, Nextcloud's shares), when the provider learns it.
