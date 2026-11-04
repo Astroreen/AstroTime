@@ -718,3 +718,46 @@ export function overlay(stored: string, incoming: string): string {
 export function zoneText(timeZone: string, year: number): string {
   return vtimezone(timeZone, year).toString();
 }
+
+/**
+ * Calendar objects as one calendar file (import.md D274), as Nextcloud's
+ * export writes one: the calendar's name (`NAME`, `X-WR-CALNAME`) and colour
+ * (`X-APPLE-CALENDAR-COLOR`), each time zone once (the first definition of
+ * a TZID), then every object's components as stored. An object that cannot
+ * be read is left out and counted in `left`.
+ */
+export function joinCalendar(
+  objects: readonly string[],
+  about: { readonly name: string; readonly color: string | null },
+): { readonly ics: string; readonly left: number } {
+  const root = new ICAL.Component("vcalendar");
+  root.addPropertyWithValue("version", "2.0");
+  root.addPropertyWithValue("prodid", "-//AstroTime//Export//EN");
+  root.addPropertyWithValue("name", about.name);
+  root.addPropertyWithValue("x-wr-calname", about.name);
+  const color = about.color && hexColor(about.color);
+  if (color) root.addPropertyWithValue("x-apple-calendar-color", color.toUpperCase());
+  const zones = new Set<string>();
+  const items: ICAL.Component[] = [];
+  let left = 0;
+  for (const ics of objects) {
+    let object: ICAL.Component;
+    try {
+      object = new ICAL.Component(ICAL.parse(ics) as unknown[]);
+    } catch {
+      left++;
+      continue;
+    }
+    for (const component of object.getAllSubcomponents().slice()) {
+      if (component.name !== "vtimezone") items.push(component);
+      else {
+        const tzid = String(component.getFirstPropertyValue("tzid"));
+        if (zones.has(tzid)) continue;
+        zones.add(tzid);
+        root.addSubcomponent(component);
+      }
+    }
+  }
+  for (const item of items) root.addSubcomponent(item);
+  return { ics: writeCalendar(root), left };
+}

@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { CalendarObject } from "../src/index.ts";
 import {
   jcalText,
+  joinCalendar,
   NotCalendarError,
   splitCalendar,
   splitCalendars,
@@ -709,5 +710,34 @@ describe("the file's object over the one stored (import D270, Update them)", () 
     expect(
       own.getAllSubcomponents("valarm").map((a) => a.getFirstPropertyValue("description")),
     ).toEqual(["Hour"]);
+  });
+});
+
+describe("objects as one calendar file (import D274, export)", () => {
+  test.each(exports)("%s, split and joined again, holds every component as written", (name) => {
+    const split = splitCalendar(fixture(`exports/${name}`));
+    const { ics, left } = joinCalendar(
+      split.objects.map((object) => object.ics),
+      { name: "Work", color: "#0b8043" },
+    );
+    expect(left).toBe(0);
+    const again = splitCalendar(ics);
+    expect(again).toMatchObject({ name: "Work", color: "#0b8043", problems: [] });
+    const components = (objects: readonly { ics: string }[]) =>
+      objects.flatMap((object) => componentsOf(object.ics)).toSorted();
+    expect(components(again.objects)).toEqual(components(split.objects));
+    // Each zone once.
+    const tzids = new ICAL.Component(ICAL.parse(ics))
+      .getAllSubcomponents("vtimezone")
+      .map((zone) => zone.getFirstPropertyValue("tzid"));
+    expect(new Set(tzids).size).toBe(tzids.length);
+  });
+
+  test("an object that cannot be read is left out and counted", () => {
+    const { left } = joinCalendar(["not iCalendar", calendar(event("a"))], {
+      name: "A",
+      color: null,
+    });
+    expect(left).toBe(1);
   });
 });

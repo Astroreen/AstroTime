@@ -2,8 +2,8 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4) and Google Takeout's
-tasks (PR I5) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4), Google Takeout's tasks
+(PR I5) and export (PR I6) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -323,6 +323,17 @@ alone, an id letters, digits, `-` and `_`; the same holds for a
 vCalendar's `URL`, `ATTACH` and a guest's name. D266, D272.
 
 ### PR I6 — Export
+
+"Export to a file" in Settings' "Data" group, its dialog loaded with its
+first opening (`components/export-dialog.tsx`): a calendar or list, as
+stored on this device (changes not yet synced too), joined by
+`joinCalendar` (`@astrotime/core/split`) into one `.ics` with its name
+and colour and each zone once, saved through `saveFile`
+(`components/save-file.ts`, which the attachments' save now shares).
+D274.
+
+Done when: the e2e exports a demo calendar, reads the download, and
+imports it back to find every item already there.
 
 Each converter's PR: its recorded or documented sample files, what maps
 and what is said as not imported (D272), its own chunk (D273).
