@@ -81,6 +81,14 @@ function dayOfRule(year: number, month: number, byDay: string): number {
   return lastDate.getUTCDate() - ((lastDate.getUTCDay() - weekday + 7) % 7);
 }
 
+/** Whether the zone's offset is ever other than `offset` from the year `from` to the year `to`, sampled weekly. */
+function changesWithin(timeZone: string, from: number, to: number, offset: number): boolean {
+  for (let at = Date.UTC(from, 0, 1); at < Date.UTC(to, 0, 1); at += 7 * DAY_MS) {
+    if (offsetAt(at, timeZone) !== offset) return true;
+  }
+  return false;
+}
+
 /** How many years after the first a yearly rule is checked for, and the onsets listed for a zone without one. */
 const YEARS = 20;
 
@@ -96,15 +104,19 @@ export function vtimezone(timeZone: string, year: number): ICAL.Component {
   const component = new ICAL.Component("vtimezone");
   component.addPropertyWithValue("tzid", timeZone);
   const found = transitions(timeZone, first);
+  if (found.length === 0) {
+    const offset = offsetAt(Date.UTC(year, 0, 1), timeZone);
+    component.addSubcomponent(
+      observance("standard", "1970-01-01T00:00:00", utcOffset(offset), utcOffset(offset)),
+    );
+    // A zone that changes only later (Almaty in 2024) lists those changes
+    // after it. Weekly samples find any change that lasts a week (summer
+    // time, Morocco's Ramadan) for a seventh of a scan day by day.
+    if (!changesWithin(timeZone, year, year + YEARS, offset)) return component;
+  }
   const later = Array.from({ length: YEARS }, (_, i) => first + 1 + i).map(
     (y) => [y, transitions(timeZone, y)] as const,
   );
-  if (found.length === 0) {
-    const offset = utcOffset(offsetAt(Date.UTC(year, 0, 1), timeZone));
-    component.addSubcomponent(observance("standard", "1970-01-01T00:00:00", offset, offset));
-    // A zone that changes only later (Almaty in 2024) lists those changes after it.
-    if (later.every(([, list]) => list.length === 0)) return component;
-  }
   const regular =
     found.length > 0 &&
     found.every((transition, index) => {
