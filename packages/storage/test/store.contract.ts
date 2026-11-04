@@ -436,6 +436,27 @@ export function storeContract(name: string, driver: () => Promise<SqlDriver> | S
       expect(await store.accounts()).toEqual([server]);
     });
 
+    test("an account on this device with no calendar left goes, and that is said (D122)", async () => {
+      const { store } = await setup();
+      await store.saveCalendar({
+        accountId: (await store.accounts())[0]!.id,
+        url: "https://cloud.example.com/remote.php/dav/calendars/astro/tasks/",
+        name: "Tasks",
+        color: null,
+        components: ["VTODO"],
+        rights: ALL_RIGHTS,
+      });
+      await store.addAccount({
+        provider: "local",
+        name: "On this device",
+        serverUrl: LOCAL_SERVER,
+        username: null,
+      });
+      expect(await store.removeLocalCalendarIfUnused()).toBe(true);
+      expect((await store.accounts()).map((account) => account.provider)).toEqual(["caldav"]);
+      expect(await store.removeLocalCalendarIfUnused()).toBe(false);
+    });
+
     test("a calendar the user made on this device is the user's: it never steps aside (import D269)", async () => {
       const { store, account: server } = await setup();
       await store.saveCalendar({

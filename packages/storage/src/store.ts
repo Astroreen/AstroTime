@@ -286,6 +286,7 @@ export class Store {
         }
         if ((await this.calendars(account.id)).length > 0) continue;
         await this.db.delete(schema.accounts).where(eq(schema.accounts.id, account.id));
+        removed = true;
       }
       if (removed) this.undoneCache.clear();
       return removed;
