@@ -14,6 +14,7 @@ import {
   type SyncState,
   type WriteResult,
 } from "@astrotime/core/provider";
+import { foldLine } from "@astrotime/core/lines";
 
 export const TASKS_API = "https://tasks.googleapis.com/tasks/v1/";
 
@@ -57,31 +58,6 @@ const unescape = (text: string) =>
     char === "n" || char === "N" ? "\n" : char,
   );
 
-const utf8 = new TextEncoder();
-
-/**
- * RFC 5545 §3.1: a line of more than 75 octets folded, counted in UTF-8 (a
- * Cyrillic letter is two), never inside a character: the first part 75
- * octets at most, each next one 74 after its leading space.
- */
-const fold = (line: string) => {
-  const parts: string[] = [];
-  let part = "";
-  let octets = 0;
-  for (const char of line) {
-    const size = utf8.encode(char).length;
-    if (octets + size > (parts.length === 0 ? 75 : 74)) {
-      parts.push(part);
-      part = "";
-      octets = 0;
-    }
-    part += char;
-    octets += size;
-  }
-  parts.push(part);
-  return parts.join("\r\n ");
-};
-
 /** `20261104T101500Z` from an RFC 3339 time. */
 const utc = (time: string) =>
   new Date(time).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
@@ -106,7 +82,7 @@ export function vtodoOf(task: GoogleTask): string {
     "END:VTODO",
     "END:VCALENDAR",
   ];
-  return `${lines.map(fold).join("\r\n")}\r\n`;
+  return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
 /** A VTODO's properties by name, unfolded, with their parameters and values. */
@@ -169,12 +145,42 @@ export function taskFieldsOf(ics: string): {
       notes: first("DESCRIPTION") ? unescape(first("DESCRIPTION")!.value) : null,
       due: dueDay,
       status: status === "COMPLETED" ? "completed" : "needsAction",
-      // Reopened: Google keeps the old time until it is cleared.
-      ...(status === "COMPLETED" ? {} : { completed: null }),
+      // Done: the time it was done, as the item says it (Google takes it);
+      // reopened: Google keeps the old time until it is cleared.
+      ...(status === "COMPLETED"
+        ? first("COMPLETED")
+          ? { completed: rfc3339(first("COMPLETED")!.value) }
+          : {}
+        : { completed: null }),
     },
-    parent: first("RELATED-TO")?.value ?? null,
+    parent: parentOf(properties, dropped),
     dropped: [...dropped],
   };
+}
+
+/** `20261109T180000Z` as RFC 3339. */
+function rfc3339(value: string): string | null {
+  const time = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
+  return time ? `${time[1]}-${time[2]}-${time[3]}T${time[4]}:${time[5]}:${time[6]}.000Z` : null;
+}
+
+/**
+ * The task's parent: a `RELATED-TO` that names one (`RELTYPE=PARENT`, or
+ * none, RFC 5545's default). Another kind (a child, a sibling), or a
+ * second parent, Google has no place for: named among what it did not keep.
+ */
+function parentOf(
+  properties: readonly { name: string; params: string; value: string }[],
+  dropped: Set<string>,
+): string | null {
+  let parent: string | null = null;
+  for (const { name, params, value } of properties) {
+    if (name !== "RELATED-TO") continue;
+    const type = /;RELTYPE=([^;:]+)/i.exec(params)?.[1]?.toUpperCase() ?? "PARENT";
+    if (type === "PARENT" && parent === null) parent = value;
+    else dropped.add("RELATED-TO");
+  }
+  return parent;
 }
 
 /** Each list's tasks at `<TASKS_API>lists/<id>/tasks/`, each task there by its id. */
@@ -297,12 +303,35 @@ export class GoogleTasks implements Provider {
   }
 
   /**
+   * A parent the Tasks API can take: a task of the same list. One it does
+   * not hold (a parent elsewhere, or not yet uploaded) is named among what
+   * was not kept, and the task goes to the top.
+   */
+  private async parentIn(
+    list: string,
+    parent: string | null,
+    dropped: readonly string[],
+  ): Promise<{ readonly parent: string | null; readonly dropped: readonly string[] }> {
+    if (parent === null) return { parent, dropped };
+    const found = await this.json<GoogleTask>(
+      "GET",
+      `${list}${encodeURIComponent(parent)}`,
+      undefined,
+      [400, 404],
+    );
+    if (found.status === 200 && found.value && !found.value.deleted) return { parent, dropped };
+    return { parent: null, dropped: [...new Set([...dropped, "RELATED-TO"])] };
+  }
+
+  /**
    * Inserted in the list `href` names, under its parent (`insert`'s `parent`);
    * Google gives its id, and its href with it.
    */
   async create(href: string, ics: string): Promise<WriteResult> {
     const list = href.slice(0, href.lastIndexOf("/") + 1);
-    const { fields, parent, dropped } = taskFieldsOf(ics);
+    const read = taskFieldsOf(ics);
+    const { fields } = read;
+    const { parent, dropped } = await this.parentIn(list, read.parent, read.dropped);
     const body = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== null));
     const url = new URL(list);
     if (parent) url.searchParams.set("parent", parent);
@@ -322,7 +351,10 @@ export class GoogleTasks implements Provider {
    * takes no `If-Match`, so the last write wins (D252).
    */
   async update(href: string, ics: string): Promise<WriteResult> {
-    const { fields, parent, dropped } = taskFieldsOf(ics);
+    const read = taskFieldsOf(ics);
+    const { fields } = read;
+    const list = href.slice(0, href.lastIndexOf("/") + 1);
+    const { parent, dropped } = await this.parentIn(list, read.parent, read.dropped);
     const patched = await this.json<GoogleTask>("PATCH", href, fields, [404]);
     if (patched.status === 404 || !patched.value) return { ok: false, reason: "gone" };
     let task = patched.value;

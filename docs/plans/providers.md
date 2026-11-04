@@ -319,13 +319,20 @@ marked _to be recorded_.
   the next `updatedMin` the latest `updated` a listing saw, Google's
   clock and never the device's; the first listing removing what Google no
   longer has; `PATCH` of the kept fields, `completed` cleared when a task
-  is reopened; a parent set by `insert`'s `parent` and changed by `move`,
-  never lost; the Tasks API taking no `If-Match`, so the last write wins),
+  is reopened, and a done task's `COMPLETED` sent as its `completed`; a
+  parent set by `insert`'s `parent` and changed by `move`, never lost,
+  and only from a `RELATED-TO` with `RELTYPE=PARENT` (or none) naming a
+  task of the same list, any other said not kept; the Tasks API taking no `If-Match`, so the last write wins),
   `vtodoOf` and `taskFieldsOf` (the mapping both ways, lines folded at 75
   octets of UTF-8, never inside a character; Google's `position` kept as
   `X-GOOGLE-TASKS-POSITION`, read-only), and
   `GoogleProvider`, the composite that sends each call to the API whose
-  address it names; proven against a fake Tasks API through the engine
+  address it names, and lists both sides so that one failing (the Tasks
+  API not enabled, its scope not granted) leaves the other syncing: the
+  engine's `PartialListing`, the side not read reported `failed` and its
+  calendars kept as they were, not removed (a side signed out or offline
+  is the account's, `AuthError` or `OfflineError` stopping the sync as
+  ever); proven against a fake Tasks API through the engine
   and a real store. The account's sign-in, its `google` row and secret,
   the registry's entry and the dialog's button come with the owner's
   clients ([D257](#D257)), as does recording Google's CalDAV. The first
@@ -370,6 +377,56 @@ marked _to be recorded_.
   in P6 before anything is written; what does not hold is recorded here.
   Tasks come from `/me/todo/lists/{id}/tasks/delta`. It comes after
   Google ([D246](#D246)).
+
+  _Built, against a fake Graph until the owner's client exists
+  ([D258](#D258)):_ `@astrotime/microsoft` — `OutlookCalendars` (the
+  calendars of `me/calendars`, read-only where `canEdit` is false; each
+  calendar's single events and series masters, pages followed by
+  `@odata.nextLink`; every time asked as an instant (`Prefer` in UTC)
+  and written in the event's own zone, `originalStartTimeZone` (an IANA
+  name or a Windows one, `W. Europe Standard Time`), with its VTIMEZONE
+  ([foundation D104](foundation.md#D104)), so a series keeps its wall
+  clock across a DST change ([D33](foundation.md#D33)), its `BYDAY` its
+  start's weekday and its `UNTIL` its end day's last second there; a
+  floating time written back in the user's zone, a TZID's in its own;
+  an all-day event's day that of its midnight's instant in its own zone
+  (Vilnius's 6 November begins on the 5th in UTC; a zone not known
+  here, the nearest midnight), and a day made here the user's midnight;
+  a changed master's
+  exceptions from `instances` over a year before today and two after,
+  one calendar object whose ETag is the master's and its exceptions'
+  together; a write the `PATCH` of the fields that differ from Graph's
+  version read just before, with the event's `If-Match`, `412` a
+  conflict for the sync's merge, `404` gone; a create carrying the UID
+  as Graph's `transactionId`, so one sent again after its answer was
+  lost is the event Graph made then, not a second; a rule or a field removed
+  here sent as `null` or empty (a series made single, a place cleared);
+  a rule leaving its days to the start (`FREQ=WEEKLY`, as Google and
+  Nextcloud write it) taken from the start, RFC 5545's reading; a rule
+  Graph's `recurrence` cannot say (a month-day list, `BYMONTHDAY=1,15`,
+  or one from the end, `-1`) not sent and said not kept, the event
+  written without it; an
+  exception under its series' UID ([D34](foundation.md#D34)), whatever
+  its own `iCalUId`), `MicrosoftTodo`
+  (lists and tasks the same way, a task with no ETag on either side
+  fetched again ([D37](foundation.md#D37)), `importance` as `PRIORITY`,
+  what To Do has no field for said not kept), `rruleOf` and `recurrenceOf` (each of
+  Graph's patterns both ways) and `MicrosoftProvider`, the composite
+  routing by address with one side failing leaving the other syncing, as
+  Google's ([D252](#D252)); iCalendar's lines from `@astrotime/core/lines`.
+  Until Graph is recorded (P6's "Done when"), what a recording decides is
+  built the plain way: **no `delta` yet** — each sync lists a calendar's
+  events and a list's tasks in full and compares their ETags, which
+  holds on every calendar kind, where `delta`'s masters are not proven;
+  an exception edited in Outlook with its master untouched arrives with
+  the master's next change; a cancelled occurrence (`EXDATE`) is not
+  read; an occurrence's own edit here is not written, and is said not
+  kept (`RECURRENCE-ID`), as is a series made here with exceptions. The
+  account's sign-in and the dialog's button come with the owner's client.
+  The first load grows by 90 bytes (127 406 to 127 496 on main
+  `1d6f7fb`), the engine's partial listing ([D252](#D252)), known by its
+  fields so that the class stays with the providers; `@astrotime/microsoft`
+  loads with a Microsoft account.
 
 - **D254. OAuth 2 on every platform: the authorization code with PKCE.**
   One flow, `@astrotime/oauth` (isomorphic, AGENTS.md rule 1): the
@@ -734,6 +791,17 @@ marked _to be recorded_.
   on Google's CalDAV), `syncAll`'s entry for it and the dialog's button
   wait for the owner's OAuth clients ([D257](#D257)), Google's CalDAV
   recorded then too.
+
+- **Microsoft wired in** ([D253](#D253)) — the provider is built; the
+  sign-in (the `microsoft` account, its tokens in the secret store),
+  `syncAll`'s entry and the dialog's button wait for the owner's client
+  ([D258](#D258)). Then Graph is recorded, and from what it shows:
+  `events/delta` and `tasks/delta` in place of the full listings, an
+  exception's own change and a cancelled occurrence (`EXDATE`) read, and
+  an occurrence's edit and deletion written to its own event. An event
+  made here takes Graph's `iCalUId` (Graph sets it, read-only) once
+  Graph's version comes down; keeping the UID made here (an extended
+  property read back as `UID`) is decided then too.
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
   starts in a bootstrap mode whose setup is its web wizard, writing a

@@ -20,6 +20,14 @@
     "./split": {
       "types": "./src/split.ts",
       "import": "./src/split.ts"
+    },
+    "./lines": {
+      "types": "./src/lines.ts",
+      "import": "./src/lines.ts"
+    },
+    "./time": {
+      "types": "./src/time.ts",
+      "import": "./src/time.ts"
     }
   },
   "scripts": {
