@@ -144,3 +144,49 @@ for (const [format, language, theme, size, viewport] of [
     await context.close();
   });
 }
+
+// Export (import D274): a calendar chosen, the file saved, said.
+for (const [language, theme, size, viewport] of [
+  ["ru", "dark", "phone", PHONE],
+  ["en", "light", "wide", WIDE],
+] as const) {
+  test(`export ${language} ${theme} ${size}`, async ({ browser }) => {
+    const words = WORDS[language];
+    const context = await browser.newContext({
+      locale: words.locale,
+      colorScheme: theme,
+      viewport,
+      ...(size === "phone" ? { hasTouch: true, isMobile: true } : {}),
+      timezoneId: "Europe/Vilnius",
+      acceptDownloads: true,
+    });
+    const page = await context.newPage();
+    await openDemo(page, "week");
+    if (size === "phone") {
+      await page.getByRole("button", { name: words.menu }).click();
+      await page
+        .getByRole("dialog", { name: words.menu })
+        .getByRole("button", { name: words.settings })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: words.menu })
+        .getByRole("button", { name: words.settings })
+        .click();
+    }
+    await page
+      .getByRole("button", { name: language === "en" ? /^Export to a file/ : /^Экспорт в файл/ })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: language === "en" ? "Export to a file" : "Экспорт в файл",
+    });
+    const saving = page.waitForEvent("download");
+    await dialog
+      .getByRole("button", { name: language === "en" ? "Export" : "Экспортировать", exact: true })
+      .click();
+    await saving;
+    await expect(dialog.getByRole("status")).toBeVisible();
+    await page.screenshot({ path: `${directory}/export-${language}-${theme}-${size}.png` });
+    await context.close();
+  });
+}
