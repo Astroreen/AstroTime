@@ -5,6 +5,7 @@
 // goes to the API whose address it is. Nothing outside this package knows
 // there are two (AGENTS.md rule 4). Loaded only with a Google account (D255).
 import { CalDavProvider, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { CannotMakeCalendarError } from "@astrotime/core/new-calendar";
 import {
   PartialListing,
   type Changes,
@@ -25,7 +26,11 @@ export { GoogleTasks, taskFieldsOf, TASKS_API, vtodoOf, type GoogleTask } from "
 export class GoogleProvider implements Provider {
   private readonly events: Provider;
   private readonly tasks: Provider;
-  /** Where a new calendar of events is made: the Calendar API, as Google's CalDAV makes none. */
+  /**
+   * Where a new calendar of events is made: the Calendar API, as Google's
+   * CalDAV makes none. Without it (a test's provider of two parts), a
+   * calendar of events is not made: `unsupported`.
+   */
   private readonly calendarsApi: Pick<Provider, "makeCalendar">;
 
   constructor(
@@ -67,9 +72,10 @@ export class GoogleProvider implements Provider {
   }
 
   /** Events in a new Google calendar, tasks in a new task list (providers D275). */
-  makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
     const part = calendar.component === "VTODO" ? this.tasks : this.calendarsApi;
-    if (!part.makeCalendar) throw new Error("This part of the account makes no calendars.");
+    if (!part.makeCalendar)
+      throw new CannotMakeCalendarError("unsupported", "This part of the account makes none.");
     return part.makeCalendar(calendar);
   }
 

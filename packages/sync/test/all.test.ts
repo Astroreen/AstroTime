@@ -899,11 +899,19 @@ describe("a calendar made on an account's server (providers D275)", () => {
       serverUrl: "local:",
       username: "",
     });
-    await expect(makeCalendar(context, local.id, ask)).rejects.toThrow(CannotMakeCalendarError);
+    const refused = (reason: CannotMakeCalendarError["reason"]) =>
+      expect.objectContaining({ name: "CannotMakeCalendarError", reason });
+    await expect(makeCalendar(context, local.id, ask)).rejects.toEqual(refused("no-server"));
     const account = (await add("a.example")).account;
     // The memory server makes none until told how.
-    await expect(makeCalendar(context, account.id, ask)).rejects.toThrow(CannotMakeCalendarError);
-    making(a, "https://a.example/plans/");
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("unsupported"));
+    const asked = making(a, "https://a.example/plans/");
+    // A name that is nothing once trimmed is refused before anything is sent.
+    for (const name of ["", "   ", "\u0007\t\u0000"])
+      await expect(makeCalendar(context, account.id, { ...ask, name })).rejects.toEqual(
+        refused("no-name"),
+      );
+    expect(asked).toEqual([]);
     a.offline = true;
     const makeOffline = a.makeCalendar!;
     a.makeCalendar = async (calendar) => {
@@ -913,6 +921,19 @@ describe("a calendar made on an account's server (providers D275)", () => {
     await expect(makeCalendar(context, account.id, ask)).rejects.toThrow(OfflineError);
     expect((await store.calendars(account.id)).map((c) => c.name)).not.toContain("Plans");
     await secrets.delete(`account:${account.id}`);
-    await expect(makeCalendar(context, account.id, ask)).rejects.toThrow(CannotMakeCalendarError);
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("signed-out"));
+  });
+
+  test("the name is sent trimmed, its control characters gone", async () => {
+    const { a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    const asked = making(a, "https://a.example/plans/");
+    const made = await makeCalendar(context, account.id, {
+      name: "  Plans\u0007 2027 ",
+      color: null,
+      component: "VTODO",
+    });
+    expect(asked.map((calendar) => calendar.name)).toEqual(["Plans 2027"]);
+    expect(made.name).toBe("Plans 2027");
   });
 });

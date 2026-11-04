@@ -94,8 +94,10 @@ export interface Provider {
   calendars(): Promise<RemoteCalendar[]>;
   /**
    * Makes a calendar or task list on the server, at once, and gives it as
-   * `calendars()` will list it (docs/plans/providers.md#D275). A provider
-   * that makes none leaves it out.
+   * `calendars()` will list it (docs/plans/providers.md#D275); its name is
+   * `calendarNameOf`'s (`@astrotime/core/new-calendar`). A provider that
+   * makes none leaves it out; one whose server, or part, turns out to make
+   * none rejects with `CannotMakeCalendarError` (`unsupported`).
    */
   makeCalendar?(calendar: NewCalendar): Promise<RemoteCalendar>;
   /**

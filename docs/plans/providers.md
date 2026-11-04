@@ -830,13 +830,23 @@ marked _to be recorded_.
   component, as Nextcloud's own apps make one (Calendar's calendars of
   events, Tasks' lists of tasks); its address is the name's ASCII letters
   and digits and eight random hex digits (`team-plans-1f0c9a2e`, a
-  Cyrillic name the random part alone), so two of one name never meet; a
-  405 (taken) is tried again elsewhere, three times at most. Its code
+  Cyrillic name the random part alone), so two of one name never meet. A
+  405 is the address taken or the method not allowed: an `Allow` that
+  leaves `MKCALENDAR` out, a 501, or a second 405 at a new random address
+  (taken twice by chance: 1 in 4·10⁹) is a server that makes no calendars
+  (Google's CalDAV), `CannotMakeCalendarError` `unsupported`, in one or two
+  requests. Its code
   (`make.ts`) loads when a calendar is made, as Digest's does: the first
-  load grows by 35 bytes (124 531 to 124 566 on main `50a5593`), the
-  provider's method and the sync's look before it lists. A control
-  character in the name is dropped (XML 1.0 cannot carry it). Proven on
-  Radicale, Baïkal (Digest and Basic), Xandikos, DAViCal and Nextcloud
+  load grows by 38 bytes (124 531 to 124 569 on main `50a5593`), the
+  provider's method and the sync's look before it lists; the name's rule
+  and the error are `@astrotime/core/new-calendar`, loaded with them. **The name** is
+  trimmed, its control characters, lone surrogates and U+FFFE/U+FFFF
+  dropped (XML 1.0 cannot carry them; `calendarNameOf`);
+  nothing left is `CannotMakeCalendarError` `no-name`, before anything is
+  sent. Every provider's `makeCalendar` rejects, never throws: a provider
+  of two parts whose part makes none rejects `unsupported` too, so the
+  caller's one check (no method at all) and the rejection cover all.
+  Proven on Radicale, Baïkal (Digest and Basic), Xandikos, DAViCal and Nextcloud
   (`servers.test.ts`), the calendars deleted after: **DAViCal keeps a
   name's `&` and `<` as the XML spelled them** (`&amp;`), whatever sets it
   (MKCALENDAR or PROPPATCH alike); its own, the name shown as it lists

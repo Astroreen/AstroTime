@@ -83,7 +83,9 @@ When you add a package, app or module, add its line here in the same PR.
     → `plans/foundation.md#D6`, `plans/foundation.md#D107`
   - `Provider` — the interface every provider implements (and
     `makeCalendar` with a `NewCalendar`, a calendar or task list made on
-    the server, `plans/providers.md#D275`; and
+    the server, its name as `calendarNameOf` (`new-calendar.ts`,
+    `@astrotime/core/new-calendar`) sends it, `CannotMakeCalendarError`
+    why none was, `plans/providers.md#D275`; and
     `FileStore`, `RemoteFile`: an account's files where its server keeps
     them, `plans/foundation.md#D231`);
     `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a

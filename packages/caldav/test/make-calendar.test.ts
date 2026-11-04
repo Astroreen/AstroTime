@@ -9,11 +9,19 @@ import { CalDavProvider, HttpError, type HttpClient, type HttpRequest } from "..
 
 const HOME = "https://dav.example/calendars/astro/";
 
-function server(statuses: number[] = []) {
+/** A server answering each request with the next status (and its `Allow`, if given); 201 after. */
+function server(statuses: (number | { status: number; allow: string })[] = []) {
   const asked: HttpRequest[] = [];
   const http: HttpClient = async (request) => {
     asked.push(request);
-    return { status: statuses.shift() ?? 201, url: request.url, header: () => null, body: "" };
+    const next = statuses.shift() ?? 201;
+    const { status, allow } = typeof next === "number" ? { status: next, allow: null } : next;
+    return {
+      status,
+      url: request.url,
+      header: (name: string) => (name.toLowerCase() === "allow" ? allow : null),
+      body: "",
+    };
   };
   return { asked, provider: new CalDavProvider(http, { username: "u", password: "p" }, HOME) };
 }
@@ -58,8 +66,8 @@ test("a name of no Latin letters gets an address of random ones; a control chara
   expect(made.name).toBe("Работа");
 });
 
-test("an address taken (405) is tried again elsewhere, three times at most; a refusal is the error", async () => {
-  const taken = server([405, 201]);
+test("an address taken (405) is tried once more elsewhere; a refusal is the error", async () => {
+  const taken = server([{ status: 405, allow: "OPTIONS, GET, PROPFIND, MKCALENDAR, DELETE" }, 201]);
   const made = await taken.provider.makeCalendar({
     name: "Work",
     color: null,
@@ -68,14 +76,40 @@ test("an address taken (405) is tried again elsewhere, three times at most; a re
   expect(taken.asked).toHaveLength(2);
   expect(taken.asked[0]!.url).not.toBe(taken.asked[1]!.url);
   expect(made.url).toBe(taken.asked[1]!.url);
-  const full = server([405, 405, 405]);
-  await expect(
-    full.provider.makeCalendar({ name: "W", color: null, component: "VEVENT" }),
-  ).rejects.toThrow(HttpError);
-  expect(full.asked).toHaveLength(3);
   // Not allowed to make one (Nextcloud's shared account, a read-only home).
   const refused = server([403]);
   await expect(
     refused.provider.makeCalendar({ name: "W", color: null, component: "VEVENT" }),
   ).rejects.toThrow(HttpError);
+});
+
+test("a server that makes no calendars says so at once: an Allow without MKCALENDAR, a 501, or 405 twice", async () => {
+  const unsupported = expect.objectContaining({
+    name: "CannotMakeCalendarError",
+    reason: "unsupported",
+  });
+  const ask = { name: "W", color: null, component: "VEVENT" } as const;
+  // Google's CalDAV names what it allows, MKCALENDAR not among them.
+  const google = server([{ status: 405, allow: "OPTIONS, GET, PUT, DELETE, PROPFIND, REPORT" }]);
+  await expect(google.provider.makeCalendar(ask)).rejects.toEqual(unsupported);
+  expect(google.asked).toHaveLength(1);
+  const notImplemented = server([501]);
+  await expect(notImplemented.provider.makeCalendar(ask)).rejects.toEqual(unsupported);
+  expect(notImplemented.asked).toHaveLength(1);
+  // No `Allow`: one more try at a new random address tells taken from unsupported.
+  const silent = server([405, 405]);
+  await expect(silent.provider.makeCalendar(ask)).rejects.toEqual(unsupported);
+  expect(silent.asked).toHaveLength(2);
+});
+
+test("a name that is nothing once trimmed is refused before any request", async () => {
+  const { asked, provider } = server();
+  for (const name of ["", "  ", "\u0000\u0007", "\uFFFE"])
+    await expect(provider.makeCalendar({ name, color: null, component: "VTODO" })).rejects.toEqual(
+      expect.objectContaining({ reason: "no-name" }),
+    );
+  expect(asked).toEqual([]);
+  // A lone surrogate and a noncharacter go; the rest stays, trimmed.
+  await provider.makeCalendar({ name: " A\uD800b\uFFFF ", color: null, component: "VTODO" });
+  expect(asked[0]!.body).toContain("<d:displayname>Ab</d:displayname>");
 });

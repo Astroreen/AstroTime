@@ -495,3 +495,24 @@ test("a calendar made goes through the Calendar API, a task list through the Tas
   });
   expect(list).toMatchObject({ url: `${TASKS_API}lists/MTIz/tasks/`, components: ["VTODO"] });
 });
+
+test("a part that makes no calendars rejects, as every provider's makeCalendar does (D275)", async () => {
+  const none: Provider = {
+    calendars: async () => [],
+    changes: async () => ({ changed: [], removed: [], syncToken: null, ctag: null }),
+    fetch: async () => null,
+    create: async () => ({ ok: false, reason: "gone" }),
+    update: async () => ({ ok: false, reason: "gone" }),
+    remove: async () => ({ ok: false, reason: "gone" }),
+  };
+  // No Calendar API given: a calendar of events is not made, said as a rejection.
+  const made = new GoogleProvider(none, none).makeCalendar({
+    name: "Plans",
+    color: null,
+    component: "VEVENT",
+  });
+  expect(made).toBeInstanceOf(Promise);
+  await expect(made).rejects.toEqual(
+    expect.objectContaining({ name: "CannotMakeCalendarError", reason: "unsupported" }),
+  );
+});
