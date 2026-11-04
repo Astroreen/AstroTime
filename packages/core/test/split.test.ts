@@ -7,6 +7,7 @@ import {
   NotCalendarError,
   splitCalendar,
   splitCalendars,
+  overlay,
   type SplitCalendar,
   withUid,
 } from "../src/split.ts";
@@ -398,9 +399,24 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     ];
     const at = (uid: string) => event(uid, ["DTEND;TZID=Office:20261105T120000"]);
     const split = splitCalendar(
-      calendar(zone("+0200"), at("a"), zone("+0200"), zone("+0500"), at("b")),
+      calendar(
+        zone("+0200"),
+        at("a"),
+        [
+          "BEGIN:VTIMEZONE",
+          "BEGIN:STANDARD",
+          "TZOFFSETTO:+0200",
+          "TZOFFSETFROM:+0200",
+          "DTSTART:19700101T000000",
+          "END:STANDARD",
+          "TZID:Office",
+          "END:VTIMEZONE",
+        ],
+        zone("+0500"),
+        at("b"),
+      ),
     );
-    // The same definition again is no problem; a different one is.
+    // The same definition again, its lines in another order, is no problem; a different one is.
     expect(split.problems).toEqual([
       { index: 3, uid: "Office", component: "VTIMEZONE", reason: "conflicting-zone", kept: false },
     ]);
@@ -591,5 +607,29 @@ describe("an object under another UID (import D270)", () => {
     expect(copy.exceptions.map((exception) => exception.uid)).toEqual(["copy"]);
     const original = CalendarObject.parse(series!.ics);
     expect({ ...copy.master, uid: "x" }).toEqual({ ...original.master, uid: "x" });
+  });
+});
+
+describe("the file's object over the one stored (import D270, Update them)", () => {
+  test("each occurrence replaced, what only the stored one has kept, its other exceptions too", () => {
+    const stored = calendar(
+      event("s", ["RRULE:FREQ=DAILY;COUNT=5", "X-OTHER:keep", "ATTACH:https://e.com/a"]),
+      event("s", ["RECURRENCE-ID:20261106T090000Z", "DESCRIPTION:stored only"]),
+      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:old", "X-MINE:1"]),
+    );
+    const incoming = calendar(
+      event("s", ["RRULE:FREQ=DAILY;COUNT=3", "DESCRIPTION:master new"]),
+      event("s", ["RECURRENCE-ID:20261107T090000Z", "DESCRIPTION:new"]),
+    );
+    const merged = CalendarObject.parse(overlay(stored, incoming));
+    expect(merged.master?.description).toBe("master new");
+    expect(merged.serialize()).toContain("RRULE:FREQ=DAILY;COUNT=3");
+    expect(merged.serialize()).toContain("X-OTHER:keep");
+    expect(merged.master?.attachments).toHaveLength(1);
+    expect(merged.exceptions.map((exception) => exception.description).toSorted()).toEqual([
+      "new",
+      "stored only",
+    ]);
+    expect(merged.serialize()).toContain("X-MINE:1");
   });
 });

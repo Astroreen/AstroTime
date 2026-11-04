@@ -79,85 +79,80 @@ export function ImportDialog({
     let current = true;
     phase.current = "idle";
     setStep({ name: "reading" });
-    void (async () => {
-      try {
-        // Not even read into memory past the limit.
-        if (file.size > MAX_FILE_BYTES)
-          throw new NotImportableError(`${file.name} is too big.`, { tooBig: true });
-        const read = await readImport(
-          { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },
-          {
-            language: i18n.resolvedLanguage ?? i18n.language,
-            timeZone,
-            newUid: () => crypto.randomUUID(),
-          },
-        );
-        if (!current) return;
-        setDestinations(
-          new Map(
-            read.sources.map((source) => [source.id, destinationOf(source, calendars, hidden)]),
-          ),
-        );
-        setStep({ name: "preview", read });
-      } catch (error) {
-        if (!current) return;
+    void readPicked(file, {
+      language: i18n.resolvedLanguage ?? i18n.language,
+      timeZone,
+      newUid: () => crypto.randomUUID(),
+    }).then((read) => {
+      if (!current) return;
+      if (read instanceof Error) {
         setStep({
           name: "failed",
           message:
-            error instanceof NotImportableError && error.tooBig
+            read instanceof NotImportableError && read.tooBig
               ? t("import.tooBig", { file: file.name, size: MAX_FILE_BYTES / 1024 / 1024 })
-              : error instanceof NotImportableError
+              : read instanceof NotImportableError
                 ? t("import.notCalendar", { file: file.name })
-                : t("import.unreadable", { file: file.name, message: String(error) }),
+                : t("import.unreadable", { file: file.name, message: read.message }),
         });
+        return;
       }
-    })();
+      setDestinations(
+        new Map(
+          read.sources.map((source) => [source.id, destinationOf(source, calendars, hidden)]),
+        ),
+      );
+      setStep({ name: "preview", read });
+    });
     return () => {
       current = false;
     };
     // Read once per file: the calendars offered later do not read it again.
   }, [file]);
 
-  const start = async (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
+  const start = (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
     if (phase.current !== "checking" && phase.current !== "asked") return;
     phase.current = "running";
     stop.current = false;
     setStep({ name: "importing", done: 0, total: 0 });
-    try {
-      const result = await runImport({
-        store,
-        sources: read.sources,
-        destinations,
-        duplicates,
-        choice,
-        accountName: t("local.account"),
-        newUid: () => crypto.randomUUID(),
-        onProgress: (done, total) => setStep({ name: "importing", done, total }),
-        stopped: () => stop.current,
-      });
-      setStep({ name: "done", result });
-      // Uploaded as any change made here is (D5).
-      void scheduler.requested();
-    } catch (error) {
-      setStep({ name: "failed", message: t("import.failed", { message: String(error) }) });
-    }
+    runImport({
+      store,
+      sources: read.sources,
+      destinations,
+      duplicates,
+      choice,
+      accountName: t("local.account"),
+      newUid: () => crypto.randomUUID(),
+      onProgress: (done, total) => setStep({ name: "importing", done, total }),
+      stopped: () => stop.current,
+    }).then(
+      (result) => {
+        setStep({ name: "done", result });
+        // Uploaded as any change made here is (D5).
+        void scheduler.requested();
+      },
+      (error: unknown) =>
+        setStep({ name: "failed", message: t("import.failed", { message: String(error) }) }),
+    );
   };
 
-  const proceed = async (read: ReadFile) => {
+  const proceed = (read: ReadFile) => {
     if (phase.current !== "idle") return;
     phase.current = "checking";
     setChecking(true);
-    try {
-      const duplicates = await duplicatesOf(store, read.sources, destinations);
-      if (duplicates.changed > 0) {
-        phase.current = "asked";
-        setStep({ name: "asking", read, duplicates });
-      } else await start(read, duplicates, "skip");
-    } catch (error) {
-      setStep({ name: "failed", message: t("import.failed", { message: String(error) }) });
-    } finally {
-      setChecking(false);
-    }
+    duplicatesOf(store, read.sources, destinations).then(
+      (duplicates) => {
+        setChecking(false);
+        if (duplicates.changed > 0) {
+          phase.current = "asked";
+          setStep({ name: "asking", read, duplicates });
+        } else start(read, duplicates, "skip");
+      },
+      (error: unknown) => {
+        setChecking(false);
+        setStep({ name: "failed", message: t("import.failed", { message: String(error) }) });
+      },
+    );
   };
 
   // Closing waits for the import's own end: a check under way goes on into writes.
@@ -223,7 +218,7 @@ export function ImportDialog({
                   disabled={
                     checking || step.read.sources.every((source) => source.items.length === 0)
                   }
-                  onClick={() => void proceed(step.read)}
+                  onClick={() => proceed(step.read)}
                 >
                   {t("import.start")}
                 </button>
@@ -245,7 +240,7 @@ export function ImportDialog({
                     key={choice}
                     type="button"
                     className={choice === "update" ? primaryButton : textButton}
-                    onClick={() => void start(step.read, step.duplicates, choice)}
+                    onClick={() => start(step.read, step.duplicates, choice)}
                   >
                     {t(`import.${choice}`)}
                   </button>
@@ -265,6 +260,24 @@ export function ImportDialog({
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+/** The file picked, read on the device; what went wrong as an error, not thrown. */
+async function readPicked(
+  file: File,
+  options: { language: string; timeZone: string; newUid: () => string },
+): Promise<ReadFile | Error> {
+  // Not even read into memory past the limit.
+  if (file.size > MAX_FILE_BYTES)
+    return new NotImportableError(`${file.name} is too big.`, { tooBig: true });
+  try {
+    return await readImport(
+      { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },
+      options,
+    );
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 function Preview({

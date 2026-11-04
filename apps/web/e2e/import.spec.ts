@@ -5,8 +5,8 @@
 // phone in Russian.
 import { expect, test } from "@playwright/test";
 
-import { HOLIDAYS, importFile, TEAM } from "./import-files.ts";
-import { choose, openDemo, PHONE, WIDE } from "./support.ts";
+import { BIG, HOLIDAYS, importFile, TEAM } from "./import-files.ts";
+import { choose, NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 test("wide, English: a file's events and a task, one already there, into Work and a new list", async ({
   page,
@@ -99,6 +99,48 @@ test("a double tap on Import imports once: one new calendar, each event once", a
       name: /^Planning poker/,
     }),
   ).toHaveCount(1);
+});
+
+test("a big file with a series, stopped in the middle: what landed stays, the series with it", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  // A clock the test holds: the import gives the page back between batches
+  // through a timer, so with time paused it waits there until the test lets it go.
+  await page.clock.install({ time: NOW });
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "week"));
+  await page.goto("/?demo");
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await importFile(page, /^Import from a file/, "archive.ics", BIG);
+  const dialog = page.getByRole("dialog", { name: "Import" });
+  const archive = dialog.getByRole("region", { name: "Archive" });
+  await expect(archive).toContainText("450 events");
+  await choose(
+    archive.getByRole("combobox", { name: "Events go to" }),
+    "New calendar on this device: Archive",
+  );
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await dialog.getByRole("button", { name: "Import", exact: true }).click();
+  // The first batch written, the run waiting for the page back.
+  await expect(dialog.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "200");
+  await dialog.getByRole("button", { name: "Stop" }).click();
+  await page.clock.resume();
+  const done = dialog.getByRole("status");
+  await expect(done).toContainText("Stopped. What was imported before stays.");
+  await expect(done).toContainText("200 events");
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await expect(settings.getByRole("checkbox", { name: "Archive" })).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  // The series came in the first batch: its occurrences in the week.
+  await expect(
+    page.getByRole("list", { name: "Thursday, November 5" }).getByRole("listitem", {
+      name: /^Morning run/,
+    }),
+  ).toBeVisible();
 });
 
 test.describe("on a phone, in Russian", () => {

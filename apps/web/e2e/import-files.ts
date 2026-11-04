@@ -71,3 +71,28 @@ export async function importFile(page: Page, entry: RegExp, name: string, text: 
   await page.getByRole("button", { name: entry }).click();
   await (await chooser).setFiles({ name, mimeType: "text/calendar", buffer: Buffer.from(text) });
 }
+
+/** A big file: a daily series first, then 449 single events, three batches' worth (import D271). */
+export const BIG = lines(
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Test//EN",
+  "X-WR-CALNAME:Archive",
+  "BEGIN:VEVENT",
+  "UID:archive-series",
+  "DTSTAMP:20261101T080000Z",
+  "DTSTART;TZID=Europe/Vilnius:20261102T080000",
+  "DTEND;TZID=Europe/Vilnius:20261102T083000",
+  "RRULE:FREQ=DAILY;COUNT=7",
+  "SUMMARY:Morning run",
+  "END:VEVENT",
+  ...Array.from({ length: 449 }, (_, i) => [
+    "BEGIN:VEVENT",
+    `UID:archive-${i}`,
+    "DTSTAMP:20261101T080000Z",
+    `DTSTART;VALUE=DATE:${20200101 + (i % 28)}`,
+    `SUMMARY:Old entry ${i}`,
+    "END:VEVENT",
+  ]).flat(),
+  "END:VCALENDAR",
+);

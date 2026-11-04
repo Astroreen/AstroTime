@@ -5,7 +5,7 @@
 // changes made here (D5), a batch a transaction, the page given back
 // between batches, stopped between them when asked.
 import { sameObjects } from "@astrotime/core";
-import { withUid } from "@astrotime/core/split";
+import { overlay, withUid } from "@astrotime/core/split";
 import type { Calendar, Component, Store, StoredObject } from "@astrotime/storage";
 
 import { calendarsFor, firstCalendarFor } from "../calendar/editing.ts";
@@ -158,21 +158,27 @@ export async function runImport(run: Run): Promise<Imported> {
   const pause = run.pause ?? yieldToPage;
   // A new calendar on this device per source that asks for one, taking what goes to it.
   const made = new Map<string, Calendar>();
-  for (const source of run.sources) {
-    const to = run.destinations.get(source.id);
-    const components: Component[] = [];
-    if (to?.events === NEW) components.push("VEVENT");
-    if (to?.tasks === NEW) components.push("VTODO");
-    if (components.length === 0) continue;
-    made.set(
-      source.id,
-      await store.addDeviceCalendar({
-        account: run.accountName,
-        calendar: source.name,
-        color: source.color,
-        components,
-      }),
-    );
+  try {
+    for (const source of run.sources) {
+      const to = run.destinations.get(source.id);
+      const components: Component[] = [];
+      if (to?.events === NEW) components.push("VEVENT");
+      if (to?.tasks === NEW) components.push("VTODO");
+      if (components.length === 0) continue;
+      made.set(
+        source.id,
+        await store.addDeviceCalendar({
+          account: run.accountName,
+          calendar: source.name,
+          color: source.color,
+          components,
+        }),
+      );
+    }
+  } catch (error) {
+    // One that could not be made: the ones made before it go again, empty.
+    for (const calendar of made.values()) await store.removeCalendar(calendar.id);
+    throw error;
   }
 
   const writes: {
@@ -183,30 +189,56 @@ export async function runImport(run: Run): Promise<Imported> {
   }[] = [];
   let skipped = 0;
   let again = 0;
+  const all = placed(run.sources, run.destinations).map(({ item, source, target }) => ({
+    item,
+    calendarId: target === NEW ? made.get(source.id)!.id : target,
+    key: keyOf(target, item.uid),
+  }));
+  // The copies' new UIDs, made first, so a copied subtask names its copied
+  // parent (`RELATED-TO`), not the original, by calendar.
+  const copied = new Map<string, Map<string, string>>();
+  if (choice === "copy") {
+    for (const { item, calendarId, key } of all) {
+      if (!duplicates.existing.has(key) || duplicates.same.has(key)) continue;
+      const uids = copied.get(calendarId) ?? new Map<string, string>();
+      if (!uids.has(item.uid)) uids.set(item.uid, run.newUid());
+      copied.set(calendarId, uids);
+    }
+  }
   /** What this run writes, by calendar and UID: one UID a calendar, once (two sources, two files of a ZIP). */
   const writing = new Set<string>();
-  for (const { item, source, target } of placed(run.sources, run.destinations)) {
-    const calendarId = target === NEW ? made.get(source.id)!.id : target;
+  for (const { item, calendarId, key } of all) {
     if (writing.has(keyOf(calendarId, item.uid))) {
       again++;
       continue;
     }
     writing.add(keyOf(calendarId, item.uid));
-    const key = keyOf(target, item.uid);
     if (duplicates.same.has(key)) continue;
-    if (duplicates.existing.has(key)) {
+    const there = duplicates.existing.get(key);
+    if (there) {
       if (choice === "skip") {
         skipped++;
         continue;
       }
+      const uids = copied.get(calendarId);
       writes.push(
         choice === "copy"
-          ? { calendarId, ics: withUid(item.ics, run.newUid()), kind: item.kind, as: "copy" }
-          : { calendarId, ics: item.ics, kind: item.kind, as: "update" },
+          ? {
+              calendarId,
+              ics: withUid(item.ics, uids!.get(item.uid)!, uids),
+              kind: item.kind,
+              as: "copy",
+            }
+          : // The file's changes over what is stored: what only it has stays (D7).
+            { calendarId, ics: overlay(there.ics, item.ics), kind: item.kind, as: "update" },
       );
       continue;
     }
-    writes.push({ calendarId, ics: item.ics, kind: item.kind, as: "new" });
+    // A new item whose parent is copied in this run names the copy.
+    const uids = copied.get(calendarId);
+    const ics =
+      uids && /^RELATED-TO/m.test(item.ics) ? withUid(item.ics, item.uid, uids) : item.ics;
+    writes.push({ calendarId, ics, kind: item.kind, as: "new" });
   }
 
   let done = 0;

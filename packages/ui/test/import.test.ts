@@ -420,6 +420,79 @@ describe("an import written through the store (import D269–D271)", () => {
     expect((await store.calendars()).map((made) => made.name)).not.toContain("Holidays");
   });
 
+  test("Update them: the file's changes over what is stored; what only the stored one has stays (D7)", async () => {
+    const { store, personal } = await setup();
+    await store.saveLocal(
+      personal.id,
+      calendar(null, [
+        ...event("kept").slice(0, -1),
+        "X-OTHER-CLIENT:keep me",
+        "ATTACH:https://example.com/agenda.pdf",
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        "TRIGGER:-PT10M",
+        "DESCRIPTION:Soon",
+        "END:VALARM",
+        "END:VEVENT",
+      ]),
+    );
+    const source = await sourceOf(
+      calendar("File", event("kept", "20261106T090000Z", ["DESCRIPTION:Moved a day"])),
+    );
+    const destinations = new Map([[source.id, { events: personal.id, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    await run(store, [source], destinations, duplicates, "update");
+    const [stored] = await store.pending(personal.id);
+    const object = CalendarObject.parse(stored!.ics);
+    expect(object.master).toMatchObject({
+      description: "Moved a day",
+      start: expect.objectContaining({ epochMs: Date.UTC(2026, 10, 6, 9) }),
+    });
+    expect(object.master!.alarms).toHaveLength(1);
+    expect(object.master!.attachments).toHaveLength(1);
+    expect(stored!.ics).toContain("X-OTHER-CLIENT:keep me");
+  });
+
+  test("Import as copies: a copied subtask names its copied parent, not the original", async () => {
+    const { store, personal } = await setup();
+    await store.saveLocal(personal.id, calendar(null, todo("parent")));
+    await store.saveLocal(personal.id, calendar(null, todo("child")));
+    const source = await sourceOf(
+      calendar(
+        "File",
+        [...todo("parent").slice(0, -1), "DESCRIPTION:changed", "END:VTODO"],
+        [...todo("child").slice(0, -1), "RELATED-TO:parent", "END:VTODO"],
+      ),
+    );
+    const destinations = new Map([[source.id, { events: null, tasks: personal.id }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    const { result } = await run(store, [source], destinations, duplicates, "copy");
+    expect(result.copies).toBe(2);
+    const tasks = (await store.pending(personal.id)).map((o) => CalendarObject.parse(o.ics));
+    const copy = (uid: string) =>
+      tasks.find((task) => task.uid !== uid && task.master?.summary === uid)!;
+    expect(copy("child").serialize()).toContain(`RELATED-TO:${copy("parent").uid}`);
+  });
+
+  test("a new calendar that cannot be made: the ones made before it go again", async () => {
+    const { store } = await setup();
+    const one = await sourceOf(calendar("One", event("a")));
+    const two = { ...(await sourceOf(calendar("Two", event("b")))), id: "two" };
+    const destinations = new Map([
+      [one.id, { events: NEW, tasks: null }],
+      [two.id, { events: NEW, tasks: null }],
+    ]);
+    const duplicates = await duplicatesOf(store, [one, two], destinations);
+    const real = store.addDeviceCalendar.bind(store);
+    let calls = 0;
+    store.addDeviceCalendar = ((names) => {
+      if (++calls === 2) return Promise.reject(new Error("The disk is full."));
+      return real(names);
+    }) as typeof store.addDeviceCalendar;
+    await expect(run(store, [one, two], destinations, duplicates)).rejects.toThrow("disk");
+    expect((await store.calendars()).map((made) => made.name)).not.toContain("One");
+  });
+
   test("a new calendar on this device, named and coloured as the source", async () => {
     const { store } = await setup();
     const source = await sourceOf(
