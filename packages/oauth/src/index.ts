@@ -106,10 +106,11 @@ export class OAuthRefusedError extends Error {
  */
 export function codeOf(redirect: string, pending: Pending): string {
   const params = new URL(redirect).searchParams;
-  if (params.get("state") !== pending.state)
-    throw new OAuthRefusedError("state_mismatch", "the answer is not to this sign-in");
+  // The service's refusal first: a denied sign-in may come back without a state.
   const error = params.get("error");
   if (error) throw new OAuthRefusedError(error, params.get("error_description"));
+  if (params.get("state") !== pending.state)
+    throw new OAuthRefusedError("state_mismatch", "the answer is not to this sign-in");
   const code = params.get("code");
   if (!code) throw new OAuthRefusedError("no_code", null);
   return code;
@@ -163,7 +164,9 @@ async function token(
     );
   if (response.status !== 200 || typeof answer.access_token !== "string")
     throw new Error(`The token endpoint answered ${response.status} without a token.`);
-  const seconds = typeof answer.expires_in === "number" ? answer.expires_in : 3600;
+  // A number, or a number in a string (some services write it so); an hour without one.
+  const given = Number(answer.expires_in);
+  const seconds = Number.isFinite(given) && given > 0 ? given : 3600;
   return {
     accessToken: answer.access_token,
     expiresAt: now + seconds * 1000,
@@ -220,6 +223,12 @@ export function tokenSource(
   tokens: Tokens,
   keep: (tokens: Tokens) => Promise<void>,
   clock: () => number = Date.now,
+  /**
+   * Hears a rotated refresh token the device could not keep
+   * (`TokenNotKeptError`): requests go on with the new access token, and the
+   * account says it will need signing in again after a restart.
+   */
+  report: (problem: TokenNotKeptError) => void = () => {},
 ): TokenSource {
   let current = tokens;
   let renewing: Promise<boolean> | null = null;
@@ -240,11 +249,14 @@ export function tokenSource(
         try {
           await keep(current);
         } catch (error) {
-          // In use now; said apart, since a restart would lose a rotated one.
+          // In use now, so the request goes on; reported, since a restart
+          // would lose a rotated one, on every path (early or after a 401).
           if (rotated)
-            throw new TokenNotKeptError("The new sign-in could not be kept on this device.", {
-              cause: error,
-            });
+            report(
+              new TokenNotKeptError("The new sign-in could not be kept on this device.", {
+                cause: error,
+              }),
+            );
         }
         return true;
       } finally {

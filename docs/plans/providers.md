@@ -373,14 +373,18 @@ marked _to be recorded_.
 
   _Built, the groundwork (P5's first part):_ `@astrotime/oauth` —
   `authorization` (the URL with an S256 challenge of a fresh 43-character
-  verifier and a `state`), `codeOf` (the redirect read back, refused when
-  its `state` is another sign-in's or it says an error), `exchange` (the
+  verifier and a `state`), `codeOf` (the redirect read back: an error it
+  says first, a denial coming back without a state too, then a `state`
+  of another sign-in's refused), `exchange` (the
   code and the verifier for the tokens; a service that gives no refresh
   token is refused, a sign-in must last), `tokenSource` (the access
-  token while it lasts, renewed a minute before its end and when a server
+  token while it lasts (`expires_in` a number or a number in a string),
+  renewed a minute before its end and when a server
   refuses it, renewals at once sharing one request, a rotated refresh
-  token kept through `keep`, or said apart, `TokenNotKeptError`, when the
-  device cannot keep it; a renewal before the end that fails offline or
+  token kept through `keep`, or, when the device cannot keep it, the new
+  access token used all the same and `TokenNotKeptError` reported to the
+  account (`report`, on the early renewal and after a `401` alike: after a
+  restart it will have to sign in again); a renewal before the end that fails offline or
   busy keeps the token that still works and is tried again with the next
   request; a 401 for a token another request replaced renews nothing
   more; `invalid_grant` of a refresh token is `AuthError`, the account

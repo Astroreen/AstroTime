@@ -142,6 +142,8 @@ test("a redirect of another sign-in, a refusal, or a wrong verifier gives no tok
   ).rejects.toThrow(/invalid_grant/);
   // A redirect with no state, or with no code.
   expect(() => codeOf(`${REDIRECT}?code=x`, pending)).toThrow(/state_mismatch/);
+  // A denied sign-in may come back without a state: said as denied.
+  expect(() => codeOf(`${REDIRECT}?error=access_denied`, pending)).toThrow(/access_denied/);
   expect(() => codeOf(`${REDIRECT}?state=${pending.state}`, pending)).toThrow(/no_code/);
 });
 
@@ -265,25 +267,50 @@ test("an early renewal that fails offline or busy keeps the token that still wor
   expect(await source.token()).toBe("fresh");
 });
 
-test("a rotated refresh token the device cannot keep is said apart; one not rotated is no failure", async () => {
+test("a rotated refresh token the device cannot keep is reported, early or after a 401, and the request goes on", async () => {
   let rotated = true;
-  const http = endpoint(() => ({
-    status: 200,
-    body: JSON.stringify({
-      access_token: "fresh",
-      expires_in: 3600,
-      ...(rotated ? { refresh_token: "r2" } : {}),
-    }),
-  }));
+  let issued = 0;
+  const http = endpoint(() => {
+    issued += 1;
+    return {
+      status: 200,
+      body: JSON.stringify({
+        access_token: `fresh-${issued}`,
+        // Some services write it as a string.
+        expires_in: "3600",
+        ...(rotated ? { refresh_token: `r${issued + 1}` } : {}),
+      }),
+    };
+  });
   const failing = async () => {
     throw new Error("keyring locked");
   };
-  const tokens = { accessToken: "a", refreshToken: "r", expiresAt: 10_000_000 };
-  await expect(tokenSource(http, client, tokens, failing).renew()).rejects.toThrow(
-    TokenNotKeptError,
+  let time = 0;
+  const reported: unknown[] = [];
+  const source = tokenSource(
+    http,
+    client,
+    { accessToken: "a", refreshToken: "r1", expiresAt: 100_000 },
+    failing,
+    () => time,
+    (problem) => reported.push(problem),
   );
+  // Early: the renewal is due; the new token serves, the problem is reported.
+  time = 70_000;
+  expect(await source.token()).toBe("fresh-1");
+  expect(reported).toHaveLength(1);
+  expect(reported[0]).toBeInstanceOf(TokenNotKeptError);
+  // A string's expires_in counts: an hour from then.
+  time = 70_000 + 3_000_000;
+  expect(await source.token()).toBe("fresh-1");
+  // After a 401: renewed, the request may go again, the problem reported again.
+  await expect(source.renew("fresh-1")).resolves.toBe(true);
+  expect(await source.token()).toBe("fresh-2");
+  expect(reported).toHaveLength(2);
+  // Not rotated: the old refresh token still works after a restart, nothing to report.
   rotated = false;
-  await expect(tokenSource(http, client, tokens, failing).renew()).resolves.toBe(true);
+  await source.renew("fresh-2");
+  expect(reported).toHaveLength(2);
 });
 
 test("a request refused with a token another request already replaced renews nothing more", async () => {
