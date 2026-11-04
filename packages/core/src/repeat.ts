@@ -135,10 +135,14 @@ function readRule(
  */
 function untilDayOf(until: ICAL.Time, anchor: ItemTime | null, start?: ICAL.Time): string {
   const zone = anchor?.type === "zoned" ? anchor.timeZone : "UTC";
+  const written = fromIcalTime(until);
   try {
-    return wallClockOf(fromIcalTime(until), zone).slice(0, 10);
+    return wallClockOf(written, zone).slice(0, 10);
   } catch (error) {
-    if (!(error instanceof RangeError) || !start?.zone) throw error;
+    if (!(error instanceof RangeError)) throw error;
+    // Only a UTC end is an instant to place; any other is its day as written.
+    if (!start?.zone || until.zone !== ICAL.Timezone.utcTimezone)
+      return localOf(written).slice(0, 10);
     const day = until.convertToZone(start.zone);
     return `${String(day.year).padStart(4, "0")}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
   }

@@ -593,6 +593,14 @@ describe("the repeat rule", () => {
       type: "until",
       until: "2026-11-10",
     });
+    // An end that is no instant (a date, a wall clock) is its day as written.
+    for (const until of ["20261109", "20261109T230000"]) {
+      const written = ics.replace("UNTIL=20261109T230000Z", `UNTIL=${until}`);
+      expect(repeatOf(CalendarObject.parse(written))?.repeat.end, until).toEqual({
+        type: "until",
+        until: "2026-11-09",
+      });
+    }
   });
 
   test("set on an item that did not repeat, and taken away with its exclusions and exceptions", () => {
