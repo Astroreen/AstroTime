@@ -439,7 +439,8 @@ async function download(
   const removed = new Set(gone.length > 0 ? await store.removeManyFromServer(gone) : []);
   for (const mine of gone.filter((object) => removed.has(object.id))) {
     report.removed++;
-    if (mine.pending !== "none") report.dropped.push(mine.href);
+    // A deletion of ours the server made too is done, not dropped.
+    if (mine.pending !== "none" && mine.pending !== "delete") report.dropped.push(mine.href);
   }
   if (!keepToken)
     await store.setSyncState(calendar.id, { syncToken: changes.syncToken, ctag: changes.ctag });

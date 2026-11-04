@@ -688,3 +688,19 @@ test("an object a server names twice as removed is removed and reported once", a
   expect(report.removed).toBe(2);
   expect(report.dropped).toEqual([`${calendarUrl}b.ics`]);
 });
+
+test("a deletion of ours the server made too is no dropped change (D38)", async () => {
+  const server = memoryServer(calendarUrl);
+  server.objects.set(`${calendarUrl}a.ics`, { etag: '"1"', ics: task("a") });
+  const { store, sync, calendar } = await device(server);
+  const ours = await store.objectAt(calendar.id, `${calendarUrl}a.ics`);
+  await store.deleteLocal(ours!.id);
+  server.objects.delete(`${calendarUrl}a.ics`);
+  // Its upload fails, so the server's removal reaches the download still pending.
+  server.beforeWrite = () => {
+    throw new Error("not now");
+  };
+  const report = await sync();
+  expect([report.removed, report.dropped]).toEqual([1, []]);
+  expect(await store.objectAt(calendar.id, `${calendarUrl}a.ics`)).toBeUndefined();
+});
