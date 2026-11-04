@@ -1017,3 +1017,43 @@ test("a redirect off Graph takes no token, and its answer is refused: a 302 to a
     ["elsewhere.example", null],
   ]);
 });
+
+test("a calendar made is an Outlook calendar, a task list a To Do list, each as its listing names it (D275)", async () => {
+  const asked: { method: string; url: string; body: unknown }[] = [];
+  const http: HttpClient = async (request) => {
+    asked.push({
+      method: request.method,
+      url: request.url,
+      body: request.body ? JSON.parse(String(request.body)) : null,
+    });
+    const answer = request.url.endsWith("me/calendars")
+      ? { id: "AAMk/new=", name: "Plans", hexColor: "", canEdit: true }
+      : { id: "AQMk/list=", displayName: "Errands" };
+    return { status: 201, url: request.url, header: () => null, body: JSON.stringify(answer) };
+  };
+  const graph = new Graph(http, tokens);
+  const provider = new MicrosoftProvider(new OutlookCalendars(graph), new MicrosoftTodo(graph));
+  const calendar = await provider.makeCalendar({
+    name: "Plans",
+    color: "#4f8fd6",
+    component: "VEVENT",
+  });
+  const list = await provider.makeCalendar({ name: "Errands", color: null, component: "VTODO" });
+  // Graph keeps its own palette: the name alone is sent.
+  expect(asked).toEqual([
+    { method: "POST", url: `${GRAPH}me/calendars`, body: { name: "Plans" } },
+    { method: "POST", url: `${GRAPH}me/todo/lists`, body: { displayName: "Errands" } },
+  ]);
+  expect(calendar).toEqual({
+    url: `${GRAPH}me/calendars/AAMk%2Fnew%3D/events/`,
+    name: "Plans",
+    color: null,
+    components: ["VEVENT"],
+    rights: { create: true, edit: true, delete: true },
+  });
+  expect(list).toMatchObject({
+    url: `${GRAPH}me/todo/lists/AQMk%2Flist%3D/tasks/`,
+    name: "Errands",
+    components: ["VTODO"],
+  });
+});

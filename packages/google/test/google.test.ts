@@ -12,6 +12,9 @@ import { syncAccount } from "@astrotime/sync";
 import { expect, test } from "vite-plus/test";
 
 import {
+  CALENDAR_API,
+  GOOGLE_CALDAV,
+  googleProvider,
   GoogleProvider,
   GoogleTasks,
   taskFieldsOf,
@@ -444,5 +447,72 @@ test("the Tasks API failing (not enabled, its scope not given) leaves the calend
   const down: Provider = { ...events, calendars: async () => Promise.reject(new Error("offline")) };
   await expect(syncAccount(store, new GoogleProvider(down, down), account.id)).rejects.toThrow(
     "offline",
+  );
+});
+
+test("a calendar made goes through the Calendar API, a task list through the Tasks API, each as its listing names it (D275)", async () => {
+  const asked: { method: string; url: string; body: unknown; authorization: string | undefined }[] =
+    [];
+  const http: HttpClient = async (request) => {
+    asked.push({
+      method: request.method,
+      url: request.url,
+      body: request.body ? JSON.parse(String(request.body)) : null,
+      authorization: request.headers["Authorization"],
+    });
+    const answer = request.url.startsWith(CALENDAR_API)
+      ? { id: "c0ffee@group.calendar.google.com", summary: "Plans" }
+      : { id: "MTIz", title: "Errands" };
+    return { status: 200, url: request.url, header: () => null, body: JSON.stringify(answer) };
+  };
+  const provider = googleProvider(http, tokens, `${GOOGLE_CALDAV}astro@example.com/`);
+  const calendar = await provider.makeCalendar({
+    name: "Plans",
+    color: "#4f8fd6",
+    component: "VEVENT",
+  });
+  const list = await provider.makeCalendar({ name: "Errands", color: null, component: "VTODO" });
+  expect(asked).toEqual([
+    {
+      method: "POST",
+      url: `${CALENDAR_API}calendars`,
+      body: { summary: "Plans" },
+      authorization: "Bearer t",
+    },
+    {
+      method: "POST",
+      url: `${TASKS_API}users/@me/lists`,
+      body: { title: "Errands" },
+      authorization: "Bearer t",
+    },
+  ]);
+  expect(calendar).toEqual({
+    url: `${GOOGLE_CALDAV}c0ffee%40group.calendar.google.com/events/`,
+    name: "Plans",
+    color: null,
+    components: ["VEVENT"],
+    rights: { create: true, edit: true, delete: true },
+  });
+  expect(list).toMatchObject({ url: `${TASKS_API}lists/MTIz/tasks/`, components: ["VTODO"] });
+});
+
+test("a part that makes no calendars rejects, as every provider's makeCalendar does (D275)", async () => {
+  const none: Provider = {
+    calendars: async () => [],
+    changes: async () => ({ changed: [], removed: [], syncToken: null, ctag: null }),
+    fetch: async () => null,
+    create: async () => ({ ok: false, reason: "gone" }),
+    update: async () => ({ ok: false, reason: "gone" }),
+    remove: async () => ({ ok: false, reason: "gone" }),
+  };
+  // No Calendar API given: a calendar of events is not made, said as a rejection.
+  const made = new GoogleProvider(none, none).makeCalendar({
+    name: "Plans",
+    color: null,
+    component: "VEVENT",
+  });
+  expect(made).toBeInstanceOf(Promise);
+  await expect(made).rejects.toEqual(
+    expect.objectContaining({ name: "CannotMakeCalendarError", reason: "unsupported" }),
   );
 });

@@ -2,9 +2,11 @@
 // docs/plans/foundation.md#D90), and the accounts it syncs.
 import type { HttpClient } from "@astrotime/caldav";
 import {
+  ALL_RIGHTS,
   AuthError,
   OfflineError,
   ServerBusyError,
+  type NewCalendar,
   type Provider,
   type SecretStore,
 } from "@astrotime/core";
@@ -12,6 +14,7 @@ import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
+import { CannotMakeCalendarError, makeCalendar } from "../src/calendars.ts";
 import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
 import {
@@ -814,5 +817,123 @@ describe("why an account has no files to attach from (design D237)", () => {
     // A CalDAV account whose home was never saved, and the demo's: no reason given.
     expect(noFilesOf(account({ homeUrl: null }))).toBeNull();
     expect(noFilesOf(account({ provider: "demo" }))).toBeNull();
+  });
+});
+
+describe("a calendar made on an account's server (providers D275)", () => {
+  /** The server makes what it is asked, and lists it from then on. */
+  const making = (server: MemoryServer, url: string) => {
+    const asked: NewCalendar[] = [];
+    server.makeCalendar = async (calendar) => {
+      asked.push(calendar);
+      const made = {
+        url,
+        name: calendar.name,
+        color: calendar.color,
+        components: [calendar.component],
+        rights: ALL_RIGHTS,
+      };
+      server.calendarList = [...server.calendarList, made];
+      return made;
+    };
+    return asked;
+  };
+
+  test("made there and kept here, as the next sync lists it", async () => {
+    const { store, a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    const asked = making(a, "https://a.example/plans/");
+    const made = await makeCalendar(context, account.id, {
+      name: "Plans",
+      color: "#4f8fd6",
+      component: "VTODO",
+    });
+    expect(asked).toEqual([{ name: "Plans", color: "#4f8fd6", component: "VTODO" }]);
+    expect(made).toMatchObject({
+      accountId: account.id,
+      url: "https://a.example/plans/",
+      name: "Plans",
+      components: ["VTODO"],
+    });
+    await syncAll(context);
+    // One calendar, the one made: the listing names the address it was kept under.
+    expect(
+      (await store.calendars(account.id)).filter((c) => c.name === "Plans").map((c) => c.id),
+    ).toEqual([made.id]);
+  });
+
+  test("a sync that listed the calendars before it was made does not remove it", async () => {
+    const { store, a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    await syncAll(context);
+    making(a, "https://a.example/plans/");
+    // The sync lists, then waits; the calendar is made meanwhile.
+    const listed = gate();
+    const later = gate();
+    const list = a.calendars.bind(a);
+    a.calendars = async () => {
+      const before = await list();
+      listed.open();
+      await later.opened;
+      return before;
+    };
+    const syncing = syncAll(context, { fresh: true });
+    await listed.opened;
+    // Made and kept while the sync holds a listing without it.
+    const calendar = await makeCalendar(context, account.id, {
+      name: "Plans",
+      color: null,
+      component: "VEVENT",
+    });
+    later.open();
+    expect((await syncing).accounts.map((one) => one.status)).toEqual(["synced"]);
+    expect((await store.calendars(account.id)).map((c) => c.id)).toContain(calendar.id);
+  });
+
+  test("none where it cannot be: no server, no credentials, a server that makes none; offline, nothing made", async () => {
+    const { store, secrets, a, context, add } = await setup();
+    const ask = { name: "Plans", color: null, component: "VEVENT" } as const;
+    const local = await store.addAccount({
+      provider: "local",
+      name: "On this device",
+      serverUrl: "local:",
+      username: "",
+    });
+    const refused = (reason: CannotMakeCalendarError["reason"]) =>
+      expect.objectContaining({ name: "CannotMakeCalendarError", reason });
+    await expect(makeCalendar(context, local.id, ask)).rejects.toEqual(refused("no-server"));
+    const account = (await add("a.example")).account;
+    // The memory server makes none until told how.
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("unsupported"));
+    const asked = making(a, "https://a.example/plans/");
+    // A name that is nothing once trimmed is refused before anything is sent.
+    for (const name of ["", "   ", "\u0007\t\u0000"])
+      await expect(makeCalendar(context, account.id, { ...ask, name })).rejects.toEqual(
+        refused("no-name"),
+      );
+    expect(asked).toEqual([]);
+    a.offline = true;
+    const makeOffline = a.makeCalendar!;
+    a.makeCalendar = async (calendar) => {
+      if (a.offline) throw new OfflineError("offline");
+      return makeOffline(calendar);
+    };
+    await expect(makeCalendar(context, account.id, ask)).rejects.toThrow(OfflineError);
+    expect((await store.calendars(account.id)).map((c) => c.name)).not.toContain("Plans");
+    await secrets.delete(`account:${account.id}`);
+    await expect(makeCalendar(context, account.id, ask)).rejects.toEqual(refused("signed-out"));
+  });
+
+  test("the name is sent trimmed, its control characters gone", async () => {
+    const { a, context, add } = await setup();
+    const account = (await add("a.example")).account;
+    const asked = making(a, "https://a.example/plans/");
+    const made = await makeCalendar(context, account.id, {
+      name: "  Plans\u0007 2027 ",
+      color: null,
+      component: "VTODO",
+    });
+    expect(asked.map((calendar) => calendar.name)).toEqual(["Plans 2027"]);
+    expect(made.name).toBe("Plans 2027");
   });
 });

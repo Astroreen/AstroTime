@@ -13,6 +13,10 @@
       "types": "./src/copy.ts",
       "import": "./src/copy.ts"
     },
+    "./new-calendar": {
+      "types": "./src/new-calendar.ts",
+      "import": "./src/new-calendar.ts"
+    },
     "./provider": {
       "types": "./src/provider.ts",
       "import": "./src/provider.ts"

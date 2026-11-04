@@ -104,6 +104,9 @@ export async function syncAccount(
 async function run(store: Store, provider: Provider, accountId: string, report: SyncReport) {
   let remote: readonly RemoteCalendar[];
   let unread: PartialListing["unread"] = [];
+  // The calendars kept before the listing: one made meanwhile (providers
+  // D275), on the server before it was kept, is not one the listing missed.
+  const before = new Set((await store.calendars(accountId)).map((calendar) => calendar.id));
   try {
     remote = await provider.calendars();
   } catch (error) {
@@ -124,7 +127,11 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
   for (const { state: _, ...calendar } of remote)
     await store.saveCalendar({ accountId, ...calendar });
   for (const calendar of await store.calendars(accountId)) {
-    if (urls.has(calendar.url) || unread.some(({ prefix }) => calendar.url.startsWith(prefix)))
+    if (
+      !before.has(calendar.id) ||
+      urls.has(calendar.url) ||
+      unread.some(({ prefix }) => calendar.url.startsWith(prefix))
+    )
       continue;
     // A calendar deleted on the server goes with its objects (D38). One that
     // only went missing from a listing must not take unsent changes with it:
