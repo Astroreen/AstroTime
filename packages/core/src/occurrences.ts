@@ -309,7 +309,11 @@ export function boundsOf(object: CalendarObject): Bounds {
     for (const property of master.getAllProperties("rdate")) {
       for (const value of property.getValues()) {
         const start = value instanceof ICAL.Period ? value.start : value;
-        if (start instanceof ICAL.Time) include(start, plus(start, lengthOf(span)));
+        if (!(start instanceof ICAL.Time)) continue;
+        // Shown as long as the series (D141's deferred period length), and
+        // bounded to its own end too, for when it shows as long as it says.
+        include(start, plus(start, lengthOf(span)));
+        if (value instanceof ICAL.Period) include(start, keepTzid(start, value.getEnd().clone()));
       }
     }
     const rules = master.getAllProperties("rrule").map((p) => p.getFirstValue() as ICAL.Recur);

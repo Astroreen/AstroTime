@@ -372,6 +372,32 @@ describe("bounds (for the local store's date index)", () => {
     }
   });
 
+  test("an RDATE of a period before DTSTART is bounded by its own end too (D36)", () => {
+    // The period runs from 3 to 20 November, past the master's one hour on the 10th.
+    for (const period of ["20261103T090000Z/20261120T090000Z", "20261103T090000Z/P17D"]) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          "BEGIN:VEVENT",
+          "UID:period",
+          "DTSTAMP:20261001T000000Z",
+          "DTSTART:20261110T090000Z",
+          "DTEND:20261110T100000Z",
+          `RDATE;VALUE=PERIOD:${period}`,
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      expect(boundsOf(object), period).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-20T09:00:00Z"),
+      });
+    }
+  });
+
   test("an unending series is open; an undated task has no bounds", () => {
     expect(boundsOf(load("tasksorg-task-recurring.ics")).endMs).toBeNull();
     expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
