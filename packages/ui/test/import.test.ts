@@ -491,6 +491,21 @@ describe("an import written through the store (import D269–D271)", () => {
     expect(copy("child").serialize()).toContain(`RELATED-TO:${copy("parent").uid}`);
   });
 
+  test("a calendar that cannot be removed again is said beside what was imported, not instead", async () => {
+    const { store } = await setup();
+    const source = await sourceOf(calendar("Holidays", event("x")));
+    const destinations = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    store.removeCalendar = () => Promise.reject(new Error("The store is closed."));
+    const { result } = await run(store, [source], destinations, duplicates, "skip", 0);
+    expect(result).toMatchObject({
+      events: 0,
+      stopped: true,
+      error: null,
+      cleanup: "The store is closed.",
+    });
+  });
+
   test("a new calendar that cannot be made: the ones made before it go again", async () => {
     const { store } = await setup();
     const one = await sourceOf(calendar("One", event("a")));

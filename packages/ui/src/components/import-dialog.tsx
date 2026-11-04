@@ -525,6 +525,11 @@ function Done({ result }: { result: Imported }) {
         </p>
       ))}
       {result.stopped ? <p className="text-note text-ink-muted">{t("import.stopped")}</p> : null}
+      {result.cleanup ? (
+        <p className="text-note text-ink-muted">
+          {t("import.cleanupFailed", { message: result.cleanup })}
+        </p>
+      ) : null}
       {result.error ? (
         <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
           {t("import.failedPart", { message: result.error })}

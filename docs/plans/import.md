@@ -140,7 +140,10 @@ not carry is said, not dropped in silence.
   component iCalendar names (its start and its `DTEND` or `DURATION`,
   its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
   out is gone: the user chose the file's version, so this is their edit,
-  not a sync that drops what it does not understand. The stored copy
+  not a sync that drops what it does not understand. So its `STATUS`,
+  `COMPLETED` and the guests' `PARTSTAT` follow the file too, by the
+  user's choice; its `SEQUENCE` becomes one past the larger of the two, so
+  a scheduling client never sees it go back (RFC 5546). The stored copy
   gives only what a file from another app cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
   not have, and its alarms and its attachments when the file has none of
   them. An item deleted here whose deletion has not reached the server
@@ -162,8 +165,10 @@ not carry is said, not dropped in silence.
   counted as given twice). A write that fails ends the run: the batch is
   one transaction, so what landed before stays and is counted, and the
   error is said. A calendar made for the import that got nothing (stopped
-  or failed before its first write) is removed again, and so are those
-  made before one that could not be made.
+  or failed before its first write) is removed again, with its account on
+  this device if nothing is left on it, and so are those made before one
+  that could not be made; a removal that fails is said beside what was
+  imported, never instead of it.
 
 - **D272. Nothing lost, and what a conversion cannot carry, said.** An
   iCalendar or jCal object is stored as the file wrote it

@@ -140,6 +140,8 @@ export interface Imported {
   readonly stopped: boolean;
   /** Why it ended before the end, if a write failed: what came before stays. */
   readonly error: string | null;
+  /** Why a calendar made for it and left empty could not be removed again. */
+  readonly cleanup: string | null;
   /** The calendars made on this device, by source. */
   readonly made: ReadonlyMap<string, Calendar>;
 }
@@ -229,8 +231,9 @@ export async function runImport(run: Run): Promise<Imported> {
       );
     }
   } catch (error) {
-    // One that could not be made: the ones made before it go again, empty.
-    for (const calendar of made.values()) await unmake(store, calendar);
+    // One that could not be made: the ones made before it go again, empty;
+    // one of those that cannot go does not hide why the import stopped.
+    for (const calendar of made.values()) await unmake(store, calendar).catch(() => {});
     throw error;
   }
 
@@ -319,11 +322,16 @@ export async function runImport(run: Run): Promise<Imported> {
     await pause();
   }
   const written = writes.slice(0, done);
-  // A calendar made for the import that got nothing (stopped, or failed, first) goes again.
+  // A calendar made for the import that got nothing (stopped, or failed, first)
+  // goes again; if it cannot, that is said beside what was imported, not instead.
+  let cleanup: string | null = null;
   for (const [id, calendar] of made) {
-    if (!written.some((write) => write.calendarId === calendar.id)) {
+    if (written.some((write) => write.calendarId === calendar.id)) continue;
+    try {
       await unmake(store, calendar);
       made.delete(id);
+    } catch (failure) {
+      cleanup = failure instanceof Error ? failure.message : String(failure);
     }
   }
   const count = (kind: "event" | "task") => written.filter((write) => write.kind === kind).length;
@@ -337,6 +345,7 @@ export async function runImport(run: Run): Promise<Imported> {
     again,
     stopped,
     error,
+    cleanup,
     made,
   };
 }

@@ -636,6 +636,19 @@ describe("the file's object over the one stored (import D270, Update them)", () 
     CalendarObject.parse(merged);
   });
 
+  test("its SEQUENCE goes past both versions', so a scheduling client sees it as newer", () => {
+    const seq = (stored: number | null, file: number | null) =>
+      vevents(
+        overlay(
+          calendar(event("s", stored === null ? [] : [`SEQUENCE:${stored}`])),
+          calendar(event("s", file === null ? [] : [`SEQUENCE:${file}`])),
+        ),
+      )[0]!.getFirstPropertyValue("sequence");
+    expect(seq(3, 1)).toBe(4);
+    expect(seq(1, 5)).toBe(6);
+    expect(seq(null, null)).toBe(1);
+  });
+
   test("its EXDATEs are the file's", () => {
     const merged = overlay(
       calendar(event("s", ["RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261106T090000Z"])),

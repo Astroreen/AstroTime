@@ -663,6 +663,14 @@ export function overlay(stored: string, incoming: string): string {
     if (component.name === "vtimezone") continue;
     const before = old.get(occurrence(component));
     if (!before) continue;
+    // A changed version of an item it had: SEQUENCE past both, so a
+    // scheduling client sees it as newer, never older (RFC 5546 §2.1.4).
+    const sequence = (one: ICAL.Component) =>
+      Number(one.getFirstPropertyValue("sequence") ?? 0) || 0;
+    component.updatePropertyWithValue(
+      "sequence",
+      Math.max(sequence(before), sequence(component)) + 1,
+    );
     const has = new Set(component.getAllProperties().map((property) => property.name));
     for (const property of before.getAllProperties().slice()) {
       const keep =

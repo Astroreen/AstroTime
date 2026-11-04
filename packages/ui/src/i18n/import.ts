@@ -77,6 +77,8 @@ export const importStrings = {
     "import.again_one": "{{count}} given twice in the file, imported once",
     "import.again_other": "{{count}} given twice in the file, imported once",
     "import.failed": "The import stopped: {{message}}",
+    "import.cleanupFailed":
+      "A calendar made for this import holds nothing and could not be removed: {{message}}. You can remove it in Settings.",
     "import.failedPart":
       "The import stopped on an error: {{message}}. What was imported before it stays.",
     "import.tooBig": "{{file}} is larger than AstroTime reads at once ({{size}} MB at most).",
@@ -186,6 +188,8 @@ export const importStrings = {
     "import.again_many": "{{count}} даны в файле дважды, импортированы один раз",
     "import.again_other": "{{count}} даны в файле дважды, импортированы один раз",
     "import.failed": "Импорт остановлен: {{message}}",
+    "import.cleanupFailed":
+      "Календарь, созданный для этого импорта, пуст, и его не удалось убрать: {{message}}. Его можно удалить в настройках.",
     "import.failedPart": "Импорт остановлен ошибкой: {{message}}. Импортированное до неё остаётся.",
     "import.tooBig": "{{file}} больше, чем AstroTime читает за раз (не больше {{size}} МБ).",
   },
