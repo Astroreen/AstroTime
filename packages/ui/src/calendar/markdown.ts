@@ -198,11 +198,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // Its content's column, its marker's indent and width included (as
     // CommonMark's): a line under it belongs to it from this column on.
     // Five spaces or more after the marker start an indented line of the
-    // item: its column is then one past the marker.
+    // item, and an empty item has no content to take the column from: its
+    // column is then one past the marker.
     const marked = indentOf(marker[1]! + marker[2]!.replace(/./g, " ") + "x");
     const spaces = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
-    const indent = spaces >= 5 ? marked + 1 : marked + spaces;
     const body = [lines[i]!.slice(marker[0].length)];
+    const indent = spaces >= 5 || BLANK.test(body[0]!) ? marked + 1 : marked + spaces;
     i++;
     while (i < lines.length) {
       const next = lines[i]!;

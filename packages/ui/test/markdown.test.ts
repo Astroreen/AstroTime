@@ -484,6 +484,15 @@ describe("an item's lines, from its content's column (design D207)", () => {
     ]);
   });
 
+  test("an empty item's lines belong to it from one past its marker, as CommonMark's", () => {
+    // " - y" is a sibling of the empty item, as after "- x"; two spaces nest it.
+    expect(parseMarkdown("-\n - y")).toEqual([list(null, item(), item(paragraph("y")))]);
+    expect(parseMarkdown("1.\n  2. y")).toEqual([list(1, item(), item(paragraph("y")))]);
+    expect(parseMarkdown("-\n  - y")).toEqual([list(null, item(list(null, item(paragraph("y")))))]);
+    // A line short of the column is no line of the empty item's.
+    expect(parseMarkdown("-\n next")).toEqual([list(null, item()), paragraph(" next")]);
+  });
+
   test("an item under a number nests from its content's column, under a bullet from 2", () => {
     expect(parseMarkdown("1. x\n   - y")).toEqual([
       list(1, item(paragraph("x"), list(null, item(paragraph("y"))))),
