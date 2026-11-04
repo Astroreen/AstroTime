@@ -78,7 +78,7 @@ were checked on 2026-11-01.
   and nothing but the app's own page, under the CSP, runs there.
   The CSP is the web's ([foundation D110](foundation.md#D110)) without what
   only the web needs: `default-src 'none'; script-src 'self'; style-src
-  'self' 'nonce-…'; base-uri 'none'; form-action 'none'; frame-ancestors
+  'self' 'nonce-…'; img-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors
   'none'`, with a fresh nonce each time `app://` serves the page (for the
   styles Base UI adds). No `connect-src`: the renderer reaches no network
   itself, every request goes through the main process; no `worker-src` and
