@@ -2351,7 +2351,8 @@ own (below).
     alerts) is centred in the same room, no wider than it, and scrolls
     when taller;
   - the edit dialog beside its draft (D155, D187) keeps its outer margin
-    from the bar on its side, narrower by it; the notices at the foot
+    from the bar on its side, narrower by it, and stands aside only where
+    the room past the bar holds a phone's width; the notices at the foot
     (copied, a change failed) sit above the gesture bar.
     `apps/web/e2e/insets.spec.ts` emulates the insets SystemBars injects
     (a phone upright; on its side, with a cutout at the left and the

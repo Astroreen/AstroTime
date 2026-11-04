@@ -234,17 +234,34 @@ describe("where the dialog stands beside the draft (design D187)", () => {
     expect(besideOf({ left: 0, right: 30 }, 799, 20)).toBeNull();
   });
 
-  test("its outer edge clears a system bar on its side, its inner edge stays beside the draft (design D235)", () => {
-    // On the right: 24 px from the bar there, narrower by the bar, so its
-    // left edge is where besideOf put it.
+  test("a system bar at a side is no room: its inset narrows the aside before a phone's width is asked (design D235)", () => {
+    // 400 px of room on the right, 48 of them a navigation bar: 352 px.
+    expect(besideOf({ left: 0, right: 568 }, 1000, 16, { left: 0, right: 48 })).toBeNull();
+    expect(besideOf({ left: 0, right: 520 }, 1000, 16, { left: 0, right: 48 })).toEqual({
+      side: "right",
+      width: 400,
+    });
+    // A cutout at the left tips a tie to the right, and narrows the left.
+    expect(besideOf({ left: 432, right: 568 }, 1000, 16, { left: 32, right: 0 })).toEqual({
+      side: "right",
+      width: 400,
+    });
+    // 600 − 24 − 8 − 32.
+    expect(besideOf({ left: 600, right: 980 }, 1000, 16, { left: 32, right: 0 })).toEqual({
+      side: "left",
+      width: 536,
+    });
+  });
+
+  test("its outer edge clears a system bar on its side (design D235)", () => {
     expect(asideStyle({ side: "right", width: 400 })).toEqual({
-      width: "calc(400px - var(--inset-right))",
+      width: 400,
       right: "calc(24px + var(--inset-right))",
       left: "auto",
       translate: "0 -50%",
     });
     expect(asideStyle({ side: "left", width: 419 })).toEqual({
-      width: "calc(419px - var(--inset-left))",
+      width: 419,
       left: "calc(24px + var(--inset-left))",
       right: "auto",
       translate: "0 -50%",
