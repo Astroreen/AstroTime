@@ -5,7 +5,7 @@
 // phone in Russian.
 import { expect, test } from "@playwright/test";
 
-import { BIG, HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TEAM } from "./import-files.ts";
+import { BIG, HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TAKEOUT, TEAM } from "./import-files.ts";
 import { choose, NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 test("wide, English: a file's events and a task, one already there, into Work and a new list", async ({
@@ -144,6 +144,21 @@ test("a big file with a series, stopped in the middle: what landed stays, the se
       name: /^Morning run/,
     }),
   ).toBeVisible();
+});
+
+test("Google Takeout's tasks: each list a source, into the tasks screen", async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  await importFile(page, /^Import from a file/, "Tasks.json", TAKEOUT);
+  const dialog = page.getByRole("dialog", { name: "Import" });
+  await expect(dialog.getByRole("region", { name: "My Tasks" })).toContainText("2 tasks");
+  await expect(dialog.getByRole("region", { name: "Работа" })).toContainText("1 task");
+  await dialog.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("3 tasks");
 });
 
 test.describe("on a phone, in Russian", () => {

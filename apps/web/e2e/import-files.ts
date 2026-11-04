@@ -108,3 +108,8 @@ export const NOKIA = readFileSync(
 export const OUTLOOK_RU = readFileSync(
   new URL("../../../packages/ui/test/fixtures/import/outlook-calendar-ru.csv", import.meta.url),
 );
+
+/** Google Takeout's Tasks.json, the converter's own fixture. */
+export const TAKEOUT = readFileSync(
+  new URL("../../../packages/ui/test/fixtures/import/takeout-tasks.json", import.meta.url),
+);

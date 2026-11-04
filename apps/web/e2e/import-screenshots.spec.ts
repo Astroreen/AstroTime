@@ -7,7 +7,7 @@
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e import-screenshots
 import { expect, test } from "@playwright/test";
 
-import { HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TEAM } from "./import-files.ts";
+import { HOLIDAYS, importFile, NOKIA, OUTLOOK_RU, TAKEOUT, TEAM } from "./import-files.ts";
 import { choose, openDemo } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
@@ -108,6 +108,7 @@ for (const [format, language, theme, size, viewport] of [
   ["vcs", "ru", "light", "phone", PHONE],
   ["vcs", "en", "dark", "wide", WIDE],
   ["csv", "ru", "dark", "phone", PHONE],
+  ["takeout", "en", "light", "wide", WIDE],
 ] as const) {
   test(`${format} ${language} ${theme} ${size}`, async ({ browser }) => {
     const words = WORDS[language];
@@ -133,7 +134,8 @@ for (const [format, language, theme, size, viewport] of [
         .click();
     }
     if (format === "vcs") await importFile(page, words.entry, "nokia.vcs", NOKIA);
-    else await importFile(page, words.entry, "Календарь.csv", OUTLOOK_RU);
+    else if (format === "csv") await importFile(page, words.entry, "Календарь.csv", OUTLOOK_RU);
+    else await importFile(page, words.entry, "Tasks.json", TAKEOUT);
     const dialog = page.getByRole("dialog", { name: words.dialog });
     await expect(dialog.getByRole("region").first()).toBeVisible();
     await page.screenshot({
