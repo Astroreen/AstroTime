@@ -306,7 +306,7 @@ function hiddenIn(text: string): Uint8Array {
     }
     let length = 1;
     while (text[at + length] === "`") length++;
-    const end = unclosed.has(length) ? -1 : text.indexOf("`".repeat(length), at + length);
+    const end = unclosed.has(length) ? -1 : runOf(text, length, at + length);
     if (end < 0) {
       unclosed.add(length);
       at += length;
@@ -324,6 +324,22 @@ function hiddenIn(text: string): Uint8Array {
     }
   }
   return hidden;
+}
+
+/**
+ * Where a run of exactly `length` backticks starts in `text` from `from`, the
+ * one that closes a code span opened by as many; -1 when none does.
+ */
+function runOf(text: string, length: number, from: number): number {
+  const run = "`".repeat(length);
+  let at = text.indexOf(run, from);
+  while (at >= 0) {
+    let end = at + length;
+    while (text[end] === "`") end++;
+    if (end - at === length) return at;
+    at = text.indexOf(run, end);
+  }
+  return -1;
 }
 
 /** The first of `sorted` at or after `from`, by halves. */
@@ -393,7 +409,7 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       let length = 1;
       while (text[i + length] === "`") length++;
       const run = "`".repeat(length);
-      const end = (unclosed.get(length) ?? -1) > i ? -1 : text.indexOf(run, i + length);
+      const end = (unclosed.get(length) ?? -1) > i ? -1 : runOf(text, length, i + length);
       if ((unclosed.get(length) ?? -1) <= i) work.steps += (end > 0 ? end : text.length) - i;
       if (end > 0) {
         push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });

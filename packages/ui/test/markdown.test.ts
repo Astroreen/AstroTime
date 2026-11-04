@@ -394,6 +394,17 @@ describe("after #94's review (design D207)", () => {
     ]);
   });
 
+  test("a code span closes only on a run of as many backticks as opened it", () => {
+    expect(parseMarkdown("`a``b`")).toEqual([paragraph({ type: "code", text: "a``b" })]);
+    expect(parseMarkdown("``a```b`` c")).toEqual([
+      paragraph({ type: "code", text: "a```b" }, " c"),
+    ]);
+    // Nor does a longer run inside hide the marks after it from emphasis.
+    expect(parseMarkdown("*x `a``b` y*")).toEqual([
+      paragraph({ type: "em", children: ["x ", { type: "code", text: "a``b" }, " y"] }),
+    ]);
+  });
+
   test("a code span wins over emphasis; a mark inside a bare link closes nothing", () => {
     expect(parseMarkdown("*foo `a*` bar*")).toEqual([
       paragraph({ type: "em", children: ["foo ", { type: "code", text: "a*" }, " bar"] }),
