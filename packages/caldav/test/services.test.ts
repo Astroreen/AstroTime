@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
-import { digestHeader } from "../src/digest.ts";
+import { digestChallenge, digestHeader } from "../src/digest.ts";
 import { HttpError, type HttpRequest, type HttpResponse } from "../src/index.ts";
 import {
   digestParam,
@@ -45,9 +45,52 @@ test.each(recordings.map((recording) => [recording.service, recording] as const)
   },
 );
 
-test("Baïkal's recording is answered with Digest, each answer checked against its challenge", () => {
+test("Baïkal's recording is answered with Digest, and a Digest answer made with another password is refused", async () => {
   const baikal = recordings.find((recording) => recording.service === "baikal-digest")!;
   expect(baikal.exchanges.filter((e) => e.request.scheme === "Digest").length).toBeGreaterThan(5);
+  // The recording's first challenge, and the request that answered it.
+  const challenged = baikal.exchanges.findIndex((e) => e.response.status === 401);
+  const [first, answered] = [baikal.exchanges[challenged]!, baikal.exchanges[challenged + 1]!];
+  expect(answered.request.scheme).toBe("Digest");
+  const challenge = digestChallenge(first.response.headers["www-authenticate"]!)!.challenge;
+  const asRecorded = (exchange: (typeof baikal.exchanges)[number], authorization?: string) => ({
+    method: exchange.request.method,
+    url: `${exchange.request.origin}${exchange.request.path}`,
+    headers: {
+      ...exchange.request.headers,
+      ...(exchange.request.depth === null ? {} : { Depth: exchange.request.depth }),
+      ...(authorization === undefined ? {} : { Authorization: authorization }),
+    },
+    ...(exchange.request.body === null ? {} : { body: exchange.request.body }),
+  });
+  const before = baikal.exchanges.slice(0, challenged + 1);
+  const signed = async (password: string) => {
+    const request = asRecorded(answered);
+    const header = await digestHeader(
+      { ...challenge, count: 0 },
+      { username: credentials.username, password },
+      request,
+      1,
+    );
+    return asRecorded(answered, header);
+  };
+  const upTo = async (http: ReturnType<typeof replay>) => {
+    for (const exchange of before)
+      await http(
+        asRecorded(
+          exchange,
+          exchange.request.scheme === "Basic" ? "Basic dXNlcjpyZWNvcmRlZA==" : undefined,
+        ),
+      );
+  };
+  // Answered right, the replay goes on; tampered (another password), it
+  // refuses, as Baïkal would: without checkDigest this replay would pass.
+  const right = replay(baikal, credentials);
+  await upTo(right);
+  expect((await right(await signed(credentials.password))).status).toBe(answered.response.status);
+  const tampered = replay(baikal, credentials);
+  await upTo(tampered);
+  await expect(tampered(await signed("another password"))).rejects.toThrow(/would refuse/);
 });
 
 const one = (

@@ -1,11 +1,12 @@
 // What a recording records (docs/plans/providers.md#D249): one account's
 // discovery, its calendars, and a calendar of the recording's own with an
 // event (and a task, where the service keeps them) made, found by a sync,
-// changed, deleted, and the calendar removed; its name is the run's own,
-// and calendars an earlier run left are removed first. The same steps run against
-// the service by scripts/record-caldav-service.ts and against the recording
-// by services.test.ts; every value in them is fixed, so the requests are
-// the same each time.
+// changed, deleted, and the calendar removed; calendars an earlier run
+// left are removed first. The same steps run against the service by
+// scripts/record-caldav-service.ts and against the recording by
+// services.test.ts. Every value in them is fixed but the calendar's name,
+// which is the run's own (`calendarName`) and kept in the recording, so a
+// replay given it sends the requests the recording holds.
 import {
   Authorization,
   CalDavProvider,
