@@ -926,20 +926,24 @@ function editSeries(
 
   const tzid = anchorTzid(master);
   if (moveNamed) {
+    // A time the edit did not move (only the end changed) stays as written (D142).
     const moveDates = (name: "exdate" | "rdate") => {
       const dates = datesOf(master, name);
-      if (dates.length > 0) setDates(master, name, dates.map(moveNamed!), tzid);
+      const moved = dates.map(moveNamed!);
+      if (moved.some((time, index) => !sameTime(time, dates[index]!)))
+        setDates(master, name, moved, tzid);
     };
     moveDates("exdate");
     moveDates("rdate");
     for (const exception of exceptions) {
       const id = recurrenceIdOf(exception)!;
       const moved = moveNamed(id);
-      setTime(exception.getFirstProperty("recurrence-id")!, moved, tzid);
+      const named = !sameTime(moved, id);
+      if (named) setTime(exception.getFirstProperty("recurrence-id")!, moved, tzid);
       if (followers.has(exception)) {
         setTimes(exception, root, timesAt!(moved));
         significant(exception, now);
-      } else touch(exception, now);
+      } else if (named) touch(exception, now);
     }
   }
 

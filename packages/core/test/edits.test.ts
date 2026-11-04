@@ -1575,6 +1575,46 @@ describe("a series' corners (D142)", () => {
     ]);
   });
 
+  test("all: a new end alone moves no EXDATE, RDATE or RECURRENCE-ID: each stays as written", () => {
+    const exdate = "EXDATE:20261116T070000Z,20261123T070000Z";
+    const rdate = "RDATE;TZID=America/New_York:20261104T090000";
+    const series = object(
+      [...mondays, "SUMMARY:Lesson", "RRULE:FREQ=WEEKLY;COUNT=6", exdate, rdate],
+      [
+        "RECURRENCE-ID:20261109T070000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261109T120000",
+        "DTEND;TZID=Europe/Vilnius:20261109T130000",
+        "LAST-MODIFIED:20261002T000000Z",
+        "SUMMARY:Lesson (moved)",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261130T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261130T090000",
+        "DTEND;TZID=Europe/Vilnius:20261130T100000",
+        "SUMMARY:Lesson (renamed)",
+      ],
+    );
+    const { ics } = editItem(
+      series,
+      { time: { start: vilnius("2026-11-02T09:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    const lines = contentLines(ics);
+    expect(lines).toContain(exdate);
+    expect(lines).toContain(rdate);
+    expect(lines).toContain("RECURRENCE-ID:20261109T070000Z");
+    // The exception moved on its own is not touched; the one that follows is two hours long too.
+    expect(lines).toContain("LAST-MODIFIED:20261002T000000Z");
+    expect(lines).toContain("DTEND;TZID=Europe/Vilnius:20261130T110000");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T09:00:00",
+      "2026-11-04T16:00:00",
+      "2026-11-09T12:00:00",
+      "2026-11-30T09:00:00",
+      "2026-12-07T09:00:00",
+    ]);
+  });
+
   test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
     const rdate = "RDATE;TZID=America/New_York:20261104T090000";
     // And one of its own after the split below, which goes.
