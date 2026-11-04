@@ -189,9 +189,27 @@ test("migration 7 gives a writable calendar every right and a read-only one none
     shared: { create: false, edit: false, delete: false },
     old: { create: false, edit: false, delete: false },
   });
-  // …and marks one read-only where this build had written every right: read_only wins for editing.
+  // …and marks one read-only where this build had written every right: read_only wins, as that build meant it.
   await driver.query("UPDATE calendars SET read_only = 1 WHERE id = 'mine'", []);
-  expect((await store.calendars()).find((c) => c.id === "mine")?.rights.edit).toBe(false);
+  expect((await store.calendars()).find((c) => c.id === "mine")?.rights).toEqual({
+    create: false,
+    edit: false,
+    delete: false,
+  });
+  // …and marks one writable where this build had written no right: read_only wins that way too.
+  // A share this build wrote with some rights and no editing is as written.
+  await driver.query("UPDATE calendars SET rights = 'create,delete' WHERE id = 'shared'", []);
+  expect((await store.calendars()).find((c) => c.id === "shared")?.rights).toEqual({
+    create: true,
+    edit: false,
+    delete: true,
+  });
+  await driver.query("UPDATE calendars SET read_only = 0 WHERE id = 'shared'", []);
+  expect((await store.calendars()).find((c) => c.id === "shared")?.rights).toEqual({
+    create: true,
+    edit: true,
+    delete: true,
+  });
 });
 
 test("migration 8 keeps every account syncing; a tab of an older build adds one that syncs too", async () => {

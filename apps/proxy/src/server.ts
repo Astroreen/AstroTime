@@ -79,7 +79,9 @@ export function contentSecurityPolicy(
     "worker-src 'self'",
     // The web app manifest and its icons, the page's icon among them (D124).
     "manifest-src 'self'",
-    `img-src 'self'${images}`,
+    // The user's own pictures, drawn from object URLs of their bytes (design
+    // D222), which 'self' does not match.
+    `img-src 'self' blob:${images}`,
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",

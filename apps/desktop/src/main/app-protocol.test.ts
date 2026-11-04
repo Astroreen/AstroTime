@@ -2,9 +2,12 @@
 // with its policy and a fresh nonce each time, the files under the renderer's
 // folder and nothing outside it.
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { chromium } from "playwright";
 import { expect, test } from "vite-plus/test";
 
 import { appFiles } from "./app-protocol.ts";
@@ -57,4 +60,62 @@ test("a file of the renderer comes as itself; anything else is not found", async
     expect([url, (await get(serve, url)).status]).toEqual([url, 404]);
   }
   expect((await get(serve, "app://astrotime/", "POST")).status).toBe(405);
+});
+
+test("the pictures show under the page's policy: illustrations (design D219) and the user's own (D222)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "astrotime-renderer-"));
+  mkdirSync(join(root, "assets"));
+  writeFileSync(
+    join(root, "index.html"),
+    '<script type="module" nonce="astrotime-csp-nonce" src="/assets/app.js"></script>',
+  );
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>';
+  writeFileSync(join(root, "assets", "art.svg"), svg);
+  // An illustration is a file of the renderer's; an own picture, an object URL of its bytes.
+  writeFileSync(
+    join(root, "assets", "app.js"),
+    `const draw = (src) => new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve("loaded");
+      image.onerror = () => resolve("refused");
+      image.src = src;
+    });
+    const own = URL.createObjectURL(new Blob([${JSON.stringify(svg)}], { type: "image/svg+xml" }));
+    window.drawn([await draw("/assets/art.svg"), await draw(own)]);`,
+  );
+  const serve = appFiles(root);
+  // app:// answered over http, so Chromium applies the same policy to the
+  // same files: `appFiles` and its policy are checked here, Electron's
+  // `protocol.handle` itself is not: the desktop's e2e starts the app
+  // through it, but checks no picture.
+  const server = createServer((req, res) => {
+    void serve(new Request(`app://astrotime${req.url}`))
+      .then(async (answer) => {
+        res.writeHead(answer.status, Object.fromEntries(answer.headers));
+        res.end(Buffer.from(await answer.arrayBuffer()));
+      })
+      // A file that fails to serve fails the picture, not the wait for it.
+      .catch(() => res.writeHead(500).end());
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    let heard: (results: string[]) => void = () => {};
+    const drawn = new Promise<string[]>((resolve, reject) => {
+      heard = resolve;
+      // A page that fails before it draws fails the test with its reason.
+      page.on("pageerror", reject);
+      page.on("console", (message) => {
+        if (/Refused to (load|execute) the script/.test(message.text()))
+          reject(new Error(message.text()));
+      });
+    });
+    await page.exposeFunction("drawn", heard);
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+    expect(await drawn).toEqual(["loaded", "loaded"]);
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

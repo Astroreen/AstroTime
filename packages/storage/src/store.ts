@@ -1108,15 +1108,19 @@ export const LOCAL_SERVER = "local:";
 export const LOCAL_CALENDAR_URL = `${LOCAL_SERVER}personal/`;
 
 function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$inferSelect): Calendar {
-  // An older build's tab writes `read_only` and not `rights`: where they
-  // disagree on editing, the fresher `read_only` wins.
-  const granted = rights?.split(",") ?? (readOnly ? [] : RIGHTS);
+  // This build writes `read_only` as `!rights.edit` (`saveCalendar`); an
+  // older build's tab writes only `read_only` (docs/plans/foundation.md#D37).
+  // Where they disagree, or `rights` is `null`, that tab wrote last, and
+  // `read_only` grants all or nothing, as it did in that build.
+  const stored = rights?.split(",");
+  const agrees = stored?.includes("edit") === !readOnly;
+  const granted = agrees ? stored : readOnly ? [] : RIGHTS;
   return {
     ...row,
     components: row.components.split(",").filter(Boolean) as Component[],
     rights: {
       create: granted.includes("create"),
-      edit: granted.includes("edit") && !readOnly,
+      edit: granted.includes("edit"),
       delete: granted.includes("delete"),
     },
   };

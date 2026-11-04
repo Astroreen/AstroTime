@@ -78,7 +78,8 @@ were checked on 2026-11-01.
   and nothing but the app's own page, under the CSP, runs there.
   The CSP is the web's ([foundation D110](foundation.md#D110)) without what
   only the web needs: `default-src 'none'; script-src 'self'; style-src
-  'self' 'nonce-…'; base-uri 'none'; form-action 'none'; frame-ancestors
+  'self' 'nonce-…'; img-src 'self' blob:; base-uri 'none'; form-action
+  'none'; frame-ancestors
   'none'`, with a fresh nonce each time `app://` serves the page (for the
   styles Base UI adds). No `connect-src`: the renderer reaches no network
   itself, every request goes through the main process; no `worker-src` and
@@ -435,6 +436,9 @@ were checked on 2026-11-01.
   reboot without opening the app ([D75](#D75), [D76](#D76)).
 - **Reminders while the app is not running** — a systemd user timer or a
   small resident helper ([D76](#D76)).
+- **A picture under `app://` in the e2e** — the CSP's `img-src` is
+  checked against `appFiles` over http (`app-protocol.test.ts`), not
+  through Electron's `protocol.handle` ([D71](#D71)).
 - **Other packages** — Flatpak (Flathub), rpm, AUR, Snap ([D78](#D78)).
 - **An AppImage without libfuse2 and with the sandbox** — electron-builder's
   static AppImage runtime (its `appimage` toolset 1.x, beta in 26.18) needs

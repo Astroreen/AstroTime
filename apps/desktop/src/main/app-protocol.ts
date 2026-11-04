@@ -34,6 +34,9 @@ function contentSecurityPolicy(nonce: string): string {
     "script-src 'self'",
     // The built stylesheet, and the <style> elements Base UI adds, which carry the nonce.
     `style-src 'self' 'nonce-${nonce}'`,
+    // The illustrations, files of the renderer's (design D219), and the
+    // user's own pictures, drawn from object URLs (design D222).
+    "img-src 'self' blob:",
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
