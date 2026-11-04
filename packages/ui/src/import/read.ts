@@ -35,6 +35,8 @@ export interface Source {
   readonly problems: readonly SplitProblem[];
   /** What a converted format had that iCalendar got nothing of, by its name there (D272). */
   readonly notImported: readonly string[];
+  /** How a CSV's dates were read, and whether that was guessed. */
+  readonly dates?: { readonly order: "dmy" | "mdy" | "ymd"; readonly guessed: boolean } | null;
 }
 
 export interface ReadFile {
@@ -90,7 +92,7 @@ export async function readImport(
     const archive = await (await import("./zip.ts")).unzip(file.bytes);
     unread.push(...archive.unread);
     for (const entry of archive.entries) {
-      if (/\.(ics|ical|ifb|icalendar|json|vcs)$/i.test(entry.name)) files.push(entry);
+      if (/\.(ics|ical|ifb|icalendar|json|vcs|csv)$/i.test(entry.name)) files.push(entry);
       else unread.push(entry.name);
     }
   }
@@ -99,8 +101,17 @@ export async function readImport(
     guessed ??= decoded.guessed;
     let calendars: SplitCalendar[];
     let notImported: readonly string[] = [];
+    let dates: Source["dates"] = null;
     try {
       let text = decoded.text;
+      const start = text.trimStart();
+      // A CSV: no calendar, no JSON; its converter loads for it alone.
+      if (!/^BEGIN:VCALENDAR/im.test(text) && !start.startsWith("[") && !start.startsWith("{")) {
+        const converted = (await import("./csv.ts")).csvToIcs(text, options);
+        text = converted.text;
+        notImported = converted.notImported;
+        dates = converted.dates;
+      }
       // vCalendar 1.0, a calendar at a time (a file may hold 2.0 ones
       // beside it): its converter loads for such a calendar alone.
       const blocks = text.split(/(?=^BEGIN:VCALENDAR)/im);
@@ -133,6 +144,7 @@ export async function readImport(
       sources.push({
         ...(await sourceOf(calendar, baseName(one.name), sources.length, options)),
         notImported,
+        dates,
       });
     }
   }

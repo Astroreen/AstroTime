@@ -103,3 +103,8 @@ export const BIG = lines(
 export const NOKIA = readFileSync(
   new URL("../../../packages/ui/test/fixtures/import/nokia.vcs", import.meta.url),
 );
+
+/** Russian Outlook's CSV of a calendar, the converter's own fixture: Windows-1251, ';' between columns. */
+export const OUTLOOK_RU = readFileSync(
+  new URL("../../../packages/ui/test/fixtures/import/outlook-calendar-ru.csv", import.meta.url),
+);

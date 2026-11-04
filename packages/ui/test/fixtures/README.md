@@ -43,12 +43,17 @@ otherwise as Wikipedia sent them. Each search asked `generator=search`,
 
 ## `import/`
 
-Files from other apps, for the import's converters (`../import.test.ts`,
-docs/plans/import.md#D266). All **synthetic**: written by hand in the
+Files from other apps, for the import's converters (`../vcs.test.ts`,
+`../csv.test.ts`, docs/plans/import.md#D266). All **synthetic**: written by hand in the
 shape each exporter is documented to write, since no such app or phone was
 at hand; each line's form follows the vCalendar 1.0 specification (versit, 1996) and the exporters' published samples.
 
-| File          | In the shape of                                                                                                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `outlook.vcs` | Outlook's "vCalendar format" (`Save As`): UTC times, quoted-printable text with soft breaks, `PRIORITY` 1–3, `AALARM`/`DALARM`, an all-day event as local midnights                             |
-| `nokia.vcs`   | an older phone's export (Nokia S60, Samsung): `TZ` and `DAYLIGHT`, local times, Windows-1251 and UTF-8 quoted-printable, 1.0's rules (`W1 MO WE #4`, `YM1`, `MD1 … LD`, `MP1 1+ TH`), a `VTODO` |
+| File                      | In the shape of                                                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `outlook.vcs`             | Outlook's "vCalendar format" (`Save As`): UTC times, quoted-printable text with soft breaks, `PRIORITY` 1–3, `AALARM`/`DALARM`, an all-day event as local midnights                             |
+| `nokia.vcs`               | an older phone's export (Nokia S60, Samsung): `TZ` and `DAYLIGHT`, local times, Windows-1251 and UTF-8 quoted-printable, 1.0's rules (`W1 MO WE #4`, `YM1`, `MD1 … LD`, `MP1 1+ TH`), a `VTODO` |
+| `google.csv`              | the columns Google Calendar's own CSV import documents (`Subject`, `Start Date`, `All Day Event`, `Private`): US dates, 12-hour times, an all-day event's last day inclusive                    |
+| `outlook-calendar.csv`    | Outlook's "Export to a file" of a calendar, in English: its 22 columns, a byte order mark, a reminder, a guest by address and one by name, `Mileage` (no place in iCalendar)                    |
+| `outlook-calendar-ru.csv` | the same in Russian Outlook: its column names in Russian, `;` between columns (the Russian list separator), Windows-1251, `ДД.ММ.ГГГГ`, `Истина`/`Ложь`                                         |
+| `outlook-tasks.csv`       | Outlook's export of tasks: `Due Date`, `Date Completed`, `% Complete`, `Status`                                                                                                                 |
+| `thunderbird.csv`         | Thunderbird's CSV export of a calendar (Outlook's column names)                                                                                                                                 |

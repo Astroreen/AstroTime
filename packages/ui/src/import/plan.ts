@@ -341,6 +341,8 @@ export async function runImport(run: Run): Promise<Imported> {
       break;
     }
     let batch: typeof writes = [];
+    /** The copies late UIDs asked for in this batch, by calendar: their new UIDs. */
+    let late = new Map<string, Map<string, string>>();
     // Counted once the batch is written: a batch that fails wrote nothing.
     let same = 0;
     let left = 0;
@@ -364,16 +366,42 @@ export async function runImport(run: Run): Promise<Imported> {
           for (const object of await local.withUids(calendarId, uids))
             there.set(keyOf(calendarId, object.uid), object);
         }
-        for (const write of fresh) {
+        // The copies a late UID asks for get their UIDs first, so the
+        // items of this batch that name one (a subtask's RELATED-TO) name
+        // the copy, as the planned copies do.
+        late = new Map();
+        const fates = fresh.map((write) => {
           const found =
             write.as === "new" ? there.get(keyOf(write.calendarId, write.uid)) : undefined;
-          if (!found) batch.push(write);
-          else if (sameObjects(found.ics, write.ics)) same++;
-          else if (choice === "copy")
-            batch.push({ ...write, ics: withUid(write.ics, run.newUid()), as: "copy" });
-          else if (choice === "update")
-            batch.push({ ...write, ics: overlay(found.ics, write.ics), as: "update" });
-          else left++;
+          if (!found) return { write, as: write.as };
+          if (sameObjects(found.ics, write.ics)) return { write, as: "same" as const };
+          if (choice === "skip") return { write, as: "left" as const };
+          if (choice === "copy") {
+            const uids = late.get(write.calendarId) ?? new Map<string, string>();
+            uids.set(write.uid, run.newUid());
+            late.set(write.calendarId, uids);
+            return { write, as: "copy" as const };
+          }
+          return { write, as: "update" as const, ics: overlay(found.ics, write.ics) };
+        });
+        for (const fate of fates) {
+          const { write } = fate;
+          if (fate.as === "same") same++;
+          else if (fate.as === "left") left++;
+          else {
+            const names = new Map([
+              ...(copied.get(write.calendarId) ?? []),
+              ...(late.get(write.calendarId) ?? []),
+            ]);
+            // Its own UID now: a copy's new one, else the file's.
+            const own = names.get(write.uid) ?? write.uid;
+            const ics = "ics" in fate ? fate.ics! : write.ics;
+            const renamed =
+              late.has(write.calendarId) && (fate.as === "copy" || /^RELATED-TO/m.test(ics))
+                ? withUid(ics, fate.as === "copy" ? own : write.uid, names)
+                : ics;
+            batch.push({ ...write, ics: renamed, as: fate.as });
+          }
         }
         // The store finds an object of the same UID itself, and updates it
         // (D270); a batch is one transaction, so a failed one wrote nothing.
@@ -384,6 +412,9 @@ export async function runImport(run: Run): Promise<Imported> {
       break;
     }
     written.push(...batch);
+    // A later batch's subtask names a copy made here too.
+    for (const [calendarId, uids] of late)
+      copied.set(calendarId, new Map([...(copied.get(calendarId) ?? []), ...uids]));
     identical += same;
     skipped += left;
     done += Math.min(BATCH, writes.length - i);

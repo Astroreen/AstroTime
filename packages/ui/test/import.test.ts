@@ -588,6 +588,40 @@ describe("an import written through the store (import D269–D271)", () => {
     }
   });
 
+  test("a parent a sync brought, copied in the batch: its subtask names the copy", async () => {
+    const { store, personal } = await setup();
+    const source = await sourceOf(
+      calendar(
+        "File",
+        [...todo("parent").slice(0, -1), "DESCRIPTION:the file's", "END:VTODO"],
+        [...todo("child").slice(0, -1), "RELATED-TO:parent", "END:VTODO"],
+      ),
+    );
+    const destinations = new Map([[source.id, { events: null, tasks: personal.id }]]);
+    const duplicates = await duplicatesOf(store, [source], destinations);
+    await store.saveManyFromServer(personal.id, [
+      {
+        href: "https://cloud.example.com/dav/Personal/parent.ics",
+        etag: '"1"',
+        ics: calendar(null, [
+          ...todo("parent").slice(0, -1),
+          "DESCRIPTION:the server's",
+          "END:VTODO",
+        ]),
+      },
+    ]);
+    const { result } = await run(store, [source], destinations, duplicates, "copy");
+    expect(result).toMatchObject({ tasks: 2, copies: 1 });
+    const tasks = (await store.pending(personal.id)).map((object) =>
+      CalendarObject.parse(object.ics),
+    );
+    const copy = tasks.find((task) => task.master?.description === "the file's")!;
+    expect(copy.uid).not.toBe("parent");
+    expect(tasks.find((task) => task.master?.summary === "child")!.serialize()).toContain(
+      `RELATED-TO:${copy.uid}`,
+    );
+  });
+
   test("a batch that fails counts nothing of itself, what it found already there neither", async () => {
     const { store, personal } = await setup();
     const source = await sourceOf(calendar("File", event("twin"), event("fresh")));

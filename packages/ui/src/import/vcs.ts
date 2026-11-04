@@ -737,9 +737,13 @@ function ruleOf(value: string, until: (value: string) => string | null): string 
       occurrences.push(`${occurrence[2] === "-" ? "-" : ""}${occurrence[1]}`);
       continue;
     }
+    // A count from the end ("1-", "LD") is a day of a month or a year;
+    // a month has none (BYMONTH is 1..12): such a rule is not carried over.
     const number = /^(\d{1,3})([+-])?$/.exec(token);
     if ((number || token === "LD") && (kind === "MD" || kind === "YM" || kind === "YD")) {
-      numbers.push(token === "LD" ? "-1" : `${number![2] === "-" ? "-" : ""}${number![1]}`);
+      const fromEnd = token === "LD" || number![2] === "-";
+      if (fromEnd && kind === "YM") return null;
+      numbers.push(token === "LD" ? "-1" : `${fromEnd ? "-" : ""}${number![1]}`);
       continue;
     }
     return null;

@@ -388,6 +388,13 @@ function SourceCard({
           </p>
         </div>
       </div>
+      {source.dates?.guessed ? (
+        <p className="text-note text-ink-muted">
+          {t("import.datesGuessed", {
+            example: exampleDate(source.dates.order, i18n.resolvedLanguage ?? "en"),
+          })}
+        </p>
+      ) : null}
       {source.notImported.length > 0 ? (
         <p className="text-note text-ink-muted">
           {t("import.notImported", { names: source.notImported.join(", ") })}
@@ -441,6 +448,15 @@ function SourceCard({
       ) : null}
     </section>
   );
+}
+
+/** How 5 November 2026 reads in a CSV's order: "11/05/2026", "05.11.2026". */
+function exampleDate(order: "dmy" | "mdy" | "ymd", language: string): string {
+  const day = new Intl.DateTimeFormat(language, { dateStyle: "long", timeZone: "UTC" }).format(
+    new Date(Date.UTC(2026, 10, 5)),
+  );
+  const written = order === "ymd" ? "2026-11-05" : order === "dmy" ? "05.11.2026" : "11/05/2026";
+  return `${written} = ${day}`;
 }
 
 function Problem({ problem }: { problem: SplitProblem }) {

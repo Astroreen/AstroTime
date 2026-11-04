@@ -2,7 +2,7 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2) and vCalendar 1.0 (PR I3) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3) and CSV (PR I4) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -264,7 +264,44 @@ named as not carried over; a component AstroTime does not read
 inside its value. Each `VCALENDAR` of a file is read by its own version:
 a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
 
+Done when: `outlook.vcs` and `nokia.vcs` convert with every field the
+plan names mapped and what has no place named (unit tests); a weekly
+series across a change of offset keeps its wall clock; an all-day event
+in UTC lands on the user's day; the e2e imports the phone's file on a
+phone in Russian and sees its events, its task and what was not carried
+over; the first load grows by at most 0.1 KiB.
+
 ### PR I4 — CSV (Outlook's and Google's columns)
+
+`csvToIcs` (`packages/ui/src/import/csv.ts`), loaded for a CSV alone:
+RFC 4180 with the delimiter its first line uses (`,`, `;`, a tab);
+Outlook's columns in English and Russian (calendar and tasks),
+Thunderbird's (Outlook's names) and the ones Google Calendar's import
+documents; each row an item at the user's wall clock in their zone, with
+a `VTIMEZONE` (`zoneText`); its UID made from the row, so the same file
+imported again finds its items there (D270). Dates: year first is ISO; a
+part past 12 tells day from month; else the user's language decides,
+said in the preview as guessed (and so when the file has both kinds of
+evidence: the rows the order chosen cannot read are named). An all-day
+event's end: a row that ends the day it starts is one day; another's
+end date is its last day in Google's documented layout and the day after
+it in Outlook's and Thunderbird's, told by the columns (any only Outlook
+writes: reminder, guests, "Show time as"), a row at a time, never one
+row deciding for the file. A date the month has not (31.02) is no date,
+and named. This rests on the formats' documentation, not on recordings. A timed event's
+end: its end day at its end time; with no end time, its end day at its
+start's time; with no end day, the start's day, or the next where the
+end is not after the start; an end still before its start is left
+out (the event an instant) and named; a start or end time that cannot be
+read is named, the day kept. Outlook's task statuses that are still to
+do but say more ("Waiting on someone else", "Deferred") are
+`NEEDS-ACTION`, Outlook's word kept as `X-OUTLOOK-STATUS`. A row given again is another item (a series written
+out a row an occurrence), its place among its likes in its UID, the same
+on every import. A reminder becomes an alarm before the start, counted
+in real time in the user's zone (a task's at its time); a guest or
+organizer named without an address, and a column with no place in
+iCalendar (`Mileage`, `Total Work`), are named as not carried over, its
+default values (`0`, `False`, `Normal`) aside. D266, D272.
 
 ### PR I5 — Google Takeout Tasks
 

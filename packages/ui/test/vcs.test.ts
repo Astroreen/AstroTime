@@ -428,4 +428,21 @@ describe("#151's review", () => {
     expect(one!.master?.summary).toBe("Old phone");
     expect(mixed.sources[0]!.name).toBe("Two");
   });
+
+  test("a month counted from the year's end has no place in iCalendar: the rule is named, the event kept", () => {
+    const { text, notImported } = vcalendarToIcs(
+      vcal("BEGIN:VEVENT", "UID:y", "DTSTART:20261105T090000Z", "RRULE:YM1 6- #2", "END:VEVENT"),
+      { timeZone: "UTC" },
+    );
+    expect(text).not.toContain("RRULE");
+    expect(text).toContain("UID:y");
+    expect(notImported).toEqual(["RRULE"]);
+    // A day of the month from its end is.
+    expect(
+      vcalendarToIcs(
+        vcal("BEGIN:VEVENT", "UID:m", "DTSTART:20261105T090000Z", "RRULE:MD1 2- #2", "END:VEVENT"),
+        { timeZone: "UTC" },
+      ).text,
+    ).toContain("RRULE:FREQ=MONTHLY;BYMONTHDAY=-2;COUNT=2");
+  });
 });
