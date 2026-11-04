@@ -410,18 +410,26 @@ marked _to be recorded_.
   `cancel` stops waiting. **Android:** `io.github.astroreen.astrotime:/oauth`,
   an intent filter on the main activity, the page in a Custom Tab, the
   answer from `appUrlOpen`, the tab closed by the user (`browserFinished`)
-  no answer (`apps/mobile/src/oauth.ts`). **The desktop:** a loopback
+  no answer, though only after a moment (1.5 s): Android may tell the tab
+  closed before it hands the app the redirect that closed it, and that
+  redirect wins (`apps/mobile/src/oauth.ts`). **The desktop:** a loopback
   server of the main process on `127.0.0.1` and a free port, for one
   request to `/oauth`, its page a check mark under `default-src 'none'`
-  (the app says the words), closed after the answer, a cancel, or 15
-  minutes (`apps/desktop/src/main/oauth.ts`, the `oauth*` channels).
+  (the app says the words), closed once the browser has that page (its
+  `finish`), a cancel, or 15 minutes (`apps/desktop/src/main/oauth.ts`, the `oauth*` channels).
   **The web:** the page in a window of its own, the answer at
   `oauth.html`, whose script (`oauth.js`, allowed as the app's own by its
   policy) posts its address to the app's tab over the origin's
   `BroadcastChannel` and closes, so the app's tab keeps its state
-  (`apps/web/src/oauth.ts`). And from the review of the groundwork: a
-  refresh refused for good (`invalid_grant`, `invalid_client`,
-  `unauthorized_client`, `invalid_scope`) signs the account out, a `429`
+  (`apps/web/src/oauth.ts`). The app keeps no handle on that window
+  (`noopener`: the service's page cannot reach back into the app), so it
+  does not hear it closed: there `open` ends only with the answer or
+  `cancel`, and the sign-in offers its Cancel while it waits. And from the review of the groundwork: a
+  refresh refused for good (`invalid_grant`, `invalid_scope`) signs the
+  account out; the app's own client refused (`invalid_client`,
+  `unauthorized_client`: a deployment's registration changed), which
+  signing in again would not mend, is tried again later as a busy service,
+  the sync's back-off holding it (foundation D128); a `429`
   or a `4xx` that is no OAuth answer is tried again later
   (`ServerBusyError`); a client's `extra` goes first, so it cannot stand
   in for the sign-in's state, challenge or redirect; a token for an

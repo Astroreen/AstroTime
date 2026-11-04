@@ -54,12 +54,28 @@ test("the answer comes back at the app's scheme; the tab closes and the listener
 
 test("the tab closed by the user, or the sign-in left, answers nothing", async () => {
   const p = plugins();
-  const attempt = await androidOAuth(p.fake).begin();
+  const pending: (() => void)[] = [];
+  const later = (then: () => void) => void pending.push(then);
+  const attempt = await androidOAuth(p.fake, later).begin();
   const answer = attempt.open("https://accounts.example/authorize");
   p.emit("browserFinished");
+  // Nothing came after the tab closed: no answer.
+  for (const then of pending.splice(0)) then();
   expect(await answer).toBeNull();
   const left = await androidOAuth(p.fake).begin();
   const nothing = left.open("https://accounts.example/authorize");
   left.cancel();
   expect(await nothing).toBeNull();
+});
+
+test("the redirect that closed the tab wins, though Android told the tab closed first", async () => {
+  const p = plugins();
+  const pending: (() => void)[] = [];
+  const attempt = await androidOAuth(p.fake, (then) => void pending.push(then)).begin();
+  const answer = attempt.open("https://accounts.example/authorize");
+  p.emit("browserFinished");
+  p.emit("appUrlOpen", `${OAUTH_REDIRECT}?code=c&state=s`);
+  // The grace runs out after the answer: it changes nothing.
+  for (const then of pending.splice(0)) then();
+  expect(await answer).toBe(`${OAUTH_REDIRECT}?code=c&state=s`);
 });

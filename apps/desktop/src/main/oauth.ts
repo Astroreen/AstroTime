@@ -30,9 +30,10 @@ export async function loopback(page: string): Promise<Loopback> {
       "Content-Security-Policy": "default-src 'none'",
       "Cache-Control": "no-store",
     });
-    res.end(page);
     finish(`${redirectUri}${url.search}`);
-    close();
+    // The server goes once the browser has the whole page, not before.
+    res.on("finish", close);
+    res.end(page);
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const redirectUri = `http://127.0.0.1:${(server.address() as AddressInfo).port}/oauth`;

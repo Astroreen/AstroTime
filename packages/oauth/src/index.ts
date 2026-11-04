@@ -7,13 +7,15 @@
 import type { HttpClient, TokenSource } from "@astrotime/caldav";
 import { AuthError, OfflineError, retryAfter, ServerBusyError } from "@astrotime/core/provider";
 
-/** RFC 6749 §5.2's errors that end a sign-in for good, on a refresh. */
-const SIGNED_OUT = new Set([
-  "invalid_grant",
-  "invalid_client",
-  "unauthorized_client",
-  "invalid_scope",
-]);
+/**
+ * RFC 6749 §5.2's errors that end a sign-in for good, on a refresh: the
+ * grant revoked, or its scopes no longer given. `invalid_client` and
+ * `unauthorized_client` say the app's client is wrong (a deployment's
+ * registration changed), which signing in again would not mend: they are
+ * tried again later, as a busy service (D254).
+ */
+const SIGNED_OUT = new Set(["invalid_grant", "invalid_scope"]);
+const CLIENT_REFUSED = new Set(["invalid_client", "unauthorized_client"]);
 
 /** A service's OAuth endpoints and this app's client there. */
 export interface OAuthClient {
@@ -57,7 +59,12 @@ export interface OAuthRedirect {
 
 export interface OAuthAttempt {
   readonly redirectUri: string;
-  /** Shows the service's page; resolves with the redirect's URL, or `null` when the user left it. */
+  /**
+   * Shows the service's page; resolves with the redirect's URL, or `null`
+   * when the user left it. Not every platform hears the page closed: on the
+   * web it is a window the app keeps no handle on (`noopener`), so there
+   * `null` comes only from `cancel`, and the sign-in offers its Cancel.
+   */
   open(url: string): Promise<string | null>;
   /** Stops waiting: `open` resolves `null`, and what waited for the answer goes. */
   cancel(): void;
@@ -186,6 +193,12 @@ async function token(
     SIGNED_OUT.has(answer.error)
   )
     throw new AuthError(`The service refused the sign-in (${answer.error}): sign in again.`);
+  if (
+    grant["grant_type"] === "refresh_token" &&
+    typeof answer.error === "string" &&
+    CLIENT_REFUSED.has(answer.error)
+  )
+    throw new ServerBusyError(`The service refused this app's client (${answer.error}).`, null);
   if (answer.error === "invalid_grant")
     throw new OAuthRefusedError("invalid_grant", "the code is used, expired or not this sign-in's");
   if (response.status >= 500)

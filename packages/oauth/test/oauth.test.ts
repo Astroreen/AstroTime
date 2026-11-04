@@ -361,7 +361,15 @@ test("an OAuth token is never sent over plain http to another host", async () =>
 
 test("a refresh the service refuses for good signs out; a busy or non-OAuth answer is tried again later", async () => {
   const tokens = { accessToken: "a", refreshToken: "r", expiresAt: 10_000_000 };
-  for (const error of ["invalid_grant", "invalid_client", "unauthorized_client", "invalid_scope"]) {
+  // The app's own client refused (a registration changed): signing in again would not mend it.
+  for (const error of ["invalid_client", "unauthorized_client"]) {
+    const refused = endpoint(() => ({ status: 401, body: JSON.stringify({ error }) }));
+    await expect(
+      tokenSource(refused, client, tokens, async () => {}).renew(),
+      error,
+    ).rejects.toThrow(ServerBusyError);
+  }
+  for (const error of ["invalid_grant", "invalid_scope"]) {
     const refused = endpoint(() => ({ status: 400, body: JSON.stringify({ error }) }));
     await expect(
       tokenSource(refused, client, tokens, async () => {}).renew(),

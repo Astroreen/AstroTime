@@ -10,7 +10,8 @@ test("the browser's return to /oauth is the answer, once; the port then closes",
   // Another path is no answer.
   expect((await fetch(redirect.redirectUri.replace("/oauth", "/elsewhere"))).status).toBe(404);
   const page = await fetch(`${redirect.redirectUri}?code=c1&state=s1`);
-  expect(await page.text()).toContain("Back to AstroTime");
+  // The whole page arrives before the server goes.
+  expect(await page.text()).toBe("<p>Back to AstroTime</p>");
   expect(page.headers.get("content-security-policy")).toBe("default-src 'none'");
   expect(await redirect.answer).toBe(`${redirect.redirectUri}?code=c1&state=s1`);
   await expect(fetch(redirect.redirectUri)).rejects.toThrow();
