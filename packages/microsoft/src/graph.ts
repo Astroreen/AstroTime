@@ -48,6 +48,9 @@ export class Graph {
       },
       options.accept ?? [],
     );
+    // An answer from elsewhere (a redirect off Graph, `Authorization` dropped on the way) is not Graph's.
+    if (response.url && new URL(response.url).origin !== ORIGIN)
+      throw new Error(`Not Microsoft Graph: ${new URL(response.url).origin}`);
     return {
       status: response.status,
       value: response.body ? (JSON.parse(response.body) as T) : null,
@@ -78,11 +81,9 @@ export class Graph {
 }
 
 /**
- * Graph's ETags are weak (`W/"…"`), its only ones, and its `If-Match` takes
- * them. The engine writes unconditionally for a weak ETag once it has
- * compared what Graph has with the base (D37), which leaves a window for an
- * edit made there meanwhile; kept as `~"…"`, they are sent as `W/"…"`, and
- * Graph refuses a write over such an edit (`412`).
+ * Graph's weak ETags (`W/"…"`) kept as `~"…"`, so the engine sends them
+ * rather than writing unconditionally, and sent back as Graph gave them
+ * (D253, to be recorded).
  */
 export const keptEtag = (etag: string | null | undefined): string | null =>
   etag ? etag.replace(/^W\//, "~") : null;

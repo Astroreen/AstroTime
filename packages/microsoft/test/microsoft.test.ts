@@ -3,7 +3,12 @@
 // `@odata.etag`, `If-Match` refused with 412, pages by `@odata.nextLink`,
 // a series' exceptions from `instances`. Through the sync engine and a real
 // store: both ways, a PATCH of what changed only.
-import type { HttpClient, HttpRequest, TokenSource } from "@astrotime/caldav";
+import {
+  followRedirects,
+  type HttpClient,
+  type HttpRequest,
+  type TokenSource,
+} from "@astrotime/caldav";
 import {
   AuthError,
   CalendarObject,
@@ -981,4 +986,34 @@ test("no ETag kept is no licence: Graph's just read is not borrowed; an edit mad
     expect.stringMatching(/^W\//),
   ]);
   expect(api.tasks.get("k1")).toMatchObject({ title: "Pay the rent", importance: "high" });
+});
+
+test("a redirect off Graph takes no token, and its answer is refused: a 302 to another host", async () => {
+  const hops: HttpRequest[] = [];
+  const answer = (status: number, url: string, headers: Record<string, string>, body: unknown) => ({
+    status,
+    url,
+    header: (name: string) => headers[name.toLowerCase()] ?? null,
+    body: JSON.stringify(body),
+  });
+  // The redirect rule the desktop and Android follow (fetch's own drops `Authorization` alike).
+  const http = followRedirects(async (request) => {
+    hops.push(request);
+    return new URL(request.url).host === "graph.microsoft.com"
+      ? answer(302, request.url, { location: "https://elsewhere.example/v1.0/me/calendars" }, {})
+      : answer(
+          200,
+          request.url,
+          { "content-type": "application/json" },
+          { value: [{ id: "x", name: "Not Graph's" }] },
+        );
+  });
+  const provider = new OutlookCalendars(new Graph(http, tokens));
+  await expect(provider.calendars()).rejects.toThrow(
+    "Not Microsoft Graph: https://elsewhere.example",
+  );
+  expect(hops.map((hop) => [new URL(hop.url).host, hop.headers["Authorization"] ?? null])).toEqual([
+    ["graph.microsoft.com", "Bearer t"],
+    ["elsewhere.example", null],
+  ]);
 });
