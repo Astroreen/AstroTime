@@ -204,6 +204,17 @@ One word per concept. Use these terms in code, docs, commits and UI.
 - **Recording** — a service's requests and answers, captured once from a
   test account with every personal value replaced, that unit tests replay
   (providers D249).
+- **AstroTime server** — the web image in **server mode**: it serves
+  CalDAV itself under `/dav/` from its own database (`@astrotime/server`),
+  so AstroTime needs no other server (server D279–D282).
+- **Mesh** — AstroTime **peers** (devices and server images) that sync with
+  each other with no server; on each peer an account of provider `mesh`
+  (server D283). A peer passing on what another sent is a **relay**.
+- **Version** — one change to a mesh item or calendar, with its HLC
+  timestamp and its peer's sequence number; the newest wins. A peer's
+  **version vector** says which versions it has (server D284).
+- **Invite** — the text (and QR code) that joins a device to a mesh: its
+  id, its secret and the addresses that listen (server D287).
 
 ## Platforms
 
