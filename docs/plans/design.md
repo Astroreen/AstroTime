@@ -2327,8 +2327,38 @@ own (below).
   - **For one item**, a picture of its own: [Deferred](#deferred); it
     would need the item to carry it to other devices and clients.
 
+### Decided in round 5: Android and the dialogs
+
+- **D235. Every dialog clear of a phone's system bars** (the owner's 1
+  and 2, round 5: on the owner's phone the details' and the edit dialog's bars
+  sat under the status bar). A WebView of Chromium 140 or newer draws the
+  page under the bars (android [D68](android.md#D68)); the shell, drawer
+  and tasks screen kept clear of them, the dialogs did not. Now the
+  dialogs stand in CSS, `styles.css`'s `.sheet` and `.centred` (named by
+  `dialog-parts.tsx`'s `sheet` and by each centred popup), so a new one
+  inherits it:
+  - a **sheet** (the details, the edit dialog, Settings, the Conflicts
+    list, the file picker) covers the whole phone screen, the system
+    bars' room padded on all four sides (portrait and landscape), its own
+    colour under the status bar; the details' picture header starts below
+    it. On a wide screen it is a card centred in the room the bars leave,
+    no taller than that room;
+  - a **centred dialog** (signing in, the colour and picture dialogs, the
+    alerts) is centred in the same room and scrolls when taller;
+  - the edit dialog beside its draft (D155, D187) keeps its outer margin
+    from the bar on its side, narrower by it; the notices at the foot
+    (copied, a change failed) sit above the gesture bar.
+    `apps/web/e2e/insets.spec.ts` emulates the insets SystemBars injects
+    (a phone upright, and on its side with the navigation bar at the right).
+    The picture drawn under a transparent status bar, as Google Calendar
+    does: [Deferred](#deferred) (the status bar's icons would then need
+    the picture's lightness, not the theme's).
+
 ## Deferred
 
+- **The details' picture under the status bar** ([D235](#D235)), edge to
+  edge as Google Calendar draws it: the bars' icons would follow the
+  picture's lightness rather than the theme.
 - **The React Compiler's other bail-outs** ([D194](#D194)), known when
   its check came, each in its owner's area: `accounts-context.tsx` (a
   `try` with `finally`, a counter changed in a callback),

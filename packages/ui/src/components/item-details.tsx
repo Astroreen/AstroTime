@@ -122,7 +122,7 @@ export function ItemDetails({
             />
           )}
           <Dialog.Close
-            className={`${dialogIcon} absolute top-2 left-2`}
+            className={`${dialogIcon} absolute top-[calc(0.5rem+var(--room-top))] left-[calc(0.5rem+var(--room-left))]`}
             aria-label={t("details.close")}
           >
             <CloseIcon className="size-5" />

@@ -624,8 +624,9 @@ were checked on 2026-11-01.
     injects zero insets, and the bars show the window's background; from 140
     the page draws under the bars and the UI pads its shell, drawer, search
     and tasks screen by `--inset-*` (`styles.css`: the injected
-    `--safe-area-inset-*`, else `env()`), which `apps/web/e2e/insets.spec.ts`
-    checks.
+    `--safe-area-inset-*`, else `env()`), and every dialog stands clear
+    of them (design [D235](design.md#D235)), which
+    `apps/web/e2e/insets.spec.ts` checks.
   - **Splash screen:** not built; it stays with the app's icon in
     [Deferred](#deferred) (the launch theme's placeholder shows until the
     WebView draws).
