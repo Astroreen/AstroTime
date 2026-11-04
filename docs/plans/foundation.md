@@ -2311,6 +2311,12 @@ task?"
   ([D38](#D38)) — the server's deletion wins and the href is reported in
   `dropped`, but that second edit goes with it, not left pending as a
   deletion in flight leaves one.
+- **A VTIMEZONE-only zone across DST, moved** ([D32](#D32)) — a zone
+  `Intl` does not know (`Customized Time Zone`) is read on a wall clock
+  with the series' own offset (`wallClockNear`, `epochNear`), so a series
+  moved, or its `UNTIL`'s day, is an hour off on the far side of a DST
+  change; reading through the object's VTIMEZONE (ical.js's
+  `convertToZone`) would be exact.
 - **A weekly series with ends in two undefined zones across DST**
   ([D32](#D32)) — its length is the first occurrence's, by instant, so
   in the weeks where the two zones' DST rules differ (Europe's and the US'
