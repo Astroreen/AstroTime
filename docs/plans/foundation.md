@@ -67,7 +67,10 @@ logic worth borrowing.
   sent (no iTIP). _Built in PR 6a:_ creating, editing and deleting
   ([D103](#D103)–[D106](#D106)), reminders added and removed in the edit
   dialog (their notifications: [D100](#D100)–[D102](#D102)), attendees in
-  the details ([design D108](design.md#D108)).
+  the details ([design D108](design.md#D108)). A rule the repeat picker
+  cannot hold is read as close as it goes and marked inexact (`repeatOf`),
+  and kept as written: a monthly `BYDAY` is exact only as one weekday with
+  an nth of 1–5 or −1 (the last) and no `BYMONTHDAY` beside it.
 - **D10. Tasks in the MVP: the full VTODO.** Summary, description,
   `DTSTART`, `DUE`, status and completion, `PERCENT-COMPLETE`, `PRIORITY`,
   `CATEGORIES`, subtasks (`RELATED-TO`), recurrence, reminders, `CLASS`, and
@@ -220,7 +223,9 @@ logic worth borrowing.
   iCalendar with `@astrotime/core` and indexes it by `boundsOf` (and, since
   migration 6, by its titles folded for search, design
   [D97](design.md#D97)); a range query returns candidates for
-  `occurrencesBetween` to place exactly. Local
+  `occurrencesBetween` to place exactly; an RDATE before DTSTART, which
+  shows, starts the bounds, and an RDATE period ends them no earlier than
+  its own end. Local
   changes carry `pending` (`create`, `update`, `delete`) for the sync engine;
   credentials are not in the store ([D19](#D19)). An object a server serves
   that does not parse is refused by the store; the sync engine skips it,
@@ -285,11 +290,18 @@ Decided while building PR 2.
   VTIMEZONE's rules differ from today's IANA data (an old or custom one, a
   historical date), the instant is the VTIMEZONE's and the wall clock in
   `timeZone` may differ from the written one, as for any VTIMEZONE named
-  with an IANA name.
+  with an IANA name. A series' UTC `UNTIL` in a zone `Intl` does not know
+  is read on its day by the zone's VTIMEZONE. A series whose start and
+  end are in two zones lasts its first occurrence's wall-clock length when
+  both name one zone (an alias, a Windows name beside its IANA one), and
+  the time between their instants otherwise (a flight from Berlin to New
+  York).
 - **D33. Occurrences are placed in the user's zone.** `occurrencesBetween`
   takes days and the IANA zone the calendar is shown in; a zoned item shows
   on the user's day, a floating one at the same wall clock everywhere. A
-  series keeps its wall-clock time and length across DST changes.
+  series keeps its wall-clock time and length across DST changes. A wall
+  clock is always `YYYY-MM-DDTHH:MM:SS`, a year before 1000 padded to four
+  digits, so wall clocks compare as text.
 - **D34. A calendar object is one UID.** A `VCALENDAR` mixing UIDs, or events
   with tasks, or with two masters, is refused (RFC 4791 §4.1); exceptions
   without their master are kept and shown. A component without a UID is
@@ -1305,9 +1317,12 @@ Decided while building PR 6a.
   what `Intl` knows of the zone (`vtimezone`): a yearly rule per
   observance where the zone's changes follow "the nth or last weekday of a
   month" (checked twenty years ahead), else an observance per change, from
-  the year before the item's. A VTIMEZONE no longer used stays (D7). The
-  edit dialog names the zone when it is not the user's; choosing another is
-  [deferred](#deferred).
+  the year before the item's. A zone with no change in that year is
+  sampled weekly over the twenty years after, and scanned day by day only
+  where its offset changes ([deferred](#deferred): a change shorter than a
+  week); with none, it has one STANDARD observance. A VTIMEZONE no longer
+  used stays (D7). The edit dialog names the zone when it is not the
+  user's; choosing another is [deferred](#deferred).
 - **D105. What each scope writes** ([D11](#D11)), on the occurrence opened:
   - **This occurrence**: its exception, made from the master the first time
     (design D94's `exceptionOf`, which now moves an event's `DTEND` too)
