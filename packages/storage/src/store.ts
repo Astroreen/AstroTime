@@ -1077,7 +1077,8 @@ function toCalendar({ readOnly, rights, ...row }: typeof schema.calendars.$infer
   // Where they disagree, or `rights` is `null`, that tab wrote last, and
   // `read_only` grants all or nothing, as it did in that build.
   const stored = rights?.split(",");
-  const granted = stored?.includes("edit") === !readOnly ? stored : readOnly ? [] : RIGHTS;
+  const agrees = stored?.includes("edit") === !readOnly;
+  const granted = agrees ? stored : readOnly ? [] : RIGHTS;
   return {
     ...row,
     components: row.components.split(",").filter(Boolean) as Component[],

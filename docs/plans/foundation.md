@@ -344,8 +344,10 @@ Decided while building PR 4.
   7): `create` a new item, `edit` one, `delete` one. This build writes
   `read_only` beside them as `!rights.edit`; a tab of a build before
   migration 7 on the same store ([D98](#D98)) writes only `read_only`.
-  Where the two disagree, that tab wrote last, and `read_only` grants all
-  three or none, as it did in that build. The CalDAV provider reads
+  Where the two disagree on editing, that tab wrote last, and `read_only`
+  grants all three or none, as it did in that build; a write of that tab
+  that agrees with `rights` on editing cannot be told from this build's,
+  and `rights` stays. The CalDAV provider reads
   them from the calendar's `current-user-privilege-set` (RFC 3744):
   `bind` creates, `write-content` edits, `unbind` deletes, and `write` or
   `all` grant all three (Radicale lists `all` without its parts, Nextcloud
