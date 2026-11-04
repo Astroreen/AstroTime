@@ -13,7 +13,7 @@ import type { Calendar } from "@astrotime/storage";
 import { createI18n } from "../src/i18n/index.ts";
 
 const NEXTCLOUD = { id: "nc", provider: "caldav", name: "Nextcloud" };
-let accounts: unknown[] = [NEXTCLOUD];
+let accounts: () => Promise<unknown[]> = async () => [NEXTCLOUD];
 const saved: unknown[] = [];
 /** What the sync's `makeCalendar` does next, set by each test. */
 let make: (accountId: string, calendar: unknown) => Promise<unknown> = async () => ({});
@@ -29,7 +29,7 @@ vi.mock("@astrotime/sync/calendars", () => ({
 vi.mock("../src/components/accounts-context.tsx", () => {
   const value = {
     store: {
-      accounts: async () => accounts,
+      accounts: () => accounts(),
       addAccount: async (account: object) => ({ ...account, id: "device" }),
       saveCalendar: async (calendar: object) => {
         saved.push(calendar);
@@ -46,7 +46,7 @@ const { NewListDialog } = await import("../src/components/new-list-dialog.tsx");
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
-  accounts = [NEXTCLOUD];
+  accounts = async () => [NEXTCLOUD];
   saved.length = 0;
   asked.length = 0;
 });
@@ -58,6 +58,9 @@ function render() {
     return (
       <>
         <output>{open ? "open" : "closed"}</output>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open
+        </button>
         <NewListDialog
           open={open}
           onClose={() => setOpen(false)}
@@ -134,7 +137,7 @@ test("the server cannot be reached, or makes no lists: said, and the dialog stay
 });
 
 test("with no account that makes lists, on this device: no place to choose", async () => {
-  accounts = [{ id: "demo", provider: "demo", name: "Demo" }];
+  accounts = async () => [{ id: "demo", provider: "demo", name: "Demo" }];
   const made = render();
   await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Packing");
   await expect.element(dialog().getByRole("combobox")).not.toBeInTheDocument();
@@ -142,5 +145,65 @@ test("with no account that makes lists, on this device: no place to choose", asy
   await expect.element(page.getByRole("status")).toHaveTextContent("closed");
   expect(asked).toEqual([]);
   expect(saved).toMatchObject([{ name: "Packing", components: ["VTODO"], accountId: "device" }]);
+  expect(made.map((calendar) => calendar.id)).toEqual(["made-here"]);
+});
+
+test("closed while the list is made: opened again it is still being made, no second one; it is shown when made", async () => {
+  let finish: (calendar: unknown) => void = () => {};
+  make = (accountId, calendar) =>
+    new Promise((resolve) => {
+      finish = () => resolve({ id: "made", accountId, ...(calendar as object) });
+    });
+  const made = render();
+  await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Errands");
+  await press(create());
+  await expect
+    .element(dialog().getByRole("status"))
+    .toHaveTextContent("Making the list on Nextcloud…");
+  await press(dialog().getByRole("button", { name: "Cancel" }));
+  await expect.element(page.getByText("closed")).toBeInTheDocument();
+  await press(page.getByRole("button", { name: "Open" }));
+  // Still on its way: said, and "Create" off, so no second list is made.
+  await expect
+    .element(dialog().getByRole("status"))
+    .toHaveTextContent("Making the list on Nextcloud…");
+  await expect.element(create()).toBeDisabled();
+  finish(null);
+  await expect.element(page.getByText("closed")).toBeInTheDocument();
+  expect(asked).toHaveLength(1);
+  expect(made.map((calendar) => calendar.id)).toEqual(["made"]);
+});
+
+test("tried again after a failure: one list made", async () => {
+  make = async () => {
+    throw Object.assign(new Error("offline"), { name: "OfflineError" });
+  };
+  const made = render();
+  await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Errands");
+  await press(create());
+  await expect.element(dialog().getByRole("alert")).toBeInTheDocument();
+  make = async (accountId, calendar) => ({ id: "made", accountId, ...(calendar as object) });
+  await press(create());
+  await expect.element(page.getByText("closed")).toBeInTheDocument();
+  expect(asked).toHaveLength(2);
+  expect(made.map((calendar) => calendar.id)).toEqual(["made"]);
+});
+
+test("the accounts not read: said, and the list can still be made on this device", async () => {
+  // Not read when the dialog opens (a moment's failure), read again when the list is made.
+  accounts = () => {
+    accounts = async () => [];
+    return Promise.reject(new Error("no store"));
+  };
+  const made = render();
+  await expect
+    .element(dialog().getByRole("alert"))
+    .toHaveTextContent(
+      "The accounts could not be read, so the list can be made on this device only.",
+    );
+  await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Packing");
+  await press(create());
+  await expect.element(page.getByText("closed")).toBeInTheDocument();
+  expect(saved).toMatchObject([{ name: "Packing", components: ["VTODO"] }]);
   expect(made.map((calendar) => calendar.id)).toEqual(["made-here"]);
 });

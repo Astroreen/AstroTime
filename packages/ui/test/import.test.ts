@@ -9,6 +9,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { decodeText } from "../src/import/decode.ts";
 import {
   BATCH,
+  CalendarNotMadeError,
   destinationOf,
   duplicatesOf,
   NEW,
@@ -772,8 +773,38 @@ describe("an import written through the store (import D269–D271)", () => {
       run(store, [source], destinations, duplicates, "skip", Infinity, async () => {
         throw offline;
       }),
-    ).rejects.toBe(offline);
+    ).rejects.toEqual(expect.objectContaining({ accountId: account.id, cause: offline }));
     expect(await store.pending(personal.id)).toEqual([]);
     expect((await store.accounts()).map((one) => one.provider)).toEqual(["caldav"]);
+  });
+
+  test("tried again elsewhere, a failure that is no calendar's making is not blamed on the account", async () => {
+    const { store } = await setup();
+    const account = (await store.accounts())[0]!;
+    const source = await sourceOf(calendar("Holidays", event("new-year")));
+    const onServer = new Map([[source.id, { events: newOn(account.id), tasks: null }]]);
+    const refused = await run(
+      store,
+      [source],
+      onServer,
+      await duplicatesOf(store, [source], onServer),
+      "skip",
+      Infinity,
+      async () => {
+        throw new Error("refused");
+      },
+    ).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(CalendarNotMadeError);
+    // Again, to a new calendar on this device, which cannot be kept: its own error.
+    const here = new Map([[source.id, { events: NEW, tasks: null }]]);
+    const full = new Error("The disk is full.");
+    store.saveCalendar = async () => {
+      throw full;
+    };
+    const again = await run(store, [source], here, await duplicatesOf(store, [source], here)).catch(
+      (error: unknown) => error,
+    );
+    expect(again).toBe(full);
+    expect(again).not.toBeInstanceOf(CalendarNotMadeError);
   });
 });

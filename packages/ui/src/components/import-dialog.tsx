@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { makeCalendarAt, placesOf, whyNotMade } from "../calendar/make.ts";
 import { addImportStrings } from "../i18n/import.ts";
 import {
+  CalendarNotMadeError,
   destinationOf,
   duplicatesOf,
   NEW,
@@ -66,8 +67,6 @@ export function ImportDialog({
   const { store, platform, timeZone, scheduler } = useAccounts();
   // The accounts a new calendar can be made on, on their servers (D277).
   const [servers, setServers] = useState<readonly Account[]>([]);
-  /** The account a new calendar is being made on, for what a failure says. */
-  const makingOn = useRef<string | null>(null);
   const [step, setStep] = useState<Step>({ name: "reading" });
   const [destinations, setDestinations] = useState<ReadonlyMap<string, Destination>>(new Map());
   const stop = useRef(false);
@@ -129,6 +128,11 @@ export function ImportDialog({
     // Read once per file: the calendars offered later do not read it again.
   }, [file]);
 
+  /** An account's name, as the choices name it. */
+  const nameOf = (accountId: string) => {
+    const account = servers.find((one) => one.id === accountId);
+    return account ? accountName(account, t) : accountId;
+  };
   const start = (read: ReadFile, duplicates: Duplicates, choice: Choice) => {
     if (phase.current !== "checking" && phase.current !== "asked") return;
     phase.current = "running";
@@ -141,16 +145,8 @@ export function ImportDialog({
       duplicates,
       choice,
       accountName: t("local.account"),
-      make: (accountId, calendar) => {
-        const account = servers.find((one) => one.id === accountId);
-        makingOn.current = account ? accountName(account, t) : accountId;
-        return makeCalendarAt(store, platform, accountId, calendar, t("local.account")).then(
-          (made) => {
-            makingOn.current = null;
-            return made;
-          },
-        );
-      },
+      make: (accountId, calendar) =>
+        makeCalendarAt(store, platform, accountId, calendar, t("local.account")),
       newUid: () => crypto.randomUUID(),
       onProgress: (done, total) => setStep({ name: "importing", done, total }),
       stopped: () => stop.current,
@@ -164,12 +160,12 @@ export function ImportDialog({
         setStep({
           name: "failed",
           message:
-            makingOn.current === null
-              ? t("import.failed", { message: String(error) })
-              : t(`import.notMade.${whyNotMade(error)}`, {
-                  account: makingOn.current,
-                  message: error instanceof Error ? error.message : String(error),
-                }),
+            error instanceof CalendarNotMadeError
+              ? t(`import.notMade.${whyNotMade(error.cause)}`, {
+                  account: nameOf(error.accountId),
+                  message: error.cause instanceof Error ? error.cause.message : String(error.cause),
+                })
+              : t("import.failed", { message: String(error) }),
         }),
     );
   };

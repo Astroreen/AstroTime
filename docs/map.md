@@ -384,8 +384,9 @@ When you add a package, app or module, add its line here in the same PR.
       `plans/design.md#D238`
   - `calendar/make.ts` — a calendar or list made where chosen (an
     account's server through `@astrotime/sync/calendars`, or this device),
-    and why one was not, in a dialog's words; `calendar/device-calendar.ts`,
-    a calendar on this device's account. Loaded with what makes one.
+    and why one was not, in a dialog's words (`calendar/place.ts`, with
+    `DEVICE`); `calendar/device-calendar.ts`, a calendar on this device's
+    account. Loaded with what makes one.
     → `plans/design.md#D276`, `plans/import.md#D277`
   - `calendar/calendars.ts` — `shownCalendars`: the store's calendars as
     the UI shows them, the calendar on this device named in the language

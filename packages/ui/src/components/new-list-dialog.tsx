@@ -7,7 +7,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { NotMade } from "../calendar/make.ts";
+import { addDeviceCalendar } from "../calendar/device-calendar.ts";
+import { DEVICE, whyNotMade, type NotMade } from "../calendar/place.ts";
 import { addNewListStrings } from "../i18n/new-list.ts";
 import { accountName } from "./accounts.tsx";
 import { useAccounts } from "./accounts-context.tsx";
@@ -16,12 +17,13 @@ import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 import { CloseIcon } from "./icons.tsx";
 import { Select } from "./select.tsx";
 
-/** What makes a list, loaded when the dialog opens: its name stays out of the first load's list of chunks. */
-type Make = typeof import("../calendar/make.ts");
-// Out of the component: the React Compiler takes no `import()` in one.
+/**
+ * What makes a list on a server, loaded when the dialog opens: its name
+ * stays out of the first load's list of chunks. Out of the component: the
+ * React Compiler takes no `import()` in one.
+ */
 const loadMake = () => import("../calendar/make.ts");
-/** This device, as a place (`make.ts`'s `DEVICE`). */
-const DEVICE = "device";
+type Make = Awaited<ReturnType<typeof loadMake>>;
 
 const input =
   "h-11 w-full rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent";
@@ -44,7 +46,7 @@ export function NewListDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  /** The list made, to show. */
+  /** The list made, to show; called for one made after the dialog closed too. */
   onMade: (calendar: Calendar) => void;
   /** The account of the list shown: the first place offered when it makes lists. */
   near: string | null;
@@ -55,11 +57,11 @@ export function NewListDialog({
   const [name, setName] = useState("");
   /** The accounts a list can be made on; none known until what makes one has loaded. */
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
+  /** What makes one, or the accounts, could not be loaded: this device alone is offered, said. */
+  const [unloaded, setUnloaded] = useState(false);
   const maker = useRef<Make | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ name: "idle" });
-  // Each try's number: one that ends after the dialog closed says nothing.
-  const attempt = useRef(0);
   const nameId = useId();
   const titleId = useId();
   useEffect(() => {
@@ -68,10 +70,12 @@ export function NewListDialog({
     Promise.all([loadMake(), store.accounts()]).then(
       ([module, all]) => {
         maker.current = module;
-        if (current) setAccounts(module.placesOf(all));
+        if (!current) return;
+        setUnloaded(false);
+        setAccounts(module.placesOf(all));
       },
-      // Not loaded (offline, a release replaced it): "Create" stays off.
-      () => {},
+      // Not loaded (offline, a release replaced it), or no accounts read.
+      () => current && setUnloaded(true),
     );
     return () => {
       current = false;
@@ -87,43 +91,38 @@ export function NewListDialog({
     places[0]!.value;
   const placeName = places.find((one) => one.value === place)!.label;
   const named = name.trim() !== "";
+  const ready = accounts !== null || unloaded;
 
+  // Closed while a list is being made, the dialog keeps it: it opens again
+  // on "Making…" with "Create" off (no second list), and the list made is
+  // still shown when it comes.
   const close = () => {
-    attempt.current++;
-    setStep({ name: "idle" });
-    setName("");
-    setChosen(null);
+    if (step.name !== "making") {
+      setStep({ name: "idle" });
+      setName("");
+      setChosen(null);
+    }
     onClose();
   };
   const make = () => {
-    const module = maker.current;
-    if (!named || step.name === "making" || !module) return;
+    if (!named || step.name === "making" || !ready) return;
     setStep({ name: "making" });
-    const mine = ++attempt.current;
-    module
-      .makeCalendarAt(
-        store,
-        platform,
-        place,
-        { name, color: null, component: "VTODO" },
-        t("local.account"),
-      )
-      .then(
-        (calendar) => {
-          if (attempt.current !== mine) return;
-          onMade(calendar);
-          close();
-        },
-        (error: unknown) => {
-          if (attempt.current !== mine) return;
-          setStep({
-            name: "failed",
-            why: module.whyNotMade(error),
-            account: placeName,
-            message: error instanceof Error ? error.message : String(error),
-          });
-        },
-      );
+    makeList(store, platform, maker.current, place, name, t("local.account")).then(
+      (calendar) => {
+        onMade(calendar);
+        setStep({ name: "idle" });
+        setName("");
+        setChosen(null);
+        onClose();
+      },
+      (error: unknown) =>
+        setStep({
+          name: "failed",
+          why: whyNotMade(error),
+          account: placeName,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+    );
   };
 
   return (
@@ -182,6 +181,11 @@ export function NewListDialog({
                 className="h-10 w-full min-w-0 rounded-lg bg-canvas pr-1 pl-2"
               />
             ) : null}
+            {unloaded ? (
+              <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
+                {t("newList.unloaded")}
+              </p>
+            ) : null}
             {step.name === "making" ? (
               <p role="status" className="text-body">
                 {t("newList.making", { account: placeName })}
@@ -198,7 +202,7 @@ export function NewListDialog({
               <button
                 type="submit"
                 className={primaryButton}
-                disabled={!named || step.name === "making" || accounts === null}
+                disabled={!named || step.name === "making" || !ready}
               >
                 {t("newList.make")}
               </button>
@@ -207,5 +211,34 @@ export function NewListDialog({
         </DialogPopup>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/**
+ * A list of tasks at `place`: on this device by the store alone (so it can
+ * be made when what makes one on a server did not load), else on the
+ * account's server through `make.ts`.
+ */
+function makeList(
+  store: Parameters<typeof addDeviceCalendar>[0],
+  platform: Parameters<Make["makeCalendarAt"]>[1],
+  maker: Make | null,
+  place: string,
+  name: string,
+  deviceAccount: string,
+): Promise<Calendar> {
+  if (place === DEVICE)
+    return addDeviceCalendar(
+      store,
+      { account: deviceAccount, calendar: name.trim(), color: null, components: ["VTODO"] },
+      () => {},
+    );
+  if (!maker) return Promise.reject(new Error("What makes a list on a server did not load."));
+  return maker.makeCalendarAt(
+    store,
+    platform,
+    place,
+    { name, color: null, component: "VTODO" },
+    deviceAccount,
   );
 }

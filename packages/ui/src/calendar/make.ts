@@ -9,34 +9,12 @@ import { makeCalendar, makesCalendars } from "@astrotime/sync/calendars";
 
 import type { Platform } from "../platform.ts";
 import { addDeviceCalendar } from "./device-calendar.ts";
+import { DEVICE, type Place } from "./place.ts";
 
-/** Where a new calendar goes: an account's id, or this device. */
-export type Place = string;
-export const DEVICE = "device";
+export { whyNotMade, type NotMade } from "./place.ts";
 
 /** The accounts a calendar can be made on, as places: each server account that makes them. */
 export const placesOf = (accounts: readonly Account[]) => accounts.filter(makesCalendars);
-
-/** Why no calendar was made, as a dialog says it. */
-export type NotMade = "offline" | "unsupported" | "refused" | "signed-out" | "failed";
-
-export function whyNotMade(error: unknown): NotMade {
-  const { name, reason, status } = (error ?? {}) as {
-    name?: unknown;
-    reason?: unknown;
-    status?: unknown;
-  };
-  if (name === "OfflineError" || name === "ServerBusyError") return "offline";
-  if (name === "AuthError") return "signed-out";
-  if (name === "CannotMakeCalendarError")
-    return reason === "unsupported"
-      ? "unsupported"
-      : reason === "signed-out"
-        ? "signed-out"
-        : "failed";
-  if (name === "HttpError" && status === 403) return "refused";
-  return "failed";
-}
 
 /**
  * A new calendar or list at `place`: on the account's server, through the

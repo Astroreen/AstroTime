@@ -2433,15 +2433,21 @@ own (below).
   is). The dialog closes and the list made is the one shown. One that
   cannot be made keeps the dialog open and says why, naming the account:
   it cannot be reached, its server makes no lists, it did not allow it,
-  sign in to it again, or the error's own words. A result that comes
-  after the dialog closed says nothing. On a phone the tasks screen is a
+  sign in to it again, or the error's own words. Closed while a list is
+  being made, the dialog keeps it: opened again it says it is still being
+  made, with "Create" off (no second list), and the list is shown once
+  made. When the accounts cannot be read (or what makes a list on a
+  server did not load), it says so and offers this device alone, made by
+  the store without that code. `DEVICE` and the reasons are
+  `calendar/place.ts`, which loads with the dialog without `make.ts`. On a phone the tasks screen is a
   dialog itself, so this one draws its own backdrop. Proven on Radicale
   (one `MKCALENDAR`, the server naming it as typed) and on a phone in
   Russian with no account (`apps/web/e2e/new-list.spec.ts`). **Its weight
-  on the first load is 0.21 KiB, past [foundation D145](foundation.md#D145)'s
-  0.1 a change**, and the budget's line (130 KiB) is not raised: the
+  on the first load is 0.23 KiB, past [foundation D145](foundation.md#D145)'s
+  0.1 a change**, accepted by the orchestrator, to whom the owner gave the
+  size calls of round 5; the budget's line (130 KiB) is not raised: the
   button and its dialog's loader on the tasks screen (0.03 KiB for the
-  button, 0.13 for the dialog's chunk and what it preloads, named in the
+  button, 0.15 for the dialog's chunk and what it preloads, named in the
   first load's list of chunks), and 0.05 in the shared part for the chunk
   that makes a calendar (`@astrotime/core/new-calendar`, shared by
   CalDAV's `make.ts` and the dialogs). The dialog loads what makes a list

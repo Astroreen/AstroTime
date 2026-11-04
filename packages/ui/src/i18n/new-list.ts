@@ -17,6 +17,8 @@ export const newListStrings = {
     "newList.refused": "{{account}} did not allow the list to be made.",
     "newList.signed-out": "Sign in to {{account}} again to make a list there.",
     "newList.failed": "The list was not made: {{message}}",
+    "newList.unloaded":
+      "The accounts could not be read, so the list can be made on this device only.",
   },
   ru: {
     "newList.title": "Новый список",
@@ -32,6 +34,8 @@ export const newListStrings = {
     "newList.refused": "{{account}} не разрешил создать список.",
     "newList.signed-out": "Войдите в {{account}} снова, чтобы создать там список.",
     "newList.failed": "Список не создан: {{message}}",
+    "newList.unloaded":
+      "Не удалось прочитать аккаунты, поэтому список можно создать только на этом устройстве.",
   },
 } as const;
 

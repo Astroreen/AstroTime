@@ -226,7 +226,9 @@ not carry is said, not dropped in silence.
   `makeCalendar`; the items then go to them as changes made here, which
   the sync uploads ([D5](foundation.md#D5)). One that cannot be made
   (offline, a server that makes none, refused, signed out) stops the
-  import before anything is written, said in words naming the account;
+  import before anything is written, said in words naming the account
+  (`CalendarNotMadeError`: only a calendar's making is blamed on its
+  account, never a later failure);
   calendars already made on a server stay there, as made (AstroTime does
   not delete calendars), and a calendar made on this device for the same
   run goes again as before. `Imported.onServer` lists them. On Radicale in
@@ -398,7 +400,8 @@ import's "new calendar on <account>" ([D277](#D277)), through PR I7.
 Done when: "+ New list" makes a list on Radicale (one `MKCALENDAR`) and
 shows it, and on this device with no account; an import makes its new
 calendar and list on Radicale and uploads its items to them; the first
-load grows by at most 0.1 KiB.
+load grows by what [design D276](design.md#D276) records (0.23 KiB, an
+exception the orchestrator accepted for the owner), not the usual 0.1.
 
 Each converter's PR: its recorded or documented sample files, what maps
 and what is said as not imported (D272), its own chunk (D273).
