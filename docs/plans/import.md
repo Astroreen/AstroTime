@@ -283,15 +283,19 @@ imported again finds its items there (D270). Dates: year first is ISO; a
 part past 12 tells day from month; else the user's language decides,
 said in the preview as guessed (and so when the file has both kinds of
 evidence: the rows the order chosen cannot read are named). An all-day
-event's end: the data says first (a row that ends the day it starts
-names its last day, which the day-after layout never writes); else a
-column only Outlook writes (reminder, guests, "Show time as") means its
-layout, the day after; else Google's documented one, the last day. This
-rests on the formats' documentation, not on recordings. A timed event's
+event's end: a row that ends the day it starts is one day; another's
+end date is its last day in Google's documented layout and the day after
+it in Outlook's and Thunderbird's, told by the columns (any only Outlook
+writes: reminder, guests, "Show time as"), a row at a time, never one
+row deciding for the file. A date the month has not (31.02) is no date,
+and named. This rests on the formats' documentation, not on recordings. A timed event's
 end: its end day at its end time; with no end time, its end day at its
 start's time; with no end day, the start's day, or the next where the
-end is not after the start; a start or end time that cannot be read is
-named, the day kept. A row given again is another item (a series written
+end is not after the start; an end still before its start is left
+out (the event an instant) and named; a start or end time that cannot be
+read is named, the day kept. Outlook's task statuses that are still to
+do but say more ("Waiting on someone else", "Deferred") are
+`NEEDS-ACTION`, Outlook's word kept as `X-OUTLOOK-STATUS`. A row given again is another item (a series written
 out a row an occurrence), its place among its likes in its UID, the same
 on every import. A reminder becomes an alarm before the start, counted
 in real time in the user's zone (a task's at its time); a guest or

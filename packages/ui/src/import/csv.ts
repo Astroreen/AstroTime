@@ -109,7 +109,7 @@ export function csvToIcs(
     dateFields.map((field) => cell(row, column, field)).filter((value) => value !== ""),
   );
   const order = dateOrder(dates, options.language);
-  const lastDayInclusive = inclusiveEnds(body, column, order.order);
+  const lastDayInclusive = inclusiveEnds(column);
   const stamp = utcStamp(options.now ?? Date.now());
   /** How many times each row was met: a row given again is an item again (a series written out). */
   const seen = new Map<string, number>();
@@ -150,8 +150,9 @@ export function csvToIcs(
       const done = completed !== null || isTrue(get("complete"));
       if (completed) push(`COMPLETED:${utc(`${completed}T000000`, options.timeZone)}`);
       const status = taskStatus(get("status"), done);
-      if (status) push(`STATUS:${status}`);
-      else if (get("status")) notImported.add(written[column.get("status")!]!);
+      if (status) push(`STATUS:${status.value}`);
+      // Outlook's own word for it, beside what iCalendar can say ("Deferred" is still to do).
+      if (get("status") !== "" && !status?.exact) push(`X-OUTLOOK-STATUS:${escape(get("status"))}`);
       const percent = /^(\d{1,3})\s*%?$/.exec(get("percent").trim())?.[1];
       if (percent) push(`PERCENT-COMPLETE:${Math.min(100, Number(percent))}`);
       const at = reminderAt(get, order.order);
@@ -200,7 +201,10 @@ export function csvToIcs(
         if (endTime !== null || (endDay !== null && endDay > startDay)) {
           let end = `${endDay ?? startDay}T${endTime ?? startTime}`;
           if (end <= start) end = `${nextDay(end.slice(0, 8))}${end.slice(8)}`;
-          push(`DTEND;TZID=${zone}:${end}`);
+          // Still before its start (an end day before the start day): no end
+          // is written, the event an instant, and the column named.
+          if (end > start) push(`DTEND;TZID=${zone}:${end}`);
+          else notImported.add(written[column.get("endDate")!]!);
         }
         firstYear ??= Number(startDay.slice(0, 4));
       }
@@ -345,7 +349,10 @@ function dateOf(value: string, order: DateOrder): string | null {
   const [a, b, c] = parts.map(Number) as [number, number, number];
   let [y, m, d] = order === "ymd" ? [a, b, c] : order === "dmy" ? [c, b, a] : [c, a, b];
   if (y < 100) y += y < 70 ? 2000 : 1900;
-  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  // A day the month has: 31.02 is no date, and named as one that cannot be read.
+  const real = new Date(Date.UTC(y, m - 1, d));
+  if (real.getUTCFullYear() !== y || real.getUTCMonth() !== m - 1 || real.getUTCDate() !== d)
+    return null;
   return `${String(y).padStart(4, "0")}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}`;
 }
 
@@ -357,7 +364,7 @@ function timeOf(value: string): string | null {
   const meridiem = match[4]?.toLowerCase();
   if (meridiem === "p" && hour < 12) hour += 12;
   if (meridiem === "a" && hour === 12) hour = 0;
-  if (hour > 23 || Number(match[2]) > 59) return null;
+  if (hour > 23 || Number(match[2]) > 59 || Number(match[3] ?? 0) > 59) return null;
   return `${String(hour).padStart(2, "0")}${match[2]}${match[3] ?? "00"}`;
 }
 
@@ -427,22 +434,11 @@ const OUTLOOK_ONLY: readonly Field[] = [
 /**
  * Whether an all-day event's end date is its last day (Google's columns, as
  * its import documents) rather than the day after it (Outlook's and
- * Thunderbird's export). The data first: an all-day row that ends on the
- * day it starts names its last day, which the day-after layout never
- * writes. Else the columns: any only Outlook writes means its layout. Else
- * Google's, the layout people write by hand.
+ * Thunderbird's export), told by the columns: any only Outlook writes means
+ * its layout; else Google's, the layout people write by hand. A row that
+ * ends the day it starts is one day either way.
  */
-function inclusiveEnds(
-  body: readonly (readonly string[])[],
-  column: ReadonlyMap<Field, number>,
-  order: DateOrder,
-): boolean {
-  for (const row of body) {
-    if (!isTrue(cell(row, column, "allDay"))) continue;
-    const start = dateOf(cell(row, column, "startDate"), order);
-    const end = dateOf(cell(row, column, "endDate"), order);
-    if (start && end && end === start) return true;
-  }
+function inclusiveEnds(column: ReadonlyMap<Field, number>): boolean {
   return !OUTLOOK_ONLY.some((field) => column.has(field));
 }
 
@@ -464,11 +460,20 @@ function sensitivity(value: string): string | null {
   return null;
 }
 
-function taskStatus(value: string, done: boolean): string | null {
+/**
+ * A task's status in iCalendar's words, and whether they say all Outlook's
+ * did: "Waiting on someone else" and "Deferred" are still to do, but say
+ * more (kept as `X-OUTLOOK-STATUS`); a status AstroTime does not know sets
+ * none, and is kept the same way.
+ */
+function taskStatus(value: string, done: boolean): { value: string; exact: boolean } | null {
   const v = value.trim().toLowerCase();
-  if (done || ["completed", "завершена", "выполнена"].includes(v)) return "COMPLETED";
-  if (["in progress", "выполняется"].includes(v)) return "IN-PROCESS";
-  if (["not started", "не начата", ""].includes(v)) return v === "" ? null : "NEEDS-ACTION";
+  if (done || ["completed", "завершена", "выполнена"].includes(v))
+    return { value: "COMPLETED", exact: true };
+  if (["in progress", "выполняется"].includes(v)) return { value: "IN-PROCESS", exact: true };
+  if (["not started", "не начата"].includes(v)) return { value: "NEEDS-ACTION", exact: true };
+  if (["waiting on someone else", "ожидает другого", "deferred", "отложена"].includes(v))
+    return { value: "NEEDS-ACTION", exact: false };
   return null;
 }
 

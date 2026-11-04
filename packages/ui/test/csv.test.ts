@@ -219,23 +219,67 @@ describe("#153's review", () => {
     expect(notImported.toSorted()).toEqual(["End Time", "Start Time"]);
   });
 
-  test("an all-day event's end: by the data first, then by columns only Outlook writes", () => {
-    const day = (text: string) => (objects(text)[0]!.master as Event).end;
-    // Ends the day it starts: the end date is its last day (Google's), even with Outlook's columns.
+  test("an all-day event's end: a row a day long either way, the others by the layout", () => {
+    const ends = (text: string) => objects(text).map((object) => (object.master as Event).end);
+    // Outlook's layout: a one-day row beside a multi-day one does not turn the file over.
     expect(
-      day(
-        "Subject,Start Date,End Date,All day event,Reminder on/off\nA,11/05/2026,11/05/2026,True,False\nB,11/09/2026,11/10/2026,True,False",
+      ends(
+        "Subject,Start Date,End Date,All day event,Reminder on/off\nA,11/05/2026,11/05/2026,True,False\nB,11/09/2026,11/11/2026,True,False",
       ),
-    ).toEqual({ type: "date", date: "2026-11-06" });
+    ).toEqual([
+      { type: "date", date: "2026-11-06" },
+      { type: "date", date: "2026-11-11" },
+    ]);
     // Outlook's layout with its reminder columns left out of the export: Show time as is Outlook's alone.
     expect(
-      day("Subject,Start Date,End Date,All day event,Show time as\nB,11/09/2026,11/10/2026,True,0"),
-    ).toEqual({ type: "date", date: "2026-11-10" });
-    // Google's columns, a two-day event: its last day named.
-    expect(day("Subject,Start Date,End Date,All Day Event\nB,11/09/2026,11/10/2026,True")).toEqual({
-      type: "date",
-      date: "2026-11-11",
-    });
+      ends(
+        "Subject,Start Date,End Date,All day event,Show time as\nB,11/09/2026,11/10/2026,True,0",
+      ),
+    ).toEqual([{ type: "date", date: "2026-11-10" }]);
+    // Google's columns: the end date is the last day.
+    expect(
+      ends(
+        "Subject,Start Date,End Date,All Day Event\nA,11/05/2026,11/05/2026,True\nB,11/09/2026,11/10/2026,True",
+      ),
+    ).toEqual([
+      { type: "date", date: "2026-11-06" },
+      { type: "date", date: "2026-11-11" },
+    ]);
+  });
+
+  test("a day the month has not, or a second past 59, is no date or time: the column named", () => {
+    const { notImported, text } = convert(
+      [header, "A,02/31/2026,9:00 AM,,,False", "B,11/05/2026,10:00:99,,,False"].join("\n"),
+    );
+    expect(notImported.toSorted()).toEqual(["Start Date", "Start Time"]);
+    expect(text).not.toContain("20260231");
+  });
+
+  test("an end still before its start is left out and named; never DTEND before DTSTART", () => {
+    const { text, notImported } = convert(
+      [header, "A,11/07/2026,9:00 AM,11/05/2026,10:00 AM,False"].join("\n"),
+    );
+    expect(text).not.toContain("DTEND");
+    expect(notImported).toEqual(["End Date"]);
+  });
+
+  test("Outlook's other task statuses are still to do, its own word kept", () => {
+    const tasks = objects(
+      [
+        "Subject,Due Date,Status",
+        "A,11/20/2026,Waiting on someone else",
+        "B,11/20/2026,Deferred",
+        "C,11/20/2026,Not Started",
+      ].join("\n"),
+    );
+    expect(tasks.map((task) => (task.master as Task).status)).toEqual([
+      "NEEDS-ACTION",
+      "NEEDS-ACTION",
+      "NEEDS-ACTION",
+    ]);
+    expect(tasks[0]!.serialize()).toContain("X-OUTLOOK-STATUS:Waiting on someone else");
+    expect(tasks[2]!.serialize()).not.toContain("X-OUTLOOK-STATUS");
+    expect(convert("Subject,Due Date,Status\nB,11/20/2026,Deferred").notImported).toEqual([]);
   });
 
   test("a row given again is another item, its UID the same on every import", () => {
