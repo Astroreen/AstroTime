@@ -391,3 +391,93 @@ for (const [language, theme, size, viewport] of [
     await context.close();
   });
 }
+
+// The owner's 3 (round 5): "Add a link" hid the other ways (design D237).
+test("the three ways stay in sight: with a link being typed, files and the device are one tap away", async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem("astrotime.view", "day"));
+  await fakeNextcloud(page);
+  await page.goto("/");
+  await signIn(page, "en");
+  await page
+    .getByRole("list", { name: "Wednesday, November 4" })
+    .getByRole("button", { name: /^Quarterly review, / })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Quarterly review" })
+    .getByRole("button", { name: "Edit" })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event" });
+  const files = edit.getByRole("button", { name: "From your files" });
+  const device = edit.getByRole("button", { name: "From this device" });
+  await expect(files).toBeEnabled();
+  await expect(device).toBeEnabled();
+
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  const link = edit.getByRole("textbox", { name: "Link" });
+  await expect(link).toBeFocused();
+  await expect(files).toBeEnabled();
+  await expect(device).toBeEnabled();
+  // Cancel goes back to the three, nothing added.
+  await link.fill("example.org/half");
+  await edit.getByRole("button", { name: "Cancel" }).click();
+  await expect(link).toHaveCount(0);
+  await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
+
+  // From the link's field straight to the files.
+  await edit.getByRole("button", { name: "Add a link" }).click();
+  await files.click();
+  await expect(page.getByRole("dialog", { name: "Choose a file" })).toBeVisible();
+});
+
+for (const [language, words] of [
+  [
+    "en",
+    {
+      create: "Create",
+      event: /^New (event|task)$/,
+      task: "Task",
+      files: "From your files",
+      device: "From this device",
+      calendar: "Files need a Nextcloud account: this calendar is on this device.",
+      list: "Files need a Nextcloud account: this list is on this device.",
+    },
+  ],
+  [
+    "ru",
+    {
+      create: "Создать",
+      event: /^(Новое мероприятие|Новая задача)$/,
+      task: "Задача",
+      files: "Из ваших файлов",
+      device: "С этого устройства",
+      calendar: "Файлы есть только у аккаунта Nextcloud: этот календарь — на этом устройстве.",
+      list: "Файлы есть только у аккаунта Nextcloud: этот список — на этом устройстве.",
+    },
+  ],
+] as const) {
+  test.describe(language, () => {
+    test.use({ locale: language === "en" ? "en-US" : "ru-RU" });
+
+    // The calendar on this device keeps no files: the ways are there, off, with why (design D237).
+    test("on the calendar on this device the file ways are off and say why", async ({ page }) => {
+      await page.setViewportSize(PHONE);
+      await page.clock.setFixedTime(NOW);
+      await page.goto("/");
+      await page.getByRole("button", { name: words.create }).click();
+      const edit = page.getByRole("dialog", { name: words.event });
+      const files = edit.getByRole("button", { name: words.files });
+      const device = edit.getByRole("button", { name: words.device });
+      await expect(files).toBeDisabled();
+      await expect(device).toBeDisabled();
+      await expect(files).toHaveAccessibleDescription(words.calendar);
+      await expect(edit.getByText(words.calendar)).toBeVisible();
+      // A task's calendar is its list (design D236).
+      await edit.getByRole("radio", { name: words.task }).click();
+      await expect(device).toHaveAccessibleDescription(words.list);
+    });
+  });
+}

@@ -2357,12 +2357,40 @@ own (below).
     The picture drawn under a transparent status bar, as Google Calendar
     does: [Deferred](#deferred) (the status bar's icons would then need
     the picture's lightness, not the theme's).
+- **D237. The three ways to attach, all in sight** (the owner's 3, round
+  5: "the add-file button only lets me type a link"). The edit dialog's
+  attachments show "Add a link", "From your files" (D234) and "From this
+  device" (foundation [D232](foundation.md#D232)) together. "Add a link"
+  opens its field above them and becomes "Cancel"; the other two stay one
+  tap away. Where the item's calendar has no files, the two file ways are
+  there but turned off, with the reason beneath them (their accessible
+  description too): the calendar or list is on this device; its server
+  keeps none (Radicale, any CalDAV server that is not Nextcloud); or its
+  Nextcloud account's sync is off. A calendar of the demo shows neither.
+  A task's reason names its list (D236). The reasons load with the
+  attachments (`i18n/files.ts`, beside `pictures.ts` through `later.ts`),
+  not with the app (foundation [D145](foundation.md#D145)). A Nextcloud is
+  known by the calendar home discovery ends at, whatever address Login
+  Flow v2 or the user gave (`packages/caldav/test/nextcloud-home.test.ts`:
+  a trailing slash, `index.php`, an app's page, `remote.php/dav`, an
+  install under a path, `/.well-known/caldav` redirected). On the
+  emulator, an account of the test user signed in through CalDAV and
+  through Login Flow v2 showed both file ways, so the owner's missing
+  buttons stay unexplained ([Deferred](#deferred)).
+  Attaching a file inline where there are no files: [Deferred](#deferred).
 
 ## Deferred
 
 - **The details' picture under the status bar** ([D235](#D235)), edge to
   edge as Google Calendar draws it: the bars' icons would follow the
   picture's lightness rather than the theme.
+- **Why the owner's phone showed only "Add a link"** ([D237](#D237)):
+  not reproduced with the test user on the same server and APK; the
+  three ways are now in sight with a reason when off, which shows the
+  cause the next time it happens.
+- **A file attached inline where the calendar has no files** ([D237](#D237)):
+  `ATTACH;VALUE=BINARY` (core's `inlineFile`) for the calendar on this
+  device and servers without files; the reason shows instead for now.
 - **The React Compiler's other bail-outs** ([D194](#D194)), known when
   its check came, each in its owner's area: `accounts-context.tsx` (a
   `try` with `finally`, a counter changed in a callback),

@@ -283,7 +283,8 @@ When you add a package, app or module, add its line here in the same PR.
       that open, inline files saved on demand (`Platform.saveFile` where
       the platform saves files). → `plans/design.md#D230`
     - `attachments-field.tsx` — the edit dialog's attachments: each
-      taken off, a link added. → `plans/design.md#D233`
+      taken off, a link added, the three ways to attach in sight.
+      → `plans/design.md#D233`, `plans/design.md#D237`
     - `file-picker.tsx` — the account's files, a folder at a time, to
       attach one. → `plans/design.md#D234`
     - `mention-field.tsx` — the edit dialog's description, where "@"
@@ -361,8 +362,9 @@ When you add a package, app or module, add its line here in the same PR.
     "Reminders" setting in Settings and a tapped reminder opening its day
     and its details.
     → `plans/foundation.md#D101`, `plans/foundation.md#D102`
-  - `i18n/` — i18next and the English and Russian catalogs; `pictures.ts`,
-    the strings of the pictures' parts that load later.
+  - `i18n/` — i18next and the English and Russian catalogs; strings that
+    load later with their part (`later.ts`): `pictures.ts`, the pictures',
+    and `files.ts`, why the edit dialog's attachments have no files.
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`

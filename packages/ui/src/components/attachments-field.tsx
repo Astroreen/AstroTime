@@ -1,7 +1,9 @@
 // The edit dialog's attachments (design D233): each with its name, kind and
-// size and a button that takes it off, then "Add a link" and, for an account
-// whose server keeps files (Nextcloud's), "From your files" (design D234).
-// The others stay as written (foundation D229). Loaded with the edit dialog,
+// size and a button that takes it off, then the three ways to attach, all
+// in sight (design D237): "Add a link", and "From your files" (D234) and
+// "From this device" (D232) for an account whose server keeps files
+// (Nextcloud's), else turned off with the reason. The others stay as
+// written (foundation D229). Loaded with the edit dialog,
 // the file picker with it: a chunk of its own, loaded from the editor's,
 // split the app's first chunks and cost the first load 0.3 KiB.
 import type { Attachment, NewAttachment } from "@astrotime/core";
@@ -19,11 +21,15 @@ import {
   typedLink,
   withAttached,
 } from "../calendar/attachments.ts";
+import { addFileStrings } from "../i18n/files.ts";
 import { AttachmentBody } from "./attachments.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CloseIcon } from "./icons.tsx";
 import { FilePicker } from "./file-picker.tsx";
 import { textButton } from "./sign-in-dialog.tsx";
+
+/** A way to attach a file, turned off where the calendar has no files (design D237). */
+const fileButton = `${textButton} disabled:text-ink-muted disabled:hover:bg-transparent`;
 
 /** A new attachment as a row shows it: its `FILENAME`'s last part. */
 const shown = (attachment: NewAttachment): Attachment => ({
@@ -37,21 +43,28 @@ const shown = (attachment: NewAttachment): Attachment => ({
 /** The largest file uploaded from the device: Android's bridge carries it in base64, in memory. */
 const MAX_UPLOAD = 50_000_000;
 
+/** Why a calendar has no files to attach from (design D237). */
+type NoFiles = "device" | "server" | "syncOff";
+
 /**
  * The account a calendar is in, where it may have files (foundation D231):
- * one that syncs with a server that keeps them. Asking makes no request.
+ * one that syncs with a server that keeps them; else why not, once its
+ * account is read. Asking makes no request.
  */
-function useFilesAccount(calendar: Calendar | undefined): Account | null {
+function useFilesAccount(calendar: Calendar | undefined): {
+  readonly account: Account | null;
+  readonly noFiles: NoFiles | null;
+} {
   const { store } = useAccounts();
-  const [found, setFound] = useState<Account | null>(null);
+  const [found, setFound] = useState<{ readonly id: string; readonly account: Account | null }>();
   const accountId = calendar?.accountId;
   useEffect(() => {
     if (!accountId) return;
     let current = true;
     store.accounts().then(
       (accounts) => {
-        const account = accounts.find((a) => a.id === accountId);
-        if (current) setFound(account && hasFiles(account) ? account : null);
+        if (current)
+          setFound({ id: accountId, account: accounts.find((a) => a.id === accountId) ?? null });
       },
       (error: unknown) => console.error(error),
     );
@@ -59,7 +72,15 @@ function useFilesAccount(calendar: Calendar | undefined): Account | null {
       current = false;
     };
   }, [accountId, store]);
-  return found?.id === accountId ? found : null;
+  const account = found && found.id === accountId ? found.account : null;
+  if (!account) return { account: null, noFiles: null };
+  if (hasFiles(account)) return { account, noFiles: null };
+  if (account.provider === "local") return { account: null, noFiles: "device" };
+  if (account.provider !== "caldav") return { account: null, noFiles: null };
+  return {
+    account: null,
+    noFiles: hasFiles({ ...account, syncOff: false }) ? "syncOff" : "server",
+  };
 }
 
 export function AttachmentsField({
@@ -67,15 +88,19 @@ export function AttachmentsField({
   calendar,
   onChange,
   field,
+  task = false,
 }: {
   value: readonly AttachmentChoice[];
   calendar: Calendar | undefined;
+  /** A task's calendar is its list (design D236). */
+  task?: boolean;
   onChange: (attachments: readonly AttachmentChoice[]) => void;
   /** The form's text field's looks. */
   field: string;
 }) {
   const { t, i18n } = useTranslation();
-  const account = useFilesAccount(calendar);
+  addFileStrings(i18n);
+  const { account, noFiles } = useFilesAccount(calendar);
   const [browsing, setBrowsing] = useState(false);
   const { platform } = useAccounts();
   // A file from the device on its way to the account's files (design D232).
@@ -167,6 +192,15 @@ export function AttachmentsField({
   const [tried, setTried] = useState(false);
   const inputId = useId();
   const hintId = useId();
+  const noFilesId = useId();
+  const why =
+    noFiles === "syncOff"
+      ? t("attachments.noFiles.syncOff")
+      : noFiles === "device"
+        ? t(task ? "attachments.noFiles.deviceList" : "attachments.noFiles.device")
+        : noFiles === "server"
+          ? t(task ? "attachments.noFiles.serverList" : "attachments.noFiles.server")
+          : null;
   const typed = typedLink(link);
   const add = () => {
     if (!typed) {
@@ -204,7 +238,7 @@ export function AttachmentsField({
           })}
         </ul>
       )}
-      {adding ? (
+      {adding && (
         <div className="flex items-center gap-2">
           <label htmlFor={inputId} className="sr-only">
             {t("attachments.link")}
@@ -239,40 +273,68 @@ export function AttachmentsField({
             {t("alarm.custom.add")}
           </button>
         </div>
-      ) : (
-        <div className="-ml-4 flex flex-wrap">
+      )}
+      {/* The three ways, in sight while a link is typed too (design D237). */}
+      <div className="-ml-4 flex flex-wrap">
+        {adding ? (
+          <button
+            type="button"
+            className={textButton}
+            onClick={() => {
+              setAdding(false);
+              setLink("");
+              setTried(false);
+            }}
+          >
+            {t("attachments.cancelLink")}
+          </button>
+        ) : (
           <button type="button" className={textButton} onClick={() => setAdding(true)}>
             {t("attachments.addLink")}
           </button>
-          {account && (
-            <>
-              <button type="button" className={textButton} onClick={() => setBrowsing(true)}>
-                {t("attachments.fromFiles")}
-              </button>
-              <button
-                type="button"
-                className={textButton}
-                disabled={uploading?.state === "sending"}
-                onClick={() => picker.current?.click()}
-              >
-                {t("attachments.upload")}
-              </button>
-              {/* The system's file dialog, Android's picker in the WebView. */}
-              <input
-                ref={picker}
-                type="file"
-                hidden
-                tabIndex={-1}
-                aria-hidden="true"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  if (file) void upload(file);
-                }}
-              />
-            </>
-          )}
-        </div>
+        )}
+        {(account || why) && (
+          <>
+            <button
+              type="button"
+              className={fileButton}
+              disabled={!account}
+              aria-describedby={why ? noFilesId : undefined}
+              onClick={() => setBrowsing(true)}
+            >
+              {t("attachments.fromFiles")}
+            </button>
+            <button
+              type="button"
+              className={fileButton}
+              disabled={!account || uploading?.state === "sending"}
+              aria-describedby={why ? noFilesId : undefined}
+              onClick={() => picker.current?.click()}
+            >
+              {t("attachments.upload")}
+            </button>
+          </>
+        )}
+        {account && (
+          // The system's file dialog, Android's picker in the WebView.
+          <input
+            ref={picker}
+            type="file"
+            hidden
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void upload(file);
+            }}
+          />
+        )}
+      </div>
+      {why && (
+        <p id={noFilesId} className="text-note text-ink-muted">
+          {why}
+        </p>
       )}
       {/* Not a web link yet: what makes it one, said to the field it describes (design D233). */}
       <p id={hintId} aria-live="polite" className="text-note text-ink-muted empty:hidden">

@@ -3,6 +3,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { catalogs, createI18n, LANGUAGES } from "../src/i18n/index.ts";
+import { fileStrings } from "../src/i18n/files.ts";
 import { pictureStrings } from "../src/i18n/pictures.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
@@ -69,13 +70,16 @@ test("plurals follow each language's rules", () => {
   ]);
 });
 
-test("the strings that load later have the same keys in every language (design D222)", () => {
-  expect(Object.keys(pictureStrings.ru).toSorted()).toEqual(
-    Object.keys(pictureStrings.en).toSorted(),
-  );
-  for (const key of Object.keys(pictureStrings.en) as (keyof typeof pictureStrings.en)[]) {
-    expect(variables(pictureStrings.ru[key]), key).toEqual(variables(pictureStrings.en[key]));
-    // None is also in the app's own catalog: one place for each string.
-    expect(catalogs.en, key).not.toHaveProperty(key);
+test("the strings that load later have the same keys in every language (design D222, D237)", () => {
+  for (const later of [pictureStrings, fileStrings] as Record<
+    "en" | "ru",
+    Record<string, string>
+  >[]) {
+    expect(Object.keys(later.ru).toSorted()).toEqual(Object.keys(later.en).toSorted());
+    for (const key of Object.keys(later.en)) {
+      expect(variables(later.ru[key]!), key).toEqual(variables(later.en[key]!));
+      // None is also in the app's own catalog: one place for each string.
+      expect(catalogs.en, key).not.toHaveProperty(key);
+    }
   }
 });
