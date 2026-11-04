@@ -199,8 +199,14 @@ not carry is said, not dropped in silence.
   group writes a calendar's objects, as stored, into one `VCALENDAR` as
   Nextcloud's export does (each `VTIMEZONE` once, `X-WR-CALNAME` and the
   colour), saved with `Platform.saveFile` where the platform saves files
-  and as a download elsewhere. Built last (I6), as it is cheap once import
-  exists.
+  and as a download elsewhere. It says "saved" only when the platform says
+  the file was written, "not saved" when its dialog was turned away, and of
+  a download only that it has begun (a browser does not say more). Two
+  objects defining one `TZID` differently keep both: the later one's is
+  renamed (`Office-2`) in that object. The file is named after the
+  calendar, made safe on every system (no control or reserved characters,
+  no trailing dot or space, no `CON` or `NUL`, at most 100 characters,
+  else `calendar.ics`). Built last (I6), as it is cheap once import exists.
 
 ## Deferred
 
