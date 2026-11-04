@@ -33,26 +33,36 @@ export class Gate {
     this.now = now;
   }
 
-  /** The user a request's `Authorization` names, if its password is theirs. */
-  async signIn(header: string | null, address: string): Promise<SignIn> {
-    const limited = this.limited(address);
+  /**
+   * The user a request's `Authorization` names, if its password is theirs.
+   * `address` `null`: a caller that cannot tell clients apart, which gets no
+   * limit rather than one bucket that locks every user out at once.
+   */
+  async signIn(header: string | null, address: string | null): Promise<SignIn> {
+    const limited = address === null ? 0 : this.limited(address);
     if (limited > 0) return { type: "limited", seconds: limited };
     const credentials = basic(header);
     if (!credentials) return { type: "none" };
+    // Counted as a failure before anything is awaited, and given back after a
+    // success, so guesses sent at once meet the limit as one after another do.
+    if (address !== null) this.fail(address);
     const user = await this.database.user(credentials.name);
     const key = createHash("sha256")
       .update(`${credentials.name}\0${credentials.password}`)
       .digest("base64");
     // A changed password (`setPassword`) is checked again.
-    if (user && this.checked.get(key) === user.password) return { type: "user", user };
+    if (user && this.checked.get(key) === user.password) {
+      if (address !== null) this.forgive(address);
+      return { type: "user", user };
+    }
     // An unknown name costs a hash as a known one does, so the time tells neither.
     const hash = user?.password ?? (await standInHash());
     if ((await verifyPassword(credentials.password, hash)) && user) {
+      if (address !== null) this.forgive(address);
       if (this.checked.size >= REMEMBERED) this.checked.clear();
       this.checked.set(key, user.password);
       return { type: "user", user };
     }
-    this.fail(address);
     return { type: "refused" };
   }
 
@@ -69,10 +79,21 @@ export class Gate {
     if (this.failures.size >= TRACKED) {
       for (const [at, entry] of this.failures)
         if (now - entry.since >= WINDOW_MS) this.failures.delete(at);
+      // All fresh: the oldest windows go, so the map stays bounded.
+      for (const at of this.failures.keys()) {
+        if (this.failures.size < TRACKED) break;
+        this.failures.delete(at);
+      }
     }
     const entry = this.failures.get(address);
     if (entry && now - entry.since < WINDOW_MS) entry.count++;
     else this.failures.set(address, { since: now, count: 1 });
+  }
+
+  /** Gives back the failure `signIn` counted ahead of a check that succeeded. */
+  private forgive(address: string): void {
+    const entry = this.failures.get(address);
+    if (entry && entry.count > 0) entry.count--;
   }
 }
 

@@ -64,8 +64,10 @@ const day = (epochMs: number) => new Date(epochMs).toISOString().slice(0, 10);
 
 /** Whether an object with this text matches the filter's time range. */
 export function inRange(ics: string, range: NonNullable<Filter["range"]>): boolean {
-  // A task with neither DTSTART nor DUE matches any range (RFC 4791 §9.9).
-  if (/^BEGIN:VTODO\r?$/m.test(ics) && !/^(DTSTART|DUE)[;:]/m.test(ics)) return true;
+  // A task with neither DTSTART nor DUE matches any range (RFC 4791 §9.9);
+  // read in the VTODO itself, not a VTIMEZONE's DTSTART.
+  const todo = /^BEGIN:VTODO\r?$([\s\S]*?)^END:VTODO\r?$/m.exec(ics);
+  if (todo && !/^(DTSTART|DUE)[;:]/m.test(todo[1]!)) return true;
   try {
     // Days around the range, then each occurrence's own instants.
     const occurrences = occurrencesBetween(CalendarObject.parse(ics), {

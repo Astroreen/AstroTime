@@ -37,8 +37,8 @@ export interface ServerOptions {
 
 /**
  * Who sent a request: the address failed sign-ins are counted by (D282).
- * The caller knows it (the socket's, or its reverse proxy's word); a request
- * without one counts with every other such request.
+ * The caller knows it (the socket's, or its reverse proxy's word); without
+ * one, no limit applies.
  */
 export interface Client {
   readonly address: string;
@@ -115,7 +115,7 @@ export function serverHandler(
     if (request.method === "OPTIONS")
       return new Response(null, { status: 200, headers: { DAV: DAV_CLASSES, Allow: ALLOW } });
 
-    const signIn = await gate.signIn(request.headers.get("authorization"), client?.address ?? "");
+    const signIn = await gate.signIn(request.headers.get("authorization"), client?.address ?? null);
     if (signIn.type === "limited")
       return new Response(null, {
         status: 429,
@@ -500,9 +500,9 @@ class Session {
       const responses: string[] = [];
       const base = this.calendarPath(calendar.slug);
       for (const one of body.children.filter((c) => c.ns === DAV && c.name === "href")) {
-        const path = new URL(one.text.trim(), this.url).pathname;
         let name: string | null = null;
         try {
+          const path = new URL(one.text.trim(), this.url).pathname;
           const rest = path.startsWith(base) ? decodeURIComponent(path.slice(base.length)) : "";
           name = rest && !rest.includes("/") ? rest : null;
         } catch {

@@ -118,6 +118,26 @@ describe("signing in (D282)", () => {
     expect((await send("PROPFIND", HOME, from)).status).toBe(207);
   });
 
+  test("guesses sent at once meet the limit as guesses one after another do", async () => {
+    const from = { address: "198.51.100.9" };
+    const answers = await Promise.all(
+      Array.from({ length: 14 }, (_, i) =>
+        send("PROPFIND", HOME, { ...from, as: ["astro", `burst${i}`] }),
+      ),
+    );
+    expect(answers.filter((a) => a.status === 401)).toHaveLength(10);
+    expect(answers.filter((a) => a.status === 429)).toHaveLength(4);
+    // The right password, sent with them, is not counted against the address.
+    const mixed = { address: "198.51.100.10" };
+    await Promise.all([
+      ...Array.from({ length: 9 }, (_, i) =>
+        send("PROPFIND", HOME, { ...mixed, as: ["astro", `x${i}`] }),
+      ),
+      send("PROPFIND", HOME, mixed),
+    ]);
+    expect((await send("PROPFIND", HOME, mixed)).status).toBe(207);
+  });
+
   test("a changed password is asked for at once, though the old one was checked before", async () => {
     expect((await send("PROPFIND", HOME)).status).toBe(207);
     await database.setPassword("astro", "new secret");
@@ -206,9 +226,10 @@ describe("Thunderbird", () => {
     ]);
     const multiget = await send("REPORT", calendar, {
       headers: { Depth: "1" },
-      body: `<?xml version="1.0" encoding="UTF-8"?>\n<C:calendar-multiget xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:getetag/><C:calendar-data/></D:prop><D:href>${calendar}tb-1.ics</D:href><D:href>${calendar}gone.ics</D:href></C:calendar-multiget>`,
+      body: `<?xml version="1.0" encoding="UTF-8"?>\n<C:calendar-multiget xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:getetag/><C:calendar-data/></D:prop><D:href>${calendar}tb-1.ics</D:href><D:href>${calendar}gone.ics</D:href><D:href>http://[</D:href></C:calendar-multiget>`,
     });
-    const [found, gone] = statuses(multiget.body);
+    const [found, gone, malformed] = statuses(multiget.body);
+    expect(malformed).toMatchObject({ href: "http://[", status: 404 });
     // The data comes back as it was written, CRs and all.
     expect(text(found!.props["calendar-data"]) ?? "").toBe(ics.trim());
     expect((found!.props["calendar-data"] as string).endsWith("\r\n")).toBe(true);
@@ -270,7 +291,19 @@ describe("Thunderbird", () => {
       ),
     ).toEqual(["once.ics"]);
     expect(await query(`<comp-filter name="VTODO"/>`)).toEqual(["todo.ics"]);
-    expect(await query("")).toEqual(["once.ics", "todo.ics", "weekly.ics"]);
+    // A task with no dates is in any range, though its VTIMEZONE has a DTSTART.
+    await send("PUT", `${calendar}zoned-todo.ics`, {
+      body: task("zoned-todo").replace(
+        "BEGIN:VTODO",
+        "BEGIN:VTIMEZONE\r\nTZID:Europe/Vilnius\r\nBEGIN:STANDARD\r\nDTSTART:19701025T040000\r\nTZOFFSETFROM:+0300\r\nTZOFFSETTO:+0200\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\nBEGIN:VTODO",
+      ),
+    });
+    expect(
+      await query(
+        `<comp-filter name="VTODO"><time-range start="20261117T000000Z" end="20261118T000000Z"/></comp-filter>`,
+      ),
+    ).toEqual(["todo.ics", "zoned-todo.ics"]);
+    expect(await query("")).toEqual(["once.ics", "todo.ics", "weekly.ics", "zoned-todo.ics"]);
   });
 });
 
