@@ -59,11 +59,11 @@ Whole calendars as each client exports them, one `VCALENDAR` holding many
 objects, for `../split.test.ts` (docs/plans/import.md#D267). Kept out of
 this folder's top so the per-object tests above do not read them.
 
-| File                     | Where it comes from                                                                                                                                                                                             |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `radicale-export.ics`    | **real**: a `GET` of a calendar collection on Radicale 3.8.0 after four of the objects above were `PUT` into it                                                                                                 |
-| `nextcloud-export.ics`   | synthetic: the `nextcloud-web-*.ics` objects in the container Nextcloud's export writes (Sabre's `ICSExportPlugin`: its `PRODID`, `X-WR-CALNAME`, `X-APPLE-CALENDAR-COLOR`, each `VTIMEZONE` once, the refresh) |
-| `google-export.ics`      | synthetic, by hand from Google Calendar's documented export: `METHOD:PUBLISH`, `X-WR-*`, a series whose exception comes after other events                                                                      |
-| `thunderbird-export.ics` | synthetic: `thunderbird-event-allday.ics` and a Thunderbird task in Thunderbird's export container                                                                                                              |
-| `apple-export.ics`       | synthetic: the `apple-event-*.ics` objects in Apple Calendar's export container (`X-APPLE-CALENDAR-COLOR` with alpha)                                                                                           |
-| `outlook-export.ics`     | synthetic: the `outlook-event-*` objects in Outlook's "Save calendar" container (`METHOD:PUBLISH`, `X-CALSTART`, `X-MS-OLK-*`)                                                                                  |
+| File                     | Where it comes from                                                                                                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `radicale-export.ics`    | **real**: a `GET` of a calendar collection on Radicale 3.8.0 after four of the objects above were `PUT` into it                                                                                    |
+| `nextcloud-export.ics`   | **real**: Nextcloud's own export (`?export`, Sabre's `ICSExportPlugin` with Nextcloud's refresh) of a calendar of the test user after three of the objects above were `PUT` into it, on 2026-11-04 |
+| `google-export.ics`      | synthetic, by hand from Google Calendar's documented export: `METHOD:PUBLISH`, `X-WR-*`, a series whose exception comes after other events                                                         |
+| `thunderbird-export.ics` | synthetic: `thunderbird-event-allday.ics` and a Thunderbird task in Thunderbird's export container                                                                                                 |
+| `apple-export.ics`       | synthetic: the `apple-event-*.ics` objects in Apple Calendar's export container (`X-APPLE-CALENDAR-COLOR` with alpha)                                                                              |
+| `outlook-export.ics`     | synthetic: the `outlook-event-*` objects in Outlook's "Save calendar" container (`METHOD:PUBLISH`, `X-CALSTART`, `X-MS-OLK-*`)                                                                     |

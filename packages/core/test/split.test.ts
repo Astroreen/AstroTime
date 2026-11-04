@@ -127,12 +127,12 @@ describe("an exported calendar split into objects (import D267)", () => {
 
   test("its name, colour and refresh", () => {
     const of = (name: string) => {
-      const { name: calendar, color, refresh } = splitCalendar(fixture(`exports/${name}`));
-      return { calendar, color, refresh };
+      const { name: named, color, refresh } = splitCalendar(fixture(`exports/${name}`));
+      return { calendar: named, color, refresh };
     };
     expect(of("nextcloud-export.ics")).toEqual({
-      calendar: "Personal",
-      color: "#0082c9",
+      calendar: "Import test",
+      color: "#0b8043",
       refresh: 4 * 3600_000,
     });
     expect(of("apple-export.ics")).toEqual({ calendar: "Home", color: "#1badf8", refresh: null });
@@ -192,8 +192,8 @@ describe("what is not one calendar (subscriptions, providers D251)", () => {
   });
 });
 
-describe("components that cannot be objects", () => {
-  test("each is named with its place and UID; the others are kept", () => {
+describe("components that cannot be objects, and those kept all the same (D272)", () => {
+  test("each is named with its place and UID; nothing that can be kept is lost", () => {
     const split = splitCalendar(
       calendar(
         event("good"),
@@ -204,19 +204,126 @@ describe("components that cannot be objects", () => {
         event("twice"),
         event("broken", ["RRULE:FREQ=SOMETIMES"]),
         ["BEGIN:VJOURNAL", "UID:journal", "SUMMARY:A note", "END:VJOURNAL"],
+        event("good", ["DESCRIPTION:Another master"]),
       ),
     );
     expect(split.objects.map(({ uid, kind }) => [uid, kind])).toEqual([
       ["good", "VEVENT"],
+      ["mixed", "VTODO"],
+      ["twice", "VEVENT"],
       // Kept as written, for a caller to keep or leave (VJOURNAL).
       ["journal", "VJOURNAL"],
+      // What had to leave its UID: under one made from it, the same on every run.
+      ["mixed-2", "VEVENT"],
+      ["good-2", "VEVENT"],
     ]);
+    expect(CalendarObject.parse(split.objects[5]!.ics).master?.description).toBe("Another master");
     expect(split.problems).toEqual([
-      { index: 1, uid: null, component: "VEVENT", reason: "no-uid" },
-      { index: 2, uid: "mixed", component: "VTODO", reason: "mixed-kinds" },
-      { index: 4, uid: "twice", component: "VEVENT", reason: "several-masters" },
-      { index: 6, uid: "broken", component: "VEVENT", reason: "invalid" },
+      { index: 1, uid: null, component: "VEVENT", reason: "no-uid", kept: false },
+      { index: 3, uid: "mixed", component: "VEVENT", reason: "mixed-kinds", kept: true },
+      { index: 5, uid: "twice", component: "VEVENT", reason: "duplicate", kept: true },
+      { index: 6, uid: "broken", component: "VEVENT", reason: "invalid", kept: false },
+      { index: 8, uid: "good", component: "VEVENT", reason: "several-masters", kept: true },
     ]);
+  });
+
+  test("a series' exceptions stay with its first master; a second master leaves under a new UID", () => {
+    let n = 0;
+    const [split] = splitCalendars(
+      calendar(
+        event("s", ["RRULE:FREQ=DAILY;COUNT=3"]),
+        event("s", ["RECURRENCE-ID:20261106T090000Z", "SUMMARY:Moved"]),
+        event("s", ["SUMMARY:Other"]),
+      ),
+      { newUid: () => `fresh-${++n}` },
+    );
+    expect(split!.objects.map((object) => object.uid)).toEqual(["s", "fresh-1"]);
+    expect(CalendarObject.parse(split!.objects[0]!.ics).exceptions).toHaveLength(1);
+  });
+
+  test("a component whose END never came ends where the next begins; the rest of the file is read", () => {
+    const text = calendar(event("a"), event("cut").slice(0, -1), event("b"), [
+      "BEGIN:VTODO",
+      "UID:t",
+      "SUMMARY:x",
+    ]);
+    for (const split of [splitCalendar(text), splitCalendars(text, { newUid: () => "x" })[0]!]) {
+      expect(split.objects.map((object) => object.uid)).toEqual(["a", "b"]);
+      expect(split.problems).toEqual([
+        { index: 1, uid: "cut", component: "VEVENT", reason: "unterminated", kept: false },
+        { index: 3, uid: "t", component: "VTODO", reason: "unterminated", kept: false },
+      ]);
+    }
+    // And the next calendar after it, in a file of several.
+    const two = lines(
+      "BEGIN:VCALENDAR",
+      ...event("a").slice(0, -1),
+      "END:VCALENDAR",
+      "BEGIN:VCALENDAR",
+      ...event("b"),
+      "END:VCALENDAR",
+    );
+    expect(
+      splitCalendars(two, { newUid: () => "x" }).map((one) => one.objects.map((o) => o.uid)),
+    ).toEqual([[], ["b"]]);
+  });
+
+  test("a VTIMEZONE that cannot be read is named; the objects naming it are kept and read the TZID", () => {
+    const zone = [
+      "BEGIN:VTIMEZONE",
+      "TZID:Europe/Vilnius",
+      "BEGIN:STANDARD",
+      "DTSTART:19701025T040000",
+      "RRULE:FREQ=SOMETIMES",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    const split = splitCalendar(
+      calendar(zone, [
+        "BEGIN:VEVENT",
+        "UID:z",
+        "DTSTAMP:20261101T080000Z",
+        "DTSTART;TZID=Europe/Vilnius:20261105T090000",
+        "END:VEVENT",
+      ]),
+    );
+    expect(split.problems).toEqual([
+      {
+        index: 0,
+        uid: "Europe/Vilnius",
+        component: "VTIMEZONE",
+        reason: "invalid-zone",
+        kept: false,
+      },
+    ]);
+    const start = CalendarObject.parse(split.objects[0]!.ics).master!.start;
+    expect(start).toMatchObject({ type: "zoned", timeZone: "Europe/Vilnius" });
+  });
+
+  test("a calendar property that cannot be read is named; the others go with each object", () => {
+    const split = splitCalendar(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "X-WR-CALNAME:Kept",
+        "REFRESH-INTERVAL;VALUE=DURATION:soon",
+        ...event("a"),
+        "END:VCALENDAR",
+      ),
+    );
+    expect(split.name).toBe("Kept");
+    expect(split.problems).toEqual([
+      {
+        index: -1,
+        uid: "REFRESH-INTERVAL",
+        component: "VCALENDAR",
+        reason: "invalid-property",
+        kept: false,
+      },
+    ]);
+    expect(split.objects[0]!.ics).toContain("X-WR-CALNAME:Kept");
   });
 });
 
@@ -231,12 +338,42 @@ describe("a file from the device, forgiven what exporters get wrong (import D267
     expect(uids(splitCalendars(text, { newUid }))).toEqual([["a", "b"]]);
   });
 
-  test("a line broken without folding joins the line before as a line break", () => {
-    const text = calendar(event("a", ["DESCRIPTION:First line", "second line"]));
+  test("a line broken without folding joins the text value before it as a line break", () => {
+    const text = calendar(
+      event("a", ["DESCRIPTION:Call the office", "Dial-in: 555 0100", "PIN 1234"]),
+    );
     const [split] = splitCalendars(text, { newUid });
     expect(CalendarObject.parse(split!.objects[0]!.ics).master?.description).toBe(
-      "First line\nsecond line",
+      "Call the office\nDial-in: 555 0100\nPIN 1234",
     );
+    expect(split!.problems).toEqual([
+      { index: 0, uid: "a", component: "VEVENT", reason: "joined-line", kept: true },
+    ]);
+  });
+
+  test("a stray line anywhere else is left out and named; nothing else changes", () => {
+    const text = calendar(
+      [
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTAMP:20261101T080000Z",
+        "DTSTART:20261105T090000Z",
+        "stray",
+        "END:VEVENT",
+      ],
+      [...event("b"), "after the end"],
+      event("c"),
+    );
+    const [split] = splitCalendars(text, { newUid });
+    expect(split!.objects.map((object) => object.uid)).toEqual(["a", "b", "c"]);
+    expect(CalendarObject.parse(split!.objects[0]!.ics).master?.start).toMatchObject({
+      type: "zoned",
+      epochMs: Date.UTC(2026, 10, 5, 9),
+    });
+    expect(split!.problems).toEqual([
+      { index: -1, uid: null, component: "VCALENDAR", reason: "dropped-line", kept: true },
+      { index: 0, uid: "a", component: "VEVENT", reason: "dropped-line", kept: true },
+    ]);
   });
 
   test("several calendars, one after another", () => {
@@ -269,7 +406,7 @@ describe("a file from the device, forgiven what exporters get wrong (import D267
     const [split] = splitCalendars(text, { newUid });
     expect(split!.objects.map((object) => object.uid)).toEqual(["a"]);
     expect(split!.problems).toEqual([
-      { index: 1, uid: "b", component: "VEVENT", reason: "invalid" },
+      { index: 1, uid: "b", component: "VEVENT", reason: "unterminated", kept: false },
     ]);
   });
 

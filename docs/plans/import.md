@@ -61,15 +61,29 @@ not carry is said, not dropped in silence.
   the `VTIMEZONE`s its times name and no others, and every property of the
   file's calendar but `METHOD` (a calendar object resource has none, RFC
   4791 §4.1). Each component is read on its own, so one value ical.js
-  refuses costs that component, not the file. It forgives what exporters
-  get wrong: a byte order mark, LF or CR line ends, blank lines, a line
-  broken without folding (joined to the one before as the line break it
-  meant), several `VCALENDAR`s one after another, a file cut short (what
-  came whole is kept), a component with no UID (it gets one). A missing
-  `VTIMEZONE` is left as written: the time model reads the TZID
-  ([D32](foundation.md#D32)). What cannot become an object (no UID, two
-  masters, kinds mixed under one UID, unreadable) is a problem with its
-  place in the file. `splitCalendar`, the same with a strict outer shape
+  refuses costs that component, not the file, and one whose `END` never
+  came ends where the next component begins or the calendar ends, so it
+  never takes the rest of the file with it. It forgives what exporters
+  get wrong: a byte order mark, LF or CR line ends, blank lines, several
+  `VCALENDAR`s one after another, a file cut short (what came whole is
+  kept), a component with no UID (it gets one). A line broken without
+  folding is joined, as the line break it meant, only to a text value
+  (`DESCRIPTION`, `SUMMARY`, `LOCATION`, `COMMENT`, an `X-` property) and
+  only when it is no property of iCalendar's (Outlook's "Dial-in: 555
+  0100"); anywhere else it is a stray line, left out; both are named. The
+  same component twice under one UID (Google's and Outlook's exports do
+  it) is kept once; a second, different master, or a component of another
+  kind under a UID taken, is kept as an object of its own under a new UID
+  (`<UID>-2` where the caller gives none, so a subscription's stays the
+  same on every run); a series' exceptions stay with its first master.
+  Nothing is dropped unnamed: what cannot be kept (no UID where none can
+  be given, unreadable, never ended) is a problem with its place in the
+  file, and so is what was kept but changed. A `VTIMEZONE` that cannot be
+  read is named, and the objects naming it go without it: a definition
+  ical.js cannot read cannot be stored either, and the time model reads
+  the TZID ([D32](foundation.md#D32)); a missing one likewise. A calendar
+  property that cannot be read is named and left out, the others kept.
+  `splitCalendar`, the same with a strict outer shape
   (exactly one whole `VCALENDAR`, else `NotCalendarError`), is D251's.
   Text is decoded as UTF-8 (UTF-16 by its byte order mark); a file that
   is not UTF-8 is read in the charset it names (vCalendar's `CHARSET`),
