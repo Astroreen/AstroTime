@@ -24,6 +24,10 @@
     "./provider": {
       "types": "./src/provider.ts",
       "import": "./src/provider.ts"
+    },
+    "./xml": {
+      "types": "./src/xml.ts",
+      "import": "./src/xml.ts"
     }
   },
   "scripts": {

@@ -80,9 +80,10 @@ function isXmlChar(code: number): boolean {
  * document, `setXmlVersion` and `addInputEntities` for its declaration
  * and DTD (whose entities are not read here); `setExternalEntities` is
  * for `addEntity`, unused. Typed with the library's own type, so an upgrade that changes the
- * contract fails the typecheck.
+ * contract fails the typecheck. `@astrotime/server` reads its requests'
+ * XML with it too (`@astrotime/caldav/xml`).
  */
-const entityDecoder: EntityDecoderOptions = {
+export const entityDecoder: EntityDecoderOptions = {
   decode: decodeReferences,
   setExternalEntities: () => {},
   addInputEntities: () => {},

@@ -27,10 +27,17 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { syncAccount } from "../src/index.ts";
 import { interopServer } from "./interop/servers.ts";
-import { externalServer, startRadicale, type CalDavServer, type Credentials } from "./servers.ts";
+import {
+  externalServer,
+  startAstroTime,
+  startRadicale,
+  type CalDavServer,
+  type Credentials,
+} from "./servers.ts";
 
 const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
   { name: "Radicale", start: startRadicale },
+  { name: "AstroTime", start: startAstroTime },
 ];
 const nextcloud = externalServer("nextcloud");
 if (nextcloud) servers.push({ name: "Nextcloud", start: async () => nextcloud });

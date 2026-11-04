@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // A Node package (docs/plans/server.md#D280): only the image runs it.
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}
