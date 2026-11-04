@@ -2361,6 +2361,14 @@ own (below).
     The picture drawn under a transparent status bar, as Google Calendar
     does: [Deferred](#deferred) (the status bar's icons would then need
     the picture's lightness, not the theme's).
+- **D236. A task's list is a list** (the owner's 4, round 5: creating a
+  task, its colour field offered "The calendar's colour"). Where the edit
+  dialog speaks of a task's list, it says list, as its List field already
+  did: the colour's first entry is "The list's colour" («Цвет списка»),
+  in the edit dialog and for Settings' "Colour of new tasks"; "No list
+  here can hold this task" and "No list takes this task now" replace the
+  calendar's words. An event keeps "The calendar's colour". The details
+  already name a task's list "List".
 - **D237. The three ways to attach, all in sight** (the owner's 3, round
   5: "the add-file button only lets me type a link"). The edit dialog's
   attachments show "Add a link", "From your files" (D234) and "From this

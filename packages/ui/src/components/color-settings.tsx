@@ -62,6 +62,7 @@ export function ColorSettings({ rowClassName }: { rowClassName: string }) {
             value={settings.defaultColors[kind]}
             calendarColor={null}
             ownById
+            task={kind === "task"}
             onChange={(color) =>
               change({ defaultColors: { ...settings.defaultColors, [kind]: color } })
             }

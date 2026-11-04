@@ -208,7 +208,14 @@ export function ItemEditor({
                   role="alert"
                   className="mt-4 rounded-xl bg-danger-soft p-3 text-body text-danger"
                 >
-                  {t(state.problem === "failed" ? "edit.failed" : `edit.problem.${state.problem}`)}
+                  {t(
+                    state.problem === "failed"
+                      ? "edit.failed"
+                      : // A task's list is a list, not a calendar (design D236).
+                        state.problem === "nowhere" && form?.kind === "task"
+                        ? "edit.problem.nowhereList"
+                        : `edit.problem.${state.problem}`,
+                  )}
                 </p>
               )}
             </form>
@@ -389,7 +396,9 @@ function Fields({
           onChange={(calendarId) => set({ calendarId })}
           options={calendars.map((c) => [c.id, c.name])}
         />
-        {calendars.length === 0 && <p className="text-small text-danger">{t("edit.noCalendar")}</p>}
+        {calendars.length === 0 && (
+          <p className="text-small text-danger">{t(event ? "edit.noCalendar" : "edit.noList")}</p>
+        )}
       </Section>
 
       <Section icon={<PaletteIcon className="size-5" />} labelled>
@@ -399,6 +408,7 @@ function Fields({
             labelClassName={fieldLabel}
             value={form.color}
             calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
+            task={!event}
             onChange={(color) => {
               setColorChosen(true);
               set({ color });

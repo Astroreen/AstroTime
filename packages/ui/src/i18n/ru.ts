@@ -382,6 +382,7 @@ export const ru = {
   "edit.list": "Список",
   "edit.color": "Цвет",
   "edit.colorDefault": "Цвет календаря",
+  "edit.colorList": "Цвет списка",
   "edit.location": "Место",
   "places.results": "Места",
   "places.credit": "Места: © участники OpenStreetMap",
@@ -397,6 +398,7 @@ export const ru = {
   "edit.save": "Сохранить",
   "edit.close": "Закрыть без сохранения",
   "edit.noCalendar": "Здесь нет календаря, в котором можно это сохранить.",
+  "edit.noList": "Здесь нет списка, в котором можно сохранить задачу.",
   "edit.failed": "Не удалось сохранить изменение. Попробуйте ещё раз.",
   "edit.problem.endBeforeStart": "Окончание должно быть позже начала.",
   "edit.problem.dueBeforeStart": "Срок не может быть раньше начала.",
@@ -409,6 +411,7 @@ export const ru = {
   "edit.problem.refused":
     "Этот календарь больше не принимает эту запись. Выберите другой календарь; ничего не сохранено.",
   "edit.problem.nowhere": "Сейчас ни один календарь не принимает эту запись. Ничего не сохранено.",
+  "edit.problem.nowhereList": "Сейчас ни один список не принимает эту задачу. Ничего не сохранено.",
   "edit.problem.inDoubt":
     "Неясно, сохранилось ли изменение. Проверьте запись и сохраните ещё раз, если изменения нет.",
   "notice.deleteInDoubt":
