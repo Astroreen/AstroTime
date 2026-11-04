@@ -84,7 +84,9 @@ test("the pictures show under the page's policy: illustrations (design D219) and
     window.drawn([await draw("/assets/art.svg"), await draw(own)]);`,
   );
   const serve = appFiles(root);
-  // app:// answered over http, so Chromium applies the same policy to the same files.
+  // app:// answered over http, so Chromium applies the same policy to the
+  // same files: `appFiles` and its policy are checked here, Electron's
+  // `protocol.handle` itself is not (the desktop's e2e runs it).
   const server = createServer((req, res) => {
     void serve(new Request(`app://astrotime${req.url}`)).then(async (answer) => {
       res.writeHead(answer.status, Object.fromEntries(answer.headers));
