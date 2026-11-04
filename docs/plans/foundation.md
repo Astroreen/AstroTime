@@ -308,7 +308,8 @@ Decided while building PR 2.
 ### Sync
 
 - **D38. Who wins a deletion.** A calendar or an object deleted on the
-  server is deleted here, with any pending change to it; a calendar that
+  server is deleted here, with any pending change to it (reported dropped,
+  unless the change was our own deletion, which is then done); a calendar that
   merely went missing from a listing while it holds unsent changes stays,
   reported, until a listing without it finds it has none. In a calendar
   that lets nothing be deleted (read-only, or a share without `unbind`,
@@ -1717,7 +1718,8 @@ too many requests.
   change's, not a timer's, not the desktop's or Android's. A change made
   while its account is held stays pending on this device, and the account
   says "Offline: changes wait until the server can be reached"; the report
-  names the soonest end of a hold (`retryAt`), and `SyncScheduler` plans a
+  names the soonest end of a hold still ahead (`retryAt`; `held` and
+  `retryAt` are both read at the run's end), and `SyncScheduler` plans a
   sync a second after it, so the change goes up then with no trigger or
   user needed: in a visible tab, or a hidden one that holds a change of its
   own ([D129](#D129)), until every account that can sync took it (one
