@@ -8,6 +8,7 @@ import {
   splitCalendar,
   splitCalendars,
   type SplitCalendar,
+  withUid,
 } from "../src/split.ts";
 import { fixture } from "./support.ts";
 
@@ -321,12 +322,21 @@ describe("components that cannot be objects, and those kept all the same (D272)"
       "SUMMARY:x",
     ]);
     for (const split of [splitCalendar(text), splitCalendars(text, { newUid: () => "x" })[0]!]) {
-      expect(split.objects.map((object) => object.uid)).toEqual(["a", "b"]);
+      // What it said reads whole: kept, and said.
+      expect(split.objects.map((object) => object.uid)).toEqual(["a", "cut", "b", "t"]);
       expect(split.problems).toEqual([
-        { index: 1, uid: "cut", component: "VEVENT", reason: "unterminated", kept: false },
-        { index: 3, uid: "t", component: "VTODO", reason: "unterminated", kept: false },
+        { index: 1, uid: "cut", component: "VEVENT", reason: "unterminated", kept: true },
+        { index: 3, uid: "t", component: "VTODO", reason: "unterminated", kept: true },
       ]);
     }
+    // One that does not read whole, the END of what was in it lost: not kept.
+    const broken = splitCalendar(
+      calendar(["BEGIN:VEVENT", "UID:v", "BEGIN:VALARM", "ACTION:DISPLAY"], event("c")),
+    );
+    expect(broken.objects.map((object) => object.uid)).toEqual(["c"]);
+    expect(broken.problems).toEqual([
+      { index: 0, uid: "v", component: "VEVENT", reason: "unterminated", kept: false },
+    ]);
     // And the next calendar after it, in a file of several.
     const two = lines(
       "BEGIN:VCALENDAR",
@@ -338,7 +348,7 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     );
     expect(
       splitCalendars(two, { newUid: () => "x" }).map((one) => one.objects.map((o) => o.uid)),
-    ).toEqual([[], ["b"]]);
+    ).toEqual([["a"], ["b"]]);
   });
 
   test("a VTIMEZONE that cannot be read is named; the objects naming it are kept and read the TZID", () => {
@@ -373,6 +383,49 @@ describe("components that cannot be objects, and those kept all the same (D272)"
     ]);
     const start = CalendarObject.parse(split.objects[0]!.ics).master!.start;
     expect(start).toMatchObject({ type: "zoned", timeZone: "Europe/Vilnius" });
+  });
+
+  test("a TZID defined twice, differently: the objects take the first, the second is named", () => {
+    const zone = (offset: string) => [
+      "BEGIN:VTIMEZONE",
+      "TZID:Office",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      `TZOFFSETFROM:${offset}`,
+      `TZOFFSETTO:${offset}`,
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    const at = (uid: string) => event(uid, ["DTEND;TZID=Office:20261105T120000"]);
+    const split = splitCalendar(
+      calendar(zone("+0200"), at("a"), zone("+0200"), zone("+0500"), at("b")),
+    );
+    // The same definition again is no problem; a different one is.
+    expect(split.problems).toEqual([
+      { index: 3, uid: "Office", component: "VTIMEZONE", reason: "conflicting-zone", kept: false },
+    ]);
+    for (const object of split.objects) {
+      expect(object.ics).toContain("TZOFFSETTO:+0200");
+      expect(object.ics).not.toContain("+0500");
+    }
+  });
+
+  test("an END with no BEGIN is named as one, and the calendar's properties are kept", () => {
+    const split = splitCalendar(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "X-WR-CALNAME:Kept",
+        "END:VEVENT",
+        ...event("a"),
+        "END:VCALENDAR",
+      ),
+    );
+    expect(split.name).toBe("Kept");
+    expect(split.objects.map((object) => object.uid)).toEqual(["a"]);
+    expect(split.problems).toEqual([
+      { index: -1, uid: null, component: "VCALENDAR", reason: "stray-end", kept: true },
+    ]);
   });
 
   test("a calendar property that cannot be read is named; the others go with each object", () => {
@@ -527,5 +580,16 @@ describe("jCal (RFC 7265)", () => {
     expect(() => jcalText({ items: [] })).toThrow(NotCalendarError);
     expect(() => jcalText(["vevent", [], []])).toThrow(NotCalendarError);
     expect(() => jcalText([])).toThrow(NotCalendarError);
+  });
+});
+
+describe("an object under another UID (import D270)", () => {
+  test("every component, a series' exceptions too, and nothing else changed", () => {
+    const [series] = splitCalendar(fixture("exports/google-export.ics")).objects;
+    const copy = CalendarObject.parse(withUid(series!.ics, "copy"));
+    expect(copy.uid).toBe("copy");
+    expect(copy.exceptions.map((exception) => exception.uid)).toEqual(["copy"]);
+    const original = CalendarObject.parse(series!.ics);
+    expect({ ...copy.master, uid: "x" }).toEqual({ ...original.master, uid: "x" });
   });
 });
