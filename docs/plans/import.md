@@ -281,12 +281,23 @@ documents; each row an item at the user's wall clock in their zone, with
 a `VTIMEZONE` (`zoneText`); its UID made from the row, so the same file
 imported again finds its items there (D270). Dates: year first is ISO; a
 part past 12 tells day from month; else the user's language decides,
-said in the preview as guessed. An all-day event's end: Google's
-columns name its last day, Outlook's the day after. A reminder becomes
-an alarm before the start (a task's at its time); a guest or organizer
-named without an address, and a column with no place in iCalendar
-(`Mileage`, `Total Work`), are named as not carried over, its default
-values (`0`, `False`, `Normal`) aside. D266, D272.
+said in the preview as guessed (and so when the file has both kinds of
+evidence: the rows the order chosen cannot read are named). An all-day
+event's end: the data says first (a row that ends the day it starts
+names its last day, which the day-after layout never writes); else a
+column only Outlook writes (reminder, guests, "Show time as") means its
+layout, the day after; else Google's documented one, the last day. This
+rests on the formats' documentation, not on recordings. A timed event's
+end: its end day at its end time; with no end time, its end day at its
+start's time; with no end day, the start's day, or the next where the
+end is not after the start; a start or end time that cannot be read is
+named, the day kept. A row given again is another item (a series written
+out a row an occurrence), its place among its likes in its UID, the same
+on every import. A reminder becomes an alarm before the start, counted
+in real time in the user's zone (a task's at its time); a guest or
+organizer named without an address, and a column with no place in
+iCalendar (`Mileage`, `Total Work`), are named as not carried over, its
+default values (`0`, `False`, `Normal`) aside. D266, D272.
 
 ### PR I5 — Google Takeout Tasks
 

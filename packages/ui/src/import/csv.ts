@@ -82,7 +82,12 @@ const isTrue = (value: string) => TRUE.has(value.trim().toLowerCase());
 
 export function csvToIcs(
   text: string,
-  options: { readonly language: string; readonly timeZone: string },
+  options: {
+    readonly language: string;
+    readonly timeZone: string;
+    /** When the import is made: each item's DTSTAMP. */
+    readonly now?: number;
+  },
 ): CsvConverted {
   const rows = parseCsv(text);
   /** The column names as written, for naming one not imported, and in lower case, to find them. */
@@ -96,8 +101,6 @@ export function csvToIcs(
   const tasks = column.has("dueDate") && !column.has("endDate");
   if (!column.has("subject") || !(column.has("startDate") || column.has("dueDate")))
     throw new NotCalendarError("The CSV has no column of titles and dates AstroTime knows.");
-  // Google's layout gives an all-day event's last day; Outlook's and Thunderbird's the day after.
-  const lastDayInclusive = !column.has("reminderOn");
   const known = new Set(column.values());
   const body = rows.slice(1).filter((row) => row.some((cell) => cell.trim() !== ""));
 
@@ -106,6 +109,10 @@ export function csvToIcs(
     dateFields.map((field) => cell(row, column, field)).filter((value) => value !== ""),
   );
   const order = dateOrder(dates, options.language);
+  const lastDayInclusive = inclusiveEnds(body, column, order.order);
+  const stamp = utcStamp(options.now ?? Date.now());
+  /** How many times each row was met: a row given again is an item again (a series written out). */
+  const seen = new Map<string, number>();
 
   const notImported = new Set<string>();
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AstroTime//Import from CSV//EN"];
@@ -164,6 +171,9 @@ export function csvToIcs(
         continue;
       }
       const startTime = timeOf(get("startTime"));
+      // A start time that cannot be read: the day is kept, all day, and the column named.
+      if (startTime === null && get("startTime") !== "" && !isTrue(get("allDay")))
+        notImported.add(written[column.get("startTime")!]!);
       const allDay = isTrue(get("allDay")) || startTime === null;
       if (allDay) {
         const endDay = date("endDate");
@@ -178,10 +188,20 @@ export function csvToIcs(
         push(`DTEND;VALUE=DATE:${after}`);
       } else {
         const zone = options.timeZone;
-        push(`DTSTART;TZID=${zone}:${startDay}T${startTime}`);
+        const start = `${startDay}T${startTime}`;
+        push(`DTSTART;TZID=${zone}:${start}`);
+        // Its end: the end day at the end time; with no end time, the end day
+        // at the start's time; with no end day, the start's day, or the next
+        // where the end time is not after the start (22:00 to 01:00).
         const endTime = timeOf(get("endTime"));
-        const endDay = date("endDate") ?? startDay;
-        if (endTime) push(`DTEND;TZID=${zone}:${endDay}T${endTime}`);
+        if (endTime === null && get("endTime") !== "")
+          notImported.add(written[column.get("endTime")!]!);
+        const endDay = date("endDate");
+        if (endTime !== null || (endDay !== null && endDay > startDay)) {
+          let end = `${endDay ?? startDay}T${endTime ?? startTime}`;
+          if (end <= start) end = `${nextDay(end.slice(0, 8))}${end.slice(8)}`;
+          push(`DTEND;TZID=${zone}:${end}`);
+        }
         firstYear ??= Number(startDay.slice(0, 4));
       }
       const showAs = get("showAs").trim().toLowerCase();
@@ -211,8 +231,10 @@ export function csvToIcs(
       // A reminder, relative to the start.
       const at = reminderAt(get, order.order);
       if (at && isTrue(get("reminderOn"))) {
+        // As instants in the user's zone: a reminder before a change of
+        // offset is that many real hours before, not wall-clock hours.
         const start = allDay ? `${startDay}T000000` : `${startDay}T${startTime}`;
-        const seconds = (wallMs(at) - wallMs(start)) / 1000;
+        const seconds = (epoch(at, options.timeZone) - epoch(start, options.timeZone)) / 1000;
         out.push(
           "BEGIN:VALARM",
           "ACTION:DISPLAY",
@@ -223,11 +245,17 @@ export function csvToIcs(
       }
     }
     const kind = tasks ? "VTODO" : "VEVENT";
-    // The same row gives the same UID: imported again, it is found there (D270).
+    // The same row gives the same UID: imported again, it is found there
+    // (D270); the same row again (an occurrence of a series written out)
+    // is another item, its place among its likes in the UID, the same on
+    // every import of the file.
+    const key = row.join("\u0000");
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
     components.push([
       `BEGIN:${kind}`,
-      `UID:csv-${hash(row.join("\u0000"))}`,
-      "DTSTAMP:19700101T000000Z",
+      `UID:csv-${hash(n === 0 ? key : `${key}\u0000${n}`)}`,
+      `DTSTAMP:${stamp}`,
       ...out,
       `END:${kind}`,
     ]);
@@ -295,10 +323,17 @@ function dateOrder(
   values: readonly string[],
   language: string,
 ): { order: DateOrder; guessed: boolean } {
-  const parts = values.map((value) => value.split(/[./-]/).map(Number));
+  // The date's own token, as `dateOf` reads it: `05/11/2026 10:00` is `05/11/2026`.
+  const parts = values.map((value) =>
+    (value.trim().split(/\s+/)[0] ?? "").split(/[./-]/).map(Number),
+  );
   if (parts.some((p) => String(p[0]).length === 4)) return { order: "ymd", guessed: false };
-  if (parts.some((p) => (p[0] ?? 0) > 12)) return { order: "dmy", guessed: false };
-  if (parts.some((p) => (p[1] ?? 0) > 12)) return { order: "mdy", guessed: false };
+  const dayFirst = parts.some((p) => (p[0] ?? 0) > 12);
+  const monthFirst = parts.some((p) => (p[1] ?? 0) > 12);
+  // Both seen: no order reads every row; day first, said as guessed, the rows it cannot read named.
+  if (dayFirst && monthFirst) return { order: "dmy", guessed: true };
+  if (dayFirst) return { order: "dmy", guessed: false };
+  if (monthFirst) return { order: "mdy", guessed: false };
   if (values.some((value) => value.includes("."))) return { order: "dmy", guessed: true };
   return { order: language.startsWith("en") ? "mdy" : "dmy", guessed: true };
 }
@@ -354,10 +389,61 @@ function nextDay(day: string): string {
   return next.slice(0, 10).replaceAll("-", "");
 }
 
+/** Seconds as an iCalendar DURATION, as other clients write one: `-PT15M`, `-P1D`, `-P1DT2H`. */
 function duration(seconds: number): string {
   const sign = seconds < 0 ? "-" : "";
-  const minutes = Math.round(Math.abs(seconds) / 60);
-  return minutes === 0 ? "PT0S" : `${sign}PT${minutes}M`;
+  let minutes = Math.round(Math.abs(seconds) / 60);
+  if (minutes === 0) return "PT0S";
+  const days = Math.floor(minutes / 1440);
+  minutes -= days * 1440;
+  const hours = Math.floor(minutes / 60);
+  minutes -= hours * 60;
+  const time = `${hours ? `${hours}H` : ""}${minutes ? `${minutes}M` : ""}`;
+  return `${sign}P${days ? `${days}D` : ""}${time ? `T${time}` : ""}`;
+}
+
+/** A wall clock `YYYYMMDDTHHMMSS` in a zone as its instant. */
+const epoch = (local: string, timeZone: string) =>
+  zonedToEpoch(
+    `${local.slice(0, 4)}-${local.slice(4, 6)}-${local.slice(6, 8)}T${local.slice(9, 11)}:${local.slice(11, 13)}:${local.slice(13, 15)}`,
+    timeZone,
+  );
+
+const utcStamp = (ms: number) => new Date(ms).toISOString().replaceAll(/[-:]|\.\d+/g, "");
+
+/** Columns only Outlook's export (and Thunderbird's, which takes its names) writes. */
+const OUTLOOK_ONLY: readonly Field[] = [
+  "reminderOn",
+  "reminderDate",
+  "reminderTime",
+  "organizer",
+  "required",
+  "optional",
+  "resources",
+  "sensitivity",
+  "showAs",
+];
+
+/**
+ * Whether an all-day event's end date is its last day (Google's columns, as
+ * its import documents) rather than the day after it (Outlook's and
+ * Thunderbird's export). The data first: an all-day row that ends on the
+ * day it starts names its last day, which the day-after layout never
+ * writes. Else the columns: any only Outlook writes means its layout. Else
+ * Google's, the layout people write by hand.
+ */
+function inclusiveEnds(
+  body: readonly (readonly string[])[],
+  column: ReadonlyMap<Field, number>,
+  order: DateOrder,
+): boolean {
+  for (const row of body) {
+    if (!isTrue(cell(row, column, "allDay"))) continue;
+    const start = dateOf(cell(row, column, "startDate"), order);
+    const end = dateOf(cell(row, column, "endDate"), order);
+    if (start && end && end === start) return true;
+  }
+  return !OUTLOOK_ONLY.some((field) => column.has(field));
 }
 
 const PRIORITY: Record<string, string> = {
@@ -398,7 +484,7 @@ const escape = (text: string) =>
     .replaceAll("\\", "\\\\")
     .replaceAll(";", "\\;")
     .replaceAll(",", "\\,")
-    .replaceAll(/\r?\n/g, "\\n");
+    .replaceAll(/\r\n?|\n/g, "\\n");
 
 /** FNV-1a, twice over: a row's own 16 hex digits. */
 function hash(text: string): string {

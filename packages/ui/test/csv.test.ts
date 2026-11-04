@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { CalendarObject, type Event, type Task } from "@astrotime/core";
 import { describe, expect, test } from "vite-plus/test";
 
+import { splitCalendars } from "@astrotime/core/split";
+
 import { csvToIcs, parseCsv } from "../src/import/csv.ts";
 import { readImport } from "../src/import/read.ts";
 
@@ -182,5 +184,91 @@ describe("a CSV's corners", () => {
         { language: "en", timeZone: "UTC", newUid: () => "x", pause: () => Promise.resolve() },
       ),
     ).rejects.toThrow("is no calendar");
+  });
+});
+
+describe("#153's review", () => {
+  const convert = (text: string, timeZone = "Europe/Vilnius", language = "en") =>
+    csvToIcs(text, { language, timeZone, now: Date.UTC(2026, 10, 4) });
+  const objects = (text: string, timeZone = "Europe/Vilnius") =>
+    splitCalendars(convert(text, timeZone).text, { newUid: () => "x" })[0]!.objects.map((o) =>
+      CalendarObject.parse(o.ics),
+    );
+  const header = "Subject,Start Date,Start Time,End Date,End Time,All Day Event";
+
+  test("a timed event's end: its end day kept with no end time; past midnight the next day", () => {
+    const [long, night] = objects(
+      [
+        header,
+        "Trip,11/05/2026,9:00 AM,11/07/2026,,False",
+        "Party,11/05/2026,10:00 PM,,1:00 AM,False",
+      ].join("\n"),
+    ).map((object) => object.master as Event);
+    expect(long!.end).toMatchObject({ epochMs: Date.UTC(2026, 10, 7, 7) });
+    expect(night!.end).toMatchObject({ epochMs: Date.UTC(2026, 10, 5, 23) });
+  });
+
+  test("a start or end time that cannot be read is named; the day is kept", () => {
+    const { notImported } = convert(
+      [
+        header,
+        "Lunch,11/05/2026,noon,11/05/2026,,False",
+        "Call,11/05/2026,9:00 AM,,later,False",
+      ].join("\n"),
+    );
+    expect(notImported.toSorted()).toEqual(["End Time", "Start Time"]);
+  });
+
+  test("an all-day event's end: by the data first, then by columns only Outlook writes", () => {
+    const day = (text: string) => (objects(text)[0]!.master as Event).end;
+    // Ends the day it starts: the end date is its last day (Google's), even with Outlook's columns.
+    expect(
+      day(
+        "Subject,Start Date,End Date,All day event,Reminder on/off\nA,11/05/2026,11/05/2026,True,False\nB,11/09/2026,11/10/2026,True,False",
+      ),
+    ).toEqual({ type: "date", date: "2026-11-06" });
+    // Outlook's layout with its reminder columns left out of the export: Show time as is Outlook's alone.
+    expect(
+      day("Subject,Start Date,End Date,All day event,Show time as\nB,11/09/2026,11/10/2026,True,0"),
+    ).toEqual({ type: "date", date: "2026-11-10" });
+    // Google's columns, a two-day event: its last day named.
+    expect(day("Subject,Start Date,End Date,All Day Event\nB,11/09/2026,11/10/2026,True")).toEqual({
+      type: "date",
+      date: "2026-11-11",
+    });
+  });
+
+  test("a row given again is another item, its UID the same on every import", () => {
+    const text = [
+      header,
+      "Stand-up,11/05/2026,9:00 AM,,9:15 AM,False",
+      "Stand-up,11/05/2026,9:00 AM,,9:15 AM,False",
+    ].join("\n");
+    const uids = () => objects(text).map((object) => object.uid);
+    expect(new Set(uids()).size).toBe(2);
+    expect(uids()).toEqual(uids());
+  });
+
+  test("a lone CR in a cell stays a line break inside its value; DTSTAMP is the import's time", () => {
+    const { text } = convert(`Subject,Start Date,Description\nA,11/05/2026,"one\rtwo"`);
+    expect(text).toContain("DESCRIPTION:one\\ntwo\r\n");
+    expect(text).toContain("DTSTAMP:20261104T000000Z");
+  });
+
+  test("a reminder before a change of offset is that many real hours before", () => {
+    // Summer time begins in Vilnius at 03:00 on 28 March 2027: 22:00 the evening before is 11 real hours before 10:00.
+    const [event] = objects(
+      "Subject,Start Date,Start Time,End Date,End Time,Reminder on/off,Reminder Date,Reminder Time\nRun,3/28/2027,10:00 AM,3/28/2027,11:00 AM,True,3/27/2027,10:00 PM",
+    );
+    expect(event!.serialize()).toContain("TRIGGER:-PT11H");
+  });
+
+  test("the date order is read from the date's own token; a date it cannot read is named", () => {
+    expect(convert("Subject,Start Date\nA,25/11/2026 10:00\n").dates).toEqual({
+      order: "dmy",
+      guessed: false,
+    });
+    const { notImported } = convert("Subject,Start Date\nA,5 Nov 2026\nB,11/05/2026\n");
+    expect(notImported).toEqual(["Start Date"]);
   });
 });
