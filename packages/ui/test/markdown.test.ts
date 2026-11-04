@@ -240,6 +240,15 @@ describe("what the review found (design D207)", () => {
     ]);
   });
 
+  test("a link's title may be in double or single quotes or in parentheses, as CommonMark's", () => {
+    const link = paragraph({ type: "link", href: "https://example.com/a", children: ["a"] });
+    expect(parseMarkdown('[a](https://example.com/a "title")')).toEqual([link]);
+    expect(parseMarkdown("[a](https://example.com/a 'title')")).toEqual([link]);
+    expect(parseMarkdown("[a](https://example.com/a (title))")).toEqual([link]);
+    // A title not closed is no title: no link.
+    expect(parseMarkdown("[a](https://example.com/a 'title)")).not.toContainEqual(link);
+  });
+
   test("***both*** is strong around emphasis; an escaped mark closes nothing", () => {
     expect(parseMarkdown("***both***")).toEqual([
       paragraph({ type: "strong", children: [{ type: "em", children: ["both"] }] }),

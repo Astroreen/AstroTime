@@ -485,7 +485,7 @@ function emphasisAt(
 /**
  * `[text](href)` at `i`, closed at `close`: the target's parentheses
  * balanced (`…/wiki/Foo_(bar)`), or in angle brackets, then an optional
- * title in quotes.
+ * title in quotes or parentheses.
  */
 function linkAt(
   text: string,
@@ -521,8 +521,10 @@ function linkAt(
     href = text.slice(start, at).replace(/\\([!-/:-@[-`{-~])/g, "$1");
   }
   skip();
-  if (text[at] === '"') {
-    const end = findBefore(text, '"', at + 1, limit);
+  // A title in double or single quotes, or in parentheses.
+  const closer = text[at] === "(" ? ")" : text[at] === '"' || text[at] === "'" ? text[at]! : null;
+  if (closer) {
+    const end = findBefore(text, closer, at + 1, limit);
     if (end < 0) return null;
     at = end + 1;
     skip();
