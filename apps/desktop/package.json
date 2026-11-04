@@ -12,6 +12,7 @@
     "start": "electron .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
   },
+  "dependencies": {},
   "devDependencies": {
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",

@@ -47,6 +47,7 @@ import {
   isWebUrl,
 } from "./checks.ts";
 import { netClient } from "./http.ts";
+import { loopback, type Loopback } from "./oauth.ts";
 import { mainReminders } from "./reminders.ts";
 import { secretsFile } from "./secrets.ts";
 import { storeProcess } from "./store.ts";
@@ -247,6 +248,30 @@ async function start() {
   });
   ipcMain.on(CHANNELS.openExternal, (event, url: unknown) => {
     if (fromApp(event) && typeof url === "string") openInBrowser(url);
+  });
+
+  // OAuth sign-ins' loopback redirects, one server each (providers D254).
+  const signIns = new Map<string, Loopback>();
+  ipcMain.handle(CHANNELS.oauthBegin, async (event) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    // The page the browser shows once it came back: no words, the app says them.
+    const redirect = await loopback(
+      '<!doctype html><meta charset="utf-8"><title>AstroTime</title><p>✓</p>',
+    );
+    const id = crypto.randomUUID();
+    signIns.set(id, redirect);
+    void redirect.answer.then(() => signIns.delete(id));
+    return { id, redirectUri: redirect.redirectUri };
+  });
+  ipcMain.handle(CHANNELS.oauthOpen, (event, id: unknown, url: unknown) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    const redirect = typeof id === "string" ? signIns.get(id) : undefined;
+    if (!redirect || typeof url !== "string" || !isWebUrl(url)) return null;
+    openInBrowser(url);
+    return redirect.answer;
+  });
+  ipcMain.on(CHANNELS.oauthCancel, (event, id: unknown) => {
+    if (fromApp(event) && typeof id === "string") signIns.get(id)?.close();
   });
 
   // The reminders' notifications, the window closed or not (D76).

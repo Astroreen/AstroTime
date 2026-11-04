@@ -15,6 +15,7 @@ import { Browser } from "@capacitor/browser";
 import { registerPlugin } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import { androidOAuth } from "./oauth.ts";
 import { cleartextOrigins, nativeClient, SigningIn, type NativeHttp } from "./http.ts";
 import { remindersLock, syncLock } from "./locks.ts";
 import { preferences } from "./preferences.ts";
@@ -42,6 +43,8 @@ export function mobilePlatform(store: Promise<Store>, shell: NativeShell): Platf
     // No Custom Tab or browser to open it: the system's own handling of the link.
     openExternal: (url) => void Browser.open({ url }).catch(() => window.open(url, "_blank")),
     signingInTo: (server) => signingIn.begin(server),
+    // OAuth's answer back at the app's own scheme (providers D254).
+    oauth: androidOAuth({ app: App, browser: Browser }),
     // An inline attachment saved where the user picks (design D230): the
     // WebView downloads no `blob:` link.
     saveFile: saveFile(shell),

@@ -403,6 +403,32 @@ marked _to be recorded_.
   and renewal are `bearer.ts`, loaded with the first OAuth request);
   `@astrotime/oauth` loads with an OAuth account.
 
+  _Built, the redirects (P5's second part):_ `Platform.oauth`, an
+  `OAuthRedirect` (`@astrotime/oauth`): `begin` gives the redirect URI
+  for the authorization URL, `open` shows the service's page and
+  resolves with the redirect's address (`null` when the user left it),
+  `cancel` stops waiting. **Android:** `io.github.astroreen.astrotime:/oauth`,
+  an intent filter on the main activity, the page in a Custom Tab, the
+  answer from `appUrlOpen`, the tab closed by the user (`browserFinished`)
+  no answer (`apps/mobile/src/oauth.ts`). **The desktop:** a loopback
+  server of the main process on `127.0.0.1` and a free port, for one
+  request to `/oauth`, its page a check mark under `default-src 'none'`
+  (the app says the words), closed after the answer, a cancel, or 15
+  minutes (`apps/desktop/src/main/oauth.ts`, the `oauth*` channels).
+  **The web:** the page in a window of its own, the answer at
+  `oauth.html`, whose script (`oauth.js`, allowed as the app's own by its
+  policy) posts its address to the app's tab over the origin's
+  `BroadcastChannel` and closes, so the app's tab keeps its state
+  (`apps/web/src/oauth.ts`). And from the review of the groundwork: a
+  refresh refused for good (`invalid_grant`, `invalid_client`,
+  `unauthorized_client`, `invalid_scope`) signs the account out, a `429`
+  or a `4xx` that is no OAuth answer is tried again later
+  (`ServerBusyError`); a client's `extra` goes first, so it cannot stand
+  in for the sign-in's state, challenge or redirect; a token for an
+  address in clear is `InClearError` (`@astrotime/caldav/bearer`, loaded
+  with the first OAuth request). The first load grows by 60 bytes
+  (127 264 to 127 324 on main `87faa6c`).
+
 ### Weight and privacy
 
 - **D255. A provider loads only with an account of its kind.** The sync

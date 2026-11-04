@@ -1,3 +1,4 @@
+import type { OAuthRedirect } from "@astrotime/oauth";
 import type { HttpClient, Preset } from "@astrotime/caldav";
 import type { ReminderScheduler, SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
@@ -68,6 +69,11 @@ export interface Platform {
   readonly unprotectedPrompt?: UnprotectedPrompt;
   /** Opens a URL in the system browser: Login Flow v2's page (a new tab on the web). */
   readonly openExternal: (url: string) => void;
+  /**
+   * Where an OAuth sign-in's answer comes back (providers D254); a platform
+   * without one offers no OAuth service.
+   */
+  readonly oauth?: OAuthRedirect;
   /**
    * Saves a file the user asked to keep (an inline attachment, design D230)
    * where the platform keeps files: Android's "Save to" picker. Without it,

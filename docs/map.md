@@ -189,7 +189,10 @@ When you add a package, app or module, add its line here in the same PR.
   → `plans/providers.md#D251`, `plans/providers.md#D263`
 - `packages/oauth` (`@astrotime/oauth`) — OAuth 2 with PKCE:
   `authorization`, `codeOf`, `exchange`, `tokenSource` (a `TokenSource`
-  the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`.
+  the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`; `OAuthRedirect`,
+  each platform's way back (`Platform.oauth`: `apps/mobile/src/oauth.ts`,
+  `apps/desktop/src/main/oauth.ts`, `apps/web/src/oauth.ts` with
+  `public/oauth.html`).
   → `plans/providers.md#D254`
 - `packages/sync` (`@astrotime/sync`) — `syncAccount`: the sync engine.
   → `plans/foundation.md#D37`

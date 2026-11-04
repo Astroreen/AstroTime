@@ -42,6 +42,11 @@ export function webPlatform(store: Promise<Store>, name: string, preset?: Preset
     ...(preset ? { preset } : {}),
     // A tab of its own, which cannot reach back into this one.
     openExternal: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
+    // OAuth's answer in a window of its own, back to oauth.html (providers D254).
+    // Its code loads with the first OAuth sign-in.
+    oauth: {
+      begin: async () => (await import("./oauth.ts")).webOAuth().begin(),
+    },
     preferences: localPreferences,
     syncLock: tabsSyncLock(name),
     reminders: webReminders(),

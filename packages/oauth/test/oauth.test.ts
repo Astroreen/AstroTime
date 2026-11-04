@@ -6,7 +6,8 @@
 import { createHash } from "node:crypto";
 
 import { Authorization, send, type HttpClient, type HttpRequest } from "@astrotime/caldav";
-import { AuthError, OfflineError } from "@astrotime/core";
+import { InClearError } from "@astrotime/caldav/bearer";
+import { AuthError, OfflineError, ServerBusyError } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
 import {
@@ -351,9 +352,50 @@ test("an OAuth token is never sent over plain http to another host", async () =>
   };
   const propfind = (url: string) => ({ method: "PROPFIND", url, headers: {} });
   await expect(send(dav, auth, propfind("http://dav.example/caldav/"), [])).rejects.toThrow(
-    /never sent unencrypted/,
+    InClearError,
   );
   expect(seen).toEqual([]);
   // To this device it may go, as a password may.
   expect((await send(dav, auth, propfind("http://127.0.0.1:5232/"), [])).status).toBe(207);
+});
+
+test("a refresh the service refuses for good signs out; a busy or non-OAuth answer is tried again later", async () => {
+  const tokens = { accessToken: "a", refreshToken: "r", expiresAt: 10_000_000 };
+  for (const error of ["invalid_grant", "invalid_client", "unauthorized_client", "invalid_scope"]) {
+    const refused = endpoint(() => ({ status: 400, body: JSON.stringify({ error }) }));
+    await expect(
+      tokenSource(refused, client, tokens, async () => {}).renew(),
+      error,
+    ).rejects.toThrow(AuthError);
+  }
+  for (const answer of [
+    { status: 429, body: "slow down" },
+    { status: 403, body: "<!doctype html><title>Blocked by the proxy</title>" },
+    { status: 400, body: "" },
+  ]) {
+    const busy = endpoint(() => answer);
+    const renewal = tokenSource(busy, client, tokens, async () => {}).renew();
+    await expect(renewal, String(answer.status)).rejects.toThrow(ServerBusyError);
+    await expect(renewal).rejects.not.toThrow(AuthError);
+  }
+});
+
+test("a client's own parameters cannot stand in for the sign-in's state, challenge or redirect", async () => {
+  const sneaky: OAuthClient = {
+    ...client,
+    extra: {
+      state: "forged",
+      code_challenge: "forged",
+      redirect_uri: "https://evil.example/",
+      prompt: "consent",
+    },
+  };
+  const { url, pending } = await authorization(sneaky, REDIRECT);
+  const asked = new URL(url).searchParams;
+  expect(asked.get("state")).toBe(pending.state);
+  expect(asked.get("code_challenge")).toBe(await challengeOf(pending.verifier));
+  expect(asked.get("redirect_uri")).toBe(REDIRECT);
+  expect(asked.getAll("state")).toHaveLength(1);
+  // Its own, which the sign-in does not set, go as they are.
+  expect(asked.get("prompt")).toBe("consent");
 });

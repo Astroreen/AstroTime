@@ -194,6 +194,9 @@ importers:
       '@astrotime/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@astrotime/oauth':
+        specifier: workspace:*
+        version: link:../../packages/oauth
       '@astrotime/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -274,6 +277,9 @@ importers:
       '@astrotime/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@astrotime/oauth':
+        specifier: workspace:*
+        version: link:../../packages/oauth
       '@astrotime/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -410,6 +416,9 @@ importers:
       '@astrotime/core':
         specifier: workspace:*
         version: link:../core
+      '@astrotime/oauth':
+        specifier: workspace:*
+        version: link:../oauth
       '@astrotime/storage':
         specifier: workspace:*
         version: link:../storage
