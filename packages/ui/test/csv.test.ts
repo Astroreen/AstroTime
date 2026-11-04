@@ -317,28 +317,21 @@ describe("#153's review", () => {
   });
 
   test("the zone is defined from the earliest year of the file, not its first row's", () => {
-    const [late, early] = objects(
-      [
-        header,
-        "Late,11/05/2026,9:00 AM,,10:00 AM,False",
-        "Early,11/05/2019,9:00 AM,,10:00 AM,False",
-      ].join("\n"),
-      "America/New_York",
-    );
+    const file = [
+      header,
+      "Late,11/05/2026,9:00 AM,,10:00 AM,False",
+      "Early,11/05/2019,9:00 AM,,10:00 AM,False",
+    ].join("\n");
+    const [late, early] = objects(file, "America/New_York");
     // 2019 is read in its own rules: 9:00 in New York on 5 November 2019 is 14:00 UTC.
     expect(early!.master!.start).toMatchObject({ epochMs: Date.UTC(2019, 10, 5, 14) });
     expect(late!.master!.start).toMatchObject({ epochMs: Date.UTC(2026, 10, 5, 14) });
-    const zone = /BEGIN:VTIMEZONE[\s\S]*?END:VTIMEZONE/.exec(
-      convert(
-        [
-          header,
-          "Late,11/05/2026,9:00 AM,,10:00 AM,False",
-          "Early,11/05/2019,9:00 AM,,10:00 AM,False",
-        ].join("\n"),
-        "America/New_York",
-      ).text,
+    // Its observances start the year before the earliest: their first DTSTART is in 2018.
+    const zone = /^BEGIN:VTIMEZONE\r$[\s\S]*?^END:VTIMEZONE\r$/m.exec(
+      convert(file, "America/New_York").text,
     )![0];
-    expect(zone).toMatch(/DTSTART:2018/);
+    const starts = [...zone.matchAll(/^DTSTART:(\d{4})/gm)].map((match) => Number(match[1]));
+    expect(Math.min(...starts)).toBe(2018);
   });
 
   test("an all-day row ending before it starts is one day, its end column named", () => {
