@@ -1413,6 +1413,32 @@ describe("deleting with a scope (D11)", () => {
     expect(starts(deleteItem(CalendarObject.parse(two), last)!)).toEqual(["2026-11-09T09:00:00"]);
   });
 
+  test("this occurrence, the last of the rule's: an exception an EXDATE names too still shows, so the object stays (D34, D142)", () => {
+    // Two Mondays: the first excluded, yet an exception for it, moved to Tuesday, shows.
+    const two = calendar(
+      [
+        "DTSTART;TZID=Europe/Vilnius:20261102T090000",
+        "DTEND;TZID=Europe/Vilnius:20261102T100000",
+        "RRULE:FREQ=WEEKLY;COUNT=2",
+        "EXDATE;TZID=Europe/Vilnius:20261102T090000",
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20261102T090000",
+        "DTSTART;TZID=Europe/Vilnius:20261103T120000",
+        "DTEND;TZID=Europe/Vilnius:20261103T130000",
+      ],
+    );
+    expect(starts(two)).toEqual(["2026-11-03T12:00:00", "2026-11-09T09:00:00"]);
+    const ics = deleteItem(CalendarObject.parse(two), {
+      now: NOW,
+      scope: "this",
+      recurrenceId: vilnius("2026-11-09T09:00:00"),
+    });
+    // What deleting leaves is what the views show.
+    expect(ics).not.toBeNull();
+    expect(starts(ics!)).toEqual(["2026-11-03T12:00:00"]);
+  });
+
   test("this occurrence of a series of dates: an EXDATE as a date", () => {
     const ics = deleteItem(load("tasksorg-task-recurring.ics"), {
       now: NOW,

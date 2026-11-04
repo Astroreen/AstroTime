@@ -718,7 +718,8 @@ function isFirst(root: ICAL.Component, master: ICAL.Component, recurrenceId: Ite
 
 /**
  * Whether any occurrence of the series shows: an exception not cancelled,
- * or one its rule or RDATEs make that no EXDATE or cancelled exception
+ * wherever it moved and even when an EXDATE names it too, as the views show
+ * it (D34), or one its rule or RDATEs make that no EXDATE or cancelled exception
  * removes. Ends as `isFirst` does: those remove finitely many.
  */
 function showsAny(root: ICAL.Component, master: ICAL.Component): boolean {
