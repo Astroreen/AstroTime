@@ -45,6 +45,12 @@ updates:
       - dependency-name: postgres
         update-types:
           - version-update:semver-major
+      # Stalwart from 0.16 on keeps its configuration in its store, set by
+      # its web wizard: the interop run stays on 0.15's file (providers D261).
+      - dependency-name: stalwartlabs/stalwart
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
     groups:
       interop:
         patterns:
