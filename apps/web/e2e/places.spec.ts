@@ -167,28 +167,68 @@ test("Copy address copies the text and says so; refused, the notice says it was 
     return page.getByRole("dialog", { name: "Design review" });
   };
   const details = await open();
-  // Two icon buttons at the end of the address's line, each with its tooltip (design D238).
+  // Two icon buttons at the end of the address's line, each with its
+  // tooltip, a finger's 48 px (design D238).
   const copy = details.getByRole("button", { name: "Copy address" });
+  const maps = details.getByRole("link", { name: "Open in maps" });
   await expect(copy).toHaveAttribute("title", "Copy address");
-  await expect(details.getByRole("link", { name: "Open in maps" })).toHaveAttribute(
-    "title",
-    "Open in maps",
+  await expect(maps).toHaveAttribute("title", "Open in maps");
+  for (const target of [copy, maps]) {
+    const size = await target.boundingBox();
+    expect([size?.width, size?.height]).toEqual([48, 48]);
+  }
+  // "Copied" is said once, by the status, not by the button's name too;
+  // a second copy while it shows says it again, a node of its own.
+  const status = details.getByRole("status");
+  await copy.click();
+  await expect(status).toHaveText("Copied");
+  await expect(copy).toHaveAccessibleName("Copy address");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  const said = status.evaluate(
+    (element) =>
+      new Promise<boolean>((resolve) =>
+        new MutationObserver((_, observer) => {
+          observer.disconnect();
+          resolve(true);
+        }).observe(element, { childList: true }),
+      ),
   );
   await copy.click();
-  await expect(details.getByRole("button", { name: "Copied" })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
+  expect(await said).toBe(true);
+  await expect(status).toHaveText("Copied");
   await page.keyboard.press("Escape");
   await expect(details).toHaveCount(0);
 
   // A tap on the address itself copies it too, and says so.
   await page.evaluate(() => navigator.clipboard.writeText(""));
   const tapped = await open();
-  // Its tap target lies over the text, out of the accessibility tree.
-  await tapped.getByText("Room 4, second floor").click({ force: true });
-  await expect(tapped.getByRole("button", { name: "Copied" })).toBeVisible();
+  const text = tapped.getByText("Room 4, second floor");
+  await text.click();
+  await expect(tapped.getByRole("status")).toHaveText("Copied");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Room 4, second floor");
   await page.keyboard.press("Escape");
   await expect(tapped).toHaveCount(0);
+
+  // A drag across it selects it, as text, and copies nothing.
+  const selecting = await open();
+  await page.evaluate(() => {
+    const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+    Object.assign(window, { writes: 0 });
+    navigator.clipboard.writeText = (data) => {
+      Object.assign(window, { writes: (window as unknown as { writes: number }).writes + 1 });
+      return write(data);
+    };
+  });
+  const line = await selecting.getByText("Room 4, second floor").boundingBox();
+  if (!line) throw new Error("not drawn");
+  await page.mouse.move(line.x + 1, line.y + line.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(line.x + line.width - 1, line.y + line.height / 2, { steps: 5 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => getSelection()?.toString())).toContain("second floor");
+  expect(await page.evaluate(() => (window as unknown as { writes: number }).writes)).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(selecting).toHaveCount(0);
 
   // The clipboard refuses: the change notice says so, over the details.
   await page.evaluate(() => {

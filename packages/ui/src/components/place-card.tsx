@@ -17,11 +17,11 @@ import { CheckIcon, CopyIcon, MapIcon } from "./icons.tsx";
 /** The map's box, wider than any card: it is cut to the card's width, the pin in the middle. */
 const BOX = { width: 512, height: 144 } as const;
 
-/** An icon button at the end of the place's line, its first line kept where the text's is. */
+/** An icon button at the end of the place's line: 48 px, a finger's target (Material's 48 dp). */
 const action =
-  "-my-2 grid size-10 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-raised-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent";
+  "grid size-12 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-raised-hover hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent";
 
-/** How long "Copied" shows before the button says "Copy address" again. */
+/** How long the tick shows after a copy. */
 const COPIED_MS = 2000;
 
 export function PlaceCard({
@@ -40,43 +40,40 @@ export function PlaceCard({
   const { platform } = useAccounts();
   const { settings } = useSettings();
   const places = settings.places ? platform.places : undefined;
-  const [copied, setCopied] = useState(false);
+  // Copies made, each said once (design D238); 0 when the tick is gone.
+  const [copied, setCopied] = useState(0);
   // Only a place with a point is split: free text shows whole, commas and all.
   const { name, address } = geo ? nameAndAddress(location, label) : { name: location, address: "" };
   useEffect(() => {
     if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    const timer = setTimeout(() => setCopied(0), COPIED_MS);
     return () => clearTimeout(timer);
   }, [copied]);
   // No clipboard to write to (an insecure page, some WebViews): no button.
   const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
   const copy = () =>
     void clipboard?.writeText(location).then(
-      () => setCopied(true),
+      () => setCopied((count) => count + 1),
       // Refused (a permission, a page out of focus): the notice says so.
       () => onCopyFailed(),
     );
   const link = mapsLink(location, geo, places?.links ?? "web");
-  const copyName = t(copied ? "places.copied" : "places.copy");
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-start gap-1">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex items-start">
+        {/* Its first line level with the icons' middle; a tap on it copies
+            the address, a long press or a drag selects as text does (design
+            D238). Keys and screen readers have the button at the end. */}
+        <div
+          className={`min-w-0 flex-1 pt-3 ${clipboard ? "cursor-copy" : ""}`}
+          onClick={() => {
+            if (document.getSelection()?.isCollapsed !== false) copy();
+          }}
+        >
           <p className="flex flex-col">
             <span className="break-words whitespace-pre-wrap">{name}</span>
             {address && <span className="break-words text-small text-ink-muted">{address}</span>}
           </p>
-          {clipboard && (
-            // A tap on the address copies it (design D238); keyboards and
-            // screen readers have the button at the end of the line.
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-hidden="true"
-              onClick={copy}
-              className="absolute -inset-1 cursor-copy rounded-lg"
-            />
-          )}
         </div>
         <a
           href={link}
@@ -92,9 +89,9 @@ export function PlaceCard({
           <button
             type="button"
             onClick={copy}
-            aria-label={copyName}
-            title={copyName}
-            className={`${action} -mr-2 ${copied ? "text-accent" : ""}`}
+            aria-label={t("places.copy")}
+            title={t("places.copy")}
+            className={`${action} ${copied ? "text-accent" : ""}`}
           >
             {copied ? <CheckIcon className="size-5" /> : <CopyIcon className="size-5" />}
           </button>
@@ -108,9 +105,9 @@ export function PlaceCard({
           link={link}
         />
       )}
-      {/* "Copied", said where the tap was, for a moment. */}
-      <span aria-live="polite" className="sr-only">
-        {copied ? t("places.copied") : ""}
+      {/* "Copied", said once for each copy: each a node of its own. */}
+      <span role="status" className="sr-only">
+        {copied > 0 && <span key={copied}>{t("places.copied")}</span>}
       </span>
     </div>
   );

@@ -267,7 +267,8 @@ function Body({
             </Row>
           )}
           {item.location && (
-            <Row icon={<PlaceIcon className="size-5" />} label={t("edit.location")}>
+            // Level with the place's first line, under its 48 px icons (design D238).
+            <Row icon={<PlaceIcon className="mt-3 size-5" />} label={t("edit.location")}>
               <PlaceCard
                 location={item.location}
                 geo={item.geo}

@@ -2399,15 +2399,19 @@ own (below).
   5: "'Open on map' and 'Copy address' I would make plain icons on the
   same line as the address, two icons at the end of the line"). The
   details' place (D177) puts "Open in maps" and "Copy address" as icon
-  buttons at the end of its first line, each with its tooltip; copied,
-  the copy icon turns to a tick and its name to "Copied" for a moment.
-  A tap on the map opens it in maps, a tap on the address copies it
-  (the "copied" feedback, and "Copied" said politely). Those two taps
-  are for the hand: their targets lie over the map and the text, out
-  of the keyboard's order and the accessibility tree, and the icon
-  buttons are the actions for keys and screen readers. OpenStreetMap's
-  credit stays a link of its own over the map. The details' picture
-  (D216, D221) is untouched.
+  buttons at the end of its first line, 48 px each (Material's 48 dp
+  touch target), each with its tooltip; the place's first line and its
+  row's icon sit level with the icons' middle. Copied, the copy icon
+  turns to a tick for two seconds and a status says "Copied" once (the
+  button keeps its name); a copy again while it shows says it again.
+  A tap on the map opens it in maps, as the icon does (on Android the
+  same `geo:` intent, which the emulator's maps app took); a plain tap
+  or click on the address copies it, while a long press or a drag
+  selects its text as any text, and copies nothing. The map's tap
+  target lies over it out of the keyboard's order and the accessibility
+  tree, and the address is text: the icon buttons are the actions for
+  keys and screen readers. OpenStreetMap's credit stays a link of its
+  own over the map. The details' picture (D216, D221) is untouched.
 
 ## Deferred
 
