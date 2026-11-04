@@ -3,13 +3,8 @@
 // (or `docker compose up -d` here), one chosen by `ASTROTIME_INTEROP`.
 // Their calendars are made where discovery finds each one's calendar home,
 // so nothing here knows a server's paths.
-import {
-  Authorization,
-  CalDavProvider,
-  fetchClient,
-  send,
-  type Credentials,
-} from "@astrotime/caldav";
+import { Authorization, fetchClient, type Credentials } from "@astrotime/caldav";
+import { CalDavProvider, send } from "@astrotime/caldav/provider";
 
 import type { CalDavServer } from "../servers.ts";
 

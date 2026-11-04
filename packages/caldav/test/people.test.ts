@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { type HttpClient, type HttpRequest } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 
 const HOME = "https://cloud.example.com/remote.php/dav/calendars/astrotime-test/";
 

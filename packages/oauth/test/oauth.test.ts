@@ -5,7 +5,8 @@
 // renewing it once when a server refuses it.
 import { createHash } from "node:crypto";
 
-import { Authorization, send, type HttpClient, type HttpRequest } from "@astrotime/caldav";
+import { Authorization, type HttpClient, type HttpRequest } from "@astrotime/caldav";
+import { send } from "@astrotime/caldav/provider";
 import { InClearError } from "@astrotime/caldav/bearer";
 import { AuthError, OfflineError, ServerBusyError } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";

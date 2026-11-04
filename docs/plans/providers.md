@@ -588,6 +588,18 @@ marked _to be recorded_.
   133 193 to 131 170 bytes (130.1, over the budget after #126 and #135, to 128.1 KiB), the room P4's registry
   and subscriptions come into. The `SignIn` steps (`accounts/sign-in.ts`)
   stay, as the accounts' context takes up a held approval with them.
+  _Built, CalDAV loaded with its first account:_ the provider, its
+  discovery and its XML parser (`fast-xml-parser` and what it needs) are
+  `@astrotime/caldav/provider`, which `connectCalDav` imports with an
+  account's sync and the `SignIn` steps with a sign-in; the package's own
+  index exports nothing of it (a module it re-exported would be on the
+  first load whole, used or not), and what the first load needs of an
+  account without it is `home.ts` (its credentials, `NoCalendarHomeError`,
+  `keepsFiles`). On the web the service worker keeps the chunk with the
+  app's other files (foundation D124), so an offline start syncs as it
+  did. AstroTime's own code at once went from 127 520 to 124 343 bytes
+  (−3.1 KiB, the room #158's 138 bytes came out of), and everything at
+  once from 323.6 to 300.2 KiB.
 
 - **D256. What is not built, and why.**
   - **Proton Calendar** has no API and no CalDAV, and Proton's Bridge
@@ -978,11 +990,6 @@ marked _to be recorded_.
 - **Exchange on premises (EWS) and EteSync** ([D256](#D256)).
 - **iCloud's Reminders** — upgraded lists are not on CalDAV; Apple gives
   no other API ([D245](#D245)).
-- **CalDAV loaded with its first account** ([D255](#D255), [D263](#D263))
-  — P4 made the subscriptions lazy; CalDAV's provider, discovery and XML
-  parser are still on the first load, used by the sign-in and the files
-  too. Moving them behind the registry is one change with foundation's
-  "the sync stack with its first use".
 - **A subscription's own colour and name, changed here** — the file's
   are shown; renaming or recolouring a subscription waits for the
   calendars' own settings to keep local names ([D263](#D263)).

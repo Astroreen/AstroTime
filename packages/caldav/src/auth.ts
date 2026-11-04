@@ -3,7 +3,7 @@
 // once a server answers 401 asking for it, as Baïkal does by default. The
 // Digest code, MD5 and all, loads only then.
 import type { HttpRequest, HttpResponse } from "./http.ts";
-import type { Credentials } from "./provider.ts";
+import type { Credentials } from "./home.ts";
 
 /** The `Authorization` header of HTTP Basic for these credentials. */
 export function basic({ username, password }: Credentials): string {

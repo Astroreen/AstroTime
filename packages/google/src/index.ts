@@ -4,7 +4,8 @@
 // (`tasks.ts`). One provider: each call names a calendar or an href, and
 // goes to the API whose address it is. Nothing outside this package knows
 // there are two (AGENTS.md rule 4). Loaded only with a Google account (D255).
-import { CalDavProvider, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { CalDavProvider } from "@astrotime/caldav/provider";
 import { CannotMakeCalendarError } from "@astrotime/core/new-calendar";
 import {
   PartialListing,

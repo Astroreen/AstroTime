@@ -4,7 +4,7 @@
 // with the first sign-in (docs/plans/providers.md#D260).
 import { basic } from "./auth.ts";
 import type { HttpClient } from "./http.ts";
-import type { Credentials } from "./provider.ts";
+import type { Credentials } from "./home.ts";
 
 /**
  * Revokes an app password Login Flow v2 gave (Nextcloud's

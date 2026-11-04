@@ -9,7 +9,8 @@
 // Deferred).
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, followRedirects, keepsFiles, type HttpClient } from "../src/index.ts";
+import { followRedirects, keepsFiles, type HttpClient } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 
 const multistatus = (href: string, prop: string) =>
   `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>${href}</d:href><d:propstat><d:prop>${prop}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;

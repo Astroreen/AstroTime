@@ -2,7 +2,6 @@
 // CalDAV server, or through Nextcloud's Login Flow v2. The steps and their
 // errors live here, outside React, so they are tested without a browser.
 import {
-  CalDavProvider,
   CertificateError,
   NoCalendarHomeError,
   ProxyRefusedError,
@@ -21,6 +20,9 @@ import { removeAccount, saveAccount } from "@astrotime/sync";
  * until the user signs in (docs/plans/providers.md#D260).
  */
 const flowModule = () => import("@astrotime/caldav/login-flow");
+
+/** The CalDAV provider, loaded with the first sign-in or sync (providers D255). */
+const caldav = () => import("@astrotime/caldav/provider");
 
 /** Why signing in did not work, as a code the UI words in the user's language. */
 export type SignInProblem =
@@ -788,6 +790,7 @@ export class SignIn {
     const end = signingInTo?.(server);
     let saved: Awaited<ReturnType<typeof saveAccount>>;
     try {
+      const { CalDavProvider } = await caldav();
       const { homeUrl } = await CalDavProvider.discover(http, server, credentials);
       if (signal.aborted) return;
       saved = await saveAccount(

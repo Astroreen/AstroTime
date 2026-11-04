@@ -12,12 +12,12 @@ import {
   Authorization,
   fetchClient,
   proxyHandler,
-  send,
   throughProxy,
   type HttpClient,
   type HttpRequest,
   type RememberedScheme,
 } from "../src/index.ts";
+import { send } from "../src/provider.ts";
 
 test("MD5 is RFC 1321's", async () => {
   expect(await md5("")).toBe("d41d8cd98f00b204e9800998ecf8427e");
