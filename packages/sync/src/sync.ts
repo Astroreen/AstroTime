@@ -3,8 +3,8 @@ import {
   CalendarObjectError,
   mergeObjects,
   OfflineError,
-  PartialListing,
   sameObjects,
+  type PartialListing,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -107,16 +107,14 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
   try {
     remote = await provider.calendars();
   } catch (error) {
-    // Part of the account read: that part syncs; the rest stays as it is, said.
-    if (!(error instanceof PartialListing)) throw error;
-    remote = error.calendars;
-    unread = error.unread;
+    // Part of the account read (a `PartialListing`, known by its fields: the
+    // engine imports no provider): that part syncs; the rest stays as it is, said.
+    const part = error as Partial<PartialListing> | null;
+    if (!part?.calendars || !part.unread) throw error;
+    remote = part.calendars;
+    unread = part.unread;
     for (const { prefix, error: why } of unread)
-      report.errors.push({
-        href: prefix,
-        problem: "failed",
-        detail: why instanceof Error ? why.message : String(why),
-      });
+      await isolated(report, prefix, () => Promise.reject(why));
   }
   const listed = new Map(remote.map((calendar) => [calendar.url, calendar.state]));
   const urls = new Set(listed.keys());

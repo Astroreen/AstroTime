@@ -379,6 +379,25 @@ importers:
         specifier: 'catalog:'
         version: 24.19.2
 
+  packages/microsoft:
+    dependencies:
+      '@astrotime/caldav':
+        specifier: workspace:*
+        version: link:../caldav
+      '@astrotime/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@astrotime/storage':
+        specifier: workspace:*
+        version: link:../storage
+      '@astrotime/sync':
+        specifier: workspace:*
+        version: link:../sync
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+
   packages/oauth:
     dependencies:
       '@astrotime/caldav':

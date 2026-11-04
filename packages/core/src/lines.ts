@@ -14,11 +14,32 @@ export const unescapeText = (text: string): string =>
     char === "n" || char === "N" ? "\n" : char,
   );
 
-/** A content line folded at 75 octets or fewer (by characters, which keeps within it). */
+/** A character's size in UTF-8 (the core has no `TextEncoder`, AGENTS.md rule 1). */
+const octetsOf = (char: string) => {
+  const point = char.codePointAt(0)!;
+  return point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+};
+
+/**
+ * A content line folded at 75 octets of UTF-8 (a Cyrillic letter is two),
+ * never inside a character: the first part 75 octets at most, each next
+ * one 74 after its leading space.
+ */
 export function foldLine(line: string): string {
-  if (line.length <= 74) return line;
-  const parts = [line.slice(0, 74)];
-  for (let at = 74; at < line.length; at += 73) parts.push(line.slice(at, at + 73));
+  const parts: string[] = [];
+  let part = "";
+  let octets = 0;
+  for (const char of line) {
+    const size = octetsOf(char);
+    if (octets + size > (parts.length === 0 ? 75 : 74)) {
+      parts.push(part);
+      part = "";
+      octets = 0;
+    }
+    part += char;
+    octets += size;
+  }
+  parts.push(part);
   return parts.join("\r\n ");
 }
 
@@ -67,7 +88,11 @@ export const lineOf = (component: Component, name: string): Line | undefined =>
  * A DATE or DATE-TIME as RFC 3339 (`2026-11-10` or `2026-11-10T09:00:00Z`);
  * a local time (no `Z`) as written, its zone in `zone` (the line's TZID).
  */
-export function timeOf(line: Line): { readonly time: string; readonly date: boolean; readonly zone: string | null } {
+export function timeOf(line: Line): {
+  readonly time: string;
+  readonly date: boolean;
+  readonly zone: string | null;
+} {
   const value = line.value;
   const date = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
   if (date) return { time: `${date[1]}-${date[2]}-${date[3]}`, date: true, zone: null };

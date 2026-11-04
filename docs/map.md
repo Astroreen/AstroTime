@@ -65,6 +65,13 @@ When you add a package, app or module, add its line here in the same PR.
     strict for a subscription's answer, forgiving for a file from the
     device; `jcalText`, jCal as iCalendar. Loaded with what needs it.
     → `plans/import.md#D267`, `plans/providers.md#D251`
+  - `lines.ts` (`@astrotime/core/lines`) — iCalendar's lines for the
+    providers that map another service's JSON: escaping, folding at 75
+    octets, a calendar's components and their properties, times.
+    → `plans/providers.md#D253`
+  - `PartialListing` (`provider.ts`) — a provider of two parts listing
+    one: the engine keeps the other part's calendars and reports it
+    `failed`. → `plans/providers.md#D252`
   - `vtimezone.ts` — a VTIMEZONE made from `Intl` for a zone the object
     does not define. → `plans/foundation.md#D104`
   - `mergeObjects` — the three-way merge of a refused write;
@@ -193,6 +200,11 @@ When you add a package, app or module, add its line here in the same PR.
   over the Tasks API (`GoogleTasks`, `vtodoOf`, `taskFieldsOf`); what a
   write could not keep said (`WriteResult.dropped`, the sync's
   `not-kept`). → `plans/providers.md#D252`
+- `packages/microsoft` (`@astrotime/microsoft`) — a Microsoft account
+  over Graph: `MicrosoftProvider`, its Outlook calendars
+  (`OutlookCalendars`, `veventOf`, `eventFieldsOf`, `rruleOf`,
+  `recurrenceOf`) and its To Do lists (`MicrosoftTodo`, `vtodoOf`,
+  `todoFieldsOf`); not wired in yet. → `plans/providers.md#D253`
 - `packages/oauth` (`@astrotime/oauth`) — OAuth 2 with PKCE:
   `authorization`, `codeOf`, `exchange`, `tokenSource` (a `TokenSource`
   the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`; `OAuthRedirect`,

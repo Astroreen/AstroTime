@@ -14,6 +14,7 @@ import {
   type SyncState,
   type WriteResult,
 } from "@astrotime/core/provider";
+import { foldLine } from "@astrotime/core/lines";
 
 export const TASKS_API = "https://tasks.googleapis.com/tasks/v1/";
 
@@ -57,31 +58,6 @@ const unescape = (text: string) =>
     char === "n" || char === "N" ? "\n" : char,
   );
 
-const utf8 = new TextEncoder();
-
-/**
- * RFC 5545 §3.1: a line of more than 75 octets folded, counted in UTF-8 (a
- * Cyrillic letter is two), never inside a character: the first part 75
- * octets at most, each next one 74 after its leading space.
- */
-const fold = (line: string) => {
-  const parts: string[] = [];
-  let part = "";
-  let octets = 0;
-  for (const char of line) {
-    const size = utf8.encode(char).length;
-    if (octets + size > (parts.length === 0 ? 75 : 74)) {
-      parts.push(part);
-      part = "";
-      octets = 0;
-    }
-    part += char;
-    octets += size;
-  }
-  parts.push(part);
-  return parts.join("\r\n ");
-};
-
 /** `20261104T101500Z` from an RFC 3339 time. */
 const utc = (time: string) =>
   new Date(time).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
@@ -106,7 +82,7 @@ export function vtodoOf(task: GoogleTask): string {
     "END:VTODO",
     "END:VCALENDAR",
   ];
-  return `${lines.map(fold).join("\r\n")}\r\n`;
+  return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
 /** A VTODO's properties by name, unfolded, with their parameters and values. */

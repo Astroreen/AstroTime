@@ -102,6 +102,7 @@ export default defineConfig({
           "packages/ics/src/**",
           "packages/oauth/src/**",
           "packages/google/src/**",
+          "packages/microsoft/src/**",
         ],
         rules: {
           "eslint/no-restricted-imports": [
