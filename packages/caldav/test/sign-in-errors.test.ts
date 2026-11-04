@@ -12,10 +12,10 @@ import {
   NoCalendarHomeError,
   proxyHandler,
   ProxyRefusedError,
-  startLoginFlow,
   throughProxy,
   type HttpClient,
 } from "../src/index.ts";
+import { startLoginFlow } from "../src/login-flow.ts";
 
 const via = throughProxy("/dav-proxy/");
 const credentials = { username: "u", password: "p" };

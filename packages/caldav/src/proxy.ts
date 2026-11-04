@@ -26,6 +26,12 @@ export const UNREACHABLE = "x-astrotime-unreachable";
  * (D20); `other-server <origin>`, the server redirects to another one (D39).
  */
 export const REFUSED = "x-astrotime-refused";
+/**
+ * The server's `WWW-Authenticate`, under a name the browser does not act
+ * on (see RETURNED), so the app can answer a Digest challenge
+ * (docs/plans/providers.md#D260); `digest.ts` reads it there.
+ */
+export const CHALLENGE = "x-astrotime-www-authenticate";
 
 /** Statuses whose responses carry no body (Fetch: a body with them is a TypeError). */
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
@@ -168,6 +174,8 @@ export function proxyHandler(options: ProxyOptions): (request: Request) => Promi
       }
       returned.set(name, via.to(location.href));
     }
+    const challenge = answer.headers.get("www-authenticate");
+    if (challenge !== null) returned.set(CHALLENGE, challenge);
     // Someone's calendar, fetched with their credentials: never kept by a cache.
     returned.set("cache-control", "no-store");
     // Streamed through: a calendar's multiget answer can be megabytes.

@@ -6,9 +6,7 @@ import {
   CertificateError,
   NoCalendarHomeError,
   ProxyRefusedError,
-  resumeLoginFlow,
   revokeAppPassword,
-  startLoginFlow,
   type Credentials,
   type HttpClient,
   type LoginFlow,
@@ -17,6 +15,12 @@ import {
 import { AuthError, OfflineError, ServerBusyError, type SecretStore } from "@astrotime/core";
 import type { Account, Store } from "@astrotime/storage";
 import { removeAccount, saveAccount } from "@astrotime/sync";
+
+/**
+ * Nextcloud's Login Flow v2, loaded with its first use: no page needs it
+ * until the user signs in (docs/plans/providers.md#D260).
+ */
+const flowModule = () => import("@astrotime/caldav/login-flow");
 
 /** Why signing in did not work, as a code the UI words in the user's language. */
 export type SignInProblem =
@@ -420,7 +424,7 @@ export class SignIn {
   async #loginFlow(signal: AbortSignal, server: string) {
     let flow: LoginFlow;
     try {
-      flow = await startLoginFlow(this.#options.http, server);
+      flow = await (await flowModule()).startLoginFlow(this.#options.http, server);
     } catch (error) {
       return this.#fail(signal, problemOf(error, "not-nextcloud"), error);
     }
@@ -487,6 +491,7 @@ export class SignIn {
         const { deadline, server, loginUrl, endpoint, token } = kept;
         const state = { server, loginUrl, endpoint, token };
         this.#set({ step: "waiting", loginUrl: state.loginUrl });
+        const { resumeLoginFlow } = await flowModule();
         await this.#await(
           signal,
           resumeLoginFlow(this.#options.http, state),

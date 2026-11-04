@@ -5,10 +5,10 @@ import {
   fetchClient,
   proxyHandler,
   revokeAppPassword,
-  startLoginFlow,
   throughProxy,
   type HttpClient,
 } from "@astrotime/caldav";
+import { startLoginFlow } from "@astrotime/caldav/login-flow";
 import {
   AuthError,
   CalendarObject,
@@ -25,6 +25,7 @@ import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { syncAccount } from "../src/index.ts";
+import { interopServer } from "./interop/servers.ts";
 import { externalServer, startRadicale, type CalDavServer, type Credentials } from "./servers.ts";
 
 const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
@@ -32,6 +33,9 @@ const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
 ];
 const nextcloud = externalServer("nextcloud");
 if (nextcloud) servers.push({ name: "Nextcloud", start: async () => nextcloud });
+// The interop run's server, when it names one (docs/plans/providers.md#D248).
+const interop = interopServer();
+if (interop) servers.push({ name: interop.name, start: async () => interop });
 
 const event = (uid: string, fields: Record<string, string> = {}) =>
   `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTAMP:20261101T080000Z\r\nDTSTART:20261102T090000Z\r\nDTEND:20261102T100000Z\r\n${Object.entries(

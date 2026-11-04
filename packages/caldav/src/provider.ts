@@ -14,6 +14,7 @@ import {
   type WriteResult,
 } from "@astrotime/core";
 
+import { Authorization } from "./auth.ts";
 import {
   AuthError,
   CertificateError,
@@ -62,12 +63,6 @@ export const NEXTCLOUD_HOME = /^(.*)\/remote\.php\/dav\/calendars\/([^/]+)\/?$/;
 
 /** Whether a calendar home's server keeps the user's files beside it (Nextcloud's, foundation D231). */
 export const keepsFiles = (homeUrl: string) => NEXTCLOUD_HOME.test(homeUrl);
-
-/** The `Authorization` header of HTTP Basic for these credentials. */
-export function basic({ username, password }: Credentials): string {
-  const bytes = new TextEncoder().encode(`${username}:${password}`);
-  return `Basic ${btoa(Array.from(bytes, (byte) => String.fromCodePoint(byte)).join(""))}`;
-}
 
 /** `#RRGGBBAA` (Apple, Nextcloud) to `#RRGGBB`; anything else as it is. */
 function color(value: string | null): string | null {
@@ -120,12 +115,12 @@ function collection(url: string): string {
  */
 export class CalDavProvider implements Provider {
   private readonly http: HttpClient;
-  private readonly authorization: string;
+  private readonly authorization: Authorization;
   readonly homeUrl: string;
 
   constructor(http: HttpClient, credentials: Credentials, homeUrl: string) {
     this.http = http;
-    this.authorization = basic(credentials);
+    this.authorization = new Authorization(credentials);
     this.homeUrl = collection(homeUrl);
   }
 
@@ -139,7 +134,7 @@ export class CalDavProvider implements Provider {
     serverUrl: string,
     credentials: Credentials,
   ): Promise<Discovery> {
-    const authorization = basic(credentials);
+    const authorization = new Authorization(credentials);
     const candidates = [new URL("/.well-known/caldav", serverUrl).href, serverUrl];
     let lastError: unknown;
     for (const candidate of candidates) {
@@ -475,16 +470,28 @@ export class CalDavProvider implements Provider {
   }
 }
 
+/**
+ * Sends a request with the account's credentials, as its server asks for
+ * them (Basic, or Digest after a 401 that asks for it: providers D260), and
+ * turns the answers a caller does not `accept` into errors.
+ */
 export async function send(
   http: HttpClient,
-  authorization: string,
+  authorization: Authorization,
   request: HttpRequest,
   accept: readonly number[],
 ): Promise<HttpResponse> {
-  const response = await http({
-    ...request,
-    headers: { ...request.headers, Authorization: authorization },
-  });
+  const signed = async () => {
+    const { header, answered } = await authorization.sign(request);
+    const response = await http({
+      ...request,
+      headers: header === null ? request.headers : { ...request.headers, Authorization: header },
+    });
+    return { response, answered };
+  };
+  let { response, answered } = await signed();
+  if (response.status === 401 && (await authorization.challenged(response, answered)))
+    ({ response } = await signed());
   if (response.status === 401) throw new AuthError(request);
   // Rate limited, or down for a while: the sync stops and waits (D128).
   if ((response.status === 429 || response.status === 503) && !accept.includes(response.status))
@@ -499,7 +506,7 @@ export async function send(
 
 async function propfindOne(
   http: HttpClient,
-  authorization: string,
+  authorization: Authorization,
   url: string,
   props: readonly string[],
 ): Promise<{ url: string; response: DavResponse | undefined }> {
