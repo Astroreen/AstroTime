@@ -157,7 +157,13 @@ export class Session {
     try {
       const frame = parseFrame(text);
       if (frame.type === "challenge") {
-        if (this.theirs || frame.mesh !== this.mesh.id) return this.close("refused");
+        if (
+          this.theirs ||
+          frame.mesh !== this.mesh.id ||
+          fromBase64url(frame.nonce)?.length !== 32
+        ) {
+          return this.close("refused");
+        }
         if (frame.peer === this.me) return this.close("self");
         this.theirs = frame;
         this.peer = frame.peer;
@@ -172,8 +178,8 @@ export class Session {
         const theirs = this.theirs;
         if (!theirs || this.established) return this.close("refused");
         const parts = this.proofParts(theirs.peer, this.me, base64url(this.nonce), theirs.nonce);
-        const theirNonce = fromBase64url(theirs.nonce);
-        if (!theirNonce || !(await verify(await this.proofKey, parts, frame.proof))) {
+        const theirNonce = fromBase64url(theirs.nonce)!;
+        if (!(await verify(await this.proofKey, parts, frame.proof))) {
           return this.close("refused");
         }
         this.receiving = await sealingKey(this.mesh.secret, theirNonce, this.nonce);
