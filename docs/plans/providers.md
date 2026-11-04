@@ -371,6 +371,34 @@ marked _to be recorded_.
   secret, is kept so too). A build without them does not offer the
   service.
 
+  _Built, the groundwork (P5's first part):_ `@astrotime/oauth` —
+  `authorization` (the URL with an S256 challenge of a fresh 43-character
+  verifier and a `state`), `codeOf` (the redirect read back, refused when
+  its `state` is another sign-in's or it says an error), `exchange` (the
+  code and the verifier for the tokens; a service that gives no refresh
+  token is refused, a sign-in must last), `tokenSource` (the access
+  token while it lasts, renewed a minute before its end and when a server
+  refuses it, renewals at once sharing one request, a rotated refresh
+  token kept through `keep`, or said apart, `TokenNotKeptError`, when the
+  device cannot keep it; a renewal before the end that fails offline or
+  busy keeps the token that still works and is tried again with the next
+  request; a 401 for a token another request replaced renews nothing
+  more; `invalid_grant` of a refresh token is `AuthError`, the account
+  signed out, of a code `OAuthRefusedError`, that sign-in refused), and `GOOGLE`, `MICROSOFT` (their endpoints and
+  scopes). The CalDAV provider takes a `TokenSource` where it took a
+  password (`Authorization`: `Bearer`, renewed once on a `401`; its
+  `credentials` are `null` then, not an empty password), and never sends
+  a token over plain http to another host than this device (`inClear`,
+  [D262](#D262)): OAuth's services are all https. Proven
+  against a fake authorization server that checks the verifier, the
+  redirect URI and the client as a real one does; the platforms'
+  redirects (Android's scheme, the desktop's loopback, the web's
+  `/oauth`) and the Google provider come next, the owner's clients
+  ([D257](#D257), [D258](#D258)) last. The first load grows by 94 bytes
+  (127 166 to 127 260 on main `4569838`: the bearer branch; its header
+  and renewal are `bearer.ts`, loaded with the first OAuth request);
+  `@astrotime/oauth` loads with an OAuth account.
+
 ### Weight and privacy
 
 - **D255. A provider loads only with an account of its kind.** The sync

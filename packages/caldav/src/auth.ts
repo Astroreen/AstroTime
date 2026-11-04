@@ -23,10 +23,26 @@ export interface DigestChallenge {
 }
 
 /**
- * How a server is answered: Basic, a Digest challenge, or not known yet
- * (`null`): the first request goes without credentials.
+ * An OAuth 2 access token and its renewal (docs/plans/providers.md#D254):
+ * a server that takes a bearer token, not a password (Google's CalDAV).
+ * `renew` gets a new one after the server refused the last, and says
+ * whether it did; a refused refresh token throws `AuthError`.
  */
-export type Scheme = "basic" | DigestChallenge | null;
+export interface TokenSource {
+  token(): Promise<string>;
+  /**
+   * After a server refused `refused`: a new token, unless one replaced it
+   * meanwhile (a request in flight beside it renewed already).
+   */
+  renew(refused?: string): Promise<boolean>;
+}
+
+/**
+ * How a server is answered: Basic, a Digest challenge, an OAuth bearer
+ * token, or not known yet (`null`): the first request goes without
+ * credentials.
+ */
+export type Scheme = "basic" | "bearer" | DigestChallenge | null;
 
 /**
  * Whether what is sent to `url` crosses a network unencrypted: plain http
@@ -57,12 +73,22 @@ const basicFirst = (url: string) => !inClear(url);
 
 /** One account's credentials, and the scheme its server asked for. */
 export class Authorization {
-  readonly credentials: Credentials;
+  /** A password's account's credentials; `null` for an OAuth account, which has `tokens`. */
+  readonly credentials: Credentials | null;
   /** How its server is answered (`digest.ts` learns it from a 401). */
   scheme: Scheme = null;
+  private readonly tokens: TokenSource | null;
 
-  constructor(credentials: Credentials) {
-    this.credentials = credentials;
+  /** A password's credentials, or a source of OAuth tokens (D254). */
+  constructor(credentials: Credentials | TokenSource) {
+    if ("token" in credentials) {
+      this.tokens = credentials;
+      this.credentials = null;
+      this.scheme = "bearer";
+    } else {
+      this.tokens = null;
+      this.credentials = credentials;
+    }
   }
 
   /**
@@ -78,10 +104,15 @@ export class Authorization {
     if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
     const scheme = this.scheme;
     if (scheme === null) return { header: null, answered: null };
-    if (scheme === "basic") return { header: basic(this.credentials), answered: scheme };
+    if (scheme === "bearer")
+      return {
+        header: await (await bearer()).bearerHeader(this.tokens!, request),
+        answered: scheme,
+      };
+    if (scheme === "basic") return { header: basic(this.credentials!), answered: scheme };
     const count = ++scheme.count;
     return {
-      header: await (await digest()).digestHeader(scheme, this.credentials, request, count),
+      header: await (await digest()).digestHeader(scheme, this.credentials!, request, count),
       answered: scheme,
     };
   }
@@ -90,9 +121,17 @@ export class Authorization {
    * Learns from a 401 to a request signed with `answered` whether sending
    * it again may succeed (`digest.ts`, `answerChallenge`).
    */
-  async challenged(response: HttpResponse, answered: Scheme): Promise<boolean> {
+  async challenged(
+    response: HttpResponse,
+    answered: Scheme,
+    header: string | null = null,
+  ): Promise<boolean> {
+    // A refused token is renewed once, unless another request renewed it
+    // already; a refused renewal throws AuthError.
+    if (answered === "bearer") return (await bearer()).renewBearer(this.tokens!, header);
     return (await digest()).answerChallenge(this, response, answered);
   }
 }
 
 const digest = () => import("./digest.ts");
+const bearer = () => import("./bearer.ts");
