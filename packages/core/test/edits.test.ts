@@ -1705,6 +1705,31 @@ describe("a series' corners (D142)", () => {
     ]);
   });
 
+  test("all: an hour later moves the EXDATEs at a time, not those of a date, which stay as written (D35, D142)", () => {
+    // Another client excluded two Mondays by their date (D35), this one a third by its time.
+    const dates = "EXDATE;VALUE=DATE:20261116,20261130";
+    const series = object([
+      ...mondays,
+      "SUMMARY:Lesson",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      dates,
+      "EXDATE;TZID=Europe/Vilnius:20261123T090000",
+    ]);
+    const { ics } = editItem(
+      series,
+      { time: { start: vilnius("2026-11-02T10:00:00"), end: vilnius("2026-11-02T11:00:00") } },
+      { now: NOW, scope: "all", recurrenceId: vilnius("2026-11-02T09:00:00") },
+    );
+    const lines = contentLines(ics);
+    expect(lines).toContain(dates);
+    expect(lines).toContain("EXDATE;TZID=Europe/Vilnius:20261123T100000");
+    expect(starts(ics)).toEqual([
+      "2026-11-02T10:00:00",
+      "2026-11-09T10:00:00",
+      "2026-12-07T10:00:00",
+    ]);
+  });
+
   test("an RDATE another client wrote in its own zone is kept as written by an edit that does not move it", () => {
     const rdate = "RDATE;TZID=America/New_York:20261104T090000";
     // And one of its own after the split below, which goes.

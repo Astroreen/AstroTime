@@ -754,7 +754,7 @@ function recurrenceIdOf(component: ICAL.Component): ItemTime | null {
 
 /**
  * Every time of a component's EXDATEs or RDATEs. An RDATE of a period is not
- * one: `setDates` leaves it as it is, `keepDates` keeps or drops it by its start.
+ * one: an edit's move leaves it as it is, `keepDates` keeps or drops it by its start.
  */
 function datesOf(component: ICAL.Component, name: "exdate" | "rdate"): ItemTime[] {
   return component
@@ -762,28 +762,6 @@ function datesOf(component: ICAL.Component, name: "exdate" | "rdate"): ItemTime[
     .flatMap((property) => property.getValues())
     .filter((value): value is ICAL.Time => value instanceof ICAL.Time)
     .map(fromIcalTime);
-}
-
-/**
- * Writes `times` as the EXDATEs or RDATEs, one property per value, when the
- * edit moved them all; RDATEs of periods stay as written.
- */
-function setDates(
-  component: ICAL.Component,
-  name: "exdate" | "rdate",
-  times: readonly ItemTime[],
-  tzid: string | null,
-): void {
-  for (const property of component.getAllProperties(name)) {
-    if (!property.getValues().some((value) => value instanceof ICAL.Period)) {
-      component.removeProperty(property);
-    }
-  }
-  for (const time of times) {
-    const property = new ICAL.Property(name);
-    component.addProperty(property);
-    setTime(property, time, tzid);
-  }
 }
 
 /**
@@ -954,12 +932,30 @@ function editSeries(
 
   const tzid = anchorTzid(master);
   if (moveNamed) {
-    // A time the edit did not move (only the end changed) stays as written (D142).
+    // A time the edit did not move (only the end changed, a date the hour
+    // moved within) stays as written, in its own line (D142); each one moved
+    // is a line of its own, in the start's TZID.
     const moveDates = (name: "exdate" | "rdate") => {
-      const dates = datesOf(master, name);
-      const moved = dates.map(moveNamed!);
-      if (moved.some((time, index) => !sameTime(time, dates[index]!)))
-        setDates(master, name, moved, tzid);
+      const moved: ItemTime[] = [];
+      for (const property of master.getAllProperties(name)) {
+        const values = property.getValues();
+        const kept = values.filter((value) => {
+          if (!(value instanceof ICAL.Time)) return true;
+          const time = fromIcalTime(value);
+          const to = moveNamed!(time);
+          if (sameTime(to, time)) return true;
+          moved.push(to);
+          return false;
+        });
+        if (kept.length === values.length) continue;
+        if (kept.length === 0) master.removeProperty(property);
+        else property.setValues(kept);
+      }
+      for (const time of moved) {
+        const property = new ICAL.Property(name);
+        master.addProperty(property);
+        setTime(property, time, tzid);
+      }
     };
     moveDates("exdate");
     moveDates("rdate");
