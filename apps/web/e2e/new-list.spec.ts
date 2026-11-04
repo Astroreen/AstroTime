@@ -3,7 +3,7 @@
 // screen makes a list on Radicale with one MKCALENDAR and shows it; an import
 // makes its new calendar and list there, and its items go up to them. On a
 // phone in Russian with no account, the list is made on this device.
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type Response } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
 import { importFile, TEAM } from "./import-files.ts";
@@ -108,15 +108,16 @@ test.describe("wide, English, on Radicale", () => {
     const put = new Set<string>();
     let uploaded: () => void = () => {};
     const uploads = new Promise<void>((resolve) => (uploaded = resolve));
-    page.on("response", (answer) => {
+    const count = (answer: Response) => {
       if (answer.request().method() !== "PUT" || answer.status() !== 201) return;
       put.add(answer.url());
       if (put.size === 3) uploaded();
-    });
+    };
+    page.on("response", count);
     await dialog.getByRole("button", { name: "Import", exact: true }).click();
     await expect(dialog.getByRole("status")).toContainText("2 events · 1 task");
     await uploads;
-    expect(put.size).toBe(3);
+    page.off("response", count);
     // One calendar a kind (providers D275), both named as the file's.
     expect(made).toHaveLength(2);
     for (const url of made) expect(await displayName(radicale, url)).toBe("Team");

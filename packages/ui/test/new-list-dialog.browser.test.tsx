@@ -239,3 +239,21 @@ test("a failure said goes once the name is changed", async () => {
   await userEvent.fill(field, "Errands 2");
   await expect.element(dialog().getByRole("alert")).not.toBeInTheDocument();
 });
+
+test("a failure said goes once the place changes", async () => {
+  make = async () => {
+    throw Object.assign(new Error("offline"), { name: "OfflineError" });
+  };
+  render();
+  await userEvent.fill(dialog().getByRole("textbox", { name: "Name" }), "Errands");
+  await press(create());
+  await expect.element(dialog().getByRole("alert")).toBeInTheDocument();
+  const where = dialog().getByRole("combobox", { name: "Where" });
+  (where.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  const device = page.getByRole("option", { name: "On this device" });
+  await expect.element(device).toBeVisible();
+  (device.element() as HTMLElement).click();
+  await expect.element(where).toHaveTextContent("On this device");
+  await expect.element(dialog().getByRole("alert")).not.toBeInTheDocument();
+});

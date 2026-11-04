@@ -50,5 +50,12 @@ describe("a stopped import, in words (import D277)", () => {
     const offline = Object.assign(new Error("fetch failed"), { name: "OfflineError" });
     expect(words("en", offline)).toBe("The import stopped: the server cannot be reached.");
     expect(words("ru", new Error("SQLITE_FULL"))).toBe("Импорт остановлен из-за ошибки.");
+    // What the user can act on is said so.
+    expect(words("en", Object.assign(new Error("401"), { name: "AuthError" }))).toBe(
+      "The import stopped: the server refused the account's sign-in. Sign in to it again.",
+    );
+    expect(words("en", Object.assign(new Error("403"), { name: "HttpError", status: 403 }))).toBe(
+      "The import stopped: the server did not allow it.",
+    );
   });
 });

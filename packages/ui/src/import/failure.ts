@@ -48,5 +48,9 @@ export function failureWords(
 /** Why an import stopped, in the catalog's words: no error's English reaches the user. */
 function stoppedWords(t: TFunction, cause: unknown): string {
   const { why } = whyNotMade(cause);
-  return t(why === "offline" || why === "busy" ? `import.stopped.${why}` : "import.stopped.failed");
+  return t(
+    why === "offline" || why === "busy" || why === "signed-out" || why === "refused"
+      ? `import.stopped.${why}`
+      : "import.stopped.failed",
+  );
 }
