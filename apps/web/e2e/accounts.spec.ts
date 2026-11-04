@@ -259,3 +259,20 @@ test("a server this AstroTime does not carry is named as the administrator's cho
     "This AstroTime's administrator has not allowed this server.",
   );
 });
+
+test("an http:// address to another host says the password would cross unencrypted; https and this device do not (providers D260)", async ({
+  page,
+}) => {
+  await openApp(page);
+  const dialog = await addAccount(page);
+  const address = dialog.getByRole("textbox", { name: "Server address" });
+  const warning =
+    "This address is not encrypted: your password could be read on the way. Use https:// if the server offers it.";
+  await address.fill("http://dav.example.net/dav.php/");
+  await expect(address).toHaveAccessibleDescription(warning);
+  await expect(dialog.getByText(warning)).toBeVisible();
+  for (const safe of ["dav.example.net", "https://dav.example.net/", "http://127.0.0.1:5232/"]) {
+    await address.fill(safe);
+    await expect(dialog.getByText(warning)).toHaveCount(0);
+  }
+});

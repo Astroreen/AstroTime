@@ -5,6 +5,7 @@ import i18next, { type i18n } from "i18next";
 import { en, type Catalog as Strings } from "./en.ts";
 import type { fileStrings } from "./files.ts";
 import type { pictureStrings } from "./pictures.ts";
+import type { signInStrings } from "./sign-in.ts";
 import type { taskStrings } from "./tasks.ts";
 import { ru } from "./ru.ts";
 
@@ -15,7 +16,8 @@ export type Language = (typeof LANGUAGES)[number];
 type Catalog = Strings &
   (typeof pictureStrings)["en"] &
   (typeof fileStrings)["en"] &
-  (typeof taskStrings)["en"];
+  (typeof taskStrings)["en"] &
+  (typeof signInStrings)["en"];
 
 export const catalogs = { en, ru } satisfies Record<Language, Record<string, string>>;
 

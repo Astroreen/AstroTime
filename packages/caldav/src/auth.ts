@@ -29,14 +29,13 @@ export interface DigestChallenge {
 export type Scheme = "basic" | DigestChallenge | null;
 
 /**
- * Whether Basic may go before the server asks for it: over https, or to
- * this device. Over plain http elsewhere a first Basic would send the
- * password in clear to a server that may want Digest, so the first request
- * there goes without credentials, to learn the scheme (D260).
+ * Whether what is sent to `url` crosses a network unencrypted: plain http
+ * to another host than this device (D260). There Basic does not go first,
+ * and the sign-in dialog says so under the address.
  */
-function basicFirst(url: string): boolean {
+export function inClear(url: string): boolean {
   const { protocol, hostname } = new URL(url);
-  return (
+  return !(
     protocol === "https:" ||
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||
@@ -44,6 +43,14 @@ function basicFirst(url: string): boolean {
     /^127\.\d+\.\d+\.\d+$/.test(hostname)
   );
 }
+
+/**
+ * Whether Basic may go before the server asks for it: over https, or to
+ * this device. Over plain http elsewhere a first Basic would send the
+ * password in clear to a server that may want Digest, so the first request
+ * there goes without credentials, to learn the scheme (D260).
+ */
+const basicFirst = (url: string) => !inClear(url);
 
 /** One account's credentials, and the scheme its server asked for. */
 export class Authorization {
