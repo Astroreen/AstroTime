@@ -56,9 +56,7 @@ export function SettingsScreen({
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
         <DialogBackdrop className="fixed inset-0 z-[100] bg-black/45 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPopup
-          className={`${sheet} z-[110] pt-(--inset-top) pb-(--inset-bottom) sm:w-[min(40rem,calc(100vw-2rem))] sm:pt-0 sm:pb-0`}
-        >
+        <DialogPopup className={`${sheet} z-[110] sm:w-[min(40rem,calc(100vw-2rem))]`}>
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
             <Dialog.Close className={dialogIcon} aria-label={t("settings.close")}>
               <CloseIcon className="size-5" />

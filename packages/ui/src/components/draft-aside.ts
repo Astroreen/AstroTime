@@ -108,10 +108,13 @@ export function besideOf(
 
 /** The dialog's place and width beside the draft, over the sheet's middle (design D187). */
 export function asideStyle({ side, width }: Aside): CSSProperties {
+  // Its outer edge clear of a system bar at that side too (design D235),
+  // narrower by it, so its inner edge stays beside the draft.
+  const inset = `var(--inset-${side})`;
   return {
-    width,
-    left: side === "left" ? MARGIN : "auto",
-    right: side === "right" ? MARGIN : "auto",
+    width: `calc(${width}px - ${inset})`,
+    [side]: `calc(${MARGIN}px + ${inset})`,
+    [side === "left" ? "right" : "left"]: "auto",
     translate: "0 -50%",
   };
 }

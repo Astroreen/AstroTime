@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { DRAFT, draftOf, drawn, placementOf, withDraft } from "../src/calendar/draft.ts";
 import { formOf, newForm, type Form, type Target } from "../src/calendar/editing.ts";
 import { expand, type Entry } from "../src/calendar/query.ts";
-import { besideOf } from "../src/components/draft-aside.ts";
+import { asideStyle, besideOf } from "../src/components/draft-aside.ts";
 
 const timeZone = "Europe/Vilnius";
 const range = { from: "2026-11-02", to: "2026-11-09", timeZone };
@@ -232,5 +232,22 @@ describe("where the dialog stands beside the draft (design D187)", () => {
     expect(besideOf({ left: 0, right: 30 }, 1600, 20)).toEqual({ side: "right", width: 720 });
     // And it floats from 40 rem.
     expect(besideOf({ left: 0, right: 30 }, 799, 20)).toBeNull();
+  });
+
+  test("its outer edge clears a system bar on its side, its inner edge stays beside the draft (design D235)", () => {
+    // On the right: 24 px from the bar there, narrower by the bar, so its
+    // left edge is where besideOf put it.
+    expect(asideStyle({ side: "right", width: 400 })).toEqual({
+      width: "calc(400px - var(--inset-right))",
+      right: "calc(24px + var(--inset-right))",
+      left: "auto",
+      translate: "0 -50%",
+    });
+    expect(asideStyle({ side: "left", width: 419 })).toEqual({
+      width: "calc(419px - var(--inset-left))",
+      left: "calc(24px + var(--inset-left))",
+      right: "auto",
+      translate: "0 -50%",
+    });
   });
 });
