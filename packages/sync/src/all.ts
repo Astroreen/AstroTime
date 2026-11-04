@@ -269,6 +269,9 @@ async function syncOne(
     holds.delete(accountId);
     return { sync: result, held: false };
   } catch (error) {
+    // A subscription that failed is read again at the next chance (D263).
+    if (account.provider === "ics")
+      (await import("./subscriptions.ts")).forget(context.store, accountId);
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
     const status =

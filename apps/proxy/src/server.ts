@@ -27,7 +27,16 @@ function logProxyFailure(method: string | undefined, url: string, error: unknown
     // Not an address of the proxy's: said as unknown.
   }
   const words = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  const cut = words.replace(/\b(https?:\/\/[^/\s"'<>]+)[^\s"'<>]*/gi, "$1");
+  // Each address as its scheme and host alone: no user name, password,
+  // path or query, whatever the error's words hold.
+  const cut = words.replace(/\bhttps?:\/\/[^\s"'<>]+/gi, (address) => {
+    try {
+      const { protocol, host } = new URL(address);
+      return `${protocol}//${host}`;
+    } catch {
+      return "an address";
+    }
+  });
   console.error(`AstroTime's proxy: ${method ?? "?"} ${origin}: ${cut}`);
 }
 

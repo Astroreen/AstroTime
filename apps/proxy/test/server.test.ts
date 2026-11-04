@@ -729,12 +729,14 @@ test("compressing again drops a copy that no longer pays off", async () => {
 
 test("a proxied failure is logged by method and origin, never a path or a query (providers D251)", async () => {
   const secret = "https://cal.example/feeds/private-4f3e2d1c/basic.ics?token=s3cr3t";
+  // An address with credentials in it, as an error's words may carry one.
+  const credentialed = "https://jane:t0ken-xyz@cal.example:8443/feeds/private-4f3e2d1c/basic.ics";
   const broken = (async () =>
     new Response(
       new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode("BEGIN:VCALENDAR"));
-          controller.error(new Error(`upstream broke while reading ${secret}`));
+          controller.error(new Error(`upstream broke while reading ${secret} (${credentialed})`));
         },
       }),
       { status: 200 },
@@ -751,6 +753,7 @@ test("a proxied failure is logged by method and origin, never a path or a query 
   const logged = log.mock.calls.flat().map(String).join("\n");
   log.mockRestore();
   expect(logged).toContain("GET https://cal.example");
-  expect(logged).not.toMatch(/private-4f3e2d1c|basic\.ics|token|s3cr3t/);
+  expect(logged).not.toMatch(/private-4f3e2d1c|basic\.ics|token|s3cr3t|jane|t0ken-xyz/);
+  expect(logged).toContain("https://cal.example:8443");
   await new Promise((resolve) => server.close(resolve));
 });

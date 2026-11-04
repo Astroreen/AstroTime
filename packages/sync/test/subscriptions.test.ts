@@ -10,7 +10,13 @@ import { syncAccount, syncAll } from "../src/index.ts";
 import { addSubscription, applyHeld } from "../src/subscriptions.ts";
 import { expect, test } from "vite-plus/test";
 
-import { calendarUrlOf, IcsProvider, NotCalendarError, subscriptionAddress } from "@astrotime/ics";
+import {
+  calendarUrlOf,
+  fingerprint,
+  IcsProvider,
+  NotCalendarError,
+  subscriptionAddress,
+} from "@astrotime/ics";
 
 const ADDRESS = "https://calendar.example.org/feeds/team.ics";
 
@@ -56,7 +62,7 @@ async function subscribed(initial: string) {
     serverUrl: new URL(ADDRESS).origin,
     username: null,
   });
-  const calendarUrl = await calendarUrlOf(ADDRESS);
+  const calendarUrl = calendarUrlOf(ADDRESS);
   let apply: string | null = null;
   const sync = async () => {
     const [kept] = await store.calendars(account.id);
@@ -93,7 +99,7 @@ test("a subscription is one read-only calendar named and coloured by its file, a
   const hrefs = (await feed.store.hrefs(calendar!.id)).map((entry) => entry.href);
   expect(hrefs.toSorted()).toEqual([`${calendar!.url}#a`, `${calendar!.url}#b`]);
   // The address, which may hold a secret, is nowhere in the store.
-  expect(calendar!.url).toMatch(/^ics:[0-9a-f]{32}$/);
+  expect(calendar!.url).toMatch(/^ics:[0-9a-f]{28}$/);
   expect(JSON.stringify(await feed.store.accounts())).not.toContain("feeds/team.ics");
 });
 
@@ -280,3 +286,41 @@ async function subscribedSummaries(store: Store, accountId: string) {
   });
   return objects.map((o) => /SUMMARY:(.*)\r\n/.exec(o.ics)?.[1]).toSorted();
 }
+
+test("a subscription needs no Web Crypto: its ids and versions are the same on a page over plain http", async () => {
+  // As a page over plain http has it: no `crypto.subtle` (an own property
+  // over the prototype's getter, taken off again after).
+  Object.defineProperty(globalThis.crypto, "subtle", { value: undefined, configurable: true });
+  try {
+    const feed = await subscribed(file(event("a", "Planning")));
+    await feed.sync();
+    expect(await feed.summaries()).toEqual(["Planning"]);
+  } finally {
+    delete (globalThis.crypto as { subtle?: unknown }).subtle;
+  }
+  expect(globalThis.crypto.subtle).toBeDefined();
+  // Stable and distinct: the same text, the same fingerprint.
+  expect(fingerprint("a")).toBe(fingerprint("a"));
+  expect(fingerprint("a")).not.toBe(fingerprint("b"));
+  expect(fingerprint("")).toMatch(/^[0-9a-f]{28}$/);
+});
+
+test("a sync that said a problem is read again at the next chance, not left alone for the hour", async () => {
+  const files = server(file(event("a", "Planning"), event("b", "Review")));
+  const store = await Store.open(nodeDriver());
+  const secrets = memorySecrets();
+  const context = {
+    store,
+    secrets,
+    http: files.http,
+    connect: () => Promise.reject(new Error("none")),
+  };
+  await addSubscription(context, ADDRESS);
+  await syncAll(context);
+  files.serve(file());
+  await syncAll(context, { retry: true });
+  const asked = files.asked.length;
+  // Held: the next automatic sync reads again, so the file's next version is seen.
+  await syncAll(context, { fresh: true });
+  expect(files.asked.length).toBe(asked + 1);
+});

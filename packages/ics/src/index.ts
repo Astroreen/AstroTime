@@ -64,14 +64,34 @@ export function subscriptionAddress(typed: string): string | null {
   }
 }
 
-async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+/** cyrb53 (public domain): 53 bits of a text, from `seed`. */
+function cyrb53(text: string, seed: number): number {
+  let h1 = 0xdeadbeef ^ seed;
+  let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ char, 2654435761);
+    h2 = Math.imul(h2 ^ char, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
+/**
+ * 106 bits of a text, as 28 hex digits: a calendar's id, an object's or a
+ * file's version. Not a guard of anything secret, so no Web Crypto, which a
+ * page over plain http does not have (D263).
+ */
+export function fingerprint(text: string): string {
+  return [0, 1].map((seed) => cyrb53(text, seed).toString(16).padStart(14, "0")).join("");
 }
 
 /** The calendar's own address in the store: the subscription's, hashed, since it may hold a secret. */
-export async function calendarUrlOf(url: string): Promise<string> {
-  return `ics:${(await sha256(url)).slice(0, 32)}`;
+export function calendarUrlOf(url: string): string {
+  return `ics:${fingerprint(url)}`;
 }
 
 /**
@@ -158,7 +178,7 @@ export class IcsProvider implements Provider {
     // Not one VCALENDAR (a sign-in page, a cut file): a failed sync that
     // changes nothing (NotCalendarError, D251).
     const split = splitCalendar(response.body);
-    const hash = await sha256(response.body);
+    const hash = fingerprint(response.body);
     const validators: Validators = {
       etag: response.header("etag"),
       modified: response.header("last-modified"),
@@ -192,7 +212,7 @@ export class IcsProvider implements Provider {
       // VJOURNAL and other kinds the views do not show are left out.
       if (object.kind !== "VEVENT" && object.kind !== "VTODO") continue;
       const href = `${this.calendarUrl}#${encodeURIComponent(object.uid)}`;
-      objects.set(href, { href, etag: await sha256(object.ics), ics: object.ics });
+      objects.set(href, { href, etag: fingerprint(object.ics), ics: object.ics });
     }
     this.objects = objects;
     return objects;

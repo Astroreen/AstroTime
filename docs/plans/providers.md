@@ -573,8 +573,10 @@ marked _to be recorded_.
   `@astrotime/core/split` ([import D267](import.md#D267)'s splitter, one
   for both); a body that is no `VCALENDAR` throws `NotCalendarError`
   before anything is written, and `VJOURNAL`s are left out. The calendar's
-  own address in the store is `ics:` and 32 hex digits of the address's
-  SHA-256, an object's `<that>#<UID>`; the account's `serverUrl` is the
+  own address in the store is `ics:` and 28 hex digits of the address's
+  fingerprint (two cyrb53 hashes, 106 bits: an id, not a guard, so no Web
+  Crypto, which a page over plain http lacks), an object's `<that>#<UID>`,
+  its ETag and the file's version fingerprints too; the account's `serverUrl` is the
   address's origin alone; the address itself is the secret
   (`{"subscription", "apply"}`). **The held removal** is a calendar's
   `HeldRemovalError`, reported by the engine as the problem
@@ -585,17 +587,25 @@ marked _to be recorded_.
   it, goes through. **Reading at most hourly** (or the file's
   `REFRESH-INTERVAL`, if longer) is kept per store in memory
   (`@astrotime/sync/subscriptions`, `recent`), the last result said again
-  meanwhile; the user's "Sync now" reads at once. **The registry**
-  ([D255](#D255)): `syncAll` opens a CalDAV account with the platform's
-  `connect` and a subscription with `@astrotime/sync/subscriptions`,
-  imported when such an account syncs (`SyncContext.http` for it); the
+  meanwhile; only after a clean sync: one that failed, or said a problem
+  (a held removal), is read again at the next chance; the user's "Sync
+  now" reads at once. **The registry**
+  ([D255](#D255)), half of it: `syncAll` opens a subscription with
+  `@astrotime/sync/subscriptions`, imported when such an account syncs
+  (`SyncContext.http` for it); a CalDAV account still with the
+  platform's `connect`, CalDAV's code staying on the first load, as the
+  sign-in and the files use it: P4's "imported only when a CalDAV account
+  exists" moves to [Deferred](#deferred), with foundation's "the sync
+  stack with its first use"; the
   sign-in dialog's third tab, "Subscribe", reads the file once before
   anything is kept, so a page or a refusal is said there. Its words, and
   the held removal's, load in a catalog of their own
   (`i18n/subscribe.ts`). **The web proxy logs no address**
   (`logProxyFailure`): a failure names the method and the server's
-  origin, any address in the error's words cut to its origin
-  ([D39](foundation.md#D39)). The first load grows by 585 bytes (126 501 to 127 086 on
+  origin, any address in the error's words read as a URL and cut to its
+  scheme and host (a user name and password in it, `https://user:token@…`,
+  never reach the log either)
+  ([D39](foundation.md#D39)). The first load grows by 631 bytes (126 501 to 127 132 on
   main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
   KiB, and #144's 4.6).
 
@@ -620,6 +630,11 @@ marked _to be recorded_.
 - **Exchange on premises (EWS) and EteSync** ([D256](#D256)).
 - **iCloud's Reminders** — upgraded lists are not on CalDAV; Apple gives
   no other API ([D245](#D245)).
+- **CalDAV loaded with its first account** ([D255](#D255), [D263](#D263))
+  — P4 made the subscriptions lazy; CalDAV's provider, discovery and XML
+  parser are still on the first load, used by the sign-in and the files
+  too. Moving them behind the registry is one change with foundation's
+  "the sync stack with its first use".
 - **A subscription's own colour and name, changed here** — the file's
   are shown; renaming or recolouring a subscription waits for the
   calendars' own settings to keep local names ([D263](#D263)).
@@ -689,6 +704,12 @@ at most 0.1 KiB net; `docs/map.md` names `@astrotime/ics` and the
 registry.
 
 _Built:_ [D263](#D263); the room on the first load in #136 and #144.
+Of the criteria above, two are met otherwise, as D263 says: hrefs are
+`ics:<fingerprint>#<UID>`, not the address (which may hold a secret),
+and the first load grew by 631 bytes, into the room #136 and #144 made
+for it, not by 0.1 KiB net. One is not met and is
+[Deferred](#deferred): the CalDAV provider is still on the first load
+(the registry is built for subscriptions only).
 
 ### PR P5 — OAuth and Google
 

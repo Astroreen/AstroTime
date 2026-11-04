@@ -37,19 +37,32 @@ export function recent(store: Store, accountId: string, now: number, retry: bool
   return read && !retry && now < read.until ? read.last : null;
 }
 
-/** Keeps a subscription's sync, and leaves its file alone for the hour, or as long as it asks. */
+/**
+ * Keeps a subscription's sync, and leaves its file alone for the hour, or as
+ * long as it asks; only a clean sync: one that said a problem (a held
+ * removal) is read again at the next chance (D263).
+ */
 export function remember(
   store: Store,
   last: AccountSync,
   provider: IcsProvider,
   now: number,
 ): void {
+  if (last.status !== "synced" || last.report.errors.length > 0) {
+    forget(store, last.accountId);
+    return;
+  }
   let reads = recently.get(store);
   if (!reads) recently.set(store, (reads = new Map()));
   reads.set(last.accountId, {
     until: now + Math.max(SUBSCRIPTION_EVERY_MS, provider.refresh ?? 0),
     last,
   });
+}
+
+/** A subscription read again at the next chance: its last sync failed, or said a problem. */
+export function forget(store: Store, accountId: string): void {
+  recently.get(store)?.delete(accountId);
 }
 
 /** A subscription's provider for a sync; `null` when no address is saved for it. */
@@ -77,7 +90,7 @@ export async function addSubscription(
 ): Promise<{ readonly account: Account; readonly added: boolean } | null> {
   const url = subscriptionAddress(typed);
   if (!url) return null;
-  const calendarUrl = await calendarUrlOf(url);
+  const calendarUrl = calendarUrlOf(url);
   const [calendar] = await new IcsProvider(
     context.http,
     { url, apply: null },
