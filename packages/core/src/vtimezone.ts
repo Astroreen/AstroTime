@@ -89,35 +89,38 @@ const YEARS = 20;
  * `year`. A zone whose changes follow "the nth (or last) weekday of a month"
  * gets a yearly RRULE per observance, checked against `Intl` for the years
  * after; any other gets an observance per change in those years. A zone
- * with no change has one STANDARD observance.
+ * with no change in those years has one STANDARD observance.
  */
 export function vtimezone(timeZone: string, year: number): ICAL.Component {
   const first = year - 1;
   const component = new ICAL.Component("vtimezone");
   component.addPropertyWithValue("tzid", timeZone);
   const found = transitions(timeZone, first);
-  if (found.length === 0) {
-    const offset = utcOffset(offsetAt(Date.UTC(year, 0, 1), timeZone));
-    component.addSubcomponent(observance("standard", "1970-01-01T00:00:00", offset, offset));
-    return component;
-  }
   const later = Array.from({ length: YEARS }, (_, i) => first + 1 + i).map(
     (y) => [y, transitions(timeZone, y)] as const,
   );
-  const regular = found.every((transition, index) => {
-    const date = onset(transition);
-    const { month, byDay } = ruleOf(date);
-    return later.every(([y, list]) => {
-      const other = list[index];
-      if (!other || list.length !== found.length || other.to !== transition.to) return false;
-      const otherDate = onset(other);
-      return (
-        otherDate.getUTCMonth() + 1 === month &&
-        otherDate.getUTCDate() === dayOfRule(y, month, byDay) &&
-        iso(otherDate).slice(10) === iso(date).slice(10)
-      );
+  if (found.length === 0) {
+    const offset = utcOffset(offsetAt(Date.UTC(year, 0, 1), timeZone));
+    component.addSubcomponent(observance("standard", "1970-01-01T00:00:00", offset, offset));
+    // A zone that changes only later (Almaty in 2024) lists those changes after it.
+    if (later.every(([, list]) => list.length === 0)) return component;
+  }
+  const regular =
+    found.length > 0 &&
+    found.every((transition, index) => {
+      const date = onset(transition);
+      const { month, byDay } = ruleOf(date);
+      return later.every(([y, list]) => {
+        const other = list[index];
+        if (!other || list.length !== found.length || other.to !== transition.to) return false;
+        const otherDate = onset(other);
+        return (
+          otherDate.getUTCMonth() + 1 === month &&
+          otherDate.getUTCDate() === dayOfRule(y, month, byDay) &&
+          iso(otherDate).slice(10) === iso(date).slice(10)
+        );
+      });
     });
-  });
   const all = regular ? found : [...found, ...later.flatMap(([, list]) => list)];
   for (const transition of all) {
     const date = onset(transition);
