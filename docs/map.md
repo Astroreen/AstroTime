@@ -188,6 +188,11 @@ When you add a package, app or module, add its line here in the same PR.
   `@astrotime/core/split`; `HeldRemovalError`, a file that would remove
   most of its calendar. Loaded with an account of its kind.
   → `plans/providers.md#D251`, `plans/providers.md#D263`
+- `packages/google` (`@astrotime/google`) — a Google account:
+  `GoogleProvider`, its calendars over Google's CalDAV and its task lists
+  over the Tasks API (`GoogleTasks`, `vtodoOf`, `taskFieldsOf`); what a
+  write could not keep said (`WriteResult.dropped`, the sync's
+  `not-kept`). → `plans/providers.md#D252`
 - `packages/oauth` (`@astrotime/oauth`) — OAuth 2 with PKCE:
   `authorization`, `codeOf`, `exchange`, `tokenSource` (a `TokenSource`
   the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`; `OAuthRedirect`,

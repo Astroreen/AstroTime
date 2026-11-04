@@ -71,6 +71,9 @@ function StatusLine({ account, value }: { account: Account; value: AccountsValue
 
 /** A subscription's held removal, with its words, loads when one is held (providers D263). */
 const HeldRemoval = lazy(() => import("./held-removal.tsx"));
+const NotKept = lazy(() =>
+  import("./held-removal.tsx").then((module) => ({ default: module.NotKept })),
+);
 
 /**
  * What the last sync could not do for an account's items, in words (D37);
@@ -83,8 +86,11 @@ function Problems({ last }: { last: AccountSync | undefined }) {
   const held = all.find((error) => error.held);
   // The held removal is said on its own; every other problem in the list.
   const errors = all.filter(
-    (error): error is (typeof all)[number] & { problem: Exclude<Problem, "held-removal"> } =>
-      error.problem !== "held-removal",
+    (
+      error,
+    ): error is (typeof all)[number] & {
+      problem: Exclude<Problem, "held-removal">;
+    } => error.problem !== "held-removal",
   );
   const dropped = last?.report?.dropped.length ?? 0;
   if (all.length === 0 && dropped === 0) return null;
@@ -101,9 +107,18 @@ function Problems({ last }: { last: AccountSync | undefined }) {
             {t("sync.problems", { count: errors.length })}
           </summary>
           <ul className="mt-1 list-disc pl-5 text-ink-muted">
-            {errors.map((error, i) => (
-              <li key={i}>{t(`sync.problem.${error.problem}`)}</li>
-            ))}
+            {errors.map((error, i) =>
+              // What a service could not keep says so in words that load with it (providers D252).
+              error.problem === "not-kept" ? (
+                <li key={i}>
+                  <Suspense fallback={null}>
+                    <NotKept />
+                  </Suspense>
+                </li>
+              ) : (
+                <li key={i}>{t(`sync.problem.${error.problem}`)}</li>
+              ),
+            )}
           </ul>
         </details>
       )}

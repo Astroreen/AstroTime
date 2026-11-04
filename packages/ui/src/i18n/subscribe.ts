@@ -1,5 +1,7 @@
 // The sign-in dialog's subscription form's strings (providers D251), loading
-// with the dialog in a catalog of their own (`later.ts`).
+// with the dialog in a catalog of their own (`later.ts`); and what a
+// provider tells of a sync (a held removal, D263; what a service could not
+// keep, D252), loading with the words that say it.
 import { laterStrings } from "./later.ts";
 
 export const subscribeStrings = {
@@ -20,6 +22,8 @@ export const subscribeStrings = {
     "subscribe.held_one": "The calendar's file would remove {{count}} item.",
     "subscribe.held_other": "The calendar's file would remove {{count}} items.",
     "subscribe.applyHeld": "Remove them",
+    "subscribe.notKept":
+      "The service keeps only some of an item's details; the rest stays on this device until it changes there.",
   },
   ru: {
     "signIn.kind.ics": "Подписка",
@@ -39,6 +43,8 @@ export const subscribeStrings = {
     "subscribe.held_many": "Файл календаря удалил бы {{count}} записей.",
     "subscribe.held_other": "Файл календаря удалил бы {{count}} записи.",
     "subscribe.applyHeld": "Удалить их",
+    "subscribe.notKept":
+      "Сервис хранит только часть сведений записи; остальное остаётся на этом устройстве, пока запись не изменится там.",
   },
 } as const satisfies Record<"en" | "ru", Record<string, string>>;
 

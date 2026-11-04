@@ -297,6 +297,36 @@ marked _to be recorded_.
   and the image's documentation says so; Android and the desktop need no
   proxy.
 
+  _Decided while building (P5's third part), D7 against what Google keeps:_
+  a **notice**, not a second copy. A write sends the fields Google keeps
+  (title, notes, the due day, status; an insert the same), and names what
+  the item said that Google could not keep (`WriteResult.dropped`: a
+  priority, categories, a time on the due, a status other than done or
+  not, reminders); the sync reports it once as the problem `not-kept`
+  ("The service keeps only some of an item's details; the rest stays on
+  this device until it changes there", in words that load with it,
+  `i18n/subscribe.ts`). The store keeps the item as it
+  was written here until Google's version of it changes, which then
+  replaces it, as any server's does ([D5](foundation.md#D5)); keeping
+  local extras over Google's answer would need the engine to merge every
+  download with what is stored, a second source of truth this plan
+  refused for Microsoft too ([D253](#D253)). The edit dialog for a Google
+  list will offer only what Google keeps, so a notice comes only from an
+  item made elsewhere (moved, imported). _Built:_ `@astrotime/google` —
+  `GoogleTasks` (lists, tasks with `updatedMin` and deleted ones, the
+  first listing removing what Google no longer has, `PATCH` of the kept
+  fields, the Tasks API taking no `If-Match`, so the last write wins),
+  `vtodoOf` and `taskFieldsOf` (the mapping both ways; Google's
+  `position` kept as `X-GOOGLE-TASKS-POSITION`, read-only), and
+  `GoogleProvider`, the composite that sends each call to the API whose
+  address it names; proven against a fake Tasks API through the engine
+  and a real store. The account's sign-in, its `google` row and secret,
+  the registry's entry and the dialog's button come with the owner's
+  clients ([D257](#D257)), as does recording Google's CalDAV. The first
+  load grows by 97 bytes (127 349 to 127 446 on main `ffca968`: the
+  engine's `not-kept`), `@astrotime/google` loading with a Google
+  account.
+
 - **D253. Microsoft: Graph, events and To Do.** Outlook's calendars and
   Microsoft To Do have no CalDAV; Microsoft Graph carries both
   (`/me/calendars/{id}/events`, `/me/todo/lists/{id}/tasks`) and answers
@@ -691,6 +721,12 @@ marked _to be recorded_.
   KiB, and #144's 4.6).
 
 ## Deferred
+
+- **Google wired in** ([D252](#D252)) — the provider is built; the sign-in
+  (the `google` account, its tokens in the secret store, the home found
+  on Google's CalDAV), `syncAll`'s entry for it and the dialog's button
+  wait for the owner's OAuth clients ([D257](#D257)), Google's CalDAV
+  recorded then too.
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
   starts in a bootstrap mode whose setup is its web wizard, writing a
