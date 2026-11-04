@@ -8,6 +8,7 @@ import { expect, test } from "vite-plus/test";
 import { challengesOf, digestChallenge, digestHeader, md5 } from "../src/digest.ts";
 import { CHALLENGE } from "../src/proxy.ts";
 import {
+  inClear,
   Authorization,
   fetchClient,
   proxyHandler,
@@ -283,4 +284,29 @@ test("over plain http to another host, the first request goes without credential
     await send(basicOnly, first, propfind(url), []);
     expect(sent).toEqual([basic]);
   }
+});
+
+test("what is in clear: plain http to another host, never https or this device, whatever a name starts with", () => {
+  for (const url of [
+    "http://dav.example.net/",
+    "http://192.168.1.5:5232/",
+    "http://100.64.0.7/",
+    // Names that only look like this device: another host, wherever they resolve.
+    "http://127.evil.example.com/",
+    "http://127.0.0.1.nip.io/",
+    "http://localhost.example.com/",
+    "http://[::2]/",
+  ])
+    expect(inClear(url), url).toBe(true);
+  for (const url of [
+    "https://dav.example.net/",
+    "https://127.evil.example.com/",
+    "http://localhost:5232/",
+    "http://cal.localhost/",
+    "http://127.0.0.1:5232/",
+    "http://127.1/",
+    "http://127.255.255.254/",
+    "http://[::1]:8080/",
+  ])
+    expect(inClear(url), url).toBe(false);
 });

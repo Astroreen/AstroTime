@@ -276,3 +276,16 @@ test("an http:// address to another host says the password would cross unencrypt
     await expect(dialog.getByText(warning)).toHaveCount(0);
   }
 });
+
+test("in Russian the same warning says the same (providers D262)", async ({ browser }) => {
+  const context = await browser.newContext({ locale: "ru-RU" });
+  const page = await context.newPage();
+  await openApp(page);
+  const dialog = await addAccount(page, "nextcloud", RU_ADD_ACCOUNT);
+  const address = dialog.getByRole("textbox", { name: "Адрес сервера" });
+  await address.fill("http://dav.example.net/");
+  await expect(address).toHaveAccessibleDescription(
+    "Этот адрес не зашифрован: пароль могут перехватить по дороге. Используйте https://, если сервер его поддерживает.",
+  );
+  await context.close();
+});

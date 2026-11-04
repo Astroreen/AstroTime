@@ -40,7 +40,10 @@ export function inClear(url: string): boolean {
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||
     hostname === "[::1]" ||
-    /^127\.\d+\.\d+\.\d+$/.test(hostname)
+    // A literal IPv4 of 127.0.0.0/8, all four parts numbers (URL spells
+    // `127.1` so too): `127.evil.example.com` or `127.0.0.1.nip.io` is
+    // another host, whatever it resolves to.
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
   );
 }
 
