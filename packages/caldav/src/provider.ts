@@ -485,7 +485,7 @@ export async function send(
     const { header, answered } = await authorization.sign(request);
     const response = await http({
       ...request,
-      headers: { ...request.headers, Authorization: header },
+      headers: header === null ? request.headers : { ...request.headers, Authorization: header },
     });
     return { response, answered };
   };

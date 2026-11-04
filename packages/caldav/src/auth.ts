@@ -22,39 +22,65 @@ export interface DigestChallenge {
   count: number;
 }
 
+/**
+ * How a server is answered: Basic, a Digest challenge, or not known yet
+ * (`null`): the first request goes without credentials.
+ */
+export type Scheme = "basic" | DigestChallenge | null;
+
+/**
+ * Whether Basic may go before the server asks for it: over https, or to
+ * this device. Over plain http elsewhere a first Basic would send the
+ * password in clear to a server that may want Digest, so the first request
+ * there goes without credentials, to learn the scheme (D260).
+ */
+function basicFirst(url: string): boolean {
+  const { protocol, hostname } = new URL(url);
+  return (
+    protocol === "https:" ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "[::1]" ||
+    /^127\.\d+\.\d+\.\d+$/.test(hostname)
+  );
+}
+
 /** One account's credentials, and the scheme its server asked for. */
 export class Authorization {
   readonly credentials: Credentials;
-  /** The server's Digest challenge, once it asked for Digest (`digest.ts`). */
-  digest: DigestChallenge | null = null;
+  /** How its server is answered (`digest.ts` learns it from a 401). */
+  scheme: Scheme = null;
 
   constructor(credentials: Credentials) {
     this.credentials = credentials;
   }
 
   /**
-   * The `Authorization` header for `request`, and the challenge it answers
-   * (`null`: Basic). A Digest answer's count is taken at once, before
-   * anything is awaited, so requests signed together never share one; they
-   * may still reach the server out of order, which a nonce's count allows.
+   * The `Authorization` header for `request` (`null`: none, to learn the
+   * scheme), and the scheme it answers. A Digest answer's count is taken at
+   * once, before anything is awaited, so requests signed together never
+   * share one; they may still reach the server out of order, which a
+   * nonce's count allows.
    */
   async sign(
     request: Pick<HttpRequest, "method" | "url">,
-  ): Promise<{ readonly header: string; readonly answered: DigestChallenge | null }> {
-    const challenge = this.digest;
-    if (!challenge) return { header: basic(this.credentials), answered: null };
-    const count = ++challenge.count;
+  ): Promise<{ readonly header: string | null; readonly answered: Scheme }> {
+    if (this.scheme === null && basicFirst(request.url)) this.scheme = "basic";
+    const scheme = this.scheme;
+    if (scheme === null) return { header: null, answered: null };
+    if (scheme === "basic") return { header: basic(this.credentials), answered: scheme };
+    const count = ++scheme.count;
     return {
-      header: await (await digest()).digestHeader(challenge, this.credentials, request, count),
-      answered: challenge,
+      header: await (await digest()).digestHeader(scheme, this.credentials, request, count),
+      answered: scheme,
     };
   }
 
   /**
-   * Learns from a 401 to a request signed for `answered` whether sending it
-   * again may succeed (`digest.ts`, `answerChallenge`).
+   * Learns from a 401 to a request signed with `answered` whether sending
+   * it again may succeed (`digest.ts`, `answerChallenge`).
    */
-  async challenged(response: HttpResponse, answered: DigestChallenge | null): Promise<boolean> {
+  async challenged(response: HttpResponse, answered: Scheme): Promise<boolean> {
     return (await digest()).answerChallenge(this, response, answered);
   }
 }

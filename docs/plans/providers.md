@@ -434,12 +434,22 @@ marked _to be recorded_.
   finding: Baïkal authenticates with HTTP Digest by default (its
   `dav_auth_type`), and AstroTime sent Basic only, so a Baïkal of
   default settings refused every sign-in as a wrong password. The CalDAV
-  provider now sends Basic first, as every other server takes it, and a
-  `401` whose `WWW-Authenticate` offers Digest (RFC 7616: MD5, SHA-256
-  and their `-sess` forms, `qop=auth` or none) is answered once; the
-  account's provider then stays on Digest, a stale nonce (`stale=true`)
-  answered again, and a refusal of the challenge a request answered is the
-  credentials refused, never a loop (`Authorization`, `auth.ts`). Requests
+  provider now sends Basic first over https and to this device, as every
+  other server takes it, and a `401` whose `WWW-Authenticate` offers
+  Digest (RFC 7616: MD5, SHA-256 and their `-sess` forms, `qop=auth` or
+  none) is answered once; the account's provider then stays on Digest. A
+  stale nonce (`stale=true`), or a new nonce given without saying so (as
+  nginx's Digest does), is taken up and the request sent again; a refusal
+  of the very challenge a request answered is the credentials refused,
+  never a loop (`Authorization`, `auth.ts`). The header is read as RFC
+  9110 §11.6.1 writes it: several challenges in one header, quoted values
+  read whole, a comma, `=` or "Digest" inside one too (`challengesOf`).
+  **Over plain http to another host** the first request goes without
+  credentials, to learn the scheme, then Basic or Digest as the server
+  asks: a first Basic there would put the password on the wire in clear
+  to a server that may only take Digest. The price is one request more per
+  sync on such a server (none over https, where Basic first saves that
+  round trip, nor on this device). Requests
   in flight together are each judged by what they were signed with: one
   sent with Basic, or with an older challenge, before another's `401`
   taught the current one, is sent again with it, not taken as a wrong
@@ -460,8 +470,8 @@ marked _to be recorded_.
   (`@astrotime/caldav/login-flow`), `revokeAppPassword`, which removing
   an account needs, staying (`app-password.ts`); the flow imports the
   core's `provider.ts` alone, not its index, so its chunk splits nothing
-  else off the first load. AstroTime's own first load went from 132 492
-  to 132 312 bytes (129.4 to 129.2 KiB).
+  else off the first load. With all of the above AstroTime's own first
+  load went from 132 492 to 132 468 bytes (129.4 KiB both).
 
 - **D261. The interop matrix, as built.** `packages/sync/test/interop/`:
   `compose.yaml` pins each server, `servers.ts` names where each listens
@@ -500,7 +510,12 @@ marked _to be recorded_.
   documentation. **Cyrus IMAP**, **SOGo** (with its database and
   users) and **Davis** (sabre/dav, as Baïkal) were not tried this round.
 - **The scheme remembered with the account** ([D260](#D260)) — a Digest
-  server's first request of each sync is a refused Basic one.
+  server's first request of each sync is a refused Basic one (or, over
+  plain http elsewhere, one without credentials).
+- **Revoking an app password over plain http** ([D260](#D260)) —
+  `revokeAppPassword` (Nextcloud's OCS, not CalDAV) still sends Basic at
+  once; Nextcloud takes Basic only, and an app password over plain http
+  was already in clear when Login Flow gave it.
 
 - **Import of an ICS file** — a file from the device (Tuta's export, an
   invitation) read into a calendar once ([D256](#D256)); a subscription

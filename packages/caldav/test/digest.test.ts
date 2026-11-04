@@ -5,7 +5,7 @@
 import { AuthError } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
-import { digestChallenge, digestHeader, md5 } from "../src/digest.ts";
+import { challengesOf, digestChallenge, digestHeader, md5 } from "../src/digest.ts";
 import { CHALLENGE } from "../src/proxy.ts";
 import {
   Authorization,
@@ -82,13 +82,15 @@ test("the Digest challenge is found among a header's others, with its quoted com
 function digestServer() {
   const nonces = ["n1", "n2"];
   let nonce = nonces[0]!;
+  /** Whether an old nonce is answered with `stale=true` (sabre/dav) or a bare new one (nginx's). */
+  let staleSaid = true;
   const sent: string[] = [];
   /** The `nc` of each Digest answer, as it arrived. */
   const counts: number[] = [];
   const fetch = (async (input: URL | string, init: RequestInit) => {
     const url = new URL(String(input));
     const header = new Headers(init.headers).get("authorization") ?? "";
-    sent.push(header.split(" ")[0] ?? "");
+    sent.push(header.split(" ")[0] || "none");
     const challenge = (stale = false) =>
       new Response("", {
         status: 401,
@@ -98,7 +100,7 @@ function digestServer() {
       });
     if (!header.startsWith("Digest ")) return challenge();
     const said = (name: string) => new RegExp(`${name}="?([^",]+)`).exec(header)?.[1] ?? "";
-    if (said("nonce") !== nonce) return challenge(true);
+    if (said("nonce") !== nonce) return challenge(staleSaid);
     // The count the client says, which the answer covers; in any order, as sabre/dav takes them.
     const count = Number.parseInt(said("nc"), 16);
     counts.push(count);
@@ -116,8 +118,9 @@ function digestServer() {
     fetch,
     sent,
     counts,
-    renew: () => {
+    renew: (stale = true) => {
       nonce = nonces[1]!;
+      staleSaid = stale;
     },
   };
 }
@@ -128,20 +131,20 @@ test("a server that asks for Digest is answered with it, and stays answered so",
   const server = digestServer();
   const http = fetchClient({ fetch: server.fetch });
   const auth = new Authorization({ username: "astro", password: "secret" });
-  expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
-  expect((await send(http, auth, propfind("http://dav.example/dav.php/a/"), [])).status).toBe(207);
+  expect((await send(http, auth, propfind("https://dav.example/dav.php/"), [])).status).toBe(207);
+  expect((await send(http, auth, propfind("https://dav.example/dav.php/a/"), [])).status).toBe(207);
   // Basic once, then Digest only: the second request needs no challenge.
   expect(server.sent).toEqual(["Basic", "Digest", "Digest"]);
   // A stale nonce is answered again with the new one, not taken as a refusal.
   server.renew();
-  expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
+  expect((await send(http, auth, propfind("https://dav.example/dav.php/"), [])).status).toBe(207);
 });
 
 test("requests sent together before the first challenge are each answered with Digest, none refused", async () => {
   const server = digestServer();
   const http = fetchClient({ fetch: server.fetch });
   const auth = new Authorization({ username: "astro", password: "secret" });
-  const urls = ["a", "b", "c", "d", "e"].map((name) => `http://dav.example/dav.php/${name}.ics`);
+  const urls = ["a", "b", "c", "d", "e"].map((name) => `https://dav.example/dav.php/${name}.ics`);
   // All five go with Basic before any 401 comes back: the later 401s meet a
   // challenge already taken up, not a refusal of it.
   const answers = await Promise.all(urls.map((url) => send(http, auth, propfind(url), [])));
@@ -159,9 +162,9 @@ test("a stale nonce met by requests in flight together is taken up once and each
   const server = digestServer();
   const http = fetchClient({ fetch: server.fetch });
   const auth = new Authorization({ username: "astro", password: "secret" });
-  await send(http, auth, propfind("http://dav.example/dav.php/"), []);
+  await send(http, auth, propfind("https://dav.example/dav.php/"), []);
   server.renew();
-  const urls = ["a", "b", "c"].map((name) => `http://dav.example/dav.php/${name}.ics`);
+  const urls = ["a", "b", "c"].map((name) => `https://dav.example/dav.php/${name}.ics`);
   const answers = await Promise.all(urls.map((url) => send(http, auth, propfind(url), [])));
   expect(answers.map((answer) => answer.status)).toEqual([207, 207, 207]);
 });
@@ -170,7 +173,7 @@ test("a wrong password is refused after one Digest try, never in a loop", async 
   const server = digestServer();
   const http = fetchClient({ fetch: server.fetch });
   const auth = new Authorization({ username: "astro", password: "wrong" });
-  await expect(send(http, auth, propfind("http://dav.example/dav.php/"), [])).rejects.toThrow(
+  await expect(send(http, auth, propfind("https://dav.example/dav.php/"), [])).rejects.toThrow(
     AuthError,
   );
   expect(server.sent).toEqual(["Basic", "Digest"]);
@@ -195,6 +198,89 @@ test("through the web proxy the challenge arrives under its own name, and Digest
     via: throughProxy("/dav-proxy/"),
   });
   const auth = new Authorization({ username: "astro", password: "secret" });
-  expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
+  expect((await send(http, auth, propfind("https://dav.example/dav.php/"), [])).status).toBe(207);
   expect(challenges).toEqual([expect.stringMatching(/^Digest realm="BaikalDAV"/)]);
+});
+
+test("a challenge's quoted values are read whole: commas, `=` and scheme names in them, several challenges in one header", () => {
+  expect(
+    challengesOf(
+      'Negotiate abc+/==, Basic realm="Digest, or not", charset="UTF-8", Digest realm="a \\"quoted\\" realm, with Basic realm=x", nonce="n=1,2", qop="auth-int, auth", algorithm=MD5',
+    ),
+  ).toEqual([
+    { scheme: "negotiate", params: new Map([["", "abc+/=="]]) },
+    {
+      scheme: "basic",
+      params: new Map([
+        ["realm", "Digest, or not"],
+        ["charset", "UTF-8"],
+      ]),
+    },
+    {
+      scheme: "digest",
+      params: new Map([
+        ["realm", 'a "quoted" realm, with Basic realm=x'],
+        ["nonce", "n=1,2"],
+        ["qop", "auth-int, auth"],
+        ["algorithm", "MD5"],
+      ]),
+    },
+  ]);
+  // "Digest" inside Basic's realm is no Digest challenge.
+  expect(digestChallenge('Basic realm="Digest realm=x, nonce=y"')).toBeNull();
+  // Of two Digest challenges, the first this client can answer.
+  expect(
+    digestChallenge(
+      'Digest realm="r", nonce="a", algorithm=SHA-512-256, Digest realm="r", nonce="b", algorithm=SHA-256',
+    )?.challenge,
+  ).toMatchObject({ nonce: "b", algorithm: "SHA-256" });
+});
+
+test("a new nonce without `stale` is taken up once before the password is called refused", async () => {
+  const server = digestServer();
+  const http = fetchClient({ fetch: server.fetch });
+  const auth = new Authorization({ username: "astro", password: "secret" });
+  await send(http, auth, propfind("https://dav.example/dav.php/"), []);
+  // As nginx's Digest does: a 401 with a fresh nonce, no stale=true.
+  server.renew(false);
+  expect((await send(http, auth, propfind("https://dav.example/dav.php/"), [])).status).toBe(207);
+  // The same nonce refused again is the password refused.
+  const wrong = new Authorization({ username: "astro", password: "wrong" });
+  await expect(send(http, wrong, propfind("https://dav.example/dav.php/"), [])).rejects.toThrow(
+    AuthError,
+  );
+});
+
+test("over plain http to another host, the first request goes without credentials to learn the scheme", async () => {
+  const digest = digestServer();
+  const auth = new Authorization({ username: "astro", password: "secret" });
+  const http = fetchClient({ fetch: digest.fetch });
+  expect((await send(http, auth, propfind("http://dav.example/dav.php/"), [])).status).toBe(207);
+  // No password in clear: nothing, then Digest.
+  expect(digest.sent).toEqual(["none", "Digest"]);
+
+  // A Basic server there gets Basic once it asks, and from then on at once.
+  const sent: (string | null)[] = [];
+  const basicOnly = fetchClient({
+    fetch: (async (_input: URL | string, init: RequestInit) => {
+      const header = new Headers(init.headers).get("authorization");
+      sent.push(header);
+      return header === basic
+        ? new Response("ok", { status: 207 })
+        : new Response("", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="r"' } });
+    }) as typeof fetch,
+  });
+  const basic = `Basic ${btoa("astro:secret")}`;
+  const plain = new Authorization({ username: "astro", password: "secret" });
+  expect((await send(basicOnly, plain, propfind("http://dav.example/a/"), [])).status).toBe(207);
+  expect((await send(basicOnly, plain, propfind("http://dav.example/b/"), [])).status).toBe(207);
+  expect(sent).toEqual([null, basic, basic]);
+
+  // Over https, and to this device, Basic goes at once: one round trip fewer.
+  for (const url of ["https://dav.example/", "http://127.0.0.1:5232/", "http://localhost/"]) {
+    sent.length = 0;
+    const first = new Authorization({ username: "astro", password: "secret" });
+    await send(basicOnly, first, propfind(url), []);
+    expect(sent).toEqual([basic]);
+  }
 });

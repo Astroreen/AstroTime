@@ -1,55 +1,108 @@
 // HTTP Digest (RFC 7616), loaded only once a server asks for it
 // (docs/plans/providers.md#D260). MD5 is not in Web Crypto, so it is here;
 // SHA-256 is Web Crypto's.
-import type { Authorization, DigestChallenge } from "./auth.ts";
+import type { Authorization, DigestChallenge, Scheme } from "./auth.ts";
 import type { HttpRequest, HttpResponse } from "./http.ts";
 import type { Credentials } from "./provider.ts";
 
 /**
- * Takes up a server's Digest challenge after a 401 to a request signed for
- * `answered`. A request signed before another's 401 taught a newer
- * challenge (requests in flight together) is sent again with that one; a
- * first challenge, or a stale nonce (RFC 7616 §3.3), is taken up and worth
- * sending again; a refusal of the current challenge is the credentials
- * refused.
+ * Learns from a 401 to a request signed with `answered` (`null`: sent
+ * without credentials) whether sending it again may succeed, and how. A
+ * request signed before another's 401 taught the current scheme (requests
+ * in flight together) is sent again with that. A Digest challenge is taken
+ * up, and the request sent again, when the request did not answer it: a
+ * first one, a stale nonce (RFC 7616 §3.3), or a new nonce the server
+ * gives without saying `stale` (nginx's and others' Digest). A request sent
+ * without credentials, to learn the scheme, is sent again with Basic when
+ * the server asks for no Digest. Anything else is the credentials refused.
  */
 export function answerChallenge(
   authorization: Authorization,
   response: HttpResponse,
-  answered: DigestChallenge | null,
+  answered: Scheme,
 ): boolean {
-  if (authorization.digest !== answered) return true;
+  if (authorization.scheme !== answered) return true;
   // Through the web proxy, the server's challenge comes under its own name
   // (proxy.ts's CHALLENGE, spelled here so this chunk imports nothing).
   const found = digestChallenge(
     response.header("www-authenticate") ?? response.header("x-astrotime-www-authenticate"),
   );
-  if (!found || (answered && !found.stale)) return false;
-  authorization.digest = { ...found.challenge, count: 0 };
-  return true;
+  const answeredDigest = typeof answered === "object" && answered !== null ? answered : null;
+  if (found && (!answeredDigest || found.stale || found.challenge.nonce !== answeredDigest.nonce)) {
+    authorization.scheme = { ...found.challenge, count: 0 };
+    return true;
+  }
+  if (answered === null) {
+    authorization.scheme = "basic";
+    return true;
+  }
+  return false;
 }
 
-const PARAM = /([a-z0-9-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^\s,]+))/gi;
+/**
+ * A `WWW-Authenticate` header's challenges (RFC 9110 §11.6.1), each its
+ * scheme in lower case and its parameters, names in lower case; a quoted
+ * value is read whole, commas, `=` and scheme names in it too, its
+ * escapes undone. A token68 (Negotiate's) is kept as a parameter of no name.
+ */
+export function challengesOf(
+  header: string,
+): { readonly scheme: string; readonly params: Map<string, string> }[] {
+  const TOKEN = /[!#$%&'*+.^_`|~0-9A-Za-z-]+/y;
+  const found: { scheme: string; params: Map<string, string> }[] = [];
+  let at = 0;
+  const skip = (pattern: RegExp) => {
+    pattern.lastIndex = at;
+    const match = pattern.exec(header);
+    if (match) at = pattern.lastIndex;
+    return match;
+  };
+  while (at < header.length) {
+    skip(/[\s,]*/y);
+    const token = skip(TOKEN)?.[0];
+    if (!token) {
+      // Nothing this grammar reads: the rest is no challenge.
+      break;
+    }
+    const before = at;
+    skip(/\s*/y);
+    if (header[at] === "=" && found.length > 0) {
+      at += 1;
+      skip(/\s*/y);
+      const quoted = skip(/"((?:[^"\\]|\\.)*)"/y);
+      const value = quoted ? quoted[1]!.replace(/\\(.)/g, "$1") : (skip(/[^\s,]*/y)?.[0] ?? "");
+      found.at(-1)!.params.set(token.toLowerCase(), value);
+      continue;
+    }
+    at = before;
+    found.push({ scheme: token.toLowerCase(), params: new Map() });
+    // A token68 right after the scheme (`Negotiate abc==`), not a parameter.
+    skip(/\s+/y);
+    const token68 = skip(/[A-Za-z0-9\-._~+/]+=*(?=\s*(,|$))/y);
+    if (token68) found.at(-1)!.params.set("", token68[0]);
+  }
+  return found;
+}
 
 /**
- * The Digest challenge among a `WWW-Authenticate` header's, with an
- * algorithm this client speaks; `null` when there is none. A header may
- * hold several challenges (Basic beside Digest); only Digest's parameters
- * are read.
+ * The first Digest challenge of a `WWW-Authenticate` header with an
+ * algorithm and a `qop` this client speaks; `null` when there is none.
  */
 export function digestChallenge(
   header: string | null,
 ): { readonly challenge: Omit<DigestChallenge, "count">; readonly stale: boolean } | null {
   if (!header) return null;
-  const start = header.search(/(^|,)\s*digest\s/i);
-  if (start < 0) return null;
-  const rest = header.slice(start).replace(/^,?\s*digest\s+/i, "");
-  // Up to the next scheme: a bare token followed by a space, not a parameter.
-  const end = rest.search(/,\s*[a-z0-9-]+\s+[a-z0-9-]+\s*=/i);
-  const params = new Map<string, string>();
-  for (const match of (end < 0 ? rest : rest.slice(0, end)).matchAll(PARAM)) {
-    params.set(match[1]!.toLowerCase(), match[2]?.replace(/\\(.)/g, "$1") ?? match[3] ?? "");
+  for (const { scheme, params } of challengesOf(header)) {
+    if (scheme !== "digest") continue;
+    const read = readDigest(params);
+    if (read) return read;
   }
+  return null;
+}
+
+function readDigest(
+  params: Map<string, string>,
+): { readonly challenge: Omit<DigestChallenge, "count">; readonly stale: boolean } | null {
   const realm = params.get("realm");
   const nonce = params.get("nonce");
   if (realm === undefined || nonce === undefined) return null;
