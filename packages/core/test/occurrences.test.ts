@@ -561,6 +561,53 @@ describe("RFC 5545's corners", () => {
     }
   });
 
+  test("an event or a task that ends in another zone than it starts ends at its instant (D32)", () => {
+    const end = (component: string, endLine: string) =>
+      occurrencesBetween(
+        CalendarObject.parse(
+          [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            `BEGIN:${component}`,
+            "UID:once",
+            "DTSTAMP:20261101T000000Z",
+            "DTSTART;TZID=Europe/Berlin:20261102T100000",
+            endLine,
+            `END:${component}`,
+            "END:VCALENDAR",
+            "",
+          ].join("\r\n"),
+        ),
+        vilnius("2026-11-01", "2026-11-08"),
+      ).map((o) => (o.end.type === "zoned" ? new Date(o.end.epochMs).toISOString() : o.end));
+    expect(end("VEVENT", "DTEND;TZID=America/New_York:20261102T130000")).toEqual([
+      "2026-11-02T18:00:00.000Z",
+    ]);
+    expect(end("VTODO", "DUE;TZID=America/New_York:20261102T130000")).toEqual([
+      "2026-11-02T18:00:00.000Z",
+    ]);
+  });
+
+  test("a series whose ends name one zone two ways keeps its wall-clock length across DST (D32)", () => {
+    // Kyiv goes from 04:00 back to 03:00 on 25 October: 22:00 to 06:00 is
+    // eight hours on the wall clock, nine elapsed. Europe/Kiev is the old
+    // name of Europe/Kyiv, and FLE Standard Time Windows' name for it.
+    for (const [from, to] of [
+      ["Europe/Kyiv", "Europe/Kiev"],
+      ["FLE Standard Time", "Europe/Kyiv"],
+    ]) {
+      const ends = occurrencesBetween(
+        event(
+          `DTSTART;TZID=${from}:20261024T220000`,
+          `DTEND;TZID=${to}:20261025T060000`,
+          "RRULE:FREQ=DAILY;COUNT=2",
+        ),
+        vilnius("2026-10-20", "2026-10-31"),
+      ).map((o) => wallClockOf(o.end, "Europe/Kyiv"));
+      expect(ends, `${from} to ${to}`).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+    }
+  });
+
   test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {
     // Google's way: a TZID and no VTIMEZONE. 09:00 in New York is 14:00Z, so
     // an UNTIL at 13:59:59Z on the 23rd ends the series the week before.

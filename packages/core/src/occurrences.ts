@@ -3,7 +3,7 @@ import ICAL from "ical.js";
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
-import { fromIcalTime, keepTzid, wallClockOf, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, wallClockIn, wallClockOf, type ItemTime } from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
 export interface Occurrence {
@@ -85,19 +85,41 @@ function rawAnchors(component: ICAL.Component): { start: ICAL.Time; end: ICAL.Ti
  * (so a 1-hour meeting stays 1 hour across DST), else the time between their
  * instants (a flight from Berlin to New York). ical.js holds both of two
  * zones the object does not define (D32) as wall clocks of one zone, so the
- * zones are told apart as `fromIcalTime` reads them.
+ * zones are told apart as `fromIcalTime` reads them, and by their clocks:
+ * one zone under two names (`Europe/Kiev` and `Europe/Kyiv`) is one zone.
  */
 export function lengthOf({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
   const from = fromIcalTime(start);
   const to = fromIcalTime(end);
   const length =
-    from.type === "zoned" && to.type === "zoned" && from.timeZone !== to.timeZone
+    from.type === "zoned" && to.type === "zoned" && !sameClock(from, to)
       ? ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000))
       : start.zone === end.zone
         ? end.subtractDate(start)
         : end.subtractDateTz(start);
   // An end before the start (RFC 5545 forbids it, some clients write it) is no length.
   return length.isNegative ? new ICAL.Duration({}) : length;
+}
+
+/**
+ * Whether two zoned times read the same wall clocks in either's zone: one
+ * zone (an alias too, which `Intl` may or may not resolve to one name), or
+ * zones with the same offsets at both instants, which measure one length.
+ */
+function sameClock(
+  a: Extract<ItemTime, { type: "zoned" }>,
+  b: Extract<ItemTime, { type: "zoned" }>,
+): boolean {
+  if (a.timeZone === b.timeZone) return true;
+  try {
+    return (
+      wallClockIn(a.epochMs, b.timeZone) === a.local &&
+      wallClockIn(b.epochMs, a.timeZone) === b.local
+    );
+  } catch {
+    // A zone `Intl` does not know (a VTIMEZONE's own name): another zone.
+    return false;
+  }
 }
 
 function bounds(range: Range) {
