@@ -347,7 +347,7 @@ marked _to be recorded_.
   package (`connectCalDav` stays the CalDAV entry). The first load holds
   the registry and no provider; CalDAV, already on it, moves to a lazy
   chunk when a PR needs its room ([D145](foundation.md#D145)'s Deferred,
-  "the sync stack and signing in with their first use"). The sign-in
+  "the sync stack with its first use"). The sign-in
   dialog's new choices (the known services' table, the subscription form,
   the OAuth buttons) load with the sign-in dialog, never before. Each PR
   measures the first load before and after; none may add more than 0.1
