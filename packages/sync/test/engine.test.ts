@@ -93,6 +93,33 @@ describe("the sync engine's harder paths (review of #4)", () => {
     ]);
   });
 
+  test("another client's object at the href of a creation whose upload failed is the server's, ours a conflict", async () => {
+    const server = memoryServer(calendarUrl);
+    const { store, sync, calendar } = await device(server);
+    await store.saveLocal(calendar.id, task("same", "Ours"));
+    // Another client takes the href first; our upload fails on its own.
+    server.objects.set(`${calendarUrl}same.ics`, { etag: '"t"', ics: task("same", "Theirs") });
+    server.beforeWrite = (method) => {
+      if (method === "create") throw new Error("PUT answered 500");
+    };
+    await sync();
+    expect(
+      (await store.undated([calendar.id])).map((o) => [
+        /SUMMARY:(\w+)/.exec(o.ics)?.[1],
+        o.pending,
+      ]),
+    ).toEqual([["Ours", "create"]]);
+    server.beforeWrite = () => {};
+    expect(await sync()).toMatchObject({ conflicts: 1, errors: [] });
+    expect(
+      (await store.undated([calendar.id])).map((o) => [
+        /SUMMARY:(\w+)/.exec(o.ics)?.[1],
+        o.pending,
+      ]),
+    ).toEqual([["Theirs", "none"]]);
+    expect((await store.conflicts()).map((c) => c.localIcs)).toEqual([task("same", "Ours")]);
+  });
+
   test("an edit made while our deletion is on its way is not lost unsaid: its drop is reported", async () => {
     const server = memoryServer(calendarUrl);
     const { store, sync, calendar } = await device(server);

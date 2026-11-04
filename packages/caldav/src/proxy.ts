@@ -39,8 +39,10 @@ export interface ProxyOptions {
   /** Where proxied URLs start on the app's origin, `/dav-proxy/`. */
   readonly prefix: string;
   /**
-   * Origins the proxy may reach (`https://cloud.example.com`). `"*"` allows
-   * any, for a dev server only it listens to; never in production.
+   * Origins the proxy may reach (`https://cloud.example.com`); an `http://`
+   * one with no port lets its host's `https://` through too, as its upgrade
+   * redirect is passed on (D39). `"*"` allows any, for a dev server only it
+   * listens to; never in production.
    */
   readonly allow: readonly string[] | "*";
   readonly fetch?: typeof fetch;

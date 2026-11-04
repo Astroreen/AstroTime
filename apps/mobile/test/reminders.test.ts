@@ -321,7 +321,10 @@ test("a reminder that fired, left the set and came back within the grace is not 
   const task = reminder("task", NOW + 10 * MINUTE);
   await scheduler(phone, preferences).reminders.schedule([task]);
   // Android fired it at its time; the task was ticked done, then unticked.
+  const id = idOf(phone, "task")!;
   await scheduler(phone, preferences, NOW + 12 * MINUTE).reminders.schedule([]);
+  // Its alarm is cancelled all the same: Doze may still hold an inexact one.
+  expect(phone.calls.at(-1)!.cancelled).toEqual([id]);
   await scheduler(phone, preferences, NOW + 13 * MINUTE).reminders.schedule([task]);
   const immediate = phone.calls
     .flatMap(({ scheduled }) => scheduled)

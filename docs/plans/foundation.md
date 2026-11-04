@@ -2304,8 +2304,9 @@ task?"
 - **A creation whose upload keeps failing, listed by the server**
   ([D38](#D38)) — it stays pending and reported, and every sync keeps its
   token and lists the calendar again until the upload recognises the
-  object as its own; a server that stores a write and keeps answering
-  500 to it makes each sync a full listing.
+  object as its own (or another's, which then wins and ours goes to the
+  Conflicts list); a server that keeps refusing the write (a 500, a 403)
+  makes each sync a full listing for as long, with no cap or backoff.
 - **A second edit made while an update's server copy is found gone**
   ([D38](#D38)) — the server's deletion wins and the href is reported in
   `dropped`, but that second edit goes with it, not left pending as a
