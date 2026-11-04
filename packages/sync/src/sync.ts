@@ -108,7 +108,9 @@ async function run(store: Store, provider: Provider, accountId: string, report: 
     remote = await provider.calendars();
   } catch (error) {
     // Part of the account read (a `PartialListing`, known by its fields: the
-    // engine imports no provider): that part syncs; the rest stays as it is, said.
+    // engine imports no provider): that part syncs; the rest stays as it is,
+    // said. A part signed out or offline is the account's, thrown by
+    // `isolated` as any `AuthError` or `OfflineError` is.
     const part = error as Partial<PartialListing> | null;
     if (!part?.calendars || !part.unread) throw error;
     remote = part.calendars;

@@ -184,7 +184,20 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
     "WKST",
   ]);
   if ([...parts.keys()].some((key) => !known.has(key))) return null;
-  const interval = Number(parts.get("INTERVAL") ?? "1");
+  // One whole number in Graph's range, or none; a list (`BYMONTHDAY=1,15`)
+  // or one from the end (`-1`) is a shape Graph has none for.
+  const whole = (name: string, max: number) => {
+    const value = parts.get(name);
+    if (value === undefined) return undefined;
+    return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= max ? Number(value) : null;
+  };
+  const [interval, count, monthDay, byMonth] = [
+    whole("INTERVAL", 999),
+    whole("COUNT", 999),
+    whole("BYMONTHDAY", 31),
+    whole("BYMONTH", 12),
+  ];
+  if ([interval, count, monthDay, byMonth].includes(null)) return null;
   const days = (parts.get("BYDAY") ?? "").split(",").filter(Boolean);
   const startDay = Number(startDate.slice(8, 10));
   const startMonth = Number(startDate.slice(5, 7));
@@ -194,7 +207,7 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
   const names = plainDays.map((match) => DAY_NAMES[match![2]!]!);
   const until = parts.get("UNTIL");
   const range: Recurrence["range"] = parts.has("COUNT")
-    ? { type: "numbered", startDate, numberOfOccurrences: Number(parts.get("COUNT")) }
+    ? { type: "numbered", startDate, numberOfOccurrences: count! }
     : until
       ? {
           type: "endDate",
@@ -204,7 +217,7 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
             : `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`,
         }
       : { type: "noEnd", startDate };
-  const base = { interval };
+  const base = { interval: interval ?? 1 };
   const relative = indexes.size === 1 && [...indexes][0] !== "";
   const index = relative ? INDEX_NAMES[[...indexes][0]!.replace("+", "")] : undefined;
   if (relative && !index) return null;
@@ -230,7 +243,7 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
           pattern: {
             ...base,
             type: "absoluteMonthly",
-            dayOfMonth: Number(parts.get("BYMONTHDAY") ?? startDay),
+            dayOfMonth: monthDay ?? startDay,
           },
           range,
         };
@@ -240,15 +253,14 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
     case "YEARLY": {
       // `BYDAY=4TH` with no month is the year's 4th Thursday, which Graph cannot say.
       if (relative && !parts.has("BYMONTH")) return null;
-      const month = Number(parts.get("BYMONTH") ?? startMonth);
-      if (!month) return null;
+      const month = byMonth ?? startMonth;
       if (days.length === 0)
         return {
           pattern: {
             ...base,
             type: "absoluteYearly",
             month,
-            dayOfMonth: Number(parts.get("BYMONTHDAY") ?? startDay),
+            dayOfMonth: monthDay ?? startDay,
           },
           range,
         };
@@ -262,6 +274,19 @@ export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Rec
     default:
       return null;
   }
+}
+
+/**
+ * An all-day event's day: Graph gives its midnight as an instant (`Prefer`
+ * in UTC), so the day is that instant's in the event's own zone; Vilnius's
+ * 6 November starts on the 5th in UTC. A zone not known here (UTC in its
+ * place) takes the nearest midnight, right for every offset within 12 hours.
+ */
+function dayIn(instant: string, zone: string): string {
+  const epoch = Date.parse(instant);
+  return compact(
+    zone === "UTC" ? new Date(epoch + 12 * 3_600_000).toISOString() : wallClockIn(epoch, zone),
+  );
 }
 
 /** The zones an event's start and end are written in: its own, as Outlook shows it. */
@@ -287,7 +312,9 @@ function veventLines(event: GraphEvent, master: GraphEvent | null): string[] {
   const allDay = event.isAllDay === true;
   const zones = zonesOf(event, master);
   const time = (name: string, at: GraphTime, zone: string) =>
-    allDay ? `${name};VALUE=DATE:${compact(at.dateTime)}` : `${name}${zonedText(utcOf(at), zone)}`;
+    allDay
+      ? `${name};VALUE=DATE:${dayIn(utcOf(at), zone)}`
+      : `${name}${zonedText(utcOf(at), zone)}`;
   const lines = [
     "BEGIN:VEVENT",
     `UID:${master ? (master.iCalUId ?? master.id) : (event.iCalUId ?? event.id)}`,
@@ -296,7 +323,7 @@ function veventLines(event: GraphEvent, master: GraphEvent | null): string[] {
   if (master && event.originalStart)
     lines.push(
       master.isAllDay
-        ? `RECURRENCE-ID;VALUE=DATE:${compact(event.originalStart)}`
+        ? `RECURRENCE-ID;VALUE=DATE:${dayIn(event.originalStart, zonesOf(master, null).start)}`
         : `RECURRENCE-ID${zonedText(event.originalStart, zonesOf(master, null).start)}`,
     );
   lines.push(time("DTSTART", event.start, zones.start), time("DTEND", event.end, zones.end));
@@ -383,7 +410,8 @@ function graphTime(
   const line = lineOf(component, name);
   if (!line) return null;
   const { time, date, zone } = timeOf(line);
-  if (date) return { time: { dateTime: `${time}T00:00:00`, timeZone: "UTC" }, date };
+  // A day is the user's: its midnight in their zone, as Outlook makes one.
+  if (date) return { time: { dateTime: `${time}T00:00:00`, timeZone: floating }, date };
   if (time.endsWith("Z")) return { time: { dateTime: time.slice(0, -1), timeZone: "UTC" }, date };
   return { time: { dateTime: time, timeZone: zone ? ianaName(zone) : floating }, date };
 }
@@ -590,8 +618,14 @@ export class OutlookCalendars implements Provider {
     const { master, exceptions } = eventsIn(ics);
     if (!master) throw new Error("A calendar object with no event.");
     const { fields, dropped } = eventFieldsOf(master, this.zone);
+    // Graph's `iCalUId` is its own; `transactionId`, the UID here, makes a
+    // create sent again (its answer lost) the event already made, not a second.
+    const uid = lineOf(master, "UID")?.value;
     const { value } = await this.graph.json<GraphEvent>("POST", calendarUrl.replace(/\/$/, ""), {
-      body: Object.fromEntries(Object.entries(fields).filter(([, field]) => field !== null)),
+      body: {
+        ...Object.fromEntries(Object.entries(fields).filter(([, field]) => field !== null)),
+        ...(uid ? { transactionId: uid } : {}),
+      },
     });
     if (!value) throw new Error("Graph gave no event back.");
     // A series made here with its own exceptions: written as a series, its exceptions not (D253's Deferred).

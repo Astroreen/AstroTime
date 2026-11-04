@@ -4,7 +4,13 @@
 // a series' exceptions from `instances`. Through the sync engine and a real
 // store: both ways, a PATCH of what changed only.
 import type { HttpClient, HttpRequest, TokenSource } from "@astrotime/caldav";
-import { CalendarObject, occurrencesBetween, type Provider } from "@astrotime/core";
+import {
+  AuthError,
+  CalendarObject,
+  OfflineError,
+  occurrencesBetween,
+  type Provider,
+} from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { syncAccount } from "@astrotime/sync";
@@ -76,7 +82,12 @@ function graphApi() {
       return page(url, [{ id: "work", name: "Work", hexColor: "#3f7be0", canEdit: true }]);
     if (path === "me/todo/lists") return page(url, [{ id: "tasks", displayName: "Tasks" }]);
     if (path === "me/calendars/work/events") {
-      if (request.method === "POST")
+      if (request.method === "POST") {
+        // Graph's own dedup: a POST with a `transactionId` it has seen is the event it made then.
+        const made = [...events.values()].find(
+          (event) => body["transactionId"] && event["transactionId"] === body["transactionId"],
+        );
+        if (made) return json(201, made);
         return json(
           201,
           keep(events, {
@@ -86,6 +97,7 @@ function graphApi() {
             type: body["recurrence"] ? "seriesMaster" : "singleInstance",
           }),
         );
+      }
       return page(url, [...events.values()]);
     }
     if ((m = /^me\/events\/([^/]+)\/instances$/.exec(path)))
@@ -622,4 +634,200 @@ test("a To Do task with no ETag on either side is fetched again, never taken as 
     new Map([[`${url}k1`, null]]),
   );
   expect(changes.changed.map((object) => object.href)).toEqual([`${url}k1`]);
+});
+
+test("an all-day event east of UTC stays on its day: Vilnius, Tokyo, a zone no database knows, a series' exception", async () => {
+  const api = graphApi();
+  // Graph gives an all-day event's midnight as an instant: 6 November in Vilnius starts on the 5th in UTC.
+  const allDay = (id: string, zone: string, start: string, end: string) =>
+    api.keep(api.events, {
+      id,
+      iCalUId: id,
+      subject: id,
+      isAllDay: true,
+      originalStartTimeZone: zone,
+      originalEndTimeZone: zone,
+      start: at(start),
+      end: at(end),
+      type: "singleInstance",
+    });
+  allDay(
+    "vilnius",
+    "FLE Standard Time",
+    "2026-11-05T22:00:00.0000000",
+    "2026-11-06T22:00:00.0000000",
+  );
+  allDay(
+    "tokyo",
+    "Tokyo Standard Time",
+    "2026-11-05T15:00:00.0000000",
+    "2026-11-06T15:00:00.0000000",
+  );
+  allDay(
+    "custom",
+    "Customized Time Zone",
+    "2026-11-05T22:00:00.0000000",
+    "2026-11-06T22:00:00.0000000",
+  );
+  api.keep(api.events, {
+    id: "s1",
+    iCalUId: "holidays",
+    subject: "Off",
+    isAllDay: true,
+    originalStartTimeZone: "Europe/Vilnius",
+    start: at("2026-11-01T22:00:00.0000000"),
+    end: at("2026-11-02T22:00:00.0000000"),
+    type: "seriesMaster",
+    recurrence: {
+      pattern: { type: "weekly", interval: 1, daysOfWeek: ["monday"] },
+      range: { type: "numbered", startDate: "2026-11-02", numberOfOccurrences: 3 },
+    },
+  });
+  api.exceptions.set("s1", [
+    {
+      id: "x1",
+      type: "exception",
+      isAllDay: true,
+      subject: "Off, moved",
+      originalStartTimeZone: "Europe/Vilnius",
+      originalStart: "2026-11-08T22:00:00Z",
+      start: at("2026-11-09T22:00:00.0000000"),
+      end: at("2026-11-10T22:00:00.0000000"),
+      "@odata.etag": 'W/"x1"',
+    },
+  ]);
+  const provider = new OutlookCalendars(
+    new Graph(api.http, tokens),
+    () => Date.UTC(2026, 10, 4),
+    "Europe/Vilnius",
+  );
+  const read = async (id: string) =>
+    (await provider.fetch(`${GRAPH}me/calendars/work/events/${id}`))!;
+  for (const id of ["vilnius", "tokyo", "custom"]) {
+    const { ics } = await read(id);
+    expect(ics, id).toContain("DTSTART;VALUE=DATE:20261106\r\n");
+    expect(ics, id).toContain("DTEND;VALUE=DATE:20261107\r\n");
+    expect(ics, id).not.toContain("VTIMEZONE");
+  }
+  const series = await read("s1");
+  expect(series.ics).toContain("DTSTART;VALUE=DATE:20261102\r\n");
+  expect(series.ics).toContain("RECURRENCE-ID;VALUE=DATE:20261109\r\n");
+  expect(series.ics).toContain("DTSTART;VALUE=DATE:20261110\r\n");
+  // Read back as it was written: a rename sends the subject alone; a day made here is the user's midnight.
+  const vilnius = await read("vilnius");
+  await provider.update(
+    `${GRAPH}me/calendars/work/events/vilnius`,
+    vilnius.ics.replace("SUMMARY:vilnius", "SUMMARY:Holiday"),
+    vilnius.etag,
+  );
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "PATCH")!.body))).toEqual({
+    subject: "Holiday",
+  });
+  await provider.create(
+    `${GRAPH}me/calendars/work/events/new`,
+    vilnius.ics.replace("UID:vilnius", "UID:made-here"),
+  );
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "POST")!.body))).toMatchObject({
+    isAllDay: true,
+    start: { dateTime: "2026-11-06T00:00:00", timeZone: "Europe/Vilnius" },
+    end: { dateTime: "2026-11-07T00:00:00", timeZone: "Europe/Vilnius" },
+  });
+});
+
+test("a month-day list or one from the end is no shape of Graph's: the event is kept, its rule said not kept, nothing NaN sent", async () => {
+  for (const rule of [
+    "FREQ=MONTHLY;BYMONTHDAY=1,15",
+    "FREQ=MONTHLY;BYMONTHDAY=-1",
+    "FREQ=YEARLY;BYMONTH=1,6",
+    "FREQ=YEARLY;BYMONTH=13",
+    "FREQ=DAILY;INTERVAL=0",
+    "FREQ=DAILY;COUNT=-2",
+  ])
+    expect(recurrenceOf(rule, "2026-11-04"), rule).toBeNull();
+  const api = graphApi();
+  const provider = new OutlookCalendars(new Graph(api.http, tokens), Date.now, "Europe/Vilnius");
+  const written = await provider.create(
+    `${GRAPH}me/calendars/work/events/new`,
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VEVENT\r\nUID:pay\r\nDTSTAMP:20261104T080000Z\r\nDTSTART;VALUE=DATE:20261130\r\nSUMMARY:Pay day\r\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-1\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  expect(written).toMatchObject({ ok: true, dropped: ["RRULE"] });
+  const body = String(api.asked.findLast((r) => r.method === "POST")!.body);
+  expect(JSON.parse(body)).not.toHaveProperty("recurrence");
+  expect(body).not.toContain("NaN");
+  expect(JSON.parse(body)).toMatchObject({
+    subject: "Pay day",
+    start: { dateTime: "2026-11-30T00:00:00" },
+    end: { dateTime: "2026-12-01T00:00:00" },
+  });
+});
+
+test("a part of the account signed out or offline is the account's: the sync stops so, its calendars kept", async () => {
+  const api = graphApi();
+  const graph = new Graph(api.http, tokens);
+  const todo = new MicrosoftTodo(graph);
+  let refusal: Error | null = null;
+  const tasks: Provider = {
+    calendars: () => (refusal ? Promise.reject(refusal) : todo.calendars()),
+    changes: (url, state, known) => todo.changes(url, state, known),
+    fetch: (href) => todo.fetch(href),
+    create: (href, ics) => todo.create(href, ics),
+    update: (href, ics, etag) => todo.update(href, ics, etag),
+    remove: (href, etag) => todo.remove(href, etag),
+  };
+  const microsoft = new MicrosoftProvider(new OutlookCalendars(graph), tasks);
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "m",
+    serverUrl: GRAPH,
+    username: null,
+  });
+  await syncAccount(store, microsoft, account.id);
+  refusal = new AuthError("Tasks.ReadWrite revoked");
+  await expect(syncAccount(store, microsoft, account.id)).rejects.toBeInstanceOf(AuthError);
+  refusal = new OfflineError("offline");
+  await expect(syncAccount(store, microsoft, account.id)).rejects.toBeInstanceOf(OfflineError);
+  expect((await store.calendars(account.id)).map((c) => c.name).toSorted()).toEqual([
+    "Tasks",
+    "Work",
+  ]);
+});
+
+test("a create whose answer was lost, sent again, is the event Graph made then: one event, not two", async () => {
+  const api = graphApi();
+  let lose = true;
+  const losing: HttpClient = async (request) => {
+    const response = await api.http(request);
+    if (request.method === "POST" && lose) {
+      lose = false;
+      throw new OfflineError("the answer was lost");
+    }
+    return response;
+  };
+  const provider = new OutlookCalendars(new Graph(losing, tokens), Date.now, "Europe/Vilnius");
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "m",
+    serverUrl: GRAPH,
+    username: null,
+  });
+  await syncAccount(store, provider, account.id);
+  const [calendar] = await store.calendars(account.id);
+  await store.saveLocal(
+    calendar!.id,
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VEVENT\r\nUID:made-here@astrotime\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Dentist\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+  );
+  await expect(syncAccount(store, provider, account.id)).rejects.toBeInstanceOf(OfflineError);
+  expect(api.events.size).toBe(1);
+  expect((await syncAccount(store, provider, account.id)).errors).toEqual([]);
+  const posts = api.asked.filter((r) => r.method === "POST");
+  expect(posts.map((r) => JSON.parse(String(r.body)).transactionId)).toEqual([
+    "made-here@astrotime",
+    "made-here@astrotime",
+  ]);
+  expect(api.events.size).toBe(1);
+  expect(await store.pending(calendar!.id)).toEqual([]);
+  const [href] = await store.hrefs(calendar!.id);
+  expect(href!.href).toBe(`${GRAPH}me/calendars/work/events/e1`);
 });

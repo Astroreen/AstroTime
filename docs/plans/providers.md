@@ -330,7 +330,9 @@ marked _to be recorded_.
   address it names, and lists both sides so that one failing (the Tasks
   API not enabled, its scope not granted) leaves the other syncing: the
   engine's `PartialListing`, the side not read reported `failed` and its
-  calendars kept as they were, not removed; proven against a fake Tasks API through the engine
+  calendars kept as they were, not removed (a side signed out or offline
+  is the account's, `AuthError` or `OfflineError` stopping the sync as
+  ever); proven against a fake Tasks API through the engine
   and a real store. The account's sign-in, its `google` row and secret,
   the registry's entry and the dialog's button come with the owner's
   clients ([D257](#D257)), as does recording Google's CalDAV. The first
@@ -387,16 +389,23 @@ marked _to be recorded_.
   clock across a DST change ([D33](foundation.md#D33)), its `BYDAY` its
   start's weekday and its `UNTIL` its end day's last second there; a
   floating time written back in the user's zone, a TZID's in its own;
+  an all-day event's day that of its midnight's instant in its own zone
+  (Vilnius's 6 November begins on the 5th in UTC; a zone not known
+  here, the nearest midnight), and a day made here the user's midnight;
   a changed master's
   exceptions from `instances` over a year before today and two after,
   one calendar object whose ETag is the master's and its exceptions'
   together; a write the `PATCH` of the fields that differ from Graph's
   version read just before, with the event's `If-Match`, `412` a
-  conflict for the sync's merge, `404` gone, a rule or a field removed
+  conflict for the sync's merge, `404` gone; a create carrying the UID
+  as Graph's `transactionId`, so one sent again after its answer was
+  lost is the event Graph made then, not a second; a rule or a field removed
   here sent as `null` or empty (a series made single, a place cleared);
   a rule leaving its days to the start (`FREQ=WEEKLY`, as Google and
   Nextcloud write it) taken from the start, RFC 5545's reading; a rule
-  Graph's `recurrence` cannot say not sent and said not kept; an
+  Graph's `recurrence` cannot say (a month-day list, `BYMONTHDAY=1,15`,
+  or one from the end, `-1`) not sent and said not kept, the event
+  written without it; an
   exception under its series' UID ([D34](foundation.md#D34)), whatever
   its own `iCalUId`), `MicrosoftTodo`
   (lists and tasks the same way, a task with no ETag on either side
@@ -789,7 +798,10 @@ marked _to be recorded_.
   ([D258](#D258)). Then Graph is recorded, and from what it shows:
   `events/delta` and `tasks/delta` in place of the full listings, an
   exception's own change and a cancelled occurrence (`EXDATE`) read, and
-  an occurrence's edit and deletion written to its own event.
+  an occurrence's edit and deletion written to its own event. An event
+  made here takes Graph's `iCalUId` (Graph sets it, read-only) once
+  Graph's version comes down; keeping the UID made here (an extended
+  property read back as `UID`) is decided then too.
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
   starts in a bootstrap mode whose setup is its web wizard, writing a
