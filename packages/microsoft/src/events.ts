@@ -22,6 +22,8 @@ import {
   utcText,
   type Component,
 } from "@astrotime/core/lines";
+import { zoneText } from "@astrotime/core/split";
+import { ianaName, isKnownTimeZone, wallClockIn, zonedToEpoch } from "@astrotime/core/time";
 
 import { GRAPH, utcOf, type Graph, type GraphTime } from "./graph.ts";
 
@@ -34,6 +36,9 @@ export interface GraphEvent {
   readonly body?: { readonly content?: string };
   readonly start: GraphTime;
   readonly end: GraphTime;
+  /** The zone the event was made in, IANA or Windows (`W. Europe Standard Time`). */
+  readonly originalStartTimeZone?: string;
+  readonly originalEndTimeZone?: string;
   readonly isAllDay?: boolean;
   readonly location?: { readonly displayName?: string };
   readonly categories?: readonly string[];
@@ -91,10 +96,34 @@ const INDEX_NAMES: Record<string, Recurrence["pattern"]["index"]> = {
   "-1": "last",
 };
 
+/** iCalendar's `20261231T225959Z` as RFC 3339. */
+const isoOf = (value: string) =>
+  value.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z");
 const compact = (date: string) => date.slice(0, 10).replaceAll("-", "");
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-/** Graph's recurrence as an `RRULE`'s value. */
-export function rruleOf(recurrence: Recurrence, allDay: boolean): string {
+/**
+ * The IANA zone a Graph zone name stands for (an IANA name, a Windows one);
+ * `UTC` for Graph's own (`tzone://Microsoft/Utc`) and for one no zone
+ * database knows (`Customized Time Zone`).
+ */
+function zoneOf(name: string | undefined): string {
+  if (!name) return "UTC";
+  const iana = ianaName(name);
+  return iana !== "UTC" && isKnownTimeZone(iana) ? iana : "UTC";
+}
+
+/** A UTC instant (RFC 3339) as a DATE-TIME's value and parameter in `zone`: `;TZID=…:…` or `:…Z`. */
+function zonedText(instant: string, zone: string): string {
+  if (zone === "UTC") return `:${utcText(instant)}`;
+  return `;TZID=${zone}:${wallClockIn(Date.parse(instant), zone).replace(/[-:]/g, "")}`;
+}
+
+/**
+ * Graph's recurrence as an `RRULE`'s value; its end day's last second in
+ * `zone`, the series' own, as `UNTIL` in UTC (RFC 5545 for a zoned start).
+ */
+export function rruleOf(recurrence: Recurrence, allDay: boolean, zone = "UTC"): string {
   const { pattern, range } = recurrence;
   const parts: string[] = [];
   const byDay = (prefix = "") =>
@@ -124,12 +153,25 @@ export function rruleOf(recurrence: Recurrence, allDay: boolean): string {
   if ((pattern.interval ?? 1) > 1) parts.push(`INTERVAL=${pattern.interval}`);
   if (range.type === "numbered") parts.push(`COUNT=${range.numberOfOccurrences}`);
   if (range.type === "endDate" && range.endDate)
-    parts.push(`UNTIL=${compact(range.endDate)}${allDay ? "" : "T235959Z"}`);
+    parts.push(
+      `UNTIL=${
+        allDay
+          ? compact(range.endDate)
+          : utcText(
+              new Date(zonedToEpoch(`${range.endDate.slice(0, 10)}T23:59:59`, zone)).toISOString(),
+            )
+      }`,
+    );
   return parts.join(";");
 }
 
-/** An `RRULE`'s value as Graph's recurrence; `null` for a rule Graph has no shape for. */
-export function recurrenceOf(rule: string, startDate: string): Recurrence | null {
+/**
+ * An `RRULE`'s value as Graph's recurrence; `null` for a rule Graph has no
+ * shape for. What the rule leaves out comes from the start, as RFC 5545
+ * says (`FREQ=WEEKLY` on the start's weekday); `startDate` is the start's
+ * day and `zone` its zone, in which `UNTIL`'s day is read.
+ */
+export function recurrenceOf(rule: string, startDate: string, zone = "UTC"): Recurrence | null {
   const parts = new Map(rule.split(";").map((part) => part.split("=") as [string, string]));
   const known = new Set([
     "FREQ",
@@ -144,6 +186,8 @@ export function recurrenceOf(rule: string, startDate: string): Recurrence | null
   if ([...parts.keys()].some((key) => !known.has(key))) return null;
   const interval = Number(parts.get("INTERVAL") ?? "1");
   const days = (parts.get("BYDAY") ?? "").split(",").filter(Boolean);
+  const startDay = Number(startDate.slice(8, 10));
+  const startMonth = Number(startDate.slice(5, 7));
   const plainDays = days.map((day) => /^([+-]?\d)?([A-Z]{2})$/.exec(day));
   if (plainDays.some((match) => !match)) return null;
   const indexes = new Set(plainDays.map((match) => match![1] ?? ""));
@@ -155,7 +199,9 @@ export function recurrenceOf(rule: string, startDate: string): Recurrence | null
       ? {
           type: "endDate",
           startDate,
-          endDate: `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`,
+          endDate: until.endsWith("Z")
+            ? wallClockIn(Date.parse(isoOf(until)), zone).slice(0, 10)
+            : `${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}`,
         }
       : { type: "noEnd", startDate };
   const base = { interval };
@@ -167,23 +213,24 @@ export function recurrenceOf(rule: string, startDate: string): Recurrence | null
     case "DAILY":
       return days.length === 0 ? { pattern: { ...base, type: "daily" }, range } : null;
     case "WEEKLY":
-      if (relative || days.length === 0) return null;
+      if (relative) return null;
       return {
         pattern: {
           ...base,
           type: "weekly",
-          daysOfWeek: names,
+          daysOfWeek:
+            names.length > 0 ? names : [WEEKDAYS[new Date(`${startDate}T00:00:00Z`).getUTCDay()]!],
           ...(wkst ? { firstDayOfWeek: DAY_NAMES[wkst]! } : {}),
         },
         range,
       };
     case "MONTHLY":
-      if (parts.has("BYMONTHDAY") && days.length === 0)
+      if (days.length === 0)
         return {
           pattern: {
             ...base,
             type: "absoluteMonthly",
-            dayOfMonth: Number(parts.get("BYMONTHDAY")),
+            dayOfMonth: Number(parts.get("BYMONTHDAY") ?? startDay),
           },
           range,
         };
@@ -191,15 +238,17 @@ export function recurrenceOf(rule: string, startDate: string): Recurrence | null
         ? { pattern: { ...base, type: "relativeMonthly", daysOfWeek: names, index: index! }, range }
         : null;
     case "YEARLY": {
-      const month = Number(parts.get("BYMONTH"));
+      // `BYDAY=4TH` with no month is the year's 4th Thursday, which Graph cannot say.
+      if (relative && !parts.has("BYMONTH")) return null;
+      const month = Number(parts.get("BYMONTH") ?? startMonth);
       if (!month) return null;
-      if (parts.has("BYMONTHDAY") && days.length === 0)
+      if (days.length === 0)
         return {
           pattern: {
             ...base,
             type: "absoluteYearly",
             month,
-            dayOfMonth: Number(parts.get("BYMONTHDAY")),
+            dayOfMonth: Number(parts.get("BYMONTHDAY") ?? startDay),
           },
           range,
         };
@@ -215,23 +264,42 @@ export function recurrenceOf(rule: string, startDate: string): Recurrence | null
   }
 }
 
-/** One event's VEVENT lines; an exception's with its `RECURRENCE-ID`. */
+/** The zones an event's start and end are written in: its own, as Outlook shows it. */
+const zonesOf = (event: GraphEvent, master: GraphEvent | null) => {
+  const start = zoneOf(event.originalStartTimeZone ?? master?.originalStartTimeZone);
+  return {
+    start,
+    end: zoneOf(
+      event.originalEndTimeZone ??
+        master?.originalEndTimeZone ??
+        event.originalStartTimeZone ??
+        master?.originalStartTimeZone,
+    ),
+  };
+};
+
+/**
+ * One event's VEVENT lines; an exception's with its `RECURRENCE-ID` and its
+ * series' UID. Times in the event's own zone, so a series keeps its wall
+ * clock across a DST change (D33) and its `BYDAY` its start's weekday.
+ */
 function veventLines(event: GraphEvent, master: GraphEvent | null): string[] {
   const allDay = event.isAllDay === true;
-  const time = (name: string, at: GraphTime) =>
-    allDay ? `${name};VALUE=DATE:${compact(at.dateTime)}` : `${name}:${utcText(utcOf(at))}`;
+  const zones = zonesOf(event, master);
+  const time = (name: string, at: GraphTime, zone: string) =>
+    allDay ? `${name};VALUE=DATE:${compact(at.dateTime)}` : `${name}${zonedText(utcOf(at), zone)}`;
   const lines = [
     "BEGIN:VEVENT",
-    `UID:${event.iCalUId ?? master?.iCalUId ?? event.id}`,
+    `UID:${master ? (master.iCalUId ?? master.id) : (event.iCalUId ?? event.id)}`,
     `DTSTAMP:${utcText(event.lastModifiedDateTime ?? "1970-01-01T00:00:00Z")}`,
   ];
   if (master && event.originalStart)
     lines.push(
       master.isAllDay
         ? `RECURRENCE-ID;VALUE=DATE:${compact(event.originalStart)}`
-        : `RECURRENCE-ID:${utcText(event.originalStart)}`,
+        : `RECURRENCE-ID${zonedText(event.originalStart, zonesOf(master, null).start)}`,
     );
-  lines.push(time("DTSTART", event.start), time("DTEND", event.end));
+  lines.push(time("DTSTART", event.start, zones.start), time("DTEND", event.end, zones.end));
   lines.push(`SUMMARY:${escapeText(event.subject ?? "")}`);
   if (event.body?.content) lines.push(`DESCRIPTION:${escapeText(event.body.content)}`);
   if (event.location?.displayName) lines.push(`LOCATION:${escapeText(event.location.displayName)}`);
@@ -241,7 +309,8 @@ function veventLines(event: GraphEvent, master: GraphEvent | null): string[] {
   if (event.sensitivity === "private" || event.sensitivity === "confidential")
     lines.push("CLASS:PRIVATE");
   if (event.isCancelled) lines.push("STATUS:CANCELLED");
-  if (!master && event.recurrence) lines.push(`RRULE:${rruleOf(event.recurrence, allDay)}`);
+  if (!master && event.recurrence)
+    lines.push(`RRULE:${rruleOf(event.recurrence, allDay, zones.start)}`);
   // Graph sets it, AstroTime shows it (Outlook's own export writes it so), and never sends it.
   if (event.onlineMeeting?.joinUrl)
     lines.push(`X-MICROSOFT-SKYPETEAMSMEETINGURL:${escapeText(event.onlineMeeting.joinUrl)}`);
@@ -249,12 +318,30 @@ function veventLines(event: GraphEvent, master: GraphEvent | null): string[] {
   return lines;
 }
 
-/** An event, with the exceptions of its series, as one calendar object. */
+/**
+ * An event, with the exceptions of its series, as one calendar object; a
+ * VTIMEZONE for each zone its times name (foundation D104).
+ */
 export function veventOf(event: GraphEvent, exceptions: readonly GraphEvent[] = []): string {
+  const zones = new Set(
+    event.isAllDay
+      ? []
+      : [event, ...exceptions].flatMap((one) =>
+          Object.values(zonesOf(one, one === event ? null : event)),
+        ),
+  );
+  zones.delete("UTC");
+  const year = Number(event.start.dateTime.slice(0, 4));
   return calendarText([
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//AstroTime//Microsoft Graph//EN",
+    ...[...zones].flatMap((zone) =>
+      zoneText(zone, year)
+        .replace(/\r?\n[ \t]/g, "")
+        .split(/\r?\n/)
+        .filter(Boolean),
+    ),
     ...veventLines(event, null),
     ...exceptions.flatMap((exception) => veventLines(exception, event)),
     "END:VCALENDAR",
@@ -271,6 +358,7 @@ const KEPT = new Set([
   "RECURRENCE-ID",
   "DTSTART",
   "DTEND",
+  "DURATION",
   "SUMMARY",
   "DESCRIPTION",
   "LOCATION",
@@ -282,20 +370,49 @@ const KEPT = new Set([
   "X-MICROSOFT-SKYPETEAMSMEETINGURL",
 ]);
 
-/** A time line as Graph's `{ dateTime, timeZone }`: UTC, or the line's own zone. */
-function graphTime(component: Component, name: string): { time: GraphTime; date: boolean } | null {
+/**
+ * A time line as Graph's `{ dateTime, timeZone }`: UTC, the line's own zone,
+ * or for a floating time (no `Z`, no TZID) `floating`, the user's: a wall
+ * clock stays the wall clock it says.
+ */
+function graphTime(
+  component: Component,
+  name: string,
+  floating: string,
+): { time: GraphTime; date: boolean } | null {
   const line = lineOf(component, name);
   if (!line) return null;
   const { time, date, zone } = timeOf(line);
   if (date) return { time: { dateTime: `${time}T00:00:00`, timeZone: "UTC" }, date };
-  return { time: { dateTime: time.replace(/Z$/, ""), timeZone: zone ?? "UTC" }, date };
+  if (time.endsWith("Z")) return { time: { dateTime: time.slice(0, -1), timeZone: "UTC" }, date };
+  return { time: { dateTime: time, timeZone: zone ? ianaName(zone) : floating }, date };
+}
+
+/** A wall clock moved by an RFC 5545 `DURATION` (`P1D`, `PT1H30M`, `-PT15M`); `null` for another. */
+function after(dateTime: string, duration: string): string | null {
+  const parts = /^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(
+    duration,
+  );
+  if (!parts) return null;
+  const [, sign, w, d, h, m, sec] = parts.map((part) => part ?? "0");
+  const seconds =
+    (Number(w) * 7 * 86_400 +
+      Number(d) * 86_400 +
+      Number(h) * 3600 +
+      Number(m) * 60 +
+      Number(sec)) *
+    (sign === "-" ? -1 : 1);
+  return new Date(Date.parse(`${dateTime}Z`) + seconds * 1000).toISOString().slice(0, 19);
 }
 
 /**
  * A VEVENT as Graph's fields; and what it says that Graph cannot keep, by
  * property (an `RRULE` of a shape Graph has none for among it).
  */
-export function eventFieldsOf(component: Component): {
+export function eventFieldsOf(
+  component: Component,
+  floating = "UTC",
+): {
   readonly fields: Record<string, unknown>;
   readonly dropped: readonly string[];
 } {
@@ -306,8 +423,20 @@ export function eventFieldsOf(component: Component): {
     const line = lineOf(component, name);
     return line ? unescapeText(line.value) : null;
   };
-  const start = graphTime(component, "DTSTART");
-  const end = graphTime(component, "DTEND");
+  const start = graphTime(component, "DTSTART", floating);
+  // No DTEND: its DURATION's end, or none (a day for a date, the start's own instant otherwise).
+  const duration = lineOf(component, "DURATION")?.value;
+  const end =
+    graphTime(component, "DTEND", floating) ??
+    (start && {
+      time: {
+        ...start.time,
+        dateTime:
+          after(start.time.dateTime, duration ?? (start.date ? "P1D" : "PT0S")) ??
+          start.time.dateTime,
+      },
+      date: start.date,
+    });
   const fields: Record<string, unknown> = {
     subject: text("SUMMARY") ?? "",
     body: { contentType: "text", content: text("DESCRIPTION") ?? "" },
@@ -323,9 +452,15 @@ export function eventFieldsOf(component: Component): {
     ...(start ? { start: start.time, isAllDay: start.date } : {}),
     ...(end ? { end: end.time } : {}),
   };
+  // No rule is `null`, which ends a series; a rule Graph cannot say is not sent, and said.
   const rule = lineOf(component, "RRULE");
-  if (rule && start) {
-    const recurrence = recurrenceOf(rule.value, start.time.dateTime.slice(0, 10));
+  if (!rule) fields["recurrence"] = null;
+  else if (start) {
+    const recurrence = recurrenceOf(
+      rule.value,
+      start.time.dateTime.slice(0, 10),
+      start.time.timeZone,
+    );
     if (recurrence) fields["recurrence"] = recurrence;
     else dropped.add("RRULE");
   }
@@ -347,10 +482,10 @@ function eventsIn(ics: string): { master: Component | null; exceptions: Componen
 }
 
 /** A series' exceptions as what Graph would be asked to keep of each, for comparing. */
-const exceptionsKey = (exceptions: readonly Component[]) =>
+const exceptionsKey = (exceptions: readonly Component[], zone: string) =>
   JSON.stringify(
     exceptions
-      .map((c) => [lineOf(c, "RECURRENCE-ID")?.value ?? "", eventFieldsOf(c).fields] as const)
+      .map((c) => [lineOf(c, "RECURRENCE-ID")?.value ?? "", eventFieldsOf(c, zone).fields] as const)
       .toSorted(([a], [b]) => a.localeCompare(b)),
   );
 
@@ -368,10 +503,17 @@ const ownEtag = (etag: string | null) => (etag ? etag.split(" ")[0]! : null);
 export class OutlookCalendars implements Provider {
   private readonly graph: Graph;
   private readonly clock: () => number;
+  /** The user's zone, a floating time's when written (an IANA name). */
+  private readonly zone: string;
 
-  constructor(graph: Graph, clock: () => number = Date.now) {
+  constructor(
+    graph: Graph,
+    clock: () => number = Date.now,
+    zone = new Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ) {
     this.graph = graph;
     this.clock = clock;
+    this.zone = zone;
   }
 
   async calendars(): Promise<RemoteCalendar[]> {
@@ -447,9 +589,9 @@ export class OutlookCalendars implements Provider {
     const calendarUrl = href.slice(0, href.lastIndexOf("/") + 1);
     const { master, exceptions } = eventsIn(ics);
     if (!master) throw new Error("A calendar object with no event.");
-    const { fields, dropped } = eventFieldsOf(master);
+    const { fields, dropped } = eventFieldsOf(master, this.zone);
     const { value } = await this.graph.json<GraphEvent>("POST", calendarUrl.replace(/\/$/, ""), {
-      body: fields,
+      body: Object.fromEntries(Object.entries(fields).filter(([, field]) => field !== null)),
     });
     if (!value) throw new Error("Graph gave no event back.");
     // A series made here with its own exceptions: written as a series, its exceptions not (D253's Deferred).
@@ -473,11 +615,14 @@ export class OutlookCalendars implements Provider {
     const current = await this.graph.json<GraphEvent>("GET", this.itemUrl(href), { accept: [404] });
     if (current.status === 404 || !current.value) return { ok: false, reason: "gone" };
     const now = eventsIn(veventOf(current.value)).master!;
-    const before = eventFieldsOf(now).fields;
-    const { fields, dropped } = eventFieldsOf(master);
+    const before = eventFieldsOf(now, this.zone).fields;
+    const { fields, dropped } = eventFieldsOf(master, this.zone);
+    // Every field either side has: one gone here is `null` in `fields` (a
+    // series made single). One only Graph's has is one not sent (an RRULE
+    // Graph cannot say, among `dropped`), left as Graph has it.
     const changed = Object.fromEntries(
       Object.entries(fields).filter(
-        ([key, value]) => JSON.stringify(before[key]) !== JSON.stringify(value),
+        ([key, value]) => JSON.stringify(before[key] ?? null) !== JSON.stringify(value),
       ),
     );
     const own = ownEtag(etag) ?? current.value["@odata.etag"] ?? null;
@@ -494,8 +639,8 @@ export class OutlookCalendars implements Provider {
     }
     const serverExceptions = event.type === "seriesMaster" ? await this.exceptionsOf(event.id) : [];
     const edited =
-      exceptionsKey(exceptions) !==
-      exceptionsKey(eventsIn(veventOf(event, serverExceptions)).exceptions);
+      exceptionsKey(exceptions, this.zone) !==
+      exceptionsKey(eventsIn(veventOf(event, serverExceptions)).exceptions, this.zone);
     const notKept = edited ? [...dropped, "RECURRENCE-ID"] : dropped;
     return {
       ok: true,

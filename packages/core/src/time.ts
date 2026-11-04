@@ -130,7 +130,7 @@ export function keepTzid(from: ICAL.Time, to: ICAL.Time): ICAL.Time {
  * Evolution and Lightning), or a Windows zone name's. Anything else is
  * returned as written.
  */
-function ianaName(tzid: string): string {
+export function ianaName(tzid: string): string {
   if (isKnownTimeZone(tzid)) return tzid;
   const parts = tzid.split("/");
   for (let i = 1; i < parts.length; i++) {
@@ -148,7 +148,7 @@ function ianaName(tzid: string): string {
 const knownZones = new Map<string, boolean>();
 const KNOWN_ZONES = 1000;
 
-function isKnownTimeZone(timeZone: string): boolean {
+export function isKnownTimeZone(timeZone: string): boolean {
   const known = knownZones.get(timeZone);
   if (known !== undefined) return known;
   let result: boolean;

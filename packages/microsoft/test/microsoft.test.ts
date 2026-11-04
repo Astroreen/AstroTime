@@ -4,7 +4,7 @@
 // a series' exceptions from `instances`. Through the sync engine and a real
 // store: both ways, a PATCH of what changed only.
 import type { HttpClient, HttpRequest, TokenSource } from "@astrotime/caldav";
-import type { Provider } from "@astrotime/core";
+import { CalendarObject, occurrencesBetween, type Provider } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { syncAccount } from "@astrotime/sync";
@@ -415,4 +415,211 @@ test("one Microsoft account, two parts: To Do failing leaves the calendars synci
       detail: "Tasks.ReadWrite not granted",
     }),
   ]);
+});
+
+test("a rule that leaves its days to the start (bare FREQ=WEEKLY, MONTHLY, YEARLY) is Graph's from the start's day", () => {
+  const wednesday = "2026-11-04";
+  expect(recurrenceOf("FREQ=WEEKLY", wednesday)?.pattern).toMatchObject({
+    type: "weekly",
+    daysOfWeek: ["wednesday"],
+  });
+  expect(recurrenceOf("FREQ=MONTHLY;INTERVAL=2", wednesday)?.pattern).toMatchObject({
+    type: "absoluteMonthly",
+    dayOfMonth: 4,
+    interval: 2,
+  });
+  expect(recurrenceOf("FREQ=YEARLY", wednesday)?.pattern).toMatchObject({
+    type: "absoluteYearly",
+    month: 11,
+    dayOfMonth: 4,
+  });
+  expect(recurrenceOf("FREQ=YEARLY;BYMONTHDAY=8", wednesday)?.pattern).toMatchObject({
+    type: "absoluteYearly",
+    month: 11,
+    dayOfMonth: 8,
+  });
+  // The year's 20th Monday, with no month: Graph has no such shape.
+  expect(recurrenceOf("FREQ=YEARLY;BYDAY=20MO", wednesday)).toBeNull();
+});
+
+test("a series removed, a place removed: the PATCH names them, null and empty, and Graph's event is single", async () => {
+  const api = graphApi();
+  api.keep(api.events, {
+    id: "s1",
+    iCalUId: "series",
+    subject: "Review",
+    location: { displayName: "Room 4" },
+    start: at("2026-11-02T08:00:00.0000000"),
+    end: at("2026-11-02T09:00:00.0000000"),
+    type: "seriesMaster",
+    recurrence: {
+      pattern: { type: "weekly", interval: 1, daysOfWeek: ["monday"] },
+      range: { type: "noEnd", startDate: "2026-11-02" },
+    },
+  });
+  const provider = new OutlookCalendars(new Graph(api.http, tokens), () => Date.UTC(2026, 10, 4));
+  const href = `${GRAPH}me/calendars/work/events/s1`;
+  const read = (await provider.fetch(href))!;
+  const single = read.ics.replace(/RRULE:[^\r]*\r\n/, "").replace("LOCATION:Room 4\r\n", "");
+  expect(await provider.update(href, single, read.etag)).toMatchObject({ ok: true });
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "PATCH")!.body))).toEqual({
+    recurrence: null,
+    location: { displayName: "" },
+  });
+  expect(api.events.get("s1")).toMatchObject({ recurrence: null, location: { displayName: "" } });
+  expect((await provider.fetch(href))!.ics).not.toContain("RRULE");
+});
+
+test("a weekly series made in Berlin keeps 09:00 across the DST change; its end day is its zone's", async () => {
+  const api = graphApi();
+  // Graph gives instants (Prefer: UTC) and the zone the event was made in, by its Windows name.
+  api.keep(api.events, {
+    id: "s1",
+    iCalUId: "berlin",
+    subject: "Standup",
+    originalStartTimeZone: "W. Europe Standard Time",
+    originalEndTimeZone: "W. Europe Standard Time",
+    start: at("2026-10-19T07:00:00.0000000"),
+    end: at("2026-10-19T07:15:00.0000000"),
+    type: "seriesMaster",
+    recurrence: {
+      pattern: { type: "weekly", interval: 1, daysOfWeek: ["monday"] },
+      range: { type: "endDate", startDate: "2026-10-19", endDate: "2026-11-09" },
+    },
+  });
+  api.exceptions.set("s1", [
+    {
+      id: "x1",
+      // An exception's own iCalUId differing from its master's: the object keeps one UID (D34).
+      iCalUId: "another",
+      type: "exception",
+      subject: "Standup, later",
+      originalStartTimeZone: "W. Europe Standard Time",
+      originalStart: "2026-11-02T08:00:00Z",
+      start: at("2026-11-02T09:00:00.0000000"),
+      end: at("2026-11-02T09:15:00.0000000"),
+      "@odata.etag": 'W/"x1"',
+    },
+  ]);
+  const provider = new OutlookCalendars(
+    new Graph(api.http, tokens),
+    () => Date.UTC(2026, 10, 4),
+    "Europe/Vilnius",
+  );
+  const href = `${GRAPH}me/calendars/work/events/s1`;
+  const read = (await provider.fetch(href))!;
+  expect(read.ics).toContain("BEGIN:VTIMEZONE\r\nTZID:Europe/Berlin");
+  expect(read.ics).toContain("DTSTART;TZID=Europe/Berlin:20261019T090000");
+  expect(read.ics).toContain("RECURRENCE-ID;TZID=Europe/Berlin:20261102T090000");
+  expect(read.ics).toContain("RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261109T225959Z");
+  expect(read.ics).not.toContain("UID:another");
+  const object = CalendarObject.parse(read.ics);
+  const starts = occurrencesBetween(object, {
+    from: "2026-10-19",
+    to: "2026-11-16",
+    timeZone: "Europe/Berlin",
+  }).map((o) =>
+    o.start.type === "zoned" ? [o.start.local, new Date(o.start.epochMs).toISOString()] : [],
+  );
+  // CEST before 25 October, CET after: the wall clock stays, the instant moves; the 2nd moved to 10:00.
+  expect(starts).toEqual([
+    ["2026-10-19T09:00:00", "2026-10-19T07:00:00.000Z"],
+    ["2026-10-26T09:00:00", "2026-10-26T08:00:00.000Z"],
+    ["2026-11-02T10:00:00", "2026-11-02T09:00:00.000Z"],
+    ["2026-11-09T09:00:00", "2026-11-09T08:00:00.000Z"],
+  ]);
+  // Renamed here: the times read back as they were sent, so only the subject changes.
+  const renamed = read.ics.replace("SUMMARY:Standup\r\n", "SUMMARY:Daily\r\n");
+  expect(await provider.update(href, renamed, read.etag)).toMatchObject({ ok: true });
+  expect(JSON.parse(String(api.asked.findLast((r) => r.method === "PATCH")!.body))).toEqual({
+    subject: "Daily",
+  });
+  // An end day read in its own zone, where UNTIL's UTC is the next day.
+  const rule = rruleOf(
+    {
+      pattern: { type: "weekly", interval: 1, daysOfWeek: ["monday"] },
+      range: { type: "endDate", startDate: "2026-11-02", endDate: "2026-12-28" },
+    },
+    false,
+    "America/New_York",
+  );
+  expect(rule).toBe("FREQ=WEEKLY;BYDAY=MO;UNTIL=20261229T045959Z");
+  expect(recurrenceOf(rule, "2026-11-02", "America/New_York")?.range).toMatchObject({
+    type: "endDate",
+    endDate: "2026-12-28",
+  });
+});
+
+test("Monday 01:00 in Moscow is Sunday in UTC: the start is written in Moscow, BYDAY and DTSTART agree", async () => {
+  const api = graphApi();
+  api.keep(api.events, {
+    id: "m1",
+    iCalUId: "moscow",
+    subject: "Early",
+    originalStartTimeZone: "Europe/Moscow",
+    start: at("2026-11-01T22:00:00.0000000"),
+    end: at("2026-11-01T22:30:00.0000000"),
+    type: "seriesMaster",
+    recurrence: {
+      pattern: { type: "weekly", interval: 1, daysOfWeek: ["monday"] },
+      range: { type: "noEnd", startDate: "2026-11-02" },
+    },
+  });
+  const provider = new OutlookCalendars(new Graph(api.http, tokens), () => Date.UTC(2026, 10, 4));
+  const read = (await provider.fetch(`${GRAPH}me/calendars/work/events/m1`))!;
+  expect(read.ics).toContain("DTSTART;TZID=Europe/Moscow:20261102T010000");
+  const [first] = occurrencesBetween(CalendarObject.parse(read.ics), {
+    from: "2026-11-01",
+    to: "2026-11-10",
+    timeZone: "Europe/Moscow",
+  });
+  expect(first!.start).toMatchObject({
+    local: "2026-11-02T01:00:00",
+    epochMs: Date.UTC(2026, 10, 1, 22),
+  });
+});
+
+test("a floating time is written in the user's zone, a TZID in its own (a Windows name as IANA's), Z in UTC", async () => {
+  const api = graphApi();
+  const provider = new OutlookCalendars(new Graph(api.http, tokens), Date.now, "Europe/Berlin");
+  const make = (uid: string, start: string, end: string) =>
+    `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//EN\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTAMP:20261104T080000Z\r\n${start}\r\n${end}\r\nSUMMARY:${uid}\r\nRRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+  const posted = async (ics: string) => {
+    expect(await provider.create(`${GRAPH}me/calendars/work/events/new`, ics)).toEqual(
+      expect.not.objectContaining({ dropped: expect.anything() }),
+    );
+    return JSON.parse(String(api.asked.findLast((r) => r.method === "POST")!.body)) as Record<
+      string,
+      unknown
+    >;
+  };
+  const floating = await posted(make("f", "DTSTART:20261110T090000", "DTEND:20261110T100000"));
+  expect(floating).toMatchObject({
+    start: { dateTime: "2026-11-10T09:00:00", timeZone: "Europe/Berlin" },
+    end: { dateTime: "2026-11-10T10:00:00", timeZone: "Europe/Berlin" },
+    // Bare FREQ=WEEKLY: the start's Tuesday.
+    recurrence: { pattern: { type: "weekly", daysOfWeek: ["tuesday"] } },
+  });
+  const windows = await posted(
+    make("w", 'DTSTART;TZID="Pacific Standard Time":20261110T090000', "DURATION:PT45M"),
+  );
+  expect(windows).toMatchObject({
+    start: { dateTime: "2026-11-10T09:00:00", timeZone: "America/Los_Angeles" },
+    end: { dateTime: "2026-11-10T09:45:00", timeZone: "America/Los_Angeles" },
+  });
+  const utc = await posted(make("u", "DTSTART:20261110T090000Z", "DTEND:20261110T093000Z"));
+  expect(utc).toMatchObject({ start: { dateTime: "2026-11-10T09:00:00", timeZone: "UTC" } });
+});
+
+test("a To Do task with no ETag on either side is fetched again, never taken as unchanged (D37)", async () => {
+  const api = graphApi();
+  api.tasks.set("k1", { id: "k1", title: "No etag", status: "notStarted" });
+  const todo = new MicrosoftTodo(new Graph(api.http, tokens));
+  const url = `${GRAPH}me/todo/lists/tasks/tasks/`;
+  const changes = await todo.changes(
+    url,
+    { syncToken: null, ctag: null },
+    new Map([[`${url}k1`, null]]),
+  );
+  expect(changes.changed.map((object) => object.href)).toEqual([`${url}k1`]);
 });

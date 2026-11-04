@@ -303,10 +303,6 @@ export class GoogleTasks implements Provider {
   }
 
   /**
-   * Inserted in the list `href` names, under its parent (`insert`'s `parent`);
-   * Google gives its id, and its href with it.
-   */
-  /**
    * A parent the Tasks API can take: a task of the same list. One it does
    * not hold (a parent elsewhere, or not yet uploaded) is named among what
    * was not kept, and the task goes to the top.
@@ -327,6 +323,10 @@ export class GoogleTasks implements Provider {
     return { parent: null, dropped: [...new Set([...dropped, "RELATED-TO"])] };
   }
 
+  /**
+   * Inserted in the list `href` names, under its parent (`insert`'s `parent`);
+   * Google gives its id, and its href with it.
+   */
   async create(href: string, ics: string): Promise<WriteResult> {
     const list = href.slice(0, href.lastIndexOf("/") + 1);
     const read = taskFieldsOf(ics);

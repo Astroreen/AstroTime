@@ -61,7 +61,10 @@ export class Graph {
   }
 }
 
-/** Graph's `{ dateTime, timeZone }`, which `Prefer` asks in UTC. */
+/**
+ * Graph's `{ dateTime, timeZone }`, which `Prefer` asks in UTC: an instant,
+ * written in the event's own zone (`originalStartTimeZone`) when read.
+ */
 export interface GraphTime {
   readonly dateTime: string;
   readonly timeZone: string;

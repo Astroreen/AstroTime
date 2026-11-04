@@ -380,15 +380,28 @@ marked _to be recorded_.
   ([D258](#D258)):_ `@astrotime/microsoft` — `OutlookCalendars` (the
   calendars of `me/calendars`, read-only where `canEdit` is false; each
   calendar's single events and series masters, pages followed by
-  `@odata.nextLink`, every time asked in UTC; a changed master's
+  `@odata.nextLink`; every time asked as an instant (`Prefer` in UTC)
+  and written in the event's own zone, `originalStartTimeZone` (an IANA
+  name or a Windows one, `W. Europe Standard Time`), with its VTIMEZONE
+  ([foundation D104](foundation.md#D104)), so a series keeps its wall
+  clock across a DST change ([D33](foundation.md#D33)), its `BYDAY` its
+  start's weekday and its `UNTIL` its end day's last second there; a
+  floating time written back in the user's zone, a TZID's in its own;
+  a changed master's
   exceptions from `instances` over a year before today and two after,
   one calendar object whose ETag is the master's and its exceptions'
   together; a write the `PATCH` of the fields that differ from Graph's
   version read just before, with the event's `If-Match`, `412` a
-  conflict for the sync's merge, `404` gone; a rule Graph's
-  `recurrence` cannot say not sent and said not kept), `MicrosoftTodo`
-  (lists and tasks the same way, `importance` as `PRIORITY`, what To Do
-  has no field for said not kept), `rruleOf` and `recurrenceOf` (each of
+  conflict for the sync's merge, `404` gone, a rule or a field removed
+  here sent as `null` or empty (a series made single, a place cleared);
+  a rule leaving its days to the start (`FREQ=WEEKLY`, as Google and
+  Nextcloud write it) taken from the start, RFC 5545's reading; a rule
+  Graph's `recurrence` cannot say not sent and said not kept; an
+  exception under its series' UID ([D34](foundation.md#D34)), whatever
+  its own `iCalUId`), `MicrosoftTodo`
+  (lists and tasks the same way, a task with no ETag on either side
+  fetched again ([D37](foundation.md#D37)), `importance` as `PRIORITY`,
+  what To Do has no field for said not kept), `rruleOf` and `recurrenceOf` (each of
   Graph's patterns both ways) and `MicrosoftProvider`, the composite
   routing by address with one side failing leaving the other syncing, as
   Google's ([D252](#D252)); iCalendar's lines from `@astrotime/core/lines`.
@@ -401,8 +414,8 @@ marked _to be recorded_.
   read; an occurrence's own edit here is not written, and is said not
   kept (`RECURRENCE-ID`), as is a series made here with exceptions. The
   account's sign-in and the dialog's button come with the owner's client.
-  The first load grows by 71 bytes (127 419 to 127 490 on main
-  `88c6621`), the engine's partial listing ([D252](#D252)), known by its
+  The first load grows by 90 bytes (127 406 to 127 496 on main
+  `1d6f7fb`), the engine's partial listing ([D252](#D252)), known by its
   fields so that the class stays with the providers; `@astrotime/microsoft`
   loads with a Microsoft account.
 

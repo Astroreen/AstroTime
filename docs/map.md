@@ -29,7 +29,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `recurrence.ts` — where a series is walked from (`startNear`: whole
       periods of its rule after `DTSTART`, near the range) and its starts
       (`seriesStarts`). → `plans/foundation.md#D118`
-  - `ItemTime`, `wallClockOf` — the time model. → `plans/foundation.md#D31`
+  - `ItemTime`, `wallClockOf` — the time model (`time.ts`, also
+    `@astrotime/core/time` with `ianaName`, a TZID or Windows zone name as
+    IANA's, for the providers). → `plans/foundation.md#D31`
   - `colors.ts` — CSS3's colour names and the nearest of a hex: an item's
     exact colour is written as `COLOR` with `X-ASTROTIME-COLOR` beside it.
     → `plans/foundation.md#D174`

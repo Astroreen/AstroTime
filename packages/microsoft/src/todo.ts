@@ -173,7 +173,9 @@ export class MicrosoftTodo implements Provider {
       const href = `${calendarUrl}${encodeURIComponent(task.id)}`;
       listed.add(href);
       const etag = task["@odata.etag"] ?? null;
-      if (known.get(href) !== etag) changed.push({ href, etag, ics: vtodoOf(task) });
+      // No ETag on either side is never "unchanged" (D37): fetched again.
+      if (etag === null || known.get(href) !== etag)
+        changed.push({ href, etag, ics: vtodoOf(task) });
     }
     return {
       changed,
