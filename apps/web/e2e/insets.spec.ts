@@ -147,6 +147,10 @@ test("on a phone turned sideways a card, the dialog beside its draft and a centr
   const draft = await box(page.locator("main [data-draft]").first());
   const dialog = await box(edit);
   expect(dialog.right <= draft.left || dialog.left >= draft.right).toBe(true);
+  // Its outer edge 24 px from the bar on its side: the aside reads `--inset-*`.
+  const side = await edit.getAttribute("data-aside");
+  if (side === "right") expect(LANDSCAPE.width - dialog.right).toBeCloseTo(24 + SIDEWAYS.right, 0);
+  else expect(dialog.left).toBeCloseTo(24 + SIDEWAYS.left, 0);
   await page.keyboard.press("Escape");
   await expect(edit).toBeHidden();
 

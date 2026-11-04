@@ -291,8 +291,11 @@ test("an item moved to another account while its file uploads: not attached, sai
     await chooser
   ).setFiles({ name: "minutes.txt", mimeType: "text/plain", buffer: Buffer.from("Minutes") });
   await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
-  // Meanwhile the item goes to the calendar on this device, which has no files.
+  // Meanwhile the item goes to the calendar on this device, which has no
+  // files: the ways turn off, the upload goes on (its input stays, D237).
   await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
+  await expect(edit.getByRole("button", { name: "From this device" })).toBeDisabled();
+  await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
   answer();
   await expect(edit.getByRole("alert")).toHaveText(
     "minutes.txt was uploaded to the Calendar folder of your files, but is not attached while the item is in another account's calendar: move it back to attach it.",
@@ -443,6 +446,7 @@ for (const [language, words] of [
       files: "From your files",
       device: "From this device",
       calendar: "Files need a Nextcloud account: this calendar is on this device.",
+      attachments: "Attachments",
       list: "Files need a Nextcloud account: this list is on this device.",
     },
   ],
@@ -455,6 +459,7 @@ for (const [language, words] of [
       files: "Из ваших файлов",
       device: "С этого устройства",
       calendar: "Файлы есть только у аккаунта Nextcloud: этот календарь — на этом устройстве.",
+      attachments: "Вложения",
       list: "Файлы есть только у аккаунта Nextcloud: этот список — на этом устройстве.",
     },
   ],
@@ -475,6 +480,14 @@ for (const [language, words] of [
       await expect(device).toBeDisabled();
       await expect(files).toHaveAccessibleDescription(words.calendar);
       await expect(edit.getByText(words.calendar)).toBeVisible();
+      // The system's file dialog stays in the page, and a file it gives here goes nowhere.
+      await edit.locator('input[type="file"]').setInputFiles({
+        name: "minutes.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("Minutes"),
+      });
+      await expect(edit.getByRole("status")).toHaveCount(0);
+      await expect(edit.getByRole("list", { name: words.attachments })).toHaveCount(0);
       // A task's calendar is its list (design D236).
       await edit.getByRole("radio", { name: words.task }).click();
       await expect(device).toHaveAccessibleDescription(words.list);
