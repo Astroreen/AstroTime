@@ -140,6 +140,10 @@ One word per concept. Use these terms in code, docs, commits and UI.
   of provider `local`: events and tasks with no server, never synced
   (foundation D122). It replaced the **first-run screen**, which asked for
   an account before showing the calendar.
+- **Import** — events and tasks read from a file into a calendar, from
+  Settings; each calendar or task list the file holds is a **source**,
+  put where the user picks (import D265, D269). **Export** is the way back:
+  a calendar as one `.ics` (import D274).
 - **Preset** — the CalDAV server and user name a single-user deployment
   names for whoever opens it, so signing in asks for the password alone
   (foundation D123).
