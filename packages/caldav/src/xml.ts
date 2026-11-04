@@ -40,9 +40,9 @@ export interface Multistatus {
 const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 
 /** Text with XML's references decoded, in one pass: `&amp;#13;` is `&#13;` as text. */
-function decodeXml(text: string): string {
-  if (!text.includes("&")) return text;
-  return text.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, decimal, name) => {
+function decodeXml(raw: string): string {
+  if (!raw.includes("&")) return raw;
+  return raw.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, decimal, name) => {
     if (name !== undefined) return NAMED[name] ?? reference;
     const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16);
     const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
