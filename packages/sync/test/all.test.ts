@@ -711,6 +711,94 @@ describe("an account a server turned away is left alone for a while (D128)", () 
     await syncAll(context);
     expect(tries()).toBe(2);
   });
+
+  test("a hold whose time has gone by, and a timeout after it, name no retryAt in the past", async () => {
+    const { context, tries, answer, pass } = await turnedAway();
+    answer(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    const busy = await syncAll(context);
+    expect(busy.retryAt).toBeGreaterThan(context.now());
+    // The hold ends; the next try finds the server silent.
+    pass(2 * 60_000);
+    answer(async () => {
+      throw new OfflineError("no answer in time");
+    });
+    const silent = await syncAll(context);
+    expect(tries()).toBe(2);
+    // No hold left to wait for: the scheduler is not woken for a time gone by.
+    expect([silent.held, silent.retryAt]).toEqual([[], null]);
+  });
+
+  /** Two accounts: the first's server answers as `busyAnswers` says, the second's sync takes `slowTakes`. */
+  async function twoAccounts() {
+    const store = await Store.open(nodeDriver());
+    const secrets = memorySecrets();
+    const server = memoryServer("https://a.example/cal/");
+    let time = 1_000_000;
+    let busyAnswer: () => Promise<void> = async () => {};
+    let slowMs = 0;
+    const add = async (username: string) =>
+      (
+        await saveAccount(
+          { store, secrets },
+          {
+            name: `${username}@a.example`,
+            serverUrl: "https://a.example/",
+            homeUrl: "https://a.example/",
+            credentials: { username, password: "right" },
+          },
+        )
+      ).account;
+    const busy = await add("busy");
+    const slow = await add("slow");
+    const connect: Connect = async (account) => ({
+      ...server,
+      calendars: async () => {
+        if (account.id === busy.id) await busyAnswer();
+        else time += slowMs;
+        return server.calendars();
+      },
+    });
+    return {
+      busy,
+      slow,
+      context: { store, secrets, connect, now: () => time },
+      busyAnswers: (next: () => Promise<void>) => (busyAnswer = next),
+      slowTakes: (ms: number) => (slowMs = ms),
+      time: () => time,
+    };
+  }
+
+  test("held and retryAt are read at one instant, the run's end: a hold that ended during the run is in neither", async () => {
+    const { busy, slow, context, busyAnswers, slowTakes, time } = await twoAccounts();
+    // The first account's server is busy for about a minute...
+    busyAnswers(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    // ...and the second one's sync outlasts that minute.
+    slowTakes(10 * 60_000);
+    const report = await syncAll(context);
+    expect(report.accounts.map((a) => [a.accountId, a.status])).toEqual([
+      [busy.id, "offline"],
+      [slow.id, "synced"],
+    ]);
+    expect([report.held, report.retryAt, report.finishedAt]).toEqual([[], null, time()]);
+  });
+
+  test("an account left alone for a hold that ends while a later one syncs is not named held", async () => {
+    const { busy, context, busyAnswers, slowTakes } = await twoAccounts();
+    busyAnswers(async () => {
+      throw new ServerBusyError("503", null);
+    });
+    const first = await syncAll(context);
+    expect(first.held).toEqual([busy.id]);
+    // Left alone by the next run, whose other sync outlasts the hold.
+    slowTakes(10 * 60_000);
+    const report = await syncAll(context);
+    expect(report.accounts[0]).toBe(first.accounts[0]);
+    expect([report.held, report.retryAt]).toEqual([[], null]);
+  });
 });
 
 describe("an account's files (foundation D231)", () => {
@@ -781,6 +869,19 @@ test("people for a mention come from the account's provider with its credentials
     username: null,
   });
   expect(await peopleOf(context, local.id, "ann")).toEqual([]);
+});
+
+test("people for a mention are not asked of an account whose sync is off (D171)", async () => {
+  const { store, a, net, context, add } = await setup();
+  const asked: string[] = [];
+  a.people = async (query) => {
+    asked.push(query);
+    return [{ name: "Anna Berg", email: "anna@example.com" }];
+  };
+  const { account } = await add("a.example");
+  await store.updateAccount(account.id, { syncOff: true });
+  expect(await peopleOf(context, account.id, "ann")).toEqual([]);
+  expect([asked, net.connections]).toEqual([[], []]);
 });
 
 describe("why an account has no files to attach from (design D237)", () => {

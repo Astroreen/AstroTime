@@ -229,26 +229,27 @@ async function everyAccount(
 ): Promise<SyncAllReport> {
   const now = context.now ?? Date.now;
   const accounts: AccountSync[] = [];
-  const held: string[] = [];
   const known = new Set<string>();
   for (const account of await context.store.accounts()) {
     // The demo's items live in the store alone; an account whose sync the
     // user turned off asks nothing of its server (D171), and is not reported.
     if (!syncs(account) || account.syncOff || state.removing.has(account.id)) continue;
     known.add(account.id);
-    const result = await syncOne(context, state, account, retry);
-    // Held now, by this run's own answer too: its next sync waits for the hold.
-    const hold = state.holds.get(account.id);
-    const holding = !!hold && (hold.refused !== null || hold.until > now());
-    if (result.held || holding) held.push(account.id);
-    accounts.push(result.sync);
+    accounts.push(await syncOne(context, state, account, retry));
   }
   for (const map of [state.holds, state.schemes])
     for (const key of map.keys()) if (!known.has(key)) map.delete(key);
-  const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > 0);
+  // Held and its end are read at one instant, the run's: a hold whose time has
+  // gone by (kept for its count by a timeout after it) holds nothing.
+  const end = now();
+  const holding = (hold: Hold | undefined) => !!hold && (hold.refused !== null || hold.until > end);
+  // Held now, whether this run left it alone or turned it away: its next
+  // sync waits for the hold; one that ended during the run holds nothing.
+  const held = accounts.map((sync) => sync.accountId).filter((id) => holding(state.holds.get(id)));
+  const ends = [...state.holds.values()].map((hold) => hold.until).filter((until) => until > end);
   return {
     accounts,
-    finishedAt: now(),
+    finishedAt: end,
     retryAt: ends.length > 0 ? Math.min(...ends) : null,
     held,
   };
@@ -259,7 +260,7 @@ async function syncOne(
   { holds, schemes }: Pick<Runs, "holds" | "schemes">,
   account: Account,
   retry: boolean,
-): Promise<{ readonly sync: AccountSync; readonly held: boolean }> {
+): Promise<AccountSync> {
   const accountId = account.id;
   const now = context.now ?? Date.now;
   let secret: string | null = null;
@@ -269,7 +270,7 @@ async function syncOne(
     // file at most hourly unless the user asks (D251).
     const subscriptions = account.provider === "ics" ? await import("./subscriptions.ts") : null;
     const early = subscriptions?.recent(context.store, accountId, now(), retry);
-    if (early) return { sync: early, held: false };
+    if (early) return early;
     const subscription = await subscriptions?.open(context, account, secret);
     const credentials = parseSecret(secret)?.credentials ?? null;
     if (!credentials && !subscription) {
@@ -279,13 +280,12 @@ async function syncOne(
         detail: "No credentials are saved for this account.",
         report: null,
       };
-      return { sync, held: false };
+      return sync;
     }
     const held = holds.get(accountId);
     // Refused credentials stay refused until they change; a busy server is
     // left alone until its time (D128). The user's own "Sync now" tries anyway.
-    if (held && !retry && (held.refused === secret || now() < held.until))
-      return { sync: held.last, held: true };
+    if (held && !retry && (held.refused === secret || now() < held.until)) return held.last;
     // The account's kind too: a password's scheme is no OAuth account's (D260).
     const by = `${account.provider} ${account.serverUrl} ${account.username}`;
     let remembered = schemes.get(accountId);
@@ -301,7 +301,7 @@ async function syncOne(
       await subscriptions!.settle(context, accountId, subscription);
     }
     holds.delete(accountId);
-    return { sync: result, held: false };
+    return result;
   } catch (error) {
     // A subscription that failed is read again at the next chance (D263);
     // its code not arriving (offline, a new release) is this sync's failure
@@ -323,7 +323,7 @@ async function syncOne(
             : "failed";
     const result: AccountSync = { accountId, status, detail, report };
     holdBack(holds, result, error, secret, now(), Math.random());
-    return { sync: result, held: false };
+    return result;
   }
 }
 

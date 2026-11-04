@@ -56,7 +56,12 @@ logic worth borrowing.
   unchanged in meaning, not byte for byte: a line keeps its name, value and
   parameters, but ical.js may write the parameters in another order, quote
   or fold it otherwise, none of which carries meaning (RFC 5545 §3.1, §3.2);
-  the round-trip tests compare lines so (`canonicalLine`). The UI exposes a
+  the round-trip tests compare lines so (`canonicalLine`). A multistatus
+  reads its references as XML spells them, once: character references to
+  a legal `Char` and the five predefined entities (XML 1.0 §2.2, §4.1,
+  §4.6), any other left as written, by a decoder of our own given to
+  fast-xml-parser (`EntityDecoderOptions`, its version pinned in the
+  catalog). The UI exposes a
   subset that grows over time ([D9](#D9), [D10](#D10)).
 - **D8. ical.js for iCalendar.** Parsing, time zones and recurrence
   expansion use Mozilla's `ical.js` (also used by Nextcloud Calendar),
@@ -312,7 +317,8 @@ Decided while building PR 2.
 ### Sync
 
 - **D38. Who wins a deletion.** A calendar or an object deleted on the
-  server is deleted here, with any pending change to it; a calendar that
+  server is deleted here, with any pending change to it (reported dropped,
+  unless the change was our own deletion, which is then done); a calendar that
   merely went missing from a listing while it holds unsent changes stays,
   reported, until a listing without it finds it has none. In a calendar
   that lets nothing be deleted (read-only, or a share without `unbind`,
@@ -1750,7 +1756,8 @@ too many requests.
   change's, not a timer's, not the desktop's or Android's. A change made
   while its account is held stays pending on this device, and the account
   says "Offline: changes wait until the server can be reached"; the report
-  names the soonest end of a hold (`retryAt`), and `SyncScheduler` plans a
+  names the soonest end of a hold still ahead (`retryAt`; `held` and
+  `retryAt` are both read at the run's end), and `SyncScheduler` plans a
   sync a second after it, so the change goes up then with no trigger or
   user needed: in a visible tab, or a hidden one that holds a change of its
   own ([D129](#D129)), until every account that can sync took it (one
