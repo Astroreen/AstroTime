@@ -61,6 +61,14 @@ export function zoneOrigin(time: ICAL.Time): ZoneOrigin {
   return timeZone ? { kind: "undefined", timeZone } : { kind: "floating" };
 }
 
+/** @internal Whether two times' zones come from the same place, as `zoneOrigin` finds them. */
+export function sameOrigin(a: ICAL.Time, b: ICAL.Time): boolean {
+  const one = zoneOrigin(a);
+  const other = zoneOrigin(b);
+  if (one.kind !== other.kind) return false;
+  return !("timeZone" in one) || one.timeZone === (other as typeof one).timeZone;
+}
+
 /** Converts an ical.js time, its zone as `zoneOrigin` finds it. */
 export function fromIcalTime(time: ICAL.Time): ItemTime {
   const origin = zoneOrigin(time);

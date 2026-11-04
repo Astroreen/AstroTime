@@ -3,7 +3,7 @@ import ICAL from "ical.js";
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
-import { fromIcalTime, keepTzid, wallClockOf, zoneOrigin, type ItemTime } from "./time.ts";
+import { fromIcalTime, keepTzid, sameOrigin, wallClockOf, type ItemTime } from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
 export interface Occurrence {
@@ -88,8 +88,7 @@ export function lengthOf(span: { start: ICAL.Time; end: ICAL.Time }): ICAL.Durat
 }
 
 function signedLength({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
-  const origin = (time: ICAL.Time) => JSON.stringify(zoneOrigin(time));
-  if (start.zone === end.zone && origin(start) === origin(end)) return end.subtractDate(start);
+  if (start.zone === end.zone && sameOrigin(start, end)) return end.subtractDate(start);
   // Two zones the object does not define are both a wall clock to ical.js (a
   // flight from Berlin to New York): their instants tell the length.
   const from = fromIcalTime(start);

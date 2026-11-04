@@ -2311,6 +2311,11 @@ task?"
   ([D38](#D38)) — the server's deletion wins and the href is reported in
   `dropped`, but that second edit goes with it, not left pending as a
   deletion in flight leaves one.
+- **A weekly series with ends in two undefined zones across DST**
+  ([D32](#D32)) — its length is the first occurrence's, by instant, so
+  in the weeks where the two zones' DST rules differ (Europe's and the US'
+  in March and October) an occurrence's end is an hour off its written
+  wall clock in the end's zone.
 - **A Saturday week start's week numbers** — `Formats.weekNumber` moves
   only a Sunday-first week to its Monday, so a locale whose week starts on
   Saturday numbers it by the ISO week before; not proven against a locale.

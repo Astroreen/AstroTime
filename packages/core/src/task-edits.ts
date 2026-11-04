@@ -6,7 +6,14 @@ import ICAL from "ical.js";
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { plus } from "./item.ts";
 import { lengthOf } from "./occurrences.ts";
-import { fromIcalTime, keepTzid, wallClockIn, zoneOrigin, type ItemTime } from "./time.ts";
+import {
+  fromIcalTime,
+  keepTzid,
+  sameOrigin,
+  wallClockIn,
+  zoneOrigin,
+  type ItemTime,
+} from "./time.ts";
 
 /**
  * The task completed or not, as Nextcloud Tasks writes it: completed is
@@ -115,8 +122,7 @@ export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICA
     // An end in a zone of its own (a flight's) stays in it, at the same instant.
     const instant = fromIcalTime(moved);
     const own =
-      JSON.stringify(zoneOrigin(endValue)) !== JSON.stringify(zoneOrigin(from)) &&
-      instant.type === "zoned"
+      !sameOrigin(endValue, from) && instant.type === "zoned"
         ? inZoneOf(endValue, instant.epochMs)
         : null;
     end.setValue(own ?? moved);
