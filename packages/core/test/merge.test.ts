@@ -125,6 +125,24 @@ describe("mergeObjects (D6)", () => {
     expect(result.master?.location).toBe("Room 3");
     expect(merged.conflict).toBe(false);
   });
+
+  test("one occurrence changed on both sides, each in another field, is no conflict", () => {
+    // Neither side had an exception for it yet: both started from the occurrence the series made.
+    const series = object({ ...base, RRULE: "FREQ=DAILY;COUNT=3" });
+    const once = (changes: { summary?: string; location?: string }, now: string) =>
+      editItem(CalendarObject.parse(series), changes, {
+        now: Date.parse(now),
+        scope: "this",
+        recurrenceId: zonedTime("2026-11-03T09:00:00", "UTC"),
+      }).ics;
+    const local = once({ summary: "Planning (ours)" }, "2026-11-01T09:00:00Z");
+    const server = once({ location: "Room 7" }, "2026-11-01T08:50:00Z");
+    const merged = mergeObjects(series, local, server);
+    expect(merged.conflict).toBe(false);
+    expect(CalendarObject.parse(merged.ics).exceptions).toMatchObject([
+      { summary: "Planning (ours)", location: "Room 7" },
+    ]);
+  });
 });
 
 describe("mergeObjects: sets and time zones (review of #4)", () => {
