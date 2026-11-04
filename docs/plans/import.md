@@ -210,6 +210,10 @@ not carry is said, not dropped in silence.
 - **xCal (RFC 6321)** (D266): no exporter people use writes it; it would
   need an XML reader in the import chunk. Comes when a user has such a
   file.
+- **Takeout's link titles** (D272): a task's links come over as their
+  addresses (`ATTACH`); their `description` (a mail's subject) and `type`
+  have no place in an `ATTACH` AstroTime reads, and are not carried over.
+  An `X-` parameter could keep them once the details show one.
 - **Todoist's CSV** (D266): its dates are free English ("every other
   Monday", "tomorrow at 5pm"), which needs Todoist's own grammar to read;
   titles and subtasks alone would import tasks without their dates.
@@ -320,7 +324,12 @@ is a file that is not Takeout's. No value can become a line of its own:
 text escaped and its control characters dropped, a link parsed as an
 http(s) URL and refused with a control character in it, a place digits
 alone, an id letters, digits, `-` and `_`; the same holds for a
-vCalendar's `URL`, `ATTACH` and a guest's name. D266, D272.
+vCalendar's `URL`, `ATTACH` and a guest's name. A subtask whose parent
+was deleted or is not in the file names no parent (a link to nothing),
+and that is said. A task with no readable `updated` gets the fixed
+`DTSTAMP` 1970-01-01, so the same file gives the same text on every
+import; `DTSTAMP` is bookkeeping a re-import's comparison ignores.
+D266, D272.
 
 ### PR I6 — Export
 

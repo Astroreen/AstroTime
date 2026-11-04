@@ -107,6 +107,13 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
   });
 
   test("a malformed file is refused or read as far as it goes, never a crash", async () => {
+    // Not JSON at all, though it starts as JSON does: said so, as before.
+    await expect(
+      readImport(
+        { name: "broken.json", bytes: new TextEncoder().encode('{"kind": "tasks#taskLists",') },
+        { language: "en", timeZone: "UTC", newUid: () => "x", pause: () => Promise.resolve() },
+      ),
+    ).rejects.toThrow(NotImportableError);
     // Not Takeout's shape at all.
     await expect(fromJson(null)).rejects.toThrow(NotImportableError);
     await expect(fromJson({ kind: "tasks#taskLists", items: null })).rejects.toThrow(
@@ -148,5 +155,21 @@ describe("Google Takeout's tasks (import D266, D272)", () => {
     ];
     const file = await fromJson(jcal, "calendar.json");
     expect(file.sources[0]!.items.map((item) => item.uid)).toEqual(["j"]);
+  });
+
+  test("a subtask whose parent was deleted or is not in the file names no parent, and that is said", async () => {
+    const file = await fromJson(
+      list([
+        task({ id: "gone", title: "Gone", deleted: true }),
+        task({ id: "a", title: "Under a deleted one", parent: "gone" }),
+        task({ id: "b", title: "Under a stranger", parent: "elsewhere" }),
+        task({ id: "c", title: "Under a kept one", parent: "a" }),
+      ]),
+    );
+    const [a, b, c] = file.sources[0]!.items;
+    expect(a!.ics).not.toContain("RELATED-TO");
+    expect(b!.ics).not.toContain("RELATED-TO");
+    expect(c!.ics).toContain("RELATED-TO:google-task-a");
+    expect(file.sources[0]!.notImported).toEqual(["parent"]);
   });
 });

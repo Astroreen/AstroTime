@@ -49,6 +49,13 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
   for (const list of lists) {
     if (!isObject(list)) continue;
     const tasks = Array.isArray(list["items"]) ? (list["items"] as unknown[]) : [];
+    // The tasks kept: a subtask names its parent only when the parent is among them.
+    const kept = new Set(
+      tasks
+        .filter((task) => isObject(task) && task["deleted"] !== true)
+        .map((task) => idOf((task as Record<string, unknown>)["id"]))
+        .filter((id) => id !== null),
+    );
     out.push(
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -76,8 +83,11 @@ export function takeoutToIcs(json: unknown): TakeoutConverted {
         const completed = stamp(task["completed"]);
         if (completed) lines.push(`COMPLETED:${completed}`);
       } else lines.push("STATUS:NEEDS-ACTION");
+      // Its parent, when the file has it; a parent deleted or not in the file
+      // would leave a link to nothing: left out, and named.
       const parent = idOf(task["parent"]);
-      if (parent) lines.push(`RELATED-TO:google-task-${parent}`);
+      if (parent && kept.has(parent)) lines.push(`RELATED-TO:google-task-${parent}`);
+      else if (task["parent"] !== undefined) notImported.add("parent");
       if (typeof task["position"] === "string" && /^\d+$/.test(task["position"]))
         lines.push(`X-GOOGLE-TASKS-POSITION:${task["position"]}`);
       for (const link of Array.isArray(task["links"]) ? (task["links"] as unknown[]) : []) {
