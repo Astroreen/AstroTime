@@ -1832,6 +1832,14 @@ optimization is lacking").
     i18next and the rest each in one, cached across updates. The groups take
     only what the page loads at once (`$initial`), so a library only a
     dialog loaded later uses (Base UI's switch) loads with that dialog.
+    _Since round 5 ([providers D255](providers.md#D255)):_ AstroTime's own
+    packages that load at once (`core`, `caldav`, `storage`, `sync`) are a
+    group too, `app`: a part loaded later that needs some of them (the
+    subscriptions' file splitter needs the iCalendar core) takes them from
+    it. Without it the bundler cut those modules into a chunk of their own,
+    which compresses worse (a lazy import of `@astrotime/core/split` cost
+    1.5 KiB at once); with it the first load is one `index` and one `app`
+    chunk, 4.6 KiB smaller (131 200 to 126 492 bytes on main `ea40a24`).
   - **Dialogs with their first opening**: the edit dialog, Settings and the
     Conflicts list (`components/lazy.tsx`), each a stand-in with its props
     that draws nothing until first open, stays drawn after, and fetches its
