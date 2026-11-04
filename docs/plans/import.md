@@ -1,8 +1,8 @@
 # Import plan
 
 Status: **in progress** — the formats, their order and the flow are
-decided; the splitter (PR I1) and the import flow for iCalendar, jCal and
-ZIP (PR I2) are built. This plan owns reading calendars
+decided; the splitter (PR I1), the import flow for iCalendar, jCal and
+ZIP (PR I2) and vCalendar 1.0 (PR I3) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -231,6 +231,15 @@ new one on this device, stops one in the middle, and sees the items in the
 views; the first load grows by at most 0.1 KiB.
 
 ### PR I3 — vCalendar 1.0
+
+`vcalendarToIcs` (`packages/ui/src/import/vcs.ts`), loaded for a 1.0 file
+alone: quoted-printable text in its charset, local times through `TZ`
+and `DAYLIGHT`, `AALARM`/`DALARM`/`MALARM` as alarms relative to the
+start, 1.0's rule grammar (`D`, `W`, `MD`, `MP`, `YM`, `YD`, `#n` or an
+end date, two occurrences when none is given) as an `RRULE`, `PRIORITY`
+1–3 as 1, 5, 9, Outlook's all-day flag as dates; a rule of several parts,
+a procedure alarm (`PALARM`) and any property iCalendar has no place for
+are named as not carried over. D266, D272.
 
 ### PR I4 — CSV (Outlook's and Google's columns)
 

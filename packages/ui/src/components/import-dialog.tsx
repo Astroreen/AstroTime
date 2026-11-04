@@ -388,6 +388,11 @@ function SourceCard({
           </p>
         </div>
       </div>
+      {source.notImported.length > 0 ? (
+        <p className="text-note text-ink-muted">
+          {t("import.notImported", { names: source.notImported.join(", ") })}
+        </p>
+      ) : null}
       {source.others > 0 ? (
         <p className="text-note text-ink-muted">{t("import.others", { count: source.others })}</p>
       ) : null}

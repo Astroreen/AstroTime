@@ -5,7 +5,7 @@
 // phone in Russian.
 import { expect, test } from "@playwright/test";
 
-import { BIG, HOLIDAYS, importFile, TEAM } from "./import-files.ts";
+import { BIG, HOLIDAYS, importFile, NOKIA, TEAM } from "./import-files.ts";
 import { choose, NOW, openDemo, PHONE, WIDE } from "./support.ts";
 
 test("wide, English: a file's events and a task, one already there, into Work and a new list", async ({
@@ -195,5 +195,24 @@ test.describe("on a phone, in Russian", () => {
     );
     await settings.getByRole("button", { name: "Закрыть настройки" }).click();
     await expect(page.getByRole("listitem", { name: /Поездка в Ригу/ }).first()).toBeVisible();
+  });
+
+  test("an old phone's vCalendar: its events and task, and what iCalendar has no place for", async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openDemo(page, "agenda");
+    await page.getByRole("button", { name: "Главное меню" }).click();
+    await page
+      .getByRole("dialog", { name: "Главное меню" })
+      .getByRole("button", { name: "Настройки" })
+      .click();
+    await importFile(page, /^Импорт из файла/, "nokia.vcs", NOKIA);
+    const dialog = page.getByRole("dialog", { name: "Импорт" });
+    const phone = dialog.getByRole("region", { name: "nokia" });
+    await expect(phone).toContainText("4 события · 1 задача");
+    await expect(phone).toContainText("Не перенесено, в iCalendar для этого нет места: PALARM");
+    await dialog.getByRole("button", { name: "Импортировать" }).click();
+    await expect(dialog.getByRole("status")).toContainText("4 события · 1 задача");
   });
 });

@@ -33,6 +33,8 @@ export interface Source {
   /** Components AstroTime does not keep (`VJOURNAL`, `VFREEBUSY`). */
   readonly others: number;
   readonly problems: readonly SplitProblem[];
+  /** What a converted format had that iCalendar got nothing of, by its name there (D272). */
+  readonly notImported: readonly string[];
 }
 
 export interface ReadFile {
@@ -88,7 +90,7 @@ export async function readImport(
     const archive = await (await import("./zip.ts")).unzip(file.bytes);
     unread.push(...archive.unread);
     for (const entry of archive.entries) {
-      if (/\.(ics|ical|ifb|icalendar|json)$/i.test(entry.name)) files.push(entry);
+      if (/\.(ics|ical|ifb|icalendar|json|vcs)$/i.test(entry.name)) files.push(entry);
       else unread.push(entry.name);
     }
   }
@@ -96,8 +98,16 @@ export async function readImport(
     const decoded = decodeText(one.bytes, options.language);
     guessed ??= decoded.guessed;
     let calendars: SplitCalendar[];
+    let notImported: readonly string[] = [];
     try {
-      calendars = splitCalendars(textOf(decoded.text), { newUid: options.newUid });
+      let text = decoded.text;
+      // vCalendar 1.0: its converter loads for it alone.
+      if (/^VERSION:1\.0[ \t]*$/im.test(text) && /^BEGIN:VCALENDAR/im.test(text)) {
+        const converted = (await import("./vcs.ts")).vcalendarToIcs(text);
+        text = converted.text;
+        notImported = converted.notImported;
+      }
+      calendars = splitCalendars(textOf(text), { newUid: options.newUid });
     } catch (error) {
       if (!(error instanceof NotCalendarError || error instanceof SyntaxError)) throw error;
       // In an archive, one file AstroTime cannot read is named, not the archive's end.
@@ -110,7 +120,10 @@ export async function readImport(
       });
     }
     for (const calendar of calendars) {
-      sources.push(await sourceOf(calendar, baseName(one.name), sources.length, options));
+      sources.push({
+        ...(await sourceOf(calendar, baseName(one.name), sources.length, options)),
+        notImported,
+      });
     }
   }
   if (sources.length === 0) throw new NotImportableError(`${file.name} holds no calendar.`);
@@ -130,7 +143,7 @@ async function sourceOf(
   fileName: string,
   index: number,
   options: ReadOptions,
-): Promise<Source> {
+): Promise<Omit<Source, "notImported">> {
   const pause = options.pause ?? yieldToPage;
   const items: ImportItem[] = [];
   const problems = [...calendar.problems];

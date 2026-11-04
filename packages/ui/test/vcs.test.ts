@@ -1,0 +1,214 @@
+import { readFileSync } from "node:fs";
+
+import { CalendarObject, type Event, type Task } from "@astrotime/core";
+import { describe, expect, test } from "vite-plus/test";
+
+import { readImport } from "../src/import/read.ts";
+import { vcalendarToIcs } from "../src/import/vcs.ts";
+
+const fixture = (name: string) => readFileSync(new URL(`fixtures/import/${name}`, import.meta.url));
+
+const read = (name: string, language = "en") =>
+  readImport(
+    { name, bytes: fixture(name) },
+    {
+      language,
+      timeZone: "Europe/Vilnius",
+      newUid: () => "new",
+      pause: () => Promise.resolve(),
+    },
+  );
+
+const lines = (...content: string[]) => `${content.join("\r\n")}\r\n`;
+
+/** The items of a converted file, by UID. */
+async function items(name: string) {
+  const [source] = (await read(name)).sources;
+  return {
+    source: source!,
+    byUid: new Map(
+      source!.items.map((item) => [item.uid, CalendarObject.parse(item.ics)] as const),
+    ),
+  };
+}
+
+describe("Outlook's vCalendar (import D266, D272)", () => {
+  test("quoted-printable text with soft breaks, UTC times, alarms before the start", async () => {
+    const { source, byUid } = await items("outlook.vcs");
+    expect(source.name).toBe("outlook");
+    expect(source.items.map((item) => item.kind)).toEqual(["event", "event"]);
+    const review = [...byUid.values()][0]!.master as Event;
+    expect(review.summary).toBe("Budget review");
+    expect(review.location).toBe("Room 4, second floor");
+    expect(review.description).toBe("Agenda:\n- last quarter\n- next year's draft\n");
+    expect(review.categories).toEqual(["Work", "Finance"]);
+    expect(review.start).toMatchObject({ epochMs: Date.UTC(2026, 10, 5, 7) });
+    // Low in 1.0 is 3; in iCalendar 9.
+    expect(byUid.values().next().value!.serialize()).toContain("PRIORITY:9");
+    // Both alarms ten minutes before, so each occurrence would have them.
+    expect(review.alarms.map((alarm) => [alarm.action, alarm.trigger])).toEqual([
+      ["AUDIO", expect.objectContaining({ type: "relative", offsetSeconds: -600 })],
+      ["DISPLAY", expect.objectContaining({ type: "relative", offsetSeconds: -600 })],
+    ]);
+    expect(source.notImported).toEqual([]);
+  });
+
+  test("an all-day event from midnight to midnight is a day", async () => {
+    const { byUid } = await items("outlook.vcs");
+    const day = [...byUid.values()][1]!.master as Event;
+    expect(day.summary).toBe("Day off");
+    expect(day.start).toEqual({ type: "date", date: "2026-11-10" });
+    expect(day.end).toEqual({ type: "date", date: "2026-11-11" });
+    expect(day.transparent).toBe(true);
+  });
+});
+
+describe("a phone's vCalendar (import D266, D272)", () => {
+  test("local times through TZ and DAYLIGHT; Windows-1251 and UTF-8 text", async () => {
+    const { byUid } = await items("nokia.vcs");
+    const meeting = byUid.get("nokia-1")!.master as Event;
+    expect(meeting.summary).toBe("Встреча с Анной");
+    // 21 October is in summer time (+03): 10:00 there is 07:00 UTC.
+    expect(meeting.start).toMatchObject({ epochMs: Date.UTC(2026, 9, 21, 7) });
+    expect(byUid.get("nokia-2")!.master!.summary).toBe("День рождения");
+    // 1 November is past summer time (+02): 09:00 there is 07:00 UTC.
+    expect(byUid.get("nokia-3")!.master).toMatchObject({
+      start: expect.objectContaining({ epochMs: Date.UTC(2026, 10, 1, 7) }),
+    });
+  });
+
+  test("1.0's rules as iCalendar's, its alarm before the start with its snoozes", async () => {
+    const { byUid } = await items("nokia.vcs");
+    const rule = (uid: string) => /^RRULE:(.*)$/m.exec(byUid.get(uid)!.serialize())?.[1];
+    expect(rule("nokia-1")).toBe("FREQ=WEEKLY;BYDAY=MO,WE;COUNT=4");
+    expect(rule("nokia-2")).toBe("FREQ=YEARLY;BYMONTH=12");
+    expect(rule("nokia-3")).toBe("FREQ=MONTHLY;BYMONTHDAY=1,-1;COUNT=6");
+    expect(rule("nokia-4")).toBe("FREQ=MONTHLY;BYDAY=1TH;UNTIL=20270629T220000Z");
+    const meeting = byUid.get("nokia-1")!;
+    expect(meeting.serialize()).toContain("EXDATE:20261026T080000Z");
+    expect(meeting.master!.alarms).toEqual([
+      expect.objectContaining({
+        action: "AUDIO",
+        trigger: expect.objectContaining({ offsetSeconds: -900 }),
+        repeat: 2,
+        repeatEverySeconds: 300,
+      }),
+    ]);
+    expect(meeting.master!.classification).toBe("PRIVATE");
+    expect(meeting.serialize()).toContain("X-EPOCAGENDAENTRYTYPE:APPOINTMENT");
+  });
+
+  test("the organizer and a guest, a task's due date, status and priority", async () => {
+    const { byUid } = await items("nokia.vcs");
+    const club = byUid.get("nokia-4")!.master as Event;
+    expect(club.organizer).toMatchObject({ address: "mailto:anna@example.com", name: "Anna Berg" });
+    expect(club.attendees).toEqual([
+      expect.objectContaining({
+        address: "mailto:marta@example.com",
+        role: "REQ-PARTICIPANT",
+        status: "NEEDS-ACTION",
+      }),
+    ]);
+    const task = byUid.get("nokia-5")!.master as Task;
+    expect(task.kind).toBe("task");
+    expect(task.status).toBe("NEEDS-ACTION");
+    expect(task.due).toMatchObject({ epochMs: Date.UTC(2026, 10, 20, 10) });
+    expect(byUid.get("nokia-5")!.serialize()).toContain("PRIORITY:1");
+  });
+
+  test("what iCalendar has no home for is named, not written as something else", async () => {
+    const { source } = await items("nokia.vcs");
+    // A procedure alarm runs a program on the phone.
+    expect(source.notImported).toEqual(["PALARM"]);
+  });
+});
+
+describe("1.0's corners", () => {
+  test("no TZ: local times stay floating", () => {
+    const { text } = vcalendarToIcs(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:1.0",
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTART:20261105T090000",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ),
+    );
+    expect(text).toContain("DTSTART:20261105T090000\r\n");
+  });
+
+  test("a rule of several parts, or one it does not know, is named and left out", () => {
+    const { text, notImported } = vcalendarToIcs(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:1.0",
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTART:20261105T090000Z",
+        "RRULE:W1 MO #2 D1 #5",
+        "RNUM:2",
+        "X-FOO;ENCODING=QUOTED-PRINTABLE:a=3Db",
+        "SPECIAL:value",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ),
+    );
+    expect(text).not.toContain("RRULE");
+    expect(text).toContain("X-FOO:a=b");
+    expect(notImported).toEqual(["RRULE", "SPECIAL"]);
+  });
+
+  test("a rule with no end repeats twice, as 1.0 says", () => {
+    const { text } = vcalendarToIcs(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:1.0",
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTART:20261105T090000Z",
+        "RRULE:D2",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ),
+    );
+    expect(text).toContain("RRULE:FREQ=DAILY;INTERVAL=2;COUNT=2");
+  });
+
+  test("text with iCalendar's special characters is escaped, 1.0's \\; unescaped", () => {
+    const { text } = vcalendarToIcs(
+      lines(
+        "BEGIN:VCALENDAR",
+        "VERSION:1.0",
+        "BEGIN:VEVENT",
+        "UID:a",
+        "DTSTART:20261105T090000Z",
+        "SUMMARY:Lunch\\; then, coffee",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ),
+    );
+    expect(text).toContain("SUMMARY:Lunch\\; then\\, coffee");
+  });
+
+  test("a vCalendar 1.0 file in Russian Windows-1251 with no charset named reads as guessed", async () => {
+    const bytes = new Uint8Array([
+      ...new TextEncoder().encode(
+        "BEGIN:VCALENDAR\r\nVERSION:1.0\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART:20261105T090000Z\r\nSUMMARY:",
+      ),
+      // "Обед" in Windows-1251.
+      0xce,
+      0xe1,
+      0xe5,
+      0xe4,
+      ...new TextEncoder().encode("\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"),
+    ]);
+    const file = await readImport(
+      { name: "a.vcs", bytes },
+      { language: "ru", timeZone: "UTC", newUid: () => "x", pause: () => Promise.resolve() },
+    );
+    expect(file.guessed).toBe("windows-1251");
+    expect(CalendarObject.parse(file.sources[0]!.items[0]!.ics).master?.summary).toBe("Обед");
+  });
+});
