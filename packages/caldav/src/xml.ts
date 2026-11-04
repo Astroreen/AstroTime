@@ -44,6 +44,9 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
+  // Character references (`&#13;`, `&#xE9;`, XML 1.0 §4.1) are read as the
+  // characters they spell: the parser reads them only with HTML's entities.
+  htmlEntities: true,
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 

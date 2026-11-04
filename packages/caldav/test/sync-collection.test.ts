@@ -212,3 +212,21 @@ test("a first sync refused with a 403 that is no expired token fails at once, wi
   ).rejects.toThrow(/403/);
   expect(requests).toEqual(["REPORT"]);
 });
+
+test("a report's data spelled with character references arrives as the text they spell (XML 1.0 §4.1)", async () => {
+  // A server's XML writer may spell each CR of the data's CRLF, or any
+  // other character, as a reference: `&#13;`, `&#xE9;`.
+  const spelled = ics("r&#xE9;f &amp; co").replaceAll("\r", "&#13;");
+  const http: HttpClient = async (request) => ({
+    status: 207,
+    url: request.url,
+    header: () => null,
+    body: multistatus(
+      `<d:response><d:href>/cal/ref.ics</d:href><d:propstat><d:prop><d:getetag>"r"</d:getetag><c:calendar-data>${spelled}</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+      "t2",
+    ),
+  });
+  const provider = new CalDavProvider(http, { username: "u", password: "p" }, home);
+  const changes = await provider.changes(home, { syncToken: "t1", ctag: null }, new Map());
+  expect(changes.changed.map((o) => o.ics)).toEqual([ics("réf & co").trimEnd()]);
+});
