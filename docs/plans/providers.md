@@ -10,8 +10,9 @@ CalDAV), [D4](foundation.md#D4) (providers behind one interface),
 lost), [D19](foundation.md#D19) (signing in), [D20](foundation.md#D20) and
 [D39](foundation.md#D39) (the web proxy), [D126](foundation.md#D126) (what
 a sync costs a server) and [D145](foundation.md#D145) (the first load's
-budget); this plan builds on them and does not repeat them. Decisions are
-D245–D264.
+budget); this plan builds on them and does not repeat them. Its
+decisions are D245–D259; D260–D264 are kept for the decisions its PRs
+take while building, and no other plan numbers them.
 
 ## Goal
 
@@ -75,7 +76,7 @@ marked _to be recorded_.
      URL, kept fresh.
   4. **OAuth 2** ([D254](#D254)) and **Google** ([D252](#D252)): built up
      to the point where the owner's OAuth clients are needed, against
-     recordings and a fake server; finished when he has made them.
+     recordings and a fake server; finished once the owner has made them.
   5. **Microsoft** ([D253](#D253)): the same, after Google.
 
   Google comes before Microsoft because more of AstroTime's references are
@@ -131,8 +132,8 @@ marked _to be recorded_.
 
   3. **The cloud run** (`interop-cloud.yml`): the same suite against the
      cloud services (iCloud, Fastmail, Google, Microsoft…) from test
-     accounts the owner makes, their credentials only in GitHub secrets he
-     creates ([D249](#D249)). By hand, and monthly; a provider's PR that
+     accounts the owner makes, their credentials only in GitHub secrets the
+     owner creates ([D249](#D249)). By hand, and monthly; a provider's PR that
      changes its cloud code may run it by hand. A service without its
      secrets is skipped, said so in the job's summary, not failed. Never
      on a PR from a fork (secrets do not reach one anyway).
@@ -182,7 +183,7 @@ marked _to be recorded_.
 
 - **D251. Subscriptions: a calendar from an ICS address, read-only.** A
   new provider, `ics`, in a package of its own: one account per address,
-  one read-only calendar ([NO_RIGHTS](foundation.md#D37)), its name from
+  one read-only calendar (`NO_RIGHTS`, foundation [D37](foundation.md#D37)'s "what the user may do in a calendar"), its name from
   the file's `X-WR-CALNAME` (or the address's host), its colour from
   `X-APPLE-CALENDAR-COLOR` or `COLOR` (RFC 7986) if the file has one.
   `webcal://` is read as `https://`. A sync is one conditional `GET`
@@ -206,7 +207,13 @@ marked _to be recorded_.
   Google Calendar's CalDAV endpoint takes an OAuth 2 bearer token, not a
   password, and speaks the CalDAV the provider already speaks, so events
   stay iCalendar end to end ([D7](foundation.md#D7)) and reuse every test
-  of it. Google Tasks has no CalDAV: a provider `google-tasks` maps the
+  of it. Google's CalDAV carries events only, never tasks. How it keeps a
+  series with its `RECURRENCE-ID` exceptions, and which calendars it
+  serves read-only (birthdays, holidays, other people's), is _to be
+  recorded_ in P5 before anything is written through it; if a recording
+  shows a write that loses properties, events move to the Calendar REST
+  API, mapped and written field by field as Google Tasks is below, and
+  this decision says so. Google Tasks has no CalDAV: a provider `google-tasks` maps the
   Tasks API (`tasklists`, `tasks`: title, notes, due as a date, status,
   completed, parent, position, links) to `VTODO`s in the store and back,
   each task list a calendar of `VTODO`s. A write sends only what the user
@@ -221,7 +228,12 @@ marked _to be recorded_.
   Changes are found with CalDAV's `sync-collection` for events and the
   Tasks API's `updatedMin` with `showDeleted` for tasks. Google's APIs
   answer CORS, its CalDAV does not: on the web events go through the
-  proxy, which must allow `https://apidata.googleusercontent.com`.
+  proxy, whose allowlist is the deployment's ([D20](foundation.md#D20)):
+  a deployment that names a Google client ([D254](#D254)) has
+  `https://apidata.googleusercontent.com` added to its allowlist by the
+  image itself, as the preset's server is ([D123](foundation.md#D123)),
+  and the image's documentation says so; Android and the desktop need no
+  proxy.
 
 - **D253. Microsoft: Graph, events and To Do.** Outlook's calendars and
   Microsoft To Do have no CalDAV; Microsoft Graph carries both
@@ -229,10 +241,20 @@ marked _to be recorded_.
   CORS. A provider `microsoft` maps Graph's events and tasks to
   iCalendar in the store and back, with Graph's `delta` queries
   (`calendarView/delta`, `tasks/delta`) for changes, and writes only
-  what changed (`PATCH`), as [D252](#D252) does for Google Tasks. Each
-  item keeps the JSON Graph served in the store beside its iCalendar, so
-  what iCalendar cannot say is still there to compare and never sent back
-  changed. A series is read with its exceptions (`instances`), and an
+  what changed (`PATCH`), as [D252](#D252) does for Google Tasks. The
+  store keeps iCalendar only, as for every provider
+  ([D5](foundation.md#D5)): no second copy of an item in Graph's JSON,
+  which would be a second source of truth to keep in step with every
+  edit. What changed is found as for any provider, by comparing the edited
+  object with its base ([D37](foundation.md#D37)), and each changed
+  property is sent as its Graph field; what Graph keeps that the store
+  does not hold stays on Graph's side, untouched, because no `PATCH`
+  names it ([D7](foundation.md#D7)'s promise kept on the server's side).
+  Graph fields worth showing that iCalendar has no property for (an
+  online meeting's link, the item's page in Outlook) are read into the
+  `X-` properties Outlook's own iCalendar export writes for them
+  (`X-MICROSOFT-SKYPETEAMSMEETINGURL`, …), and are never written back:
+  Graph sets them itself. Graph's `changeKey` is the object's ETag. A series is read with its exceptions (`instances`), and an
   edit of one occurrence writes that occurrence's own event, as Outlook
   does. It comes after Google ([D246](#D246)).
 
@@ -284,7 +306,10 @@ marked _to be recorded_.
   dialog's new choices (the known services' table, the subscription form,
   the OAuth buttons) load with the sign-in dialog, never before. Each PR
   measures the first load before and after; none may add more than 0.1
-  KiB to it.
+  KiB to it, net. The registry (P4) is not exempt: the room it needs is
+  made in the same PR by moving something off the first load first (the
+  sign-in dialog, which is on it today, is the first candidate), and the
+  PR says what moved and both numbers.
 
 - **D256. What is not built, and why.**
   - **Proton Calendar** has no API and no CalDAV, and Proton's Bridge
@@ -302,9 +327,11 @@ marked _to be recorded_.
 
 - **D257. What the owner makes for Google, step by step** (when the
   OAuth PR is ready for it; nothing is needed before):
-  1. At console.cloud.google.com, a project "AstroTime"; enable "Google
-     Calendar API" and "Google Tasks API" (CalDAV's endpoint is part of
-     the Calendar API: "CalDAV API" enabled too).
+  1. At console.cloud.google.com, a project "AstroTime"; in its API
+     library enable three APIs: "CalDAV API" (the events, [D252](#D252)),
+     "Google Tasks API" (the tasks) and "Google Calendar API" (the
+     calendars' list and colours, if P5's recording needs it; enabling
+     it costs nothing).
   2. The OAuth consent screen: External; the app's name, the owner's
      support address, the scopes
      `https://www.googleapis.com/auth/calendar` and
@@ -317,10 +344,10 @@ marked _to be recorded_.
   3. OAuth clients: **Android** (package `io.github.astroreen.astrotime`,
      the SHA-1 of the debug and of the release signing keys, "Enable
      custom URI scheme" in its advanced settings); **Desktop app**; and
-     for his own web deployment a **Web application** client with his
-     deployment's origin and `http://localhost:5180` as authorized
+     for the owner's own web deployment a **Web application** client
+     with that deployment's origin and `http://localhost:5180` as authorized
      JavaScript origins and `<origin>/oauth` as redirect URIs.
-  4. A Google account for the tests only (not his own), a test user of
+  4. A Google account for the tests only (not the owner's own), a test user of
      the consent screen, with a refresh token for the cloud run made by
      `scripts/record-google.ts`; the client ids as repository variables
      (`ASTROTIME_GOOGLE_*_CLIENT_ID`), the desktop and web secrets and the
@@ -331,7 +358,7 @@ marked _to be recorded_.
   1. At entra.microsoft.com (free with a personal Microsoft account), an
      app registration "AstroTime", "Accounts in any organizational
      directory and personal Microsoft accounts".
-  2. Platforms: **Single-page application** with his deployment's
+  2. Platforms: **Single-page application** with the owner's deployment's
      `<origin>/oauth` and `http://localhost:5180/oauth`; **Mobile and
      desktop applications** with `io.github.astroreen.astrotime://oauth`
      and `http://localhost`; "Allow public client flows" on.
@@ -375,6 +402,9 @@ Each PR is based on `main`, measures the first load before and after
 
 D245–D259 as decisions; `docs/README.md` lists the plan.
 
+Done when: `scripts/docs.test.ts` passes (every route leads somewhere,
+the plan is reached from `AGENTS.md`).
+
 ### PR P2 — The interop matrix
 
 `interop.yml`, `packages/sync/test/interop/` (the compose file and each
@@ -383,16 +413,39 @@ against every server there; Dependabot's `docker-compose` entry; what
 breaks on a server fixed in the provider, each fix a commit of its own
 with its test, or recorded in Deferred. D248.
 
+Done when: `servers.test.ts` passes against each listed server in its
+own job of `interop.yml`, and a server made to fail (a wrong password in
+a run by hand) fails its own job only; the workflow runs on a PR that
+changes `packages/caldav/**` and not on one that changes only
+`packages/ui/**`; Dependabot's config names the compose file; each
+server that could not join is in Deferred with the reason; `docs/map.md`
+names `packages/sync/test/interop/`.
+
 ### PR P3 — Known services
 
 The services' table, the sign-in dialog's list, the help texts in English
 and Russian, each service's recording or interop proof. D247, D250.
+
+Done when: choosing a service fills its address and shows its help, in
+English and Russian, on a phone and a wide screen (screenshots); a unit
+test replays each listed service's recording through discovery and a
+first sync; a service without a recording is not listed; the first load
+grows by at most 0.1 KiB.
 
 ### PR P4 — Subscriptions
 
 `@astrotime/ics`, the provider registry ([D255](#D255)), the sign-in
 dialog's "Subscribe to a calendar", the store's provider `ics`. D251,
 D255.
+
+Done when: tests show that a `304` changes nothing in the store; a `200`
+adds a new UID's object, changes a changed one's and removes one whose
+UID left the file; a series keeps its exceptions in one object; nothing
+is ever written to the server; the URL's secret is in the secret store,
+not the account's row; the CalDAV provider is imported only when a
+CalDAV account exists (a test of the registry); the first load grows by
+at most 0.1 KiB net; `docs/map.md` names `@astrotime/ics` and the
+registry.
 
 ### PR P5 — OAuth and Google
 
@@ -401,6 +454,23 @@ redirect on each platform, `google-tasks`; against a fake OAuth server
 and recordings until the owner's clients exist ([D257](#D257)). D252,
 D254.
 
+Done when: against a fake OAuth server, a sign-in on each platform's
+redirect ends with a refresh token in the secret store, an expired access
+token is refreshed once, and a refused refresh signs the account out;
+Google's CalDAV recording (series and exceptions included) replays
+through a sync, and a Tasks recording maps to `VTODO`s and back with a
+`PATCH` of the changed fields only; the owner's steps (D257) are sent to
+the orchestrator, and once the owner has made them the cloud run passes
+on the test account; `docs/map.md` names `@astrotime/oauth` and
+`google-tasks`.
+
 ### PR P6 — Microsoft
 
 The `microsoft` provider, on P5's OAuth. D253, D258.
+
+Done when: Graph recordings of events (a series with an exception
+included) and of To Do tasks replay through a sync into iCalendar; an
+edit sends a `PATCH` of the changed fields only, and a field the store
+does not hold is never sent; the owner's steps (D258) are sent to the
+orchestrator, and once made the cloud run passes on the test account;
+`docs/map.md` names the provider.
