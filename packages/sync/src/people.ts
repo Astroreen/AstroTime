@@ -10,8 +10,9 @@ import { readSecret } from "./secret.ts";
 /**
  * People the server of an account knows by name or e-mail, for a mention in
  * a description (docs/plans/design.md#D208): asked of its provider with its
- * credentials, now. Nobody for an account that is not on a server, has no
- * credentials, or whose provider has no people; `null` when the server could
+ * credentials, now. Nobody for an account that is not on a server, whose
+ * sync is off (no request goes to its server, D171), has no credentials, or
+ * whose provider has no people; `null` when the server could
  * not be asked (offline, refused): no answer, which a caller does not keep,
  * and a mention can still be typed.
  */
@@ -24,7 +25,7 @@ export async function peopleOf(
   query: string,
 ): Promise<Person[] | null> {
   const account = (await context.store.accounts()).find((a) => a.id === accountId);
-  if (account?.provider !== "caldav") return [];
+  if (account?.provider !== "caldav" || account.syncOff) return [];
   const credentials = (await readSecret(context.secrets, accountId))?.credentials;
   if (!credentials) return [];
   try {

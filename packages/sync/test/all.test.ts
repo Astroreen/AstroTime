@@ -789,3 +789,16 @@ test("people for a mention come from the account's provider with its credentials
   });
   expect(await peopleOf(context, local.id, "ann")).toEqual([]);
 });
+
+test("people for a mention are not asked of an account whose sync is off (D171)", async () => {
+  const { store, a, net, context, add } = await setup();
+  const asked: string[] = [];
+  a.people = async (query) => {
+    asked.push(query);
+    return [{ name: "Anna Berg", email: "anna@example.com" }];
+  };
+  const { account } = await add("a.example");
+  await store.updateAccount(account.id, { syncOff: true });
+  expect(await peopleOf(context, account.id, "ann")).toEqual([]);
+  expect([asked, net.connections]).toEqual([[], []]);
+});
