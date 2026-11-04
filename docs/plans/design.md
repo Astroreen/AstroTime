@@ -1850,7 +1850,9 @@ reminders, its description and mentions in it.
     before it (`https://example.com/a_`).
   - **As CommonMark where text is plain:** only a bullet or a list from 1
     cuts a paragraph short, so a wrapped line "2019. was a good year" stays
-    words; a backtick fence has no backtick after it on its line ("Run
+    words, in a list item too (only its own list's next item ends it); a
+    code span closes on a run of as many backticks (`` `a``b` `` is one); a
+    link's title may be in `"…"`, `'…'`or`(…)`; a backtick fence has no backtick after it on its line ("Run
     `npm i` now" is inline code) and closes only on a fence of its own
     character, as long or longer; a tab indents to the next stop of 4
     (and stays a tab inside code); a written link's target keeps balanced
@@ -2239,7 +2241,8 @@ own (below).
   house it has no name for; or a street's word, "Baker Street", "ул.
   Ленина") is not looked up, nor one with no name at all: a home or an
   office sends nothing, only a named place (a museum, a restaurant, a
-  park) goes out (`isAddress`). A name's short words count too ("Ox
+  park) goes out (`isAddress`). A first "St" is a saint's ("St Paul's
+  Cathedral"), after a name a street's. A name's short words count too ("Ox
   Bar"); a name with nothing left to search for asks nothing and notes
   nothing.
   **When**: a card asks once it nears the screen (an intersection with the

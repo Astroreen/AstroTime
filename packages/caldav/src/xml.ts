@@ -37,6 +37,19 @@ export interface Multistatus {
   readonly syncToken: string | null;
 }
 
+const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/** Text with XML's references decoded, in one pass: `&amp;#13;` is `&#13;` as text. */
+function decodeXml(text: string): string {
+  if (!text.includes("&")) return text;
+  return text.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi, (reference, hex, decimal, name) => {
+    if (name !== undefined) return NAMED[name] ?? reference;
+    const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16);
+    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    return valid ? String.fromCodePoint(code) : reference;
+  });
+}
+
 const parser = new XMLParser({
   // Attributes are kept for <comp name="VEVENT"/>, as `@_name`.
   ignoreAttributes: false,
@@ -44,9 +57,16 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   parseTagValue: false,
   trimValues: false,
-  // Character references (`&#13;`, `&#x41;`) are XML's own; fast-xml-parser
-  // decodes them only with HTML's entities.
-  htmlEntities: true,
+  // XML's own references only: its five entities and character references
+  // (`&#13;`, `&#xE9;`), which fast-xml-parser decodes only together with
+  // HTML's. Anything else (`&nbsp;`) stays as written.
+  entityDecoder: {
+    decode: decodeXml,
+    setExternalEntities: () => {},
+    addInputEntities: () => {},
+    reset: () => {},
+    setXmlVersion: () => {},
+  },
   isArray: (name) => ["response", "propstat", "href", "comp", "privilege"].includes(name),
 });
 

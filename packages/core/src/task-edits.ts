@@ -135,7 +135,10 @@ export function exceptionOf(master: ICAL.Component, recurrenceId: ItemTime): ICA
  * a series in Berlin), so it still names the same instant.
  */
 function like(template: ICAL.Time, time: ItemTime): ICAL.Time {
-  if (time.type === "zoned" && !template.isDate) {
+  // In the template's own zone its wall clock is kept as written: one in a
+  // DST gap (02:30 on the spring-forward day) is what ical.js names it by.
+  const own = fromIcalTime(template);
+  if (time.type === "zoned" && own.type === "zoned" && own.timeZone !== time.timeZone) {
     const same = inZoneOf(template, time.epochMs);
     if (same) return same;
   }

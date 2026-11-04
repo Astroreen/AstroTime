@@ -168,3 +168,31 @@ describe("a zone only the object's VTIMEZONE names (Outlook's Customized Time Zo
     ).toEqual(["2026-01-22T10:00:00"]);
   });
 });
+
+describe("an occurrence in a DST gap", () => {
+  test("edited alone, its exception is named by the series' wall clock, and replaces it", () => {
+    // 02:30 on 29 March 2026 does not exist in Berlin; the series names it so.
+    for (const zones of [[], ["Europe/Berlin"]]) {
+      const object = CalendarObject.parse(
+        zoned(
+          zones,
+          "DTSTART;TZID=Europe/Berlin:20260327T023000",
+          "DTEND;TZID=Europe/Berlin:20260327T033000",
+          "RRULE:FREQ=DAILY;COUNT=4",
+        ),
+      );
+      const range = utc("2026-03-29", "2026-03-30");
+      const [gap] = occurrencesBetween(object, range);
+      const { ics: edited } = editItem(
+        object,
+        { summary: "Moved review" },
+        { now: 0, scope: "this", recurrenceId: gap!.recurrenceId },
+      );
+      // Named as the series names it, so a client matching wall clocks finds it too.
+      expect(edited).toContain("RECURRENCE-ID;TZID=Europe/Berlin:20260329T023000\r\n");
+      expect(
+        occurrencesBetween(CalendarObject.parse(edited), range).map((o) => o.item.summary),
+      ).toEqual(["Moved review"]);
+    }
+  });
+});
