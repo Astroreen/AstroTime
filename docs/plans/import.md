@@ -132,14 +132,16 @@ not carry is said, not dropped in silence.
 - **D270. The same UID already there.** In the target calendar, an object
   with the same UID that is the same item ([`sameObjects`](foundation.md#D107))
   is skipped, silently counted. One that differs is a duplicate: the
-  dialog asks once for all of them, "Update them", "Import as copies" (a
+  dialog asks once for all of them, "Use the file's version" (which says
+  what it keeps), "Import as copies" (a
   new UID, the series with its exceptions) or "Skip them"; none is chosen
   for the user. An update lays the file's object over the stored one
   (`overlay`): the file says what the item is, every property and
   component iCalendar names (its start and its `DTEND` or `DURATION`,
   its rule and `EXDATE`s, its exceptions, its guests), and what it leaves
-  out is gone; the stored copy gives only what a file from another app
-  cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
+  out is gone: the user chose the file's version, so this is their edit,
+  not a sync that drops what it does not understand. The stored copy
+  gives only what a file from another app cannot know ([D7](foundation.md#D7)): its `X-` properties the file does
   not have, and its alarms and its attachments when the file has none of
   them. An item deleted here whose deletion has not reached the server
   yet is not there as the user sees it, so it is not asked about: the

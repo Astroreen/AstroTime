@@ -24,7 +24,7 @@ const WORDS = {
     entry: /^Import from a file/,
     dialog: "Import",
     start: "Import",
-    update: "Update them",
+    update: "Use the file's version",
     done: "Imported",
   },
   ru: {
@@ -35,7 +35,7 @@ const WORDS = {
     entry: /^Импорт из файла/,
     dialog: "Импорт",
     start: "Импортировать",
-    update: "Обновить их",
+    update: "Взять версию из файла",
     done: "Импортировано",
   },
 } as const;

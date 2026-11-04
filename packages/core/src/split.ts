@@ -638,7 +638,7 @@ export function withUid(
 }
 
 /**
- * The file's object over the one stored (import.md D270, "Update them").
+ * The file's object over the one stored (import.md D270, "Use the file's version").
  * The file says what the item is: every property and component iCalendar
  * names (its times, `DTEND` or `DURATION`, its rule, its exceptions, its
  * guests) is the file's, and what the file leaves out is gone. The stored

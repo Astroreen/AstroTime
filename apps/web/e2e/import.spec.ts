@@ -37,7 +37,10 @@ test("wide, English: a file's events and a task, one already there, into Work an
   await expect(dialog.getByRole("alert")).toContainText(
     "1 entry of the file is already in the calendar it goes to",
   );
-  await dialog.getByRole("button", { name: "Update them" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "The file's version replaces the one there.",
+  );
+  await dialog.getByRole("button", { name: "Use the file's version" }).click();
   const done = dialog.getByRole("status");
   await expect(done).toContainText("Imported");
   await expect(done).toContainText("2 events · 1 task");

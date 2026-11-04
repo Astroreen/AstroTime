@@ -460,6 +460,7 @@ function Asking({ duplicates }: { duplicates: Duplicates }) {
   return (
     <div role="alert" className="flex flex-col gap-2 rounded-2xl bg-canvas p-4 text-body">
       <p>{t("import.duplicates", { count: duplicates.changed })}</p>
+      <p className="text-note text-ink-muted">{t("import.updateMeans")}</p>
       {duplicates.identical > 0 ? (
         <p className="text-note text-ink-muted">
           {t("import.identical", { count: duplicates.identical })}

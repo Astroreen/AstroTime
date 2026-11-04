@@ -55,7 +55,9 @@ export const importStrings = {
       "{{count}} entries of the file are already in the calendars they go to, and differ from the ones there.",
     "import.identical_one": "{{count}} more is there already, the same: it is skipped.",
     "import.identical_other": "{{count}} more are there already, the same: they are skipped.",
-    "import.update": "Update them",
+    "import.update": "Use the file's version",
+    "import.updateMeans":
+      "The file's version replaces the one there. Only what another app cannot know stays: its own fields, and its reminders and attachments if the file has none.",
     "import.copy": "Import as copies",
     "import.skip": "Skip them",
     "import.back": "Back",
@@ -151,7 +153,9 @@ export const importStrings = {
     "import.identical_few": "Ещё {{count}} уже есть, такие же: они пропускаются.",
     "import.identical_many": "Ещё {{count}} уже есть, такие же: они пропускаются.",
     "import.identical_other": "Ещё {{count}} уже есть, такие же: они пропускаются.",
-    "import.update": "Обновить их",
+    "import.update": "Взять версию из файла",
+    "import.updateMeans":
+      "Версия из файла заменит ту, что уже есть. Останется только то, чего другое приложение знать не может: её собственные поля, а также напоминания и вложения, если в файле их нет.",
     "import.copy": "Импортировать копиями",
     "import.skip": "Пропустить их",
     "import.back": "Назад",
