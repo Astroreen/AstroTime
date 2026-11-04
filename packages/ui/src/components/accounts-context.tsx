@@ -20,7 +20,8 @@ import type { LocaleSettings } from "../calendar/locale.ts";
 import type { Platform } from "../platform.ts";
 import { KEYS } from "../preferences.ts";
 import { RemoveAccountDialog } from "./remove-account.tsx";
-import { SignInDialog, type SignInRequest } from "./sign-in-dialog.tsx";
+import { SignInDialog } from "./lazy.tsx";
+import type { SignInRequest } from "./sign-in-dialog.tsx";
 
 export interface AccountsValue {
   readonly platform: Platform;

@@ -1854,8 +1854,12 @@ optimization is lacking").
     menu's choice (`calendar/copy.ts`, `@astrotime/core/copy`); after #78
     AstroTime's own code at once was 130.3 KiB, past the budget, and it is
     123.5 KiB with them out of the first load.
-    Signing in and the sync stack stay in the first load
-    ([Deferred](#deferred)). _Since [design D155](design.md#D155):_ the
+    The sync stack stays in the first load ([Deferred](#deferred)).
+    _Since round 5:_ the sign-in dialog loads the same way, with its
+    first opening (its forms and Base UI's tabs, 5.4 KiB; the buttons every
+    dialog shares in `components/buttons.ts`), for the room
+    [providers D255](providers.md#D255) asks; the `SignIn` steps stay, as
+    the accounts' context takes up a held approval with them. _Since [design D155](design.md#D155):_ the
     Agenda loads the same way, with its first showing (its notice's "Close"
     leaves it for the Week), and the edit dialog's draft is made in the
     editor's chunk, so neither is in the first load.
@@ -2377,10 +2381,11 @@ task?"
 - **An `RDATE` period moved with its series** — a series moved keeps its
   `RDATE`s of periods where they were, and one made all-day keeps them
   timed ([D142](#D142)).
-- **The sync stack and signing in with their first use** — CalDAV, the
-  XML parser and the sign-in dialog (some 30 KiB gzipped) still load at
-  once ([D145](#D145)); they belong to the accounts' code, which was being
-  rewritten when D145 was measured.
+- **The sync stack with its first use** — CalDAV, the XML parser and the
+  `SignIn` steps still load at once ([D145](#D145)); they belong to the
+  accounts' code, which was being rewritten when D145 was measured. The
+  sign-in dialog itself loads with its first opening since round 5
+  ([providers D255](providers.md#D255)).
 - **Google provider** — Google Calendar and Google Tasks through their REST
   APIs and OAuth ([D4](#D4)).
 - **System calendars** — Android `CalendarContract` (calendars synced by

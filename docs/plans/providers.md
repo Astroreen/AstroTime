@@ -347,7 +347,7 @@ marked _to be recorded_.
   package (`connectCalDav` stays the CalDAV entry). The first load holds
   the registry and no provider; CalDAV, already on it, moves to a lazy
   chunk when a PR needs its room ([D145](foundation.md#D145)'s Deferred,
-  "the sync stack and signing in with their first use"). The sign-in
+  "the sync stack with its first use"). The sign-in
   dialog's new choices (the known services' table, the subscription form,
   the OAuth buttons) load with the sign-in dialog, never before. Each PR
   measures the first load before and after; none may add more than 0.1
@@ -355,6 +355,14 @@ marked _to be recorded_.
   made in the same PR by moving something off the first load first (the
   sign-in dialog, which is on it today, is the first candidate), and the
   PR says what moved and both numbers.
+  _Built, the room:_ the sign-in dialog loads with its first opening, as
+  the edit dialog does ([D145](foundation.md#D145)'s `deferred`, in
+  `components/lazy.tsx`), its forms and Base UI's tabs in a chunk of 5.4
+  KiB; the buttons every dialog shares moved to `components/buttons.ts`
+  so the others need not load it. AstroTime's own first load went from
+  133 193 to 131 170 bytes (130.1, over the budget after #126 and #135, to 128.1 KiB), the room P4's registry
+  and subscriptions come into. The `SignIn` steps (`accounts/sign-in.ts`)
+  stay, as the accounts' context takes up a held approval with them.
 
 - **D256. What is not built, and why.**
   - **Proton Calendar** has no API and no CalDAV, and Proton's Bridge

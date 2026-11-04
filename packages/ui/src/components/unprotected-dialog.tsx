@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UnprotectedPrompt } from "../accounts/unprotected.ts";
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export function UnprotectedDialog({ prompt }: { prompt: UnprotectedPrompt }) {

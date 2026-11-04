@@ -7,7 +7,7 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { primaryButton, textButton } from "./sign-in-dialog.tsx";
+import { primaryButton, textButton } from "./buttons.ts";
 import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export interface ScopeRequest {

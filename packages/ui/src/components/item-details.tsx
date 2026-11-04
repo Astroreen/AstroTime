@@ -37,7 +37,7 @@ import { AttachmentList, AttachmentsIcon } from "./attachments.tsx";
 import { DetailsPicture } from "./item-picture.tsx";
 import { PlaceCard } from "./place-card.tsx";
 import { MenuButton } from "./select.tsx";
-import { primaryButton } from "./sign-in-dialog.tsx";
+import { primaryButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 /**

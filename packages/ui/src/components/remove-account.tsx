@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { accountName } from "./accounts.tsx";
-import { textButton } from "./sign-in-dialog.tsx";
+import { textButton } from "./buttons.ts";
 import { AlertDialogBackdrop, AlertDialogPopup } from "./dialog-parts.tsx";
 
 export function RemoveAccountDialog({
