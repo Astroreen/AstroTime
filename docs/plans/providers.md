@@ -807,6 +807,48 @@ marked _to be recorded_.
   main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
   KiB, and #144's 4.6).
 
+- **D275. Making a calendar or task list on an account's server.** A
+  provider may make one (`Provider.makeCalendar`, with a `NewCalendar`:
+  its name, colour and the one component it holds, `VEVENT` or `VTODO`)
+  and gives it back as its listing will name it, every right granted: the
+  user's own. **It is made at once, on the server**, through
+  `makeCalendar` (`@astrotime/sync/calendars`, loaded with the dialog that
+  asks), which opens the account's provider as a sync does and keeps the
+  calendar in the store; offline, or refused, nothing is made, and the
+  error is the caller's to say. A calendar is not a pending local change
+  like an item: one made offline, with items in it, would wait on a
+  server that may refuse it (a read-only home, a quota). It is saved once
+  no sync is listing calendars (`afterSyncs`: this instance's running sync,
+  and another's through the context's `lock`), so a sync whose listing
+  came before it never removes it; a sync that starts later lists it.
+  `makesCalendars` says which accounts can: a CalDAV account's (the
+  calendar on this device is the store's own, a subscription makes none;
+  Google and Microsoft once wired). **CalDAV**: one `MKCALENDAR` (RFC 4791
+  §5.3.1) in the calendar home, with `displayname`, Apple's
+  `calendar-color` and the `supported-calendar-component-set` of its one
+  component, as Nextcloud's own apps make one (Calendar's calendars of
+  events, Tasks' lists of tasks); its address is the name's ASCII letters
+  and digits and eight random hex digits (`team-plans-1f0c9a2e`, a
+  Cyrillic name the random part alone), so two of one name never meet; a
+  405 (taken) is tried again elsewhere, three times at most. Its code
+  (`make.ts`) loads when a calendar is made, as Digest's does: the first
+  load grows by 24 bytes (124 531 to 124 555 on main `50a5593`), the
+  provider's method and `afterSyncs`. A control
+  character in the name is dropped (XML 1.0 cannot carry it). Proven on
+  Radicale, Baïkal (Digest and Basic), Xandikos, DAViCal and Nextcloud
+  (`servers.test.ts`), the calendars deleted after: **DAViCal keeps a
+  name's `&` and `<` as the XML spelled them** (`&amp;`), whatever sets it
+  (MKCALENDAR or PROPPATCH alike); its own, the name shown as it lists
+  it. **Microsoft**: `POST /me/calendars` (`name`) for events,
+  `POST /me/todo/lists` (`displayName`) for tasks; Graph's colours are a
+  palette of its own (`color`, `lightBlue`…), so the colour asked is left
+  to Outlook. **Google**: its CalDAV makes none, so the Calendar API's
+  `calendars.insert` (`summary`, under the `calendar` scope already asked)
+  makes a calendar of events, at the address Google documents for its
+  collection (`/caldav/v2/<id>/events/`, to be recorded once wired); the
+  Tasks API's `tasklists.insert` (`title`) a task list. Neither keeps the
+  colour asked.
+
 ## Deferred
 
 - **Google wired in** ([D252](#D252)) — the provider is built; the sign-in
@@ -826,6 +868,15 @@ marked _to be recorded_.
   made here takes Graph's `iCalUId` (Graph sets it, read-only) once
   Graph's version comes down; keeping the UID made here (an extended
   property read back as `UID`) is decided then too.
+
+- **A calendar made offline** ([D275](#D275)) — kept here as a pending
+  calendar and made by the next sync, its items after it; it needs a
+  calendar row the engine creates before its items, and what to do when
+  the server refuses it then.
+- **A new calendar's colour on Google and Microsoft** ([D275](#D275)) —
+  the nearest of Graph's palette (`color`) and Google's `calendarList`
+  colour (`backgroundColor` with `colorRgbFormat`), sent after the
+  calendar is made.
 
 - **Graph's national clouds** ([D253](#D253)) — `graph.microsoft.us`,
   `microsoftgraph.chinacloudapi.cn` and the like are refused as another

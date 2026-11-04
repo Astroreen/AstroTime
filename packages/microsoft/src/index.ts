@@ -6,6 +6,7 @@ import type { HttpClient, TokenSource } from "@astrotime/caldav";
 import {
   PartialListing,
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -61,6 +62,13 @@ export class MicrosoftProvider implements Provider {
     throw new PartialListing((tasks as PromiseFulfilledResult<RemoteCalendar[]>).value, [
       { prefix: CALENDARS, error: events.reason },
     ]);
+  }
+
+  /** Events in a new Outlook calendar, tasks in a new To Do list (providers D275). */
+  makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const part = calendar.component === "VTODO" ? this.tasks : this.events;
+    if (!part.makeCalendar) throw new Error("This part of the account makes no calendars.");
+    return part.makeCalendar(calendar);
   }
 
   changes(

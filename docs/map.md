@@ -82,6 +82,8 @@ When you add a package, app or module, add its line here in the same PR.
     `differences`, the fields two versions differ in.
     → `plans/foundation.md#D6`, `plans/foundation.md#D107`
   - `Provider` — the interface every provider implements (and
+    `makeCalendar` with a `NewCalendar`, a calendar or task list made on
+    the server, `plans/providers.md#D275`; and
     `FileStore`, `RemoteFile`: an account's files where its server keeps
     them, `plans/foundation.md#D231`);
     `CalendarRights` (`ALL_RIGHTS`, `NO_RIGHTS`), what the user may do in a
@@ -151,7 +153,8 @@ When you add a package, app or module, add its line here in the same PR.
     listing as fallback, multiget, writes with ETags.
     → `plans/foundation.md#D2`, `plans/foundation.md#D127`; `people`, RFC
     3744's principal search asked of the calendar home.
-    → `plans/design.md#D208`
+    → `plans/design.md#D208`; `makeCalendar`, one `MKCALENDAR` in the
+    home (`make.ts`, loaded then). → `plans/providers.md#D275`
   - `Authorization` (`auth.ts`) — a request's credentials: Basic, an
     OAuth bearer token (`TokenSource`, `plans/providers.md#D254`), or
     Digest once the server asks (`digest.ts`, loaded then).
@@ -203,12 +206,15 @@ When you add a package, app or module, add its line here in the same PR.
   `GoogleProvider`, its calendars over Google's CalDAV and its task lists
   over the Tasks API (`GoogleTasks`, `vtodoOf`, `taskFieldsOf`); what a
   write could not keep said (`WriteResult.dropped`, the sync's
-  `not-kept`). → `plans/providers.md#D252`
+  `not-kept`). → `plans/providers.md#D252`; a new calendar through the
+  Calendar API (`GoogleCalendars`), a new task list through the Tasks
+  API (`makeCalendar`). → `plans/providers.md#D275`
 - `packages/microsoft` (`@astrotime/microsoft`) — a Microsoft account
   over Graph: `MicrosoftProvider`, its Outlook calendars
   (`OutlookCalendars`, `veventOf`, `eventFieldsOf`, `rruleOf`,
   `recurrenceOf`) and its To Do lists (`MicrosoftTodo`, `vtodoOf`,
-  `todoFieldsOf`); not wired in yet. → `plans/providers.md#D253`
+  `todoFieldsOf`); not wired in yet. → `plans/providers.md#D253`; a new
+  Outlook calendar or To Do list (`makeCalendar`). → `plans/providers.md#D275`
 - `packages/oauth` (`@astrotime/oauth`) — OAuth 2 with PKCE:
   `authorization`, `codeOf`, `exchange`, `tokenSource` (a `TokenSource`
   the CalDAV provider signs with), `GOOGLE`, `MICROSOFT`; `OAuthRedirect`,
@@ -230,6 +236,10 @@ When you add a package, app or module, add its line here in the same PR.
     `plans/design.md#D237`
     → `plans/foundation.md#D90`; `peopleOf`, an account's people for a
     mention. → `plans/design.md#D208`
+  - `calendars.ts` (`@astrotime/sync/calendars`) — `makeCalendar`, a
+    calendar or task list made on an account's server now and kept here,
+    saved after any sync listing (`afterSyncs`); `makesCalendars`, which
+    accounts can. → `plans/providers.md#D275`
   - `subscriptions.ts` (`@astrotime/sync/subscriptions`) — adding a
     subscription, opening it for `syncAll`, its hourly reads, applying a
     held removal; `syncs`, whether an account syncs with a server.

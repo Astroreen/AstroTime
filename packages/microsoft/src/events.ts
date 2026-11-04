@@ -6,6 +6,7 @@
 // event's `If-Match`.
 import {
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -512,6 +513,26 @@ const etagOf = (event: GraphEvent, exceptions: readonly GraphEvent[]) =>
 /** The event's own `@odata.etag`, as Graph gave it, for its `If-Match`. */
 const ownEtag = (etag: string | null) => sentEtag(etag?.split(" ")[0] || null);
 
+/** An Outlook calendar as Graph lists it (only what AstroTime reads). */
+interface OutlookCalendar {
+  readonly id: string;
+  readonly name?: string;
+  readonly hexColor?: string;
+  readonly canEdit?: boolean;
+}
+
+/** An Outlook calendar as a calendar of events: listed and made alike. */
+const calendarOf = (calendar: OutlookCalendar): RemoteCalendar => ({
+  url: `${GRAPH}me/calendars/${encodeURIComponent(calendar.id)}/events/`,
+  name: calendar.name ?? "",
+  color: calendar.hexColor || null,
+  components: ["VEVENT"],
+  rights:
+    calendar.canEdit === false
+      ? { create: false, edit: false, delete: false }
+      : { create: true, edit: true, delete: true },
+});
+
 /** A Microsoft account's Outlook calendars, as a provider. */
 export class OutlookCalendars implements Provider {
   private readonly graph: Graph;
@@ -530,22 +551,21 @@ export class OutlookCalendars implements Provider {
   }
 
   async calendars(): Promise<RemoteCalendar[]> {
-    const calendars = await this.graph.all<{
-      id: string;
-      name?: string;
-      hexColor?: string;
-      canEdit?: boolean;
-    }>(`${GRAPH}me/calendars?$top=100`);
-    return calendars.map((calendar) => ({
-      url: `${GRAPH}me/calendars/${encodeURIComponent(calendar.id)}/events/`,
-      name: calendar.name ?? "",
-      color: calendar.hexColor || null,
-      components: ["VEVENT"],
-      rights:
-        calendar.canEdit === false
-          ? { create: false, edit: false, delete: false }
-          : { create: true, edit: true, delete: true },
-    }));
+    const calendars = await this.graph.all<OutlookCalendar>(`${GRAPH}me/calendars?$top=100`);
+    return calendars.map(calendarOf);
+  }
+
+  /**
+   * A new Outlook calendar (`POST /me/calendars`, providers D275), by its
+   * name: Graph keeps colours of its own (`color`, a name of its palette),
+   * so the one asked is left to Outlook's choice.
+   */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const { value } = await this.graph.json<OutlookCalendar>("POST", `${GRAPH}me/calendars`, {
+      body: { name: calendar.name },
+    });
+    if (!value?.id) throw new Error("Graph made a calendar and named no id.");
+    return calendarOf(value);
   }
 
   private itemUrl(href: string): string {

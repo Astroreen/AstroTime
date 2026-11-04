@@ -81,8 +81,23 @@ export interface Person {
   readonly email: string | null;
 }
 
+/** A calendar or task list to make on an account's server (docs/plans/providers.md#D275). */
+export interface NewCalendar {
+  readonly name: string;
+  /** `#rrggbb`; a service whose colours are its own (Graph's, Google's) is given none. */
+  readonly color: string | null;
+  /** What it holds: events, or tasks (a task list). */
+  readonly component: "VEVENT" | "VTODO";
+}
+
 export interface Provider {
   calendars(): Promise<RemoteCalendar[]>;
+  /**
+   * Makes a calendar or task list on the server, at once, and gives it as
+   * `calendars()` will list it (docs/plans/providers.md#D275). A provider
+   * that makes none leaves it out.
+   */
+  makeCalendar?(calendar: NewCalendar): Promise<RemoteCalendar>;
   /**
    * People whose name or e-mail holds `query`, as the server finds them;
    * none where it finds nobody (design D208). A provider without people

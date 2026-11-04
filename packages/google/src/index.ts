@@ -8,6 +8,7 @@ import { CalDavProvider, type HttpClient, type TokenSource } from "@astrotime/ca
 import {
   PartialListing,
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -15,20 +16,26 @@ import {
   type WriteResult,
 } from "@astrotime/core/provider";
 
+import { GoogleCalendars, GOOGLE_CALDAV } from "./calendars.ts";
 import { GoogleTasks, TASKS_API } from "./tasks.ts";
 
+export { CALENDAR_API, GoogleCalendars, GOOGLE_CALDAV } from "./calendars.ts";
 export { GoogleTasks, taskFieldsOf, TASKS_API, vtodoOf, type GoogleTask } from "./tasks.ts";
-
-/** Google's CalDAV, where discovery of an account's calendar home starts. */
-export const GOOGLE_CALDAV = "https://apidata.googleusercontent.com/caldav/v2/";
 
 export class GoogleProvider implements Provider {
   private readonly events: Provider;
   private readonly tasks: Provider;
+  /** Where a new calendar of events is made: the Calendar API, as Google's CalDAV makes none. */
+  private readonly calendarsApi: Pick<Provider, "makeCalendar">;
 
-  constructor(events: Provider, tasks: Provider) {
+  constructor(
+    events: Provider,
+    tasks: Provider,
+    calendarsApi: Pick<Provider, "makeCalendar"> = {},
+  ) {
     this.events = events;
     this.tasks = tasks;
+    this.calendarsApi = calendarsApi;
   }
 
   /** The API an address is of: the Tasks API's, or else Google's CalDAV. */
@@ -57,6 +64,13 @@ export class GoogleProvider implements Provider {
     throw new PartialListing(read, [
       { prefix: events.status === "rejected" ? GOOGLE_CALDAV : TASKS_API, error: failed.reason },
     ]);
+  }
+
+  /** Events in a new Google calendar, tasks in a new task list (providers D275). */
+  makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const part = calendar.component === "VTODO" ? this.tasks : this.calendarsApi;
+    if (!part.makeCalendar) throw new Error("This part of the account makes no calendars.");
+    return part.makeCalendar(calendar);
   }
 
   changes(
@@ -94,5 +108,6 @@ export function googleProvider(
   return new GoogleProvider(
     new CalDavProvider(http, tokens, homeUrl),
     new GoogleTasks(http, tokens),
+    new GoogleCalendars(http, tokens),
   );
 }

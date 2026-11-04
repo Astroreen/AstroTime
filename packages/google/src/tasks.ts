@@ -8,6 +8,7 @@ import { Authorization, send, type HttpClient, type TokenSource } from "@astroti
 import {
   ALL_RIGHTS,
   type Changes,
+  type NewCalendar,
   type Provider,
   type RemoteCalendar,
   type RemoteObject,
@@ -186,6 +187,21 @@ function parentOf(
 /** Each list's tasks at `<TASKS_API>lists/<id>/tasks/`, each task there by its id. */
 const listUrl = (id: string) => `${TASKS_API}lists/${encodeURIComponent(id)}/tasks/`;
 
+/** A task list as the Tasks API gives it (only what AstroTime reads). */
+interface TaskList {
+  readonly id: string;
+  readonly title?: string;
+}
+
+/** A task list as a calendar of tasks: listed and made alike. */
+const listOf = (list: TaskList): RemoteCalendar => ({
+  url: listUrl(list.id),
+  name: list.title ?? "",
+  color: null,
+  components: ["VTODO"],
+  rights: ALL_RIGHTS,
+});
+
 /** A Google account's task lists, as a provider: one calendar of VTODOs each. */
 export class GoogleTasks implements Provider {
   private readonly http: HttpClient;
@@ -232,17 +248,19 @@ export class GoogleTasks implements Provider {
         items?: { id: string; title?: string }[];
         nextPageToken?: string;
       }>("GET", url.href);
-      for (const list of value?.items ?? [])
-        lists.push({
-          url: listUrl(list.id),
-          name: list.title ?? "",
-          color: null,
-          components: ["VTODO"],
-          rights: ALL_RIGHTS,
-        });
+      for (const list of value?.items ?? []) lists.push(listOf(list));
       page = value?.nextPageToken;
     } while (page);
     return lists;
+  }
+
+  /** A new task list (`tasklists.insert`, providers D275); Google Tasks keeps no colour. */
+  async makeCalendar(calendar: NewCalendar): Promise<RemoteCalendar> {
+    const { value } = await this.json<TaskList>("POST", `${TASKS_API}users/@me/lists`, {
+      title: calendar.name,
+    });
+    if (!value?.id) throw new Error("Google made a task list and named no id.");
+    return listOf(value);
   }
 
   /**
