@@ -1419,7 +1419,8 @@ Decided while building PR 6a.
     not count, so no object is left with no occurrence (an edit's old
     series, a deletion's whole object goes). An exception before it counts
     even when an EXDATE names its occurrence too, as the views show it
-    ([D34](#D34)).
+    ([D34](#D34)). Deleting "this occurrence" when it is the last that
+    shows deletes the object too.
   - **`UNTIL` takes the start's type** (RFC 5545 §3.3.10) when a series is
     made all-day or timed (`movedRule`): it ends on the same day, written
     as a date for an all-day series, as 23:59:59 that day in the start's
@@ -2322,6 +2323,13 @@ task?"
   in the weeks where the two zones' DST rules differ (Europe's and the US'
   in March and October) an occurrence's end is an hour off its written
   wall clock in the end's zone.
+- **"This and following" from an RDATE its rule does not make**
+  ([D105](#D105)) — the new series starts on the RDATE's day, and an
+  `RRULE` that leaves its days to `DTSTART` (no `BYDAY`, `BYMONTHDAY`,
+  `BYMONTH`) moves to that day: Mondays split at a Wednesday RDATE become
+  Wednesdays. Its `COUNT` is one short too, since `DTSTART` counts as an
+  occurrence of the rule. Writing those parts out from the old start, and
+  counting the start, waits; AstroTime itself writes no RDATEs.
 - **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
   in the user's `/Calendar`, attached to nothing; attaching it to the item
   if that was saved meanwhile, or removing it, waits for an upload that
