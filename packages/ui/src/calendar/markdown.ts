@@ -132,9 +132,12 @@ function blocks(lines: readonly string[], depth: number): Block[] {
       const mark = fence[1]!;
       // Closed by a fence of its own character, as long or longer, alone on its line.
       const closing = new RegExp(`^ {0,3}${mark[0]}{${mark.length},}[ \t]*$`);
+      // Each line loses as many of its spaces as the fence is indented, no more.
+      const indent = new RegExp(`^ {0,${fence[0].length - mark.length}}`);
       const body: string[] = [];
       i++;
-      while (i < lines.length && !closing.test(lines[i]!)) body.push(lines[i++]!);
+      while (i < lines.length && !closing.test(lines[i]!))
+        body.push(lines[i++]!.replace(indent, ""));
       i++;
       out.push({ type: "code", text: body.join("\n") });
       continue;
@@ -198,11 +201,12 @@ function listAt(lines: readonly string[], from: number, depth: number): [Block, 
     // Its content's column, its marker's indent and width included (as
     // CommonMark's): a line under it belongs to it from this column on.
     // Five spaces or more after the marker start an indented line of the
-    // item: its column is then one past the marker.
+    // item, and an empty item has no content to take the column from: its
+    // column is then one past the marker.
     const marked = indentOf(marker[1]! + marker[2]!.replace(/./g, " ") + "x");
     const spaces = indentOf(marker[0].replace(/\S/g, " ") + "x") - marked;
-    const indent = spaces >= 5 ? marked + 1 : marked + spaces;
     const body = [lines[i]!.slice(marker[0].length)];
+    const indent = spaces >= 5 || BLANK.test(body[0]!) ? marked + 1 : marked + spaces;
     i++;
     while (i < lines.length) {
       const next = lines[i]!;
@@ -310,7 +314,7 @@ function hiddenIn(text: string): Uint8Array {
     }
     let length = 1;
     while (text[at + length] === "`") length++;
-    const end = unclosed.has(length) ? -1 : closingRun(text, length, at + length);
+    const end = unclosed.has(length) ? -1 : runOf(text, length, at + length);
     if (end < 0) {
       unclosed.add(length);
       at += length;
@@ -331,16 +335,17 @@ function hiddenIn(text: string): Uint8Array {
 }
 
 /**
- * Where a code span opened by `length` backticks closes: the next run of
- * exactly as many (CommonMark's), not part of a longer one (`` `a``b` ``
- * is one span); -1 when none does.
+ * Where a run of exactly `length` backticks starts in `text` from `from`, the
+ * one that closes a code span opened by as many; -1 when none does.
  */
-function closingRun(text: string, length: number, from: number): number {
-  for (let at = text.indexOf("`", from); at >= 0; at = text.indexOf("`", at)) {
-    let end = at;
+function runOf(text: string, length: number, from: number): number {
+  const run = "`".repeat(length);
+  let at = text.indexOf(run, from);
+  while (at >= 0) {
+    let end = at + length;
     while (text[end] === "`") end++;
     if (end - at === length) return at;
-    at = end;
+    at = text.indexOf(run, end);
   }
   return -1;
 }
@@ -412,7 +417,7 @@ function inline(text: string, links = true, depth = 0): Inline[] {
       let length = 1;
       while (text[i + length] === "`") length++;
       const run = "`".repeat(length);
-      const end = (unclosed.get(length) ?? -1) > i ? -1 : closingRun(text, length, i + length);
+      const end = (unclosed.get(length) ?? -1) > i ? -1 : runOf(text, length, i + length);
       if ((unclosed.get(length) ?? -1) <= i) work.steps += (end > 0 ? end : text.length) - i;
       if (end > 0) {
         push({ type: "code", text: text.slice(i + length, end).replace(/\n/g, " ") });
@@ -507,7 +512,7 @@ function emphasisAt(
 /**
  * `[text](href)` at `i`, closed at `close`: the target's parentheses
  * balanced (`…/wiki/Foo_(bar)`), or in angle brackets, then an optional
- * title in quotes.
+ * title in quotes or parentheses.
  */
 function linkAt(
   text: string,
@@ -544,7 +549,7 @@ function linkAt(
   }
   skip();
   // A title in double or single quotes, or in parentheses.
-  const closer = TITLES[text[at] ?? ""];
+  const closer = text[at] === "(" ? ")" : text[at] === '"' || text[at] === "'" ? text[at]! : null;
   if (closer) {
     const end = findBefore(text, closer, at + 1, limit);
     if (end < 0) return null;
@@ -563,8 +568,6 @@ function findBefore(text: string, char: string, from: number, limit: number): nu
   }
   return -1;
 }
-
-const TITLES: Record<string, string> = { '"': '"', "'": "'", "(": ")" };
 
 /** The longest link target, its title included, read after `](`. */
 const LONGEST_TARGET = 2048;

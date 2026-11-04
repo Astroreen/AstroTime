@@ -240,6 +240,15 @@ describe("what the review found (design D207)", () => {
     ]);
   });
 
+  test("a link's title may be in double or single quotes or in parentheses, as CommonMark's", () => {
+    const link = paragraph({ type: "link", href: "https://example.com/a", children: ["a"] });
+    expect(parseMarkdown('[a](https://example.com/a "title")')).toEqual([link]);
+    expect(parseMarkdown("[a](https://example.com/a 'title')")).toEqual([link]);
+    expect(parseMarkdown("[a](https://example.com/a (title))")).toEqual([link]);
+    // A title not closed is no title: no link.
+    expect(parseMarkdown("[a](https://example.com/a 'title)")).not.toContainEqual(link);
+  });
+
   test("***both*** is strong around emphasis; an escaped mark closes nothing", () => {
     expect(parseMarkdown("***both***")).toEqual([
       paragraph({ type: "strong", children: [{ type: "em", children: ["both"] }] }),
@@ -385,6 +394,17 @@ describe("after #94's review (design D207)", () => {
     ]);
   });
 
+  test("a code span closes only on a run of as many backticks as opened it", () => {
+    expect(parseMarkdown("`a``b`")).toEqual([paragraph({ type: "code", text: "a``b" })]);
+    expect(parseMarkdown("``a```b`` c")).toEqual([
+      paragraph({ type: "code", text: "a```b" }, " c"),
+    ]);
+    // Nor does a longer run inside hide the marks after it from emphasis.
+    expect(parseMarkdown("*x `a``b` y*")).toEqual([
+      paragraph({ type: "em", children: ["x ", { type: "code", text: "a``b" }, " y"] }),
+    ]);
+  });
+
   test("a code span wins over emphasis; a mark inside a bare link closes nothing", () => {
     expect(parseMarkdown("*foo `a*` bar*")).toEqual([
       paragraph({ type: "em", children: ["foo ", { type: "code", text: "a*" }, " bar"] }),
@@ -399,6 +419,14 @@ describe("after #94's review (design D207)", () => {
         ],
       }),
     ]);
+  });
+
+  test("an indented fence's lines lose as much of their indent as the fence has", () => {
+    // As CommonMark's: up to the fence's own three spaces, no more.
+    expect(parseMarkdown("   ```\n   a\n    b\n  c\n   ```")).toEqual([
+      { type: "code", text: "a\n b\nc" },
+    ]);
+    expect(parseMarkdown(" ~~~\n\tx\n ~~~")).toEqual([{ type: "code", text: "\tx" }]);
   });
 
   test("a tab inside fenced code stays a tab, at the top and in a list", () => {
@@ -482,6 +510,15 @@ describe("an item's lines, from its content's column (design D207)", () => {
     expect(parseMarkdown("  - x\n  - y")).toEqual([
       list(null, item(paragraph("x")), item(paragraph("y"))),
     ]);
+  });
+
+  test("an empty item's lines belong to it from one past its marker, as CommonMark's", () => {
+    // " - y" is a sibling of the empty item, as after "- x"; two spaces nest it.
+    expect(parseMarkdown("-\n - y")).toEqual([list(null, item(), item(paragraph("y")))]);
+    expect(parseMarkdown("1.\n  2. y")).toEqual([list(1, item(), item(paragraph("y")))]);
+    expect(parseMarkdown("-\n  - y")).toEqual([list(null, item(list(null, item(paragraph("y")))))]);
+    // A line short of the column is no line of the empty item's.
+    expect(parseMarkdown("-\n next")).toEqual([list(null, item()), paragraph(" next")]);
   });
 
   test("an item under a number nests from its content's column, under a bullet from 2", () => {

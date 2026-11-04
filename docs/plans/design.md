@@ -1852,10 +1852,10 @@ reminders, its description and mentions in it.
     cuts a paragraph short, so a wrapped line "2019. was a good year" stays
     words, in a list item too (only its own list's next item ends it); a
     code span closes on a run of as many backticks (`` `a``b` `` is one); a
-    link's title may be in `"…"`, `'…'`or`(…)`; a backtick fence has no
-    backtick after it on its line ("Run
-    `npm i` now" is inline code) and closes only on a fence of its own
-    character, as long or longer; a tab indents to the next stop of 4
+    link's title may be in double or single quotes or in parentheses; a
+    backtick fence has no backtick after it on its line ("Run `npm i` now"
+    is inline code) and closes only on a fence of its own character, as
+    long or longer; a tab indents to the next stop of 4
     (and stays a tab inside code); a written link's target keeps balanced
     parentheses (`…/wiki/Foo_(bar)`); a code span wins over emphasis, and
     no mark closes inside a bare link; a lone `#` is text; an empty item

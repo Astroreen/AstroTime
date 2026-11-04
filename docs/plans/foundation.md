@@ -2316,9 +2316,6 @@ task?"
   in the weeks where the two zones' DST rules differ (Europe's and the US'
   in March and October) an occurrence's end is an hour off its written
   wall clock in the end's zone.
-- **A Saturday week start's week numbers** — `Formats.weekNumber` moves
-  only a Sunday-first week to its Monday, so a locale whose week starts on
-  Saturday numbers it by the ISO week before; not proven against a locale.
 - **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
   in the user's `/Calendar`, attached to nothing; attaching it to the item
   if that was saved meanwhile, or removing it, waits for an upload that
