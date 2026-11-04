@@ -15,7 +15,7 @@ import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { Dot } from "./color-select.tsx";
 import { CloseIcon } from "./icons.tsx";
-import { saveFile } from "./save-file.ts";
+import { saveFile, type Saved } from "./save-file.ts";
 import { Select } from "./select.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 
@@ -25,7 +25,14 @@ const EVER = { from: "0001-01-01", to: "9999-12-31", timeZone: "UTC" };
 type Outcome =
   | { readonly name: "idle" }
   | { readonly name: "saving" }
-  | { readonly name: "saved"; readonly file: string; readonly count: number; readonly left: number }
+  | {
+      readonly name: "saved";
+      readonly file: string;
+      readonly count: number;
+      readonly left: number;
+      /** Written, turned away, or a download begun: only the first is "saved". */
+      readonly how: Saved;
+    }
   | { readonly name: "failed"; readonly message: string };
 
 export function ExportDialog({
@@ -52,6 +59,8 @@ export function ExportDialog({
 
   const save = () => {
     if (!calendar || outcome.name === "saving") return;
+    // The last export's download link, long begun: let go.
+    for (const url of links.current.splice(0)) URL.revokeObjectURL(url);
     setOutcome({ name: "saving" });
     exportCalendar(store, platform, calendar, colorOf(calendar), links.current).then(
       (saved) => setOutcome({ name: "saved", ...saved }),
@@ -110,8 +119,15 @@ export function ExportDialog({
           </div>
           {outcome.name === "saved" ? (
             <p role="status" className="text-body">
-              {t("export.saved", { count: outcome.count, file: outcome.file })}
-              {outcome.left > 0 ? ` ${t("export.left", { count: outcome.left })}` : ""}
+              {outcome.how === "cancelled"
+                ? t("export.cancelled")
+                : t(outcome.how === "saved" ? "export.saved" : "export.downloading", {
+                    count: outcome.count,
+                    file: outcome.file,
+                  })}
+              {outcome.left > 0 && outcome.how !== "cancelled"
+                ? ` ${t("export.left", { count: outcome.left })}`
+                : ""}
             </p>
           ) : outcome.name === "failed" ? (
             <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-note">
@@ -142,7 +158,7 @@ async function exportCalendar(
   calendar: Calendar,
   color: string,
   links: string[],
-): Promise<{ file: string; count: number; left: number }> {
+): Promise<{ file: string; count: number; left: number; how: Saved }> {
   const objects = [
     ...(await store.objectsBetween([calendar.id], EVER)),
     ...(await store.undated([calendar.id])),
@@ -151,12 +167,39 @@ async function exportCalendar(
     objects.map((object) => object.ics),
     { name: calendar.name, color },
   );
-  // A file name any system takes: the calendar's name, its slashes and the like aside.
-  const file = `${calendar.name.replaceAll(/[\\/:*?"<>|]+/g, " ").trim() || "calendar"}.ics`;
-  await saveFile(
+  const file = fileNameOf(calendar.name);
+  const how = await saveFile(
     { name: file, type: "text/calendar", bytes: new TextEncoder().encode(ics) },
     platform,
     links,
   );
-  return { file, count: objects.length - left, left };
+  return { file, count: objects.length - left, left, how };
+}
+
+/** Names Windows keeps for its devices, whatever their extension. */
+const RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+const NAME_AT_MOST = 100;
+/** Characters no file name may hold on one system or another. */
+const FORBIDDEN = '\\/:*?"<>|';
+
+/**
+ * A file name every system takes, from a calendar's name: no control
+ * character, none of `\\ / : * ? " < > |`, no dot or space at its end, no
+ * name Windows keeps for a device (`CON`, `NUL`, `COM1`…), at most 100
+ * characters before `.ics`; "calendar" where nothing is left.
+ */
+export function fileNameOf(name: string): string {
+  const plain = [...name]
+    .map((c) =>
+      c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f || FORBIDDEN.includes(c) ? " " : c,
+    )
+    .join("")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+  const base = [...plain]
+    .slice(0, NAME_AT_MOST)
+    .join("")
+    .replace(/[. ]+$/, "");
+  if (base === "") return "calendar.ics";
+  return RESERVED.test(base) ? `${base} calendar.ics` : `${base}.ics`;
 }

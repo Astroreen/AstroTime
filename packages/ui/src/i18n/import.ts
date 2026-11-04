@@ -16,6 +16,9 @@ export const importStrings = {
     "export.left_one": "{{count}} item could not be read and is not in it.",
     "export.left_other": "{{count}} items could not be read and are not in it.",
     "export.failed": "The file was not saved: {{message}}",
+    "export.cancelled": "Not saved: the file's place was not chosen.",
+    "export.downloading_one": "{{count}} item: the download of {{file}} has begun.",
+    "export.downloading_other": "{{count}} items: the download of {{file}} has begun.",
     "import.close": "Close",
     "import.reading": "Reading {{file}}…",
     "import.notCalendar":
@@ -113,6 +116,11 @@ export const importStrings = {
     "export.left_many": "{{count}} записей не читаются, их в файле нет.",
     "export.left_other": "{{count}} записи не читаются, их в файле нет.",
     "export.failed": "Файл не сохранён: {{message}}",
+    "export.cancelled": "Не сохранено: место для файла не выбрано.",
+    "export.downloading_one": "{{count}} запись: загрузка {{file}} началась.",
+    "export.downloading_few": "{{count}} записи: загрузка {{file}} началась.",
+    "export.downloading_many": "{{count}} записей: загрузка {{file}} началась.",
+    "export.downloading_other": "{{count}} записи: загрузка {{file}} началась.",
     "import.close": "Закрыть",
     "import.reading": "Читаем {{file}}…",
     "import.notCalendar":

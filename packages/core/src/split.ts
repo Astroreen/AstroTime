@@ -719,6 +719,16 @@ export function zoneText(timeZone: string, year: number): string {
   return vtimezone(timeZone, year).toString();
 }
 
+/** Every `TZID` parameter in a component and its subcomponents named anew where `names` says. */
+function renameTzids(component: ICAL.Component, names: ReadonlyMap<string, string>): void {
+  for (const property of component.getAllProperties()) {
+    const tzid = property.getParameter("tzid");
+    const name = typeof tzid === "string" ? names.get(tzid) : undefined;
+    if (name) property.setParameter("tzid", name);
+  }
+  for (const child of component.getAllSubcomponents()) renameTzids(child, names);
+}
+
 /**
  * Calendar objects as one calendar file (import.md D274), as Nextcloud's
  * export writes one: the calendar's name (`NAME`, `X-WR-CALNAME`) and colour
@@ -737,7 +747,8 @@ export function joinCalendar(
   root.addPropertyWithValue("x-wr-calname", about.name);
   const color = about.color && hexColor(about.color);
   if (color) root.addPropertyWithValue("x-apple-calendar-color", color.toUpperCase());
-  const zones = new Set<string>();
+  /** Each TZID written, by its definition's meaning: a second, different one is written under a name of its own. */
+  const zones = new Map<string, string>();
   const items: ICAL.Component[] = [];
   let left = 0;
   for (const ics of objects) {
@@ -748,14 +759,25 @@ export function joinCalendar(
       left++;
       continue;
     }
+    // This object's TZIDs as written in the file: its own, or a new name
+    // where another object's zone of that TZID says otherwise (D7: each
+    // object keeps the zone it was written with).
+    const renamed = new Map<string, string>();
+    for (const zone of object.getAllSubcomponents("vtimezone").slice()) {
+      const tzid = String(zone.getFirstPropertyValue("tzid"));
+      const meant = canonical(zone);
+      let name = tzid;
+      for (let n = 2; zones.has(name) && zones.get(name) !== meant; n++) name = `${tzid}-${n}`;
+      if (name !== tzid) renamed.set(tzid, name);
+      if (zones.has(name)) continue;
+      zones.set(name, meant);
+      zone.updatePropertyWithValue("tzid", name);
+      root.addSubcomponent(zone);
+    }
     for (const component of object.getAllSubcomponents().slice()) {
-      if (component.name !== "vtimezone") items.push(component);
-      else {
-        const tzid = String(component.getFirstPropertyValue("tzid"));
-        if (zones.has(tzid)) continue;
-        zones.add(tzid);
-        root.addSubcomponent(component);
-      }
+      if (component.name === "vtimezone") continue;
+      if (renamed.size > 0) renameTzids(component, renamed);
+      items.push(component);
     }
   }
   for (const item of items) root.addSubcomponent(item);

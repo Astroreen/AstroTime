@@ -17,8 +17,13 @@ import { useAccounts } from "./accounts-context.tsx";
 import { saveFile } from "./save-file.ts";
 
 /** Saves an inline file, decoded now (D230). */
-function save(file: InlineFile, name: string, platform: Platform, links: string[]): Promise<void> {
-  return saveFile(
+async function save(
+  file: InlineFile,
+  name: string,
+  platform: Platform,
+  links: string[],
+): Promise<void> {
+  await saveFile(
     { name, type: file.type ?? "application/octet-stream", bytes: file.bytes },
     platform,
     links,

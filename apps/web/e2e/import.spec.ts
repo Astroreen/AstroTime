@@ -182,7 +182,8 @@ test("export a calendar to a file, and import it back: every item already there 
   const text = readFileSync(await download.path(), "utf8");
   expect(text).toContain("X-WR-CALNAME:Work");
   expect(text).toContain("SUMMARY:Design review");
-  await expect(dialog.getByRole("status")).toContainText("saved as Work.ics");
+  // The web begins a download: said as begun, not as saved.
+  await expect(dialog.getByRole("status")).toContainText("the download of Work.ics has begun");
   await dialog.getByRole("button", { name: "Close" }).last().click();
 
   await importFile(page, /^Import from a file/, "Work.ics", text);

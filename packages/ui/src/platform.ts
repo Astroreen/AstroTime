@@ -78,13 +78,14 @@ export interface Platform {
    * Saves a file the user asked to keep (an inline attachment, design D230)
    * where the platform keeps files: Android's "Save to" picker. Without it,
    * the browser downloads it (the web; the desktop, whose Electron asks
-   * where).
+   * where). False when the user turned the picker away; the platform says
+   * so where it knows (import D274).
    */
   readonly saveFile?: (file: {
     readonly name: string;
     readonly type: string;
     readonly bytes: Uint8Array;
-  }) => Promise<void>;
+  }) => Promise<boolean | void>;
   /**
    * Signing in to `server` (the address typed, or the one Nextcloud named)
    * begins; the function it returns ends it. A shell that sends plain http
