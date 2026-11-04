@@ -112,6 +112,16 @@ export async function readImport(
         notImported = converted.notImported;
         dates = converted.dates;
       }
+      // JSON: Google Takeout's tasks, told by their kind (their converter
+      // loads for them alone); else jCal, below.
+      if (start.startsWith("{") || start.startsWith("[")) {
+        const json: unknown = JSON.parse(text);
+        if (takeoutKind(json)) {
+          const converted = (await import("./takeout.ts")).takeoutToIcs(json);
+          text = converted.text;
+          notImported = converted.notImported;
+        }
+      }
       // vCalendar 1.0, a calendar at a time (a file may hold 2.0 ones
       // beside it): its converter loads for such a calendar alone.
       const blocks = text.split(/(?=^BEGIN:VCALENDAR)/im);
@@ -150,6 +160,15 @@ export async function readImport(
   }
   if (sources.length === 0) throw new NotImportableError(`${file.name} holds no calendar.`);
   return { sources, guessed, unread };
+}
+
+/** Whether parsed JSON says it is Google Takeout's tasks, by its own `kind`. */
+function takeoutKind(json: unknown): boolean {
+  const kind = (value: unknown) =>
+    typeof value === "object" && value !== null ? (value as { kind?: unknown }).kind : undefined;
+  if (Array.isArray(json))
+    return json.length > 0 && json.every((list) => kind(list) === "tasks#taskList");
+  return kind(json) === "tasks#taskLists" || kind(json) === "tasks#taskList";
 }
 
 /** Whether a calendar's text is vCalendar 1.0: its `VERSION` before its first component. */

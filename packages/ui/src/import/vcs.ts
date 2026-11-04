@@ -212,6 +212,11 @@ function decoded(line: Line): string {
   }
 }
 
+/** A control character (C0 or DEL): none may reach a content line written as it is. */
+const isControl = (c: string) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f;
+/** A value with no control character and no space: a URL as one line. */
+const plain = (value: string) => value !== "" && ![...value].some((c) => isControl(c) || c === " ");
+
 const isEncoding = (bare: string) => /^(QUOTED-PRINTABLE|BASE64|8BIT|7BIT)$/.test(bare);
 
 /** Text as iCalendar's TEXT (RFC 5545 §3.3.11). */
@@ -478,7 +483,13 @@ function convertComponent(
       case "UID":
       case "URL":
       case "RELATED-TO":
-        out.push(`${line.name}:${line.name === "URL" ? textOf(line) : text()}`);
+        if (line.name !== "URL") out.push(`${line.name}:${text()}`);
+        else {
+          // A URL is written as it is: one with a line break or another control character is none.
+          const url = textOf(line).trim();
+          if (plain(url)) out.push(`URL:${url}`);
+          else notImported.add(line.name);
+        }
         break;
       case "CATEGORIES":
       case "RESOURCES":
@@ -560,7 +571,9 @@ function convertComponent(
           break;
         }
         const role = (line.params.get("ROLE") ?? "").toUpperCase();
-        const cnParam = cn ? `;CN="${cn.replaceAll('"', "'")}"` : "";
+        // A name in a quoted parameter: no quote, no line break, no other control character.
+        const shown = cn ? [...cn.replaceAll('"', "'")].filter((c) => !isControl(c)).join("") : "";
+        const cnParam = shown ? `;CN="${shown}"` : "";
         if ((role === "ORGANIZER" || role === "OWNER") && !organizer) {
           organizer = true;
           out.push(`ORGANIZER${cnParam}:mailto:${address}`);
@@ -584,7 +597,7 @@ function convertComponent(
       }
       case "ATTACH": {
         const value = textOf(line).trim();
-        if (/^(https?|ftp|cid):/i.test(value)) out.push(`ATTACH:${value}`);
+        if (/^(https?|ftp|cid):/i.test(value) && plain(value)) out.push(`ATTACH:${value}`);
         else notImported.add(line.name);
         break;
       }

@@ -2,7 +2,8 @@
 
 Status: **in progress** — the formats, their order and the flow are
 decided; the splitter (PR I1), the import flow for iCalendar, jCal and
-ZIP (PR I2), vCalendar 1.0 (PR I3) and CSV (PR I4) are built. This plan owns reading calendars
+ZIP (PR I2), vCalendar 1.0 (PR I3), CSV (PR I4) and Google Takeout's
+tasks (PR I5) are built. This plan owns reading calendars
 and tasks from files into AstroTime, and writing them out again. It builds
 on foundation's [D5](foundation.md#D5) (the store is the UI's truth, only
 the sync engine talks to servers), [D7](foundation.md#D7) (nothing lost),
@@ -278,7 +279,7 @@ RFC 4180 with the delimiter its first line uses (`,`, `;`, a tab);
 Outlook's columns in English and Russian (calendar and tasks),
 Thunderbird's (Outlook's names) and the ones Google Calendar's import
 documents; each row an item at the user's wall clock in their zone, with
-a `VTIMEZONE` (`zoneText`); its UID made from the row, so the same file
+a `VTIMEZONE` (`zoneText`, from the file's earliest year); its UID made from the row, so the same file
 imported again finds its items there (D270). Dates: year first is ISO; a
 part past 12 tells day from month; else the user's language decides,
 said in the preview as guessed (and so when the file has both kinds of
@@ -292,7 +293,7 @@ and named. This rests on the formats' documentation, not on recordings. A timed 
 end: its end day at its end time; with no end time, its end day at its
 start's time; with no end day, the start's day, or the next where the
 end is not after the start; an end still before its start is left
-out (the event an instant) and named; a start or end time that cannot be
+out (the event an instant) and named, an all-day row's (one day) too; a start or end time that cannot be
 read is named, the day kept. Outlook's task statuses that are still to
 do but say more ("Waiting on someone else", "Deferred") are
 `NEEDS-ACTION`, Outlook's word kept as `X-OUTLOOK-STATUS`. A row given again is another item (a series written
@@ -304,6 +305,22 @@ iCalendar (`Mileage`, `Total Work`), are named as not carried over, its
 default values (`0`, `False`, `Normal`) aside. D266, D272.
 
 ### PR I5 — Google Takeout Tasks
+
+`takeoutToIcs` (`packages/ui/src/import/takeout.ts`), loaded for such a
+file alone: Takeout's `Tasks.json` (the Tasks API's `tasks#taskLists`),
+alone or in Takeout's ZIP; each list a source named as it, each task a
+`VTODO` with its notes, its due day (Google keeps the day alone), its
+status and completion, its parent as `RELATED-TO`, its links as
+attachments, its place as `X-GOOGLE-TASKS-POSITION`, its UID made from
+Google's id so a second import finds it. A task the user deleted, which
+Takeout keeps, is left out as Google Tasks leaves it out. The file is
+told by its own `kind`, not by a word inside it; a value of the wrong
+shape is left out, never a crash, and one of the wrong shape at the top
+is a file that is not Takeout's. No value can become a line of its own:
+text escaped and its control characters dropped, a link parsed as an
+http(s) URL and refused with a control character in it, a place digits
+alone, an id letters, digits, `-` and `_`; the same holds for a
+vCalendar's `URL`, `ATTACH` and a guest's name. D266, D272.
 
 ### PR I6 — Export
 

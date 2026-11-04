@@ -117,7 +117,12 @@ export function csvToIcs(
   const notImported = new Set<string>();
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AstroTime//Import from CSV//EN"];
   const components: string[][] = [];
+  /** The earliest year a local time is written in: the zone's observances start the year before it. */
   let firstYear: number | null = null;
+  const year = (day: string) => {
+    const y = Number(day.slice(0, 4));
+    if (y && (firstYear === null || y < firstYear)) firstYear = y;
+  };
   for (const row of body) {
     // A column with a value no field took: named, not written.
     for (const [at, value] of row.entries())
@@ -164,7 +169,6 @@ export function csvToIcs(
           `DESCRIPTION:${escape(get("subject") || "Reminder")}`,
           "END:VALARM",
         );
-      firstYear ??= Number((due ?? start ?? "").slice(0, 4)) || null;
     } else {
       const startDay = date("startDate");
       if (!startDay) {
@@ -178,6 +182,8 @@ export function csvToIcs(
       const allDay = isTrue(get("allDay")) || startTime === null;
       if (allDay) {
         const endDay = date("endDate");
+        // An end day before its start: one day, the column named, as a timed row's.
+        if (endDay !== null && endDay < startDay) notImported.add(written[column.get("endDate")!]!);
         // The day after its last: Google's says its last day, the others the day after.
         const after =
           endDay && endDay > startDay
@@ -206,7 +212,7 @@ export function csvToIcs(
           if (end > start) push(`DTEND;TZID=${zone}:${end}`);
           else notImported.add(written[column.get("endDate")!]!);
         }
-        firstYear ??= Number(startDay.slice(0, 4));
+        year(startDay);
       }
       const showAs = get("showAs").trim().toLowerCase();
       if (["0", "free", "свободен", "свободно"].includes(showAs)) push("TRANSP:TRANSPARENT");

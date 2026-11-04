@@ -445,4 +445,21 @@ describe("#151's review", () => {
       ).text,
     ).toContain("RRULE:FREQ=MONTHLY;BYMONTHDAY=-2;COUNT=2");
   });
+
+  test("a URL, an attachment or a guest's name with a line break in it cannot become a line of its own", () => {
+    const { text, notImported } = vcalendarToIcs(
+      vcal(
+        "BEGIN:VEVENT",
+        "UID:i",
+        "DTSTART:20261105T090000Z",
+        "URL;ENCODING=QUOTED-PRINTABLE:https://example.com/=0D=0AX-INJECTED:1",
+        "ATTACH;ENCODING=QUOTED-PRINTABLE:https://example.com/a=0D=0AX-INJECTED:2",
+        "ATTENDEE;ENCODING=QUOTED-PRINTABLE;ROLE=ATTENDEE:Anna=0D=0AX-INJECTED:3 <anna@example.com>",
+        "END:VEVENT",
+      ),
+      { timeZone: "UTC" },
+    );
+    expect(text).not.toMatch(/^X-INJECTED/m);
+    expect(notImported.toSorted()).toEqual(["ATTACH", "URL"]);
+  });
 });
