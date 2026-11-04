@@ -94,6 +94,6 @@ services:
     ports:
       - 127.0.0.1:5604:80
   davical-db:
-    image: postgres:16.10-alpine
+    image: postgres:16.15-alpine
     environment:
       POSTGRES_PASSWORD: davical
