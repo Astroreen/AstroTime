@@ -1,0 +1,260 @@
+{
+  "service": "baikal-digest",
+  "recorded": "2026-11-04",
+  "origin": "http://127.0.0.1:5601",
+  "server": "http://127.0.0.1:5601/dav.php/",
+  "exchanges": [
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/.well-known/caldav",
+        "depth": "0",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 401,
+        "path": "/dav.php",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing",
+          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea83a4acccd\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}read on </s:message>\n</d:error>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/.well-known/caldav",
+        "depth": "0",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/</d:href><d:propstat><d:prop><d:current-user-principal><d:href>/dav.php/principals/user/</d:href></d:current-user-principal></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/dav.php/principals/user/",
+        "depth": "0",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><c:calendar-home-set/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php/principals/user/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/principals/user/</d:href><d:propstat><d:prop><cal:calendar-home-set><d:href>/dav.php/calendars/user/</d:href></cal:calendar-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/dav.php/calendars/user/",
+        "depth": "1",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:resourcetype/><d:displayname/><ic:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><nc:deleted-at/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 401,
+        "path": "/dav.php/calendars/user/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing",
+          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea83a4b104e\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}read on calendars/user</s:message>\n</d:error>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/dav.php/calendars/user/",
+        "depth": "1",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:resourcetype/><d:displayname/><ic:calendar-color/><c:supported-calendar-component-set/><d:current-user-privilege-set/><nc:deleted-at/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php/calendars/user/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><x1:calendar-color xmlns:x1=\"http://apple.com/ns/ical/\"/><cal:supported-calendar-component-set/><x2:deleted-at xmlns:x2=\"http://nextcloud.com/ns\"/><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/inbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-deliver/></d:privilege><d:privilege><cal:schedule-deliver-invite/></d:privilege><d:privilege><cal:schedule-deliver-reply/></d:privilege><d:privilege><cal:schedule-query-freebusy/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><x1:calendar-color xmlns:x1=\"http://apple.com/ns/ical/\"/><cal:supported-calendar-component-set/><x2:deleted-at xmlns:x2=\"http://nextcloud.com/ns\"/><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/outbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-outbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:schedule-send/></d:privilege><d:privilege><cal:schedule-send-invite/></d:privilege><d:privilege><cal:schedule-send-reply/></d:privilege><d:privilege><cal:schedule-send-freebusy/></d:privilege><d:privilege><cal:schedule-post-vevent/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><x1:calendar-color xmlns:x1=\"http://apple.com/ns/ical/\"/><cal:supported-calendar-component-set/><x2:deleted-at xmlns:x2=\"http://nextcloud.com/ns\"/><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "MKCALENDAR",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": null,
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
+      },
+      "response": {
+        "status": 401,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "www-authenticate": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6aea83a4b2c06\",opaque=\"d66d5f0524036afcb61420e358f990ce\""
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:sabredav-version>4.7.0</s:sabredav-version>\n  <s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception>\n  <s:message>No 'Authorization: Digest' header found. Either the client didn't send one, or the server is misconfigured. Login was needed for privilege: {DAV:}bind on calendars/user</s:message>\n</d:error>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "MKCALENDAR",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": null,
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:mkcalendar xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:set><d:prop><d:displayname>astrotime-recording</d:displayname><c:supported-calendar-component-set><c:comp name=\"VEVENT\"/><c:comp name=\"VTODO\"/></c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>"
+      },
+      "response": {
+        "status": 201,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8"
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "depth": null,
+        "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+      },
+      "response": {
+        "status": 201,
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8",
+          "etag": "\"03e6c49f1931ed67583d6fd17d0702ec\""
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-task.ics",
+        "depth": null,
+        "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VTODO\r\nUID:astrotime-recording-vtodo\r\nDTSTAMP:20261104T080000Z\r\nDUE:20261110T170000Z\r\nSUMMARY:Recorded task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+      },
+      "response": {
+        "status": 201,
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-task.ics",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8",
+          "etag": "\"7c0bdbcae540da91efa3b659e6b5ef1b\""
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "PROPFIND",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": "1",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><d:resourcetype/><d:sync-token/><cs:getctag/></d:prop></d:propfind>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8",
+          "dav": "1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy, calendar-auto-schedule, calendar-availability, resource-sharing, calendarserver-sharing"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:sync-token>http://sabre.io/ns/sync/3</d:sync-token><cs:getctag>http://sabre.io/ns/sync/3</cs:getctag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getetag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:sync-token/><cs:getctag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "REPORT",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": "1",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:prop><d:getetag/><c:calendar-data/></d:prop><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics</d:href><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-task.ics</d:href></c:calendar-multiget>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><d:response><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics</d:href><d:propstat><d:prop><d:getetag>&quot;03e6c49f1931ed67583d6fd17d0702ec&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-task.ics</d:href><d:propstat><d:prop><d:getetag>&quot;7c0bdbcae540da91efa3b659e6b5ef1b&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VTODO\nUID:astrotime-recording-vtodo\nDTSTAMP:20261104T080000Z\nDUE:20261110T170000Z\nSUMMARY:Recorded task\nEND:VTODO\nEND:VCALENDAR\n</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "depth": null,
+        "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AstroTime//Recording//EN\r\nBEGIN:VEVENT\r\nUID:astrotime-recording-vevent\r\nDTSTAMP:20261104T080000Z\r\nDTSTART:20261110T090000Z\r\nDTEND:20261110T100000Z\r\nSUMMARY:Recorded event changed\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+      },
+      "response": {
+        "status": 204,
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8",
+          "etag": "\"c335d57f751d1ae188a13e90d9358648\""
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "REPORT",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": "1",
+        "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:ic=\"http://apple.com/ns/ical/\" xmlns:nc=\"http://nextcloud.com/ns\"><d:sync-token>http://sabre.io/ns/sync/3</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>"
+      },
+      "response": {
+        "status": 207,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "application/xml; charset=utf-8"
+        },
+        "body": "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\">\n <d:response>\n  <d:href>/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics</d:href>\n  <d:propstat>\n   <d:prop>\n    <d:getetag>&quot;c335d57f751d1ae188a13e90d9358648&quot;</d:getetag>\n    <cal:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AstroTime//Recording//EN\nBEGIN:VEVENT\nUID:astrotime-recording-vevent\nDTSTAMP:20261104T080000Z\nDTSTART:20261110T090000Z\nDTEND:20261110T100000Z\nSUMMARY:Recorded event changed\nEND:VEVENT\nEND:VCALENDAR\n</cal:calendar-data>\n   </d:prop>\n   <d:status>HTTP/1.1 200 OK</d:status>\n  </d:propstat>\n </d:response>\n <d:sync-token>http://sabre.io/ns/sync/4</d:sync-token>\n</d:multistatus>\n"
+      }
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "depth": null,
+        "body": null
+      },
+      "response": {
+        "status": 204,
+        "path": "/dav.php/calendars/user/astrotime-recording/astrotime-recording-event.ics",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8"
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "depth": null,
+        "body": null
+      },
+      "response": {
+        "status": 204,
+        "path": "/dav.php/calendars/user/astrotime-recording/",
+        "headers": {
+          "content-type": "text/html; charset=UTF-8"
+        },
+        "body": ""
+      }
+    }
+  ]
+}

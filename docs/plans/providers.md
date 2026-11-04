@@ -165,6 +165,16 @@ marked _to be recorded_.
   `PROPFIND` answers, where a unit test needs one, are recorded from the
   interop run's container the same way (as Radicale's and Nextcloud's
   are now, `packages/caldav/test/fixtures/README.md`).
+  _Built:_ `packages/caldav/test/recording.ts` (the recorder, the
+  redaction, word by word so a short name inside another word stays, and
+  the strict replay), `scenario.ts` (discovery, a calendar of the
+  recording's own, an event and a task made, found by a sync, changed and
+  deleted), `scripts/record-caldav-service.ts` and `services.test.ts`,
+  first proven on the interop run's Baïkal (Digest), Xandikos and DAViCal
+  (`fixtures/services/`). Recording Xandikos found AstroTime's own
+  scenario writing a `SUMMARY` with an unescaped comma, which Xandikos
+  serves back escaped (RFC 5545 §3.3.11 asks for `\,`): the scenario's
+  text has none now.
 
 ### Known services and subscriptions
 
@@ -457,7 +467,12 @@ marked _to be recorded_.
   asks: a first Basic there would put the password on the wire in clear
   to a server that may only take Digest. The price is one request more per
   sync on such a server (none over https, where Basic first saves that
-  round trip, nor on this device). Requests
+  round trip, nor on this device). **A server that takes Basic only, over
+  plain http, still gets the password in clear**, from its second
+  request on: nothing on the client can protect it there, and the user
+  chose it by typing an `http://` address; the sign-in dialog says so
+  under such an address (on another host than this device), to be built
+  with the next change to the dialog once it loads lazily (D255). Requests
   in flight together are each judged by what they were signed with: one
   sent with Basic, or with an older challenge, before another's `401`
   taught the current one, is sent again with it, not taken as a wrong
@@ -479,7 +494,8 @@ marked _to be recorded_.
   an account needs, staying (`app-password.ts`); the flow imports the
   core's `provider.ts` alone, not its index, so its chunk splits nothing
   else off the first load. With all of the above AstroTime's own first
-  load went from 132 492 to 132 468 bytes (129.4 KiB both).
+  load went from 132 492 to 132 468 bytes (129.4 KiB both), measured on
+  main `688c51a` with #134 rebased on it.
 
 - **D261. The interop matrix, as built.** `packages/sync/test/interop/`:
   `compose.yaml` pins each server, `servers.ts` names where each listens

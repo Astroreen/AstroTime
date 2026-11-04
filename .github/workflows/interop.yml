@@ -9,7 +9,7 @@ name: Interop
 on:
   pull_request:
     paths: &paths
-      - packages/caldav/src/**
+      - packages/caldav/**
       - packages/sync/src/**
       - packages/sync/test/servers.ts
       - packages/sync/test/servers.test.ts
