@@ -513,3 +513,30 @@ test("a scheme remembered of one origin is not sent to another: that one starts 
   await send(server.http, new Authorization(astro, schemes), propfind("http://other.example/"), []);
   expect(server.sent).toEqual([null, "Basic"]);
 });
+
+test("a wrong password on a server whose 401 offers Digest and Basic: one Digest, refused, never Basic", async () => {
+  const digest = digestServer();
+  // Its every 401 names Basic beside Digest, as many servers do.
+  const both = (async (input: URL | string, init: RequestInit) => {
+    const answer = await digest.fetch(input, init);
+    if (answer.status !== 401) return answer;
+    const challenge = `${answer.headers.get("WWW-Authenticate")}, Basic realm="r"`;
+    return new Response("", { status: 401, headers: { "WWW-Authenticate": challenge } });
+  }) as typeof fetch;
+  const http = fetchClient({ fetch: both });
+  const schemes: RememberedScheme = {};
+  await send(http, new Authorization(astro, schemes), propfind("https://dav.example/"), []);
+  digest.sent.length = 0;
+  const wrong = new Authorization({ username: "astro", password: "typo" }, schemes);
+  await expect(send(http, wrong, propfind("https://dav.example/"), [])).rejects.toBeInstanceOf(
+    AuthError,
+  );
+  expect(digest.sent).toEqual(["Digest"]);
+  // Not recalled either: Basic first (https), then Digest, refused; no Basic again.
+  digest.sent.length = 0;
+  const fresh = new Authorization({ username: "astro", password: "typo" }, {});
+  await expect(send(http, fresh, propfind("https://dav.example/"), [])).rejects.toBeInstanceOf(
+    AuthError,
+  );
+  expect(digest.sent).toEqual(["Basic", "Digest"]);
+});

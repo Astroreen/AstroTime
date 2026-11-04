@@ -12,6 +12,7 @@ import { Store, type Account } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { describe, expect, test } from "vite-plus/test";
 
+import { schemesOf } from "../src/all.ts";
 import { accountFiles, noFilesOf } from "../src/files.ts";
 import { peopleOf } from "../src/people.ts";
 import {
@@ -839,8 +840,12 @@ test("each account's remembered scheme is its own, kept across syncs, and forgot
   await syncAll(context);
   expect(of(first.id)[2]).not.toBe(of(first.id)[0]);
   expect(of(first.id)[2]).not.toHaveProperty("scheme");
-  // Removed: the next sync keeps nothing of it (the second account's stays).
+  expect(schemesOf(store).get(first.id)).toBe(of(first.id)[2]);
+  // Removed: the next sync keeps nothing of it; the other account's stays.
+  expect(schemesOf(store).has(second.id)).toBe(true);
   await removeAccount({ ...context, revokeWaitMs: 0 }, second.id);
   await syncAll(context);
+  expect(schemesOf(store).has(second.id)).toBe(false);
+  expect([...schemesOf(store).keys()]).toEqual([first.id]);
   expect(of(first.id)[3]).toBe(of(first.id)[2]);
 });

@@ -713,13 +713,14 @@ marked _to be recorded_.
   stored one would be a migration and the store's code on the first load
   to save one request a start. **Never a downgrade:** a Digest refused
   is sent again in Basic only over https and only when the 401 asks for
-  Basic (a server set up anew since); a bare 401, or one over plain
-  http, is the password refused, so a forged 401 never gets the password
+  Basic and no Digest at all (a server set up anew since); one that
+  still offers Digest, a bare 401, or one over plain http, is the
+  password refused, so a forged 401 never gets the password
   in clear. The same scheme refused is the password refused, never sent
   twice (a brute-force guard's count is the user's, not ours). What is
   kept, and that rule, load with Digest (`digest.ts`, `taken` and
-  `answerChallenge`), so the first load grows by 133 bytes (127 520 to 127 653 on main
-  `50a5593`), 31 over a PR's 0.1 KiB ([foundation D145](foundation.md#D145)):
+  `answerChallenge`), so the first load grows by 138 bytes (127 520 to 127 658 on main
+  `50a5593`), 36 over a PR's 0.1 KiB ([foundation D145](foundation.md#D145)):
   the price of a scheme bound to its origin and forgotten with its
   account, which the review asked for; it is won back by CalDAV loading
   with its first account ([D255](#D255)), the PR after this one. The Baïkal recording shows

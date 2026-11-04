@@ -36,14 +36,15 @@ export function answerChallenge(
     authorization.scheme = "basic";
     return true;
   }
-  // Digest refused by a server that asks for Basic now (set up anew since an
-  // earlier sync learned it): Basic once, over https only and only when the
-  // 401 asks for it. A bare 401, or one over plain http, is the password
-  // refused: a forged 401 never gets the password in clear (D260). Basic
-  // refused where Digest is asked was taken up above; the same scheme
-  // refused is the password refused, never sent twice.
+  // Digest refused by a server that asks for Basic now and no Digest at all
+  // (set up anew since an earlier sync learned it): Basic once, over https
+  // only. A 401 that still offers Digest, a bare one, or one over plain
+  // http is the password refused: a forged 401 never gets the password in
+  // clear (D260). Basic refused where Digest is asked was taken up above;
+  // the same scheme refused is the password refused, never sent twice.
   if (
     !answeredDigest ||
+    found ||
     !response.url.startsWith("https:") ||
     !challengesOf(header ?? "").some(({ scheme }) => scheme === "basic")
   )
