@@ -264,6 +264,13 @@ named as not carried over; a component AstroTime does not read
 inside its value. Each `VCALENDAR` of a file is read by its own version:
 a 2.0 calendar beside a 1.0 one is not converted. D266, D272.
 
+Done when: `outlook.vcs` and `nokia.vcs` convert with every field the
+plan names mapped and what has no place named (unit tests); a weekly
+series across a change of offset keeps its wall clock; an all-day event
+in UTC lands on the user's day; the e2e imports the phone's file on a
+phone in Russian and sees its events, its task and what was not carried
+over; the first load grows by at most 0.1 KiB.
+
 ### PR I4 — CSV (Outlook's and Google's columns)
 
 `csvToIcs` (`packages/ui/src/import/csv.ts`), loaded for a CSV alone:
