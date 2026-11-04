@@ -410,10 +410,33 @@ marked _to be recorded_.
   its own `iCalUId`), `MicrosoftTodo`
   (lists and tasks the same way, a task with no ETag on either side
   fetched again ([D37](foundation.md#D37)), `importance` as `PRIORITY`,
-  what To Do has no field for said not kept), `rruleOf` and `recurrenceOf` (each of
-  Graph's patterns both ways) and `MicrosoftProvider`, the composite
-  routing by address with one side failing leaving the other syncing, as
-  Google's ([D252](#D252)); iCalendar's lines from `@astrotime/core/lines`.
+  each time read in the zone its value names, `Prefer` heeded or not, a
+  due day written as the user's midnight, what To Do has no field for
+  said not kept), `rruleOf` and `recurrenceOf` (each of Graph's patterns
+  both ways) and `MicrosoftProvider`, the composite routing by address
+  with one side failing leaving the other syncing, as Google's
+  ([D252](#D252)); iCalendar's lines from `@astrotime/core/lines`.
+
+  The token goes to Graph's own origin over https only (`Graph.json`):
+  a page link elsewhere is refused unsent, and an answer that comes from
+  elsewhere after a redirect is refused too (every platform's HTTP drops
+  `Authorization` on a hop off the origin, `followRedirects`); a listing
+  that repeats a page or runs past 1000 pages is refused, never taken as
+  the whole, since what it missed would be removed here. Graph's
+  national clouds (`graph.microsoft.us`, …) are not offered.
+
+  Graph's ETags are weak (`W/"…"`), its only ones. The engine writes
+  without an `If-Match` for a weak ETag once it has compared Graph's
+  version with the base ([D37](foundation.md#D37)), which leaves a window
+  for an edit made there meanwhile; so the provider keeps them as
+  `~"…"`, which the engine passes on, and sends them back as `W/"…"`.
+  That Graph's `If-Match` takes a weak ETag (RFC 9110 asks a strong
+  comparison) is _to be recorded_: the first Graph recording proves a
+  `412` for a stale one and a write for the current one. If Graph
+  refuses them (every write a `412`) or ignores them, the provider keeps
+  them weak instead, and the engine's comparison before an unconditional
+  `PATCH` is the protection. A write with no ETag kept is a conflict,
+  never one against the version just read.
   Until Graph is recorded (P6's "Done when"), what a recording decides is
   built the plain way: **no `delta` yet** — each sync lists a calendar's
   events and a list's tasks in full and compares their ETags, which
@@ -796,12 +819,18 @@ marked _to be recorded_.
   sign-in (the `microsoft` account, its tokens in the secret store),
   `syncAll`'s entry and the dialog's button wait for the owner's client
   ([D258](#D258)). Then Graph is recorded, and from what it shows:
+  `If-Match` with Graph's weak ETags ([D253](#D253), and its fallback),
   `events/delta` and `tasks/delta` in place of the full listings, an
   exception's own change and a cancelled occurrence (`EXDATE`) read, and
   an occurrence's edit and deletion written to its own event. An event
   made here takes Graph's `iCalUId` (Graph sets it, read-only) once
   Graph's version comes down; keeping the UID made here (an extended
   property read back as `UID`) is decided then too.
+
+- **Graph's national clouds** ([D253](#D253)) — `graph.microsoft.us`,
+  `microsoftgraph.chinacloudapi.cn` and the like are refused as another
+  origin; a government or China tenant would need its own endpoints
+  and client, when someone asks.
 
 - **More servers in the interop run** ([D261](#D261)): **Stalwart** 1.0
   starts in a bootstrap mode whose setup is its web wizard, writing a

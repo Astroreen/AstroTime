@@ -1,10 +1,15 @@
 // Microsoft Graph as the providers ask it (docs/plans/providers.md#D253): JSON
-// with the account's bearer token, renewed once when refused (`send`), every
-// time in UTC and every body as text (`Prefer`), pages followed by their
-// `@odata.nextLink`, writes against the item's `@odata.etag` (`If-Match`).
+// with the account's bearer token, renewed once when refused (`send`), sent
+// to Graph only; every time asked in UTC and every body as text (`Prefer`),
+// each time read by its own zone all the same; pages followed by their
+// `@odata.nextLink`; writes against the item's `@odata.etag` (`If-Match`).
 import { Authorization, send, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { ianaName, isKnownTimeZone, wallClockIn, zonedToEpoch } from "@astrotime/core/time";
 
 export const GRAPH = "https://graph.microsoft.com/v1.0/";
+const ORIGIN = new URL(GRAPH).origin;
+/** More pages than a mailbox has: a listing longer is Graph's fault, refused rather than taken as whole. */
+const MAX_PAGES = 1000;
 
 export class Graph {
   private readonly http: HttpClient;
@@ -24,6 +29,9 @@ export class Graph {
       readonly accept?: readonly number[];
     } = {},
   ): Promise<{ readonly status: number; readonly value: T | null }> {
+    // The bearer token goes to Graph and nowhere else (a page link elsewhere, plain http).
+    if (new URL(url).origin !== ORIGIN)
+      throw new Error(`Not Microsoft Graph: ${new URL(url).origin}`);
     const response = await send(
       this.http,
       this.authorization,
@@ -40,17 +48,28 @@ export class Graph {
       },
       options.accept ?? [],
     );
+    // An answer from elsewhere (a redirect off Graph, `Authorization` dropped on the way) is not Graph's.
+    if (response.url && new URL(response.url).origin !== ORIGIN)
+      throw new Error(`Not Microsoft Graph: ${new URL(response.url).origin}`);
     return {
       status: response.status,
       value: response.body ? (JSON.parse(response.body) as T) : null,
     };
   }
 
-  /** Every item of a collection, page after page. */
+  /**
+   * Every item of a collection, page after page. A listing that comes back
+   * to a page it gave, or goes on past `MAX_PAGES`, is refused, never taken
+   * as the whole collection (what it misses would be removed here).
+   */
   async all<T>(url: string): Promise<T[]> {
     const items: T[] = [];
+    const seen = new Set<string>();
     let next: string | undefined = url;
     while (next) {
+      if (seen.has(next)) throw new Error("Graph gave a page it had given already.");
+      if (seen.size >= MAX_PAGES) throw new Error(`Graph gave more than ${MAX_PAGES} pages.`);
+      seen.add(next);
       const page: { value?: T[]; "@odata.nextLink"?: string } | null = (
         await this.json<{ value?: T[]; "@odata.nextLink"?: string }>("GET", next)
       ).value;
@@ -62,14 +81,54 @@ export class Graph {
 }
 
 /**
- * Graph's `{ dateTime, timeZone }`, which `Prefer` asks in UTC: an instant,
- * written in the event's own zone (`originalStartTimeZone`) when read.
+ * Graph's weak ETags (`W/"…"`) kept as `~"…"`, so the engine sends them
+ * rather than writing unconditionally, and sent back as Graph gave them
+ * (D253, to be recorded).
+ */
+export const keptEtag = (etag: string | null | undefined): string | null =>
+  etag ? etag.replace(/^W\//, "~") : null;
+export const sentEtag = (etag: string | null): string | null =>
+  etag ? etag.replace(/^~/, "W/") : null;
+
+/**
+ * Graph's `{ dateTime, timeZone }`: a wall clock in its zone, UTC when
+ * `Prefer` was heeded (To Do's due dates keep their own).
  */
 export interface GraphTime {
   readonly dateTime: string;
   readonly timeZone: string;
 }
 
-/** A Graph time as RFC 3339 UTC (`…Z`), read as UTC whatever its zone says when `Prefer` was heeded. */
-export const utcOf = (time: GraphTime): string =>
-  `${time.dateTime.replace(/\.\d+$/, "").replace(/Z$/, "")}Z`;
+/**
+ * The IANA zone a Graph zone name stands for (an IANA name, a Windows one);
+ * `UTC` for Graph's own (`tzone://Microsoft/Utc`) and for one no zone
+ * database knows (`Customized Time Zone`).
+ */
+export function zoneOf(name: string | undefined): string {
+  if (!name) return "UTC";
+  const iana = ianaName(name);
+  return iana !== "UTC" && isKnownTimeZone(iana) ? iana : "UTC";
+}
+
+/** A Graph time as the RFC 3339 UTC instant (`…Z`) it is in its own zone. */
+export function utcOf(time: GraphTime): string {
+  const local = time.dateTime.replace(/\.\d+$/, "").replace(/Z$/, "");
+  const zone = zoneOf(time.timeZone);
+  if (zone === "UTC") return `${local}Z`;
+  return new Date(zonedToEpoch(local, zone)).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+/**
+ * A day as iCalendar's DATE (`20261106`) from its midnight's instant: that
+ * instant's day in `zone`, the item's own; Vilnius's 6 November starts on
+ * the 5th in UTC. A zone not known here (UTC in its place) takes the
+ * nearest midnight, right for every offset within 12 hours.
+ */
+export function dayIn(instant: string, zone: string): string {
+  const epoch = Date.parse(instant);
+  return (
+    zone === "UTC" ? new Date(epoch + 12 * 3_600_000).toISOString() : wallClockIn(epoch, zone)
+  )
+    .slice(0, 10)
+    .replaceAll("-", "");
+}

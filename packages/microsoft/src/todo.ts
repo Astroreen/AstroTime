@@ -21,7 +21,16 @@ import {
   type Component,
 } from "@astrotime/core/lines";
 
-import { GRAPH, utcOf, type Graph, type GraphTime } from "./graph.ts";
+import {
+  dayIn,
+  GRAPH,
+  keptEtag,
+  sentEtag,
+  utcOf,
+  zoneOf,
+  type Graph,
+  type GraphTime,
+} from "./graph.ts";
 
 /** A task as Graph gives it (only what AstroTime reads). */
 export interface TodoTask {
@@ -57,8 +66,11 @@ export function vtodoOf(task: TodoTask): string {
     `SUMMARY:${escapeText(task.title ?? "")}`,
   ];
   if (task.body?.content) lines.push(`DESCRIPTION:${escapeText(task.body.content)}`);
+  // A due day is its midnight in the zone the value names, whatever `Prefer` asked.
   if (task.dueDateTime)
-    lines.push(`DUE;VALUE=DATE:${utcOf(task.dueDateTime).slice(0, 10).replaceAll("-", "")}`);
+    lines.push(
+      `DUE;VALUE=DATE:${dayIn(utcOf(task.dueDateTime), zoneOf(task.dueDateTime.timeZone))}`,
+    );
   lines.push(`STATUS:${STATUS_IN[task.status ?? "notStarted"] ?? "NEEDS-ACTION"}`);
   if (task.status === "completed" && task.completedDateTime)
     lines.push(`COMPLETED:${utcText(utcOf(task.completedDateTime))}`);
@@ -85,8 +97,14 @@ const KEPT = new Set([
   "CATEGORIES",
 ]);
 
-/** A VTODO as To Do's fields; and what it says that To Do cannot keep, by property. */
-export function todoFieldsOf(component: Component): {
+/**
+ * A VTODO as To Do's fields, its due day the midnight of `zone`, the
+ * user's; and what it says that To Do cannot keep, by property.
+ */
+export function todoFieldsOf(
+  component: Component,
+  zone = "UTC",
+): {
   readonly fields: Record<string, unknown>;
   readonly dropped: readonly string[];
 } {
@@ -101,7 +119,7 @@ export function todoFieldsOf(component: Component): {
   let dueDateTime: GraphTime | null = null;
   if (due) {
     const { time, date } = timeOf(due);
-    dueDateTime = { dateTime: `${time.slice(0, 10)}T00:00:00`, timeZone: "UTC" };
+    dueDateTime = { dateTime: `${time.slice(0, 10)}T00:00:00`, timeZone: zone };
     if (!date) dropped.add("DUE time");
   }
   const status = (lineOf(component, "STATUS")?.value ?? "NEEDS-ACTION").toUpperCase();
@@ -143,9 +161,12 @@ const todoIn = (ics: string) =>
 /** A Microsoft account's To Do lists, as a provider. */
 export class MicrosoftTodo implements Provider {
   private readonly graph: Graph;
+  /** The user's zone, whose midnight a due day is written as (an IANA name). */
+  private readonly zone: string;
 
-  constructor(graph: Graph) {
+  constructor(graph: Graph, zone = new Intl.DateTimeFormat().resolvedOptions().timeZone) {
     this.graph = graph;
+    this.zone = zone;
   }
 
   async calendars(): Promise<RemoteCalendar[]> {
@@ -172,7 +193,7 @@ export class MicrosoftTodo implements Provider {
     for (const task of tasks) {
       const href = `${calendarUrl}${encodeURIComponent(task.id)}`;
       listed.add(href);
-      const etag = task["@odata.etag"] ?? null;
+      const etag = keptEtag(task["@odata.etag"]);
       // No ETag on either side is never "unchanged" (D37): fetched again.
       if (etag === null || known.get(href) !== etag)
         changed.push({ href, etag, ics: vtodoOf(task) });
@@ -188,14 +209,14 @@ export class MicrosoftTodo implements Provider {
   async fetch(href: string): Promise<RemoteObject | null> {
     const { status, value } = await this.graph.json<TodoTask>("GET", href, { accept: [404] });
     if (status === 404 || !value) return null;
-    return { href, etag: value["@odata.etag"] ?? null, ics: vtodoOf(value) };
+    return { href, etag: keptEtag(value["@odata.etag"]), ics: vtodoOf(value) };
   }
 
   async create(href: string, ics: string): Promise<WriteResult> {
     const list = href.slice(0, href.lastIndexOf("/") + 1);
     const todo = todoIn(ics);
     if (!todo) throw new Error("A calendar object with no task.");
-    const { fields, dropped } = todoFieldsOf(todo);
+    const { fields, dropped } = todoFieldsOf(todo, this.zone);
     const { value } = await this.graph.json<TodoTask>("POST", list.replace(/\/$/, ""), {
       body: fields,
     });
@@ -203,7 +224,7 @@ export class MicrosoftTodo implements Provider {
     return {
       ok: true,
       href: `${list}${encodeURIComponent(value.id)}`,
-      etag: value["@odata.etag"] ?? null,
+      etag: keptEtag(value["@odata.etag"]),
       ...(dropped.length > 0 ? { dropped } : {}),
     };
   }
@@ -214,8 +235,8 @@ export class MicrosoftTodo implements Provider {
     if (!todo) throw new Error("A calendar object with no task.");
     const current = await this.graph.json<TodoTask>("GET", href, { accept: [404] });
     if (current.status === 404 || !current.value) return { ok: false, reason: "gone" };
-    const before = todoFieldsOf(todoIn(vtodoOf(current.value))!).fields;
-    const { fields, dropped } = todoFieldsOf(todo);
+    const before = todoFieldsOf(todoIn(vtodoOf(current.value))!, this.zone).fields;
+    const { fields, dropped } = todoFieldsOf(todo, this.zone);
     const changed = Object.fromEntries(
       Object.entries(fields).filter(
         ([key, value]) => JSON.stringify(before[key]) !== JSON.stringify(value),
@@ -223,9 +244,12 @@ export class MicrosoftTodo implements Provider {
     );
     let task = current.value;
     if (Object.keys(changed).length > 0) {
+      // No ETag kept here: Graph's just read is no proof our base was it
+      // (D37), so the sync fetches, merges and writes against that one.
+      if (etag === null && task["@odata.etag"]) return { ok: false, reason: "conflict" };
       const patched = await this.graph.json<TodoTask>("PATCH", href, {
         body: changed,
-        etag: etag ?? task["@odata.etag"] ?? null,
+        etag: sentEtag(etag),
         accept: [404, 412],
       });
       if (patched.status === 404) return { ok: false, reason: "gone" };
@@ -235,13 +259,16 @@ export class MicrosoftTodo implements Provider {
     return {
       ok: true,
       href,
-      etag: task["@odata.etag"] ?? null,
+      etag: keptEtag(task["@odata.etag"]),
       ...(dropped.length > 0 ? { dropped } : {}),
     };
   }
 
   async remove(href: string, etag: string | null): Promise<WriteResult> {
-    const { status } = await this.graph.json("DELETE", href, { etag, accept: [404, 412] });
+    const { status } = await this.graph.json("DELETE", href, {
+      etag: sentEtag(etag),
+      accept: [404, 412],
+    });
     if (status === 404) return { ok: false, reason: "gone" };
     if (status === 412) return { ok: false, reason: "conflict" };
     return { ok: true, href, etag: null };
