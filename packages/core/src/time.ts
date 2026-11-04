@@ -192,7 +192,8 @@ export function wallClockIn(epochMs: number, timeZone: string): string {
     formatters.set(timeZone, format);
   }
   const parts = Object.fromEntries(format.formatToParts(epochMs).map((p) => [p.type, p.value]));
-  const local = `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}`;
+  // `Intl` writes a year before 1000 with fewer digits (`999`): padded, as iCalendar writes it.
+  const local = `${parts["year"]!.padStart(4, "0")}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}`;
   // The oldest goes first (a Map keeps insertion order), so a layout that
   // passes the limit keeps what it asked for last instead of starting over.
   if (wallClocks.size >= WALL_CLOCKS) wallClocks.delete(wallClocks.keys().next().value!);

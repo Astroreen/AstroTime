@@ -85,3 +85,21 @@ describe("a VTIMEZONE made from Intl (RFC 5545 §3.6.5)", () => {
     expect((CalendarObject.parse(ics).master as Event).start).toEqual(start);
   });
 });
+
+describe("a zone that changes after a year without changes", () => {
+  // Kazakhstan moved Almaty from UTC+6 to UTC+5 on 1 March 2024, with no change in 2023.
+  test("places every instant of the item's year as Intl does", () => {
+    const { misses } = compare("Asia/Almaty", 2024);
+    expect(misses).toEqual([]);
+  });
+
+  test("an item written in it after the change reads back at its instant", () => {
+    const start = zonedTime("2024-06-01T09:00:00", "Asia/Almaty");
+    const ics = createItem(
+      "event",
+      { summary: "x", time: { start, end: zonedTime("2024-06-01T10:00:00", "Asia/Almaty") } },
+      { now: NOW, uid: "x" },
+    );
+    expect((CalendarObject.parse(ics).master as Event).start).toEqual(start);
+  });
+});

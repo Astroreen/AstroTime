@@ -81,6 +81,28 @@ function dayOfRule(year: number, month: number, byDay: string): number {
   return lastDate.getUTCDate() - ((lastDate.getUTCDay() - weekday + 7) % 7);
 }
 
+/**
+ * What `changesWithin` found, by its arguments: each item written in a zone
+ * asks again, and the answer is about 1,000 `Intl` calls. Bounded as
+ * `wallClocks` in `time.ts` is.
+ */
+const changes = new Map<string, boolean>();
+const CHANGES = 1000;
+
+/** Whether the zone's offset is ever other than `offset` from the year `from` to the year `to`, sampled weekly. */
+function changesWithin(timeZone: string, from: number, to: number, offset: number): boolean {
+  const key = `${timeZone} ${from} ${to} ${offset}`;
+  const known = changes.get(key);
+  if (known !== undefined) return known;
+  let result = false;
+  for (let at = Date.UTC(from, 0, 1); at < Date.UTC(to, 0, 1) && !result; at += 7 * DAY_MS) {
+    result = offsetAt(at, timeZone) !== offset;
+  }
+  if (changes.size >= CHANGES) changes.delete(changes.keys().next().value!);
+  changes.set(key, result);
+  return result;
+}
+
 /** How many years after the first a yearly rule is checked for, and the onsets listed for a zone without one. */
 const YEARS = 20;
 
@@ -89,7 +111,7 @@ const YEARS = 20;
  * `year`. A zone whose changes follow "the nth (or last) weekday of a month"
  * gets a yearly RRULE per observance, checked against `Intl` for the years
  * after; any other gets an observance per change in those years. A zone
- * with no change has one STANDARD observance.
+ * with no change in those years has one STANDARD observance.
  */
 export function vtimezone(timeZone: string, year: number): ICAL.Component {
   const first = year - 1;
@@ -97,27 +119,34 @@ export function vtimezone(timeZone: string, year: number): ICAL.Component {
   component.addPropertyWithValue("tzid", timeZone);
   const found = transitions(timeZone, first);
   if (found.length === 0) {
-    const offset = utcOffset(offsetAt(Date.UTC(year, 0, 1), timeZone));
-    component.addSubcomponent(observance("standard", "1970-01-01T00:00:00", offset, offset));
-    return component;
+    const offset = offsetAt(Date.UTC(year, 0, 1), timeZone);
+    component.addSubcomponent(
+      observance("standard", "1970-01-01T00:00:00", utcOffset(offset), utcOffset(offset)),
+    );
+    // A zone that changes only later (Almaty in 2024) lists those changes
+    // after it. Weekly samples find any change that lasts a week (summer
+    // time, Morocco's Ramadan) for a seventh of a scan day by day.
+    if (!changesWithin(timeZone, year, year + YEARS, offset)) return component;
   }
   const later = Array.from({ length: YEARS }, (_, i) => first + 1 + i).map(
     (y) => [y, transitions(timeZone, y)] as const,
   );
-  const regular = found.every((transition, index) => {
-    const date = onset(transition);
-    const { month, byDay } = ruleOf(date);
-    return later.every(([y, list]) => {
-      const other = list[index];
-      if (!other || list.length !== found.length || other.to !== transition.to) return false;
-      const otherDate = onset(other);
-      return (
-        otherDate.getUTCMonth() + 1 === month &&
-        otherDate.getUTCDate() === dayOfRule(y, month, byDay) &&
-        iso(otherDate).slice(10) === iso(date).slice(10)
-      );
+  const regular =
+    found.length > 0 &&
+    found.every((transition, index) => {
+      const date = onset(transition);
+      const { month, byDay } = ruleOf(date);
+      return later.every(([y, list]) => {
+        const other = list[index];
+        if (!other || list.length !== found.length || other.to !== transition.to) return false;
+        const otherDate = onset(other);
+        return (
+          otherDate.getUTCMonth() + 1 === month &&
+          otherDate.getUTCDate() === dayOfRule(y, month, byDay) &&
+          iso(otherDate).slice(10) === iso(date).slice(10)
+        );
+      });
     });
-  });
   const all = regular ? found : [...found, ...later.flatMap(([, list]) => list)];
   for (const transition of all) {
     const date = onset(transition);

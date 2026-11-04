@@ -10,7 +10,11 @@ import {
   type Occurrence,
   type Range,
 } from "../src/index.ts";
+import { vtimezone } from "../src/vtimezone.ts";
 import { load } from "./support.ts";
+
+/** A VTIMEZONE for `timeZone` as AstroTime writes one, as content lines. */
+const zoneFor = (timeZone: string) => vtimezone(timeZone, 2026).toString().split("\r\n");
 
 const vilnius = (from: string, to: string): Range => ({ from, to, timeZone: "Europe/Vilnius" });
 const starts = (occurrences: Occurrence[], timeZone = "Europe/Vilnius") =>
@@ -348,6 +352,123 @@ describe("bounds (for the local store's date index)", () => {
     });
   });
 
+  test("an RDATE before DTSTART, which shows (Google's birthdays), starts the bounds (D36)", () => {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:early",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART:20261110T090000Z",
+      "DTEND:20261110T100000Z",
+      "RDATE:20261103T090000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ];
+    for (const rule of [[], ["RRULE:FREQ=WEEKLY;COUNT=2"], ["RRULE:FREQ=WEEKLY"]]) {
+      const object = CalendarObject.parse(lines.toSpliced(8, 0, ...rule).join("\r\n"));
+      expect(starts(occurrencesBetween(object, vilnius("2026-11-03", "2026-11-04")))).toEqual([
+        "2026-11-03T11:00:00",
+      ]);
+      expect(boundsOf(object).startMs, rule.join()).toBe(Date.parse("2026-11-03T09:00:00Z"));
+    }
+  });
+
+  test("an RDATE of a period before DTSTART is bounded by its own end too (D36)", () => {
+    // The period runs from 3 to 20 November, past the master's one hour on the 10th.
+    for (const period of ["20261103T090000Z/20261120T090000Z", "20261103T090000Z/P17D"]) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          "BEGIN:VEVENT",
+          "UID:period",
+          "DTSTAMP:20261001T000000Z",
+          "DTSTART:20261110T090000Z",
+          "DTEND:20261110T100000Z",
+          `RDATE;VALUE=PERIOD:${period}`,
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      expect(boundsOf(object), period).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-20T09:00:00Z"),
+      });
+    }
+  });
+
+  test("an RDATE of every kind before DTSTART starts the bounds (D36)", () => {
+    const SLACK = 14 * 3_600_000;
+    const bounded = (zones: string[], start: string, end: string, rdate: string) =>
+      boundsOf(
+        CalendarObject.parse(
+          [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//test//EN",
+            ...zones,
+            "BEGIN:VEVENT",
+            "UID:kinds",
+            "DTSTAMP:20261001T000000Z",
+            start,
+            end,
+            rdate,
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+          ].join("\r\n"),
+        ),
+      );
+    // A wall clock with no zone, and a date: widened by the furthest zones.
+    expect(
+      bounded([], "DTSTART:20261110T090000", "DTEND:20261110T100000", "RDATE:20261103T090000"),
+    ).toEqual({
+      startMs: Date.parse("2026-11-03T09:00:00Z") - SLACK,
+      endMs: Date.parse("2026-11-10T10:00:00Z") + SLACK,
+    });
+    expect(
+      bounded(
+        [],
+        "DTSTART;VALUE=DATE:20261110",
+        "DTEND;VALUE=DATE:20261111",
+        "RDATE;VALUE=DATE:20261103",
+      ),
+    ).toEqual({
+      startMs: Date.parse("2026-11-03T00:00:00Z") - SLACK,
+      endMs: Date.parse("2026-11-11T00:00:00Z") + SLACK,
+    });
+    // In a zone, defined or not (Google's way): 11:00 in Vilnius is 09:00Z.
+    for (const zones of [[], zoneFor("Europe/Vilnius")]) {
+      const start = "DTSTART;TZID=Europe/Vilnius:20261110T110000";
+      const end = "DTEND;TZID=Europe/Vilnius:20261110T120000";
+      const label = zones.length > 0 ? "defined" : "undefined";
+      expect(
+        bounded(zones, start, end, "RDATE;TZID=Europe/Vilnius:20261103T110000"),
+        label,
+      ).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-10T10:00:00Z"),
+      });
+      expect(
+        bounded(
+          zones,
+          start,
+          end,
+          "RDATE;VALUE=PERIOD;TZID=Europe/Vilnius:20261103T110000/20261120T110000",
+        ),
+        `${label} period`,
+      ).toEqual({
+        startMs: Date.parse("2026-11-03T09:00:00Z"),
+        endMs: Date.parse("2026-11-20T09:00:00Z"),
+      });
+    }
+  });
+
   test("an unending series is open; an undated task has no bounds", () => {
     expect(boundsOf(load("tasksorg-task-recurring.ics")).endMs).toBeNull();
     expect(boundsOf(load("tasksorg-task-completed.ics"))).toEqual({ startMs: null, endMs: null });
@@ -494,6 +615,150 @@ describe("RFC 5545's corners", () => {
         "",
       ].join("\r\n"),
     );
+
+  test("a series between two zones that share an offset only in its first occurrence keeps that length (D32)", () => {
+    // London and Lagos are both UTC+1 in summer, an hour apart in winter:
+    // 10:00 in London to 12:00 in Lagos is two hours in June, and every week after.
+    for (const zones of [[], zoneFor("Europe/London"), zoneFor("Africa/Lagos")]) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          ...zones,
+          "BEGIN:VEVENT",
+          "UID:shared",
+          "DTSTAMP:20260101T000000Z",
+          "DTSTART;TZID=Europe/London:20260601T100000",
+          "DTEND;TZID=Africa/Lagos:20260601T120000",
+          "RRULE:FREQ=WEEKLY",
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      const winter = occurrencesBetween(object, vilnius("2026-12-07", "2026-12-08"));
+      expect(
+        winter.map((o) =>
+          [o.start, o.end].map((t) => (t.type === "zoned" ? new Date(t.epochMs).toISOString() : t)),
+        ),
+        zones[1],
+      ).toEqual([["2026-12-07T10:00:00.000Z", "2026-12-07T12:00:00.000Z"]]);
+    }
+  });
+
+  test("a series that ends in another zone than it starts lasts as long as its first (D32)", () => {
+    // 10:00 in Berlin is 09:00Z; 13:00 in New York is 18:00Z: nine hours, each day.
+    const ends = (start: string) =>
+      occurrencesBetween(
+        event(start, "DTEND;TZID=America/New_York:20261102T130000", "RRULE:FREQ=DAILY;COUNT=2"),
+        vilnius("2026-11-01", "2026-11-08"),
+      ).map((o) => (o.end.type === "zoned" ? new Date(o.end.epochMs).toISOString() : o.end));
+    // Neither zone defined (Google's way), and one of them UTC.
+    for (const start of [
+      "DTSTART;TZID=Europe/Berlin:20261102T100000",
+      "DTSTART:20261102T090000Z",
+    ]) {
+      expect(ends(start), start).toEqual(["2026-11-02T18:00:00.000Z", "2026-11-03T18:00:00.000Z"]);
+    }
+  });
+
+  test("an event or a task that ends in another zone than it starts ends at its instant (D32)", () => {
+    const end = (component: string, endLine: string) =>
+      occurrencesBetween(
+        CalendarObject.parse(
+          [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            `BEGIN:${component}`,
+            "UID:once",
+            "DTSTAMP:20261101T000000Z",
+            "DTSTART;TZID=Europe/Berlin:20261102T100000",
+            endLine,
+            `END:${component}`,
+            "END:VCALENDAR",
+            "",
+          ].join("\r\n"),
+        ),
+        vilnius("2026-11-01", "2026-11-08"),
+      ).map((o) => (o.end.type === "zoned" ? new Date(o.end.epochMs).toISOString() : o.end));
+    expect(end("VEVENT", "DTEND;TZID=America/New_York:20261102T130000")).toEqual([
+      "2026-11-02T18:00:00.000Z",
+    ]);
+    expect(end("VTODO", "DUE;TZID=America/New_York:20261102T130000")).toEqual([
+      "2026-11-02T18:00:00.000Z",
+    ]);
+  });
+
+  test("a series whose ends name one zone two ways keeps its wall-clock length across DST (D32)", () => {
+    // Kyiv goes from 04:00 back to 03:00 on 25 October: 22:00 to 06:00 is
+    // eight hours on the wall clock, nine elapsed. Europe/Kiev is the old
+    // name of Europe/Kyiv, and FLE Standard Time Windows' name for it.
+    for (const [from, to] of [
+      ["Europe/Kyiv", "Europe/Kiev"],
+      ["FLE Standard Time", "Europe/Kyiv"],
+    ]) {
+      const ends = occurrencesBetween(
+        event(
+          `DTSTART;TZID=${from}:20261024T220000`,
+          `DTEND;TZID=${to}:20261025T060000`,
+          "RRULE:FREQ=DAILY;COUNT=2",
+        ),
+        vilnius("2026-10-20", "2026-10-31"),
+      ).map((o) => wallClockOf(o.end, "Europe/Kyiv"));
+      expect(ends, `${from} to ${to}`).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+    }
+  });
+
+  test("a series whose ends name one zone two ways, each with its VTIMEZONE, keeps its wall-clock length (D32)", () => {
+    // As above, with each name defined: ical.js holds two zone objects. Two
+    // names only their VTIMEZONEs know (Outlook numbers its custom zones)
+    // are one zone too, by ical.js's reading of both clocks.
+    const zone = (tzid: string) => [
+      "BEGIN:VTIMEZONE",
+      `TZID:${tzid}`,
+      "BEGIN:DAYLIGHT",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "DTSTART:19700329T030000",
+      "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+      "END:DAYLIGHT",
+      "BEGIN:STANDARD",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "DTSTART:19701025T040000",
+      "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    for (const [from, to] of [
+      ["Europe/Kyiv", "Europe/Kiev"],
+      ["Customized Time Zone", "Customized Time Zone 1"],
+    ] as const) {
+      const object = CalendarObject.parse(
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//test//EN",
+          ...zone(from),
+          ...zone(to),
+          "BEGIN:VEVENT",
+          "UID:aliases",
+          "DTSTAMP:20261001T000000Z",
+          `DTSTART;TZID=${from}:20261024T220000`,
+          `DTEND;TZID=${to}:20261025T060000`,
+          "RRULE:FREQ=DAILY;COUNT=2",
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      const ends = occurrencesBetween(object, vilnius("2026-10-20", "2026-10-31")).map((o) =>
+        wallClockOf(o.end, "Europe/Kyiv"),
+      );
+      expect(ends, `${from} to ${to}`).toEqual(["2026-10-25T06:00:00", "2026-10-26T06:00:00"]);
+    }
+  });
 
   test("a UTC UNTIL bounds a series in a zone the object does not define by its instant", () => {
     // Google's way: a TZID and no VTIMEZONE. 09:00 in New York is 14:00Z, so

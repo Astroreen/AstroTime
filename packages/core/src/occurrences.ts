@@ -3,7 +3,15 @@ import ICAL from "ical.js";
 import type { CalendarObject } from "./calendar-object.ts";
 import { plus, readItem, type Item } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
-import { fromIcalTime, keepTzid, sameOrigin, wallClockOf, type ItemTime } from "./time.ts";
+import {
+  fromIcalTime,
+  keepTzid,
+  sameOrigin,
+  wallClockIn,
+  wallClockOf,
+  zoneOrigin,
+  type ItemTime,
+} from "./time.ts";
 
 /** One occurrence of an item on the calendar (GLOSSARY.md: Occurrence). */
 export interface Occurrence {
@@ -90,12 +98,48 @@ export function lengthOf(span: { start: ICAL.Time; end: ICAL.Time }): ICAL.Durat
 function signedLength({ start, end }: { start: ICAL.Time; end: ICAL.Time }): ICAL.Duration {
   if (start.zone === end.zone && sameOrigin(start, end)) return end.subtractDate(start);
   // Two zones the object does not define are both a wall clock to ical.js (a
-  // flight from Berlin to New York): their instants tell the length.
+  // flight from Berlin to New York): their instants tell the length, unless
+  // both name one zone (`sameClock`), whose wall clocks tell it.
   const from = fromIcalTime(start);
   const to = fromIcalTime(end);
-  if (from.type === "zoned" && to.type === "zoned")
-    return ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000));
+  if (from.type === "zoned" && to.type === "zoned") {
+    return sameClock(start, end)
+      ? end.subtractDate(start)
+      : ICAL.Duration.fromSeconds(Math.round((to.epochMs - from.epochMs) / 1000));
+  }
   return end.subtractDateTz(start);
+}
+
+/**
+ * Whether two zoned times read the same wall clocks in either's zone (D32):
+ * one zone under two names (an alias, a Windows name beside its IANA one,
+ * two VTIMEZONEs of one zone), or zones with the same offsets at both
+ * instants (London and Lagos in summer). Those measure one length either
+ * way: each zone's offset is the same at both, so the wall clocks are as far
+ * apart as the instants, and every later occurrence adds that length to its
+ * own start's wall clock.
+ */
+function sameClock(start: ICAL.Time, end: ICAL.Time): boolean {
+  const a = fromIcalTime(start);
+  const b = fromIcalTime(end);
+  if (a.type !== "zoned" || b.type !== "zoned") return false;
+  if (a.timeZone === b.timeZone) return true;
+  try {
+    return (
+      wallClockIn(a.epochMs, b.timeZone) === a.local &&
+      wallClockIn(b.epochMs, a.timeZone) === b.local
+    );
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // A zone only its VTIMEZONE knows (`Customized Time Zone`): ical.js reads
+    // its clock, when both ends have a VTIMEZONE (or are UTC).
+    const defined = (time: ICAL.Time) => ["defined", "utc"].includes(zoneOrigin(time).kind);
+    if (!defined(start) || !defined(end)) return false;
+    return (
+      start.convertToZone(end.zone).toString().slice(0, 19) === a.local &&
+      end.convertToZone(start.zone).toString().slice(0, 19) === b.local
+    );
+  }
 }
 
 function bounds(range: Range) {
@@ -302,6 +346,19 @@ export function boundsOf(object: CalendarObject): Bounds {
   const span = master ? anchors(master) : null;
   if (master && span) {
     include(span.start, span.end);
+    // Every RDATE bounds the object: one before DTSTART shows too
+    // (`firstDay`), so the bounds start there; one after it widens them no
+    // further than the walk below, which reaches it too.
+    for (const property of master.getAllProperties("rdate")) {
+      for (const value of property.getValues()) {
+        const start = value instanceof ICAL.Period ? value.start : value;
+        if (!(start instanceof ICAL.Time)) continue;
+        // Shown as long as the series (D141's deferred period length), and
+        // bounded to its own end too, for when it shows as long as it says.
+        include(start, plus(start, lengthOf(span)));
+        if (value instanceof ICAL.Period) include(start, keepTzid(start, value.getEnd().clone()));
+      }
+    }
     const rules = master.getAllProperties("rrule").map((p) => p.getFirstValue() as ICAL.Recur);
     if (rules.some((rule) => rule.until === null && rule.count === null)) {
       open = true;

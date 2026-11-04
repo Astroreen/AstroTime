@@ -562,6 +562,86 @@ describe("the repeat rule", () => {
     expect(yearly).toContain("RRULE:FREQ=YEARLY\r\n");
   });
 
+  test("a monthly nth weekday on some days of the month only is inexact (D9)", () => {
+    const monthly = (rule: string) =>
+      repeatOf(
+        CalendarObject.parse(
+          calendar(["DTSTART;TZID=Europe/Vilnius:20261123T090000", `RRULE:FREQ=MONTHLY;${rule}`]),
+        ),
+      );
+    // The fourth Monday only when it is the 22nd to the 24th (some months
+    // have none) is read as close as it goes, the fourth Monday, and marked
+    // inexact: the edit dialog keeps it as written ("kept"), and the details
+    // say it is another app's.
+    expect(monthly("BYDAY=4MO;BYMONTHDAY=22,23,24")).toMatchObject({
+      exact: false,
+      repeat: { monthlyWeekday: { nth: 4, weekday: "MO" } },
+    });
+    expect(monthly("BYDAY=4MO")).toMatchObject({
+      exact: true,
+      repeat: { monthlyWeekday: { nth: 4, weekday: "MO" } },
+    });
+  });
+
+  test("an end in UTC is read on its UTC day in a zone nothing knows, which is floating (D32)", () => {
+    // No VTIMEZONE, no IANA or Windows name: the start is a wall clock, and
+    // 23:00Z on 9 November is that day.
+    const series = calendar([
+      "DTSTART;TZID=Nowhere Standard Time:20261102T090000",
+      "DTEND;TZID=Nowhere Standard Time:20261102T100000",
+      "RRULE:FREQ=DAILY;UNTIL=20261109T230000Z",
+    ]);
+    expect(repeatOf(CalendarObject.parse(series))?.repeat.end).toEqual({
+      type: "until",
+      until: "2026-11-09",
+    });
+  });
+
+  test("an end in UTC is read on the day of a zone only the object's VTIMEZONE knows (D32)", () => {
+    // Outlook's own name for a zone, UTC+2 in winter: 23:00Z on 9 November is 01:00 on the 10th.
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Customized Time Zone",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T040000",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+      "END:STANDARD",
+      "BEGIN:DAYLIGHT",
+      "DTSTART:16010101T030000",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+      "END:DAYLIGHT",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:custom",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART;TZID=Customized Time Zone:20261102T090000",
+      "DTEND;TZID=Customized Time Zone:20261102T100000",
+      "RRULE:FREQ=DAILY;UNTIL=20261109T230000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+    expect(repeatOf(CalendarObject.parse(ics))?.repeat.end).toEqual({
+      type: "until",
+      until: "2026-11-10",
+    });
+    // An end that is no instant (a date, a wall clock) is its day as written.
+    for (const until of ["20261109", "20261109T230000"]) {
+      const written = ics.replace("UNTIL=20261109T230000Z", `UNTIL=${until}`);
+      expect(repeatOf(CalendarObject.parse(written))?.repeat.end, until).toEqual({
+        type: "until",
+        until: "2026-11-09",
+      });
+    }
+  });
+
   test("set on an item that did not repeat, and taken away with its exclusions and exceptions", () => {
     const repeating = editItem(
       load("nextcloud-web-event-timed.ics"),

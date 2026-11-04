@@ -25,7 +25,7 @@ export interface Repeat {
   readonly interval: number;
   /** A weekly rule's days; empty for the start's own weekday. */
   readonly weekdays: readonly Weekday[];
-  /** A monthly rule on the nth weekday (1–5, or −1 for the last); `null`: on the start's day of the month. */
+  /** A monthly rule on the nth weekday (1–5, or −1 to −5 from the last); `null`: on the start's day of the month. */
   readonly monthlyWeekday: { readonly nth: number; readonly weekday: Weekday } | null;
   readonly end: RepeatEnd;
 }
@@ -90,7 +90,9 @@ function readRule(rule: ICAL.Recur, anchor: ItemTime | null, single: boolean): R
       byDay.length === 0 &&
       (byMonthDay.length === 0 ||
         (byMonthDay.length === 1 && startDate?.getUTCDate() === byMonthDay[0]));
-    if (!(monthlyWeekday || onItsDay) || byMonth.length > 0) exact = false;
+    // An nth weekday on some days of the month only is more than a `Repeat` holds.
+    const onWeekday = monthlyWeekday !== null && byMonthDay.length === 0;
+    if (!(onWeekday || onItsDay) || byMonth.length > 0) exact = false;
   } else if (frequency === "YEARLY") {
     const onItsDay =
       byDay.length === 0 &&
