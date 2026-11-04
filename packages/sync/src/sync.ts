@@ -158,7 +158,13 @@ async function isolated(
     if (error instanceof OfflineError || error instanceof AuthError) throw error;
     // A problem the error names (`SyncProblem`, a subscription's
     // `HeldRemovalError` with what it holds): the engine imports no provider.
-    const { problem = "failed", held } = error as Partial<SyncReport["errors"][number]>;
+    // Whatever was thrown (`undefined` too) stays this calendar's (D37).
+    const named =
+      error !== null && typeof error === "object"
+        ? (error as Partial<SyncReport["errors"][number]>)
+        : {};
+    const problem = typeof named.problem === "string" ? named.problem : "failed";
+    const held = named.held;
     report.errors.push({
       href,
       problem,

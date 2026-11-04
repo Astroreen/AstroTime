@@ -118,6 +118,20 @@ export async function addSubscription(
 }
 
 /**
+ * After a sync, a held removal the user applied is used up: the next file
+ * that removes as much asks again, even one the same as before (D263).
+ */
+export async function settle(
+  context: Pick<SyncContext, "secrets">,
+  accountId: string,
+  provider: IcsProvider,
+): Promise<void> {
+  const { url, apply } = provider.subscription;
+  if (apply === null) return;
+  await context.secrets.set(keyOf(accountId), JSON.stringify({ subscription: url, apply: null }));
+}
+
+/**
  * The user applies a subscription's file whose removals were held (D263):
  * that version, and only it, goes through at the next sync.
  */

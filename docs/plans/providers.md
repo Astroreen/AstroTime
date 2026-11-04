@@ -584,7 +584,8 @@ marked _to be recorded_.
   (`SyncReport.errors[].held`); the account's problems say "The
   calendar's file would remove N items" with "Remove them", which writes
   that version into the secret as `apply` and syncs: that file, and only
-  it, goes through. **Reading at most hourly** (or the file's
+  it, goes through, and once: the sync after it clears `apply`
+  (`settle`), so the same drop later asks again. **Reading at most hourly** (or the file's
   `REFRESH-INTERVAL`, if longer) is kept per store in memory
   (`@astrotime/sync/subscriptions`, `recent`), the last result said again
   meanwhile; only after a clean sync: one that failed, or said a problem
@@ -605,7 +606,7 @@ marked _to be recorded_.
   origin, any address in the error's words read as a URL and cut to its
   scheme and host (a user name and password in it, `https://user:token@…`,
   never reach the log either)
-  ([D39](foundation.md#D39)). The first load grows by 631 bytes (126 501 to 127 132 on
+  ([D39](foundation.md#D39)). The first load grows by 649 bytes (126 501 to 127 150 on
   main `0ae0dc1`), into the room [D255](#D255)'s note gave it (#136's 2.1
   KiB, and #144's 4.6).
 
@@ -706,7 +707,7 @@ registry.
 _Built:_ [D263](#D263); the room on the first load in #136 and #144.
 Of the criteria above, two are met otherwise, as D263 says: hrefs are
 `ics:<fingerprint>#<UID>`, not the address (which may hold a secret),
-and the first load grew by 631 bytes, into the room #136 and #144 made
+and the first load grew by 649 bytes, into the room #136 and #144 made
 for it, not by 0.1 KiB net. One is not met and is
 [Deferred](#deferred): the CalDAV provider is still on the first load
 (the registry is built for subscriptions only).

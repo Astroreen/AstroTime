@@ -324,3 +324,74 @@ test("a sync that said a problem is read again at the next chance, not left alon
   await syncAll(context, { fresh: true });
   expect(files.asked.length).toBe(asked + 1);
 });
+
+test("an applied removal is used up: the same big drop later asks again", async () => {
+  const two = file(event("a", "Planning"), event("b", "Review"));
+  const files = server(two);
+  const store = await Store.open(nodeDriver());
+  const secrets = memorySecrets();
+  const context = {
+    store,
+    secrets,
+    http: files.http,
+    connect: () => Promise.reject(new Error("none")),
+  };
+  const { account } = (await addSubscription(context, ADDRESS))!;
+  await syncAll(context);
+  files.serve(file());
+  const errorsOf = (report: Awaited<ReturnType<typeof syncAll>>) =>
+    report.accounts[0]?.status === "synced" ? report.accounts[0].report.errors : [];
+  const [held] = errorsOf(await syncAll(context, { retry: true }));
+  await applyHeld(context, account.id, held!.held!.version);
+  await syncAll(context, { retry: true });
+  expect(await subscribedSummaries(store, account.id)).toEqual([]);
+  expect(JSON.parse([...secrets.values.values()][0]!)).toMatchObject({ apply: null });
+  // Back to two items, then the very same empty file again: held again.
+  files.serve(two);
+  await syncAll(context, { retry: true });
+  files.serve(file());
+  expect(errorsOf(await syncAll(context, { retry: true }))[0]?.problem).toBe("held-removal");
+  expect(await subscribedSummaries(store, account.id)).toEqual(["Planning", "Review"]);
+});
+
+test("whatever a provider throws, undefined too, stays that calendar's problem (foundation D37)", async () => {
+  const store = await Store.open(nodeDriver());
+  const account = await store.addAccount({
+    provider: "caldav",
+    name: "x",
+    serverUrl: "https://dav.example",
+    username: null,
+  });
+  const calendar = (url: string) => ({
+    url,
+    name: url,
+    color: null,
+    components: ["VEVENT" as const],
+    rights: { create: false, edit: false, delete: false },
+  });
+  const report = await syncAccount(
+    store,
+    {
+      calendars: async () => [
+        calendar("https://dav.example/a/"),
+        calendar("https://dav.example/b/"),
+      ],
+      changes: async (url) => {
+        // oxlint-disable-next-line no-throw-literal -- what a careless provider may do
+        if (url.endsWith("/a/")) throw undefined;
+        return { changed: [], removed: [], syncToken: "t", ctag: null };
+      },
+      fetch: async () => null,
+      create: async () => ({ ok: false, reason: "gone" }),
+      update: async () => ({ ok: false, reason: "gone" }),
+      remove: async () => ({ ok: false, reason: "gone" }),
+    },
+    account.id,
+  );
+  expect(report.errors).toEqual([
+    { href: "https://dav.example/a/", problem: "failed", detail: "undefined" },
+  ]);
+  // The other calendar synced: its token is kept.
+  const [, b] = await store.calendars(account.id);
+  expect(b?.syncToken).toBe("t");
+});

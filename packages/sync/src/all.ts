@@ -265,13 +265,21 @@ async function syncOne(
       status: "synced",
       report: await syncAccount(context.store, provider, accountId),
     };
-    if (subscription) subscriptions!.remember(context.store, result, subscription, now());
+    if (subscription) {
+      subscriptions!.remember(context.store, result, subscription, now());
+      await subscriptions!.settle(context, accountId, subscription);
+    }
     holds.delete(accountId);
     return { sync: result, held: false };
   } catch (error) {
-    // A subscription that failed is read again at the next chance (D263).
+    // A subscription that failed is read again at the next chance (D263);
+    // its code not arriving (offline, a new release) is this sync's failure
+    // already, said below: an account's sync never throws (D90).
     if (account.provider === "ics")
-      (await import("./subscriptions.ts")).forget(context.store, accountId);
+      await import("./subscriptions.ts").then(
+        (subscriptions) => subscriptions.forget(context.store, accountId),
+        () => {},
+      );
     const report = (error as { report?: SyncReport } | null)?.report ?? null;
     const detail = error instanceof Error ? error.message : String(error);
     const status =

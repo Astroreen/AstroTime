@@ -122,7 +122,7 @@ const validatorsOf = (state: SyncState | undefined): Validators => {
 /** One subscription, as a provider: one read-only calendar from one file. */
 export class IcsProvider implements Provider {
   private readonly http: HttpClient;
-  private readonly subscription: Subscription;
+  readonly subscription: Subscription;
   private readonly calendarUrl: string;
   /** What the store keeps of the calendar: its name, colour and state, for a `304`. */
   private readonly kept: (Pick<RemoteCalendar, "name" | "color"> & SyncState) | null;
