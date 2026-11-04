@@ -42,7 +42,8 @@
     },
     "apps/web": {
       // The service worker is an entry of the build (service-worker.ts).
-      "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts", "sw/sw.ts"],
+      // public/oauth.js: the OAuth redirect page's script (providers D254).
+      "entry": ["src/main.tsx", "vite.config.ts", "dav-proxy.ts", "sw/sw.ts", "public/oauth.js"],
       // Loaded by @vitejs/plugin-react when the React Compiler is on.
       "ignoreDependencies": ["oxc-transform-react"],
     },

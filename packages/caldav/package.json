@@ -16,6 +16,10 @@
     "./login-flow": {
       "types": "./src/login-flow.ts",
       "import": "./src/login-flow.ts"
+    },
+    "./bearer": {
+      "types": "./src/bearer.ts",
+      "import": "./src/bearer.ts"
     }
   },
   "scripts": {

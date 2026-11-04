@@ -5,7 +5,17 @@
 // redirect back; requests go through its `HttpClient`. Loaded only when an
 // OAuth account is added or syncs (D255).
 import type { HttpClient, TokenSource } from "@astrotime/caldav";
-import { AuthError, OfflineError } from "@astrotime/core/provider";
+import { AuthError, OfflineError, retryAfter, ServerBusyError } from "@astrotime/core/provider";
+
+/**
+ * RFC 6749 §5.2's errors that end a sign-in for good, on a refresh: the
+ * grant revoked, or its scopes no longer given. `invalid_client` and
+ * `unauthorized_client` say the app's client is wrong (a deployment's
+ * registration changed), which signing in again would not mend: they are
+ * tried again later, as a busy service (D254).
+ */
+const SIGNED_OUT = new Set(["invalid_grant", "invalid_scope"]);
+const CLIENT_REFUSED = new Set(["invalid_client", "unauthorized_client"]);
 
 /** A service's OAuth endpoints and this app's client there. */
 export interface OAuthClient {
@@ -37,6 +47,33 @@ export const MICROSOFT = {
   tokenEndpoint: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
   scopes: ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"],
 } as const satisfies Omit<OAuthClient, "clientId">;
+
+/**
+ * Where a sign-in's answer comes back on a platform (D254): Android's own
+ * scheme, the desktop's loopback address, the web's `oauth.html`.
+ */
+export interface OAuthRedirect {
+  /**
+   * Makes one sign-in ready: its redirect URI, for the authorization URL.
+   * Called in the user's click itself, before anything is awaited: the web
+   * opens its window there, where no popup blocker holds it.
+   */
+  begin(): Promise<OAuthAttempt>;
+}
+
+export interface OAuthAttempt {
+  readonly redirectUri: string;
+  /**
+   * Shows the service's page; resolves with the redirect's URL, or `null`
+   * when the user left it. Not every platform hears the page closed: on the
+   * web the window is cut from the app (no `opener`) and not watched, so
+   * there `null` comes only from `cancel`, and the sign-in offers its
+   * Cancel; a window the browser refused rejects (`PopupBlockedError`).
+   */
+  open(url: string): Promise<string | null>;
+  /** Stops waiting: `open` resolves `null`, and what waited for the answer goes. */
+  cancel(): void;
+}
 
 /** The tokens a sign-in gives: the refresh token is kept as a password is (the secret store). */
 export interface Tokens {
@@ -78,6 +115,9 @@ export async function authorization(
   const pending = { state: random(24), verifier: random(32), redirectUri };
   const url = new URL(client.authorizationEndpoint);
   url.search = new URLSearchParams({
+    // A client's own parameters first: none of them can stand in for the
+    // sign-in's own (its state, challenge, redirect) that follow.
+    ...client.extra,
     response_type: "code",
     client_id: client.clientId,
     redirect_uri: redirectUri,
@@ -85,7 +125,6 @@ export async function authorization(
     state: pending.state,
     code_challenge: await challengeOf(pending.verifier),
     code_challenge_method: "S256",
-    ...client.extra,
   }).toString();
   return { url: url.href, pending };
 }
@@ -151,12 +190,31 @@ async function token(
   // RFC 6749 §5.2: a refresh token that no longer works is the account
   // signed out; a code that does not (used, expired, another verifier) is
   // this sign-in refused, the account untouched.
+  // A refresh the service refuses for good (the grant revoked, this client
+  // or its scopes no longer allowed) is the account to sign in again.
+  if (
+    grant["grant_type"] === "refresh_token" &&
+    typeof answer.error === "string" &&
+    SIGNED_OUT.has(answer.error)
+  )
+    throw new AuthError(`The service refused the sign-in (${answer.error}): sign in again.`);
+  if (
+    grant["grant_type"] === "refresh_token" &&
+    typeof answer.error === "string" &&
+    CLIENT_REFUSED.has(answer.error)
+  )
+    throw new ServerBusyError(`The service refused this app's client (${answer.error}).`, null);
   if (answer.error === "invalid_grant")
-    throw grant["grant_type"] === "refresh_token"
-      ? new AuthError("The service no longer accepts this sign-in: sign in again.")
-      : new OAuthRefusedError("invalid_grant", "the code is used, expired or not this sign-in's");
+    throw new OAuthRefusedError("invalid_grant", "the code is used, expired or not this sign-in's");
   if (response.status >= 500)
     throw new OfflineError(`The token endpoint answered ${response.status}.`);
+  // Rate limited, or a 4xx that is no OAuth answer (a proxy's, a portal's):
+  // tried again later, never taken for a refusal of the sign-in.
+  if (response.status === 429 || (response.status >= 400 && typeof answer.error !== "string"))
+    throw new ServerBusyError(
+      `The token endpoint answered ${response.status}.`,
+      retryAfter(response.header("retry-after")),
+    );
   if (typeof answer.error === "string")
     throw new OAuthRefusedError(
       answer.error,
