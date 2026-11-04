@@ -6,7 +6,10 @@
 set -eu
 cd /var/www/davis
 db=/var/www/davis/var/data.db
-if [ ! -f "$db" ]; then
+# Written once the user is in: a start that stopped halfway makes it all again.
+made=/var/www/davis/var/.astrotime-made
+if [ ! -f "$made" ]; then
+  rm -f "$db"
   php bin/console doctrine:migrations:migrate --no-interaction --quiet
   php -r '
     $db = new PDO("sqlite:" . $argv[1]);
@@ -16,5 +19,6 @@ if [ ! -f "$db" ]; then
       ->execute(["principals/astro", "astro@example.com", "Astro"]);
   ' "$db"
   chown -R www-data:www-data var
+  touch "$made"
 fi
 exec docker-php-entrypoint /usr/bin/supervisord -c /etc/supervisord.conf

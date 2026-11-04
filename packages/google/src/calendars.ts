@@ -4,7 +4,8 @@
 // calendar is then Google's CalDAV's like any other, at the address its
 // listing names. Google keeps colours of its own: the calendar takes the
 // one Google gives it.
-import { Authorization, send, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { Authorization, type HttpClient, type TokenSource } from "@astrotime/caldav";
+import { send } from "@astrotime/caldav/provider";
 import type { NewCalendar, RemoteCalendar } from "@astrotime/core/provider";
 
 /** Google's CalDAV, where discovery of an account's calendar home starts. */

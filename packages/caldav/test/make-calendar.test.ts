@@ -5,7 +5,8 @@
 // packages/sync/test/servers.test.ts.
 import { expect, test } from "vite-plus/test";
 
-import { CalDavProvider, HttpError, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { HttpError, type HttpClient, type HttpRequest } from "../src/index.ts";
+import { CalDavProvider } from "../src/provider.ts";
 
 const HOME = "https://dav.example/calendars/astro/";
 

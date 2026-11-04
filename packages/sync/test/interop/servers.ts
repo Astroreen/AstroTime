@@ -16,6 +16,8 @@ const INTEROP: Record<string, { name: string; url: string; username?: string }> 
   // Its `.well-known/caldav` answers 405: discovery goes on from the address.
   davical: { name: "DAViCal", url: "http://127.0.0.1:5604/caldav.php/", username: "admin" },
   davis: { name: "Davis", url: "http://127.0.0.1:5605/dav/" },
+  // Its root, as a user types it (`.well-known/caldav` leads on); the
+  // workflow's wait asks `/dav/cal/` itself, which answers once it is up.
   stalwart: { name: "Stalwart", url: "http://127.0.0.1:5606/" },
   // Its test server's users; any password is taken.
   cyrus: { name: "Cyrus IMAP", url: "http://127.0.0.1:5607/", username: "user1" },
