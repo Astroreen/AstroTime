@@ -27,7 +27,9 @@ export interface SplitObject {
  * component of another kind, under a UID taken: it becomes an object of its
  * own under a new UID), `joined-line` (a line broken without folding,
  * joined to the text value before it), `dropped-line` (a stray line that
- * belongs to no value, left out). Of the calendar itself: `invalid-zone` (a
+ * belongs to no value, left out), `ambiguous-line` (after a text value, a
+ * line that reads as a property iCalendar does not name, "Meeting-ID:123":
+ * kept as that property). Of the calendar itself: `invalid-zone` (a
  * `VTIMEZONE` that cannot be read: the objects naming it go without it, and
  * their times are read from the TZID, foundation D32) and
  * `invalid-property` (a calendar property that cannot be read, left out).
@@ -41,6 +43,7 @@ export type SplitProblemReason =
   | "mixed-kinds"
   | "joined-line"
   | "dropped-line"
+  | "ambiguous-line"
   | "invalid-zone"
   | "invalid-property";
 
@@ -132,6 +135,33 @@ export function jcalText(json: unknown): string {
  */
 const CONTENT_LINE = /^([A-Za-z0-9-]+)[;:]/;
 
+/**
+ * The names of RFC 5545's properties and its extensions' (RFC 7986, 7808,
+ * 7953, 9073, 9074, 9253, the draft's ESTIMATED-DURATION), and BEGIN and
+ * END: only to tell a line that may be a text value's from one that is
+ * surely a property. Every content line is kept as a property either way.
+ */
+const KNOWN = new Set(
+  (
+    "BEGIN END VERSION PRODID CALSCALE METHOD NAME DESCRIPTION UID LAST-MODIFIED URL " +
+    "REFRESH-INTERVAL SOURCE COLOR IMAGE CONFERENCE ATTACH CATEGORIES CLASS COMMENT GEO " +
+    "LOCATION PERCENT-COMPLETE PRIORITY RESOURCES STATUS SUMMARY COMPLETED DTEND DUE " +
+    "DTSTART DURATION FREEBUSY TRANSP TZID TZNAME TZOFFSETFROM TZOFFSETTO TZURL TZUNTIL " +
+    "TZID-ALIAS-OF ATTENDEE CONTACT ORGANIZER RECURRENCE-ID RELATED-TO EXDATE RDATE RRULE " +
+    "EXRULE ACTION REPEAT TRIGGER CREATED DTSTAMP SEQUENCE REQUEST-STATUS ACKNOWLEDGED " +
+    "PROXIMITY STRUCTURED-DATA STYLED-DESCRIPTION LOCATION-TYPE CALENDAR-ADDRESS " +
+    "PARTICIPANT-TYPE RESOURCE-TYPE BUSYTYPE LINK CONCEPT REFID ESTIMATED-DURATION"
+  ).split(" "),
+);
+
+/** What was done to a line: joined to it, left out, or kept as a property that may not be one. */
+type Note = "joined" | "dropped" | "ambiguous";
+const NOTED = {
+  joined: "joined-line",
+  dropped: "dropped-line",
+  ambiguous: "ambiguous-line",
+} as const satisfies Record<Note, SplitProblemReason>;
+
 /** Properties whose value is free text, where a line break written as is belongs (RFC 5545 §3.3.11). */
 const TEXT = new Set(["SUMMARY", "DESCRIPTION", "LOCATION", "COMMENT", "CONTACT", "RESOURCES"]);
 const isText = (name: string) => TEXT.has(name) || name.startsWith("X-");
@@ -140,7 +170,7 @@ const isText = (name: string) => TEXT.has(name) || name.startsWith("X-");
 interface Line {
   text: string;
   /** `joined`: a line broken without folding was added to it; `dropped`: a stray line, left out. */
-  note: "joined" | "dropped" | null;
+  note: Note | null;
 }
 
 /**
@@ -153,25 +183,30 @@ interface Line {
  */
 function lines(text: string): Line[] {
   const result: Line[] = [];
-  /** The last line a property starts on, and its name. */
-  let last: { line: Line; name: string } | null = null;
+  /** The last line a property starts on, which a fold goes on. */
+  let last: Line | null = null;
+  /** The text value a line broken without folding goes on: the last, past lines that may be its. */
+  let value: Line | null = null;
   for (const raw of text.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/)) {
     if (raw.trim() === "") continue;
     if (/^[ \t]/.test(raw)) {
       // A fold: the line before goes on. After a stray line it is stray too.
-      if (result.at(-1)?.note === "dropped") result.push({ text: raw, note: "dropped" });
-      else if (last) last.line.text += `\r\n${raw}`;
-      else result.push({ text: raw, note: "dropped" });
+      if (result.at(-1)?.note === "dropped" || !last) result.push({ text: raw, note: "dropped" });
+      else last.text += `\r\n${raw}`;
       continue;
     }
-    const name = CONTENT_LINE.exec(raw)?.[1];
+    const name = CONTENT_LINE.exec(raw)?.[1]?.toUpperCase();
     if (name !== undefined) {
-      const line: Line = { text: raw, note: null };
+      // After a text value, a name iCalendar does not have may be that
+      // value's line ("Meeting-ID:123"): kept as the property it reads as, and said.
+      const ambiguous = value !== null && !KNOWN.has(name) && !name.startsWith("X-");
+      const line: Line = { text: raw, note: ambiguous ? "ambiguous" : null };
       result.push(line);
-      last = { line, name: name.toUpperCase() };
-    } else if (last !== null && isText(last.name)) {
-      last!.line.text += `\\n${raw}`;
-      last!.line.note = "joined";
+      last = line;
+      if (!ambiguous) value = isText(name) ? line : null;
+    } else if (value) {
+      value.text += `\\n${raw}`;
+      if (!value.note) value.note = "joined";
     } else {
       result.push({ text: raw, note: "dropped" });
     }
@@ -187,7 +222,7 @@ interface Part {
   readonly uid: string | null;
   readonly component: ICAL.Component | null;
   readonly whole: boolean;
-  readonly notes: readonly ("joined" | "dropped")[];
+  readonly notes: readonly Note[];
 }
 
 interface Calendar {
@@ -201,7 +236,7 @@ interface Calendar {
 interface Block {
   readonly name: string;
   readonly lines: string[];
-  readonly notes: ("joined" | "dropped")[];
+  readonly notes: Note[];
   whole: boolean;
 }
 
@@ -274,8 +309,7 @@ function calendarOf(header: readonly Line[], blocks: readonly Block[]): Calendar
   const problems: SplitProblem[] = [];
   const own = (reason: SplitProblemReason, uid: string | null = null, kept = true) =>
     problems.push({ index: -1, uid, component: "VCALENDAR", reason, kept });
-  for (const line of header)
-    if (line.note) own(line.note === "joined" ? "joined-line" : "dropped-line");
+  for (const line of header) if (line.note) own(NOTED[line.note]);
   const properties = header.filter((line) => line.note !== "dropped").map((line) => line.text);
   let root: ICAL.Component;
   try {
@@ -371,14 +405,16 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
     return `${uid}-${n}`;
   };
   const isMaster = (component: ICAL.Component) => !component.hasProperty("recurrence-id");
+  /** Each component's place in the file, for a problem of its own. */
+  const placeOf = new Map<ICAL.Component, number>();
   for (const part of calendar.parts) {
     const { component } = part;
     if (!component) {
       problem(part, part.uid, part.whole ? "invalid" : "unterminated", false);
       continue;
     }
-    for (const note of part.notes)
-      problem(part, part.uid, note === "joined" ? "joined-line" : "dropped-line", true);
+    placeOf.set(component, part.index);
+    for (const note of part.notes) problem(part, part.uid, NOTED[note], true);
     let uid = component.getFirstPropertyValue("uid");
     if ((typeof uid !== "string" || uid === "") && newUid) {
       uid = newUid();
@@ -428,27 +464,60 @@ function splitOne(calendar: Calendar, newUid: (() => string) | null): SplitCalen
   }
 
   const objects: SplitObject[] = [];
-  for (const { uid, index, components } of [...groups.values(), ...apart]) {
-    const kind = components[0]!.name.toUpperCase();
+  const textOfObject = (components: readonly ICAL.Component[]) => {
     const used = new Set(components.flatMap(tzidsOf));
     const own = [...zones].filter(([tzid]) => used.has(tzid)).map(([, zone]) => zone.toJSON());
-    const ics = writeCalendar(
+    return writeCalendar(
       new ICAL.Component([
         "vcalendar",
         header,
         [...own, ...components.map((component) => component.toJSON())],
       ]),
     );
-    if (kind === "VEVENT" || kind === "VTODO") {
-      try {
-        CalendarObject.parse(ics);
-      } catch {
-        // What ical.js cannot read of a value throws its own errors, not only ours.
-        problems.push({ index, uid, component: kind, reason: "invalid", kept: false });
-        continue;
-      }
+  };
+  const readable = (ics: string) => {
+    try {
+      CalendarObject.parse(ics);
+      return true;
+    } catch {
+      // What ical.js cannot read of a value throws its own errors, not only ours.
+      return false;
     }
-    objects.push({ uid, kind, ics });
+  };
+  // In the order the file gives them, a UID's first component's place.
+  for (const { uid, components: all } of [...groups.values(), ...apart].toSorted(
+    (a, b) => a.index - b.index,
+  )) {
+    const kind = all[0]!.name.toUpperCase();
+    let components = all;
+    if ((kind === "VEVENT" || kind === "VTODO") && !readable(textOfObject(all))) {
+      // One unreadable exception costs itself, not its series: each read alone.
+      const unread = all.filter((component) => !readable(textOfObject([component])));
+      for (const component of unread) {
+        problems.push({
+          index: placeOf.get(component)!,
+          uid,
+          component: kind,
+          reason: "invalid",
+          kept: false,
+        });
+      }
+      components = all.filter((component) => !unread.includes(component));
+      if (components.length > 0 && !readable(textOfObject(components))) {
+        for (const component of components) {
+          problems.push({
+            index: placeOf.get(component)!,
+            uid,
+            component: kind,
+            reason: "invalid",
+            kept: false,
+          });
+        }
+        components = [];
+      }
+      if (components.length === 0) continue;
+    }
+    objects.push({ uid, kind, ics: textOfObject(components) });
   }
   problems.sort((a, b) => a.index - b.index);
 

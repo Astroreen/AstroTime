@@ -73,7 +73,9 @@ not carry is said, not dropped in silence.
   555 0100") after a text value (`DESCRIPTION`, `SUMMARY`, `LOCATION`,
   `COMMENT`, `CONTACT`, `RESOURCES`, an `X-` property) is that value broken
   without folding, joined as the line break it meant; anywhere else it is
-  a stray line, left out; both are named. The
+  a stray line, left out; both are named. A content line after a text
+  value whose name iCalendar does not have ("Meeting-ID:123") may be that
+  value's: it is kept as the property it reads as, and named. The
   same component twice under one UID (Google's and Outlook's exports do
   it) is kept once; a second, different master, or a component of another
   kind under a UID taken, is kept as an object of its own under a new UID
@@ -81,7 +83,11 @@ not carry is said, not dropped in silence.
   gives none, so a subscription's stays the same on every run); a series'
   exceptions stay with its first master, and an exception of another kind
   goes with the object of its kind that left the UID; a component given
-  again is kept once, wherever its first went.
+  again is kept once, wherever its first went. An object that cannot be
+  read loses only the components that cannot be read alone (an exception
+  with a broken `RECURRENCE-ID`), each named; its series and its other
+  exceptions are kept. Objects come in the order of their first component
+  in the file.
   Nothing is dropped unnamed: what cannot be kept (no UID where none can
   be given, unreadable, never ended) is a problem with its place in the
   file, and so is what was kept but changed. A `VTIMEZONE` that cannot be

@@ -207,14 +207,14 @@ describe("components that cannot be objects, and those kept all the same (D272)"
         event("good", ["DESCRIPTION:Another master"]),
       ),
     );
+    // In the file's order; what had to leave its UID under one made from
+    // it, the same on every run; VJOURNAL kept as written, for a caller to keep or leave.
     expect(split.objects.map(({ uid, kind }) => [uid, kind])).toEqual([
       ["good", "VEVENT"],
       ["mixed", "VTODO"],
-      ["twice", "VEVENT"],
-      // Kept as written, for a caller to keep or leave (VJOURNAL).
-      ["journal", "VJOURNAL"],
-      // What had to leave its UID: under one made from it, the same on every run.
       ["mixed-2", "VEVENT"],
+      ["twice", "VEVENT"],
+      ["journal", "VJOURNAL"],
       ["good-2", "VEVENT"],
     ]);
     expect(CalendarObject.parse(split.objects[5]!.ics).master?.description).toBe("Another master");
@@ -224,6 +224,39 @@ describe("components that cannot be objects, and those kept all the same (D272)"
       { index: 5, uid: "twice", component: "VEVENT", reason: "duplicate", kept: true },
       { index: 6, uid: "broken", component: "VEVENT", reason: "invalid", kept: false },
       { index: 8, uid: "good", component: "VEVENT", reason: "several-masters", kept: true },
+    ]);
+  });
+
+  test("an exception that cannot be read costs itself, not its series and the other exceptions", () => {
+    const split = splitCalendar(
+      calendar(
+        event("s", ["RRULE:FREQ=DAILY;COUNT=3"]),
+        event("s", ["RECURRENCE-ID:20261106T090000Z", "DESCRIPTION:Moved"]),
+        event("s", ["RECURRENCE-ID:not a time", "DESCRIPTION:Broken"]),
+      ),
+    );
+    const series = CalendarObject.parse(split.objects[0]!.ics);
+    expect(series.master?.recurring).toBe(true);
+    expect(series.exceptions.map((exception) => exception.description)).toEqual(["Moved"]);
+    expect(split.problems).toEqual([
+      { index: 2, uid: "s", component: "VEVENT", reason: "invalid", kept: false },
+    ]);
+  });
+
+  test("after a text value, a line that reads as a property iCalendar does not name is kept, and said", () => {
+    const [split] = splitCalendars(
+      calendar(event("a", ["DESCRIPTION:Join the call", "Meeting-ID:123", "PIN 1234"])),
+      { newUid: () => "x" },
+    );
+    const object = new ICAL.Component(ICAL.parse(split!.objects[0]!.ics)).getFirstSubcomponent(
+      "vevent",
+    )!;
+    expect(object.getFirstPropertyValue("meeting-id")).toBe("123");
+    // The broken line after it still goes on the text value.
+    expect(object.getFirstPropertyValue("description")).toBe("Join the call\nPIN 1234");
+    expect(split!.problems.map((problem) => problem.reason)).toEqual([
+      "joined-line",
+      "ambiguous-line",
     ]);
   });
 
@@ -254,7 +287,7 @@ describe("components that cannot be objects, and those kept all the same (D272)"
         event("u-3"),
       ),
     );
-    expect(split.objects.map((object) => object.uid)).toEqual(["u", "u-2", "u-3", "u-4", "u-5"]);
+    expect(split.objects.map((object) => object.uid)).toEqual(["u", "u-4", "u-5", "u-2", "u-3"]);
     const description = (uid: string) =>
       CalendarObject.parse(split.objects.find((object) => object.uid === uid)!.ics).master
         ?.description;
@@ -403,7 +436,10 @@ describe("a file from the device, forgiven what exporters get wrong (import D267
       "Dial-in:555 0100",
     ];
     const [split] = splitCalendars(calendar(event("a", after)), { newUid });
-    expect(split!.problems).toEqual([]);
+    // After a text value, a name iCalendar does not have may be its line: kept, and said.
+    expect(split!.problems).toEqual([
+      { index: 0, uid: "a", component: "VEVENT", reason: "ambiguous-line", kept: true },
+    ]);
     const names = new ICAL.Component(ICAL.parse(split!.objects[0]!.ics))
       .getFirstSubcomponent("vevent")!
       .getAllProperties()
