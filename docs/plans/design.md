@@ -2332,6 +2332,9 @@ own (below).
 
 ## Deferred
 
+- **`1.` and `1)` as one list** ([D207](#D207)) — the Markdown parser
+  tells a numbered list from a bulleted one, not one delimiter from the
+  other, so `1. a` then `2) b` is one list where CommonMark makes two.
 - **The React Compiler's other bail-outs** ([D194](#D194)), known when
   its check came, each in its owner's area: `accounts-context.tsx` (a
   `try` with `finally`, a counter changed in a callback),

@@ -229,6 +229,7 @@ describe("an address is never a place to look up (design D220)", () => {
     "Тверская улица",
     "Baker Street",
     "Main St",
+    "St",
     "Flat 4B",
     "",
   ])("%s reads as an address", (name) => {

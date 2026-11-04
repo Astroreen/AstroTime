@@ -175,7 +175,9 @@ export function isAddress(name: string): boolean {
   // "St" first is a saint's ("St Paul's Cathedral"); after a name, a street's.
   return (
     words.length === 0 ||
-    words.some((word, index) => STREETS.has(word) && !(index === 0 && word === "st"))
+    words.some(
+      (word, index) => STREETS.has(word) && !(index === 0 && word === "st" && words.length > 1),
+    )
   );
 }
 

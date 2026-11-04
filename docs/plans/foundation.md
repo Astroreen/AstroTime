@@ -2301,6 +2301,18 @@ task?"
 
 ## Deferred
 
+- **A creation whose upload keeps failing, listed by the server**
+  ([D38](#D38)) — it stays pending and reported, and every sync keeps its
+  token and lists the calendar again until the upload recognises the
+  object as its own; a server that stores a write and keeps answering
+  500 to it makes each sync a full listing.
+- **A second edit made while an update's server copy is found gone**
+  ([D38](#D38)) — the server's deletion wins and the href is reported in
+  `dropped`, but that second edit goes with it, not left pending as a
+  deletion in flight leaves one.
+- **A Saturday week start's week numbers** — `Formats.weekNumber` moves
+  only a Sunday-first week to its Monday, so a locale whose week starts on
+  Saturday numbers it by the ISO week before; not proven against a locale.
 - **A file uploaded while its dialog closed** ([D232](#D232)) — it stays
   in the user's `/Calendar`, attached to nothing; attaching it to the item
   if that was saved meanwhile, or removing it, waits for an upload that
