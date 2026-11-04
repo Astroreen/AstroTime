@@ -1,0 +1,59 @@
+# The self-hostable CalDAV servers of the interop run
+# (docs/plans/providers.md#D248), each pinned to a release: Dependabot's
+# docker-compose ecosystem bumps them, and a bump runs the interop run
+# (.github/workflows/interop.yml). Each listens on 127.0.0.1 only, with the
+# user `astro` (DAViCal: `admin`) and the password `secret`; servers.ts beside
+# it names the address a user would type for each.
+name: astrotime-interop
+
+services:
+  # sabre/dav with Digest, Baïkal's default.
+  baikal-digest:
+    image: ckulka/baikal:0.10.1-nginx
+    environment:
+      BAIKAL_AUTH: Digest
+      BAIKAL_PORT: 5601
+    volumes:
+      - ./baikal/setup.sh:/docker-entrypoint.d/35-astrotime-setup.sh:ro
+    ports:
+      - 127.0.0.1:5601:5601
+
+  # The same with Basic, which a reverse proxy in front of Baïkal often asks for.
+  baikal-basic:
+    image: ckulka/baikal:0.10.1-nginx
+    environment:
+      BAIKAL_AUTH: Basic
+      BAIKAL_PORT: 5602
+    volumes:
+      - ./baikal/setup.sh:/docker-entrypoint.d/35-astrotime-setup.sh:ro
+    ports:
+      - 127.0.0.1:5602:5602
+
+  # Xandikos as its documentation deploys it: authentication is its reverse
+  # proxy's (its own --htpasswd needs TLS), so it takes any credentials.
+  xandikos:
+    image: ghcr.io/jelmer/xandikos:v0.4.10
+    environment:
+      DEFAULTS: "true"
+      AUTOCREATE: "true"
+      CURRENT_USER_PRINCIPAL: /astro/
+    ports:
+      - 127.0.0.1:5603:8000
+
+  # DAViCal, on its own PostgreSQL; its user is its administrator, `admin`.
+  # Its image has no version tags: pinned by digest.
+  davical:
+    image: tuxnvape/davical-standalone:latest@sha256:dfb52fc1f05aa68ecd4d87a3f9f1f8a1a6a4c044a64ba0d1dd17c484a96f4124
+    environment:
+      DBHOST: davical-db
+      PGSQL_ROOT_PASS: davical
+      PASSDAVDB: davical
+      ADMINDAVICALPASS: secret
+    depends_on:
+      - davical-db
+    ports:
+      - 127.0.0.1:5604:80
+  davical-db:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_PASSWORD: davical
