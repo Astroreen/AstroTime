@@ -1,7 +1,8 @@
 # Server and mesh plan
 
-Status: **in progress** — the three ways to sync are decided; nothing is
-built yet. This plan owns AstroTime working with no other software: its
+Status: **in progress** — the three ways to sync are decided; AstroTime's
+own CalDAV server ([PR S2](#pr-s2--astrotimeserver)) is built, not yet in
+the image. This plan owns AstroTime working with no other software: its
 own server that every client syncs with, and a mesh of AstroTime peers
 that sync with each other. It builds on foundation's
 [D4](foundation.md#D4) (providers behind one interface),
@@ -66,6 +67,22 @@ alone needs nothing else.
     An object is stored as its client sent it, byte for byte; its ETag is a
     hash of those bytes ([D7](foundation.md#D7)). Paths:
     `/dav/principals/<user>/`, `/dav/calendars/<user>/<calendar>/<object>.ics`.
+  - How it reads the rest (PR S2): a sync token is
+    `urn:astrotime:sync:<calendar id>:<change number>`, the calendar's
+    `getctag` the same, and a calendar's id is never reused, so a token of
+    a removed calendar is unknown to its successor; `Depth: infinity` (or
+    none) is answered as 1, as SabreDAV does; `calendar-query` reads the
+    component and its time range, a date or floating time in UTC, and
+    answers a property filter's superset; `MKCALENDAR` and `MKCOL` with
+    the calendar resourcetype (RFC 5689, DAVx⁵'s) keep the name, the
+    colour and `VEVENT`/`VTODO` of the component set, and drop the rest
+    (a description, a time zone); `PROPPATCH` of anything else refuses the
+    whole update (`403`, the others `424`); a second resource with one UID
+    is `403 no-uid-conflict`; `DELETE` of a calendar removes it with its
+    objects; a body over 10 MiB is `413`; a path segment with an encoded
+    slash is `400`; a VTODO with neither `DTSTART` nor `DUE` is placed by
+    `COMPLETED` and `CREATED` (RFC 4791 §9.9); an object core cannot expand
+    matches any range, more than asked rather than hidden.
 
 - **D281. Server mode is the web image with a data directory.**
   `ASTROTIME_SERVER_DATA` (the image's volume, `/data`) turns it on; the
@@ -84,7 +101,14 @@ alone needs nothing else.
   makes the first user at start when there are none, so one `docker run`
   is enough. HTTP Basic over the reverse proxy's TLS, as Nextcloud's app
   passwords; ten failed sign-ins from one address in a minute answer
-  `429` with `Retry-After` until the minute is over. A new user gets a
+  `429` with `Retry-After` until the minute is over. Only a refused
+  password is a failure, and a success forgives none; checks still running
+  count against the limit, so guesses sent at once meet it too, while
+  requests with one password share one check (one scrypt), and a password
+  once checked is remembered by a hash of it until it changes. An unknown
+  name costs a scrypt as a known one does. The handler is told the address
+  by its caller (the image: the socket's); a caller that gives none gets
+  no limit rather than one bucket that locks every user out. A new user gets a
   calendar ("Personal") and a task list ("Tasks"). Each user sees only
   their own calendars; sharing between users is
   [deferred](#deferred).
@@ -189,7 +213,10 @@ alone needs nothing else.
   with the CalDAV provider and `syncAccount` exactly as the Radicale run
   does (`packages/sync/test/servers.test.ts`), the request budget
   included, plus a recorded Thunderbird-style and DAVx⁵-style session
-  per D279's other clients.
+  per D279's other clients. The provider and engine half runs in
+  `@astrotime/sync`'s own files, the server one more entry beside Radicale
+  (`startAstroTime`), so every test there holds for it and the packages
+  depend one way; the clients' sessions are `@astrotime/server`'s.
 
 - **D292. One mesh peer per device and mesh.** A device joins a mesh
   once; a second invite of the same mesh id is the same account. A
@@ -271,6 +298,14 @@ alone needs nothing else.
   quarantine it, instead of every connection refusing it ([D293](#D293)).
 - Limits on a mesh frame, a batch and an address list (a batch could be
   chunked); within a mesh whose peers all hold the secret ([D293](#D293)).
+- On AstroTime's server ([D280](#D280)): dead properties (a calendar's
+  description and time zone, any client's own), `calendar-query`'s
+  property filters and partial `calendar-data` (`comp`, `expand`),
+  free-busy and scheduling (RFC 6638); a ceiling on scrypt work across
+  addresses (many addresses, or a caller that gives none, each pay a
+  hash per new guess); pruning the change log, which
+  keeps a row per object name a calendar ever held (a removed one's too),
+  and answering a token older than the pruning `403 valid-sync-token`.
 
 ## PR plan
 
@@ -293,7 +328,10 @@ client comes back byte for byte.
 ### PR S3 — Server mode in the image
 
 D281, D282 (the command and the first user). After S2. `apps/proxy`
-mounts the server under `/dav/` when `ASTROTIME_SERVER_DATA` is set, the
+mounts the server under `/dav/` (and `/.well-known/caldav`) when
+`ASTROTIME_SERVER_DATA` is set (a `401` to the page must not bring up
+the browser's own password dialog, as the proxy's never does, while
+Thunderbird and DAVx⁵ need its `WWW-Authenticate`), the
 image's volume, the preset to its own origin, README's self-hosting
 section, an e2e run where the web app signs in to its own server.
 

@@ -11,10 +11,11 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { connectCalDav, saveAccount, syncAll } from "../src/index.ts";
 import { recording, type Recorded } from "./recorder.ts";
-import { externalServer, startRadicale, type CalDavServer } from "./servers.ts";
+import { externalServer, startAstroTime, startRadicale, type CalDavServer } from "./servers.ts";
 
 const servers: { name: string; start: () => Promise<CalDavServer> }[] = [
   { name: "Radicale", start: startRadicale },
+  { name: "AstroTime", start: startAstroTime },
 ];
 const nextcloud = externalServer("nextcloud");
 if (nextcloud) servers.push({ name: "Nextcloud", start: async () => nextcloud });

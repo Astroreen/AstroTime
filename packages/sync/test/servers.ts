@@ -1,13 +1,18 @@
 // Real CalDAV servers for the integration tests (AGENTS.md: protocol code is
 // tested against a real CalDAV server). Radicale runs for every test run: the
 // dev shell and CI provide its binary, and the test waits for its "ready" log
-// line, never for time. Nextcloud runs in CI's nightly job, which starts it
+// line, never for time. AstroTime's own server (docs/plans/server.md#D291)
+// runs in the test's process on an in-memory database. Nextcloud runs in CI's nightly job, which starts it
 // and passes its address in ASTROTIME_NEXTCLOUD_URL.
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { ServerDatabase, serverHandler } from "@astrotime/server";
+import { nodeDriver } from "@astrotime/storage/node";
 
 export interface CalDavServer {
   readonly name: string;
@@ -94,6 +99,59 @@ export async function startRadicale(): Promise<CalDavServer> {
       const exited = new Promise((resolve) => child.once("exit", resolve));
       child.kill();
       await exited;
+    },
+  };
+}
+
+/** AstroTime's own server (`@astrotime/server`) on a port of its own, one user in it. */
+export async function startAstroTime(): Promise<CalDavServer> {
+  const username = "astro";
+  const password = "secret";
+  const database = await ServerDatabase.open(nodeDriver());
+  await database.addUser(username, password);
+  const handler = serverHandler({ database });
+  const server = createHttpServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers))
+      if (typeof value === "string") headers.set(name, value);
+    const response = await handler(
+      new Request(`http://${req.headers.host}${req.url}`, {
+        method: req.method!,
+        headers,
+        ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
+      }),
+      { address: req.socket.remoteAddress ?? "" },
+    );
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+  const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  return {
+    name: "AstroTime",
+    url,
+    username,
+    password,
+    async mkcalendar(name, components = ["VEVENT", "VTODO"]) {
+      const calendarUrl = `${url}dav/calendars/${username}/${name}/`;
+      const response = await fetch(calendarUrl, {
+        method: "MKCALENDAR",
+        headers: { Authorization: authorization, "Content-Type": "application/xml" },
+        body: `<?xml version="1.0"?><c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:ic="http://apple.com/ns/ical/"><d:set><d:prop><d:displayname>${name}</d:displayname><ic:calendar-color>#0082c9ff</ic:calendar-color><c:supported-calendar-component-set>${components.map((c) => `<c:comp name="${c}"/>`).join("")}</c:supported-calendar-component-set></d:prop></d:set></c:mkcalendar>`,
+      });
+      if (response.status !== 201)
+        throw new Error(`MKCALENDAR ${calendarUrl}: ${response.status} ${await response.text()}`);
+      return calendarUrl;
+    },
+    async deleteCalendar(calendarUrl) {
+      await fetch(calendarUrl, { method: "DELETE", headers: { Authorization: authorization } });
+    },
+    async stop() {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
     },
   };
 }
