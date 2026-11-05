@@ -36,6 +36,7 @@
     "@astrotime/storage": "workspace:*"
   },
   "devDependencies": {
+    "@astrotime/server": "workspace:*",
     "@types/node": "catalog:"
   }
 }

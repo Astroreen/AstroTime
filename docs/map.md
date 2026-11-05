@@ -251,16 +251,25 @@ When you add a package, app or module, add its line here in the same PR.
     held removal; `syncs`, whether an account syncs with a server.
     → `plans/providers.md#D263`
   - `test/budget.test.ts` — the requests each action costs a server, held
-    to a budget on Radicale and Nextcloud; `test/recorder.ts` records them
+    to a budget on Radicale, AstroTime's own server and Nextcloud; `test/recorder.ts` records them
     for any `HttpClient`. → `plans/foundation.md#D126`
   - `test/interop/` — the interop run's servers in containers (Baïkal,
     Xandikos, DAViCal, Davis, Stalwart, Cyrus: `compose.yaml`), one chosen
     by `ASTROTIME_INTEROP` (`.github/workflows/interop.yml`). → `plans/providers.md#D248`,
     `plans/providers.md#D261`
   - `test/servers.test.ts` — the provider and the engine against Radicale
-    (every run) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
+    and AstroTime's own server (every run, `startAstroTime` in
+    `test/servers.ts`) and Nextcloud (nightly, `ASTROTIME_NEXTCLOUD_*`), with a
     Login Flow v2 approved in Chromium on Nextcloud's own pages, and on
     Nextcloud a second user made for the run with calendars shared to it.
+
+- `packages/server` (`@astrotime/server`) — AstroTime's own CalDAV server,
+  Node only: `serverHandler`, a `(Request) => Promise<Response>` like
+  `proxyHandler`, serving discovery, PROPFIND, the three REPORTs, writes
+  with ETags, MKCALENDAR and PROPPATCH under `/dav/`; `ServerDatabase`, its
+  schema on a `SqlDriver` (users with scrypt hashes, calendars, objects
+  byte for byte, the change log its sync tokens count). → `plans/server.md#D280`,
+  `plans/server.md#D282`
 
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
