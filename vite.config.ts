@@ -103,6 +103,7 @@ export default defineConfig({
           "packages/oauth/src/**",
           "packages/google/src/**",
           "packages/microsoft/src/**",
+          "packages/mesh/src/**",
         ],
         rules: {
           "eslint/no-restricted-imports": [
