@@ -225,14 +225,25 @@ export class Session {
         this.sending = await sealingKey(this.mesh.secret, this.nonce, theirNonce);
         if (this.gone) return;
         this.state = "open";
-        return await this.events.established(this);
+        return await this.own(() => this.events.established(this));
       }
       if (this.state !== "open" || !this.receiving) return this.close("refused");
       const message = parseMessage(await open(this.receiving, this.received++, frame.data));
-      await this.events.message(this, message);
+      await this.own(() => this.events.message(this, message));
+    } catch (error) {
+      // A frame malformed, or sealed without this key and count.
+      this.events.error(error);
+      this.close("refused");
+    }
+  }
+
+  /** Runs this side's handling of a frame: what it throws (a store) refuses nobody. */
+  private async own(work: () => Promise<void>): Promise<void> {
+    try {
+      await work();
     } catch (error) {
       this.events.error(error);
-      this.close(error instanceof ClockAheadError ? "clock" : "refused");
+      this.close(error instanceof ClockAheadError ? "clock" : undefined);
     }
   }
 

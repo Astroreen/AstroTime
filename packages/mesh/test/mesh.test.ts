@@ -9,6 +9,7 @@ import {
   type Item,
   itemKey,
   MeshNode,
+  type MeshTransaction,
   newMesh,
   type Version,
 } from "../src/index.ts";
@@ -624,4 +625,54 @@ test("a sealed hello that comes while the proof before it is still being checked
   expect(errors).toEqual([]);
   expect(refusals).toEqual([]);
   expect(c.peers()).toEqual(["peer-z"]);
+});
+
+test("a store that throws is an error of this side, not a refusal of the other", async () => {
+  class FailingStore extends MemoryMeshStore {
+    failing = false;
+    override transaction<T>(work: (tx: MeshTransaction) => Promise<T>): Promise<T> {
+      if (this.failing) return Promise.reject(new Error("disk full"));
+      return super.transaction(work);
+    }
+  }
+  const network = new MemoryNetwork();
+  const timers = new ManualTimers();
+  const mesh = newMesh();
+  const store = new FailingStore();
+  const refusals: string[] = [];
+  const errors: string[] = [];
+  const c = new MeshNode({
+    peer: "peer-c",
+    mesh,
+    store: new MemoryMeshStore(),
+    transport: network.transport("peer-c"),
+    timers,
+    onRefused: (reason) => refusals.push(`c ${reason}`),
+  });
+  await c.start();
+  network.listen("mem://peer-c", "peer-c", (connection) => c.accept(connection));
+  store.failing = true;
+  await store.addAddresses(["mem://peer-c"]);
+  const a = new MeshNode({
+    peer: "peer-a",
+    mesh,
+    store,
+    transport: network.transport("peer-a"),
+    timers,
+    onRefused: (reason) => refusals.push(`a ${reason}`),
+    onError: (error) => errors.push((error as Error).message),
+  });
+  await a.start();
+  await network.quiet();
+
+  expect(errors).toContain("disk full");
+  expect(refusals).toEqual([]);
+  // Closed before a batch: again after a wait, and then it syncs.
+  expect(timers.size).toBe(1);
+  store.failing = false;
+  await c.change(lunch, event("Lunch"));
+  timers.fire();
+  await network.quiet();
+  expect(a.peers()).toEqual(["peer-c"]);
+  expect(store.versions().map(({ body }) => body)).toEqual([event("Lunch")]);
 });

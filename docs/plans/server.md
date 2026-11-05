@@ -229,6 +229,12 @@ alone needs nothing else.
     when every earlier one is covered; one that came out of order (through
     two relays) is counted at the next anti-entropy, whose answer resends
     it. So a vector never claims a version its peer lacks.
+    The cost is accepted: a batch carries only current versions, so gaps
+    in an author's sequence are normal there and close only through the
+    sender's vector, and a push that follows a gap waits for the next
+    anti-entropy to be counted; until then a hello reports less than this
+    replica holds, and the other side resends versions it already has.
+    Convergent, and bounded by one connection's pushes.
   - **Only what changed something is passed on**: a version that won, or
     one newly counted. A duplicate, or one older than what a peer has
     and already counted, stops there, so pushes end in a mesh with cycles.
