@@ -27,7 +27,16 @@ export function newPeerId(): string {
   return base64url(randomBytes(16));
 }
 
+/**
+ * An invite as text; throws on an address it could not carry (with `@`,
+ * `,` or white space in it, which `parseInvite` would split).
+ */
 export function formatInvite({ mesh, addresses }: Invite): string {
+  for (const address of addresses) {
+    if (address === "" || /[@,\s]/.test(address)) {
+      throw new RangeError(`An invite cannot carry the address ${JSON.stringify(address)}`);
+    }
+  }
   const text = `${SCHEME}${mesh.id}.${base64url(mesh.secret)}`;
   return addresses.length > 0 ? `${text}@${addresses.join(",")}` : text;
 }
@@ -43,7 +52,7 @@ export function parseInvite(text: string): Invite | undefined {
   const secret = fromBase64url(key);
   if (secret?.length !== 32) return undefined;
   const addresses = at === -1 ? [] : rest.slice(at + 1).split(",");
-  if (addresses.some((address) => address === "" || /\s/.test(address))) return undefined;
+  if (addresses.some((address) => address === "" || /[@\s]/.test(address))) return undefined;
   return { mesh: { id, secret }, addresses };
 }
 

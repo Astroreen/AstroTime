@@ -502,7 +502,7 @@ test("a transport that hands frames over before the last is handled: the handsha
 
 describe("a listener that drops connections", () => {
   /** C's node behind a listener that closes each connection at its `drop`th frame. */
-  async function dropping(drop: number) {
+  async function dropping(drop: number, handled = false) {
     const network = new MemoryNetwork();
     const timers = new ManualTimers();
     const mesh = newMesh();
@@ -513,6 +513,7 @@ describe("a listener that drops connections", () => {
       mesh,
       store: new MemoryMeshStore(),
       transport: network.transport("peer-c"),
+      listening: ["mem://peer-c"],
       timers,
     });
     await c.start();
@@ -521,10 +522,12 @@ describe("a listener that drops connections", () => {
       const handlers = c.accept(connection);
       let frames = 0;
       return {
-        message: (text) => {
+        message: async (text) => {
           frames += 1;
-          if (frames === drop) return connection.close();
-          return handlers.message(text);
+          if (frames === drop && !handled) return connection.close();
+          await handlers.message(text);
+          // Its answer (a batch to a hello) is sent before the close.
+          if (frames === drop) connection.close();
         },
         closed: () => handlers.closed(),
       };
@@ -560,6 +563,18 @@ describe("a listener that drops connections", () => {
     }
     expect(accepted()).toBe(4);
     expect(refusals).toEqual([]);
+    expect(timers.waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+  });
+
+  test("a peer that drops right after its batch is redialled with growing waits too", async () => {
+    // C answers A's hello with its batch, then drops: a crash loop.
+    const { network, timers, accepted } = await dropping(3, true);
+    for (let round = 0; round < 3; round += 1) {
+      timers.fire();
+      await network.quiet();
+    }
+    expect(accepted()).toBe(4);
+    expect(timers.waits).toEqual([1_000, 2_000, 4_000, 8_000]);
   });
 });
 
@@ -675,4 +690,24 @@ test("a store that throws is an error of this side, not a refusal of the other",
   await network.quiet();
   expect(a.peers()).toEqual(["peer-c"]);
   expect(store.versions().map(({ body }) => body)).toEqual([event("Lunch")]);
+});
+
+test("a refusal frame after the handshake is not believed: no reason is reported", async () => {
+  const mesh = new Harness();
+  mesh.add("peer-c", { listens: true, invitedBy: [] });
+  mesh.add("peer-a", { listens: false, invitedBy: ["peer-c"] });
+  await mesh.up("peer-c");
+  await mesh.up("peer-a");
+  await mesh.settle();
+  let injected = false;
+  mesh.network.tap = (frame) => {
+    if (injected || frame.from !== "peer-a" || !frame.text.includes('"sealed"')) return frame.text;
+    injected = true;
+    return JSON.stringify({ type: "refusal", reason: "clock" });
+  };
+  const edit = await mesh.node("peer-a").change(lunch, event("Lunch"));
+  await mesh.settle();
+  expect(injected).toBe(true);
+  expect(mesh.refusals).toEqual([]);
+  expect(mesh.versions("peer-c")).toEqual([edit]);
 });

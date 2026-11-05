@@ -137,6 +137,18 @@ describe("invite", () => {
     expect(parseInvite(formatInvite({ mesh, addresses: [] }))).toEqual({ mesh, addresses: [] });
   });
 
+  test("will not carry an address that would not come back as one", () => {
+    const mesh = newMesh();
+    for (const address of [
+      "wss://me@cal.example/mesh",
+      "wss://cal.example/mesh?a=1,2",
+      "ws://a b",
+      "",
+    ]) {
+      expect(() => formatInvite({ mesh, addresses: [address] }), address).toThrow(RangeError);
+    }
+  });
+
   test("refuses what is not one", () => {
     const { id } = newMesh();
     const secret = "A".repeat(43);

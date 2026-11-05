@@ -32,7 +32,9 @@ export type Refusal =
   /** Another mesh, a wrong proof, or a frame out of place or that does not open. */
   | "refused"
   /** The two wall clocks differ by more than `MAX_DRIFT`, or a version came stamped further ahead. */
-  | "clock";
+  | "clock"
+  /** The other side sent a version stamped more than `MAX_DRIFT` ahead of this clock. */
+  | "ahead";
 
 /** How far two peers' wall clocks may differ, as Kerberos and TOTP bound drift (D284). */
 export const MAX_DRIFT = 5 * 60_000;
@@ -72,8 +74,8 @@ export class Session {
   private received = 0;
   private outbox: Promise<void> = Promise.resolve();
   private inbox: Promise<void> = Promise.resolve();
-  /** The other side answered this side's hello with its batch (D285). */
-  answered = false;
+  /** When the other side answered this side's hello with its batch (D285). */
+  answeredAt: number | undefined;
   private state: "handshake" | "open" | "closed" = "handshake";
   private refusal: Refusal | undefined;
   private readonly me: string;
@@ -206,8 +208,9 @@ export class Session {
         return;
       }
       if (frame.type === "refusal") {
-        // Said back by this side, it would only echo: the other side's reason is kept.
-        this.refusal ??= frame.reason;
+        // In the clear, so believed only in the handshake: after it, anyone on
+        // the path could send one, and it closes the connection with no reason.
+        if (this.state === "handshake") this.refusal ??= frame.reason;
         return this.close();
       }
       if (frame.type === "proof") {
@@ -243,7 +246,7 @@ export class Session {
       await work();
     } catch (error) {
       this.events.error(error);
-      this.close(error instanceof ClockAheadError ? "clock" : undefined);
+      this.close(error instanceof ClockAheadError ? "ahead" : undefined);
     }
   }
 

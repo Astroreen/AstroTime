@@ -41,9 +41,11 @@ export interface MeshNodeOptions {
   /**
    * A connection this side refused, or the other in the handshake: `clock`
    * when the two wall clocks are more than five minutes apart, which the UI
-   * says ("this device's clock is off", D284); `refused` for a wrong secret.
+   * says ("this device's clock is off", D284); `ahead` when the other side
+   * sent a version stamped more than five minutes ahead (its clock, or the
+   * clock of the peer that made it); `refused` for a wrong secret.
    */
-  readonly onRefused?: (reason: "clock" | "refused", address: string | undefined) => void;
+  readonly onRefused?: (reason: "clock" | "refused" | "ahead", address: string | undefined) => void;
   /** A connection that failed: a frame that did not open, a store that threw. */
   readonly onError?: (error: unknown) => void;
 }
@@ -222,9 +224,7 @@ export class MeshNode {
     );
     if (vector) {
       session.learn(vector);
-      // The connection served: its address's backoff starts over.
-      session.answered = true;
-      if (session.address !== undefined) this.dial(session.address).failures = 0;
+      session.answeredAt ??= this.now();
     }
     await this.relay(fresh, session);
   }
@@ -307,17 +307,21 @@ export class MeshNode {
       this.sessions.delete(session.peer);
       this.options.onPeers?.(this.peers());
     }
-    if (refusal === "clock" || refusal === "refused")
+    if (refusal === "clock" || refusal === "refused" || refusal === "ahead")
       this.options.onRefused?.(refusal, session.address);
     if (session.address !== undefined) {
       const dial = this.dial(session.address);
       dial.busy = false;
-      // Refused, or closed before it served a batch (a drop in the handshake, a
-      // peer that crashes once connected): again only after a wait. Closed after
-      // a batch (a restart): again at once.
+      // Always again after a wait, so a peer that drops each connection is never
+      // dialled in a loop. The wait starts over only after a connection that
+      // served a batch and stayed up as long as the longest wait.
+      const served = session.answeredAt;
+      if (!refusal && served !== undefined && this.now() - served >= MAX_BACKOFF) {
+        dial.failures = 0;
+      }
       const elsewhere = session.peer !== undefined && this.sessions.has(session.peer);
       if (refusal === "self") this.selves.add(session.address);
-      else if ((refusal || !session.answered) && !elsewhere) this.retry(session.address, dial);
+      else if (!elsewhere) this.retry(session.address, dial);
     }
     this.dialAll();
   }

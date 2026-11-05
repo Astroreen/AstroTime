@@ -260,14 +260,16 @@ alone needs nothing else.
     reaches the other side in the batch or as a push after it.
   - **Two connections with one peer** (two listeners dialling each other):
     both keep the one dialled by the smaller peer id.
-  - **Redial**: a dial that fails, a connection refused (a wrong secret,
-    a clock off, a frame that does not open), or one that closed before
-    the other side answered its hello with a batch (a drop, a peer that
-    crashes once connected) waits 1 s, doubled per failure up to a
-    minute; the count starts over with a batch received, and a
-    connection that closes after one is redialled at once. Only a
-    `refusal` frame, sent or received, is a refusal (`onRefused`): a bare
-    close in the handshake is a drop. An address that answers with this
+  - **Redial**: every dial that fails and every connection that closes
+    is dialled again after a wait: 1 s, doubled per failure up to a
+    minute. The count starts over only after a connection that served a
+    batch and stayed up a minute, so a peer that drops each connection
+    (crashing once connected, even after its batch) is never dialled in
+    a loop. Only a `refusal` frame, sent or received in the handshake, is
+    a refusal (`onRefused`): it is in the clear, so one after the
+    handshake closes the connection with no reason, and a bare close in
+    the handshake is a drop. A version stamped ahead closes with `ahead`,
+    not `clock`: the clock at fault may be the other peer's. An address that answers with this
     very peer is never dialled again.
   - **Keys**: the secret is only HKDF's root; the proofs' HMAC key and
     each direction's AES-GCM key are derived from it with labels of their
@@ -302,6 +304,10 @@ alone needs nothing else.
 - Finding peers on the local network (mDNS) instead of typing an address.
 - A version stamped ahead in a peer's store: cap what it stamps, or
   quarantine it, instead of every connection refusing it ([D293](#D293)).
+- Bounding a vector a peer sends: one inflated entry (a bug, a backup
+  restored with its peer id) makes a replica skip that author's real
+  versions for good. Accepted for now, as every peer holds the secret
+  ([D293](#D293)).
 - Limits on a mesh frame, a batch and an address list (a batch could be
   chunked); within a mesh whose peers all hold the secret ([D293](#D293)).
 - On AstroTime's server ([D280](#D280)): dead properties (a calendar's

@@ -235,8 +235,11 @@ export class MemoryNetwork {
 /** Timers that run when a test says so: `fire` runs every one waiting now. */
 export class ManualTimers implements Timers {
   private readonly waiting = new Set<() => void>();
+  /** Every wait asked for, in order. */
+  readonly waits: number[] = [];
 
-  after(_ms: number, run: () => void): () => void {
+  after(ms: number, run: () => void): () => void {
+    this.waits.push(ms);
     this.waiting.add(run);
     return () => this.waiting.delete(run);
   }
