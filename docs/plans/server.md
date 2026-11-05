@@ -309,7 +309,9 @@ alone needs nothing else.
   versions for good. Accepted for now, as every peer holds the secret
   ([D293](#D293)).
 - Limits on a mesh frame, a batch and an address list (a batch could be
-  chunked); within a mesh whose peers all hold the secret ([D293](#D293)).
+  chunked, a gossiped address checked as a URL); within a mesh whose
+  peers all hold the secret ([D293](#D293)). Before the handshake a frame
+  over 1 KiB is already refused unread.
 - On AstroTime's server ([D280](#D280)): dead properties (a calendar's
   description and time zone, any client's own), `calendar-query`'s
   property filters and partial `calendar-data` (`comp`, `expand`),

@@ -711,3 +711,29 @@ test("a refusal frame after the handshake is not believed: no reason is reported
   expect(mesh.refusals).toEqual([]);
   expect(mesh.versions("peer-c")).toEqual([edit]);
 });
+
+test("before the handshake, an oversized frame is refused unread", async () => {
+  const network = new MemoryNetwork();
+  const mesh = newMesh();
+  const refusals: string[] = [];
+  const c = new MeshNode({
+    peer: "peer-c",
+    mesh,
+    store: new MemoryMeshStore(),
+    transport: network.transport("peer-c"),
+    timers: new ManualTimers(),
+    onRefused: (reason) => refusals.push(reason),
+  });
+  await c.start();
+  network.listen("mem://peer-c", "peer-c", (connection) => c.accept(connection));
+  network.transport("peer-z").dial("mem://peer-c", {
+    failed: () => undefined,
+    opened: (connection) => {
+      connection.send(JSON.stringify({ type: "challenge", padding: "x".repeat(2048) }));
+      return { message: () => undefined, closed: () => undefined };
+    },
+  });
+  await network.quiet();
+  expect(refusals).toEqual(["refused"]);
+  expect(network.connected("peer-c", "peer-z")).toBe(0);
+});

@@ -182,10 +182,10 @@ export class MeshNode {
   private async message(session: Session, message: Message): Promise<void> {
     switch (message.type) {
       case "hello": {
-        if (session.live) return;
         // The batch is queued under the lock, before any push after its snapshot;
-        // its sealing is not waited for there.
+        // its sealing is not waited for there. A second hello gets no second batch.
         const [sent] = await this.exclusive(async () => {
+          if (session.live) return [Promise.resolve()] as const;
           const [versions, vector] = await this.options.store.transaction(
             async (tx) => [await tx.notCoveredBy(message.vector), await tx.vector()] as const,
           );

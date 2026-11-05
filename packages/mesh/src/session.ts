@@ -31,10 +31,13 @@ export type Refusal =
   | "self"
   /** Another mesh, a wrong proof, or a frame out of place or that does not open. */
   | "refused"
-  /** The two wall clocks differ by more than `MAX_DRIFT`, or a version came stamped further ahead. */
+  /** The two wall clocks differ by more than `MAX_DRIFT`. */
   | "clock"
   /** The other side sent a version stamped more than `MAX_DRIFT` ahead of this clock. */
   | "ahead";
+
+/** The longest frame read before the handshake is done: a challenge, a proof, a refusal. */
+const HANDSHAKE_FRAME = 1024;
 
 /** How far two peers' wall clocks may differ, as Kerberos and TOTP bound drift (D284). */
 export const MAX_DRIFT = 5 * 60_000;
@@ -184,6 +187,8 @@ export class Session {
   private async receive(text: string): Promise<void> {
     if (this.gone) return;
     try {
+      // Before the handshake proves anything, a frame is small: none is parsed past that.
+      if (!this.established && text.length > HANDSHAKE_FRAME) return this.close("refused");
       const frame = parseFrame(text);
       if (frame.type === "challenge") {
         if (
