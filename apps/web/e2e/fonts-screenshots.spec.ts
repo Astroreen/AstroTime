@@ -111,3 +111,13 @@ for (const textSize of [85, 130]) {
     });
   }
 }
+
+test("the widest fonts at 130 % on a phone", async ({ browser }) => {
+  for (const font of ["noto-sans", "pt-sans", "nunito"] as const) {
+    for (const view of ["week", "month", "agenda"] as const) {
+      const page = await open(browser, { theme: "light", size: PHONE, font, textSize: 130 }, view);
+      await shot(page, `wide-glyphs-${font}-130-${view}-phone`);
+      await page.context().close();
+    }
+  }
+});
