@@ -75,14 +75,25 @@ change the user's events and tasks.
   (the server when it answers, else Whisper on this device). Off, there is
   no microphone button anywhere: a phone's keyboard has its own dictation,
   and its words go through `parseQuick` like typed ones. On, the button
-  stands in quick create, beside "Save".
+  stands in quick create, beside "Save". Recording needs the microphone,
+  which [foundation D110](foundation.md#D110)'s `Permissions-Policy` turned
+  off: it becomes `microphone=(self)`, the page's own and no frame's, and
+  the browser still asks the user the first time.
 - **D303. Whisper on this device.** A Whisper model run in the page
   (WASM, WebGPU where there is one): tiny (about 40 MB), base (about 75 MB,
   the default) or small (about 250 MB), downloaded once, only after the user
   agrees in the setting (its size said), kept on the device and then used
   offline. The language spoken is detected, with the app's as the hint. It
   loads in a chunk of its own, never on the first load
-  ([foundation D145](foundation.md#D145)).
+  ([foundation D145](foundation.md#D145)). The runtime (its scripts and
+  WebAssembly) is the app's own files, under the `wasm-unsafe-eval`
+  [foundation D110](foundation.md#D110) already allows. The model is not:
+  it comes from Hugging Face, a pinned revision whose files' SHA-256 the
+  app knows, the one download from another origin, and only once the user
+  agreed to it, as the place search names Photon
+  ([foundation D178](foundation.md#D178)). On the web it is fetched through the
+  proxy's `/models/` route, which reaches that one host alone; the desktop
+  and Android fetch it through the platform's HTTP.
 - **D304. A server: any OpenAI-compatible one.** One interface,
   `POST /v1/audio/transcriptions`, as whisper.cpp's server, speaches
   (faster-whisper), LocalAI, OpenAI and Groq serve it. The setting takes
@@ -91,7 +102,12 @@ change the user's events and tasks.
   are, in the platform's secrets ([foundation D89](foundation.md#D89),
   [android D64](android.md#D64), [desktop D74](desktop.md#D74)), never in
   the settings. Audio goes only to the server the user entered:
-  "Automatic" means that server or this device, never another.
+  "Automatic" means that server or this device, never another. The
+  request goes through the platform's HTTP as CalDAV's does: on the web
+  through the proxy ([foundation D39](foundation.md#D39)), the speech
+  server's origin on its allowlist and only its `/v1/audio/transcriptions`
+  and `/v1/models` passed, so the page's `connect-src 'self'` stays; on the
+  desktop and Android from outside the page.
   AstroTime's own server
   ([server D281](server.md#D281)) can serve the same endpoint; it is not
   required to.
@@ -123,10 +139,27 @@ change the user's events and tasks.
   the calendar shows a change at once and sync sends it. An attachment is
   taken by a path on this computer. A browser or a phone cannot be one: a
   page opens no port and its database is the browser's own.
+  - **Through the window's store.** The database is the utility
+    process's and its one page's ([desktop D73](desktop.md#D73)): nobody
+    else is told of a commit. So the main process only listens; each tool
+    call goes over IPC to the window, which runs it against its own store,
+    as a click there would, and its answer comes back. The calendar on
+    screen and sync both see the change. With no window open a call is
+    answered that AstroTime must be open (a hidden or minimised window
+    serves).
+  - **Who may call.** It binds `127.0.0.1` alone. A request whose `Host`
+    is not `127.0.0.1:<port>` or `localhost:<port>` is refused (DNS
+    rebinding), and so is any request with an `Origin` (a page in a browser
+    calling localhost; an MCP client sends none). The token is 32 random
+    bytes in `Authorization: Bearer`, compared in constant time, kept with
+    the credentials through `safeStorage` ([desktop D74](desktop.md#D74)),
+    and "New token" in the setting replaces it at once.
 - **D309. Then on AstroTime's server.** In server mode
   ([server D281](server.md#D281)) the server serves MCP at `/mcp` over the
   server's own data, no CalDAV round trip, for a token a user makes there:
-  read only, or read and write. An attachment comes as its content.
+  read only, or read and write. An attachment comes as its content. It keeps
+  [D311](#D311)'s log in its database, per user, and its `undo` tool takes
+  one entry under the same rule.
 - **D310. Any assistant, not only Claude.** Settings → Assistants shows the
   address and token and copies a ready configuration for Claude (Desktop and
   Code), Cursor, VS Code (Copilot), Codex, Gemini CLI, LM Studio, and any
@@ -136,7 +169,14 @@ change the user's events and tasks.
   Every change through MCP goes into a log, Settings → Assistants →
   "Changed by an assistant", each with its item, its time and "Undo", which
   puts the item back as it was (a deleted one made again with all its
-  properties).
+  properties, [foundation D7](foundation.md#D7)).
+  - **Where**: in the store, on this device; it does not sync (an item's
+    history is not iCalendar's), and it keeps the latest 500 changes.
+  - **Only while nothing changed since.** An entry holds the item before
+    and after. "Undo" is offered while the item is still what the assistant
+    left (the same raw object: no edit by the user, no sync bringing
+    another's); once it changed, the entry says "Changed since" and offers
+    to open the item instead. Undo never overwrites a later edit.
 
 ## Deferred
 
@@ -154,7 +194,7 @@ change the user's events and tasks.
 
 Each PR is based on `main`.
 
-### PR A1 — This plan
+### PR AS1 — This plan
 
 The decisions above, design's D294–D299, the grilling's record, the
 glossary's words, the library's routes.
@@ -162,17 +202,30 @@ glossary's words, the library's routes.
 Done when: `scripts/docs.test.ts` passes with the plan reachable from the
 trailhead.
 
-### PR A2 — `parseQuick`
+### PR AS2 — `parseQuick`
 
 D300. The parser, the English and Russian packs, `chrono-node`; recorded
-lines in both languages as tests. After design's quick create (PR D2) it is
+lines in both languages as tests. After design's quick create (PR L2) it is
 wired into it: D301.
 
-Done when: the tests read «завтра в 13 обед с Машей в Кофемании 1 час» and
-"call mom friday 5pm" into their pieces and spans, and quick create marks
-them as they are typed (e2e, both languages).
+Done when: with `now` Thursday 2026-11-05 10:00 in `Europe/Moscow`, the
+tests read:
 
-### PR A3 — Voice
+- «завтра в 13 обед с Машей в Кофемании 1 час» as an event, 2026-11-06
+  13:00–14:00, place «Кофемании», title «обед с Машей», with the spans of
+  «завтра в 13», «в Кофемании» and «1 час»;
+- "call mom friday 5pm" as a task ("call" is a task word), 2026-11-06
+  17:00, no length, title "call mom";
+- «завтра купить хлеб» as an all-day task on 2026-11-06;
+- «отпуск с 10 по 14 декабря» as an all-day event 2026-12-10 to 14
+  (`DTEND` the 15th);
+- «завтра» at 23:30 as the next day in the user's zone, not UTC's, and a
+  time that a DST change skips («в 2:30» on a spring-forward day) as the
+  zone resolves it, as the editor does;
+
+and quick create marks them as they are typed (e2e, both languages).
+
+### PR AS3 — Voice
 
 D302–D306. Settings → Voice, Whisper on this device, the server, Android's
 recogniser.
@@ -181,7 +234,7 @@ Done when: a recorded clip through each recogniser (a fake server speaking
 the OpenAI interface in tests) opens quick create filled; with Voice off no
 microphone button is in the accessibility tree.
 
-### PR A4 — MCP in the desktop app
+### PR AS4 — MCP in the desktop app
 
 D307, D308, D310, D311.
 
@@ -189,7 +242,7 @@ Done when: an MCP client in tests lists, creates, changes and deletes an
 item through the desktop app's endpoint, the store holds each change, sync
 sends it, and "Undo" in the log puts it back.
 
-### PR A5 — MCP on AstroTime's server
+### PR AS5 — MCP on AstroTime's server
 
 D309. After server's PR S3.
 

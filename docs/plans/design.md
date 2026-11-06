@@ -2823,7 +2823,22 @@ Round 6 ([the grilling of 2026-11-06](../grilling/2026-11-06-assistant.md))
 is built in four PRs, each from `main`, with screenshots before and after
 in both themes:
 
-- **PR D1** — the font and the text size (D294, D295).
-- **PR D2** — quick create and the lighter editor (D296, D297).
-- **PR D3** — the pictures drawn again, and the new subjects (D298).
-- **PR D4** — parallax without scroll timelines, and in the cards (D299).
+- **PR L1** — the font and the text size (D294, D295). Done when: each
+  font is chosen in Settings and the app's text is drawn in it (the
+  computed `font-family` of a card, a heading and a button), none is
+  fetched before it is chosen, and 85 % and 130 % keep every view free of
+  clipped text on a phone and a wide screen (screenshots, both themes).
+- **PR L2** — quick create and the lighter editor (D296, D297). Done when:
+  e2e makes an event and a task through quick create on a phone and a wide
+  screen, dragging the sheet up opens the editor with its title, time,
+  place and calendar carried over, Enter saves and Escape closes, and
+  `editing.spec.ts` passes with D205's measures (screenshots before and
+  after).
+- **PR L3** — the pictures drawn again, and the new subjects (D298). Done
+  when: every illustration and banner is rendered at its sizes and the gap
+  check passes on each, and the screenshots before and after sit side by
+  side in the PR.
+- **PR L4** — parallax without scroll timelines, and in the cards (D299).
+  Done when: in Firefox (no scroll timelines) a banner's picture moves
+  against the list as it scrolls, a card's does too, and with reduced
+  motion neither does (e2e reading `transform`).

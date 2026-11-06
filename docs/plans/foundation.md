@@ -553,8 +553,11 @@ Decided while building PR 7.
   The page also gets `Referrer-Policy: same-origin` (not `no-referrer`,
   which would send `Origin: null` with the app's own PROPFINDs, and the
   proxy refuses those), `Cross-Origin-Opener-Policy: same-origin` and a
-  `Permissions-Policy` that turns off the camera, microphone, location,
-  payments, USB, serial, HID and screen capture; `X-Frame-Options` is left
+  `Permissions-Policy` that turns off the camera, location, payments, USB,
+  serial, HID and screen capture, and allows the microphone to the page
+  alone (`microphone=(self)`, for voice input,
+  [assistant D302](assistant.md#D302); _until then_ it was off too);
+  `X-Frame-Options` is left
   out, since every supported browser reads `frame-ancestors`. Proxied
   answers get `default-src 'none'; sandbox`, so a page among them, opened
   by URL on the app's origin, runs nothing; `fetch` ignores it. The dev
