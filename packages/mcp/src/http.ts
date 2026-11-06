@@ -20,8 +20,12 @@ export interface EndpointOptions {
   readonly port: () => number;
   /** The token a call must carry; `null` refuses every call. */
   readonly token: () => string | null;
-  /** Runs a tool, its input checked by the SDK against the tool's schema. */
-  readonly call: (name: ToolName, args: unknown) => Promise<ToolAnswer>;
+  /**
+   * Runs a tool, its input checked by the SDK against the tool's schema.
+   * `signal` aborts when the client goes before the answer: a call waiting
+   * elsewhere (the desktop's window) is let go then.
+   */
+  readonly call: (name: ToolName, args: unknown, signal: AbortSignal) => Promise<ToolAnswer>;
   readonly version?: string;
 }
 
@@ -58,7 +62,9 @@ function resultOf(answer: ToolAnswer): CallToolResult {
 
 /** The endpoint: every request checked, then served by the MCP SDK, one server per request. */
 export function mcpEndpoint(options: EndpointOptions): (request: Request) => Promise<Response> {
-  const handler = createMcpHandler(() => {
+  const handler = createMcpHandler(({ requestInfo }) => {
+    // One server per request: its calls end with it.
+    const signal = requestInfo?.signal ?? new AbortController().signal;
     const server = new McpServer(
       { name: "astrotime", title: "AstroTime", version: options.version ?? "0.0.0" },
       { instructions: INSTRUCTIONS },
@@ -72,7 +78,7 @@ export function mcpEndpoint(options: EndpointOptions): (request: Request) => Pro
           inputSchema: tool.input,
           annotations: { title: tool.title, ...tool.annotations },
         },
-        async (args: unknown) => resultOf(await options.call(name, args)),
+        async (args: unknown) => resultOf(await options.call(name, args, signal)),
       );
     }
     return server;

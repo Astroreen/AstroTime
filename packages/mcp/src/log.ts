@@ -3,6 +3,7 @@
 // after. "Undo" puts the item back only while it is still the very object
 // the assistant left: an edit by the user, or a sync bringing another's,
 // is never overwritten.
+import { sameObjects } from "@astrotime/core";
 import type { AssistantChange, Store, StoredObject } from "@astrotime/storage";
 
 /**
@@ -20,9 +21,18 @@ export interface LoggedChange extends AssistantChange {
 /** The item an entry is about, as the store holds it now; a deletion not yet uploaded is none. */
 const currentOf = (found: readonly StoredObject[]) => found[0] ?? null;
 
+/**
+ * Whether the item is still what the assistant left: the same text, or the
+ * same items field for field, so a server that writes the object again in
+ * its own way (Nextcloud) after the upload is no change (`sameObjects`,
+ * bookkeeping aside).
+ */
 function stateOf(change: AssistantChange, current: StoredObject | null): ChangeState {
   if (change.undoneAt !== null) return "undone";
-  return (current?.ics ?? null) === change.afterIcs ? "undoable" : "changed";
+  const now = current?.ics ?? null;
+  const left = change.afterIcs;
+  const same = now === left || (now !== null && left !== null && sameObjects(now, left));
+  return same ? "undoable" : "changed";
 }
 
 /** The log, the latest first, each entry with whether it can be undone now. */

@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { serveAssistants } from "../assistants/serve.ts";
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
 import { everyRun, liveQuery, whileShown } from "../calendar/live.ts";
@@ -95,20 +96,12 @@ export function AccountsProvider({
   useEffect(() => {
     const { assistants } = platform;
     if (!assistants) return;
-    let stop: (() => void) | undefined;
-    let stopped = false;
-    void import("../assistants/serve.ts").then(({ serveAssistants }) => {
-      if (stopped) return;
-      stop = serveAssistants(assistants, {
-        store,
-        timeZone,
-        onChanged: () => scheduler.changed(),
-      });
+    // The tools themselves load with the first call (`serve.ts`).
+    return serveAssistants(assistants, {
+      store,
+      timeZone,
+      onChanged: () => scheduler.changed(),
     });
-    return () => {
-      stopped = true;
-      stop?.();
-    };
   }, [platform, store, timeZone, scheduler]);
   const status = useSyncExternalStore(
     (onChange) => scheduler.subscribe(onChange),

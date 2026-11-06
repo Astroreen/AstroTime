@@ -52,6 +52,11 @@ export type Pending = StoredObject["pending"];
 export type AssistantChange = typeof schema.assistantChanges.$inferSelect;
 /** The most changes by assistants the store keeps: the latest (D311). */
 export const ASSISTANT_CHANGES_KEPT = 500;
+/**
+ * The most text the log keeps, before and after together: an item with a
+ * file inline is large, and the oldest changes go first past it (D311).
+ */
+export const ASSISTANT_CHANGES_BYTES = 32 * 1024 * 1024;
 
 /** What a local change (`Store.changeLocal`) reads and writes, inside its transaction. */
 export interface LocalChange {
@@ -621,10 +626,18 @@ export class Store {
       .insert(schema.assistantChanges)
       .values({ ...change, id: crypto.randomUUID(), undoneAt: null })
       .returning();
-    // Only the latest are kept: the oldest beyond them go with each new one.
-    await this.db.run(
-      sql`DELETE FROM assistant_changes WHERE id NOT IN (SELECT id FROM assistant_changes ORDER BY at DESC, rowid DESC LIMIT ${ASSISTANT_CHANGES_KEPT})`,
-    );
+    // Only the latest are kept, by count and by size: the oldest beyond
+    // either go with each new one. The newest always stays.
+    await this.db.run(sql`
+      DELETE FROM assistant_changes WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            ROW_NUMBER() OVER latest AS n,
+            SUM(LENGTH(COALESCE(before_ics, '')) + LENGTH(COALESCE(after_ics, ''))) OVER latest AS bytes
+          FROM assistant_changes
+          WINDOW latest AS (ORDER BY at DESC, rowid DESC)
+        ) WHERE n > ${ASSISTANT_CHANGES_KEPT} OR (n > 1 AND bytes > ${ASSISTANT_CHANGES_BYTES})
+      )`);
     return row!;
   }
 

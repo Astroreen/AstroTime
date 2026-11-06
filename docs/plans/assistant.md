@@ -203,7 +203,8 @@ change the user's events and tasks.
     reads the profile reads the store itself. A request is at most 4 MiB, an
     attachment's content about 1 MiB (written inline, `VALUE=BINARY`,
     `NewInlineFile` in the core). A call waits for the page's answer; one
-    whose page reloads or goes is answered that AstroTime must be open. The
+    whose page reloads or goes is answered that AstroTime must be open, and
+    one whose client closes its connection first is let go. The
     page may write text to the clipboard for the setting's copies
     ([desktop D71](desktop.md#D71)).
 - **D309. Then on AstroTime's server.** In server mode
@@ -242,7 +243,12 @@ change the user's events and tasks.
     `loggedChanges` and `undoChange` in `packages/mcp/src/log.ts`. Undoing
     the latest entry of an item makes the one before it undoable again. A
     deletion never sent took its row, so its undo makes the item again
-    under the same UID.
+    under the same UID. "The same raw object" is read as the same text or
+    the same items field for field (core's `sameObjects`, bookkeeping
+    aside): a server that writes the object again in its own way after the
+    upload (Nextcloud's VObject) is no change. The log is bounded by size
+    as well, 32 MiB of text before and after together, the oldest going
+    first, since a file inline makes an entry large.
 
 ## Deferred
 

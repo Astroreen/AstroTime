@@ -42,9 +42,13 @@ interface Call {
 function fakePage() {
   const calls: Call[] = [];
   let heard: ((call: Call) => void) | undefined;
+  let withdrawn: ((id: string) => void) | undefined;
   return {
     calls,
     serving: true,
+    /** Resolves with the next call the endpoint lets go of. */
+    nextWithdrawn: () => new Promise<string>((resolve) => (withdrawn = resolve)),
+    withdraw: (id: string) => withdrawn?.(id),
     next: () => new Promise<Call>((resolve) => (heard = resolve)),
     send(id: string, name: string, args: unknown) {
       if (!this.serving) return false;
@@ -162,5 +166,34 @@ test("New token refuses the old one at once, and the new one is kept", async () 
   await expect(client.listTools()).rejects.toThrow();
   await expect(connect(url!, old!)).rejects.toThrow();
   await (await connect(url!, token!)).close();
+  await endpoint.close();
+});
+
+test("a call whose client goes before the answer is let go, not held for ever", async () => {
+  const { page, endpoint } = setUp();
+  const { url, token } = await endpoint.setEnabled(true);
+  const sent = page.next();
+  const withdrawn = page.nextWithdrawn();
+  // A client that sends its call and is gone (killed, its connection closed).
+  const body = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "list_calendars", arguments: {} },
+  });
+  const asked = request(url!, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-06-18",
+    },
+  });
+  asked.on("error", () => {});
+  asked.end(body);
+  const call = await sent;
+  asked.destroy();
+  expect(await withdrawn).toBe(call.id);
   await endpoint.close();
 });

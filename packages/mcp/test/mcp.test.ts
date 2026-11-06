@@ -8,7 +8,7 @@ import type { AddressInfo } from "node:net";
 import { fetchClient } from "@astrotime/caldav";
 import { CalDavProvider } from "@astrotime/caldav/provider";
 import { CalendarObject } from "@astrotime/core";
-import { ASSISTANT_CHANGES_KEPT, Store } from "@astrotime/storage";
+import { ASSISTANT_CHANGES_BYTES, ASSISTANT_CHANGES_KEPT, Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
 import { syncAccount } from "@astrotime/sync";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
@@ -423,4 +423,61 @@ test("a new token refuses the old one at once; with nowhere to run, a call says 
   expect(await call(fresh, "list_calendars")).toEqual({ refused: "AstroTime must be open." });
   runner = open;
   await fresh.close();
+});
+
+test("a server writing the object again its own way after the upload is no change: Undo stays (D311)", async () => {
+  const mcp = await client();
+  const created = await call(mcp, "create_event", {
+    calendarId: here.calendar.id,
+    summary: "Normalised",
+    start: "2026-11-12T09:00",
+  });
+  const stored = (await here.store.object(created["id"] as string))!;
+  await here.sync();
+  // As Nextcloud answers it on the next sync: its own stamp, its own order of lines.
+  const lines = stored.ics.split("\r\n");
+  const rewritten = lines
+    .map((line) => (line.startsWith("DTSTAMP:") ? "DTSTAMP:20261112T000000Z" : line))
+    .filter((line) => !line.startsWith("PRODID:"));
+  rewritten.splice(1, 0, "PRODID:-//Sabre//Sabre VObject 4.5.6//EN");
+  await here.store.saveFromServer(here.calendar.id, {
+    href: (await here.store.object(stored.id))!.href,
+    etag: '"server"',
+    ics: rewritten.join("\r\n"),
+  });
+  expect((await here.store.object(stored.id))!.ics).not.toBe(stored.ics);
+  const [entry] = await loggedChanges(here.store);
+  expect(entry).toMatchObject({ tool: "create_event", state: "undoable" });
+  await mcp.close();
+});
+
+test("the log keeps the latest changes within its size too: the oldest large ones go first", async () => {
+  const store = await Store.open(nodeDriver());
+  await store.addLocalCalendarIfEmpty({
+    calendar: "Personal",
+    account: "This device",
+    color: "#3366cc",
+  });
+  const [calendar] = await store.calendars();
+  let at = 0;
+  const tools = assistantTools({ store, timeZone: "UTC", now: () => ++at });
+  // About 1 MiB of file each, written inline.
+  const content = "QUJD".repeat(256 * 1024);
+  const files = Math.ceil(ASSISTANT_CHANGES_BYTES / content.length) + 2;
+  for (let i = 1; i <= files; i++) {
+    const { id } = (await tools.call("create_task", {
+      calendarId: calendar!.id,
+      summary: `Task ${i}`,
+    })) as { id: string };
+    await tools.call("add_attachment", { id, name: `${i}.txt`, content });
+  }
+  const kept = await store.assistantChanges();
+  const bytes = kept.reduce(
+    (sum, entry) => sum + (entry.beforeIcs?.length ?? 0) + (entry.afterIcs?.length ?? 0),
+    0,
+  );
+  expect(bytes).toBeLessThanOrEqual(ASSISTANT_CHANGES_BYTES);
+  expect(kept.length).toBeLessThan(files * 2);
+  expect(kept[0]).toMatchObject({ tool: "add_attachment", summary: `Task ${files}` });
+  await store.close();
 });

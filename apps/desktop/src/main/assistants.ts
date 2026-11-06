@@ -26,6 +26,9 @@ const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 export const NOT_OPEN =
   "AstroTime must be open for an assistant to reach the calendars: open its window.";
 
+/** What a call whose client went is answered with, for no one. */
+const GONE = "The client went before the answer.";
+
 /** `assistants.json`: whether the endpoint is on, and the port configurations name. */
 interface Settings {
   readonly enabled: boolean;
@@ -36,6 +39,8 @@ interface Settings {
 interface Page {
   /** Sends a call to the page that serves; false when none does. */
   send(id: string, name: string, args: unknown): boolean;
+  /** The call's client went before its answer: the page may drop it. */
+  withdraw?(id: string): void;
 }
 
 export interface AssistantsOptions {
@@ -50,7 +55,11 @@ export interface AssistantsOptions {
 const newToken = () => randomBytes(32).toString("base64url");
 
 /** The request as the web's, its body read up to the cap; `null` when it is over. */
-async function toRequest(req: IncomingMessage, port: number): Promise<Request | null> {
+async function toRequest(
+  req: IncomingMessage,
+  port: number,
+  signal: AbortSignal,
+): Promise<Request | null> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -66,6 +75,7 @@ async function toRequest(req: IncomingMessage, port: number): Promise<Request | 
   return new Request(`http://127.0.0.1:${port}${req.url ?? "/"}`, {
     method: req.method ?? "GET",
     headers,
+    signal,
     ...(hasBody ? { body: Buffer.concat(chunks) } : {}),
   });
 }
@@ -116,10 +126,21 @@ export function assistants(options: AssistantsOptions) {
     port: () => port,
     token: () => token,
     ...(options.version ? { version: options.version } : {}),
-    call(name, args) {
+    call(name, args, signal) {
       const id = crypto.randomUUID();
       return new Promise<ToolAnswer>((resolve) => {
         calls.set(id, resolve);
+        // A client that went (closed its connection) lets its call go: a
+        // window that never answers holds nothing for ever.
+        signal.addEventListener(
+          "abort",
+          () => {
+            if (!calls.has(id)) return;
+            answer(id, { refused: GONE });
+            page.withdraw?.(id);
+          },
+          { once: true },
+        );
         if (!page.send(id, name, args)) answer(id, { refused: NOT_OPEN });
       });
     },
@@ -129,7 +150,12 @@ export function assistants(options: AssistantsOptions) {
   async function listen(): Promise<void> {
     const http = createServer((req, res) => {
       void (async () => {
-        const request = await toRequest(req, port);
+        // The client's connection closing before the answer aborts the request.
+        const gone = new AbortController();
+        res.on("close", () => {
+          if (!res.writableFinished) gone.abort();
+        });
+        const request = await toRequest(req, port, gone.signal);
         if (!request) {
           res.writeHead(413, { Connection: "close" }).end();
           return;

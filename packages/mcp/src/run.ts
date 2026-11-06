@@ -416,9 +416,11 @@ function endOf(value: string, zone: string): ItemTime {
 /** A timed event's hour, an all-day event's day. */
 function defaultEnd(start: ItemTime, zone: string): ItemTime {
   if (start.type === "date") return { type: "date", date: addDays(start.date, 1) };
-  const epochMs =
-    (start.type === "zoned" ? start.epochMs : Date.parse(`${start.local}Z`)) + 3_600_000;
-  return start.type === "zoned" ? zonedTime(wallClockIn(epochMs, zone), zone) : start;
+  const epochMs = orderOf(start) + 3_600_000;
+  // A floating time an hour later on its own wall clock.
+  if (start.type === "floating")
+    return { type: "floating", local: new Date(epochMs).toISOString().slice(0, 19) };
+  return zonedTime(wallClockIn(epochMs, zone), zone);
 }
 
 /** An end before its start, or a day with a time, is refused. */
