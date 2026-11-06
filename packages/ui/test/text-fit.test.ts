@@ -39,4 +39,16 @@ describe("what of a covered block's text fits above the item over it (design D15
     });
     expect(textFit(30, { compact: false, covered: false }).showTime).toBe(false);
   });
+
+  test("at a larger text size the hour is taller and so are the lines: the same 45 minutes keep two (design D295)", () => {
+    const scale = 1.3;
+    const at = (minutes: number) => (minutes / 60) * HOUR * scale - 2;
+    expect(textFit(at(45), { compact: false, covered: true, scale })).toEqual({
+      showTime: false,
+      lines: 2,
+    });
+    // Measured at 100 % lines, the same pixels would add the time line, which has no room at 130 %.
+    expect(textFit(at(45), { compact: false, covered: true }).showTime).toBe(true);
+    expect(textFit(38, { compact: false, covered: false, scale }).showTime).toBe(false);
+  });
 });

@@ -516,7 +516,7 @@ Decided while building PR 7.
   app does and nothing more (`contentSecurityPolicy` in
   `apps/proxy/src/server.ts`):
   - `default-src 'none'`: nothing not named below (no frames, objects,
-    fonts, images or media: the app uses system fonts and inline SVG icons);
+    images or media: the icons are inline SVG);
   - `script-src 'self' 'wasm-unsafe-eval'`: the app's own scripts, and
     SQLite's WebAssembly, which the store's worker compiles;
   - `style-src 'self' 'nonce-…'`: the built stylesheet, and the `<style>`
@@ -532,6 +532,10 @@ Decided while building PR 7.
     design [D219](design.md#D219), [D222](design.md#D222)): the icons and
     illustrations, and the user's own pictures, drawn from object URLs,
     which `'self'` does not match;
+  - `font-src 'self'` (added with [design D294](design.md#D294), PR L1):
+    the fonts AstroTime bundles, files of its own, fetched once one is
+    chosen; before, `default-src 'none'` refused every font, since the app
+    drew only the system's;
   - `base-uri 'none'`, `form-action 'none'` (no form is ever submitted to
     a URL), `frame-ancestors 'none'` (no other site frames the app).
 

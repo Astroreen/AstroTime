@@ -558,7 +558,7 @@ describe("the Content Security Policy (D110)", () => {
     expect(new Set(nonces).size).toBe(nonces.length);
   });
 
-  test("the policy loads only the app's own scripts, styles, workers, connections, manifest and icons, and the places' (D178) with their photos' (design D221)", () => {
+  test("the policy loads only the app's own scripts, styles, workers, connections, manifest, icons and fonts (design D294), and the places' (D178) with their photos' (design D221)", () => {
     expect(contentSecurityPolicy("n0nce").split("; ")).toEqual([
       "default-src 'none'",
       "script-src 'self' 'wasm-unsafe-eval'",
@@ -567,6 +567,7 @@ describe("the Content Security Policy (D110)", () => {
       "worker-src 'self'",
       "manifest-src 'self'",
       "img-src 'self' blob: https://tile.openstreetmap.org https://upload.wikimedia.org https://thumb.wikimedia.org",
+      "font-src 'self'",
       "base-uri 'none'",
       "form-action 'none'",
       "frame-ancestors 'none'",

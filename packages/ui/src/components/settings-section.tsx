@@ -1,6 +1,7 @@
 // The Settings screen (design D53, D131): the whole screen on a phone, a
-// dialog from 640 px, in groups: general (theme, language, the burst on a
-// completed task, D198), the views (week
+// dialog from 640 px, in groups: general (theme, the font and text size
+// with their preview, D294, D295, language, the burst on a completed task,
+// D198), the views (week
 // start, clock, "hide completed", week numbers), the colours (D172, D173),
 // the pictures (D217),
 // the accounts with how each syncs, whether it syncs at all (foundation
@@ -32,6 +33,7 @@ import { useCalendar } from "./context.ts";
 import { CloseIcon } from "./icons.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 import { Select } from "./select.tsx";
+import { TypeSettings } from "./type-settings.tsx";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 
 /** A language's name in itself: "English", "Русский". */
@@ -119,6 +121,7 @@ function SettingsGroups({
           onChange={(theme) => change({ theme: theme as Settings["theme"] })}
           options={THEMES.map((theme) => [theme, t(`settings.theme.${theme}`)])}
         />
+        <TypeSettings rowClassName={choiceRow} />
         <Choice
           label={t("settings.language")}
           value={settings.language}

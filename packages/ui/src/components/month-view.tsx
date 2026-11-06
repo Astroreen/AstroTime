@@ -24,6 +24,9 @@ const NUMBER = 26;
 const ROW = 17;
 const GAP = 3;
 
+/** A row of chips at the text size (design D295). */
+const rowAt = (textScale = 1) => Math.round(ROW * textScale);
+
 /** The week numbers' column, unless they are turned off (design D169), then the days. */
 const columnsOf = (weekNumbers: boolean): CSSProperties => ({
   gridTemplateColumns: `${weekNumbers ? "var(--weeks) " : ""}repeat(7, minmax(0, 1fr))`,
@@ -42,7 +45,8 @@ export interface MonthViewProps {
 
 export function MonthView(props: MonthViewProps) {
   const { weeks, today } = props;
-  const { formats, weekNumbers } = useCalendar();
+  const { formats, weekNumbers, textScale } = useCalendar();
+  const rowHeight = rowAt(textScale);
   const body = useRef<HTMLDivElement>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
   // How many rows of chips a tile fits: every tile is as tall, so the
@@ -52,13 +56,13 @@ export function MonthView(props: MonthViewProps) {
     if (!element) return;
     const measure = () => {
       const tile = (element.clientHeight - GAP * (weeks.length - 1)) / weeks.length;
-      setCapacity(Math.floor((tile - NUMBER - 2) / ROW));
+      setCapacity(Math.floor((tile - NUMBER - 2) / rowHeight));
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [weeks.length]);
+  }, [weeks.length, rowHeight]);
 
   const root = useRef<HTMLDivElement>(null);
   const tiles = useRef(new Map<string, HTMLElement>());
@@ -154,7 +158,8 @@ function Week({
   tile: (day: string) => (element: HTMLElement | null) => void;
   touch: boolean;
 }) {
-  const { t, formats, timeZone, colorOf, weekNumbers } = useCalendar();
+  const { t, formats, timeZone, colorOf, weekNumbers, textScale } = useCalendar();
+  const rowHeight = rowAt(textScale);
   const { shown, more } = foldWeek(week.spans, capacity);
   // The first day's column: after the week's number, or the first (design D169).
   const first = weekNumbers ? 2 : 1;
@@ -201,7 +206,7 @@ function Week({
             gridColumn: `${covered[0]! + first} / ${covered.at(-1)! + first + 1}`,
             gridRow: 1,
             marginTop: NUMBER,
-            height: ROW - 1,
+            height: rowHeight - 1,
           }}
         >
           <GhostChip
@@ -244,7 +249,8 @@ function DayTile({
   more: number;
   moreRow: number;
 }) {
-  const { t, formats, timeZone } = useCalendar();
+  const { t, formats, timeZone, textScale } = useCalendar();
+  const rowHeight = rowAt(textScale);
   const outside = day.slice(0, 7) !== month.slice(0, 7);
   const isToday = day === today;
   const name = formats.fullDate(day);
@@ -295,8 +301,8 @@ function DayTile({
               role="none"
               className="absolute left-0 z-[1] px-[1.5px]"
               style={{
-                top: span.row * ROW,
-                height: ROW - 1,
+                top: span.row * rowHeight,
+                height: rowHeight - 1,
                 width: `calc(${length * 100}% + ${(length - 1) * GAP}px)`,
               }}
             >
@@ -322,7 +328,7 @@ function DayTile({
             role="listitem"
             aria-label={touch ? t("month.more", { count: more, day: name }) : undefined}
             className="absolute inset-x-0 z-[1] px-[1.5px]"
-            style={{ top: moreRow * ROW, height: ROW - 1 }}
+            style={{ top: moreRow * rowHeight, height: rowHeight - 1 }}
           >
             {touch ? (
               // Drawn where the button is: its text centred, on the line's baseline.

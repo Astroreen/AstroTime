@@ -434,7 +434,8 @@ function Strip({
       style={{
         gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
         // `repeat(0, …)` is no value: the strip would keep the rows it had.
-        gridTemplateRows: rows === 0 ? "none" : `repeat(${rows}, 24px)`,
+        gridTemplateRows:
+          rows === 0 ? "none" : `repeat(${rows}, calc(24px * var(--text-scale, 1)))`,
         // One row's height when empty, so a tap finds it (design D188).
         minHeight: rows === 0 ? 24 : undefined,
       }}

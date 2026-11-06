@@ -35,12 +35,14 @@ export const anchored = (scrollTop: number, offset: number, from: number, to: nu
 
 /**
  * Lets the time grids in `main` be pinched; `hour` is the height drawn now,
- * `commit` keeps one a zoom ended on. Returns what detaches it.
+ * `commit` keeps one a zoom ended on, `home` is the one `0` goes back to
+ * (`HOUR` at the text size, design D295). Returns what detaches it.
  */
 export function zoomable(
   main: HTMLElement,
   hour: () => number,
   commit: (hour: number) => void,
+  home: () => number = () => HOUR,
 ): () => void {
   let live: number | null = null;
   let settle: ReturnType<typeof setTimeout> | undefined;
@@ -145,7 +147,7 @@ export function zoomable(
     if (scale === null || !scroller) return;
     event.preventDefault();
     const { top, height } = scroller.getBoundingClientRect();
-    zoomTo(scale === 0 ? HOUR : current() * scale, scroller, top + height / 2);
+    zoomTo(scale === 0 ? home() : current() * scale, scroller, top + height / 2);
     end();
   };
 

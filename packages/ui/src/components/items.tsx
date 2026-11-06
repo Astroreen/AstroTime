@@ -264,17 +264,20 @@ const TIME_LINE = 14;
  * D153): the time line under the title where it has room (never in a
  * narrow column); and, `covered` by an item drawn over it, as many whole
  * lines of its title as fit above that item, two of them before the time
- * line, since the title matters most.
+ * line, since the title matters most. Lines are as tall as the text size
+ * makes them (`scale`, design D295); the padding is not scaled.
  */
 export function textFit(
   visible: number,
-  { compact, covered }: { compact: boolean; covered: boolean },
+  { compact, covered, scale = 1 }: { compact: boolean; covered: boolean; scale?: number },
 ): { showTime: boolean; lines: number | undefined } {
   const size = compact ? "compact" : "wide";
-  const timeFits = !compact && visible >= 38;
+  const line = LINE[size] * scale;
+  const timeLine = TIME_LINE * scale;
+  const timeFits = !compact && visible >= 38 * scale;
   if (!covered) return { showTime: timeFits, lines: undefined };
-  const showTime = timeFits && visible - PADDING[size] - TIME_LINE >= 2 * LINE[size];
-  const lines = Math.floor((visible - PADDING[size] - (showTime ? TIME_LINE : 0)) / LINE[size]);
+  const showTime = timeFits && visible - PADDING[size] - timeLine >= 2 * line;
+  const lines = Math.floor((visible - PADDING[size] - (showTime ? timeLine : 0)) / line);
   return { showTime, lines: Math.max(1, lines) };
 }
 
@@ -290,7 +293,7 @@ export function TimedItem({
   compact: boolean;
 }) {
   const { shape, top, bottom, left, width, layer, room, continuesBefore, continuesAfter } = placed;
-  const { colorOf, formats, timeZone, found, hour, landed } = useCalendar();
+  const { colorOf, formats, timeZone, found, hour, landed, textScale = 1 } = useCalendar();
   const label = useItemLabel();
   const { source, held } = useDragSource(entry, "grid");
   const height = ((bottom - top) / 60) * hour - 2;
@@ -298,7 +301,11 @@ export function TimedItem({
   // Another item drawn over this one from `room` on: its text keeps above
   // that, as many whole lines as fit (design D153).
   const covered = room < bottom - top;
-  const fit = textFit(covered ? (room / 60) * hour - 2 : height, { compact, covered });
+  const fit = textFit(covered ? (room / 60) * hour - 2 : height, {
+    compact,
+    covered,
+    scale: textScale,
+  });
   const showTime = shape === "block" && fit.showTime;
   const lines = fit.lines;
   const name = label(entry, false);

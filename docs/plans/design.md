@@ -301,7 +301,8 @@ the project.
   ([desktop D75](desktop.md#D75)). _Since [D169](#D169):_ "Show week
   numbers", after "Hide completed tasks". _Since [D172](#D172),
   [D173](#D173):_ the default colours and the user's own, in a "Colours"
-  group.
+  group. _Since [D294](#D294), [D295](#D295):_ "Font" and "Text size"
+  under "Theme", with their preview above them.
 - **D97. Search, in detail** (D53): `Store.search` finds the objects whose
   title holds the text, in the visible calendars, at most 50, the latest
   start first. Migration 6 adds a `titles` column: every component's
@@ -634,7 +635,8 @@ are its decisions.
   the title they change. On a phone the bar is as it was (D46, D59): the
   menu, the period, search, today's date as an icon, tasks, the account.
 - **D134. One scale for type, one rule for corners, and empty screens that
-  say what to do.**
+  say what to do.** _Amended by [D295](#D295):_ each size below is at
+  100 %; the user's text size scales them all, fields never under 16 px.
   - **Type**: eight sizes, each a role, as tokens in `styles.css`
     (`text-tiny` 11 px: hour labels, the month picker's weekdays, chips and
     "+N" where columns are narrow, a phone's Week and the Month;
@@ -2513,16 +2515,56 @@ keywords". The quick parse and voice that fill quick create are the
   licence beside its files (`fonts/<name>/OFL.txt`), and the README's
   credits name them. They need `font-src 'self'`, which
   [foundation D110](foundation.md#D110)'s policy lacks: PR L1 adds it and
-  amends D110. The seven with Cyrillic, in the weights used, are about
+  amends D110 (and the desktop's copy, [desktop D71](desktop.md#D71)).
+  The seven with Cyrillic, in the weights used, are about
   1 MB of WOFF2: none is in the first load, the PWA's precache leaves them
   out (cached once chosen), and the desktop and Android packages carry
   them, which their size reports state.
+  _As built (PR L1):_ each from its Fontsource package (Google Fonts'
+  files), in four subsets (latin, latin-ext, cyrillic, cyrillic-ext, with
+  Google Fonts' ranges); the six variable ones narrowed with fontTools to
+  weights 400–600, the type scale's (normal, `font-medium`,
+  `font-semibold`), and PT Sans, which is static, in its 400 and 700 (the
+  browser draws 500 as 400 and 600 as 700). `scripts/fonts.sh` makes them
+  again. Measured: **907 568 bytes** (886 KiB) of WOFF2 in all, from
+  JetBrains Mono's 55 760 to PT Sans's 294 712 (Inter 127 657, Roboto
+  103 520, Noto Sans 176 730, Nunito 86 391, Literata 94 414); the desktop
+  and Android packages grow by those bytes, since WOFF2 does not compress
+  further, and the web's first load not at all (one 1.1 KiB chunk of the
+  files' URLs loads with the choice). There is no size report in CI to
+  state it, so D294 and the PR do. The files are registered from script
+  (`FontFace`, `packages/ui/src/fonts/`), not by `@font-face` in the
+  stylesheet: a chosen font loads all four subsets at once, so it is all
+  kept offline and a change of language needs no network, and a face that
+  failed can be asked again with a new one, which a stylesheet's cannot.
+  The text is drawn in a font only once all its files came; until then
+  the one before stays. **Offline:** the service worker keeps a font's
+  files as it keeps a picture, once they are first fetched
+  ([D219](#D219), [foundation D124](foundation.md#D124)). A font chosen
+  while its files cannot come (offline, never kept) is not chosen: the
+  dropdown stays on the font drawn now and its row says "Inter could not
+  be downloaded. Connect to the network once to keep it on this device;
+  until then the text stays as it was." A font chosen before whose files
+  are gone (a cleared cache, offline) is drawn in the font before it,
+  the row says the same, and it is asked again when the network comes
+  back (`online`).
 - **D295. A text size of the user's choice, seen as it is set.** Settings
   → General → Text size, under Font, in steps from 85 % to 130 % (100 % the
   default), scales the whole type scale ([D134](#D134)), hour heights and
   touch targets that hold text with it. Font and size share one live
   preview above them: an event, a task and a day's heading, drawn by the
   views' own components, changing as the choice does.
+  _As built (PR L1):_ ten steps of 5 % (a slider, its value said as
+  "115%"); `--text-scale` on the root multiplies every token of the type
+  scale, but a field's `text-input` never goes under 16 px (iOS zooms
+  into a smaller one). The time grid's hour is drawn at the text size
+  (56 px at 100 %, 72.8 px at 130 %) while the pinched height is kept at
+  100 % ([D192](#D192)), so pinching and the text size do not fight; the
+  lines a covered block keeps ([D153](#D153)), the all-day strip's rows
+  and the Month's rows of chips grow with it. The preview is the Agenda's
+  day heading and two of its cards (`AgendaCard`), today's, made from
+  iCalendar as any item is, inert (nothing in it opens), named "Preview of
+  the font and text size".
 - **D296. Quick create: a sheet, not the whole editor.** A tap on a slot,
   the floating button or "Create" ([D132](#D132)) opens quick create
   (`quick-create.tsx`): on a phone a sheet from the bottom over the view,
@@ -2602,7 +2644,10 @@ keywords". The quick parse and voice that fill quick create are the
   editor's chunk is fetched once the page is idle; expanded before it
   arrives (a slow first visit), quick create goes and the editor shows a
   moment later.
-
+- **A font's retry on `online`, under test** ([D294](#D294)) — a saved
+  font whose files are gone at startup (a cleared cache, offline) is asked
+  for again when the network comes back; no e2e drives that path yet (the
+  kept font offline and a refused pick are covered).
 - **Painted pictures** ([D298](#D298)) — if SVG drawn again still falls
   short, raster illustrations (WebP or AVIF) the owner supplies, kept as
   files of their own as [D219](#D219) keeps the SVG.

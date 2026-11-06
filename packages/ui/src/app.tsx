@@ -13,6 +13,7 @@ import { CalendarScreen } from "./components/calendar-screen.tsx";
 import { RemindersProvider } from "./components/reminders-context.tsx";
 import { UnprotectedDialog } from "./components/unprotected-dialog.tsx";
 import { UpdateNotice } from "./components/update-notice.tsx";
+import { familyOf, loadFont } from "./fonts/index.ts";
 import { createI18n } from "./i18n/index.ts";
 import type { Platform, ShellState } from "./platform.ts";
 import { KEYS, usePreference } from "./preferences.ts";
@@ -63,6 +64,36 @@ export function AstroTime({ platform, languages, timeZone, nonce }: AstroTimePro
     if (chosen.theme === "system") delete root.dataset["theme"];
     else root.dataset["theme"] = chosen.theme;
   }, [chosen.theme]);
+
+  const { font, textSize } = chosen;
+  // The font (design D294): drawn once its files came, the one before kept
+  // until then; one that could not come is asked again when the network is.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (font === "system") {
+      root.style.removeProperty("--font-chosen");
+      return;
+    }
+    let live = true;
+    const apply = () =>
+      loadFont(font).then(
+        () => live && root.style.setProperty("--font-chosen", familyOf(font)),
+        () => {},
+      );
+    void apply();
+    window.addEventListener("online", apply);
+    return () => {
+      live = false;
+      window.removeEventListener("online", apply);
+    };
+  }, [font]);
+
+  // The text size (design D295) scales the type scale (styles.css).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (textSize === 100) root.style.removeProperty("--text-scale");
+    else root.style.setProperty("--text-scale", String(textSize / 100));
+  }, [textSize]);
 
   useEffect(() => {
     let live = true;

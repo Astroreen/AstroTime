@@ -107,18 +107,25 @@ export function CalendarScreen({
   const [hidden, setHidden] = usePreference(preferences, KEYS.hiddenCalendars, readHidden, (ids) =>
     JSON.stringify([...ids]),
   );
-  // The time grid's hour, pinched on this device (design D192).
-  const [hour, setHour] = usePreference(
+  // The time grid's hour, pinched on this device (design D192), kept at
+  // 100 % and drawn at the text size (D295), so text keeps its room.
+  const [keptHour, setHour] = usePreference(
     preferences,
     KEYS.hour,
-    (stored) => hourIn(Number(stored) || HOUR),
+    // Clamped as drawn, not as kept: at 130 % the least hour drawn, 24 px,
+    // is kept as 18.5. Any positive number reads back as it was.
+    (stored) => (Number(stored) > 0 ? Number(stored) : HOUR),
     String,
   );
+  const textScale = chosen.textSize / 100;
+  const hour = hourIn(keptHour * textScale);
   const mainRef = useRef<HTMLElement>(null);
   const hourNow = useRef(hour);
+  const scaleNow = useRef(textScale);
   // Not during render: the React Compiler keeps no memos where it is.
   useLayoutEffect(() => {
     hourNow.current = hour;
+    scaleNow.current = textScale;
   });
   // Pinching, its own chunk once the view is drawn (foundation D145).
   useEffect(() => {
@@ -127,7 +134,13 @@ export function CalendarScreen({
     let gone = false;
     if (main)
       void import("./pinch.ts").then(({ zoomable }) => {
-        if (!gone) detach = zoomable(main, () => hourNow.current, setHour);
+        if (!gone)
+          detach = zoomable(
+            main,
+            () => hourNow.current,
+            (drawn) => setHour(Math.round((drawn / scaleNow.current) * 100) / 100),
+            () => HOUR * scaleNow.current,
+          );
       });
     return () => {
       gone = true;
@@ -507,6 +520,7 @@ export function CalendarScreen({
         colorOf,
         weekNumbers,
         hour,
+        textScale,
         landed: editing.landed,
         found: foundId,
       }}

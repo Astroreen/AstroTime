@@ -12,6 +12,7 @@ import type { pictureStrings } from "./pictures.ts";
 import type { signInStrings } from "./sign-in.ts";
 import type { subscribeStrings } from "./subscribe.ts";
 import type { taskStrings } from "./tasks.ts";
+import type { typeStrings } from "./type.ts";
 import { ru } from "./ru.ts";
 
 export const LANGUAGES = ["en", "ru"] as const;
@@ -27,7 +28,8 @@ type Catalog = Strings &
   (typeof dataStrings)["en"] &
   (typeof importStrings)["en"] &
   (typeof newListStrings)["en"] &
-  (typeof assistantStrings)["en"];
+  (typeof assistantStrings)["en"] &
+  (typeof typeStrings)["en"];
 
 export const catalogs = { en, ru } satisfies Record<Language, Record<string, string>>;
 

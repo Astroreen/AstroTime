@@ -20,6 +20,7 @@ const TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
 };
 
 /**
@@ -37,6 +38,8 @@ function contentSecurityPolicy(nonce: string): string {
     // The illustrations, files of the renderer's (design D219), and the
     // user's own pictures, drawn from object URLs (design D222).
     "img-src 'self' blob:",
+    // The fonts the renderer bundles, once one is chosen (design D294).
+    "font-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",

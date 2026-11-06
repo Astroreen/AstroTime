@@ -143,6 +143,11 @@ One word per concept. Use these terms in code, docs, commits and UI.
   card is drawn over it, the details under it (design D216).
 - **Month banner** — the wide picture of a month's season over its first
   day in the Agenda (design D218).
+- **Font** — the typeface the app's text is drawn in: the system's, or
+  one AstroTime bundles (design D294). Never "typeface" in the UI.
+- **Text size** — how large the app's text is, 85 % to 130 % of the type
+  scale (design D295). Never "zoom" or "font size"; pinching the time grid
+  (design D192) changes the hour's height, not the text.
 - **Account button** — the avatar at the end of the top bar; it opens the
   **accounts dialog**: each account with its sync status and menu, "Sync
   now", "Add account" (foundation D92).
