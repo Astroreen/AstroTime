@@ -2605,6 +2605,14 @@ keywords". The quick parse and voice that fill quick create are the
   than English and Russian (the eight subjects once listed here came with
   [D298](#D298)); a new subject needs its picture drawn to D298's standard
   first, and its words are one group of `subjects.ts` once it has one.
+- **Pictures whole in every crop** ([D298](#D298)): the details' header
+  on a 360 px phone shows only the middle of an item's picture, and the
+  176 px banner on a wide screen cuts some 27 units off a month's top and
+  foot, so a few side things are cut: the palm's leaves (beach), the
+  headphones (meeting), the cabinet (haircut), the wall bars (sport), and
+  the lowest flowers of March and May. Each picture's subject stays whole;
+  drawing these in again needs a picture per crop or a tighter
+  composition, weighed against the card, which shows the whole.
 - **A place's photo without Wikipedia** ([D220](#D220)): a place with no
   article (most cafés, offices, homes) has no photo; a source of photos of
   any place that sends nothing more and needs no key was not found. The

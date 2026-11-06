@@ -71,7 +71,6 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "на море",
       "к морю",
       "у моря",
-      "на моря",
     ],
   ],
   [

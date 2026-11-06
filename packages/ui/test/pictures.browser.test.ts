@@ -14,6 +14,8 @@ const SCALE = 2;
 /** The picture's pixels with its ground (its first shape, D216) painted `ground`. */
 async function draw(svg: string, ground: string): Promise<ImageData> {
   const painted = svg.replace(/(<svg[^>]*>\s*<rect[^>]*fill=")#[0-9a-f]{6}/i, `$1${ground}`);
+  // Not painted, the two draws would match and the check pass having checked nothing.
+  expect(painted, "the ground as the picture's first shape").not.toBe(svg);
   const [, width, height] = /viewBox="0 0 (\d+) (\d+)"/.exec(svg)!.map(Number);
   const img = new Image(width! * SCALE, height! * SCALE);
   img.src = URL.createObjectURL(new Blob([painted], { type: "image/svg+xml" }));
