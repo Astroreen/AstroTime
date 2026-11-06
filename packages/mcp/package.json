@@ -1,0 +1,32 @@
+{
+  "name": "@astrotime/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AstroTime as an MCP server: tools over the local store, the log of assistants' changes, the endpoint (docs/plans/assistant.md#D307)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./http": {
+      "types": "./src/http.ts",
+      "import": "./src/http.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test"
+  },
+  "dependencies": {
+    "@astrotime/core": "workspace:*",
+    "@astrotime/storage": "workspace:*",
+    "@modelcontextprotocol/server": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@astrotime/caldav": "workspace:*",
+    "@astrotime/sync": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

@@ -2,7 +2,8 @@
 // security settings (D71), the app:// scheme, HTTP from here (D72), the
 // store in a utility process (D73), credentials through safeStorage (D74),
 // one instance that lives on with its window closed, with its tray, its sync
-// triggers and its theme (D75), and the reminders' notifications (D76).
+// triggers and its theme (D75), the reminders' notifications (D76), and the
+// MCP endpoint for assistants (docs/plans/assistant.md#D308).
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +25,7 @@ import {
   type IpcMainEvent,
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
+  type WebContents,
 } from "electron";
 
 import icon from "../../resources/icon.png?inline";
@@ -36,8 +38,10 @@ import {
   type ShellState,
 } from "../bridge.ts";
 import { appFiles } from "./app-protocol.ts";
+import { assistants } from "./assistants.ts";
 import { backgroundTriggers } from "./background.ts";
 import {
+  checkAssistantAnswer,
   checkReminders,
   checkRequest,
   checkSecret,
@@ -197,10 +201,16 @@ app.on("web-contents-created", (_event, contents) => {
 
 async function start() {
   await app.whenReady();
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, grant) =>
-    grant(false),
+  // The page may write text to the clipboard (Settings → Assistants copies
+  // the address, the token and a configuration, assistant D310); nothing else.
+  const allowed = (permission: string, url: string) =>
+    permission === "clipboard-sanitized-write" && isAppUrl(url);
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, grant, details) =>
+    grant(allowed(permission, details.requestingUrl)),
   );
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionCheckHandler((_contents, permission, origin) =>
+    allowed(permission, origin),
+  );
   protocol.handle(APP_SCHEME, appFiles(files.renderer));
 
   const store = storeProcess(
@@ -243,6 +253,59 @@ async function start() {
     if (!fromApp(event)) throw new Error("Not the app's page.");
     return secrets.delete(checkSecretKey(key));
   });
+  // The MCP endpoint (assistant D308): the main process listens, the window
+  // runs each call against its store. The page serves from its `serve`
+  // until it stops, reloads or goes.
+  let serving: WebContents | null = null;
+  const endpoint = assistants({
+    path: join(app.getPath("userData"), "assistants.json"),
+    secrets,
+    version: app.getVersion(),
+    page: {
+      send(id, name, args) {
+        if (!serving || serving.isDestroyed()) return false;
+        serving.send(CHANNELS.assistantsCall, id, name, args);
+        return true;
+      },
+    },
+  });
+  const watched = new WeakSet<WebContents>();
+  const stopServing = (contents: WebContents) => {
+    if (serving !== contents) return;
+    serving = null;
+    endpoint.pageGone();
+  };
+  ipcMain.handle(CHANNELS.assistantsState, (event) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    return endpoint.state();
+  });
+  ipcMain.handle(CHANNELS.assistantsEnable, (event, enabled: unknown) => {
+    if (!fromApp(event) || typeof enabled !== "boolean") throw new Error("Not the app's page.");
+    return endpoint.setEnabled(enabled);
+  });
+  ipcMain.handle(CHANNELS.assistantsNewToken, (event) => {
+    if (!fromApp(event)) throw new Error("Not the app's page.");
+    return endpoint.newToken();
+  });
+  ipcMain.on(CHANNELS.assistantsServe, (event, on: unknown) => {
+    if (!fromApp(event)) return;
+    const contents = event.sender;
+    if (on !== true) return stopServing(contents);
+    serving = contents;
+    // A reload or a crash takes the page's calls with it: heard once per page.
+    if (watched.has(contents)) return;
+    watched.add(contents);
+    contents.on("did-start-loading", () => stopServing(contents));
+    contents.on("render-process-gone", () => stopServing(contents));
+    contents.once("destroyed", () => stopServing(contents));
+  });
+  ipcMain.on(CHANNELS.assistantsAnswer, (event, id: unknown, answer: unknown) => {
+    if (fromApp(event) && event.sender === serving)
+      refusing(() => endpoint.answer(...checkAssistantAnswer(id, answer)));
+  });
+  void endpoint.start().catch((error: unknown) => console.error(error));
+  app.on("will-quit", () => void endpoint.close());
+
   ipcMain.on(CHANNELS.store, (event) => {
     if (fromApp(event)) event.sender.postMessage(CHANNELS.store, null, [store.connect()]);
   });

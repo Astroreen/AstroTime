@@ -97,6 +97,20 @@ export interface NewAttachment {
   readonly parameters?: Readonly<Record<string, string>>;
 }
 
+/**
+ * A file to add inline (`VALUE=BINARY`, base64): its content, never a path
+ * (docs/plans/assistant.md#D308), with its name and type.
+ */
+export interface NewInlineFile {
+  /** The file's bytes in base64 (RFC 4648 §4), as `ATTACH` holds them. */
+  readonly content: string;
+  readonly name?: string | null;
+  readonly type?: string | null;
+}
+
+/** Base64 as RFC 4648 §4 writes it: whole quanta, padding only at the end. */
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
 /** Control characters, a line break among them: no parameter or value may hold one (RFC 5545 §3.1). */
 const CONTROL = /\p{Cc}+/gu;
 /** A media type, as `FMTTYPE` takes one (RFC 4288's names). */
@@ -112,16 +126,24 @@ const clean = (text: string) => text.replaceAll(CONTROL, " ").trim();
 /**
  * Removes the attachments at `remove` (their indexes before) and adds `add`
  * after the rest. What is added is checked first, nothing written when it
- * fails: a link with a control character or space, or a provider's
- * parameter whose name is no token or one written here, is refused
- * (`RangeError`); a name's or a value's control characters become spaces,
+ * fails: a link with a control character or space, a provider's
+ * parameter whose name is no token or one written here, or an inline
+ * file's content that is not base64, is refused (`RangeError`); a name's or a value's control characters become spaces,
  * and a type that is no media type is left out.
  */
 export function setAttachments(
   component: ICAL.Component,
-  changes: { readonly remove: readonly number[]; readonly add: readonly NewAttachment[] },
+  changes: {
+    readonly remove: readonly number[];
+    readonly add: readonly (NewAttachment | NewInlineFile)[];
+  },
 ): void {
   for (const add of changes.add) {
+    if ("content" in add) {
+      if (!add.content || !BASE64.test(add.content))
+        throw new RangeError("Not a file's content in base64.");
+      continue;
+    }
     if (!add.uri || /[\s\p{Cc}]/u.test(add.uri))
       throw new RangeError(`Not a link to attach: ${JSON.stringify(add.uri)}`);
     for (const name of Object.keys(add.parameters ?? {})) {
@@ -136,19 +158,24 @@ export function setAttachments(
   }
   for (const add of changes.add) {
     const property = new ICAL.Property("attach");
-    property.setValue(add.uri);
+    if ("content" in add) {
+      property.resetType("binary");
+      property.setParameter("encoding", "BASE64");
+      property.setValue(new ICAL.Binary(add.content));
+    } else property.setValue(add.uri);
     const type = add.type && clean(add.type);
     if (type && MEDIA_TYPE.test(type)) property.setParameter("fmttype", type);
     const name = add.name && clean(add.name);
     if (name) property.setParameter("filename", name);
     if (
+      "size" in add &&
       add.size !== undefined &&
       add.size !== null &&
       Number.isSafeInteger(add.size) &&
       add.size >= 0
     )
       property.setParameter("size", String(add.size));
-    for (const [key, value] of Object.entries(add.parameters ?? {}))
+    for (const [key, value] of Object.entries(("parameters" in add && add.parameters) || {}))
       property.setParameter(key.toLowerCase(), clean(value));
     component.addProperty(property);
   }

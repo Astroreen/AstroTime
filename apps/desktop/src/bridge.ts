@@ -37,7 +37,33 @@ export const CHANNELS = {
   sync: "astrotime:sync",
   /** The shell's state from the page's settings: the theme, the close, the words (D75). */
   shell: "astrotime:shell",
+  /**
+   * The MCP endpoint (assistant D308): its state, on or off, a new token;
+   * the page saying it serves calls, each call from the main process and
+   * its answer back.
+   */
+  assistantsState: "astrotime:assistants-state",
+  assistantsEnable: "astrotime:assistants-enable",
+  assistantsNewToken: "astrotime:assistants-new-token",
+  assistantsServe: "astrotime:assistants-serve",
+  assistantsCall: "astrotime:assistants-call",
+  assistantsAnswer: "astrotime:assistants-answer",
 } as const;
+
+/**
+ * The MCP endpoint as Settings → Assistants shows it (assistant D308): on or
+ * off, its address while it listens, its token while on, and why it could
+ * not listen.
+ */
+export interface AssistantsState {
+  readonly enabled: boolean;
+  readonly url: string | null;
+  readonly token: string | null;
+  readonly error?: string;
+}
+
+/** A tool's answer from the page: the item, or a refusal in words for the assistant. */
+export type AssistantAnswer = { readonly ok: unknown } | { readonly refused: string };
 
 /** The argument the main process gives the page when the system shows notifications (D76). */
 export const NOTIFICATIONS_ARGUMENT = "--astrotime-notifications";
@@ -113,4 +139,11 @@ export interface Bridge {
    * now"; returns the function that stops it.
    */
   onSyncRequest(listener: (byUser: boolean) => void): () => void;
+  readonly assistants: {
+    state(): Promise<AssistantsState>;
+    setEnabled(enabled: boolean): Promise<AssistantsState>;
+    newToken(): Promise<AssistantsState>;
+    /** Runs the endpoint's calls here, against the page's store; returns the function that stops it. */
+    serve(run: (tool: string, args: unknown) => Promise<AssistantAnswer>): () => void;
+  };
 }

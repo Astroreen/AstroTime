@@ -68,6 +68,7 @@ test("the app starts sandboxed on app://, keeps its store in a utility process, 
   expect(inside).toEqual({
     node: ["undefined", "undefined"],
     bridge: [
+      "assistants",
       "connectStore",
       "http",
       "oauth",

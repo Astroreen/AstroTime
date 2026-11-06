@@ -48,6 +48,15 @@ export type StoredObject = typeof schema.objects.$inferSelect;
 export type Conflict = typeof schema.conflicts.$inferSelect;
 export type Component = "VEVENT" | "VTODO";
 export type Pending = StoredObject["pending"];
+/** A change an assistant made through MCP (docs/plans/assistant.md#D311). */
+export type AssistantChange = typeof schema.assistantChanges.$inferSelect;
+/** The most changes by assistants the store keeps: the latest (D311). */
+export const ASSISTANT_CHANGES_KEPT = 500;
+/**
+ * The most text the log keeps, before and after together: an item with a
+ * file inline is large, and the oldest changes go first past it (D311).
+ */
+export const ASSISTANT_CHANGES_BYTES = 32 * 1024 * 1024;
 
 /** What a local change (`Store.changeLocal`) reads and writes, inside its transaction. */
 export interface LocalChange {
@@ -58,6 +67,18 @@ export interface LocalChange {
   delete(id: string): Promise<void>;
   /** As `Store.withUids`, read in the same transaction as the writes. */
   withUids(calendarId: string, uids: readonly string[]): Promise<StoredObject[]>;
+}
+
+/**
+ * The log of assistants' changes (docs/plans/assistant.md#D311), read and
+ * written in a local change's transaction, beside the change itself.
+ */
+export interface AssistantLog {
+  /** Logs a change, keeping the latest `ASSISTANT_CHANGES_KEPT`. */
+  add(change: Omit<AssistantChange, "id" | "undoneAt">): Promise<AssistantChange>;
+  get(id: string): Promise<AssistantChange | undefined>;
+  /** Marks a logged change undone at `at`. */
+  undone(id: string, at: number): Promise<void>;
 }
 
 /** A task that rolls over to today, with the occurrence it counts by (design D51). */
@@ -566,18 +587,67 @@ export class Store {
    * (docs/plans/foundation.md#D99): it reads the objects as the store holds
    * them now and writes from what it read, so no sync and no other tab writes
    * in between; and its writes (`save` as `saveLocal`, `delete` as
-   * `deleteLocal`), one object or more, land whole or not at all.
+   * `deleteLocal`), one object or more, land whole or not at all. An
+   * assistant's change logs itself in the same transaction (`log`, D311).
    */
-  changeLocal<T>(change: (local: LocalChange) => Promise<T>): Promise<T> {
+  changeLocal<T>(change: (local: LocalChange, log: AssistantLog) => Promise<T>): Promise<T> {
     return this.exclusive(() =>
-      change({
-        object: (id) => this.object(id),
-        calendars: () => this.calendars(),
-        save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
-        delete: (id) => this.deleteLocalNow(id),
-        withUids: (calendarId, uids) => this.withUids(calendarId, uids),
-      }),
+      change(
+        {
+          object: (id) => this.object(id),
+          calendars: () => this.calendars(),
+          save: (calendarId, ics, href) => this.saveLocalNow(calendarId, ics, href),
+          delete: (id) => this.deleteLocalNow(id),
+          withUids: (calendarId, uids) => this.withUids(calendarId, uids),
+        },
+        {
+          add: (entry) => this.logAssistantChangeNow(entry),
+          get: (id) =>
+            this.db
+              .select()
+              .from(schema.assistantChanges)
+              .where(eq(schema.assistantChanges.id, id))
+              .get(),
+          undone: async (id, at) => {
+            await this.db
+              .update(schema.assistantChanges)
+              .set({ undoneAt: at })
+              .where(eq(schema.assistantChanges.id, id));
+          },
+        },
+      ),
     );
+  }
+
+  private async logAssistantChangeNow(
+    change: Omit<AssistantChange, "id" | "undoneAt">,
+  ): Promise<AssistantChange> {
+    const [row] = await this.db
+      .insert(schema.assistantChanges)
+      .values({ ...change, id: crypto.randomUUID(), undoneAt: null })
+      .returning();
+    // Only the latest are kept, by count and by size: the oldest beyond
+    // either go with each new one. The newest always stays.
+    await this.db.run(sql`
+      DELETE FROM assistant_changes WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            ROW_NUMBER() OVER latest AS n,
+            SUM(LENGTH(COALESCE(before_ics, '')) + LENGTH(COALESCE(after_ics, ''))) OVER latest AS bytes
+          FROM assistant_changes
+          WINDOW latest AS (ORDER BY at DESC, rowid DESC)
+        ) WHERE n > ${ASSISTANT_CHANGES_KEPT} OR (n > 1 AND bytes > ${ASSISTANT_CHANGES_BYTES})
+      )`);
+    return row!;
+  }
+
+  /** The changes assistants made through MCP, the latest first (D311). */
+  assistantChanges(): Promise<AssistantChange[]> {
+    return this.db
+      .select()
+      .from(schema.assistantChanges)
+      .orderBy(desc(schema.assistantChanges.at), sql`rowid DESC`)
+      .limit(ASSISTANT_CHANGES_KEPT);
   }
 
   /** Deletes an object on this device: at once if it never reached the server, else after the upload. */

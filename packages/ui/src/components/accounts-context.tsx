@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { serveAssistants } from "../assistants/serve.ts";
 import { browserEnvironment, SyncScheduler, type SyncStatus } from "../accounts/scheduler.ts";
 import { hasPendingFlow, heldApproval, SignIn } from "../accounts/sign-in.ts";
 import { everyRun, liveQuery, whileShown } from "../calendar/live.ts";
@@ -90,6 +91,18 @@ export function AccountsProvider({
       ),
     [platform, scheduler],
   );
+  // An assistant's calls through the shell's MCP endpoint run here, against
+  // this store, and a change is sent as the user's own (assistant D308).
+  useEffect(() => {
+    const { assistants } = platform;
+    if (!assistants) return;
+    // The tools themselves load with the first call (`serve.ts`).
+    return serveAssistants(assistants, {
+      store,
+      timeZone,
+      onChanged: () => scheduler.changed(),
+    });
+  }, [platform, store, timeZone, scheduler]);
   const status = useSyncExternalStore(
     (onChange) => scheduler.subscribe(onChange),
     () => scheduler.status,

@@ -16,8 +16,10 @@
   "devDependencies": {
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
+    "@astrotime/mcp": "workspace:*",
     "@astrotime/storage": "workspace:*",
     "@astrotime/ui": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:",
     "@playwright/test": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",

@@ -7,7 +7,8 @@
 // D171), its menu and its calendars, each shown or not (D137), reminders
 // (foundation D101), places on the map (D175), the data (import from a file,
 // import D265) and, on the desktop, whether closing the window quits
-// (desktop D75). Each applies at once and is kept on this device.
+// (desktop D75) and the assistants' MCP endpoint (assistant D308). Each
+// applies at once and is kept on this device.
 import type { Account, Calendar } from "@astrotime/storage";
 import { syncs } from "@astrotime/sync";
 import { Dialog } from "@base-ui/react/dialog";
@@ -15,11 +16,13 @@ import { Switch } from "@base-ui/react/switch";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { addAssistantStrings } from "../i18n/assistants.ts";
 import { addDataStrings } from "../i18n/data.ts";
 import { LANGUAGES } from "../i18n/index.ts";
 import { wikipediaOf } from "../places/photos.ts";
 import { CLOCKS, THEMES, useSettings, WEEK_STARTS, type Settings } from "../settings.ts";
 import { AccountRow, accountName, AddAccountButton } from "./accounts.tsx";
+import { AssistantSettings } from "./assistant-settings.tsx";
 import { useAccounts } from "./accounts-context.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
 import { deferred } from "./lazy.tsx";
@@ -106,6 +109,7 @@ function SettingsGroups({
   const { formats } = useCalendar();
   const { settings, change } = useSettings();
   const { platform, setSyncing } = useAccounts();
+  if (platform.assistants) addAssistantStrings(i18n);
   return (
     <>
       <Group title={t("settings.general")}>
@@ -257,6 +261,12 @@ function SettingsGroups({
       <Group title={t("settings.notifications")}>
         <RemindersSwitch />
       </Group>
+      {/* The MCP endpoint, where the shell serves one (assistant D308). */}
+      {platform.assistants ? (
+        <Group title={t("assistants.title")}>
+          <AssistantSettings assistants={platform.assistants} onLeave={onLeave} />
+        </Group>
+      ) : null}
       {platform.shell ? (
         <Group title={t("settings.desktop")}>
           <Toggle
@@ -385,7 +395,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Toggle({
+export function Toggle({
   label,
   checked,
   onChange,

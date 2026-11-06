@@ -158,4 +158,31 @@ export interface Platform {
    * (the desktop's page reaches no network itself, desktop D72).
    */
   readonly places?: Places;
+  /**
+   * AstroTime's MCP endpoint for assistants, where the shell serves one (the
+   * desktop's, assistant D308): Settings → Assistants turns it on, and the
+   * UI runs each call against its own store, as a click would.
+   */
+  readonly assistants?: Assistants;
+}
+
+/** The endpoint as Settings → Assistants shows it: on or off, its address and token. */
+export interface AssistantsState {
+  readonly enabled: boolean;
+  /** Where it listens; `null` while off, or when it could not listen (`error` says why). */
+  readonly url: string | null;
+  readonly token: string | null;
+  readonly error?: string;
+}
+
+/** A tool's answer: the item as the store holds it, or a refusal in words for the assistant. */
+export type AssistantAnswer = { readonly ok: unknown } | { readonly refused: string };
+
+export interface Assistants {
+  state(): Promise<AssistantsState>;
+  setEnabled(enabled: boolean): Promise<AssistantsState>;
+  /** Replaces the token: the old one is refused at once. */
+  newToken(): Promise<AssistantsState>;
+  /** Runs the endpoint's calls here; returns the function that stops it. */
+  serve(run: (tool: string, args: unknown) => Promise<AssistantAnswer>): () => void;
 }

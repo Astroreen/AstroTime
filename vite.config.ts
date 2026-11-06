@@ -104,6 +104,7 @@ export default defineConfig({
           "packages/google/src/**",
           "packages/microsoft/src/**",
           "packages/mesh/src/**",
+          "packages/mcp/src/**",
         ],
         rules: {
           "eslint/no-restricted-imports": [

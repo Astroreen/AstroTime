@@ -5,6 +5,7 @@ import type { HttpRequest } from "@astrotime/caldav";
 import { MAX_REMINDERS, type ScheduledReminder } from "@astrotime/core";
 
 import {
+  type AssistantAnswer,
   APP_HOST,
   APP_SCHEME,
   SECRET_SAVINGS,
@@ -168,4 +169,22 @@ export function isAppUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The most a tool's answer may hold: an item with its attachments' names, never their bytes. */
+const MAX_ANSWER_BYTES = 4 * 1024 * 1024;
+
+/** The page's answer to a call (assistant D308): its id, and the item or a refusal. */
+export function checkAssistantAnswer(id: unknown, value: unknown): [string, AssistantAnswer] {
+  const answer = (value ?? {}) as Record<string, unknown>;
+  const refused = "refused" in answer;
+  if (
+    !isText(id, 64) ||
+    refused === "ok" in answer ||
+    (refused && !isText(answer["refused"])) ||
+    JSON.stringify(value).length > MAX_ANSWER_BYTES
+  ) {
+    throw new TypeError("An answer is a call's id and its item or its refusal.");
+  }
+  return [id, refused ? { refused: answer["refused"] as string } : { ok: answer["ok"] }];
 }

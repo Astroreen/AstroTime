@@ -19,6 +19,10 @@ catalog:
   "@capacitor/cli": 8.6.0
   "@capacitor/core": 8.6.0
   "@capacitor/local-notifications": 8.3.1
+  # The MCP SDK's v2 line (docs/plans/assistant.md#D307): the server's
+  # web-standard handler, and the client the tests speak through.
+  "@modelcontextprotocol/client": 2.4.0
+  "@modelcontextprotocol/server": 2.4.0
   "@playwright/test": 1.61.1
   "@tailwindcss/vite": 4.3.3
   "@types/node": 24.19.2
@@ -46,6 +50,7 @@ catalog:
   typescript: 7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vite-plus: 1.3.0
+  zod: 4.6.7
 
 # Vite+ ships its own Vite core; route every `vite` request to it so the
 # toolchain has a single Vite and test-runner instance (as in Jhin).
