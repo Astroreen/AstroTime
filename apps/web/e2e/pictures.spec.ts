@@ -20,7 +20,7 @@ const PHOTO = Buffer.from(
 const loaded = (picture: Locator) =>
   picture.evaluate((img: HTMLImageElement) => img.decode().then(() => img.naturalWidth > 0));
 
-test("a lunch is drawn over its picture in the Agenda and its details; a stand-up is not (D215, D216)", async ({
+test("a lunch is drawn over its picture in the Agenda and its details; a design review is not (D215, D216)", async ({
   page,
 }) => {
   await openDemo(page, "agenda");
@@ -32,8 +32,9 @@ test("a lunch is drawn over its picture in the Agenda and its details; a stand-u
   // Its height is the card's own, before the picture and after it (no shift).
   expect((await lunch.boundingBox())?.height).toBe(104);
   // An item with no theme's word is the plain card.
-  const standUp = page.getByRole("listitem", { name: /^Stand-up/ }).first();
-  await expect(standUp.locator("img")).toHaveCount(0);
+  // (A stand-up is a meeting since D298, drawn over its picture.)
+  const review = page.getByRole("listitem", { name: /^Design review/ }).first();
+  await expect(review.locator("img")).toHaveCount(0);
 
   await lunch.getByRole("button").click();
   const details = page.getByRole("dialog", { name: "Lunch with Marta" });
