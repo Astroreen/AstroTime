@@ -112,7 +112,9 @@ export function CalendarScreen({
   const [keptHour, setHour] = usePreference(
     preferences,
     KEYS.hour,
-    (stored) => hourIn(Number(stored) || HOUR),
+    // Clamped as drawn, not as kept: at 130 % the least hour drawn, 24 px,
+    // is kept as 18.5. Any positive number reads back as it was.
+    (stored) => (Number(stored) > 0 ? Number(stored) : HOUR),
     String,
   );
   const textScale = chosen.textSize / 100;
@@ -136,7 +138,7 @@ export function CalendarScreen({
           detach = zoomable(
             main,
             () => hourNow.current,
-            (drawn) => setHour(drawn / scaleNow.current),
+            (drawn) => setHour(Math.round((drawn / scaleNow.current) * 100) / 100),
             () => HOUR * scaleNow.current,
           );
       });
