@@ -149,7 +149,9 @@ change the user's events and tasks.
   [D7](foundation.md#D7)). Its tools: list the calendars; search items and
   list them over a range; get one; create an event or a task; change one
   (the fields it names, the rest kept); complete a task; add an attachment;
-  delete. Every tool's input is checked against its schema and its result is
+  delete; and `undo` on AstroTime's server ([D309](#D309)), where no
+  window offers [D311](#D311)'s "Undo" (the desktop has none: its log is
+  undone in Settings). Every tool's input is checked against its schema and its result is
   the item as the store holds it. Read-only tools carry `readOnlyHint`.
 - **D308. First in the desktop app, beside the store.** The desktop app
   ([desktop D73](desktop.md#D73)) serves MCP's streamable HTTP on
@@ -223,9 +225,9 @@ trailhead.
 
 ### PR AS2 — `parseQuick`
 
-D300. The parser, the English and Russian packs, `chrono-node`; recorded
-lines in both languages as tests. After design's quick create (PR L2) it is
-wired into it: D301.
+D300, D301. Started once design's quick create (PR L2) is merged: the
+parser, the English and Russian packs, `chrono-node`, recorded lines in
+both languages as tests, and its wiring into quick create.
 
 Done when: with `now` Thursday 2026-11-05 10:00 in `Europe/Moscow` unless
 a case names another, the tests read:
