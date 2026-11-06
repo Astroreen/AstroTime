@@ -33,9 +33,18 @@ change the user's events and tasks.
   end or a length, an all-day flag, a place, the kind (event or task), a
   reminder, and the title that is left. Rules, not a model: offline,
   instant, the same on every platform, and testable.
-  - **Dates and times** are `chrono-node`'s (pure JS, isomorphic; its
-    locales in 2.10.3: ar, de, en, es, fi, fr, id, it, ja, nl, pt, ru, sv,
-    uk, vi, zh).
+  - **Dates and times** are `chrono-node`'s (its locales in 2.10.3: ar,
+    de, en, es, fi, fr, id, it, ja, nl, pt, ru, sv, uk, vi, zh). PR AS2
+    shows its packed ESM imports no Node or DOM module
+    ([foundation D24](foundation.md#D24)), imports each language's entry
+    point alone (`chrono-node/en`, `chrono-node/ru`), never the index of
+    all, and the parser is a chunk that loads with quick create, not on
+    the first load ([foundation D145](foundation.md#D145)).
+  - **The zone is AstroTime's.** chrono reads against a reference instant
+    and an offset, not an IANA zone: `parseQuick` takes its wall-clock
+    pieces (a day, an hour) and resolves them in `zone` with core's own
+    time code, so a DST gap or a late hour is resolved as the editor
+    resolves it.
   - **The rest** is a **language pack**, `parse/<lang>.ts`: data in one
     schema for every language (words that open a place, «в», "at", "bei";
     lengths, «1 час», "for 2 hours"; words that make a task, «купить»,
@@ -90,13 +99,15 @@ change the user's events and tasks.
   WebAssembly) is the app's own files, under the `wasm-unsafe-eval`
   [foundation D110](foundation.md#D110) already allows. The model is not:
   it comes from Hugging Face, a pinned revision whose files' SHA-256 the
-  app knows, the one download from another origin, and only once the user
-  agreed to it, as the place search names Photon
+  app knows, fetched from another origin only once the user agreed to it, as the place search names Photon
   ([foundation D178](foundation.md#D178)). On the web it is fetched through the
   proxy's `/models/` route, which reaches Hugging Face alone and follows
   its redirects itself only to Hugging Face's own download hosts (its
-  CDN), checking each file's SHA-256 as it streams; the desktop and
-  Android fetch it through the platform's HTTP, with the same check.
+  CDN); the desktop and Android fetch it through the platform's HTTP. The
+  client checks each whole file's SHA-256 before the runtime loads it and
+  keeps none that differs. The runtime's workers are the app's own files
+  (`worker-src 'self'`); one that would start a `blob:` worker is
+  configured not to, or is not used.
 - **D304. A server: any OpenAI-compatible one.** One interface,
   `POST /v1/audio/transcriptions`, as whisper.cpp's server, speaches
   (faster-whisper), LocalAI, OpenAI and Groq serve it. The setting takes

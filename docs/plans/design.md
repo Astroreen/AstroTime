@@ -2479,7 +2479,12 @@ keywords". The quick parse and voice that fill quick create are the
   origin ([D43](#D43)). Kept with the other settings on this device (D96).
   The seven bundled fonts are under the SIL Open Font Licence 1.1; each ships with its
   licence beside its files (`fonts/<name>/OFL.txt`), and the README's
-  credits name them.
+  credits name them. They need `font-src 'self'`, which
+  [foundation D110](foundation.md#D110)'s policy lacks: PR L1 adds it and
+  amends D110. The seven with Cyrillic, in the weights used, are about
+  1 MB of WOFF2: none is in the first load, the PWA's precache leaves them
+  out (cached once chosen), and the desktop and Android packages carry
+  them, which their size reports state.
 - **D295. A text size of the user's choice, seen as it is set.** Settings
   → General → Text size, under Font, in steps from 85 % to 130 % (100 % the
   default), scales the whole type scale ([D134](#D134)), hour heights and
@@ -2825,15 +2830,18 @@ in both themes:
 
 - **PR L1** — the font and the text size (D294, D295). Done when: each
   font is chosen in Settings and the app's text is drawn in it (the
-  computed `font-family` of a card, a heading and a button), none is
+  computed `font-family` of a card, a heading and a button, and
+  `document.fonts` reporting it loaded under the real CSP), none is
   fetched before it is chosen, and 85 % and 130 % keep every view free of
   clipped text on a phone and a wide screen (screenshots, both themes).
 - **PR L2** — quick create and the lighter editor (D296, D297). Done when:
   e2e makes an event and a task through quick create on a phone and a wide
   screen, dragging the sheet up opens the editor with its title, time,
-  place and calendar carried over, Enter saves and Escape closes, and
-  `editing.spec.ts` passes with D205's measures (screenshots before and
-  after).
+  place and calendar carried over, Enter saves and Escape closes. The specs
+  that open the editor from a slot, the floating button or "Create" now
+  reach it through quick create's "Expand" (one helper), so
+  `editing.spec.ts` still measures D205 on the full editor; D132, D155 and
+  D205 get their "amended by" notes (screenshots before and after).
 - **PR L3** — the pictures drawn again, and the new subjects (D298). Done
   when: every illustration and banner is rendered at its sizes and the gap
   check passes on each, and the screenshots before and after sit side by
