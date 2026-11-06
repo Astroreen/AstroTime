@@ -37,6 +37,7 @@ export function TypeSettings({ rowClassName }: { rowClassName: string }) {
     const request = ++latest.current;
     if (font === "system") {
       setPending(null);
+      setAsked(null);
       change({ font });
       return;
     }

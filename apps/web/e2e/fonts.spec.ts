@@ -102,6 +102,12 @@ test("a font that cannot be fetched leaves the text as it was and says so; it co
   // The system's own list names Roboto too, after its own fonts.
   await expect(page.locator("body")).not.toHaveCSS("font-family", /^"?Roboto"?, /);
 
+  // The system's font, which needs no files, says nothing more of Roboto.
+  await choose(font, "System default");
+  await expect(settings.getByText(/could not be downloaded/)).toHaveCount(0);
+  await choose(font, "Roboto");
+  await expect(settings.getByText(/^Roboto could not be downloaded\./)).toBeVisible();
+
   offline = false;
   // Another font that comes clears the message; Roboto comes too, once the network does.
   await choose(font, "Nunito");
