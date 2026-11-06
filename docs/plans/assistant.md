@@ -93,8 +93,10 @@ change the user's events and tasks.
   app knows, the one download from another origin, and only once the user
   agreed to it, as the place search names Photon
   ([foundation D178](foundation.md#D178)). On the web it is fetched through the
-  proxy's `/models/` route, which reaches that one host alone; the desktop
-  and Android fetch it through the platform's HTTP.
+  proxy's `/models/` route, which reaches Hugging Face alone and follows
+  its redirects itself only to Hugging Face's own download hosts (its
+  CDN), checking each file's SHA-256 as it streams; the desktop and
+  Android fetch it through the platform's HTTP, with the same check.
 - **D304. A server: any OpenAI-compatible one.** One interface,
   `POST /v1/audio/transcriptions`, as whisper.cpp's server, speaches
   (faster-whisper), LocalAI, OpenAI and Groq serve it. The setting takes
@@ -248,7 +250,9 @@ D307, D308, D310, D311.
 
 Done when: an MCP client in tests lists, creates, changes and deletes an
 item through the desktop app's endpoint, the store holds each change, sync
-sends it, and "Undo" in the log puts it back.
+sends it, and "Undo" in the log puts it back; and a request with a missing
+or wrong token, a foreign `Host` or any `Origin` is refused, and the old
+token is refused after "New token".
 
 ### PR AS5 — MCP on AstroTime's server
 

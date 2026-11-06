@@ -2477,7 +2477,7 @@ keywords". The quick parse and voice that fill quick create are the
   it is chosen, never at the first load
   ([foundation D145](foundation.md#D145)); nothing comes from another
   origin ([D43](#D43)). Kept with the other settings on this device (D96).
-  All eight are under the SIL Open Font Licence 1.1; each ships with its
+  The seven bundled fonts are under the SIL Open Font Licence 1.1; each ships with its
   licence beside its files (`fonts/<name>/OFL.txt`), and the README's
   credits name them.
 - **D295. A text size of the user's choice, seen as it is set.** Settings

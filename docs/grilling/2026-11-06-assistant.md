@@ -39,7 +39,7 @@ how they were reached.
 | Q10 | Which recogniser when        | **changed:** "always let the user choose; a setting of its own"                                                                   | D302     |
 | Q11 | After recognition            | quick create filled, nothing saved by itself                                                                                      | D306     |
 | Q12 | A lighter editor             | **asked for a prototype** before deciding                                                                                         | D297     |
-| Q13 | Which fonts                  | eight with Cyrillic, 85–130 %, the preview in Settings                                                                            | D294     |
+| Q13 | Which fonts                  | System and seven bundled, with Cyrillic, 85–130 %, the preview in Settings                                                        | D294     |
 | Q14 | Parallax                     | a fallback where there are no scroll timelines, and in the cards                                                                  | D299     |
 | Q15 | How to draw better           | SVG drawn again, each checked rendered; painted pictures deferred                                                                 | D298     |
 | Q16 | What MCP reads and writes    | **asked:** "why can it not change the client's database directly? and a file?" — it can, in the desktop app; a page opens no port | D308     |
