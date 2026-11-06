@@ -76,8 +76,9 @@ change the user's events and tasks.
   no microphone button anywhere: a phone's keyboard has its own dictation,
   and its words go through `parseQuick` like typed ones. On, the button
   stands in quick create, beside "Save". Recording needs the microphone,
-  which [foundation D110](foundation.md#D110)'s `Permissions-Policy` turned
-  off: it becomes `microphone=(self)`, the page's own and no frame's, and
+  which [foundation D110](foundation.md#D110)'s `Permissions-Policy` turns
+  off (`microphone=()` in `apps/proxy/src/server.ts`): PR AS3 makes it
+  `microphone=(self)`, the page's own and no frame's, and amends D110 then;
   the browser still asks the user the first time.
 - **D303. Whisper on this device.** A Whisper model run in the page
   (WASM, WebGPU where there is one): tiny (about 40 MB), base (about 75 MB,
@@ -104,10 +105,15 @@ change the user's events and tasks.
   the settings. Audio goes only to the server the user entered:
   "Automatic" means that server or this device, never another. The
   request goes through the platform's HTTP as CalDAV's does: on the web
-  through the proxy ([foundation D39](foundation.md#D39)), the speech
-  server's origin on its allowlist and only its `/v1/audio/transcriptions`
-  and `/v1/models` passed, so the page's `connect-src 'self'` stays; on the
-  desktop and Android from outside the page.
+  through the proxy ([foundation D39](foundation.md#D39)), so the page's
+  `connect-src 'self'` stays. The proxy's allowlist is the operator's (an
+  environment variable), not the user's: on the web a speech server is
+  usable only when the operator listed its origin, or it is the image's own
+  server, and an address off the list is refused in the setting with why
+  ("this AstroTime's operator does not allow that server"). The desktop and
+  Android take any address, from outside the page. PR AS3 amends D39 for
+  the speech server's two paths and the `/models/` route of
+  [D303](#D303).
   AstroTime's own server
   ([server D281](server.md#D281)) can serve the same endpoint; it is not
   required to.
@@ -208,8 +214,8 @@ D300. The parser, the English and Russian packs, `chrono-node`; recorded
 lines in both languages as tests. After design's quick create (PR L2) it is
 wired into it: D301.
 
-Done when: with `now` Thursday 2026-11-05 10:00 in `Europe/Moscow`, the
-tests read:
+Done when: with `now` Thursday 2026-11-05 10:00 in `Europe/Moscow` unless
+a case names another, the tests read:
 
 - «завтра в 13 обед с Машей в Кофемании 1 час» as an event, 2026-11-06
   13:00–14:00, place «Кофемании», title «обед с Машей», with the spans of
@@ -219,9 +225,11 @@ tests read:
 - «завтра купить хлеб» as an all-day task on 2026-11-06;
 - «отпуск с 10 по 14 декабря» as an all-day event 2026-12-10 to 14
   (`DTEND` the 15th);
-- «завтра» at 23:30 as the next day in the user's zone, not UTC's, and a
-  time that a DST change skips («в 2:30» on a spring-forward day) as the
-  zone resolves it, as the editor does;
+- «завтра в 9 стендап» with `now` 2026-11-05 23:30 in `America/New_York`
+  (04:30 the next day in UTC) as 2026-11-06 09:00 there, not the 7th;
+- «14 марта в 2:30 звонок» with `now` 2027-03-01 in `America/New_York`,
+  a time that day's spring-forward skips, as 03:30, as the editor resolves
+  it;
 
 and quick create marks them as they are typed (e2e, both languages).
 
