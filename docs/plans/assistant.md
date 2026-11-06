@@ -54,6 +54,18 @@ change the user's events and tasks.
   left. A mark tapped is undone (its words go back to the title, its row to
   what it was); a row the user set by hand is never overwritten by a later
   parse.
+  - **The title stays a plain `<input>`.** The marks are an overlay behind
+    it (a mirror of the input with its font, padding and scroll, its text
+    transparent, the spans filled), `aria-hidden`, so the accessibility
+    tree holds one text field as before. What was understood is said by
+    the rows themselves and once more by a polite live region ("Friday,
+    13:00–14:00, Кофемания") after typing pauses on a change. Undoing a
+    mark is also in the row's own menu ("Keep in the title"), so it needs
+    no tap on the overlay.
+  - **IME composition**: the line is parsed on `compositionend`, never in
+    the middle of a composition; Enter that ends a composition does not
+    save, as [design D206](design.md#D206)'s "Custom…" already holds.
+    Enter saves and Escape closes as [design D296](design.md#D296) says.
 
 ### Voice
 
@@ -75,7 +87,12 @@ change the user's events and tasks.
   `POST /v1/audio/transcriptions`, as whisper.cpp's server, speaches
   (faster-whisper), LocalAI, OpenAI and Groq serve it. The setting takes
   the server's address and token, and the model is picked from what its
-  `GET /v1/models` lists. AstroTime's own server
+  `GET /v1/models` lists. The token is kept as an account's credentials
+  are, in the platform's secrets ([foundation D89](foundation.md#D89),
+  [android D64](android.md#D64), [desktop D74](desktop.md#D74)), never in
+  the settings. Audio goes only to the server the user entered:
+  "Automatic" means that server or this device, never another.
+  AstroTime's own server
   ([server D281](server.md#D281)) can serve the same endpoint; it is not
   required to.
 - **D305. Android's own recogniser, offline only.** `SpeechRecognizer`

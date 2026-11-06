@@ -129,8 +129,9 @@ the project.
   far as white needs (CSS relative colours), so any calendar colour reads
   (D47; the rule is [D120](#D120)'s, which replaced black or white text by
   OKLCH lightness); a done task's fill is its colour mixed 45% into the
-  grid's, darkened the same way. Fonts are the system's (or one the user picks, [D294](#D294)) and the
-  icons AstroTime's own SVG, so nothing loads from another origin (D43). An
+  grid's, darkened the same way. Fonts are the system's (or one the user
+  picks, [D294](#D294)) and the icons AstroTime's own SVG, so nothing loads
+  from another origin (D43). An
   hour is 56 px tall; from 1024 px wide the drawer is a sidebar (D46).
 - **D59. Details read from the reference for the time grid:**
   - the top bar names the month, both months across a change of month
@@ -2476,6 +2477,9 @@ keywords". The quick parse and voice that fill quick create are the
   it is chosen, never at the first load
   ([foundation D145](foundation.md#D145)); nothing comes from another
   origin ([D43](#D43)). Kept with the other settings on this device (D96).
+  All eight are under the SIL Open Font Licence 1.1; each ships with its
+  licence beside its files (`fonts/<name>/OFL.txt`), and the README's
+  credits name them.
 - **D295. A text size of the user's choice, seen as it is set.** Settings
   → General → Text size, under Font, in steps from 85 % to 130 % (100 % the
   default), scales the whole type scale ([D134](#D134)), hour heights and
