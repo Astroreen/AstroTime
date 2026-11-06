@@ -27,8 +27,10 @@ export interface CalendarContextValue {
   readonly weekNumbers: boolean;
   /** The occurrence just saved from the edit dialog, which lands with motion once (design D193). */
   readonly landed?: Landed | null;
-  /** Pixels per hour of the time grid, as last pinched on this device (design D192). */
+  /** Pixels per hour of the time grid, as last pinched on this device (design D192), at the text size. */
   readonly hour: number;
+  /** The text size as a factor of the type scale, 0.85 to 1.3 (design D295); 1 if not given. */
+  readonly textScale?: number;
   /** The stored object a search jumped to, marked on the views (design D53). */
   readonly found?: string | null;
 }

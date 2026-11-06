@@ -205,7 +205,7 @@ function StaticMap({
         href="https://www.openstreetmap.org/copyright"
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute right-0 bottom-0 rounded-tl-md bg-white/85 px-1.5 py-0.5 text-[0.6875rem] leading-4 text-[#1b1e25] hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+        className="absolute right-0 bottom-0 rounded-tl-md bg-white/85 px-1.5 py-0.5 text-tiny leading-4 text-[#1b1e25] hover:underline focus-visible:outline-2 focus-visible:outline-accent"
       >
         {t("places.attribution")}
       </a>

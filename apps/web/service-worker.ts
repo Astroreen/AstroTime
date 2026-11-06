@@ -2,7 +2,8 @@
 // `sw/sw.ts` becomes `/sw.js` beside the page, and the list of every file
 // the build wrote (and the public ones: the manifest and its icons), with a
 // hash of them as the version, is written into it; the pictures (design
-// D219) in a list of their own, kept as each is first shown. Only the build has one;
+// D219) and the bundled fonts (design D294) in a list of their own, kept as
+// each is first shown or chosen. Only the build has one;
 // the dev server registers none (src/main.tsx).
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -11,8 +12,8 @@ import { join, relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
 const SW = "sw.js";
-/** Where the build writes the pictures (`vite.config.ts`, design D219). */
-const PICTURES = "assets/pictures/";
+/** Where the build writes the pictures and the fonts (`vite.config.ts`, design D219, D294). */
+const KEPT_WHEN_USED = ["assets/pictures/", "assets/fonts/"];
 
 /** Every file under `dir`, as paths relative to it with `/`, sorted. */
 function filesUnder(dir: string): string[] {
@@ -69,8 +70,11 @@ export function serviceWorker(): Plugin {
       if (page?.type === "asset") hash.update("index.html").update(page.source);
       const all = [base, ...[...built, ...own].toSorted().map((file) => `${base}${file}`)];
       for (const file of all) hash.update(file);
-      // The pictures (design D219) are kept as each is first shown, not with the app.
-      const isPicture = (file: string) => file.startsWith(`${base}${PICTURES}`);
+      // The pictures (design D219) are kept as each is first shown, not with
+      // the app, and the fonts as each is chosen (design D294): the worker
+      // treats both as its pictures.
+      const isPicture = (file: string) =>
+        KEPT_WHEN_USED.some((dir) => file.startsWith(`${base}${dir}`));
       const files = all.filter((file) => !isPicture(file));
       const pictures = all.filter(isPicture);
       const version = hash.digest("base64url").slice(0, 16);

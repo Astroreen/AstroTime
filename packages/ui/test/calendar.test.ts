@@ -202,6 +202,8 @@ describe("the drawer's settings override the locale (D53)", () => {
   test("what was stored is read back; anything unreadable is the default", () => {
     const chosen = {
       theme: "light",
+      font: "pt-sans",
+      textSize: 115,
       language: "ru",
       weekStart: 6,
       clock: 24,
@@ -237,6 +239,11 @@ describe("the drawer's settings override the locale (D53)", () => {
     expect(readSettings('{"placePhotos":"no"}').placePhotos).toBe(true);
     // A completed task is celebrated too (design D198).
     expect(readSettings('{"celebrate":"no"}').celebrate).toBe(true);
+    // A font AstroTime does not bundle, and a text size off its steps (design D294, D295).
+    expect(readSettings('{"font":"Comic Sans","textSize":112}')).toMatchObject({
+      font: "system",
+      textSize: 100,
+    });
     // The user's own words and banners (design D223): only readable entries.
     expect(
       readSettings(

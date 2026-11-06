@@ -1,6 +1,7 @@
 /*
  * AstroTime's look (design D43, D44): dense like Google Calendar, in a calm
- * palette of its own; system fonts, nothing loaded from elsewhere. Dark was
+ * palette of its own; the system's font or one the user picks of the app's
+ * own files (D294), nothing loaded from elsewhere. Dark was
  * designed first. The theme follows the system (`color-scheme: light dark`
  * and `light-dark()`); `data-theme="light"` or `"dark"` on the root element
  * overrides it (the setting is PR 5b's, design D53).
@@ -39,28 +40,31 @@
   /*
    * The type scale (design D134): eight sizes, each a role, and the fields',
    * instead of the sixteen the UI had grown. Dense as Google Calendar (D43):
-   * an item's title on the grid is 11.5 px, a dialog's title 19 px.
+   * an item's title on the grid is 11.5 px, a dialog's title 19 px. Each is
+   * scaled by the user's text size (design D295): `--text-scale` on the
+   * root, 0.85 to 1.3, which `app.tsx` sets.
    */
   /* The smallest: hour labels, the month picker's weekdays, chips and "+N"
    * where columns are narrow (a phone's Week, the Month). */
-  --text-tiny: 11px;
+  --text-tiny: calc(11px * var(--text-scale, 1));
   /* An item's title on the grid, the strip and the Month. */
-  --text-chip: 11.5px;
+  --text-chip: calc(11.5px * var(--text-scale, 1));
   /* Hints and second lines under a name. */
-  --text-note: 12.5px;
+  --text-note: calc(12.5px * var(--text-scale, 1));
   /* Group headings, secondary text, compact controls. */
-  --text-small: 13px;
+  --text-small: calc(13px * var(--text-scale, 1));
   /* Body text: rows, fields, settings. */
-  --text-body: 14px;
+  --text-body: calc(14px * var(--text-scale, 1));
   /* A list's main line: a task, a tab, a search field. */
-  --text-row: 15px;
+  --text-row: calc(15px * var(--text-scale, 1));
   /* A dialog's or a day's title, the drawer's wordmark. */
-  --text-title: 19px;
+  --text-title: calc(19px * var(--text-scale, 1));
   /* A screen's title, an item's in its details and editor, the period. */
-  --text-headline: 22px;
+  --text-headline: calc(22px * var(--text-scale, 1));
   /* Every field that takes text or a choice: a browser zooms the page into
-   * one under 16 px when it gets the focus (iOS Safari), so none is smaller. */
-  --text-input: 16px;
+   * one under 16 px when it gets the focus (iOS Safari), so none is smaller,
+   * whatever the text size. */
+  --text-input: max(16px, calc(16px * var(--text-scale, 1)));
   /* An all-day row shown anew as the strip opens (design D193). */
   --animate-row-in: row-in 180ms cubic-bezier(0.2, 0, 0, 1);
   @keyframes row-in {
@@ -181,6 +185,11 @@
       border-width: 2px;
       background-color: var(--scrollbar-active);
     }
+  }
+  /* A font the user picked (design D294), once its files came: `app.tsx`
+   * sets `--font-chosen` on the root; else Tailwind's, the system's. */
+  html {
+    font-family: var(--font-chosen, var(--default-font-family));
   }
   html,
   body {

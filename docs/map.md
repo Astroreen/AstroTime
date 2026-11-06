@@ -362,6 +362,9 @@ When you add a package, app or module, add its line here in the same PR.
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
       screen), from the drawer's foot. → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
+    - `type-settings.tsx` — Settings' "Font" and "Text size", with their
+      live preview (the Agenda's day heading and cards). → `plans/design.md#D294`,
+      `plans/design.md#D295`
     - `lazy.tsx` — dialogs that load with their first opening: the
       details, quick create, the edit dialog, Settings, the Conflicts list, the sign-in
       dialog (`plans/providers.md#D255`), and the copy's notice
@@ -538,10 +541,16 @@ When you add a package, app or module, add its line here in the same PR.
     and `import.ts`, Settings' "Data" group's and the import dialog's
     (`plans/import.md#D273`), `new-list.ts`, "+ New list"'s
     (`plans/design.md#D276`), `assistants.ts`, Settings → Assistants'
-    (`plans/assistant.md#D308`).
+    (`plans/assistant.md#D308`), `type.ts`, the font's and text size's
+    (`plans/design.md#D294`).
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
+  - `fonts/` — the seven bundled fonts, WOFF2 with their licences
+    (`<name>/OFL.txt`), made by `scripts/fonts.sh`; `index.ts`, the list,
+    `loadFont` (every file, then its faces in `document.fonts`) and
+    `useFontFailure`; `faces.ts`, the files' URLs, a chunk of its own.
+    → `plans/design.md#D294`
   - `demo/` (`@astrotime/ui/demo`) — demo data around today, for the dev
     server, tests and screenshots, with a read-only calendar and a conflict
     to resolve. → `plans/foundation.md#D57`
@@ -600,13 +609,16 @@ When you add a package, app or module, add its line here in the same PR.
     (`import-files.ts`, the files they pick). → `plans/import.md#D265`;
     `idle.spec.ts` counts React commits in the Month view across another
     tab's change: an idle tab does no work, a hidden one waits.
-    → `plans/foundation.md#D181`, `plans/foundation.md#D182`
+    → `plans/foundation.md#D181`, `plans/foundation.md#D182`;
+    `fonts.spec.ts` chooses each font (none fetched before), one with no
+    network, and the text size. → `plans/design.md#D294`, `plans/design.md#D295`
   - `e2e/built/` — the production build on the image's server, under its
     Content Security Policy, with no violation. → `plans/foundation.md#D110`;
     `offline.spec.ts` reloads it with the network gone, updates it, and
-    reads its manifest. → `plans/foundation.md#D124`; `csp.spec.ts` also
-    opens a place's map and searches a place under the policy.
-    → `plans/foundation.md#D178`
+    reads its manifest, and keeps a font once chosen. → `plans/foundation.md#D124`;
+    `csp.spec.ts` also opens a place's map and searches a place under the
+    policy (→ `plans/foundation.md#D178`) and loads a bundled font
+    (→ `plans/design.md#D294`).
   - `dav-proxy.ts` — the CORS proxy in the dev server. → `plans/foundation.md#D39`,
     its rules beyond localhost `plans/foundation.md#D20`
   - `dev-clients.ts` — lets in only loopback and tailnet clients when the dev
@@ -711,6 +723,9 @@ When you add a package, app or module, add its line here in the same PR.
   (`xvfb-run -a pnpm --filter @astrotime/desktop e2e`). → `plans/desktop.md#D79`
 - `scripts/t3/` — `dev.sh` starts the web dev server and a local Radicale,
   `stop.sh` stops them, `smoke.sh` proves both. → `../scripts/t3/README.md`
+- `scripts/fonts.sh` — makes the bundled fonts in `packages/ui/src/fonts/`
+  from their Fontsource packages, narrowed with fontTools.
+  → `plans/design.md#D294`
 - `scripts/docs.test.ts` — checks the context library's routes.
   → `README.md#how-knowledge-is-arranged`
 - `scripts/generate-windows-zones.ts` — fetches a pinned Unicode CLDR

@@ -11,6 +11,7 @@ import { pictureStrings } from "../src/i18n/pictures.ts";
 import { signInStrings } from "../src/i18n/sign-in.ts";
 import { subscribeStrings } from "../src/i18n/subscribe.ts";
 import { taskStrings } from "../src/i18n/tasks.ts";
+import { typeStrings } from "../src/i18n/type.ts";
 
 const PLURAL = /_(zero|one|two|few|many|other)$/;
 const base = (key: string) => key.replace(PLURAL, "");
@@ -76,7 +77,7 @@ test("plurals follow each language's rules", () => {
   ]);
 });
 
-test("the strings that load later have the same keys in every language (design D222, D236, D237, providers D262, D263, import D273, design D276)", () => {
+test("the strings that load later have the same keys in every language (design D222, D236, D237, providers D262, D263, import D273, design D276, D294)", () => {
   for (const later of [
     pictureStrings,
     fileStrings,
@@ -86,6 +87,7 @@ test("the strings that load later have the same keys in every language (design D
     dataStrings,
     importStrings,
     newListStrings,
+    typeStrings,
   ] as Record<"en" | "ru", Record<string, string>>[]) {
     const bases = (catalog: Record<string, string>) =>
       [...new Set(Object.keys(catalog).map(base))].toSorted();

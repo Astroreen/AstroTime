@@ -52,12 +52,20 @@ export default defineConfig({
     manifest: true,
     rolldownOptions: {
       output: {
-        // The pictures (design D219) apart from the other files: the service
-        // worker keeps each as it is first shown, not with the app (D124).
-        assetFileNames: (asset) =>
-          asset.originalFileNames.some((name) => name.includes("/pictures/art/"))
-            ? "assets/pictures/[name]-[hash][extname]"
-            : "assets/[name]-[hash][extname]",
+        // The pictures (design D219) and the bundled fonts (design D294) apart
+        // from the other files: the service worker keeps each as it is first
+        // shown or chosen, not with the app (D124).
+        assetFileNames: (asset) => {
+          if (asset.originalFileNames.some((name) => name.includes("/pictures/art/")))
+            return "assets/pictures/[name]-[hash][extname]";
+          // `fonts/inter/latin.woff2` as `assets/fonts/inter-latin-…`.
+          const font = asset.originalFileNames
+            .map((name) => /\/fonts\/([\w-]+)\/[\w-]+\.woff2$/.exec(name)?.[1])
+            .find(Boolean);
+          return font
+            ? `assets/fonts/${font}-[name]-[hash][extname]`
+            : "assets/[name]-[hash][extname]";
+        },
         // Libraries in chunks of their own (docs/plans/foundation.md#D145): an
         // update of AstroTime's own code leaves them in the browser's cache.
         // Only what the page loads at once (`$initial`): a library only a

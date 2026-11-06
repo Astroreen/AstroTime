@@ -65,7 +65,7 @@ export function contentSecurityPolicy(
   // What it draws: the map's tiles, and Wikimedia's photos.
   const images = origins([PLACES.tiles, ...PLACES.photos]);
   return [
-    // Nothing the app does not ask for below: no frames, objects, fonts or media.
+    // Nothing the app does not ask for below: no frames, objects or media.
     "default-src 'none'",
     // The app's own scripts; SQLite's WebAssembly compiles in the store's worker.
     "script-src 'self' 'wasm-unsafe-eval'",
@@ -82,6 +82,8 @@ export function contentSecurityPolicy(
     // The user's own pictures, drawn from object URLs of their bytes (design
     // D222), which 'self' does not match.
     `img-src 'self' blob:${images}`,
+    // The fonts AstroTime bundles, files of its own, fetched once one is chosen (design D294).
+    "font-src 'self'",
     "base-uri 'none'",
     // Forms are handled by the app; none is ever submitted to a URL.
     "form-action 'none'",

@@ -2,18 +2,24 @@
 // start and clock, whether completed tasks (D51) and the week numbers
 // (D169) show on the views, the colours new items start with and the
 // user's own (D172, D173), whether reminders notify (foundation D101), the
-// pictures the Agenda and the details are drawn with (D217), and whether
-// completing a task is celebrated (D198).
+// pictures the Agenda and the details are drawn with (D217), whether
+// completing a task is celebrated (D198), and the font and text size (D294,
+// D295).
 // Kept in the app's preferences as one value and applied at once.
 import { isColorName } from "@astrotime/core";
 import { createContext, useContext } from "react";
 
 import type { LocaleSettings } from "./calendar/locale.ts";
+import { FONTS, type Font } from "./fonts/index.ts";
 import { LANGUAGES, type Language } from "./i18n/index.ts";
 
 export const THEMES = ["system", "dark", "light"] as const;
 /** `system` follows the device; the others set `data-theme` on the root (design D58). */
 export type Theme = (typeof THEMES)[number];
+
+/** The text sizes, in percent of the type scale (design D295). */
+export const TEXT_SIZES = [85, 90, 95, 100, 105, 110, 115, 120, 125, 130] as const;
+type TextSize = (typeof TEXT_SIZES)[number];
 
 /** The weekdays a week may start on, ISO-numbered: Monday, Sunday, Saturday. */
 export const WEEK_STARTS = [1, 7, 6] as const;
@@ -39,6 +45,10 @@ export interface OwnWord {
 
 export interface Settings {
   readonly theme: Theme;
+  /** The app's font: the system's, or one AstroTime bundles (design D294). */
+  readonly font: Font;
+  /** The whole type scale, in percent (design D295). */
+  readonly textSize: TextSize;
   readonly language: "system" | Language;
   readonly weekStart: "locale" | (typeof WEEK_STARTS)[number];
   readonly clock: "locale" | (typeof CLOCKS)[number];
@@ -81,6 +91,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
+  font: "system",
+  textSize: 100,
   language: "system",
   weekStart: "locale",
   clock: "locale",
@@ -114,6 +126,8 @@ export function readSettings(stored: string | null): Settings {
   const d = DEFAULT_SETTINGS;
   return {
     theme: oneOf(THEMES, value.theme, d.theme),
+    font: oneOf(FONTS, value.font, d.font),
+    textSize: oneOf(TEXT_SIZES, value.textSize, d.textSize),
     language: oneOf(["system", ...LANGUAGES] as const, value.language, d.language),
     weekStart: oneOf(["locale", ...WEEK_STARTS] as const, value.weekStart, d.weekStart),
     clock: oneOf(["locale", ...CLOCKS] as const, value.clock, d.clock),

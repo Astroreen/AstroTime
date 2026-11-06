@@ -2,8 +2,8 @@
 // served by the web image's own server: the store opens (wasm in a worker, on
 // OPFS), an account is added through /dav-proxy/, its event's details (with
 // its place's map, D178, its photo, design D220, and an inline attachment
-// saved, design D230) and edit dialog (with Location's search) open, and
-// the browser reports not one violation. The
+// saved, design D230) and edit dialog (with Location's search) open, a
+// bundled font draws (design D294), and the browser reports not one violation. The
 // production build has no demo data (D57), so the app starts on its
 // first-run screen, which shows only once the store is open.
 import { readFileSync } from "node:fs";
@@ -13,7 +13,7 @@ import { test as base, expect } from "@playwright/test";
 
 import { createAppServer } from "../../../proxy/src/server.ts";
 import { startRadicale, type CalDavServer } from "../../../../packages/sync/test/servers.ts";
-import { addAccount, openApp, WIDE } from "../support.ts";
+import { addAccount, choose, openApp, WIDE } from "../support.ts";
 
 const test = base.extend<{ radicale: CalDavServer; violations: string[] }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -217,5 +217,47 @@ test("the built app opens its store, adds an account through the proxy, and brea
     page.getByRole("listbox", { name: "Places" }).getByRole("option").first(),
   ).toBeVisible();
 
+  expect(violations).toEqual([]);
+});
+
+test("a bundled font is fetched only once chosen, from the app's own files, and loads under the policy (design D294)", async ({
+  page,
+  violations,
+}) => {
+  const fonts: { path: string; type: string | undefined }[] = [];
+  page.on("response", (answer) => {
+    if (answer.request().resourceType() === "font")
+      fonts.push({
+        path: new URL(answer.url()).pathname,
+        type: answer.headers()["content-type"],
+      });
+  });
+  const loaded = page.waitForResponse((answer) => new URL(answer.url()).pathname === "/");
+  await openApp(page);
+  const policy = (await loaded).headers()["content-security-policy"] ?? "";
+  expect(policy).toContain("font-src 'self';");
+  await page
+    .getByRole("navigation", { name: "Main menu" })
+    .getByRole("button", { name: "Settings" })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await expect(settings.getByRole("combobox", { name: "Font" })).toBeVisible();
+  expect(fonts).toEqual([]);
+
+  await choose(settings.getByRole("combobox", { name: "Font" }), "PT Sans");
+  await expect(settings.getByRole("heading", { name: "Settings" })).toHaveCSS(
+    "font-family",
+    /^"PT Sans", /,
+  );
+  const faces = await page.evaluate(() =>
+    [...document.fonts].map((face) => [face.family.replace(/^"(.*)"$/, "$1"), face.status]),
+  );
+  expect(faces).toEqual(Array.from({ length: 8 }, () => ["PT Sans", "loaded"]));
+  expect(fonts).toHaveLength(8);
+  for (const font of fonts)
+    expect(font).toEqual({
+      path: expect.stringMatching(/^\/assets\/fonts\/pt-sans-.+\.woff2$/),
+      type: "font/woff2",
+    });
   expect(violations).toEqual([]);
 });

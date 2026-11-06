@@ -4,7 +4,8 @@
 // files the worker kept and the store on the device. The worker keeps
 // neither CalDAV (/dav-proxy/) nor the deployment's preset (D123), and a
 // newer version is offered quietly, then runs once the user reloads into it.
-// A picture (design D219) is kept as it is first shown, not on install.
+// A picture (design D219) is kept as it is first shown, not on install; a
+// bundled font (design D294) once it is chosen.
 import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -16,7 +17,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 import { createAppServer } from "../../../proxy/src/server.ts";
 import { startRadicale, type CalDavServer } from "../../../../packages/sync/test/servers.ts";
-import { NOW, WIDE } from "../support.ts";
+import { choose, NOW, WIDE } from "../support.ts";
 
 const DIST = fileURLToPath(new URL("../../dist", import.meta.url));
 
@@ -254,6 +255,62 @@ test("a picture is kept as it is first shown, not on install, and shows with no 
     expect(kept).toContainEqual(expect.stringMatching(/^\/assets\/pictures\/meal-.+\.svg$/));
     expect(kept.filter((path) => !/\/(meal|month-\d\d)-/.test(path))).toEqual([]);
     await context.setOffline(false);
+  } finally {
+    await close(server);
+  }
+});
+
+test("a font is kept once it is chosen, not on install, and draws with no network (design D294)", async ({
+  page,
+  context,
+  radicale,
+  violations,
+}) => {
+  const { server, port } = await serve(DIST, radicale);
+  const keptFonts = () =>
+    page.evaluate(async () => {
+      const name = (await caches.keys()).find((key) => key !== "astrotime-versions");
+      const cache = await caches.open(name!);
+      return (await cache.keys())
+        .map((request) => new URL(request.url).pathname)
+        .filter((path) => path.startsWith("/assets/fonts/"));
+    });
+  const loaded = () =>
+    page.evaluate(() =>
+      [...document.fonts]
+        .filter((face) => face.status === "loaded")
+        .map((face) => face.family.replace(/^"(.*)"$/, "$1")),
+    );
+  const body = page.locator("body");
+  try {
+    await page.clock.setFixedTime(NOW);
+    await page.goto(`http://127.0.0.1:${port}/`);
+    const main = page.getByRole("main");
+    await expect(main).toBeVisible();
+    await activated(page);
+    // Installed: the app's files, no font.
+    expect(await keptFonts()).toEqual([]);
+
+    await page
+      .getByRole("navigation", { name: "Main menu" })
+      .getByRole("button", { name: "Settings" })
+      .click();
+    const settings = page.getByRole("dialog", { name: "Settings" });
+    await choose(settings.getByRole("combobox", { name: "Font" }), "Literata");
+    await expect(body).toHaveCSS("font-family", /^Literata, /);
+    // No network: the font from the worker, which kept it as it was
+    // chosen, all four subsets of it, so the language may change offline too.
+    await context.setOffline(true);
+    const font = page.waitForResponse((answer) => answer.url().includes("/assets/fonts/"));
+    await page.reload();
+    expect((await font).fromServiceWorker()).toBe(true);
+    await expect(body).toHaveCSS("font-family", /^Literata, /);
+    expect(await loaded()).toContain("Literata");
+    const kept = await keptFonts();
+    expect(kept).toHaveLength(4);
+    for (const path of kept) expect(path).toMatch(/^\/assets\/fonts\/literata-[\w-]+\.woff2$/);
+    await context.setOffline(false);
+    expect(violations).toEqual([]);
   } finally {
     await close(server);
   }

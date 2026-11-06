@@ -158,7 +158,7 @@ function LoadFailed({
       className="fixed inset-0 z-[120] grid place-items-center bg-black/45 p-4"
     >
       <div className="flex max-w-sm flex-col gap-4 rounded-3xl bg-raised p-6 text-ink shadow-2xl">
-        <p id="astrotime-load-failed" className="text-[15px]">
+        <p id="astrotime-load-failed" className="text-row">
           {t(again ? "lazy.failedAgain" : "lazy.failed")}
         </p>
         <div className="flex flex-wrap justify-end gap-2">

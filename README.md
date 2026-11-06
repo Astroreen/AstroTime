@@ -137,3 +137,19 @@ Contributors and agents start at [`AGENTS.md`](AGENTS.md).
 ## License
 
 [AGPL-3.0](LICENSE).
+
+## Credits
+
+The fonts AstroTime bundles, each under the
+[SIL Open Font License 1.1](https://openfontlicense.org), its licence beside
+its files in [`packages/ui/src/fonts/`](packages/ui/src/fonts/):
+[Inter](https://github.com/rsms/inter) (The Inter Project Authors),
+[Roboto](https://github.com/googlefonts/roboto-classic) (The Roboto Project
+Authors), [Noto Sans](https://github.com/notofonts/latin-greek-cyrillic)
+(The Noto Project Authors), [PT Sans](https://www.paratype.com/fonts/pt/pt-sans)
+(ParaType), [Nunito](https://github.com/googlefonts/nunito) (The Nunito
+Project Authors), [Literata](https://github.com/googlefonts/literata) (The
+Literata Project Authors) and
+[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (The JetBrains
+Mono Project Authors), from [Fontsource](https://fontsource.org)'s packages
+of Google Fonts' files.
