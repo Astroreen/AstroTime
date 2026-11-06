@@ -28,8 +28,11 @@ import { CloseIcon } from "./icons.tsx";
 import { FilePicker } from "./file-picker.tsx";
 import { textButton } from "./buttons.ts";
 
+/** A way to attach, a pale hint on the dialog's ground as an empty field is (design D297). */
+const way =
+  "flex min-h-10 items-center rounded-lg px-2 text-row text-ink-muted hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent";
 /** A way to attach a file, turned off where the calendar has no files (design D237). */
-const fileButton = `${textButton} disabled:text-ink-muted disabled:hover:bg-transparent`;
+const fileButton = `${way} disabled:opacity-60 disabled:hover:bg-transparent`;
 
 /** A new attachment as a row shows it: its `FILENAME`'s last part. */
 const shown = (attachment: NewAttachment): Attachment => ({
@@ -271,11 +274,11 @@ export function AttachmentsField({
         </div>
       )}
       {/* The three ways, in sight while a link is typed too (design D237). */}
-      <div className="-ml-4 flex flex-wrap">
+      <div className="flex flex-wrap">
         {adding ? (
           <button
             type="button"
-            className={textButton}
+            className={way}
             onClick={() => {
               setAdding(false);
               setLink("");
@@ -285,7 +288,7 @@ export function AttachmentsField({
             {t("attachments.cancelLink")}
           </button>
         ) : (
-          <button type="button" className={textButton} onClick={() => setAdding(true)}>
+          <button type="button" className={way} onClick={() => setAdding(true)}>
             {t("attachments.addLink")}
           </button>
         )}
@@ -327,7 +330,7 @@ export function AttachmentsField({
         />
       </div>
       {why && (
-        <p id={noFilesId} className="text-note text-ink-muted">
+        <p id={noFilesId} className="px-2 text-note text-ink-muted">
           {why}
         </p>
       )}

@@ -48,8 +48,9 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
-import type { EditorState, Press } from "./item-editor.tsx";
-import { CopyNotice, ItemDetails, ItemEditor } from "./lazy.tsx";
+import type { Press } from "./editor-fields.tsx";
+import type { EditorState } from "./item-editor.tsx";
+import { CopyNotice, ItemDetails, ItemEditor, QuickCreate } from "./lazy.tsx";
 import type { Landed } from "./context.ts";
 import { ScopeDialog, type ScopeRequest } from "./scope-dialog.tsx";
 
@@ -74,7 +75,7 @@ export type Rescheduled = "saved" | "unchanged" | "cancelled" | "gone" | "inDoub
 export interface EditingValue {
   /** Shows an item's details. */
   open(target: Target): void;
-  /** Opens the edit dialog for a new item. */
+  /** Opens quick create for a new item, which expands to the edit dialog (design D296). */
   create(kind: "event" | "task", options: CreateOptions): void;
   /** Whether any calendar can take a new item. */
   readonly canCreate: boolean;
@@ -152,6 +153,8 @@ interface Editing {
   readonly state: EditorState;
   /** "Copy to": the copy's iCalendar, which `initial` is the form of (design D164). */
   readonly base?: string;
+  /** A new item in quick create, not yet expanded to the edit dialog (design D296). */
+  readonly quick?: boolean;
 }
 
 export function useEditingState({
@@ -307,6 +310,7 @@ export function useEditingState({
       setEditing({
         target: null,
         initial: null,
+        quick: true,
         state: {
           existing: false,
           form,
@@ -433,6 +437,17 @@ export function useEditingState({
     else if (scopes.length === 0) run("all");
     else setAsking({ action: "edit", kind: state.form.kind, scopes, run });
   };
+
+  /**
+   * Quick create becomes the edit dialog, every field as it is (design
+   * D296); the click that opened it is long past.
+   */
+  const expand = () =>
+    setEditing((current) => {
+      if (!current?.quick) return current;
+      const { opener: _opener, ...state } = current.state;
+      return { ...current, quick: false, state };
+    });
 
   const edit = () => {
     if (!details) return;
@@ -577,8 +592,17 @@ export function useEditingState({
         onStar={star}
         onCopyFailed={() => setNotice("copyFailed")}
       />
+      <QuickCreate
+        state={editing?.quick ? shownState : null}
+        calendars={shownCalendars}
+        onChange={change}
+        onDraft={setDraft}
+        onSave={save}
+        onClose={() => setEditing(null)}
+        onExpand={expand}
+      />
       <ItemEditor
-        state={shownState}
+        state={editing?.quick ? null : shownState}
         target={editing?.target ?? null}
         calendars={shownCalendars}
         onChange={change}

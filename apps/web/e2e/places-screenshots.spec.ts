@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -101,6 +101,7 @@ for (const language of ["en", "ru"] as const) {
         const name = (what: string) => `${what}-${theme}-${language}-${size}`;
         const page = await open(browser, language, theme, size === "phone");
         await page.getByRole("button", { name: w.create }).click();
+        await expand(page, language);
         const dialog = page.getByRole("dialog", { name: w.newEvent });
         await dialog.getByRole("textbox", { name: w.title }).fill(w.walk);
         await dialog.getByRole("combobox", { name: w.location }).fill(w.query);

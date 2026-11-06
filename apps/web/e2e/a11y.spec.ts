@@ -7,7 +7,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { HOLIDAYS, importFile } from "./import-files.ts";
-import { choose, openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, quickCreate, WIDE } from "./support.ts";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"];
 
@@ -293,6 +293,23 @@ test.describe("the screens and dialogs", () => {
         await edit.getByRole("button", { name: "Save" }).click();
         await expect(page.getByRole("alertdialog", { name: "Edit recurring event" })).toBeVisible();
         await audit(page, "the scope dialog");
+      });
+
+      test("quick create, a sheet on a phone and a popover on a wide screen (design D296)", async ({
+        page,
+      }) => {
+        for (const [viewport, view] of [
+          [PHONE, "day"],
+          [WIDE, "week"],
+        ] as const) {
+          await page.setViewportSize(viewport);
+          await openDemo(page, view);
+          await page.getByRole("button", { name: "Create" }).first().click();
+          await expect(quickCreate(page).getByRole("textbox", { name: "Title" })).toBeFocused();
+          await audit(page, `quick create, ${view}`);
+          await quickCreate(page).getByRole("radio", { name: "Task" }).click();
+          await audit(page, `quick create for a task, ${view}`);
+        }
       });
 
       test("the details with attachments: a file by link, a web link, a file to save (design D230)", async ({

@@ -7,7 +7,7 @@
 // move a focused item.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { NOW, openDemo, WIDE } from "./support.ts";
+import { expand, NOW, openDemo, quickCreate, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -264,6 +264,7 @@ test("a press dragged over an empty slot sizes a new event", async ({ page }) =>
   );
   await expect(page.getByText("2:00 – 4:30 PM", { exact: true })).toBeVisible();
   await page.mouse.up();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-07");
   await expect(dialog.getByLabel("Start time")).toHaveText("2:00 PM");
@@ -297,7 +298,7 @@ test("a press while a closing dialog still fades out reaches the grid and drags 
     await pointOn(page, "Saturday, November 7", 14.1),
     await pointOn(page, "Saturday, November 7", 16.4),
   );
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = quickCreate(page);
   await expect(dialog).toBeVisible();
   // Opened to the end: closed while it still fades in, it closes at once.
   await expect(page.locator("[data-starting-style]")).toHaveCount(0);
@@ -351,15 +352,15 @@ test("a double click on an empty hour makes one new event there, its dialog kept
 }) => {
   await openDemo(page, "week");
   await expect(item(page, "Saturday, November 7", /^Concert at the philharmonic/)).toBeVisible();
-  // The editor's chunk loaded, as after any first dialog: the dialog opens
+  // Quick create's chunk loaded, as after any first dialog: the dialog opens
   // with the first click, under the second press.
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await expect(quickCreate(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const at = await pointOn(page, "Tuesday, November 3", 16.1);
   await page.mouse.dblclick(at.x, at.y);
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = quickCreate(page);
   await expect(dialog).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
@@ -373,7 +374,7 @@ test("a dialog opened by a single click closes on a backdrop press that is not i
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await expect(quickCreate(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const at = await pointOn(page, "Tuesday, November 3", 16.1);
@@ -381,14 +382,14 @@ test("a dialog opened by a single click closes on a backdrop press that is not i
   // the dialog, which stands on Tuesday's right.
   const elsewhere = await pointOn(page, "Sunday, November 1", 16.1);
   await page.mouse.click(at.x, at.y);
-  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  await expect(quickCreate(page)).toBeVisible();
   // A press on the backdrop that the browser counts as a second click (a
   // click just before, elsewhere) but is not the opening click's second:
   // it closes the dialog. `detail` alone would have kept it open.
   await page.mouse.move(elsewhere.x, elsewhere.y);
   await page.mouse.down({ clickCount: 2 });
   await page.mouse.up({ clickCount: 2 });
-  await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(0);
+  await expect(quickCreate(page)).toHaveCount(0);
 });
 
 test("a double click's second click on an empty hour after a press on an item is a click of its own (design D154)", async ({
@@ -428,7 +429,7 @@ test("a double click's second click on an empty hour after a press on an item is
     },
     [from, to],
   );
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = quickCreate(page);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
 });
@@ -523,13 +524,13 @@ test.describe("by touch on a wide screen (design D190)", () => {
   test("a double tap on an empty hour keeps the dialog its first tap opened", async ({ page }) => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Create" }).click();
-    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+    await expect(quickCreate(page)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     const at = await pointOn(page, "Tuesday, November 3", 16.1);
     await page.touchscreen.tap(at.x, at.y);
     await page.touchscreen.tap(at.x, at.y);
-    const dialog = page.getByRole("dialog", { name: "New event" });
+    const dialog = quickCreate(page);
     await expect(dialog.getByRole("combobox", { name: "Start time" })).toHaveText(/4:00 PM/);
     await expect(page.getByRole("dialog")).toHaveCount(1);
   });

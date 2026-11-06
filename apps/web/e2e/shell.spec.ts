@@ -3,7 +3,7 @@
 // phone the tasks cover the calendar.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -136,5 +136,6 @@ test("while the tasks show, no view is current and Create makes a task", async (
   await expect(tasks(page)).toBeVisible();
   await expect(sidebar.locator("[aria-current]")).toHaveCount(0);
   await sidebar.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await expect(page.getByRole("dialog", { name: "New task" })).toBeVisible();
 });

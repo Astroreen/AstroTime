@@ -3,7 +3,7 @@
 // a WebView of Chromium 140 or newer), and the UI keeps clear of it.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { addAccount, openDemo, PHONE } from "./support.ts";
+import { addAccount, openDemo, PHONE, expand } from "./support.ts";
 
 const STATUS_BAR = 24;
 const NAVIGATION_BAR = 48;
@@ -140,6 +140,7 @@ test("on a phone turned sideways a card, the dialog beside its draft and a centr
   ).toEqual(["32px", "48px"]);
 
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const edit = page.getByRole("dialog", { name: "New event" });
   await expect(edit).toHaveAttribute("data-aside", /^(left|right)$/);
   await inRoom(edit, SIDEWAYS, LANDSCAPE);

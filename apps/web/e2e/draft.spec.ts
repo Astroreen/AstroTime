@@ -3,7 +3,7 @@
 // the accessibility tree, so the draft is found by its mark, `data-draft`.
 import { expect, test, type Page } from "@playwright/test";
 
-import { choose, openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const draft = (page: Page) => page.locator("main [data-draft]");
 const inDay = (page: Page, day: string) =>
@@ -18,6 +18,7 @@ test.describe("on a wide screen", () => {
     await openDemo(page, "week");
     await expect(page.getByRole("list", { name: "Wednesday, November 4" })).toBeVisible();
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await expect(dialog).toBeVisible();
     // From the next half hour on the day shown, untitled.
@@ -76,6 +77,7 @@ test.describe("on a wide screen", () => {
     await openDemo(page, "month");
     await expect(page.locator('[data-view="month"]')).toBeVisible();
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("radio", { name: "Task" }).click();
     await page
@@ -124,6 +126,7 @@ test.describe("on a screen under 1024 px (design D187)", () => {
     const wednesday = page.getByRole("list", { name: "Wednesday, November 4" });
     const box = (await wednesday.boundingBox())!;
     await wednesday.click({ position: { x: box.width / 2, y: 14.25 * 56 } });
+    await expand(page);
     await page
       .getByRole("dialog", { name: "New event" })
       .getByRole("radio", { name: "Task" })
@@ -166,6 +169,7 @@ test.describe("on a screen under 1024 px (design D187)", () => {
     const monday = page.getByRole("list", { name: "Monday, November 2" });
     const box = (await monday.boundingBox())!;
     await monday.click({ position: { x: box.width / 2, y: 16.25 * 56 } });
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await expect(inDay(page, "Monday, November 2")).toBeVisible();
     const drawn = (await draft(page).boundingBox())!;
@@ -185,6 +189,7 @@ test.describe("on a screen under 1024 px (design D187)", () => {
   }) => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     const drawn = (await draft(page).boundingBox())!;
     const edges = `${Math.round(drawn.x)},${Math.round(drawn.x + drawn.width)}`;
@@ -210,6 +215,7 @@ test.describe("on a screen under 1024 px (design D187)", () => {
   }) => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await expect(dialog).toHaveAttribute("data-aside", "left");
     // Wide enough to float, too narrow for a phone's width beside Wednesday.
@@ -225,6 +231,7 @@ test.describe("on a phone", () => {
     await openDemo(page, "day");
     await expect(page.getByRole("list", { name: "Wednesday, November 4" })).toBeVisible();
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Dentist");
     await expect(inDay(page, "Wednesday, November 4")).toHaveAttribute(

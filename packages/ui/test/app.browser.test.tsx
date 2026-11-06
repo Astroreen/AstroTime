@@ -606,7 +606,7 @@ test("a calendar shared to edit, without adding or deleting: its item shows Edit
 
   // A new event goes in a calendar that takes new items: not Team, not the read-only Holidays.
   (page.getByRole("button", { name: "Create" }).element() as HTMLElement).click();
-  const creating = page.getByRole("dialog", { name: "New event" });
+  const creating = page.getByRole("dialog", { name: "Quick create" });
   await expect.element(creating).toBeInTheDocument();
   expect(await options(creating)).toEqual(["Personal", "Work"]);
 });
@@ -827,7 +827,7 @@ test("a new event's dialog open as the calendar on this device steps aside saves
   const store = await emptyStore();
   render(Promise.resolve(store), ["en-US"]);
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = page.getByRole("dialog", { name: "Quick create" });
   const field = dialog.getByRole("combobox", { name: "Calendar" });
   await expect.element(field).toHaveTextContent("Personal");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Made meanwhile");
@@ -896,7 +896,7 @@ test("a hidden calendar that stepped aside leaves the view and new items to the 
   expect(await store.removeLocalCalendarIfUnused()).toBe(true);
   render(Promise.resolve(store), ["en-US"], { preferences });
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = page.getByRole("dialog", { name: "Quick create" });
   await expect
     .element(dialog.getByRole("combobox", { name: "Calendar" }))
     .toHaveTextContent("Work");
@@ -1053,7 +1053,7 @@ test("a new event's calendar that no longer takes events stays in the field, and
   });
   render(Promise.resolve(store), ["en-US"]);
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "New event" });
+  const dialog = page.getByRole("dialog", { name: "Quick create" });
   const field = dialog.getByRole("combobox", { name: "Calendar" });
   await expect.element(field).toHaveTextContent("Work");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Refused");
@@ -1091,7 +1091,7 @@ test("a new item with no calendar left to take it says so, in Russian, and keeps
   });
   render(Promise.resolve(behind), ["ru-RU"]);
   await page.getByRole("button", { name: "Создать", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Новое мероприятие" });
+  const dialog = page.getByRole("dialog", { name: "Быстрое создание" });
   await dialog.getByRole("textbox", { name: "Название" }).fill("Некуда");
   await dialog.getByRole("button", { name: "Сохранить" }).click();
   await expect
@@ -1197,7 +1197,7 @@ test("the back button closes what is open, the topmost first, then lets the shel
     return back();
   };
 
-  // The drawer, a dialog opened from the top bar, the editor of a new event.
+  // The drawer, a dialog opened from the top bar, quick create (design D296).
   await page.getByRole("button", { name: "Main menu" }).click();
   await expect.element(page.getByRole("dialog", { name: "Main menu" })).toBeInTheDocument();
   expect(press()).toBe(true);
@@ -1207,7 +1207,7 @@ test("the back button closes what is open, the topmost first, then lets the shel
   expect(press()).toBe(true);
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await expect.element(page.getByRole("dialog", { name: "New event" })).toBeInTheDocument();
+  await expect.element(page.getByRole("dialog", { name: "Quick create" })).toBeInTheDocument();
   expect(press()).toBe(true);
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 

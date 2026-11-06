@@ -46,11 +46,13 @@ export function PlaceField({
   const { settings } = useSettings();
   const places = settings.places ? platform.places : undefined;
   const label = t("edit.location");
+  // An empty one is its pale hint (design D297).
+  const placeholder = t("edit.addLocation");
   if (!places) {
     return (
       <input
         aria-label={label}
-        placeholder={label}
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value, null)}
         className={className}
@@ -71,6 +73,7 @@ export function PlaceField({
         )
       }
       label={label}
+      placeholder={placeholder}
       className={className}
     />
   );
@@ -96,6 +99,7 @@ function Search({
   onChange,
   onPick,
   label,
+  placeholder,
   className,
 }: {
   search: PlaceSearch;
@@ -105,6 +109,7 @@ function Search({
   onChange: (text: string, place: Place | null) => void;
   onPick: (place: Place) => void;
   label: string;
+  placeholder: string;
   className: string;
 }) {
   const { t } = useTranslation();
@@ -151,7 +156,7 @@ function Search({
         onChange(text, place ?? null);
       }}
     >
-      <Autocomplete.Input aria-label={label} placeholder={label} className={className} />
+      <Autocomplete.Input aria-label={label} placeholder={placeholder} className={className} />
       <Autocomplete.Portal>
         {/* Over the edit dialog, as every dropdown's popup (design D167). */}
         <Autocomplete.Positioner

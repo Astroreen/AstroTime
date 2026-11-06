@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, choose, NOW, PHONE, RU_ADD_ACCOUNT, WIDE } from "./support.ts";
+import { addAccount, choose, NOW, PHONE, RU_ADD_ACCOUNT, WIDE, expand } from "./support.ts";
 
 const SERVER = "https://cloud.example.com";
 const USER = "astrotime-test";
@@ -473,6 +473,7 @@ for (const [language, words] of [
       await page.clock.setFixedTime(NOW);
       await page.goto("/");
       await page.getByRole("button", { name: words.create }).click();
+      await expand(page, language);
       const edit = page.getByRole("dialog", { name: words.event });
       const files = edit.getByRole("button", { name: words.files });
       const device = edit.getByRole("button", { name: words.device });

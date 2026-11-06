@@ -6,7 +6,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { startRadicale } from "../../../packages/sync/test/servers.ts";
-import { addAccount, choose, openApp, WIDE } from "./support.ts";
+import { addAccount, choose, openApp, WIDE, expand } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -25,6 +25,7 @@ test("with no account and no network, an event made on this device stays after a
   // No network: nothing in AstroTime needs it for this.
   await context.setOffline(true);
   await page.getByRole("button", { name: "Create" }).first().click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Dentist");
   await choose(dialog.getByLabel("Start time"), "4:00 PM");
@@ -47,6 +48,7 @@ test("an account added beside the calendar on this device keeps it once it holds
     await radicale.mkcalendar("work");
     await openApp(page);
     await page.getByRole("button", { name: "Create" }).first().click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Kept here");
     await dialog.getByRole("button", { name: "Save" }).click();

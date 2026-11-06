@@ -2,7 +2,7 @@
 // November 4, 2026, 10:40 in Vilnius (docs/plans/foundation.md#pr-5--calendar-grid).
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const day = (page: Page, name: string) => page.getByRole("list", { name });
 const strip = (page: Page) => page.getByRole("list", { name: "All day" });
@@ -348,6 +348,7 @@ test.describe("a folded strip on a phone (D186)", () => {
   test("a day with three items keeps them all while today folds, no +1", async ({ page }) => {
     await openDemo(page, "3days");
     await page.getByRole("button", { name: "Create" }).tap();
+    await expand(page);
     await page
       .getByRole("dialog", { name: "New event" })
       .getByRole("radio", { name: "Task" })
@@ -516,6 +517,7 @@ test.describe("the shell around the views (design D132, D133)", () => {
     await expect(create(main)).toHaveCount(0);
     // It opens a new event, as the floating button does.
     await create(sidebar).click();
+    await expand(page);
     await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
     await page.keyboard.press("Escape");
 

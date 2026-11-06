@@ -7,7 +7,7 @@
 import { test as base, expect } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { addAccount, choose, openApp, WIDE } from "./support.ts";
+import { addAccount, choose, openApp, WIDE, expand } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -42,6 +42,7 @@ test("an event created here reaches the server, and again once dragged", async (
   await expect(page.getByRole("region", { name: "On this device" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Made in AstroTime");
   await choose(dialog.getByLabel("Start time"), "4:00 PM");
@@ -117,6 +118,7 @@ test("a change the server dropped is told in the accounts dialog and in Settings
 
   // Made here and uploaded.
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Gone elsewhere");
   await choose(dialog.getByLabel("Start time"), "4:00 PM");

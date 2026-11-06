@@ -196,6 +196,13 @@ export const ItemEditor = deferred(
   (props: ComponentProps<typeof import("./item-editor.tsx").ItemEditor>) => props.state !== null,
 );
 
+/** Quick create (design D296): a chunk of its own, not the editor's. */
+export const QuickCreate = deferred(
+  () => import("./quick-create.tsx"),
+  (module) => module.QuickCreate,
+  (props: ComponentProps<typeof import("./quick-create.tsx").QuickCreate>) => props.state !== null,
+);
+
 export const SettingsScreen = deferred(
   () => import("./settings-section.tsx"),
   (module) => module.SettingsScreen,

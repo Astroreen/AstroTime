@@ -363,7 +363,7 @@ When you add a package, app or module, add its line here in the same PR.
       screen), from the drawer's foot. → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
     - `lazy.tsx` — dialogs that load with their first opening: the
-      details, the edit dialog, Settings, the Conflicts list, the sign-in
+      details, quick create, the edit dialog, Settings, the Conflicts list, the sign-in
       dialog (`plans/providers.md#D255`), and the copy's notice
       (`copy-notice.tsx`); and the Agenda with its first showing.
       → `plans/foundation.md#D145`
@@ -373,6 +373,11 @@ When you add a package, app or module, add its line here in the same PR.
       (`reschedule`); the details (`item-details.tsx`), the edit
       dialog (`item-editor.tsx`) and the scope dialog (`scope-dialog.tsx`).
       → `plans/design.md#D108`
+    - `quick-create.tsx` — quick create: a new item's sheet on a phone, a
+      popover beside its draft on a wide screen, expanded into the edit
+      dialog; `editor-fields.tsx`, the rows both share (date, time,
+      calendar, kind, the looks of a row, a double click's second press).
+      → `plans/design.md#D296`, `plans/design.md#D297`
     - `draft-aside.ts` — `useDraft`, the edit dialog's draft made in the
       editor's chunk and handed to the views (`DrawnDraft`), and where the
       dialog stands on a wide screen, beside it. → `plans/design.md#D155`
@@ -567,6 +572,10 @@ When you add a package, app or module, add its line here in the same PR.
     and reloads a tab in the middle of a Login Flow. → `plans/foundation.md#D121`;
     `reminders.spec.ts` moves `page.clock` and sees notifications through a
     wrapped `Notification` (`captureNotifications`). → `plans/foundation.md#D101`;
+    `quick-create.spec.ts` makes an event and a task through quick create
+    and expands it, `quick-create-screenshots.spec.ts` takes its evidence;
+    the specs that create through the edit dialog reach it by `expand` in
+    `support.ts`. → `plans/design.md#D296`;
     `editing.spec.ts` creates, edits and deletes on the demo data,
     `editing-server.spec.ts` sees an item made here, then dragged, reach
     Radicale, `editing-screenshots.spec.ts` takes the editing evidence.
