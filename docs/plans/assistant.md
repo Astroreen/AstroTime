@@ -60,17 +60,16 @@ change the user's events and tasks.
   ([design D296](design.md#D296)) runs `parseQuick` as the title is typed:
   each span understood is marked in the title (the accent's soft fill), and
   its value fills the sheet's rows at once. The title saved is the words
-  left. A mark tapped is undone (its words go back to the title, its row to
-  what it was); a row the user set by hand is never overwritten by a later
+  left. A mark is undone from its row ("Keep in the title": its words go
+  back to the title, its row to what it was), since a tap lands on the
+  input, not on the overlay behind it; a row the user set by hand is never overwritten by a later
   parse.
   - **The title stays a plain `<input>`.** The marks are an overlay behind
     it (a mirror of the input with its font, padding and scroll, its text
     transparent, the spans filled), `aria-hidden`, so the accessibility
     tree holds one text field as before. What was understood is said by
     the rows themselves and once more by a polite live region ("Friday,
-    13:00–14:00, Кофемания") after typing pauses on a change. Undoing a
-    mark is also in the row's own menu ("Keep in the title"), so it needs
-    no tap on the overlay.
+    13:00–14:00, Кофемания") after typing pauses on a change.
   - **IME composition**: the line is parsed on `compositionend`, never in
     the middle of a composition; Enter that ends a composition does not
     save, as [design D206](design.md#D206)'s "Custom…" already holds.
@@ -157,8 +156,10 @@ change the user's events and tasks.
   ([desktop D73](desktop.md#D73)) serves MCP's streamable HTTP on
   `127.0.0.1` only, behind a token, when Settings → Assistants turns it on
   (off by default). It writes the app's own database through the store, so
-  the calendar shows a change at once and sync sends it. An attachment is
-  taken by a path on this computer. A browser or a phone cannot be one: a
+  the calendar shows a change at once and sync sends it. An attachment comes
+  as its content, as on the server ([D309](#D309)), never as a path: a
+  path would let any holder of the token read any file the app can read
+  and sync it out. A browser or a phone cannot be one: a
   page opens no port and its database is the browser's own.
   - **Through the window's store.** The database is the utility
     process's and its one page's ([desktop D73](desktop.md#D73)): nobody
