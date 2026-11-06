@@ -2644,7 +2644,10 @@ keywords". The quick parse and voice that fill quick create are the
   editor's chunk is fetched once the page is idle; expanded before it
   arrives (a slow first visit), quick create goes and the editor shows a
   moment later.
-
+- **A font's retry on `online`, under test** ([D294](#D294)) — a saved
+  font whose files are gone at startup (a cleared cache, offline) is asked
+  for again when the network comes back; no e2e drives that path yet (the
+  kept font offline and a refused pick are covered).
 - **Painted pictures** ([D298](#D298)) — if SVG drawn again still falls
   short, raster illustrations (WebP or AVIF) the owner supplies, kept as
   files of their own as [D219](#D219) keeps the SVG.
