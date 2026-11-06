@@ -131,6 +131,8 @@ export function assistantTools(options: AssistantToolsOptions) {
     },
 
     async list_items({ from, to, calendarIds }) {
+      checkDay(from);
+      checkDay(to);
       const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
       if (!(days >= 0)) throw new ToolError("`to` is before `from`.");
       if (days >= MAX_DAYS) throw new ToolError(`At most ${MAX_DAYS} days at once.`);
@@ -229,6 +231,13 @@ export function assistantTools(options: AssistantToolsOptions) {
             ? { time: movedTimes(object, input.start, input.end, zone) }
             : {}),
         };
+        // Its exceptions name occurrences by their old times: moving the
+        // series would leave them behind, so its times stay the user's to move.
+        if (changes.time && object.master?.recurring && object.exceptions.length > 0) {
+          throw new ToolError(
+            "This repeating item has occurrences changed on their own; its times are changed in AstroTime.",
+          );
+        }
         if (Object.keys(changes).length === 0) throw new ToolError("Name a field to change.");
         return saved(local, "change_item", stored, editItem(object, changes, { now: now() }).ics);
       }),
@@ -397,11 +406,16 @@ function zoneOf(asked: string | undefined, user: string): string {
 }
 
 /** A day, or a wall clock in `zone`, as the core's time; a day that is no day is refused. */
-function timeOf(value: string, zone: string): ItemTime {
-  const date = value.slice(0, 10);
+/** A day that is one: `2026-13-45` is refused. */
+function checkDay(date: string): void {
   if (Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || addDays(date, 0) !== date) {
     throw new ToolError(`No day ${date}.`);
   }
+}
+
+function timeOf(value: string, zone: string): ItemTime {
+  const date = value.slice(0, 10);
+  checkDay(date);
   if (value.length === 10) return { type: "date", date };
   const local = value.length === 16 ? `${value}:00` : value;
   return zonedTime(local, zone);

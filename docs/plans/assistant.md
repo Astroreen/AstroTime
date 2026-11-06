@@ -158,7 +158,9 @@ change the user's events and tasks.
   (`tools.ts`), run over the store by `assistantTools` (`run.ts`); times are
   a day (`YYYY-MM-DD`) or a wall clock (`YYYY-MM-DDTHH:MM`) in the user's
   zone or a `timeZone` given, an all-day event's end its last day itself. A
-  repeating item is changed, completed and deleted as a whole series.
+  repeating item is changed, completed and deleted as a whole series; its
+  times are refused while it has occurrences changed on their own, whose
+  `RECURRENCE-ID`s moving the series would leave behind.
   The MCP side is the official TypeScript SDK's v2 line,
   `@modelcontextprotocol/server` 2.4.0, chosen over v1's single
   `@modelcontextprotocol/sdk` because its `createMcpHandler` is a

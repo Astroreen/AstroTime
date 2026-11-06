@@ -269,6 +269,7 @@ async function start() {
       },
     },
   });
+  const watched = new WeakSet<WebContents>();
   const stopServing = (contents: WebContents) => {
     if (serving !== contents) return;
     serving = null;
@@ -291,9 +292,11 @@ async function start() {
     const contents = event.sender;
     if (on !== true) return stopServing(contents);
     serving = contents;
-    // A reload or a crash takes the page's calls with it.
-    contents.once("did-start-loading", () => stopServing(contents));
-    contents.once("render-process-gone", () => stopServing(contents));
+    // A reload or a crash takes the page's calls with it: heard once per page.
+    if (watched.has(contents)) return;
+    watched.add(contents);
+    contents.on("did-start-loading", () => stopServing(contents));
+    contents.on("render-process-gone", () => stopServing(contents));
     contents.once("destroyed", () => stopServing(contents));
   });
   ipcMain.on(CHANNELS.assistantsAnswer, (event, id: unknown, answer: unknown) => {

@@ -197,3 +197,25 @@ test("a call whose client goes before the answer is let go, not held for ever", 
   expect(await withdrawn).toBe(call.id);
   await endpoint.close();
 });
+
+test("a caller without the token is refused before its body is read", async () => {
+  const { endpoint, page } = setUp();
+  const { url } = await endpoint.setEnabled(true);
+  // A body it never finishes: the refusal comes from the headers alone.
+  const status = await new Promise<number>((resolve, reject) => {
+    const sent = request(url!, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": 4 * 1024 * 1024 },
+    });
+    sent.on("response", (res) => {
+      res.resume();
+      resolve(res.statusCode!);
+      sent.destroy();
+    });
+    sent.on("error", reject);
+    sent.write("{");
+  });
+  expect(status).toBe(401);
+  expect(page.calls).toHaveLength(0);
+  await endpoint.close();
+});

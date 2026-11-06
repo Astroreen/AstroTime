@@ -60,8 +60,14 @@ function resultOf(answer: ToolAnswer): CallToolResult {
   };
 }
 
-/** The endpoint: every request checked, then served by the MCP SDK, one server per request. */
-export function mcpEndpoint(options: EndpointOptions): (request: Request) => Promise<Response> {
+/**
+ * The endpoint: every request checked, then served by the MCP SDK, one
+ * server per request. `refusal` checks a request's caller from its headers
+ * alone, so a server can refuse it before reading its body.
+ */
+export function mcpEndpoint(options: EndpointOptions): ((request: Request) => Promise<Response>) & {
+  refusal(headers: Headers, url: string): Response | null;
+} {
   const handler = createMcpHandler(({ requestInfo }) => {
     // One server per request: its calls end with it.
     const signal = requestInfo?.signal ?? new AbortController().signal;
@@ -84,21 +90,26 @@ export function mcpEndpoint(options: EndpointOptions): (request: Request) => Pro
     return server;
   });
 
-  return async (request) => {
+  const check = (headers: Headers, url: string): Response | null => {
     // A page in a browser calling this machine; an MCP client sends none.
-    if (request.headers.has("origin")) return refusal(403, "No requests from a web page.");
+    if (headers.has("origin")) return refusal(403, "No requests from a web page.");
     // A name that only resolves here (DNS rebinding) is not this machine's.
     const port = options.port();
-    const host = request.headers.get("host")?.toLowerCase();
+    const host = headers.get("host")?.toLowerCase();
     if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
       return refusal(403, "Not this machine's address.");
     }
-    if (new URL(request.url).pathname !== MCP_PATH) return refusal(404, "Not found.");
+    if (new URL(url).pathname !== MCP_PATH) return refusal(404, "Not found.");
     const token = options.token();
-    const given = /^Bearer (.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1];
+    const given = /^Bearer (.+)$/i.exec(headers.get("authorization") ?? "")?.[1];
     if (token === null || given === undefined || !sameToken(given, token)) {
       return refusal(401, "A valid token is required.", { "WWW-Authenticate": "Bearer" });
     }
-    return handler.fetch(request);
+    return null;
   };
+  return Object.assign(
+    (request: Request) =>
+      Promise.resolve(check(request.headers, request.url) ?? handler.fetch(request)),
+    { refusal: check },
+  );
 }

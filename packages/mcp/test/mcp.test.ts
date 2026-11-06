@@ -481,3 +481,86 @@ test("the log keeps the latest changes within its size too: the oldest large one
   expect(kept[0]).toMatchObject({ tool: "add_attachment", summary: `Task ${files}` });
   await store.close();
 });
+
+test("a day or a time that is none is refused; a time a DST gap skips is resolved as the editor resolves it", async () => {
+  const mcp = await client();
+  expect(await call(mcp, "list_items", { from: "2026-13-45", to: "2026-13-46" })).toEqual({
+    refused: "No day 2026-13-45.",
+  });
+  expect(
+    await call(mcp, "create_event", {
+      calendarId: here.calendar.id,
+      summary: "x",
+      start: "2026-11-12T25:99",
+    }),
+  ).toMatchObject({ refused: expect.stringContaining("A day (YYYY-MM-DD) or a day and a time") });
+  // 02:30 on 2027-03-14 does not exist in New York: as RFC 5545 reads it, 03:30, and an hour on.
+  const gap = await call(mcp, "create_event", {
+    calendarId: here.calendar.id,
+    summary: "In the gap",
+    start: "2027-03-14T02:30",
+    timeZone: "America/New_York",
+  });
+  expect(gap).toMatchObject({ end: "2027-03-14T04:30", timeZone: "America/New_York" });
+  await mcp.close();
+});
+
+test("a repeating item with occurrences changed on their own keeps its times; its other fields change", async () => {
+  const mcp = await client();
+  const series = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Other//Client//EN",
+    "BEGIN:VEVENT",
+    "UID:series-with-exception",
+    "DTSTAMP:20261101T080000Z",
+    "DTSTART;TZID=Europe/Vilnius:20261116T100000",
+    "DTEND;TZID=Europe/Vilnius:20261116T110000",
+    "RRULE:FREQ=WEEKLY;COUNT=4",
+    "SUMMARY:Weekly",
+    "END:VEVENT",
+    "BEGIN:VEVENT",
+    "UID:series-with-exception",
+    "DTSTAMP:20261101T080000Z",
+    "RECURRENCE-ID;TZID=Europe/Vilnius:20261123T100000",
+    "DTSTART;TZID=Europe/Vilnius:20261123T120000",
+    "DTEND;TZID=Europe/Vilnius:20261123T130000",
+    "SUMMARY:Weekly, moved",
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n");
+  const stored = await here.store.saveLocal(here.calendar.id, series);
+  expect(
+    await call(mcp, "change_item", { id: stored.id, start: "2026-11-16T09:00" }),
+  ).toMatchObject({
+    refused: expect.stringContaining("occurrences changed on their own"),
+  });
+  expect((await here.store.object(stored.id))!.ics).toBe(stored.ics);
+  expect(await call(mcp, "change_item", { id: stored.id, location: "Room 2" })).toMatchObject({
+    location: "Room 2",
+  });
+  await mcp.close();
+});
+
+test("Undo's boundary: what a server rewrites (stamps, PRODID, order) is no change; any field the user edits is (D311)", async () => {
+  const mcp = await client();
+  const created = await call(mcp, "create_event", {
+    calendarId: here.calendar.id,
+    summary: "Boundary",
+    start: "2026-11-13T09:00",
+  });
+  const stored = (await here.store.object(created["id"] as string))!;
+  const bumped = stored.ics
+    .replace(/\r\nSEQUENCE:0\r\n/, "\r\nSEQUENCE:1\r\n")
+    .replace(/\r\nLAST-MODIFIED:[^\r]+/, "\r\nLAST-MODIFIED:20261113T000000Z");
+  await here.store.saveLocal(here.calendar.id, bumped);
+  expect((await loggedChanges(here.store))[0]?.state).toBe("undoable");
+  // An X- property is a field like any other: the user's edit stays.
+  await here.store.saveLocal(
+    here.calendar.id,
+    bumped.replace("\r\nEND:VEVENT", "\r\nX-MINE:kept\r\nEND:VEVENT"),
+  );
+  expect((await loggedChanges(here.store))[0]?.state).toBe("changed");
+  await mcp.close();
+});

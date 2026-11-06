@@ -55,9 +55,19 @@ export interface AssistantsOptions {
 const newToken = () => randomBytes(32).toString("base64url");
 
 /** The request as the web's, its body read up to the cap; `null` when it is over. */
+/** A request's headers as the web's. */
+function headersOf(req: IncomingMessage): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (typeof value === "string") headers.set(name, value);
+  }
+  return headers;
+}
+
 async function toRequest(
   req: IncomingMessage,
-  port: number,
+  url: string,
+  headers: Headers,
   signal: AbortSignal,
 ): Promise<Request | null> {
   const chunks: Buffer[] = [];
@@ -67,12 +77,8 @@ async function toRequest(
     if (size > MAX_REQUEST_BYTES) return null;
     chunks.push(chunk as Buffer);
   }
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (typeof value === "string") headers.set(name, value);
-  }
   const hasBody = req.method !== "GET" && req.method !== "HEAD" && chunks.length > 0;
-  return new Request(`http://127.0.0.1:${port}${req.url ?? "/"}`, {
+  return new Request(url, {
     method: req.method ?? "GET",
     headers,
     signal,
@@ -132,15 +138,14 @@ export function assistants(options: AssistantsOptions) {
         calls.set(id, resolve);
         // A client that went (closed its connection) lets its call go: a
         // window that never answers holds nothing for ever.
-        signal.addEventListener(
-          "abort",
-          () => {
-            if (!calls.has(id)) return;
-            answer(id, { refused: GONE });
-            page.withdraw?.(id);
-          },
-          { once: true },
-        );
+        const letGo = () => {
+          if (!calls.has(id)) return;
+          answer(id, { refused: GONE });
+          page.withdraw?.(id);
+        };
+        // Gone already: never sent.
+        if (signal.aborted) return answer(id, { refused: GONE });
+        signal.addEventListener("abort", letGo, { once: true });
         if (!page.send(id, name, args)) answer(id, { refused: NOT_OPEN });
       });
     },
@@ -155,7 +160,19 @@ export function assistants(options: AssistantsOptions) {
         res.on("close", () => {
           if (!res.writableFinished) gone.abort();
         });
-        const request = await toRequest(req, port, gone.signal);
+        // The caller is checked from its headers, before its body is read.
+        const url = `http://127.0.0.1:${port}${req.url ?? "/"}`;
+        const headers = headersOf(req);
+        const refused = handle.refusal(headers, url);
+        if (refused) {
+          res.writeHead(refused.status, {
+            ...Object.fromEntries(refused.headers),
+            Connection: "close",
+          });
+          res.end(await refused.text());
+          return;
+        }
+        const request = await toRequest(req, url, headers, gone.signal);
         if (!request) {
           res.writeHead(413, { Connection: "close" }).end();
           return;
