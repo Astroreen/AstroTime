@@ -56,7 +56,8 @@ export function loadFont(font: BundledFont): Promise<void> {
       })
       .then((faces) => {
         for (const face of faces) document.fonts.add(face);
-        failure.set(failure.font === font ? null : failure.font);
+        // A font that came is drawn now: an older failure says nothing more.
+        failure.set(null);
       });
     loading.catch(() => {
       loaded.delete(font);
@@ -67,7 +68,7 @@ export function loadFont(font: BundledFont): Promise<void> {
   return loading;
 }
 
-/** The font that last could not be fetched, until it is. */
+/** The font that last could not be fetched, until it or another comes. */
 const failure = {
   font: null as BundledFont | null,
   listeners: new Set<() => void>(),

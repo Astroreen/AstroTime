@@ -103,6 +103,10 @@ test("a font that cannot be fetched leaves the text as it was and says so; it co
   await expect(page.locator("body")).not.toHaveCSS("font-family", /^"?Roboto"?, /);
 
   offline = false;
+  // Another font that comes clears the message; Roboto comes too, once the network does.
+  await choose(font, "Nunito");
+  await expect(font).toHaveText("Nunito");
+  await expect(settings.getByText(/could not be downloaded/)).toHaveCount(0);
   await choose(font, "Roboto");
   await expect(font).toHaveText("Roboto");
   await expect(settings.getByText(/could not be downloaded/)).toHaveCount(0);
