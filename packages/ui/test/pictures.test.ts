@@ -47,6 +47,40 @@ describe("an item's subject from its title", () => {
     ["Новый год", "winter"],
     ["Встречаем Новый год у Лены", "winter"],
     ["New Year's Eve", "winter"],
+    ["Team meeting", "meeting"],
+    ["Video call with Max", "meeting"],
+    ["Созвон с командой", "meeting"],
+    ["Встреча с заказчиком", "meeting"],
+    ["Совещание", "meeting"],
+    ["Собеседование", "meeting"],
+    ["Haircut", "haircut"],
+    ["Barber", "haircut"],
+    ["Стрижка", "haircut"],
+    ["Подстричься", "haircut"],
+    ["К парикмахеру", "haircut"],
+    ["Code review", "code"],
+    ["Coding session", "code"],
+    ["Хакатон", "code"],
+    ["Код-ревью", "code"],
+    ["Отладка сервера", "code"],
+    ["Cleaning the flat", "cleaning"],
+    ["Vacuum the stairs", "cleaning"],
+    ["Генеральная уборка", "cleaning"],
+    ["Прибраться дома", "cleaning"],
+    ["Стирка", "cleaning"],
+    ["Car wash", "car"],
+    ["Oil change", "car"],
+    ["Автосервис", "car"],
+    ["Шиномонтаж", "car"],
+    ["Переобуть машину", "car"],
+    ["Wedding", "wedding"],
+    ["Свадьба Ани и Пети", "wedding"],
+    ["В ЗАГС", "wedding"],
+    ["Beach day", "beach"],
+    ["На море!", "beach"],
+    ["Пляж", "beach"],
+    ["Halloween", "halloween"],
+    ["Хэллоуин у Оли", "halloween"],
   ] as const)("%s → %s", (title, subject) => {
     expect(subjectOf(title)).toBe(subject);
   });
@@ -97,6 +131,33 @@ describe("an item's subject from its title", () => {
   test("a title is read once: asked again, the same answer", () => {
     expect(subjectOf("Lunch with Anna")).toBe("meal");
     expect(subjectOf("Lunch with Anna")).toBe("meal");
+  });
+
+  test("the new subjects' words with another sense give nothing alone (design D298)", () => {
+    for (const title of [
+      "Park the car", // a car only as what is done to one
+      "Dress code",
+      "Code of conduct",
+      "Team sync", // a meeting only as one
+      "Call mom",
+      "Clean code", // neither cleaning nor coding
+      "Sea of tasks",
+      "Море дел",
+      "Встречаем гостей", // to meet, not a meeting
+    ])
+      expect(subjectOf(title), title).toBeNull();
+  });
+
+  test("a new subject keeps to its place among the others", () => {
+    expect(subjectOf("Halloween party")).toBe("halloween");
+    expect(subjectOf("Wedding dinner")).toBe("wedding");
+    expect(subjectOf("Vacation at the beach")).toBe("beach");
+    expect(subjectOf("Flight to the beach")).toBe("beach");
+    expect(subjectOf("Lunch meeting")).toBe("meal");
+    expect(subjectOf("Coffee call with Anna")).toBe("coffee");
+    expect(subjectOf("Code review meeting")).toBe("code");
+    expect(subjectOf("Meeting at the airport")).toBe("travel");
+    expect(subjectOf("Driving lesson")).toBe("car");
   });
 
   test("a run that is no sport", () => {
@@ -212,7 +273,8 @@ describe("the pictures' files", () => {
     expect(svg.startsWith(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"`)).toBe(
       true,
     );
-    expect(svg).not.toMatch(/<(script|text|image|foreignObject|a)\b|href=|on\w+=/i);
+    // A link only to a shape of its own (`<use href="#tree">`), never out.
+    expect(svg).not.toMatch(/<(script|text|image|foreignObject|a)\b|href="(?!#)|on\w+=/i);
   });
 });
 

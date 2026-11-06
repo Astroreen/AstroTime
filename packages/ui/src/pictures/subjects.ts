@@ -7,24 +7,32 @@ import { foldForSearch } from "@astrotime/storage";
 /** The subjects, each a picture of its own. */
 export const SUBJECTS = [
   "winter",
+  "halloween",
+  "wedding",
   "birthday",
+  "beach",
   "travel",
   "doctor",
+  "haircut",
+  "car",
   "study",
   "cinema",
   "music",
   "sport",
   "walk",
+  "cleaning",
   "shopping",
   "meal",
   "coffee",
+  "code",
+  "meeting",
 ] as const;
 export type Subject = (typeof SUBJECTS)[number];
 
 /**
  * Each subject's words, the most specific first: a title with words of
  * two groups gets the first's (the winter holidays before a birthday, a
- * birthday before a meal, any party last). A word is matched against the title's words, folded
+ * birthday before a meal, a meal before a meeting, any party last). A word is matched against the title's words, folded
  * as search folds them (case and diacritics aside, `ё` as `е`): `обед`
  * only the word itself, `обед*` any word it begins (обеда, обеденный),
  * several in a row (`день рождени*`), `=ДР` the word exactly as written,
@@ -46,9 +54,25 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "елк*",
     ],
   ],
+  ["halloween", ["halloween*", "trick or treat*", "хэллоуин*", "хеллоуин*"]],
+  ["wedding", ["wedding*", "bridal", "свадьб*", "свадеб*", "венчани*", "бракосочетани*", "загс*"]],
   [
     "birthday",
     ["birthday*", "bday*", "рождени*", "=ДР", "днюх*", "днюшк*", "юбиле*", "anniversary"],
+  ],
+  [
+    "beach",
+    [
+      "beach*",
+      "seaside",
+      "sunbathing",
+      "пляж*",
+      // "Море" alone is also a sea of anything: only as where one goes.
+      "на море",
+      "к морю",
+      "у моря",
+      "на моря",
+    ],
   ],
   [
     "travel",
@@ -103,6 +127,43 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "больниц*",
       "терапевт*",
       "медосмотр*",
+    ],
+  ],
+  [
+    "haircut",
+    [
+      "haircut*",
+      "barber*",
+      "hairdresser*",
+      "hair salon",
+      "стрижк*",
+      "подстричь*",
+      "постричь*",
+      "парикмахер*",
+      "барбер*",
+    ],
+  ],
+  [
+    "car",
+    [
+      // "Car" alone is also "Park the car": only as what is done to one.
+      "car wash",
+      "car service",
+      "car repair",
+      "car inspection",
+      "oil change",
+      "tyre*",
+      "tires",
+      "driving lesson*",
+      "driving test",
+      "test drive",
+      "автосервис*",
+      "автомойк*",
+      "шиномонтаж*",
+      "техосмотр*",
+      "переобу*",
+      "автошкол*",
+      "вождени*",
     ],
   ],
   [
@@ -245,6 +306,22 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
     ],
   ],
   [
+    "cleaning",
+    [
+      "cleaning",
+      "clean up",
+      "cleanup",
+      "tidy*",
+      "vacuum*",
+      "laundry",
+      "уборк*",
+      "убраться",
+      "прибра*",
+      "пылесос*",
+      "стирк*",
+    ],
+  ],
+  [
     "shopping",
     [
       "shopping",
@@ -307,6 +384,54 @@ const WORDS: readonly (readonly [Subject, readonly string[]])[] = [
       "чаепити*",
       "капучино",
       "латте",
+    ],
+  ],
+  [
+    "code",
+    [
+      // "Code" alone is also "Dress code": only as work on one.
+      "code review*",
+      "coding",
+      "programming",
+      "hackathon*",
+      "debug*",
+      "refactor*",
+      "pull request*",
+      "код ревью",
+      "кодинг*",
+      "программирова*",
+      "хакатон*",
+      "рефактор*",
+      "дебаг*",
+      "отладк*",
+    ],
+  ],
+  [
+    "meeting",
+    [
+      // "Sync" and "call" alone are also "Team sync", "Call mom": only as a meeting.
+      "meeting*",
+      "video call*",
+      "zoom call*",
+      "conference call*",
+      "call with",
+      "standup*",
+      "stand up",
+      "webinar*",
+      "interview*",
+      "one on one",
+      "встреча",
+      "встречи",
+      "встречу",
+      "встрече",
+      "созвон*",
+      "совещани*",
+      "планерк*",
+      "митинг*",
+      "переговор*",
+      "собеседовани*",
+      "стендап*",
+      "вебинар*",
     ],
   ],
   // A party of no kind named is drawn as a birthday, after every subject:
