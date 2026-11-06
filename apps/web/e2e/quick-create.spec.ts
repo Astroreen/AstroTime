@@ -121,6 +121,24 @@ test.describe("on a phone", () => {
     ).toBeVisible();
   });
 
+  test("the handle is a button: Enter on it expands; a tap beside a titled one keeps it", async ({
+    page,
+  }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Create" }).click();
+    const quick = quickCreate(page);
+    await quick.getByRole("textbox", { name: "Title" }).fill("Keep me");
+    // The dimmed view above the sheet: nothing typed is lost to a stray tap.
+    await page.mouse.click(PHONE.width / 2, 40);
+    await expect(quick).toBeVisible();
+    await quick.getByRole("button", { name: "Expand" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(quick).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: "New event" }).getByRole("textbox", { name: "Title" }),
+    ).toHaveValue("Keep me");
+  });
+
   test("a short drag springs back; dragged down it closes", async ({ page }) => {
     await openDemo(page, "day");
     await page.getByRole("button", { name: "Create" }).click();

@@ -103,6 +103,12 @@ export function QuickCreate({
           details.cancel();
           return;
         }
+        // A stray tap beside a titled one loses nothing; Escape, the ✕ or a
+        // drag down still close it (design D296).
+        if (!open && details.reason === "outside-press" && form?.summary.trim()) {
+          details.cancel();
+          return;
+        }
         if (!open) onClose();
       }}
     >

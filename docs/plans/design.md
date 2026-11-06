@@ -2515,14 +2515,16 @@ keywords". The quick parse and voice that fill quick create are the
   pressed, "Expand" to a screen reader and the keyboard) becomes the full
   editor ([D297](#D297)) with everything already filled carried over; the
   popover has an expand icon in its corner. Enter saves, Escape closes
-  (a filled one asks, as the editor does). Google Calendar's quick create
+  (a filled one asks, as the editor does: _not yet, see [Deferred](#deferred); a press beside a titled one does not close it meanwhile_). Google Calendar's quick create
   on Android and the web is the reference.
   _Built:_ the sheet's handle is the button "Expand"; dragged up 40 px it
   expands, dragged down 96 px it closes, less springs back. The popover
   has its expand icon and a ✕ in its top corner. The time row is the date,
   then the start and, for an event, the end (an event over days shows both
   dates, as the editor does). The editor does not ask before it closes a
-  filled form, so neither does quick create yet ([Deferred](#deferred)).
+  filled form, so neither does quick create yet ([Deferred](#deferred));
+  meanwhile a press outside a titled one leaves it open, and Escape, the ✕
+  and a drag down close it.
   The title is a plain `<input>` and the foot keeps the microphone's place
   left of "Save", for [assistant D301](assistant.md#D301) and
   [D302](assistant.md#D302). Every creation goes through it: a slot, the
