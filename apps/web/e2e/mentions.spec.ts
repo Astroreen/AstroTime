@@ -9,7 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { addAccount, openApp, WIDE } from "./support.ts";
+import { addAccount, openApp, WIDE, expand } from "./support.ts";
 
 const test = base.extend<{ radicale: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -43,6 +43,7 @@ async function signedIn(page: Page, radicale: CalDavServer) {
   await expect(account.getByText(/^Synced at /)).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   return page.getByRole("dialog", { name: "New event" });
 }
 

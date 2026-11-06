@@ -24,7 +24,7 @@ import { useMediaQuery } from "../hooks.ts";
  * query counts rem from the browser's own font size, not the root's; the
  * page sets no root size of its own, so the two are one.
  */
-const FLOATS_REM = 40;
+export const FLOATS_REM = 40;
 /** The dialog's widest in rem, as the sheet's `sm:w-[min(36rem,…)]` in the middle: larger with the user's larger font. */
 const WIDEST_REM = 36;
 /** The narrowest it stands beside the draft: a phone's width, which the form is made for. */
@@ -131,7 +131,7 @@ export function asideStyle({ side, width }: Aside): CSSProperties {
 }
 
 /** The draft as the view shows it: not a copy in a period drawn beside it for a swipe (design D154). */
-function shownDraft(): Element | undefined {
+export function shownDraft(): Element | undefined {
   return [...document.querySelectorAll("main [data-draft]")].find(
     (element) => !element.closest("[inert]"),
   );

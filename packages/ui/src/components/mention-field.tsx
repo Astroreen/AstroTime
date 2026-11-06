@@ -39,6 +39,7 @@ export function MentionField({
   onChange,
   accountId,
   label,
+  placeholder = label,
   className,
 }: {
   value: string;
@@ -46,6 +47,8 @@ export function MentionField({
   /** The account of the item's calendar; `null` on this device, where no one is offered. */
   accountId: string | null;
   label: string;
+  /** The empty field's pale hint; its label by default. */
+  placeholder?: string;
   className: string;
 }) {
   const { t } = useTranslation();
@@ -125,7 +128,7 @@ export function MentionField({
       <textarea
         ref={field}
         aria-label={label}
-        placeholder={label}
+        placeholder={placeholder}
         value={value}
         rows={4}
         aria-autocomplete="list"

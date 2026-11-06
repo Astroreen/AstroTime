@@ -5,7 +5,7 @@
 // step waits for what it draws.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const grid = (page: Page) => page.locator("main [data-current] [data-scroller]");
 const standUp = (page: Page) =>
@@ -198,6 +198,7 @@ test.describe("what is no zoom, and what ends one (design D192)", () => {
     await openDemo(page, "3days");
     await zoomable(page);
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).press("+");
     await dialog.getByRole("radio", { name: "Task" }).press("-");

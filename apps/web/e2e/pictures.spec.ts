@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openDemo } from "./support.ts";
+import { openDemo, expand } from "./support.ts";
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -146,6 +146,7 @@ test.describe("a place's photo", () => {
   /** An event with no subject's word at a place picked from Location's search. */
   async function sightseeing(page: Page) {
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Sightseeing");
     await dialog.getByRole("combobox", { name: "Location" }).fill("Brandenburger");
@@ -211,6 +212,7 @@ test.describe("a place's photo", () => {
     );
     await openDemo(page, "agenda");
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Plumber");
     await dialog.getByRole("combobox", { name: "Location" }).fill("Unter den Linden 77");

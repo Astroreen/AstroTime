@@ -4,7 +4,7 @@
 // dropdown of the edit dialog with a dot left of each name.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { choose, openDemo, WIDE } from "./support.ts";
+import { choose, openDemo, WIDE, expand } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -94,6 +94,7 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   // Its title says the kind: "New event", "New task".
   const dialog = page.getByRole("dialog", { name: /^New (event|task)$/ });
   const colour = dialog.getByRole("combobox", { name: "Colour" });
@@ -139,6 +140,7 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   );
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await expect(dialog.getByRole("combobox", { name: "Colour" })).toHaveText("Deep teal");
 });
 
@@ -169,6 +171,7 @@ test("a colour chosen in the dialog stays through a switch of kind, the default'
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: /^New (event|task)$/ });
   const colour = dialog.getByRole("combobox", { name: "Colour" });
   await expect(colour).toHaveText("Rose one");
@@ -191,6 +194,7 @@ test.describe("in Russian", () => {
   test("a task's colour is its list's, an event's its calendar's", async ({ page }) => {
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Создать" }).click();
+    await expand(page, "ru");
     const dialog = page.getByRole("dialog", { name: /^Новое мероприятие$|^Новая задача$/ });
     const colour = dialog.getByRole("combobox", { name: "Цвет" });
     await dialog.getByRole("radio", { name: "Задача" }).click();

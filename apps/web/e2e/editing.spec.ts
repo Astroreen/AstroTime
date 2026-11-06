@@ -5,7 +5,7 @@
 // calendar, and the Conflicts list (D6).
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { choose, openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, expand, openDemo, PHONE, quickCreate, WIDE } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -33,6 +33,7 @@ test('"+" creates an event on the day shown from the next half hour; it shows in
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   // Google's prefill: today, from the next half hour after 10:40, an hour long.
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-04");
@@ -60,6 +61,7 @@ test("a reminder picked from the menu is saved with the item and shown in its de
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Call the bank");
   await dialog.getByRole("button", { name: "Add a reminder" }).click();
@@ -84,6 +86,7 @@ for (const [size, viewport] of [
     await page.setViewportSize(viewport);
     await openDemo(page, "week");
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("button", { name: "Add a reminder" }).click();
     await page.getByRole("menuitem", { name: "10 minutes before" }).click();
@@ -118,6 +121,7 @@ test("the reminder menu offers four, the most added first; Custom… adds any am
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Visa appointment");
   // Nothing added on this device yet: Google's defaults.
@@ -158,6 +162,7 @@ test("the reminder menu offers four, the most added first; Custom… adds any am
   await page.reload();
   await expect(opener(page, "Wednesday, November 4", /^Design review, /)).toBeVisible();
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await dialog.getByRole("button", { name: "Add a reminder" }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
     "4 days before",
@@ -222,6 +227,7 @@ test("the tally counts a saved item's reminders only, each under the kind it was
 
   // A save refused (the end before the start) and the dialog closed: nothing counted.
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await addCustom("5", "hours");
   await dialog.getByLabel("End date").fill("2026-11-03");
   await dialog.getByRole("button", { name: "Save" }).click();
@@ -229,6 +235,7 @@ test("the tally counts a saved item's reminders only, each under the kind it was
   await dialog.getByRole("button", { name: "Close without saving" }).click();
   await expect(dialog).toHaveCount(0);
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await offers(defaults);
 
   // Added to a timed item, then "All day" switched on and saved: a timed reminder still.
@@ -237,6 +244,7 @@ test("the tally counts a saved item's reminders only, each under the kind it was
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await offers(["3 hours before", ...defaults.slice(0, 3)]);
   await dialog.getByRole("switch", { name: "All day" }).click();
   await offers([
@@ -289,6 +297,7 @@ test("Enter in the title saves; a tap on an empty slot of the grid creates there
   // 2:15 PM in a 56-pixel hour: the half hour from 2:00.
   const box = (await column.boundingBox())!;
   await column.click({ position: { x: box.width - 10, y: 14.25 * 56 } });
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog.getByLabel("Start time")).toHaveText("2:00 PM");
   await expect(dialog.getByLabel("End time")).toHaveText("3:00 PM");
@@ -308,6 +317,7 @@ test("a tap on an empty spot of the all-day strip creates on that day, all day; 
   const box = (await strip.boundingBox())!;
   // Tuesday, the third of seven columns, has nothing all day.
   await strip.click({ position: { x: (box.width / 7) * 2.5, y: box.height - 6 } });
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
@@ -329,13 +339,13 @@ test("a tap on an empty spot of the all-day strip creates on that day, all day; 
 
 test.describe("what in the all-day strip is no tap there (design D188)", () => {
   /**
-   * Opens and closes a new item's dialog, so its chunk is loaded: a dialog
+   * Opens and closes quick create (design D296), so its chunk is loaded: a dialog
    * a press would open is then in the page as soon as the press is done,
    * and "no dialog" says no dialog was opened, not one still loading.
    */
-  async function loadEditor(page: Page) {
+  async function loadQuickCreate(page: Page) {
     await page.getByRole("button", { name: "Create" }).click();
-    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+    await expect(quickCreate(page)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   }
@@ -350,7 +360,7 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     page,
   }) => {
     await openDemo(page, "week");
-    await loadEditor(page);
+    await loadQuickCreate(page);
     await page.getByRole("button", { name: "Next week" }).click();
     // A read-only calendar's item, which does not drag.
     const festival = page
@@ -367,7 +377,7 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
 
   test("a press moved 8 px or more on an empty spot creates nothing", async ({ page }) => {
     await openDemo(page, "week");
-    await loadEditor(page);
+    await loadQuickCreate(page);
     const spot = await tuesday(page);
     await page.mouse.move(spot.x, spot.y);
     await page.mouse.down();
@@ -376,12 +386,12 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     // Unmoved, the same spot creates.
     await page.mouse.click(spot.x, spot.y);
-    await expect(page.getByRole("dialog", { name: "New event" })).toHaveCount(1);
+    await expect(quickCreate(page)).toHaveCount(1);
   });
 
   test("a press that leaves the strip and comes back creates nothing", async ({ page }) => {
     await openDemo(page, "week");
-    await loadEditor(page);
+    await loadQuickCreate(page);
     const spot = await tuesday(page);
     await page.mouse.move(spot.x, spot.y);
     await page.mouse.down();
@@ -396,7 +406,7 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     page,
   }) => {
     await openDemo(page, "week");
-    await loadEditor(page);
+    await loadQuickCreate(page);
     const spot = await tuesday(page);
     // A finger's press that becomes a scroll: down, then cancelled by the
     // browser; a click there after it is no tap of that press.
@@ -415,10 +425,10 @@ test.describe("what in the all-day strip is no tap there (design D188)", () => {
     await openDemo(page, "week");
     // The editor's chunk loaded, so the dialog is there before the second
     // press, which then lands on its backdrop (design D190).
-    await loadEditor(page);
+    await loadQuickCreate(page);
     const spot = await tuesday(page);
     await page.mouse.dblclick(spot.x, spot.y);
-    const dialog = page.getByRole("dialog", { name: "New event" });
+    const dialog = quickCreate(page);
     await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
     await expect(page.getByRole("dialog")).toHaveCount(1);
   });
@@ -442,6 +452,7 @@ test.describe("on a phone, the all-day strip (design D188)", () => {
     const box = (await strip.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(24);
     await strip.tap({ position: { x: box.width / 2, y: box.height / 2 } });
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();
     await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-10");
@@ -453,6 +464,7 @@ test("an end before the start is refused, in words; Escape closes without saving
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Backwards");
   await choose(dialog.getByLabel("End time"), "10:00 AM");
@@ -715,6 +727,7 @@ test("the tasks screen adds a task to its list, today, and completes it", async 
     .getByRole("tabpanel", { name: /^Tasks/ })
     .getByRole("button", { name: "Add a task" })
     .click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New task" });
   await expect(dialog.getByLabel("List")).toHaveText(/.+/);
   // A start always, today, all day; no due until one is added (design D159).
@@ -741,6 +754,7 @@ test("a task made on a tapped slot starts there, a chip at its start; its due is
   const column = day(page, "Thursday, November 5");
   const box = (await column.boundingBox())!;
   await column.click({ position: { x: box.width - 10, y: 14.25 * 56 } });
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("radio", { name: "Task" }).click();
   const task = page.getByRole("dialog", { name: "New task" });
@@ -778,6 +792,7 @@ test("an all-day task shows in the strip on its day; its due can be cleared (des
 }) => {
   await openDemo(page, "week");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   await page
     .getByRole("dialog", { name: "New event" })
     .getByRole("radio", { name: "Task" })
@@ -899,6 +914,7 @@ test.describe("on a phone, in Russian", () => {
   }) => {
     await openDemo(page, "day");
     await page.getByRole("button", { name: "Создать" }).click();
+    await expand(page, "ru");
     await page
       .getByRole("dialog", { name: "Новое мероприятие" })
       .getByRole("radio", { name: "Задача" })
@@ -922,6 +938,7 @@ test.describe("on a phone, in Russian", () => {
   }) => {
     await openDemo(page, "day");
     await page.getByRole("button", { name: "Создать" }).click();
+    await expand(page, "ru");
     const dialog = page.getByRole("dialog", { name: "Новое мероприятие" });
     const box = (await dialog.boundingBox())!;
     expect(box.width).toBe(PHONE.width);

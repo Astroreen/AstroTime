@@ -3,7 +3,7 @@
 // nothing here waits for an animation to run or end.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openDemo, PHONE, WIDE } from "./support.ts";
+import { openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const header = (page: Page, name: string) => page.getByRole("heading", { name });
 
@@ -201,6 +201,7 @@ test.describe("an item saved, the strip opened (design D193)", () => {
       content: "[data-landed] { animation-play-state: paused !important; }",
     });
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Call the plumber");
     await dialog.getByRole("button", { name: "Save" }).click();
@@ -235,6 +236,7 @@ test.describe("an item saved, the strip opened (design D193)", () => {
     await openDemo(page, "month");
     await expect(page.locator('[data-view="month"]')).toBeVisible();
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Swimming");
     await dialog.getByLabel("Start date").fill("2026-11-10");
@@ -280,6 +282,7 @@ test.describe("an item saved, the strip opened (design D193)", () => {
       content: "[data-landed] { animation-play-state: paused !important; }",
     });
     await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await dialog.getByRole("textbox", { name: "Title" }).fill("Renew the lease");
     await dialog.getByLabel("Start date").fill("2026-11-18");

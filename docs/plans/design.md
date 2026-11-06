@@ -623,7 +623,8 @@ are its decisions.
   D68](android.md#D68)). Where the button floats, the time grid keeps 80 px
   below midnight, as the Agenda and the tasks list already did, so it never
   hides the last hour for good; under a sidebar's Create the grid ends at
-  midnight.
+  midnight. _Amended by [D296](#D296): "Create" and the floating button open quick
+  create, which expands to the edit dialog._
 - **D133. The top bar on a wide screen is in Google's web order** (_since
   [D226](#D226), [D227](#D227): no Settings, and the tasks toggle is a
   calendar | tasks switch_): the menu,
@@ -1076,6 +1077,12 @@ Settings, the colours and the lists controls open.
   new event that follows its form, all day into the strip, the dialog beside
   it; an edited event at its new place and back at its old one when the
   dialog goes; a task in the Month; the phone).
+  _Amended by [D296](#D296):_ a new item starts in quick create, which
+  draws the draft as the edit dialog does (`useDraft`, in its own chunk
+  `quick-create.tsx`, not the editor's); on a phone its sheet stands at the
+  foot, the draft above it; from 640 px its popover stands beside the draft,
+  level with its top, on the side with room (`usePopoverPlace`), with no
+  dimming. Expanded, the edit dialog takes the draft over as before.
 - **D167. Dropdowns of our own** (feedback 14: "when I open one I am met by
   a not very pretty native list"). Every list a control opens is
   AstroTime's, from `components/select.tsx`: `Select` picks one value (Base
@@ -1777,6 +1784,11 @@ reminders, its description and mentions in it.
   stood 10 px from its row's top, beside the label of a labelled field.
   `editing.spec.ts` measures each icon against its control on a phone and a
   wide screen.
+  _Amended by [D297](#D297):_ no row has a label above its field now (a
+  field is named for a screen reader, and its value or pale hint says the
+  rest), so every icon stands 10 px from its row's top, level with its
+  40 px control (`Section` in `editor-fields.tsx`). `editing.spec.ts` still
+  measures it, on the edit dialog reached through quick create's "Expand".
 
 - **D206. Reminders of the user's own; the menu offers the four most added**
   (the owner's feedback 2 after round 3: "Reminders must be dynamic. I want a
@@ -2523,8 +2535,24 @@ keywords". The quick parse and voice that fill quick create are the
   pressed, "Expand" to a screen reader and the keyboard) becomes the full
   editor ([D297](#D297)) with everything already filled carried over; the
   popover has an expand icon in its corner. Enter saves, Escape closes
-  (a filled one asks, as the editor does). Google Calendar's quick create
+  (a filled one asks, as the editor does: _not yet, see [Deferred](#deferred); a press beside a titled one does not close it meanwhile_). Google Calendar's quick create
   on Android and the web is the reference.
+  _Built:_ the sheet's handle is the button "Expand"; dragged up 40 px it
+  expands, dragged down 96 px it closes, less springs back. The popover
+  has its expand icon and a ✕ in its top corner. The time row is the date,
+  then the start and, for an event, the end (an event over days shows both
+  dates, as the editor does). The editor does not ask before it closes a
+  filled form, so neither does quick create yet ([Deferred](#deferred));
+  meanwhile a press outside a titled one leaves it open, and Escape, the ✕
+  and a drag down close it.
+  The title is a plain `<input>` and the foot keeps the microphone's place
+  left of "Save", for [assistant D301](assistant.md#D301) and
+  [D302](assistant.md#D302). Every creation goes through it: a slot, the
+  all-day strip, the floating button, "Create", the tasks screen's "Add a
+  task"; "Copy to" opens the edit dialog itself. Its fields, the date and
+  time, the calendar's row and the shared looks are in `editor-fields.tsx`,
+  so its chunk (4 KiB) loads without the editor's. Tested:
+  `apps/web/e2e/quick-create.spec.ts`.
 - **D297. The full editor, lighter.** Its rows lose their boxes: each is an
   icon and its value on the dialog's ground, with no border or fill, as in
   Google Calendar's edit screen; groups are parted by a hairline. An empty
@@ -2535,6 +2563,13 @@ keywords". The quick parse and voice that fill quick create are the
   "Colour"). "Save" is in the top bar only, none at the form's foot. Every
   field, its behaviour and its tests stay as they are; only how they are
   drawn changes, and [D205](#D205)'s icon alignment is measured again.
+  _Built:_ the rows' labels went (Repeat, Calendar, Colour are named for a
+  screen reader), the hints are "Add a location", "Add a description",
+  "Add due", "Add a reminder", and the three ways to attach drawn as pale
+  hints ([D237](#D237) keeps them in sight). The groups: kind and title;
+  time and repeat; reminders; calendar and colour; place, description and
+  attachments. "Add guests" has no row: the editor has no guests field
+  ([Deferred](#deferred)).
 - **D298. Pictures drawn to a higher standard.** The owner: "you can see
   mistakes (a snowdrift floating above the ground, a gap between a hill and
   a field) and the shapes they are made of". Every illustration and month
@@ -2555,6 +2590,18 @@ keywords". The quick parse and voice that fill quick create are the
   Google's do. None with reduced motion.
 
 ## Deferred
+
+- **Asking before a filled form is closed** ([D296](#D296)) — "a filled
+  one asks, as the editor does": the editor asks nothing on Escape or ✕
+  today, so quick create closes as it does; one question for both, when
+  one comes.
+- **Guests in the editor** ([D297](#D297)) — "Add guests" needs a guests
+  field, which the editor has never had: the details show guests, and
+  editing them waits in [foundation's Deferred](foundation.md#deferred).
+- **Expanding before the editor's code is here** ([D296](#D296)) — the
+  editor's chunk is fetched once the page is idle; expanded before it
+  arrives (a slow first visit), quick create goes and the editor shows a
+  moment later.
 
 - **Painted pictures** ([D298](#D298)) — if SVG drawn again still falls
   short, raster illustrations (WebP or AVIF) the owner supplies, kept as

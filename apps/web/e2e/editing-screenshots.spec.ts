@@ -9,7 +9,7 @@
 //   ASTROTIME_SCREENSHOTS=/tmp/shots pnpm --filter @astrotime/web e2e editing-screenshots
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { choose, openDemo, PHONE, WIDE } from "./support.ts";
+import { choose, openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const directory = process.env["ASTROTIME_SCREENSHOTS"];
 test.skip(!directory, "set ASTROTIME_SCREENSHOTS to a directory to take the screenshots");
@@ -196,6 +196,7 @@ for (const language of ["en", "ru"] as const) {
       await phone.keyboard.press("Escape");
       await expect(phone.getByRole("dialog")).toHaveCount(0);
       await phone.getByRole("button", { name: w.create }).click();
+      await expand(phone, language);
       const create = phone.getByRole("dialog", { name: w.newEvent });
       await create
         .getByRole("textbox", { name: w.title })
@@ -250,6 +251,7 @@ for (const language of ["en", "ru"] as const) {
       // On a phone: a task from "+", its start as an event's, then its due.
       const phone = await open(browser, { language, theme, size: TOUCH_PHONE, touch: true }, "day");
       await phone.getByRole("button", { name: w.create }).click();
+      await expand(phone, language);
       await phone
         .getByRole("dialog", { name: w.newEvent })
         .getByRole("radio", { name: w.task })
@@ -271,6 +273,7 @@ for (const language of ["en", "ru"] as const) {
       // On a wide screen: the same task in the week, a chip at its start.
       const wide = await open(browser, { language, theme, size: WIDE }, "week");
       await wide.getByRole("button", { name: w.create }).click();
+      await expand(wide, language);
       await wide
         .getByRole("dialog", { name: w.newEvent })
         .getByRole("radio", { name: w.task })

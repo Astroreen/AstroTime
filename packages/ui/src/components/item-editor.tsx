@@ -5,7 +5,10 @@
 // custom rule; reminders; the calendar; colour; location; description;
 // attachments (design D233) (a task
 // has no status, priority, progress or tags here, design D162). Enter in a
-// field saves, Escape closes.
+// field saves, Escape closes. A new item reaches it from quick create's
+// "Expand" (design D296). Its rows have no boxes: an icon and the value on
+// the dialog's ground, an empty one a pale hint, groups parted by a
+// hairline (design D297).
 import {
   nthWeekdayOf,
   WEEKDAYS,
@@ -71,16 +74,22 @@ import { useAccounts } from "./accounts-context.tsx";
 import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
+import {
+  CalendarSelect,
+  DateTime,
+  field,
+  fieldButton,
+  hint,
+  KindSwitch,
+  Section,
+  TimeSelect,
+  titleField,
+  useSecondPress,
+  type Press,
+} from "./editor-fields.tsx";
 
-/** The click on an empty slot that opened a new item's dialog (design D190). */
-export interface Press {
-  readonly x: number;
-  readonly y: number;
-  /** The click's count: 1 for a single click, 2 for a double click's second. */
-  readonly detail: number;
-  /** Its `timeStamp`. */
-  readonly at: number;
-}
+/** A label above a field of a panel inside a row: the custom repeat's. */
+const fieldLabel = "text-small leading-5 text-ink-muted";
 
 export interface EditorState {
   /** `false`: a new item, whose kind can still switch. */
@@ -96,13 +105,6 @@ export interface EditorState {
   readonly problemKind?: Form["kind"];
   readonly saving: boolean;
 }
-
-const field =
-  "h-10 w-full min-w-0 rounded-lg bg-canvas px-3 text-input text-ink ring-1 ring-line outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent [color-scheme:inherit]";
-/** A dropdown's button in the form, as a field (design D167). */
-const fieldButton = "h-10 w-full min-w-0 rounded-lg bg-canvas pr-2 pl-3 ring-1 ring-line";
-/** A dropdown's label above it: one 20 px line, which `Section` counts on. */
-const fieldLabel = "text-small leading-5 text-ink-muted";
 
 export function ItemEditor({
   state,
@@ -272,132 +274,126 @@ function Fields({
   const [colorChosen, setColorChosen] = useState(false);
   const set = (changes: Partial<Form>) => onChange({ ...form, ...changes });
   const event = form.kind === "event";
+  const calendar = calendars.find((c) => c.id === form.calendarId);
   return (
-    <div className="flex flex-col gap-4">
-      {!existing && !copy && (
-        <div role="radiogroup" aria-label={t("edit.kind")} className="flex gap-2">
-          {(["event", "task"] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              role="radio"
-              aria-checked={form.kind === kind}
-              onClick={() => {
-                const next = switchKind(form, kind);
-                onChange(colorChosen ? next : { ...next, color: defaults[kind] });
-              }}
-              className="rounded-full px-4 py-1.5 text-body font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-accent aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
-            >
-              {t(`edit.kind.${kind}`)}
-            </button>
-          ))}
-        </div>
-      )}
-      <input
-        aria-label={t("edit.title")}
-        placeholder={t("edit.titlePlaceholder")}
-        value={form.summary}
-        autoFocus={!existing}
-        onChange={(e) => set({ summary: e.target.value })}
-        className="h-12 w-full border-b border-line bg-transparent px-1 text-headline text-ink outline-none placeholder:text-ink-muted focus:border-accent"
-      />
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-3 pb-3">
+        {!existing && !copy && (
+          <KindSwitch
+            value={form.kind}
+            onChange={(kind) => {
+              const next = switchKind(form, kind);
+              onChange(colorChosen ? next : { ...next, color: defaults[kind] });
+            }}
+          />
+        )}
+        <input
+          aria-label={t("edit.title")}
+          placeholder={t("edit.titlePlaceholder")}
+          value={form.summary}
+          autoFocus={!existing}
+          onChange={(e) => set({ summary: e.target.value })}
+          className={titleField}
+        />
+      </div>
 
-      <Section icon={<ClockIcon className="size-5" />}>
-        <Toggle
-          label={t("edit.allDay")}
-          checked={form.allDay}
-          onChange={(allDay) => onChange(withAllDay(form, allDay))}
-        />
-        <DateTime
-          form={form}
-          dateLabel={t("edit.startDate")}
-          timeLabel={t("edit.startTime")}
-          date={form.startDate}
-          time={form.startTime}
-          onDate={(date) => onChange(withStartDate(form, date))}
-          onTime={(startTime) => onChange(withStartTime(form, startTime))}
-        />
-        {event ? (
+      <Group>
+        <Section icon={<ClockIcon className="size-5" />}>
+          <Toggle
+            label={t("edit.allDay")}
+            checked={form.allDay}
+            onChange={(allDay) => onChange(withAllDay(form, allDay))}
+          />
           <DateTime
             form={form}
-            dateLabel={t("edit.endDate")}
-            timeLabel={t("edit.endTime")}
-            date={form.endDate}
-            time={form.endTime}
-            onDate={(endDate) => set({ endDate })}
-            onTime={(endTime) => set({ endTime })}
+            dateLabel={t("edit.startDate")}
+            timeLabel={t("edit.startTime")}
+            date={form.startDate}
+            time={form.startTime}
+            onDate={(date) => onChange(withStartDate(form, date))}
+            onTime={(startTime) => onChange(withStartTime(form, startTime))}
           />
-        ) : form.endDate === "" ? (
-          <button
-            type="button"
-            onClick={() => onChange(withDue(form, true))}
-            className="flex min-h-10 items-center self-start rounded-lg px-1 text-row text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            {t("edit.addDue")}
-          </button>
-        ) : (
-          <div role="group" aria-label={t("edit.due")} className="flex flex-col gap-1">
-            <span className="text-small text-ink-muted">{t("edit.due")}</span>
-            <div className="flex items-center gap-1">
-              <div className="min-w-0 flex-1">
-                <DateTime
-                  form={form}
-                  allDay={dueIsDate(form)}
-                  dateLabel={t("edit.dueDate")}
-                  timeLabel={t("edit.dueTime")}
-                  date={form.endDate}
-                  time={form.endTime}
-                  onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
-                  onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
-                />
+          {event ? (
+            <DateTime
+              form={form}
+              dateLabel={t("edit.endDate")}
+              timeLabel={t("edit.endTime")}
+              date={form.endDate}
+              time={form.endTime}
+              onDate={(endDate) => set({ endDate })}
+              onTime={(endTime) => set({ endTime })}
+            />
+          ) : form.endDate === "" ? (
+            <button type="button" onClick={() => onChange(withDue(form, true))} className={hint}>
+              {t("edit.addDue")}
+            </button>
+          ) : (
+            <div role="group" aria-label={t("edit.due")} className="flex flex-col gap-1">
+              <span className="px-2 text-small text-ink-muted">{t("edit.due")}</span>
+              <div className="flex items-center gap-1">
+                <div className="min-w-0 flex-1">
+                  <DateTime
+                    form={form}
+                    allDay={dueIsDate(form)}
+                    dateLabel={t("edit.dueDate")}
+                    timeLabel={t("edit.dueTime")}
+                    date={form.endDate}
+                    time={form.endTime}
+                    onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
+                    onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label={t("edit.removeDue")}
+                  title={t("edit.removeDue")}
+                  onClick={() => onChange(withDue(form, false))}
+                  className={dialogIcon}
+                >
+                  <CloseIcon className="size-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                aria-label={t("edit.removeDue")}
-                title={t("edit.removeDue")}
-                onClick={() => onChange(withDue(form, false))}
-                className={dialogIcon}
-              >
-                <CloseIcon className="size-4" />
-              </button>
             </div>
-          </div>
-        )}
-        {!form.allDay && form.zone === null && (
-          <p className="text-small text-ink-muted">{t("edit.floating")}</p>
-        )}
-        {!form.allDay && form.zone !== null && form.zone !== timeZone && (
-          <p className="text-small text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
-        )}
-      </Section>
+          )}
+          {!form.allDay && form.zone === null && (
+            <p className="px-2 text-small text-ink-muted">{t("edit.floating")}</p>
+          )}
+          {!form.allDay && form.zone !== null && form.zone !== timeZone && (
+            <p className="px-2 text-small text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
+          )}
+        </Section>
 
-      <Section icon={<RepeatIcon className="size-5" />} labelled>
-        <RepeatField form={form} onChange={(repeat) => set({ repeat })} />
-      </Section>
+        <Section icon={<RepeatIcon className="size-5" />}>
+          <RepeatField form={form} onChange={(repeat) => set({ repeat })} />
+        </Section>
+      </Group>
 
-      <Section icon={<BellIcon className="size-5" />}>
-        <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
-      </Section>
+      <Group>
+        <Section icon={<BellIcon className="size-5" />}>
+          <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
+        </Section>
+      </Group>
 
-      <Section icon={<CalendarIcon className="size-5" />} labelled>
-        <Select
-          label={t(event ? "edit.calendar" : "edit.list")}
-          value={form.calendarId}
-          onChange={(calendarId) => set({ calendarId })}
-          options={calendars.map((c) => [c.id, c.name])}
-        />
-        {calendars.length === 0 && (
-          <p className="text-small text-danger">{t(event ? "edit.noCalendar" : "edit.noList")}</p>
-        )}
-      </Section>
+      <Group>
+        <Section icon={<CalendarIcon className="size-5" />}>
+          <CalendarSelect
+            label={t(event ? "edit.calendar" : "edit.list")}
+            value={form.calendarId}
+            onChange={(calendarId) => set({ calendarId })}
+            calendars={calendars}
+          />
+          {calendars.length === 0 && (
+            <p className="px-2 text-small text-danger">
+              {t(event ? "edit.noCalendar" : "edit.noList")}
+            </p>
+          )}
+        </Section>
 
-      <Section icon={<PaletteIcon className="size-5" />} labelled>
-        <div className="flex flex-col gap-1">
+        <Section icon={<PaletteIcon className="size-5" />}>
           <ColorSelect
             label={t("edit.color")}
-            labelClassName={fieldLabel}
             value={form.color}
-            calendarColor={calendars.find((c) => c.id === form.calendarId)?.color ?? null}
+            calendarColor={calendar?.color ?? null}
             task={!event}
             onChange={(color) => {
               setColorChosen(true);
@@ -405,68 +401,47 @@ function Fields({
             }}
             className={fieldButton}
           />
-        </div>
-      </Section>
+        </Section>
+      </Group>
 
-      <Section icon={<PlaceIcon className="size-5" />}>
-        <PlaceField
-          value={form.location}
-          geo={form.place?.geo ?? null}
-          onChange={(location, picked) => set({ location, place: picked ?? form.place })}
-          className={field}
-        />
-      </Section>
+      <Group>
+        <Section icon={<PlaceIcon className="size-5" />}>
+          <PlaceField
+            value={form.location}
+            geo={form.place?.geo ?? null}
+            onChange={(location, picked) => set({ location, place: picked ?? form.place })}
+            className={field}
+          />
+        </Section>
 
-      <Section icon={<NotesIcon className="size-5" />}>
-        <MentionField
-          label={t("edit.description")}
-          value={form.description}
-          accountId={calendars.find((c) => c.id === form.calendarId)?.accountId ?? null}
-          onChange={(description) => set({ description })}
-          className={`${field} h-auto py-2`}
-        />
-      </Section>
+        <Section icon={<NotesIcon className="size-5" />}>
+          <MentionField
+            label={t("edit.description")}
+            placeholder={t("edit.addDescription")}
+            value={form.description}
+            accountId={calendar?.accountId ?? null}
+            onChange={(description) => set({ description })}
+            className={`${field} field-sizing-content h-auto min-h-10 resize-none py-2`}
+          />
+        </Section>
 
-      <Section icon={<AttachmentsIcon className="size-5" />}>
-        <AttachmentsField
-          value={form.attachments ?? []}
-          calendar={calendars.find((c) => c.id === form.calendarId)}
-          onChange={(attachments) => set({ attachments })}
-          field={field}
-          task={!event}
-        />
-      </Section>
+        <Section icon={<AttachmentsIcon className="size-5" />}>
+          <AttachmentsField
+            value={form.attachments ?? []}
+            calendar={calendar}
+            onChange={(attachments) => set({ attachments })}
+            field={field}
+            task={!event}
+          />
+        </Section>
+      </Group>
     </div>
   );
 }
 
-/**
- * A row of the form: its icon level with the middle of its first control, a
- * 40 px field (design D205), below its label when it has one (`labelled`:
- * the label's 20 px line, `fieldLabel`'s `leading-5`, and the 4 px under it,
- * the `gap-1` of the column that holds the label and its dropdown in
- * `Select`, `RepeatField` and the Colour row; `editing.spec.ts` measures it).
- */
-function Section({
-  icon,
-  labelled = false,
-  children,
-}: {
-  icon: ReactNode;
-  labelled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <span
-        aria-hidden="true"
-        className={`${labelled ? "mt-[2.125rem]" : "mt-2.5"} shrink-0 text-ink-muted`}
-      >
-        {icon}
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">{children}</div>
-    </div>
-  );
+/** A group of rows, parted from the one above by a hairline (design D297). */
+function Group({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-2 border-t border-line py-3">{children}</div>;
 }
 
 function Toggle({
@@ -479,7 +454,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-3 text-row">
+    <label className="flex min-h-10 cursor-pointer items-center gap-3 px-2 text-row">
       <span className="min-w-0 flex-1">{label}</span>
       <Switch.Root
         checked={checked}
@@ -489,75 +464,6 @@ function Toggle({
         <Switch.Thumb className="size-5 rounded-full bg-ink-muted transition-[translate,background-color] duration-150 data-checked:translate-x-4 data-checked:bg-on-accent" />
       </Switch.Root>
     </label>
-  );
-}
-
-function DateTime({
-  form,
-  dateLabel,
-  timeLabel,
-  date,
-  time,
-  onDate,
-  onTime,
-  allDay,
-}: {
-  form: Form;
-  /** A date alone, or a date and a time; the form's "All day" by default. */
-  allDay?: boolean;
-  dateLabel: string;
-  timeLabel: string;
-  date: string;
-  time: string;
-  onDate: (date: string) => void;
-  onTime: (time: string) => void;
-}) {
-  return (
-    <div className="flex gap-2">
-      <input
-        type="date"
-        aria-label={dateLabel}
-        value={date}
-        required
-        onChange={(e) => e.target.value && onDate(e.target.value)}
-        className={`${field} flex-[3]`}
-      />
-      {!(allDay ?? form.allDay) && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
-    </div>
-  );
-}
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
-/** Every quarter of an hour, as Google's time list offers them. */
-const QUARTERS = Array.from(
-  { length: 96 },
-  (_, i) => `${pad2(Math.floor(i / 4))}:${pad2((i % 4) * 15)}`,
-);
-
-/**
- * A time from a list in the user's clock (12 or 24 hours, design D96), which
- * the browser's own time field does not follow; a time between the quarters
- * the item already has stays in the list.
- */
-function TimeSelect({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (time: string) => void;
-}) {
-  const { formats } = useCalendar();
-  const times = QUARTERS.includes(value) ? QUARTERS : [...QUARTERS, value].toSorted();
-  return (
-    <Dropdown
-      label={label}
-      value={value}
-      onChange={onChange}
-      options={times.map((time) => ({ value: time, label: formats.clock(time) }))}
-      className={`${fieldButton} flex-[2]`}
-    />
   );
 }
 
@@ -657,7 +563,6 @@ function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: Repeat
       <div className="flex flex-col gap-1">
         <Dropdown
           label={t("edit.repeat")}
-          labelClassName={fieldLabel}
           value={current}
           onChange={(value) => {
             if (value === "custom") {
@@ -905,7 +810,7 @@ function Reminders({
       {form.alarms.length > 0 && (
         <ul aria-label={t("edit.reminders")} className="flex flex-col gap-1">
           {form.alarms.map((choice, index) => (
-            <li key={index} className="flex min-h-10 items-center gap-2 text-body">
+            <li key={index} className="flex min-h-10 items-center gap-2 pl-2 text-body">
               <span className="min-w-0 flex-1">{wordsOf(choice)}</span>
               <button
                 type="button"
@@ -1047,35 +952,4 @@ function CustomReminder({
       </div>
     </div>
   );
-}
-
-/** How far apart, in px and ms, two presses are still one double click's. */
-const SAME_SPOT = 8;
-const DOUBLE_CLICK_MS = 500;
-
-/**
- * Whether a click outside the dialog (its backdrop's, as Base UI closes a
- * dialog with a backdrop on a `click`, by mouse or touch) is the second of
- * the double click whose first click opened it (design D190): the first
- * click outside since it opened, one more in the click count, at about the
- * same spot, soon after. Any other is a click of its own.
- */
-function useSecondPress(opener: Press | undefined): (event: Event) => boolean {
-  // Each opening's first click outside is the only one that may be its second.
-  const asked = useRef<Press | undefined>(undefined);
-  return (event) => {
-    const first = opener && asked.current !== opener ? opener : undefined;
-    asked.current = opener;
-    return (
-      first !== undefined &&
-      // Base UI hands the `click` that closes a dialog with a backdrop, a
-      // MouseEvent by mouse and by touch alike (drag.spec.ts tests both);
-      // anything else closes it, as before D190.
-      event instanceof MouseEvent &&
-      event.detail === first.detail + 1 &&
-      Math.abs(event.clientX - first.x) < SAME_SPOT &&
-      Math.abs(event.clientY - first.y) < SAME_SPOT &&
-      event.timeStamp - first.at < DOUBLE_CLICK_MS
-    );
-  };
 }

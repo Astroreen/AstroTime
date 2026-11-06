@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { NOW, openDemo, PHONE, WIDE } from "./support.ts";
+import { NOW, openDemo, PHONE, WIDE, expand } from "./support.ts";
 
 const recorded = readFileSync(
   new URL("../../../packages/ui/test/fixtures/photon-en.json", import.meta.url),
@@ -55,6 +55,7 @@ for (const [name, device] of [
       const { searched, tiles } = await fakeServices(page);
       await openDemo(page, "day");
       await page.getByRole("button", { name: "Create" }).click();
+      await expand(page);
       const dialog = page.getByRole("dialog", { name: "New event" });
       await dialog.getByRole("textbox", { name: "Title" }).fill("Walk");
       const location = dialog.getByRole("combobox", { name: "Location" });
@@ -147,6 +148,7 @@ test("a search that fails (a captive portal's page) leaves Location a text field
   );
   await openDemo(page, "day");
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill("Walk");
   const answered = page.waitForResponse((answer) => answer.url().startsWith("https://photon"));
@@ -321,6 +323,7 @@ test("with places off in Settings, Location is a text field that asks nothing", 
   await expect(settings).toBeHidden();
 
   await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await expect(dialog.getByRole("combobox", { name: "Location" })).toHaveCount(0);
   await dialog.getByRole("textbox", { name: "Location" }).fill("Brandenburger Tor");

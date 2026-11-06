@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** The demo data's today, as the frozen clock has it: a Wednesday, mid-morning in Vilnius. */
 export const NOW = new Date("2026-11-04T10:40:00+02:00");
@@ -11,6 +11,35 @@ export async function choose(field: Locator, option: string): Promise<void> {
     .getByRole("listbox")
     .getByRole("option", { name: option, exact: true })
     .click();
+}
+
+/** Quick create's words, its own and its "Expand" (design D296), in each language. */
+const QUICK = {
+  en: { dialog: "Quick create", expand: "Expand", editor: /^New (event|task)$/ },
+  ru: {
+    dialog: "Быстрое создание",
+    expand: "Развернуть",
+    editor: /^Новое мероприятие$|^Новая задача$/,
+  },
+} as const;
+
+/** Quick create, which a slot, the floating button or "Create" opens (design D296). */
+export function quickCreate(page: Page, language: keyof typeof QUICK = "en"): Locator {
+  return page.getByRole("dialog", { name: QUICK[language].dialog });
+}
+
+/**
+ * The edit dialog for a new item, reached as the user reaches it: quick
+ * create (design D296), opened by a slot, the floating button or "Create",
+ * then its "Expand". Every spec that creates through the full editor comes
+ * here, so what they test of the editor (D205 among it) is the editor's.
+ */
+export async function expand(page: Page, language: keyof typeof QUICK = "en"): Promise<void> {
+  const quick = quickCreate(page, language);
+  await quick.getByRole("button", { name: QUICK[language].expand }).click();
+  await expect(quick).toHaveCount(0);
+  // Its code may still be on its way: the test goes on once it is there.
+  await expect(page.getByRole("dialog", { name: QUICK[language].editor })).toBeVisible();
 }
 
 export const PHONE = { width: 412, height: 915 };

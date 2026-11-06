@@ -6,7 +6,7 @@
 // change another tab makes: one change, one round of drawing, not a stream.
 import { expect, test, type Page } from "@playwright/test";
 
-import { NOW, openApp, WIDE } from "./support.ts";
+import { NOW, openApp, WIDE, expand } from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -54,6 +54,7 @@ async function setShown(page: Page, shown: boolean): Promise<void> {
 /** Creates an event on a day of the demo's month with room to show it. */
 async function createEvent(page: Page, title: string, date: string): Promise<void> {
   await page.getByRole("button", { name: "Create" }).first().click();
+  await expand(page);
   const dialog = page.getByRole("dialog", { name: "New event" });
   await dialog.getByRole("textbox", { name: "Title" }).fill(title);
   await dialog.getByLabel("Start date").fill(date);

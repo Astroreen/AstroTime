@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { test as base, expect } from "@playwright/test";
 
 import { createAppServer } from "../../../proxy/src/server.ts";
-import { openApp, WIDE } from "../support.ts";
+import { openApp, quickCreate, WIDE } from "../support.ts";
 
 const test = base.extend({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -26,18 +26,24 @@ const test = base.extend({
 
 test.use({ viewport: WIDE, serviceWorkers: "block" });
 
-test("the edit dialog's code that did not arrive is asked for again", async ({ page }) => {
+test("quick create opens without the edit dialog's code, whose code that did not arrive is asked for again", async ({
+  page,
+}) => {
   // The edit dialog's chunk fails, under any URL it is asked for, until the
-  // test lets it through.
+  // test lets it through: quick create needs none of it (design D296).
   const editor = /\/assets\/item-editor-[\w-]+\.js/;
   await page.route(editor, (route) => route.abort("internetdisconnected"));
   await openApp(page);
   await page.getByRole("button", { name: "Create" }).first().click();
+  const quick = quickCreate(page);
+  await quick.getByRole("textbox", { name: "Title" }).fill("Kept");
+  await quick.getByRole("button", { name: "Expand" }).click();
   const failed = page.getByRole("alertdialog", { name: /Could not load this part of AstroTime/ });
   await expect(failed).toBeVisible();
   await page.unroute(editor);
   await failed.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "New event" });
+  await expect(dialog.getByRole("textbox", { name: "Title" })).toHaveValue("Kept");
   await expect(failed).toHaveCount(0);
 });
 
