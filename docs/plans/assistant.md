@@ -1,8 +1,8 @@
 # Assistant plan
 
-Status: **planned** — decided in the
-[grilling of 2026-11-06](../grilling/2026-11-06-assistant.md), nothing built
-yet. This plan owns turning words into items and letting an AI assistant at
+Status: **in progress** — decided in the
+[grilling of 2026-11-06](../grilling/2026-11-06-assistant.md); MCP in the
+desktop app ([PR AS4](#pr-as4--mcp-in-the-desktop-app)) is built. This plan owns turning words into items and letting an AI assistant at
 the user's calendars: the quick parse of a typed or spoken line, voice
 input, and AstroTime's MCP server. It builds on foundation's
 [D24](foundation.md#D24) (the core is isomorphic), [D5](foundation.md#D5)
@@ -152,6 +152,25 @@ change the user's events and tasks.
   window offers [D311](#D311)'s "Undo" (the desktop has none: its log is
   undone in Settings). Every tool's input is checked against its schema and its result is
   the item as the store holds it. Read-only tools carry `readOnlyHint`.
+  _Built in PR AS4_ (`packages/mcp`): the tools `list_calendars`,
+  `search_items`, `list_items`, `get_item`, `create_event`, `create_task`,
+  `change_item`, `complete_task`, `add_attachment` and `delete_item`
+  (`tools.ts`), run over the store by `assistantTools` (`run.ts`); times are
+  a day (`YYYY-MM-DD`) or a wall clock (`YYYY-MM-DDTHH:MM`) in the user's
+  zone or a `timeZone` given, an all-day event's end its last day itself. A
+  repeating item is changed, completed and deleted as a whole series.
+  The MCP side is the official TypeScript SDK's v2 line,
+  `@modelcontextprotocol/server` 2.4.0, chosen over v1's single
+  `@modelcontextprotocol/sdk` because its `createMcpHandler` is a
+  web-standard `(Request) => Promise<Response>`, as the proxy's and the
+  server's handlers are, so AstroTime's server can serve the same endpoint
+  (D309), and it serves both the 2026-07-28 protocol and 2025's stateless
+  clients; its only dependencies are its own core and Zod. The schemas are
+  Zod 4's, which the SDK lists as JSON Schema and checks a call against; the
+  store's side checks the same ones again. The tools import no SDK and no
+  Node: they run in the desktop's window. The endpoint is
+  `@astrotime/mcp/http` (`mcpEndpoint`), which checks who may call before
+  the SDK sees a request.
 - **D308. First in the desktop app, beside the store.** The desktop app
   ([desktop D73](desktop.md#D73)) serves MCP's streamable HTTP on
   `127.0.0.1` only, behind a token, when Settings → Assistants turns it on
@@ -176,6 +195,17 @@ change the user's events and tasks.
     bytes in `Authorization: Bearer`, compared in constant time, kept with
     the credentials through `safeStorage` ([desktop D74](desktop.md#D74)),
     and "New token" in the setting replaces it at once.
+  - _Built in PR AS4_ (`apps/desktop/src/main/assistants.ts`): the port is
+    one the system picks the first time, kept in `assistants.json` with the
+    switch so the configurations stay right, and another only when it is
+    taken. The token is kept under `assistants:token` in the keyring, or,
+    where there is none, unprotected in the profile without asking: whoever
+    reads the profile reads the store itself. A request is at most 4 MiB, an
+    attachment's content about 1 MiB (written inline, `VALUE=BINARY`,
+    `NewInlineFile` in the core). A call waits for the page's answer; one
+    whose page reloads or goes is answered that AstroTime must be open. The
+    page may write text to the clipboard for the setting's copies
+    ([desktop D71](desktop.md#D71)).
 - **D309. Then on AstroTime's server.** In server mode
   ([server D281](server.md#D281)) the server serves MCP at `/mcp` over the
   server's own data, no CalDAV round trip, for a token a user makes there:
@@ -186,6 +216,14 @@ change the user's events and tasks.
   address and token and copies a ready configuration for Claude (Desktop and
   Code), Cursor, VS Code (Copilot), Codex, Gemini CLI, LM Studio, and any
   other client as plain JSON.
+  _Built in PR AS4_ (`packages/ui/src/assistants/configs.ts`), each in the
+  form its own documentation gave on 2026-11-06: Claude Code's `claude mcp
+  add --transport http`, Cursor's and LM Studio's `mcpServers` with `url`,
+  VS Code's `servers` with `type: "http"`, Codex's `[mcp_servers]` with
+  `http_headers`, Gemini CLI's `httpUrl`. Claude Desktop's file takes only
+  local servers, and its custom connectors are reached from Anthropic's
+  cloud, never from this machine: it goes through `npx mcp-remote`, the
+  token in its environment.
 - **D311. A deletion is asked; every change is kept to undo.** `delete`
   carries `destructiveHint`, so the assistant's client asks the user first.
   Every change through MCP goes into a log, Settings → Assistants →
@@ -199,6 +237,12 @@ change the user's events and tasks.
     left (the same raw object: no edit by the user, no sync bringing
     another's); once it changed, the entry says "Changed since" and offers
     to open the item instead. Undo never overwrites a later edit.
+  - _Built in PR AS4_: migration 9's `assistant_changes`, written in the
+    change's own transaction (`Store.changeLocal`'s `AssistantLog`);
+    `loggedChanges` and `undoChange` in `packages/mcp/src/log.ts`. Undoing
+    the latest entry of an item makes the one before it undoable again. A
+    deletion never sent took its row, so its undo makes the item again
+    under the same UID.
 
 ## Deferred
 
@@ -209,6 +253,12 @@ change the user's events and tasks.
   file each.
 - **A language model for the quick parse** where rules fall short
   ([D300](#D300)).
+- **An occurrence of a series by an assistant** ([D307](#D307)): the
+  tools change, complete and delete a repeating item as a whole series;
+  the edit dialog's scopes (this, this and following) wait.
+- **Larger attachments by an assistant** ([D308](#D308)): about 1 MiB
+  inline today; a file to the account's files (foundation D232) would
+  take more.
 - **Whisper on the desktop natively** (whisper.cpp in the main process)
   if the page's WASM is too slow there ([D303](#D303)).
 

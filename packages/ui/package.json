@@ -25,6 +25,7 @@
   "dependencies": {
     "@astrotime/caldav": "workspace:*",
     "@astrotime/core": "workspace:*",
+    "@astrotime/mcp": "workspace:*",
     "@astrotime/oauth": "workspace:*",
     "@astrotime/storage": "workspace:*",
     "@astrotime/sync": "workspace:*",

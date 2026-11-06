@@ -88,7 +88,10 @@ were checked on 2026-11-01.
   `connect-src 'self'` and `object-src 'none'`, written before D110 built
   the web's policy from what the app does. Navigation away from `app://` and
   new windows are refused (links open in the system browser), permission
-  requests are denied, and the fuses are set at packaging: `RunAsNode`,
+  requests are denied (_changed in assistant PR AS4:_ but writing text to
+  the clipboard, `clipboard-sanitized-write`, for the app's own page, so
+  Settings → Assistants copies its address, token and configurations,
+  [assistant D310](assistant.md#D310)), and the fuses are set at packaging: `RunAsNode`,
   `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`
   and `GrantFileProtocolExtraPrivileges` off, `EnableCookieEncryption` and
   `OnlyLoadAppFromAsar` on (`EnableEmbeddedAsarIntegrityValidation` does

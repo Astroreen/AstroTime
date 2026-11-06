@@ -33,6 +33,12 @@ catalogs:
     '@capacitor/local-notifications':
       specifier: 8.3.1
       version: 8.3.1
+    '@modelcontextprotocol/client':
+      specifier: 2.4.0
+      version: 2.4.0
+    '@modelcontextprotocol/server':
+      specifier: 2.4.0
+      version: 2.4.0
     '@playwright/test':
       specifier: 1.61.1
       version: 1.61.1
@@ -102,6 +108,9 @@ catalogs:
     vite-plus:
       specifier: 1.3.0
       version: 1.3.0
+    zod:
+      specifier: 4.6.7
+      version: 4.6.7
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
@@ -137,12 +146,18 @@ importers:
       '@astrotime/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@astrotime/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@astrotime/storage':
         specifier: workspace:*
         version: link:../../packages/storage
       '@astrotime/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@modelcontextprotocol/client':
+        specifier: 'catalog:'
+        version: 2.4.0
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.61.1
@@ -385,6 +400,34 @@ importers:
         specifier: 'catalog:'
         version: 24.19.2
 
+  packages/mcp:
+    dependencies:
+      '@astrotime/core':
+        specifier: workspace:*
+        version: link:../core
+      '@astrotime/storage':
+        specifier: workspace:*
+        version: link:../storage
+      '@modelcontextprotocol/server':
+        specifier: 'catalog:'
+        version: 2.4.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@astrotime/caldav':
+        specifier: workspace:*
+        version: link:../caldav
+      '@astrotime/sync':
+        specifier: workspace:*
+        version: link:../sync
+      '@modelcontextprotocol/client':
+        specifier: 'catalog:'
+        version: 2.4.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+
   packages/mesh:
     devDependencies:
       '@types/node':
@@ -488,6 +531,9 @@ importers:
       '@astrotime/core':
         specifier: workspace:*
         version: link:../core
+      '@astrotime/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@astrotime/oauth':
         specifier: workspace:*
         version: link:../oauth
@@ -742,6 +788,18 @@ packages:
   '@malept/flatpak-bundler@0.4.0':
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
+
+  '@modelcontextprotocol/client@2.4.0':
+    resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/server@2.4.0':
+    resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
+    engines: {node: '>=20'}
 
   '@napi-rs/wasm-runtime@1.2.6':
     resolution: {integrity: sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw==}
@@ -2427,6 +2485,14 @@ packages:
   estree-walker@3.0.3:
     resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
 
+  eventsource-parser@3.1.1:
+    resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
+    engines: {node: '>=18.0.0'}
+
+  eventsource@3.0.7:
+    resolution: {integrity: sha512-CRT1WTyuQoD771GW56XEZFQ/ZoSfWid1alKGDYMmkt2yl8UXrVR4pspqWNEcqKvVIzg6PAltWjxcSSPrboA4iA==}
+    engines: {node: '>=18.0.0'}
+
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
@@ -2675,6 +2741,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@6.2.15:
+    resolution: {integrity: sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -3100,6 +3169,10 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  pkce-challenge@5.0.1:
+    resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
+    engines: {node: '>=16.20.0'}
 
   pkijs@3.4.3:
     resolution: {integrity: sha512-V9kOzaItwDgqlryhXysQsAXUEKi5O7kqWUaP3dXI7MLvkPqWWMb4wVb1QAtmEDCKI+XIAINsZoNKMFF7sZb1eg==}
@@ -4001,6 +4074,25 @@ snapshots:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@modelcontextprotocol/client@2.4.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.4.0
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.1.1
+      jose: 6.2.15
+      pkce-challenge: 5.0.1
+      zod: 4.6.7
+
+  '@modelcontextprotocol/core@2.4.0':
+    dependencies:
+      zod: 4.6.7
+
+  '@modelcontextprotocol/server@2.4.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.4.0
+      zod: 4.6.7
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
     dependencies:
@@ -5174,6 +5266,12 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.10
 
+  eventsource-parser@3.1.1: {}
+
+  eventsource@3.0.7:
+    dependencies:
+      eventsource-parser: 3.1.1
+
   expect-type@1.4.0: {}
 
   exponential-backoff@3.1.3: {}
@@ -5441,6 +5539,8 @@ snapshots:
       picocolors: 1.1.1
 
   jiti@2.7.0: {}
+
+  jose@6.2.15: {}
 
   js-tokens@4.0.0: {}
 
@@ -5879,6 +5979,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  pkce-challenge@5.0.1: {}
 
   pkijs@3.4.3:
     dependencies:

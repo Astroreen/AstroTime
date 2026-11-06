@@ -3,7 +3,8 @@
 // main process (D72), credentials in the keyring's care (D74), the system browser,
 // preferences in localStorage, reminders shown by the main process (D76), and
 // the shell that lives on with its window closed: its theme, its close, its
-// sync triggers (D75). One window, one store: no sync lock (foundation D91).
+// sync triggers (D75), and the MCP endpoint's calls run against the page's
+// store (assistant D308). One window, one store: no sync lock (foundation D91).
 import type { HttpClient } from "@astrotime/caldav";
 import { OfflineError } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
@@ -36,6 +37,8 @@ export function desktopPlatform(bridge: Bridge, store: Promise<Store>): Platform
     reminders: desktopReminders(bridge.reminders),
     shell: (state) => bridge.shell(state),
     onSyncRequest: (listener) => bridge.onSyncRequest(listener),
+    // The MCP endpoint the main process serves; its calls run here (assistant D308).
+    assistants: bridge.assistants,
   };
 }
 

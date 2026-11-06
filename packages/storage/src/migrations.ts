@@ -93,6 +93,23 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE accounts ADD COLUMN sync_off INTEGER NOT NULL DEFAULT 0;
   `,
+  // 9: what assistants changed through MCP, to undo
+  // (docs/plans/assistant.md#D311): on this device only, never synced.
+  `
+  CREATE TABLE assistant_changes (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL,
+    tool TEXT NOT NULL,
+    calendar_id TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+    uid TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    summary TEXT,
+    before_ics TEXT,
+    after_ics TEXT,
+    undone_at INTEGER
+  );
+  CREATE INDEX assistant_changes_at ON assistant_changes(at);
+  `,
 ];
 
 /** The database was written by a newer AstroTime; this build must not touch it. */

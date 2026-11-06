@@ -35,6 +35,25 @@ const bridge: Bridge = {
   shell: (state) => ipcRenderer.send(CHANNELS.shell, state),
   onSyncRequest: (listener) =>
     listen<[unknown]>(CHANNELS.sync, (byUser) => listener(byUser === true)),
+  assistants: {
+    state: () => ipcRenderer.invoke(CHANNELS.assistantsState),
+    setEnabled: (enabled) => ipcRenderer.invoke(CHANNELS.assistantsEnable, enabled),
+    newToken: () => ipcRenderer.invoke(CHANNELS.assistantsNewToken),
+    serve(run) {
+      const stop = listen<[string, string, unknown]>(CHANNELS.assistantsCall, (id, tool, args) => {
+        void run(tool, args).then(
+          (answer) => ipcRenderer.send(CHANNELS.assistantsAnswer, id, answer),
+          (error: unknown) =>
+            ipcRenderer.send(CHANNELS.assistantsAnswer, id, { refused: String(error) }),
+        );
+      });
+      ipcRenderer.send(CHANNELS.assistantsServe, true);
+      return () => {
+        stop();
+        ipcRenderer.send(CHANNELS.assistantsServe, false);
+      };
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld("astrotime", bridge);

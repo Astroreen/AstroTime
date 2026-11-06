@@ -90,6 +90,26 @@ export function AccountsProvider({
       ),
     [platform, scheduler],
   );
+  // An assistant's calls through the shell's MCP endpoint run here, against
+  // this store, and a change is sent as the user's own (assistant D308).
+  useEffect(() => {
+    const { assistants } = platform;
+    if (!assistants) return;
+    let stop: (() => void) | undefined;
+    let stopped = false;
+    void import("../assistants/serve.ts").then(({ serveAssistants }) => {
+      if (stopped) return;
+      stop = serveAssistants(assistants, {
+        store,
+        timeZone,
+        onChanged: () => scheduler.changed(),
+      });
+    });
+    return () => {
+      stopped = true;
+      stop?.();
+    };
+  }, [platform, store, timeZone, scheduler]);
   const status = useSyncExternalStore(
     (onChange) => scheduler.subscribe(onChange),
     () => scheduler.status,

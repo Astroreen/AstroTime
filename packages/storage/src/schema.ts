@@ -94,3 +94,32 @@ export const conflicts = sqliteTable("conflicts", {
   localIcs: text("local_ics").notNull(),
   createdAt: integer("created_at").notNull(),
 });
+
+/**
+ * A change an assistant made through MCP (migration 9,
+ * docs/plans/assistant.md#D311): the item before and after, kept on this
+ * device to undo, never synced; the latest 500.
+ */
+export const assistantChanges = sqliteTable(
+  "assistant_changes",
+  {
+    id: text("id").primaryKey(),
+    at: integer("at").notNull(),
+    /** The MCP tool that made it: `create_event`, `change_item`, `delete_item`… */
+    tool: text("tool").notNull(),
+    calendarId: text("calendar_id")
+      .notNull()
+      .references(() => calendars.id, { onDelete: "cascade" }),
+    uid: text("uid").notNull(),
+    kind: text("kind", { enum: ["event", "task"] }).notNull(),
+    /** The item's title as the change left it (or found it, for a deletion). */
+    summary: text("summary"),
+    /** The object's iCalendar before; `null`: the change created it. */
+    beforeIcs: text("before_ics"),
+    /** The object's iCalendar after; `null`: the change deleted it. */
+    afterIcs: text("after_ics"),
+    /** When the user undid it; `null` while not. */
+    undoneAt: integer("undone_at"),
+  },
+  (t) => [index("assistant_changes_at").on(t.at)],
+);

@@ -97,7 +97,8 @@ When you add a package, app or module, add its line here in the same PR.
     comes from: [`README.md`](../packages/core/test/fixtures/README.md).
   - `Item.attachments`, `inlineFile` (`attachments.ts`) — an item's
     `ATTACH`es: links and inline files, with name, type and size, kept as
-    written; `ItemChanges.attachments` removes and adds.
+    written; `ItemChanges.attachments` removes and adds (a file inline by
+    its content, `NewInlineFile`, `plans/assistant.md#D308`).
     → `plans/foundation.md#D229`
   - `Item.geo`, `Item.placeLabel`, `Place`, `placeText` — a place's point
     (and Apple's name for it), read from `GEO` or
@@ -131,6 +132,9 @@ When you add a package, app or module, add its line here in the same PR.
       download in batches. → `plans/foundation.md#D99`, `plans/foundation.md#D103`
     - `reminders` — every calendar's reminders in a range of days.
       → `plans/foundation.md#D100`
+    - `assistantChanges` — "Changed by an assistant", the latest 500
+      (migration 9), written in a change's transaction (`AssistantLog`).
+      → `plans/assistant.md#D311`
   - `SqlDriver` and its drivers: `@astrotime/storage/node` (`node:sqlite`),
     `@astrotime/storage/web` (sqlite-wasm on OPFS in a worker).
     → `plans/foundation.md#D25`
@@ -289,6 +293,19 @@ When you add a package, app or module, add its line here in the same PR.
     (partitions, `quiet`) and hand-wound timers; `test/mesh.test.ts`, the
     proof of the mesh. → `plans/server.md#D290`
 
+- `packages/mcp` (`@astrotime/mcp`) — AstroTime as an MCP server, over
+  the store (isomorphic). → `plans/assistant.md#D307`
+  - `tools.ts`, `run.ts` — the tools, their Zod schemas and hints, and
+    `assistantTools`, which runs them over a store and logs each change.
+  - `log.ts` — `loggedChanges` and `undoChange`: "Changed by an
+    assistant" and its Undo while the item is unchanged since.
+    → `plans/assistant.md#D311`
+  - `http.ts` (`@astrotime/mcp/http`) — `mcpEndpoint`, streamable HTTP on
+    the MCP SDK as a `(Request) => Promise<Response>`, with its checks:
+    Host, Origin, the token in constant time. → `plans/assistant.md#D308`
+  - `test/mcp.test.ts` — the SDK's client through the endpoint, a store
+    syncing with AstroTime's own server.
+
 - `packages/ui` (`@astrotime/ui`) — the React UI every app renders.
   → `plans/foundation.md#D22`
   - `AstroTime` — the root: the app gives it its `Platform` (the store,
@@ -402,6 +419,12 @@ When you add a package, app or module, add its line here in the same PR.
       account's server too), the question about items already there, the
       progress and the summary; loaded with its first opening.
       → `plans/import.md#D265`, `plans/import.md#D268`, `plans/import.md#D277`
+    - `assistant-settings.tsx` — Settings → Assistants, where the shell
+      serves MCP: on or off, the address, the token, "New token", a
+      configuration per assistant (`assistants/configs.ts`), and "Changed
+      by an assistant" with its Undo; `assistants/serve.ts`, the endpoint's
+      calls run against the page's store. → `plans/assistant.md#D308`,
+      `plans/assistant.md#D310`, `plans/assistant.md#D311`
     - `new-list-dialog.tsx` — the tasks screen's "+ New list": a name and
       where, made on the account's server or on this device; loaded with
       its first opening. → `plans/design.md#D276`
@@ -509,7 +532,8 @@ When you add a package, app or module, add its line here in the same PR.
     subscription and a held removal (`plans/providers.md#D263`), `data.ts`
     and `import.ts`, Settings' "Data" group's and the import dialog's
     (`plans/import.md#D273`), `new-list.ts`, "+ New list"'s
-    (`plans/design.md#D276`).
+    (`plans/design.md#D276`), `assistants.ts`, Settings → Assistants'
+    (`plans/assistant.md#D308`).
     → `plans/foundation.md#D17`
   - `styles.css` — the theme's tokens, dark and light, and the type scale.
     → `plans/design.md#D58`, `plans/design.md#D134`
@@ -638,7 +662,9 @@ When you add a package, app or module, add its line here in the same PR.
     `plans/desktop.md#D72`, `plans/desktop.md#D74`; one instance whose
     window closes to the tray, the frame's theme (`index.ts`), the sync
     timer and resume (`background.ts`), the reminders' notifications
-    (`reminders.ts`). → `plans/desktop.md#D75`, `plans/desktop.md#D76`
+    (`reminders.ts`). → `plans/desktop.md#D75`, `plans/desktop.md#D76`;
+    the MCP endpoint on 127.0.0.1, its token and the calls it hands the
+    window (`assistants.ts`). → `plans/assistant.md#D308`
   - `src/store/` — the store's utility process, `node:sqlite` on
     `astrotime.sqlite3` in userData. → `plans/desktop.md#D73`
   - `src/preload/` and `src/bridge.ts` — the one object the page gets
@@ -650,7 +676,9 @@ When you add a package, app or module, add its line here in the same PR.
     of the test's own and without one (`keyringSession`), living in the
     background (`background.spec.ts`: one instance, the close, resume's
     sync and reminder, the theme), an inline attachment saved
-    (`attachments.spec.ts`, `plans/design.md#D230`), Login Flow v2
+    (`attachments.spec.ts`, `plans/design.md#D230`), an assistant through
+    the MCP endpoint (`assistants.spec.ts`, `plans/assistant.md#D308`),
+    Login Flow v2
     against a Nextcloud (`ASTROTIME_NEXTCLOUD_*`), and the screenshots
     (`ASTROTIME_SCREENSHOTS`). → `plans/desktop.md#D79`
   - `electron-builder.yml` — packaging: the AppImage and deb, the fuses,

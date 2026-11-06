@@ -7,7 +7,7 @@
 // all occurrences (the master).
 import ICAL from "ical.js";
 
-import { setAttachments, type NewAttachment } from "./attachments.ts";
+import { setAttachments, type NewAttachment, type NewInlineFile } from "./attachments.ts";
 import { CalendarObject, CalendarObjectError } from "./calendar-object.ts";
 import { hexColor, isColorName, nearestColorName } from "./colors.ts";
 import { point, readItem, X_COLOR, type Geo } from "./item.ts";
@@ -71,11 +71,12 @@ export interface ItemChanges {
   };
   /**
    * Attachments removed, by their index among the item's `ATTACH`es, and
-   * added; the others stay as written (foundation D229).
+   * added (a link, or a file inline); the others stay as written
+   * (foundation D229).
    */
   readonly attachments?: {
     readonly remove: readonly number[];
-    readonly add: readonly NewAttachment[];
+    readonly add: readonly (NewAttachment | NewInlineFile)[];
   };
   /**
    * The item's own colour: a CSS colour name, written as RFC 7986 `COLOR`,
