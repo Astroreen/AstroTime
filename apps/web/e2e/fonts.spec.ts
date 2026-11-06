@@ -109,6 +109,44 @@ test("a font that cannot be fetched leaves the text as it was and says so; it co
   await expect(page.locator("body")).toHaveCSS("font-family", /^"?Roboto"?, /);
 });
 
+test("a font whose files come after a later pick's is not applied: the last pick wins (D294)", async ({
+  page,
+}) => {
+  await page.setViewportSize(WIDE);
+  await openDemo(page, "week");
+  // Literata's files held back until released.
+  let release = () => {};
+  const released = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (isFont(request) && request.url().includes("literata")) await released;
+    await route.fallback();
+  });
+  const settings = await openSettings(page);
+  const font = settings.getByRole("combobox", { name: "Font" });
+  const body = page.locator("body");
+
+  for (const last of ["Inter", "System default"]) {
+    await choose(font, "Literata");
+    await expect(settings.getByText("Downloading Literata…")).toBeVisible();
+    await choose(font, last);
+    await expect(font).toHaveText(last);
+  }
+  // Literata's files come now: its faces load, and nothing changes.
+  release();
+  await page.waitForFunction(() =>
+    [...document.fonts].some(
+      (face) => face.family.includes("Literata") && face.status === "loaded",
+    ),
+  );
+  await expect(font).toHaveText("System default");
+  await expect(settings.getByText(/Downloading/)).toHaveCount(0);
+  await expect(body).not.toHaveCSS("font-family", /^"?Literata/);
+  await page.reload();
+  await expect(page.getByRole("main", { name: "November" })).toBeVisible();
+  await expect(body).not.toHaveCSS("font-family", /^"?Literata/);
+});
+
 test("the text size scales the type scale and the hour, seen in the preview as it is set (D295)", async ({
   page,
 }) => {

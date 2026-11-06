@@ -5,7 +5,7 @@
 // that cannot come (offline, never kept) leaves the font as it was, and the
 // row says so.
 import { CalendarObject, createItem } from "@astrotime/core";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
@@ -30,8 +30,11 @@ export function TypeSettings({ rowClassName }: { rowClassName: string }) {
   const sizeId = useId();
   const nameOf = (font: (typeof FONTS)[number]) =>
     font === "system" ? t("settings.font.system") : FAMILIES[font].name;
+  // The last pick: a font whose files come after a later pick's is not applied.
+  const latest = useRef(0);
   const pick = (value: string) => {
     const font = FONTS.find((name) => name === value) ?? "system";
+    const request = ++latest.current;
     if (font === "system") {
       setPending(null);
       change({ font });
@@ -41,10 +44,10 @@ export function TypeSettings({ rowClassName }: { rowClassName: string }) {
     setAsked(font);
     loadFont(font)
       .then(
-        () => change({ font }),
+        () => request === latest.current && change({ font }),
         () => {},
       )
-      .finally(() => setPending((now) => (now === font ? null : now)));
+      .finally(() => request === latest.current && setPending(null));
   };
   const hint =
     pending !== null
