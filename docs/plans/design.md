@@ -2133,8 +2133,18 @@ own (below).
   coffee, and last a party of no kind named ("party", "вечеринка",
   "корпоратив"), drawn as a birthday: "Birthday dinner" is a birthday,
   "Coffee at the airport" a trip, "Christmas party" and "Новогодний
-  корпоратив" the winter holidays, "Dinner party" a meal. Twelve subjects now, each drawn with care; more are
-  [Deferred](#deferred). The Day, 3 days, Week and Month views are as they
+  корпоратив" the winter holidays, "Dinner party" a meal. Twelve subjects at first; _since [D298](#D298):_
+  twenty, with meetings and calls, a haircut, code, cleaning, the car, a
+  wedding, the beach and Halloween, tried in the order winter holidays,
+  Halloween, wedding, birthday, beach, travel, doctor, haircut, car, study,
+  cinema, music, sport, walk, cleaning, shopping, meal, coffee, code,
+  meeting, and the party last: "Halloween party" is Halloween's, "Lunch
+  meeting" a meal, "Code review meeting" code, "Meeting at the airport" a
+  trip. Their words with another sense count only in a phrase that says
+  it: "car wash", "oil change", not "Park the car"; "code review",
+  "coding", not "Dress code"; "call with", "video call", not "Call mom" or
+  "Team sync"; "на море", "к морю", not "Море дел"; «встреча» but not
+  «встречаем». More are [Deferred](#deferred). The Day, 3 days, Week and Month views are as they
   were: pictures are the Agenda's and the details'.
 - **D216. The Agenda's card and the details' header over the picture.**
   - **A card with a subject** (`picture-card.tsx`) is at least 104 px
@@ -2193,6 +2203,10 @@ own (below).
   browser has no scroll timelines (Firefox, older WebViews), where the
   picture stands still. Settings → Pictures, "Month banners in the
   Agenda", on by default; off, the month's name as before.
+  _Since [D298](#D298):_ each banner is drawn in layers of depth, groups
+  of its own (`sky`, `far`, `mid`, `near`) that the parallax of
+  [D299](#D299) may move apart, each land layer reaching the picture's
+  foot, so a layer moved shows no gap under it.
 - **D219. Pictures weigh nothing at the first load.**
   - **Each a file of its own** (`pictures/art/*.svg`, imported with
     `?no-inline`, so Vite never inlines one into a script, D145): the
@@ -2210,11 +2224,17 @@ own (below).
     Offline and never shown before, a card is drawn on its ground alone.
   - **Our own, hand-written SVG** under the repository's licence (AGPL-3.0),
     drawn for AstroTime in a flat style of its palette (no outlines, two or
-    three tones a colour, no faces, no text); no artwork of Google's or
+    three tones a colour, no faces, no text; _since [D298](#D298):_ with
+    gradients for light, soft shadows, one cheap grain of `feTurbulence`
+    over each, and a shape drawn once and reused with `<use>`, the only
+    link a picture holds); no artwork of Google's or
     anyone else's is copied or traced. One SVG serves a phone and a wide
     screen alike, so no `srcset` is needed. The twenty-four (twelve subjects,
     twelve months) are 78 KB, 24.8 KB gzipped, together; the largest, May's
-    meadow, 2.3 KB gzipped.
+    meadow, 2.3 KB gzipped. _Since [D298](#D298):_ the thirty-two (twenty
+    subjects, twelve months), drawn again, are 249 KB, 76 KB gzipped,
+    together; the largest, February's, 3.9 KB gzipped, each still fetched
+    alone as it is shown.
 
 - **D220. With no subject but a place, the place's photo.** An item whose
   title has no subject's word (D215) and whose place has a point (picked
@@ -2581,11 +2601,18 @@ keywords". The quick parse and voice that fill quick create are the
   development machine) were looked at by eye or not at all; a check per
   engine needs headed runs in CI. A thumb hidden until the user scrolls,
   as macOS and Android draw theirs, needs a script on every scroller.
-- **More illustrated subjects** ([D215](#D215)): meetings and calls,
-  haircut, code, cleaning, the car, a wedding, the beach and holidays,
-  Halloween; and words in languages other than English and Russian. Each
-  needs its picture drawn to the same standard first; a subject's words
-  are one group of `subjects.ts` once it has one.
+- **More illustrated subjects** ([D215](#D215)): words in languages other
+  than English and Russian (the eight subjects once listed here came with
+  [D298](#D298)); a new subject needs its picture drawn to D298's standard
+  first, and its words are one group of `subjects.ts` once it has one.
+- **Pictures whole in every crop** ([D298](#D298)): the details' header
+  on a 360 px phone shows only the middle of an item's picture, and the
+  176 px banner on a wide screen cuts some 27 units off a month's top and
+  foot, so a few side things are cut: the palm's leaves (beach), the
+  headphones (meeting), the cabinet (haircut), the wall bars (sport), and
+  the lowest flowers of March and May. Each picture's subject stays whole;
+  drawing these in again needs a picture per crop or a tighter
+  composition, weighed against the card, which shows the whole.
 - **A place's photo without Wikipedia** ([D220](#D220)): a place with no
   article (most cafés, offices, homes) has no photo; a source of photos of
   any place that sends nothing more and needs no key was not found. The

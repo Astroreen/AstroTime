@@ -721,6 +721,10 @@ When you add a package, app or module, add its line here in the same PR.
 - `scripts/bench-big-calendar.ts` — a big calendar read as the views, the
   undone chip and the reminders read it; prints how long each takes, run by
   hand. → `plans/foundation.md#D118`
+- `scripts/render-pictures.ts` — draws every picture at the sizes the app
+  shows it (card, details, banner), one PNG each, before and after side by
+  side when given the old ones; run by hand. `packages/ui/test/pictures.browser.test.ts`
+  fails on a gap between shapes meant to meet. → `plans/design.md#D298`
 - `scripts/generate-icons.ts` — draws the web app's PNG icons from its SVG
   in Chromium, run by hand. → `plans/foundation.md#D124`
 - `scripts/sweep-recurrence.ts` — the generated series of D118's proof for

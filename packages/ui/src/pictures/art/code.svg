@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" width="360" height="120" preserveAspectRatio="xMidYMid slice" data-solid="79">
+  <rect width="360" height="120" fill="#5d6ea3"/>
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5d6ea3"/>
+      <stop offset="1" stop-color="#7484b8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="205" cy="44" r="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a8c7fa" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#a8c7fa" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a06a45"/>
+      <stop offset="1" stop-color="#c48f63"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26324f"/>
+      <stop offset="1" stop-color="#1f2a44"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#46527a"/>
+      <stop offset=".6" stop-color="#8e9ab8"/>
+      <stop offset="1" stop-color="#5f6b8e"/>
+    </linearGradient>
+    <linearGradient id="kb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3cbe0"/>
+      <stop offset="1" stop-color="#e6eaf4"/>
+    </linearGradient>
+    <linearGradient id="pot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#b9503c"/>
+      <stop offset=".65" stop-color="#e2725b"/>
+      <stop offset="1" stop-color="#f09a80"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-150%" width="160%" height="400%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" stitchTiles="stitch"/>
+      <feColorMatrix values="2.2 0 0 0 -.6  2.2 0 0 0 -.6  2.2 0 0 0 -.6  0 0 0 0 1"/>
+    </filter>
+    <path id="leaf" d="M0 0C-4-6-4-14 0-20C4-14 4-6 0 0Z"/>
+  </defs>
+  <g id="back">
+    <rect width="360" height="120" fill="url(#wall)"/>
+    <rect width="360" height="120" fill="url(#glow)"/>
+    <path d="M276 30H338Q340 30 340 32V33Q340 35 338 35H276Q274 35 274 33V32Q274 30 276 30Z" fill="#8a5a3c"/>
+    <path d="M282 14Q282 12 284 12H289Q291 12 291 14V30H282ZM292 17Q292 15 294 15H298Q300 15 300 17V30H292Z" fill="#e6b54a"/>
+    <path d="M301 12Q301 10 303 10H307Q309 10 309 12V30H301Z" fill="#2f8f87"/>
+    <path d="M311 19L315 17Q317 16 318 18L324 30H317Z" fill="#c6b3e6"/>
+    <path d="M284 16H289M294 19H298M303 14H307" stroke="#f7ead7" stroke-width="1.2"/>
+    <path d="M76 14Q76 12 78 12H106Q108 12 108 14V44Q108 46 106 46H78Q76 46 76 44Z" fill="#f7ead7" opacity=".85"/>
+    <path d="M81 18H103V40H81Z" fill="#9fd8c8"/>
+    <path d="M81 34C88 28 94 32 98 27S103 25 103 25V40H81Z" fill="#5d9b5a"/>
+  </g>
+  <g id="mid">
+    <path d="M0 78C120 77 240 77 360 78V120H0Z" fill="url(#desk)"/>
+    <path d="M0 78C120 77 240 77 360 78V80.5C240 79.5 120 79.5 0 80.5Z" fill="#8a5a3c"/>
+    <path d="M0 106C120 105 240 105 360 106V120H0Z" fill="#74492f"/>
+    <path d="M0 106C120 105 240 105 360 106V108C240 107 120 107 0 108Z" fill="#d9a77a"/>
+  </g>
+  <g id="near">
+    <ellipse cx="205" cy="86" rx="24" ry="2.6" fill="#3d2618" opacity=".45" filter="url(#soft)"/>
+    <path d="M200 70H210L212 84H198Z" fill="url(#metal)"/>
+    <path d="M186 84C186 82 190 81 205 81S224 82 224 84V85C224 87 220 87.5 205 87.5S186 87 186 85Z" fill="url(#metal)"/>
+    <path d="M148 12C148 9 150 8 153 8H257C260 8 262 9 262 12V68C262 71 260 72 257 72H153C150 72 148 71 148 68Z" fill="#2b3550"/>
+    <path d="M152 12H258V66H152Z" fill="url(#screen)"/>
+    <path d="M152 66H258V68.5H152Z" fill="#46527a"/>
+    <g stroke-width="2.6" stroke-linecap="round" fill="none">
+      <path d="M158 18H174M162 24H180M162 54H176M158 60H166" stroke="#c6b3e6"/>
+      <path d="M178 18H196M184 24H192M168 30H184M174 42H198M168 48H178" stroke="#9fd8c8"/>
+      <path d="M201 18H207M196 24H212M188 30H204M168 36H200M202 42H214M182 48H200" stroke="#a8c7fa"/>
+      <path d="M216 24H230M208 30H220M204 36H214M218 42H228M204 48H212M180 54H196" stroke="#e6b54a"/>
+      <path d="M224 30H240M218 36H226M232 42H244M168 42H170" stroke="#f4b393"/>
+      <path d="M168 60V60.1" stroke="#f7ead7"/>
+    </g>
+    <path d="M152 12H186L152 40Z" fill="#fff" opacity=".06"/>
+    <path d="M252 12H258V66H252Z" fill="#1a2238" opacity=".5"/>
+    <ellipse cx="196" cy="102" rx="60" ry="3" fill="#3d2618" opacity=".45" filter="url(#soft)"/>
+    <path d="M144 90Q145 88 147 88H245Q247 88 248 90L252 99Q253 101 251 101H141Q139 101 140 99Z" fill="url(#kb)"/>
+    <path d="M147 90.5H245M146 93.3H246M145 96.1H247" stroke="#8e9ab8" stroke-width="1.8" stroke-dasharray="6 1.6"/>
+    <path d="M168 98.6H222" stroke="#8e9ab8" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M140 100H252V101.5Q252 103 250 103H142Q140 103 140 101.5Z" fill="#8e9ab8"/>
+    <ellipse cx="270" cy="101" rx="9" ry="2" fill="#3d2618" opacity=".45" filter="url(#soft)"/>
+    <path d="M264 97C264 93 266 91 270 91S276 93 276 97C276 100 273 101 270 101S264 100 264 97Z" fill="#e6eaf4"/>
+    <path d="M270 91V95.5" stroke="#8e9ab8" stroke-width="1"/>
+    <path d="M272 92C274 93 275 95 275 97L273 97C273 95 273 93 272 92Z" fill="#fff" opacity=".7"/>
+    <g transform="translate(-12 0)">
+    <ellipse cx="314" cy="101" rx="20" ry="2.6" fill="#3d2618" opacity=".45" filter="url(#soft)"/>
+    <g fill="#5d9b5a">
+      <use href="#leaf" transform="translate(313 80) rotate(-48) scale(1.2)"/>
+      <use href="#leaf" transform="translate(315 80) rotate(44) scale(1.25)"/>
+      <use href="#leaf" transform="translate(314 80) rotate(-12) scale(1.5)"/>
+    </g>
+    <g fill="#3f7a45">
+      <use href="#leaf" transform="translate(313 80) rotate(-78) scale(1.05)"/>
+      <use href="#leaf" transform="translate(315 80) rotate(16) scale(1.35)"/>
+      <use href="#leaf" transform="translate(315 80) rotate(76) scale(1)"/>
+    </g>
+    <path d="M300 78H328L325 97C324.5 100 321 101 314 101S303.5 100 303 97Z" fill="url(#pot)"/>
+    <path d="M299 78Q299 76 301 76H327Q329 76 329 78V80Q329 82 327 82H301Q299 82 299 80Z" fill="#f09a80"/>
+    </g>
+  </g>
+  <rect id="grain" width="360" height="120" filter="url(#grain)" opacity=".2" style="mix-blend-mode:soft-light"/>
+</svg>
