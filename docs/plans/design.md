@@ -129,8 +129,9 @@ the project.
   far as white needs (CSS relative colours), so any calendar colour reads
   (D47; the rule is [D120](#D120)'s, which replaced black or white text by
   OKLCH lightness); a done task's fill is its colour mixed 45% into the
-  grid's, darkened the same way. Fonts are the system's and the
-  icons AstroTime's own SVG, so nothing loads from another origin (D43). An
+  grid's, darkened the same way. Fonts are the system's (or one the user
+  picks, [D294](#D294)) and the icons AstroTime's own SVG, so nothing loads
+  from another origin (D43). An
   hour is 56 px tall; from 1024 px wide the drawer is a sidebar (D46).
 - **D59. Details read from the reference for the time grid:**
   - the top bar names the month, both months across a change of month
@@ -2459,8 +2460,85 @@ own (below).
   chunks into one through the build's chunk groups pulled the app's own code
   into it (+15 KiB), so it was not done.
 
+### Decided in round 6: type, creating and pictures
+
+The owner's list of 2026-11-06, walked in the
+[grilling of that day](../grilling/2026-11-06-assistant.md): "be able to
+change fonts"; "a simpler UI for creating tasks and events: the fields and
+buttons make it look heavy"; "better pictures for the months and the
+keywords". The quick parse and voice that fill quick create are the
+[assistant plan](assistant.md)'s.
+
+- **D294. A font of the user's choice.** Settings → General → Font, under Theme:
+  **System** (the default, [D58](#D58)'s), Inter, Roboto, Noto Sans,
+  PT Sans, Nunito, Literata and JetBrains Mono, each with Cyrillic, so the
+  Russian interface keeps its letters. Each is WOFF2 in the app's own
+  files, only the weights the type scale uses ([D134](#D134)), loaded when
+  it is chosen, never at the first load
+  ([foundation D145](foundation.md#D145)); nothing comes from another
+  origin ([D43](#D43)). Kept with the other settings on this device (D96).
+  The seven bundled fonts are under the SIL Open Font Licence 1.1; each ships with its
+  licence beside its files (`fonts/<name>/OFL.txt`), and the README's
+  credits name them. They need `font-src 'self'`, which
+  [foundation D110](foundation.md#D110)'s policy lacks: PR L1 adds it and
+  amends D110. The seven with Cyrillic, in the weights used, are about
+  1 MB of WOFF2: none is in the first load, the PWA's precache leaves them
+  out (cached once chosen), and the desktop and Android packages carry
+  them, which their size reports state.
+- **D295. A text size of the user's choice, seen as it is set.** Settings
+  → General → Text size, under Font, in steps from 85 % to 130 % (100 % the
+  default), scales the whole type scale ([D134](#D134)), hour heights and
+  touch targets that hold text with it. Font and size share one live
+  preview above them: an event, a task and a day's heading, drawn by the
+  views' own components, changing as the choice does.
+- **D296. Quick create: a sheet, not the whole editor.** A tap on a slot,
+  the floating button or "Create" ([D132](#D132)) opens quick create
+  (`quick-create.tsx`): on a phone a sheet from the bottom over the view,
+  from 40 rem a popover by the slot, the item drawn behind it as its draft
+  ([D155](#D155)). It holds the title (large, and marked as the
+  [quick parse](assistant.md#D301) understands it), the switch "Event |
+  Task", the time row, the place and the calendar; at its foot "Save", and
+  the microphone when voice is on ([assistant D302](assistant.md#D302)).
+  It has no "More options" button: the sheet dragged up (or its handle
+  pressed, "Expand" to a screen reader and the keyboard) becomes the full
+  editor ([D297](#D297)) with everything already filled carried over; the
+  popover has an expand icon in its corner. Enter saves, Escape closes
+  (a filled one asks, as the editor does). Google Calendar's quick create
+  on Android and the web is the reference.
+- **D297. The full editor, lighter.** Its rows lose their boxes: each is an
+  icon and its value on the dialog's ground, with no border or fill, as in
+  Google Calendar's edit screen; groups are parted by a hairline. An empty
+  field stays in its place as its icon and a pale hint ("Add a
+  location", "Add guests", "Add a description", "Attach a file"), never
+  folded into chips; a tap puts the cursor in it. The calendar and the
+  item's own colour are two rows (the calendar with its colour's dot, then
+  "Colour"). "Save" is in the top bar only, none at the form's foot. Every
+  field, its behaviour and its tests stay as they are; only how they are
+  drawn changes, and [D205](#D205)'s icon alignment is measured again.
+- **D298. Pictures drawn to a higher standard.** The owner: "you can see
+  mistakes (a snowdrift floating above the ground, a gap between a hill and
+  a field) and the shapes they are made of". Every illustration and month
+  banner ([D215](#D215), [D218](#D218)) is drawn again, still AstroTime's
+  own SVG: organic curves instead of plain shapes, gradients for light,
+  soft shadows and texture (`feTurbulence`) on the mid-tone ground
+  ([D216](#D216)), and layers of depth that the parallax moves
+  ([D299](#D299)). Each is checked rendered: drawn to PNG at its sizes and
+  looked at for gaps between shapes, objects that do not stand on their
+  ground and edges that show the shapes; a script fails on two shapes meant
+  to meet that leave a gap. The subjects in [Deferred](#deferred) come with
+  it. A picture stays a file of its own, fetched late ([D219](#D219)).
+- **D299. Parallax everywhere, and in the cards.** The month banners'
+  drift ([D218](#D218)) gets a fallback where the browser has no scroll
+  timelines (Firefox, older Android WebViews): one `requestAnimationFrame`
+  per scroll that moves only `transform`. The Agenda's picture cards
+  ([D216](#D216)) drift the same way, less (6 % of their height), as
+  Google's do. None with reduced motion.
+
 ## Deferred
 
+- **Painted pictures** ([D298](#D298)) — if SVG drawn again still falls
+  short, raster illustrations (WebP or AVIF) the owner supplies, kept as
+  files of their own as [D219](#D219) keeps the SVG.
 - **`1.` and `1)` as one list** ([D207](#D207)) — the Markdown parser
   tells a numbered list from a bulleted one, not one delimiter from the
   other, so `1. a` then `2) b` is one list where CommonMark makes two.
@@ -2745,3 +2823,30 @@ The accessibility pass (`fix/accessibility`) brought D119 and D120; its
 evidence is the audit's run and screenshots of the colours before and after.
 `fix/touch-targets` closed two of its Deferred items: the Month's day as
 the target on a touch screen (D86, D119) and a period drawn once read (D59).
+
+Round 6 ([the grilling of 2026-11-06](../grilling/2026-11-06-assistant.md))
+is built in four PRs, each from `main`, with screenshots before and after
+in both themes:
+
+- **PR L1** — the font and the text size (D294, D295). Done when: each
+  font is chosen in Settings and the app's text is drawn in it (the
+  computed `font-family` of a card, a heading and a button, and
+  `document.fonts` reporting it loaded under the real CSP), none is
+  fetched before it is chosen, and 85 % and 130 % keep every view free of
+  clipped text on a phone and a wide screen (screenshots, both themes).
+- **PR L2** — quick create and the lighter editor (D296, D297). Done when:
+  e2e makes an event and a task through quick create on a phone and a wide
+  screen, dragging the sheet up opens the editor with its title, time,
+  place and calendar carried over, Enter saves and Escape closes. The specs
+  that open the editor from a slot, the floating button or "Create" now
+  reach it through quick create's "Expand" (one helper), so
+  `editing.spec.ts` still measures D205 on the full editor; D132, D155 and
+  D205 get their "amended by" notes (screenshots before and after).
+- **PR L3** — the pictures drawn again, and the new subjects (D298). Done
+  when: every illustration and banner is rendered at its sizes and the gap
+  check passes on each, and the screenshots before and after sit side by
+  side in the PR.
+- **PR L4** — parallax without scroll timelines, and in the cards (D299).
+  Done when: in Firefox (no scroll timelines) a banner's picture moves
+  against the list as it scrolls, a card's does too, and with reduced
+  motion neither does (e2e reading `transform`).

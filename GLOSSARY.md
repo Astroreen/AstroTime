@@ -81,6 +81,16 @@ One word per concept. Use these terms in code, docs, commits and UI.
   timed items are spans too); a one-day item is a span of one day.
 - **Draft** — the item the edit dialog makes or edits, drawn in the views
   behind it as its form says now (design D155).
+- **Quick create** — the small sheet (a popover on a wide screen) that a
+  new item opens in: its title, kind, time, place and calendar; dragged up
+  it becomes the edit dialog (design D296). Never "quick add".
+- **Quick parse** — reading a typed or spoken line into an item's pieces,
+  its day, time, length, place and kind (`parseQuick`, assistant D300); a
+  **language pack** is one language's words for it (`parse/<lang>.ts`).
+- **Recogniser** — what turns speech into words for quick create: Android's
+  own, Whisper on this device, or a server (assistant D302).
+- **Assistant** — an AI client that reaches AstroTime through its MCP
+  server (`@astrotime/mcp`, assistant D307). Never "agent" in the UI.
 - **Ghost** — what a drag draws where the item would go, with its new
   time, while the item stays dimmed where it was until the drop is saved
   (design D111).

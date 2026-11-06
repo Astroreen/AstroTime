@@ -32,6 +32,7 @@ what is deferred, and the PRs that land it. Plans are canon once implemented.
 | [`providers.md`](plans/providers.md)   | the services beyond Nextcloud, how each is reached, how each is tested | in progress |
 | [`import.md`](plans/import.md)         | calendars and tasks read from files, and written out to one            | in progress |
 | [`server.md`](plans/server.md)         | AstroTime's own CalDAV server, and the mesh of peers with no server    | in progress |
+| [`assistant.md`](plans/assistant.md)   | the quick parse of a line, voice input, and AstroTime as an MCP server | planned     |
 
 ## Grilling sessions
 
@@ -39,9 +40,10 @@ A grilling session is the owner and an agent walking a design tree question
 by question until nothing is assumed. The session is the record of _how_ the
 decisions were reached; the decisions themselves live in the plan.
 
-| Session                                                         | Fed                                          |
-| --------------------------------------------------------------- | -------------------------------------------- |
-| [`2026-10-31-foundation.md`](grilling/2026-10-31-foundation.md) | [`plans/foundation.md`](plans/foundation.md) |
+| Session                                                         | Fed                                                                              |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`2026-10-31-foundation.md`](grilling/2026-10-31-foundation.md) | [`plans/foundation.md`](plans/foundation.md)                                     |
+| [`2026-11-06-assistant.md`](grilling/2026-11-06-assistant.md)   | [`plans/assistant.md`](plans/assistant.md), [`plans/design.md`](plans/design.md) |
 
 ## How knowledge is arranged
 
