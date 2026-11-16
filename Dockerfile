@@ -6,7 +6,7 @@
 
 # The build stage runs on the builder's own platform: its output is JavaScript,
 # the same for every image, so an arm64 image needs no emulation.
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS build
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS build
 WORKDIR /src
 RUN corepack enable
 COPY . .
@@ -18,7 +18,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm --filter @astrotime/proxy build \
   && pnpm --filter @astrotime/proxy compress
 
-FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080 ASTROTIME_WEB_ROOT=/app/web
 COPY --from=build /src/apps/proxy/dist/main.js /app/server.js
