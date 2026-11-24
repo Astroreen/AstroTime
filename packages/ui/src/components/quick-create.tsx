@@ -16,6 +16,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -60,8 +61,8 @@ export function QuickCreate({
   state,
   calendars,
   accounts,
-  accountRow,
-  copiesTo,
+  showWhere,
+  multiple,
   onChange,
   onSave,
   onClose,
@@ -73,10 +74,10 @@ export function QuickCreate({
   calendars: readonly Calendar[];
   /** The accounts to choose from; none when there is no choice (design D313). */
   accounts: readonly AccountChoice[];
-  /** Whether the account is chosen in its own row: not while a new item goes to every account (D314). */
-  accountRow: boolean;
-  /** Where copies of a new item go, each calendar with its account; none when it goes to one (design D314). */
-  copiesTo: readonly string[];
+  /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
+  showWhere: boolean;
+  /** A new item may be ticked into several calendars (D313). */
+  multiple: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -174,25 +175,26 @@ export function QuickCreate({
                 form={form}
                 calendars={calendars}
                 accounts={accounts}
-                accountRow={accountRow}
-                copiesTo={copiesTo}
+                showWhere={showWhere}
+                multiple={multiple}
                 onChange={onChange}
+                save={
+                  // In the corner of the kind's row, as the owner asked (design D296's
+                  // amendment); the microphone stands left of it when voice is on (assistant D302).
+                  <button
+                    type="submit"
+                    disabled={state.saving || calendars.length === 0}
+                    className={`${primaryButton} ml-auto shrink-0`}
+                  >
+                    {t("edit.save")}
+                  </button>
+                }
               />
               {state.problem && (
                 <p role="alert" className="rounded-xl bg-danger-soft p-3 text-body text-danger">
                   {t(problemKey(state.problem, state.problemKind ?? form.kind))}
                 </p>
               )}
-              {/* The microphone stands left of "Save" when voice is on (assistant D302). */}
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={state.saving || calendars.length === 0}
-                  className={`${primaryButton} flex-1`}
-                >
-                  {t("edit.save")}
-                </button>
-              </div>
             </form>
           )}
         </DialogPopup>
@@ -205,16 +207,19 @@ function Fields({
   form,
   calendars,
   accounts,
-  accountRow,
-  copiesTo,
+  showWhere,
+  multiple,
   onChange,
+  save,
 }: {
   form: Form;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
-  accountRow: boolean;
-  copiesTo: readonly string[];
+  showWhere: boolean;
+  multiple: boolean;
   onChange: (form: Form) => void;
+  /** "Save", at the end of the kind's row. */
+  save: ReactNode;
 }) {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -224,13 +229,16 @@ function Fields({
   const days = event && form.endDate !== form.startDate;
   return (
     <>
-      <KindSwitch
-        value={form.kind}
-        // The new kind's default colour (design D172): no colour is chosen here.
-        onChange={(kind) =>
-          onChange({ ...switchKind(form, kind), color: defaultColorOf(settings, kind) })
-        }
-      />
+      <div className="flex items-center gap-2 pr-1">
+        <KindSwitch
+          value={form.kind}
+          // The new kind's default colour (design D172): no colour is chosen here.
+          onChange={(kind) =>
+            onChange({ ...switchKind(form, kind), color: defaultColorOf(settings, kind) })
+          }
+        />
+        {save}
+      </div>
       <input
         aria-label={t("edit.title")}
         placeholder={t("edit.titlePlaceholder")}
@@ -305,16 +313,17 @@ function Fields({
           className={field}
         />
       </Section>
-      <Section icon={<CalendarIcon className="size-5" />}>
-        <CalendarFields
-          form={form}
-          calendars={calendars}
-          accounts={accounts}
-          accountRow={accountRow}
-          copiesTo={copiesTo}
-          onChange={(calendarId) => set({ calendarId })}
-        />
-      </Section>
+      {showWhere && (
+        <Section icon={<CalendarIcon className="size-5" />}>
+          <CalendarFields
+            form={form}
+            calendars={calendars}
+            accounts={accounts}
+            multiple={multiple}
+            onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
+          />
+        </Section>
+      )}
     </>
   );
 }

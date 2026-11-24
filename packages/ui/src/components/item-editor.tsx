@@ -111,8 +111,8 @@ export function ItemEditor({
   state,
   calendars,
   accounts,
-  accountRow,
-  copiesTo,
+  showWhere,
+  multiple,
   onChange,
   onSave,
   onClose,
@@ -124,10 +124,10 @@ export function ItemEditor({
   calendars: readonly Calendar[];
   /** The accounts to choose from; none when there is no choice (design D313). */
   accounts: readonly AccountChoice[];
-  /** Whether the account is chosen in its own row: not while a new item goes to every account (D314). */
-  accountRow: boolean;
-  /** Where copies of a new item go, each calendar with its account; none when it goes to one (design D314). */
-  copiesTo: readonly string[];
+  /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
+  showWhere: boolean;
+  /** A new item may be ticked into several calendars (D313). */
+  multiple: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -211,8 +211,8 @@ export function ItemEditor({
                 copy={state.copy ?? false}
                 calendars={calendars}
                 accounts={accounts}
-                accountRow={accountRow}
-                copiesTo={copiesTo}
+                showWhere={showWhere}
+                multiple={multiple}
                 onChange={onChange}
               />
               {state.problem && (
@@ -268,8 +268,8 @@ function Fields({
   copy,
   calendars,
   accounts,
-  accountRow,
-  copiesTo,
+  showWhere,
+  multiple,
   onChange,
 }: {
   form: Form;
@@ -277,8 +277,8 @@ function Fields({
   copy: boolean;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
-  accountRow: boolean;
-  copiesTo: readonly string[];
+  showWhere: boolean;
+  multiple: boolean;
   onChange: (form: Form) => void;
 }) {
   const { t } = useTranslation();
@@ -394,16 +394,17 @@ function Fields({
       </Group>
 
       <Group>
-        <Section icon={<CalendarIcon className="size-5" />}>
-          <CalendarFields
-            form={form}
-            calendars={calendars}
-            accounts={accounts}
-            accountRow={accountRow}
-            copiesTo={copiesTo}
-            onChange={(calendarId) => set({ calendarId })}
-          />
-        </Section>
+        {showWhere && (
+          <Section icon={<CalendarIcon className="size-5" />}>
+            <CalendarFields
+              form={form}
+              calendars={calendars}
+              accounts={accounts}
+              multiple={multiple}
+              onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
+            />
+          </Section>
+        )}
 
         <Section icon={<PaletteIcon className="size-5" />}>
           <ColorSelect

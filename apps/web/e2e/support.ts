@@ -13,6 +13,40 @@ export async function choose(field: Locator, option: string): Promise<void> {
     .click();
 }
 
+/** Where an item goes: the row with its account and calendars (design D313). */
+export const calendarField = (scope: Locator): Locator =>
+  scope.getByRole("button", { name: /^(Calendar|List|Календарь|Список): / });
+
+/**
+ * Picks `calendar` in the row's picker (design D313): its `account` first
+ * when the picker opens on the accounts, then the calendar alone. A new
+ * item's picker stays open for more ticks, so it is closed after.
+ */
+export async function pickCalendar(
+  scope: Locator,
+  calendar: string,
+  account?: string,
+): Promise<void> {
+  const page = scope.page();
+  await calendarField(scope).click();
+  if (account) await page.getByRole("button", { name: account, exact: true }).click();
+  const group = page.getByRole("group", { name: /^(Calendar|List|Календарь|Список)$/ });
+  const box = group.getByRole("checkbox", { name: calendar, exact: true });
+  // Ticked alone: the new one first (the last tick never goes), then the others off.
+  if (!(await box.isChecked())) await box.click();
+  if ((await calendarField(scope).getAttribute("aria-expanded")) === "true") {
+    const ticked = await group
+      .getByRole("checkbox", { checked: true })
+      .evaluateAll((boxes) => boxes.map((one) => one.closest("label")?.textContent ?? ""));
+    for (const name of ticked)
+      if (name !== calendar) await group.getByRole("checkbox", { name, exact: true }).click();
+  }
+  // One calendar only (an item that exists, a copy): the pick closed it already.
+  if ((await calendarField(scope).getAttribute("aria-expanded")) === "true")
+    await calendarField(scope).click();
+  await expect(group).toHaveCount(0);
+}
+
 /** Quick create's words, its own and its "Expand" (design D296), in each language. */
 const QUICK = {
   en: { dialog: "Quick create", expand: "Expand", editor: /^New (event|task)$/ },

@@ -1,6 +1,7 @@
 // The evidence for the account a new item goes to (design D313) and every
 // account at once (D314): quick create on a phone with two accounts signed
-// in (two real Radicales), and Settings' accounts on a wide screen, in both
+// in (two real Radicales) with its picker open, the accounts then one's
+// calendars, two ticked, and Settings' accounts on a wide screen, in both
 // themes and both languages. It runs on `main` too, for the "before"
 // pictures: there quick create has no account row and Settings no switch.
 // Runs only when ASTROTIME_SCREENSHOTS names a directory:
@@ -30,8 +31,20 @@ const test = base.extend<{ first: CalDavServer; second: CalDavServer }>({
 });
 
 const WORDS = {
-  en: { create: "Create", title: "Title", menu: "Main menu", settings: "Settings" },
-  ru: { create: "Создать", title: "Название", menu: "Главное меню", settings: "Настройки" },
+  en: {
+    create: "Create",
+    title: "Title",
+    menu: "Main menu",
+    settings: "Settings",
+    calendar: "Calendar",
+  },
+  ru: {
+    create: "Создать",
+    title: "Название",
+    menu: "Главное меню",
+    settings: "Настройки",
+    calendar: "Календарь",
+  },
 } as const;
 
 async function signIn(page: Page, server: CalDavServer): Promise<void> {
@@ -64,6 +77,7 @@ for (const language of ["en", "ru"] as const) {
       await page.emulateMedia({ colorScheme: theme });
       await first.mkcalendar("home");
       await second.mkcalendar("work");
+      await second.mkcalendar("family");
       await openApp(page);
       await signIn(page, first);
       await signIn(page, second);
@@ -87,6 +101,20 @@ for (const language of ["en", "ru"] as const) {
         const quick = quickCreate(page, language);
         await quick.getByRole("textbox", { name: w.title }).fill("Dentist");
         await shot(page, name(what));
+        // The row's picker, where there is one (design D313): the accounts, then one's calendars.
+        const field = quick.getByRole("button", { name: new RegExp(`^${w.calendar}: `) });
+        if (what === "quick" && (await field.count()) > 0) {
+          await field.click();
+          await shot(page, name("picker-accounts"));
+          await page.getByRole("button", { name: "astro", exact: true }).nth(1).click();
+          await page
+            .getByRole("group", { name: w.calendar })
+            .getByRole("checkbox", { name: "work" })
+            .click();
+          await shot(page, name("picker-calendars"));
+          await page.keyboard.press("Escape");
+          await expect(page.getByRole("group", { name: w.calendar })).toHaveCount(0);
+        }
         await page.keyboard.press("Escape");
         await expect(quick).toHaveCount(0);
       }

@@ -2595,6 +2595,8 @@ keywords". The quick parse and voice that fill quick create are the
   time, the calendar's row and the shared looks are in `editor-fields.tsx`,
   so its chunk (4 KiB) loads without the editor's. Tested:
   `apps/web/e2e/quick-create.spec.ts`.
+  _Amended by [D315](#D315):_ "Save" stands at the end of the kind's row,
+  not at the foot.
 - **D297. The full editor, lighter.** Its rows lose their boxes: each is an
   icon and its value on the dialog's ground, with no border or fill, as in
   Google Calendar's edit screen; groups are parted by a hairline. An empty
@@ -2633,60 +2635,62 @@ keywords". The quick parse and voice that fill quick create are the
 
 ### Decided in round 7: the account a new item goes to
 
-- **D313. The account an item goes to, chosen in its dialog.** The owner,
+- **D313. Where an item goes: its account, then its calendars.** The owner,
   with Google Calendar's sheet beside it: "tasks and events need a choice
-  of which account to make them in". Quick create ([D296](#D296)) and the
-  edit dialog ([D297](#D297)) show, in the calendar's row, the account
-  first (its avatar and name, `edit.account`), then that account's
-  calendars (a task's lists) only. Two accounts of one name (one login
-  on two servers) say their server beside it, its path too when they
-  share a host, wherever the dialog names them. Choosing an account puts the item in
-  its first calendar offered, visible before hidden, as
-  [foundation D122](foundation.md#D122)'s default does. With one account
-  offered there is no account row: the calendar is the whole choice, as
-  before. An existing item's dialog offers it too: a move to another
+  of which account to make them in"; then, on the first build: "imagine
+  ten calendars per account: that takes far too much room. Accounts matter
+  more than calendars; calendars are better tucked away. No IP or server
+  address; first the account, then the calendar (or several)". Quick
+  create ([D296](#D296)) and the edit dialog ([D297](#D297)) have one row
+  for it, as Google's: the account's avatar and name, and small under it
+  the calendars (a task's lists) it goes in. The name is the user name
+  without the server's address AstroTime put after it (`astro`, not
+  `astro@cloud.example.com`); a user name that is an address stays whole.
+  Pressed, the row opens the accounts, then the chosen account's
+  calendars, each with a tick; with one account offered, its calendars at
+  once. A new item (not a copy, [D164](#D164)) may be ticked into several
+  of the account's calendars: it is saved in the first and a copy, a UID
+  of its own, in each other, in one local write; the last tick never goes.
+  Another account's calendar replaces the ticks. An existing item, or a
+  copy, goes in one: a pick closes the list, and a move to another
   account's calendar is the move the calendar field already made
   ([D37](foundation.md#D37)'s rights decide where); its own account leads
-  back to its own calendar. A kind switched to one its calendar cannot
-  hold moves to the same account's first calendar that can, before
-  another account's.
+  back to its own calendar. Choosing an account puts the item in its
+  first calendar offered, visible before hidden, as [foundation
+  D122](foundation.md#D122)'s default does. A kind switched to one its
+  calendar cannot hold moves to the same account's first calendar that
+  can, before another account's, and keeps the ticks that take it.
 - **D314. A new item in every account, a setting.** The owner: "by
   default a new event or task goes to one calendar; one can also choose
   to sync all calendars, so each has every task and event; then the
-  account choice is hidden". Settings → Accounts has "Save new items to
-  every account" (off by default, shown with two accounts on a server or
-  more). On, a new event or task (not a copy, [D164](#D164) picks one
-  calendar) is saved in the calendar chosen and, in the same local write, a
-  copy of it in each other account on a server's first calendar that takes
-  it, visible before hidden; an account none of whose calendars takes it
-  gets none. One copy per account, not one per calendar: the owner hides
-  the account choice, not the calendar's, so "every calendar" is each
-  account's. The calendar on this device ([foundation
-  D122](foundation.md#D122)) and the demo's get no copy: they reach no
-  server, and a copy would keep the device's calendar from stepping aside. A copy carries what the item has, its reminders too (each
-  copy's ring: one per account), but no file of an account's own
-  ([foundation D232](foundation.md#D232): its link opens only for its
-  account, even on the same server); a link the user gave, or a file
-  inline, goes to every copy. An account whose sync is off
-  ([foundation D171](foundation.md#D171)) gets its copy too, which waits
-  here until sync is on, as any change made there does. The setting stays in sight while it is
-  on, even with one account on a server left, so it can be turned off;
-  it does nothing then. Each copy
-  has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
-  are two items, not one shared. The dialog has no account row then, and
-  says under the calendar where else it is saved, each copy's calendar
-  with its account ("Also saved to Work · astro@work.example.com": the
-  first calendar by name may be one shared with the user); a new item
-  starts in an account on a server, not on this device; one put on this
-  device by choice still goes to every server, as the line under the
-  calendar says before it is saved. Each copy is an
-  item of its own, drawn as one where its calendar is shown. Its
-  calendars, every account's in one list, each say whose they are
-  ("Personal · astro@cloud.example.com").
-  It is about creating in the dialogs: an edit or a deletion later changes
-  the one copy edited ([Deferred](#deferred)), and an assistant's
-  `create` through MCP ([assistant D307](assistant.md#D307)) names its
-  calendar and makes one item.
+  account choice is hidden", and, asked, that the row of [D313](#D313) is
+  then not shown at all. Settings → Accounts has "Save new items to every
+  account" (off by default, shown with two accounts on a server or more,
+  and while it is on, so it can be turned off). On, with two accounts on a
+  server or more, a new event or task (not a copy) has no row for where it
+  goes: it starts in an account on a server, and is saved there and, in
+  the same local write, a copy of it, a UID of its own, in each other
+  account on a server's first calendar that takes it, visible before
+  hidden; an account none of whose calendars takes it gets none. One copy
+  per account: "every calendar" is each account's, as the owner hides the
+  account choice. The calendar on this device ([foundation
+  D122](foundation.md#D122)), the demo's and subscriptions get no copy;
+  one put on this device by choice still goes to every server. A copy
+  carries what the item has, its reminders too (each copy rings), but no
+  file of an account's own ([foundation D232](foundation.md#D232): its
+  link opens only for its account, even on the same server); a link the
+  user gave, or a file inline, goes to every copy. An account whose sync
+  is off ([foundation D171](foundation.md#D171)) gets its copy too, which
+  waits here until sync is on. The setting's hint says the copies are
+  separate items: an edit or a deletion later changes the one copy edited
+  ([Deferred](#deferred)). An assistant's `create` through MCP
+  ([assistant D307](assistant.md#D307)) names its calendar and makes one
+  item.
+- **D315. Quick create's "Save" in the kind's row.** The owner: "the Save
+  button in the corner, on the same row as Event, Task". Quick create
+  ([D296](#D296)) has no "Save" at its foot: it stands at the end of the
+  "Event | Task" row, the microphone left of it when voice is on
+  ([assistant D302](assistant.md#D302)).
 
 ## Deferred
 
@@ -2695,9 +2699,9 @@ keywords". The quick parse and voice that fill quick create are the
   a completion or a deletion changes only the one copy. Keeping them alike
   needs a link between them (an `X-` property, kept by [foundation
   D7](foundation.md#D7)) and rules for a copy changed on its server.
-  Which of an account's calendars a copy goes to is its first by name;
-  choosing one per account (or passing over calendars others shared) waits
-  with it.
+  Which of another account's calendars a copy goes to is its first by
+  name; choosing one per account (or passing over calendars others shared)
+  waits with it.
 - **A file kept when its item changes account** ([D313](#D313)) — a file
   uploaded to one account's files and attached stays on the item when its
   calendar is then changed to another account's, as it did before D313;

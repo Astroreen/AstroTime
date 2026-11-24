@@ -32,7 +32,6 @@ import {
   noticeOf,
   NowhereError,
   accountsOnServers,
-  otherAccountsCalendars,
   problemOf,
   RefusedError,
   rewriteTarget,
@@ -50,8 +49,6 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
-import { accountLabels } from "./account-labels.ts";
-import { accountName } from "./accounts.tsx";
 import type { AccountChoice, Press } from "./editor-fields.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor, QuickCreate } from "./lazy.tsx";
@@ -390,9 +387,16 @@ export function useEditingState({
       const accountId = byId(form.calendarId)?.accountId;
       const own = offered.filter((c) => c.accountId === accountId);
       const sameAccount = own.find((c) => !hidden.has(c.id)) ?? own[0];
-      const next = fits
+      const placed = fits
         ? form
         : { ...form, calendarId: sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId };
+      // The other calendars ticked: those of its account that take its kind (D313).
+      const account = byId(placed.calendarId)?.accountId;
+      const alsoIn = (placed.alsoIn ?? []).filter(
+        (id) =>
+          id !== placed.calendarId && offered.some((c) => c.id === id && c.accountId === account),
+      );
+      const next = { ...placed, alsoIn };
       // A rule moves with the item's day (D105).
       const moved = followed(current.state.form, next);
       return { ...current, state: { ...current.state, form: moved, problem: null } };
@@ -605,45 +609,27 @@ export function useEditingState({
       : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
-  // A new item (not a copy) that goes to every account on a server: no
-  // account to choose, and the dialog says where else it goes (design D314).
-  // Accounts as the dialog names them: a twin's with its server (D313).
-  const labels = accountLabels(accounts, (account) => accountName(account, t));
-  // Each copy's calendar and account, named under the calendar (D314).
-  const copiesTo =
-    editing !== null && shown !== null && !shown.refused && toEvery && !editing.base
-      ? otherAccountsCalendars(
-          calendars,
-          editing.state.form.kind,
-          shown.calendar,
-          servers,
-          hidden,
-        ).flatMap((other) => {
-          const account = accounts.find((one) => one.id === other.accountId);
-          return account ? [`${other.name} · ${labels.get(account.id) ?? ""}`] : [];
-        })
-      : [];
   // Each account offered, with where choosing it puts the item (D313): an
   // existing item's own calendar in its own account, else the account's
-  // first calendar that takes it, visible before hidden; none to choose
-  // when there is only one.
+  // first calendar that takes it, visible before hidden. In the accounts'
+  // own order, as the drawer and Settings list them.
   const from = editing ? fromOf(editing) : undefined;
-  // In the accounts' own order, as the drawer and Settings list them.
-  const choices = accounts.flatMap((account) => {
-    const id = account.id;
-    const own = shownCalendars.filter(
-      (one) => one.accountId === id && !(shown?.refused && one.id === shown.calendar.id),
-    );
+  const accountChoices: AccountChoice[] = accounts.flatMap((account) => {
+    const all = shownCalendars.filter((one) => one.accountId === account.id);
+    // A calendar that refuses the item is where its account leads only when it has no other.
+    const own = all.filter((one) => !(shown?.refused && one.id === shown.calendar.id));
     const first =
-      own.find((one) => one.id === from?.id) ?? own.find((one) => !hidden.has(one.id)) ?? own[0];
-    return first
-      ? [{ account, calendarId: first.id, label: labels.get(id) ?? accountName(account, t) }]
-      : [];
+      own.find((one) => one.id === from?.id) ??
+      own.find((one) => !hidden.has(one.id)) ??
+      own[0] ??
+      all[0];
+    return first ? [{ account, calendarId: first.id }] : [];
   });
-  // A new item while new items go to every account has no account row,
-  // whichever calendar it is in now (D314).
+  // A new item (not a copy) while new items go to every account on a
+  // server: no row for where it goes at all (D314).
   const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
-  const accountChoices: AccountChoice[] = choices.length < 2 ? [] : choices;
+  // A new item (not a copy) may be ticked into several calendars (D313).
+  const multiple = editing !== null && editing.target === null && !editing.base;
 
   const dialogs = (
     <>
@@ -668,8 +654,8 @@ export function useEditingState({
         state={editing?.quick ? shownState : null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        accountRow={!everyMode}
-        copiesTo={copiesTo}
+        showWhere={!everyMode}
+        multiple={multiple}
         onChange={change}
         onDraft={setDraft}
         onSave={save}
@@ -681,8 +667,8 @@ export function useEditingState({
         target={editing?.target ?? null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        accountRow={!everyMode}
-        copiesTo={copiesTo}
+        showWhere={!everyMode}
+        multiple={multiple}
         onChange={change}
         onDraft={setDraft}
         onSave={save}

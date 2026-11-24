@@ -1,13 +1,14 @@
-// The account a new item goes to (design D313), and every account at once
-// (D314), against two real Radicales: quick create offers each account and
-// that account's calendars, and the event is uploaded to the one chosen;
-// with Settings' "Save new items to every account" on, there is no account
-// to choose, and the event is uploaded to both servers, a UID each. With
+// Where a new item goes (design D313), and every account at once (D314),
+// against two real Radicales: quick create's row opens the accounts, then
+// the chosen one's calendars, two ticked; the event is uploaded to both of
+// them, a UID each, and nothing to the other server. With Settings' "Save
+// new items to every account" on, the row is gone, and the event is
+// uploaded to both servers. With
 // ASTROTIME_SCREENSHOTS naming a directory, the evidence is taken on the way.
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type Response } from "@playwright/test";
 
 import { startRadicale, type CalDavServer } from "../../../packages/sync/test/servers.ts";
-import { addAccount, choose, openApp, quickCreate, WIDE } from "./support.ts";
+import { addAccount, calendarField, openApp, quickCreate, WIDE } from "./support.ts";
 
 const test = base.extend<{ first: CalDavServer; second: CalDavServer }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it
@@ -46,19 +47,26 @@ async function signIn(page: Page, server: CalDavServer): Promise<string> {
   return name;
 }
 
-/** The UID of an upload to `server`'s calendar, once it was created there. */
-const uploadTo = (page: Page, server: CalDavServer) =>
-  page
-    .waitForResponse(
-      (response) =>
-        // Through the dev server's proxy (`/dav-proxy/`), which names the server in its path.
-        response.request().method() === "PUT" &&
-        decodeURIComponent(response.url()).includes(`${new URL(server.url).host}/`),
-    )
-    .then((response) => {
+/** The UIDs of the next `count` uploads to `server`, once each was created there. */
+const uploadsTo = (page: Page, server: CalDavServer, count: number) =>
+  new Promise<string[]>((resolve) => {
+    const uids: string[] = [];
+    const seen = (response: Response) => {
+      // Through the dev server's proxy (`/dav-proxy/`), which names the server in its path.
+      if (
+        response.request().method() !== "PUT" ||
+        !decodeURIComponent(response.url()).includes(`${new URL(server.url).host}/`)
+      )
+        return;
       expect(response.status()).toBe(201);
-      return /\r\nUID:([^\r]+)\r\n/.exec(response.request().postData() ?? "")?.[1];
-    });
+      uids.push(/\r\nUID:([^\r]+)\r\n/.exec(response.request().postData() ?? "")?.[1] ?? "");
+      if (uids.length === count) {
+        page.off("response", seen);
+        resolve(uids);
+      }
+    };
+    page.on("response", seen);
+  });
 
 /** How many items a calendar holds on its server, as another client lists them. */
 async function itemsIn(server: CalDavServer, url: string): Promise<number> {
@@ -83,35 +91,35 @@ test("a new event goes to the account chosen, or to every account", async ({
   const work = await second.mkcalendar("work");
   const family = await second.mkcalendar("family");
   await openApp(page);
-  const firstName = await signIn(page, first);
-  const secondName = await signIn(page, second);
+  await signIn(page, first);
+  await signIn(page, second);
 
-  // Quick create offers each account, and the chosen one's calendars (D313).
+  // Quick create's one row: the account, then its calendars (D313).
   await page.getByRole("button", { name: "Create" }).click();
   const quick = quickCreate(page);
-  const account = quick.getByRole("combobox", { name: "Account" });
-  await expect(account).toBeVisible();
-  // Each account in turn: its own calendars only, its first one chosen.
-  const calendar = quick.getByRole("combobox", { name: "Calendar" });
-  await choose(account, firstName);
-  await expect(calendar).toHaveText(/home/);
-  await calendar.click();
-  await expect(page.getByRole("option", { name: "home" })).toBeVisible();
-  await expect(page.getByRole("option", { name: "family" })).toHaveCount(0);
-  await page.getByRole("option", { name: "home" }).click();
-  await choose(account, secondName);
-  await expect(account).toHaveText(new RegExp(secondName.replaceAll(".", "\\.")));
-  await expect(calendar).not.toHaveText(/home/);
-  await calendar.click();
-  await expect(page.getByRole("option", { name: "work" })).toBeVisible();
-  await expect(page.getByRole("option", { name: "family" })).toBeVisible();
-  await expect(page.getByRole("option", { name: "home" })).toHaveCount(0);
-  await page.getByRole("option", { name: "family" }).click();
+  const field = calendarField(quick);
+  await field.click();
+  // The accounts first, then the one chosen's calendars only.
+  // Each by its user name, no server's address (both are "astro" here), in
+  // the order they were added.
+  const accounts = page.getByRole("button", { name: "astro", exact: true });
+  await expect(accounts).toHaveCount(2);
+  await accounts.nth(1).click();
+  const calendars = page.getByRole("group", { name: "Calendar" });
+  await expect(calendars.getByRole("checkbox")).toHaveCount(2);
+  await expect(calendars.getByRole("checkbox", { name: "home" })).toHaveCount(0);
+  // Its first calendar is ticked; a second tick puts a copy there too.
+  await expect(calendars.getByRole("checkbox", { name: "family" })).toBeChecked();
+  await calendars.getByRole("checkbox", { name: "work" }).click();
+  await page.keyboard.press("Escape");
+  await expect(calendars).toHaveCount(0);
+  await expect(field).toHaveAccessibleName(/^Calendar: astro ?, family, work$/);
   await quick.getByRole("textbox", { name: "Title" }).fill("Family dinner");
   await shoot(page, "account-choice");
-  const toSecond = uploadTo(page, second);
+  const toSecond = uploadsTo(page, second, 2);
   await quick.getByRole("button", { name: "Save" }).click();
-  expect(await toSecond).toBeTruthy();
+  const [dinner, dinnerCopy] = await toSecond;
+  expect(dinner).not.toBe(dinnerCopy);
 
   // On: no account to choose, and the event is uploaded to both (D314).
   await page
@@ -128,21 +136,19 @@ test("a new event goes to the account chosen, or to every account", async ({
   await expect(settings).toBeHidden();
 
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(quick.getByRole("combobox", { name: "Account" })).toHaveCount(0);
-  await expect(quick.getByText(`Also saved to home · ${firstName}`)).toBeVisible();
+  // No row for where it goes: every account gets it.
+  await expect(calendarField(quick)).toHaveCount(0);
   await quick.getByRole("textbox", { name: "Title" }).fill("Dentist");
   await shoot(page, "every-account-quick-create");
-  const both = Promise.all([uploadTo(page, first), uploadTo(page, second)]);
+  const both = Promise.all([uploadsTo(page, first, 1), uploadsTo(page, second, 1)]);
   await quick.getByRole("button", { name: "Save" }).click();
-  const [one, other] = await both;
-  expect(one).toBeTruthy();
-  expect(other).toBeTruthy();
+  const [[one], [other]] = await both;
   expect(one).not.toBe(other);
-  // Off, the family calendar alone had it; on, the first server's too (the
-  // second's first calendar by name is family again).
+  // Off, the second server's two ticked calendars had it; on, each server's
+  // first calendar by name (family there, home here).
   expect([
     await itemsIn(first, home),
     await itemsIn(second, family),
     await itemsIn(second, work),
-  ]).toEqual([1, 2, 0]);
+  ]).toEqual([1, 2, 1]);
 });

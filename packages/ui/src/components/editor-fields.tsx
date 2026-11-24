@@ -3,14 +3,18 @@
 // on an empty slot (D190). Here, not in the editor's chunk, so quick create
 // loads them without the editor (foundation D145).
 import type { Account, Calendar } from "@astrotime/storage";
-import { useRef, type ReactNode } from "react";
+import { Popover } from "@base-ui/react/popover";
+import { useRef, useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import type { Form } from "../calendar/editing.ts";
-import { Avatar } from "./accounts.tsx";
+import { accountName, Avatar } from "./accounts.tsx";
+import { CalendarRow } from "./calendar-row.tsx";
 import { Dot } from "./color-select.tsx";
 import { useCalendar } from "./context.ts";
-import { Select as Dropdown } from "./select.tsx";
+import { ChevronIcon } from "./icons.tsx";
+import { popup, row, Select as Dropdown } from "./select.tsx";
 
 /** The click on an empty slot that opened a new item's dialog (design D190). */
 export interface Press {
@@ -84,34 +88,15 @@ export function KindSwitch({
   );
 }
 
-/** The calendar (a task's list) an item goes in, each with its colour's dot (design D297). */
-function CalendarSelect({
-  label,
-  value,
-  onChange,
-  calendars,
-  accountOf,
-}: {
-  label: string;
-  value: string;
-  onChange: (calendarId: string) => void;
-  calendars: readonly Calendar[];
-  /** The name of a calendar's account, beside its own when the list has several accounts' (D314). */
-  accountOf?: (calendar: Calendar) => string | undefined;
-}) {
-  return (
-    <Dropdown
-      label={label}
-      value={value}
-      onChange={onChange}
-      options={calendars.map((c) => ({
-        value: c.id,
-        label: accountOf?.(c) ? `${c.name} · ${accountOf(c)}` : c.name,
-        leading: <Dot color={c.color} />,
-      }))}
-      className={fieldButton}
-    />
-  );
+/**
+ * An account as the dialogs name it (design D313): its name, without the
+ * server's address AstroTime put after the user name ("astro@cloud…" is
+ * "astro"); a user name that is an address itself stays whole.
+ */
+function shortName(account: Account, t: TFunction): string {
+  const name = accountName(account, t);
+  const user = account.username;
+  return user && !user.includes("@") && name.startsWith(`${user}@`) ? user : name;
 }
 
 /**
@@ -121,82 +106,144 @@ function CalendarSelect({
 export interface AccountChoice {
   readonly account: Account;
   readonly calendarId: string;
-  /** Its name, with its server beside a twin's (`accountLabels`). */
-  readonly label: string;
 }
 
 /**
- * Where an item goes (design D313): its account, when more than one is
- * offered, then that account's calendars (a task's lists). `accounts` is
- * empty when there is no account to choose; `copiesTo`, where a new item's
- * copies go when it goes to every account (D314), said under the calendar.
+ * Where an item goes (design D313), one row as Google Calendar's: the
+ * account (its avatar and name) and, small under it, its calendars (a
+ * task's lists). Pressed, it opens the accounts, then the chosen account's
+ * calendars; a new item may be ticked into several (`multiple`), a copy in
+ * each. One account offered: its calendars at once.
  */
 export function CalendarFields({
   form,
   calendars,
   accounts,
-  accountRow,
-  copiesTo,
+  multiple,
   onChange,
 }: {
   form: Form;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
-  /** The account chosen in its own row; else the calendars of all are one list, each with its account's name. */
-  accountRow: boolean;
-  copiesTo: readonly string[];
-  onChange: (calendarId: string) => void;
+  multiple: boolean;
+  onChange: (calendarId: string, alsoIn: readonly string[]) => void;
 }) {
   const { t } = useTranslation();
   const event = form.kind === "event";
-  const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
-  // The account row only while the item's own account is one of them.
-  const choosing = accountRow && accounts.some((one) => one.account.id === accountId);
-  // One list of several accounts' calendars: each says whose it is.
-  const accountOf =
-    !choosing && accounts.length > 1
-      ? (calendar: Calendar) => {
-          const choice = accounts.find((one) => one.account.id === calendar.accountId);
-          return choice?.label;
-        }
-      : undefined;
-  const own = choosing ? calendars.filter((c) => c.accountId === accountId) : calendars;
+  const label = t(event ? "edit.calendar" : "edit.list");
+  const chosen = calendars.find((c) => c.id === form.calendarId);
+  const account = accounts.find((one) => one.account.id === chosen?.accountId)?.account;
+  const alsoIn = multiple ? (form.alsoIn ?? []) : [];
+  const ticked = [form.calendarId, ...alsoIn];
+  const names = ticked.flatMap((id) => calendars.find((c) => c.id === id)?.name ?? []);
+  const [open, setOpen] = useState(false);
+  // The accounts first, unless one alone is offered.
+  const [step, setStep] = useState<string | null>(null);
+  const single = accounts.length < 2;
+  const shownAccount = single ? (accounts[0]?.account.id ?? null) : step;
+  if (calendars.length === 0)
+    return (
+      <p className="px-2 text-small text-danger">{t(event ? "edit.noCalendar" : "edit.noList")}</p>
+    );
+  const own = calendars.filter((c) => c.accountId === shownAccount);
+  const toggle = (id: string) => {
+    if (!multiple || chosen?.accountId !== shownAccount) {
+      // Another account's calendar, or one calendar only: it alone.
+      onChange(id, []);
+      if (!multiple) setOpen(false);
+      return;
+    }
+    if (!ticked.includes(id)) {
+      onChange(form.calendarId, [...alsoIn, id]);
+      return;
+    }
+    // The last one ticked stays: an item goes somewhere.
+    if (ticked.length === 1) return;
+    const rest = ticked.filter((one) => one !== id);
+    onChange(rest[0]!, rest.slice(1));
+  };
   return (
-    <>
-      {choosing && accountId !== undefined && (
-        <Dropdown
-          label={t("edit.account")}
-          value={accountId}
-          onChange={(id) => {
-            const chosen = accounts.find((one) => one.account.id === id);
-            if (chosen) onChange(chosen.calendarId);
-          }}
-          options={accounts.map(({ account, label }) => ({
-            value: account.id,
-            label,
-            leading: <Avatar account={account} size="size-6" />,
-          }))}
-          className={fieldButton}
-        />
-      )}
-      <CalendarSelect
-        label={t(event ? "edit.calendar" : "edit.list")}
-        value={form.calendarId}
-        onChange={onChange}
-        calendars={own}
-        {...(accountOf ? { accountOf } : {})}
-      />
-      {calendars.length === 0 && (
-        <p className="px-2 text-small text-danger">
-          {t(event ? "edit.noCalendar" : "edit.noList")}
-        </p>
-      )}
-      {copiesTo.length > 0 && calendars.length > 0 && (
-        <p className="px-2 text-small text-ink-muted">
-          {t("edit.everyAccount", { where: copiesTo.join(", ") })}
-        </p>
-      )}
-    </>
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setStep(null);
+      }}
+    >
+      <Popover.Trigger className="flex min-h-10 w-full min-w-0 items-center gap-3 rounded-lg px-2 py-0.5 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent">
+        {/* Its name is what it shows, after the field's: "Calendar: Work account, Personal". */}
+        <span className="sr-only">{label}: </span>
+        {account && <Avatar account={account} size="size-7" />}
+        <span className="flex min-w-0 flex-1 flex-col">
+          {account && (
+            <span className="truncate text-body leading-5 text-ink">
+              {shortName(account, t)}
+              <span className="sr-only">, </span>
+            </span>
+          )}
+          <span className="flex min-w-0 items-center gap-1.5 text-small leading-4 text-ink-muted">
+            <Dot color={chosen?.color ?? null} className="size-2.5" />
+            <span className="truncate">{names.join(", ")}</span>
+          </span>
+        </span>
+        <ChevronIcon direction="down" className="size-5 shrink-0 text-ink-muted" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner sideOffset={4} align="start" className="z-[140]">
+          <Popover.Popup className={`${popup} w-72`}>
+            {shownAccount === null ? (
+              <>
+                <Popover.Title className="px-2 py-1.5 text-small text-ink-muted">
+                  {t("edit.account")}
+                </Popover.Title>
+                {accounts.map(({ account: one }) => (
+                  <button
+                    key={one.id}
+                    type="button"
+                    onClick={() => setStep(one.id)}
+                    className={`${row} w-full text-left`}
+                  >
+                    <Avatar account={one} size="size-7" />
+                    <span className="min-w-0 flex-1 truncate">{shortName(one, t)}</span>
+                    <ChevronIcon direction="right" className="size-4 shrink-0 text-ink-muted" />
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 px-1 py-1">
+                  {!single && (
+                    <button
+                      type="button"
+                      aria-label={t("edit.accounts")}
+                      onClick={() => setStep(null)}
+                      className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-raised-hover"
+                    >
+                      <ChevronIcon direction="left" className="size-5" />
+                    </button>
+                  )}
+                  <Popover.Title className="min-w-0 truncate px-1 text-small text-ink-muted">
+                    {shortName(accounts.find((one) => one.account.id === shownAccount)!.account, t)}
+                  </Popover.Title>
+                </div>
+                <div role="group" aria-label={label}>
+                  {own.map((calendar) => (
+                    <CalendarRow
+                      key={calendar.id}
+                      calendar={calendar}
+                      color={calendar.color ?? "var(--color-ink-muted)"}
+                      shown={chosen?.accountId === shownAccount && ticked.includes(calendar.id)}
+                      onToggle={(id) => toggle(id)}
+                      className="min-h-10 rounded-lg hover:bg-raised-hover pointer-coarse:min-h-12"
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

@@ -5,7 +5,16 @@
 // calendar, and the Conflicts list (D6).
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { choose, expand, openDemo, PHONE, quickCreate, WIDE } from "./support.ts";
+import {
+  calendarField,
+  choose,
+  expand,
+  pickCalendar,
+  openDemo,
+  PHONE,
+  quickCreate,
+  WIDE,
+} from "./support.ts";
 
 test.use({ viewport: WIDE });
 
@@ -45,7 +54,7 @@ test('"+" creates an event on the day shown from the next half hour; it shows in
   await expect(dialog.getByLabel("End time")).toHaveText("6:00 PM");
   await dialog.getByLabel("Start date").fill("2026-11-01");
   await expect(dialog.getByLabel("End date")).toHaveValue("2026-11-01");
-  await choose(dialog.getByRole("combobox", { name: "Calendar" }), "Personal");
+  await pickCalendar(dialog, "Personal");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
 
@@ -98,7 +107,7 @@ for (const [size, viewport] of [
       [allDay, allDay.locator("xpath=parent::label")],
       [dialog.getByRole("combobox", { name: "Repeat" })],
       [list.getByRole("listitem").first()],
-      [dialog.getByRole("combobox", { name: "Calendar" })],
+      [calendarField(dialog)],
       [dialog.getByRole("combobox", { name: "Colour" })],
       [dialog.getByRole("combobox", { name: "Location" })],
     ];
@@ -669,7 +678,7 @@ test("Copy to opens a new item filled from this one, in another calendar if chos
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-03");
   // A copy keeps its kind.
   await expect(dialog.getByRole("radio", { name: "Task" })).toHaveCount(0);
-  await choose(dialog.getByRole("combobox", { name: "Calendar" }), "Work");
+  await pickCalendar(dialog, "Work");
   await dialog.getByLabel("Start date").fill("2026-11-05");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
@@ -729,7 +738,7 @@ test("the tasks screen adds a task to its list, today, and completes it", async 
     .click();
   await expand(page);
   const dialog = page.getByRole("dialog", { name: "New task" });
-  await expect(dialog.getByLabel("List")).toHaveText(/.+/);
+  await expect(calendarField(dialog)).toHaveAccessibleName(/^List: .+/);
   // A start always, today, all day; no due until one is added (design D159).
   await expect(dialog.getByLabel("Start date")).toHaveValue("2026-11-04");
   await expect(dialog.getByRole("switch", { name: "All day" })).toBeChecked();

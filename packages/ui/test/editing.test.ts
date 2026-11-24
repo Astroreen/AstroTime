@@ -1466,7 +1466,7 @@ describe("a new item in every account (design D314)", () => {
                 ...inner,
                 object: (id) => inner.object(id),
                 calendars: () => inner.calendars(),
-                withUids: (calendarId, uids) => inner.withUids(calendarId, uids),
+                withUids: (calendarId, wanted) => inner.withUids(calendarId, wanted),
                 delete: (id) => inner.delete(id),
                 save: async (calendarId, ics, href) => {
                   if (++saves === 2) throw new Error("The disk is full.");

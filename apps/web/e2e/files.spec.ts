@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, choose, NOW, PHONE, RU_ADD_ACCOUNT, WIDE, expand } from "./support.ts";
+import { addAccount, pickCalendar, NOW, PHONE, RU_ADD_ACCOUNT, WIDE, expand } from "./support.ts";
 
 const SERVER = "https://cloud.example.com";
 const USER = "astrotime-test";
@@ -294,9 +294,7 @@ test("an item moved to another account while its file uploads: not attached, sai
   // Meanwhile the item goes to the calendar on this device, which has no
   // files: the ways turn off, the upload goes on (its input stays, D237).
   // Another account's calendar is chosen through its account (design D313).
-  const account = edit.getByRole("combobox", { name: "Account" });
-  await choose(account, "On this device");
-  await expect(edit.getByRole("combobox", { name: "Calendar" })).toHaveText(/Personal/);
+  await pickCalendar(edit, "Personal", "On this device");
   await expect(edit.getByRole("button", { name: "From this device" })).toBeDisabled();
   await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
   answer();
@@ -305,9 +303,8 @@ test("an item moved to another account while its file uploads: not attached, sai
   );
   await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
   // Back in the account the file went to: attached after all, the alert gone.
-  // Its own account leads back to its own calendar (design D313).
-  await choose(account, `${USER}@cloud.example.com`);
-  await expect(edit.getByRole("combobox", { name: "Calendar" })).toHaveText(/Work/);
+  // Back in its own account's calendar (design D313).
+  await pickCalendar(edit, "Work", USER);
   await expect(edit.getByRole("list", { name: "Attachments" }).getByRole("listitem")).toHaveText([
     /minutes\.txt/,
   ]);

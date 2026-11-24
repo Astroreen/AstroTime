@@ -80,6 +80,11 @@ export type RepeatChoice = Repeat | null | "kept";
 export interface Form {
   readonly kind: "event" | "task";
   readonly calendarId: string;
+  /**
+   * A new item's other calendars of the same account, ticked beside
+   * `calendarId` (design D313): a copy, a UID of its own, in each.
+   */
+  readonly alsoIn?: readonly string[];
   readonly summary: string;
   /** A task's start and due alike (design D159). */
   readonly allDay: boolean;
@@ -955,7 +960,20 @@ export async function saveForm(
       if (!into) throw new NowhereError("No calendar takes this item now.");
       if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
       await local.save(into.calendar.id, ics);
-      if (!request.everyAccount || request.base) return;
+      if (request.base) return;
+      // The other calendars ticked in its account, each that still takes it (D313).
+      for (const id of form.alsoIn ?? []) {
+        const also = calendars.find((calendar) => calendar.id === id);
+        if (!also || also.id === into.calendar.id || also.accountId !== into.calendar.accountId)
+          continue;
+        if (calendarsFor([also], form.kind).length === 0) continue;
+        const copy = createItem(form.kind, changesOf(null, form, untitled), {
+          now: writes.now,
+          uid: writes.uid(),
+        });
+        await local.save(also.id, copy);
+      }
+      if (!request.everyAccount) return;
       // In the same transaction: every account gets it, or none does. A
       // copy has no file of an account's own (a provider's parameters name
       // it): its link opens only for its account (foundation D232); a link
