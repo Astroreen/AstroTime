@@ -257,6 +257,9 @@ One word per concept. Use these terms in code, docs, commits and UI.
   not on the screen: on Android a WorkManager job that runs a page of the
   app in a **headless WebView** (one with no activity or window) on the
   app's origin (android plan D67).
+- **Schedule widget** — Android's home screen widget of the days ahead,
+  drawn from a **snapshot** the UI hands the shell (`WidgetHost`), never
+  from the store itself (android plan D317).
 - **Keep running** — the desktop app living on with its window closed: the
   window hides, the tray stays, syncs and reminders go on; off, closing the
   window quits (desktop plan D75).

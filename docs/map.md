@@ -506,6 +506,11 @@ When you add a package, app or module, add its line here in the same PR.
     `destinationOf`, `duplicatesOf`, `runImport` (`plan.ts`), where each
     source goes, a new calendar on this device, and the writes in batches.
     → `plans/import.md#D266`–`#D271`
+  - `widget/` — the schedule widget's snapshot: `scheduleSnapshot`
+    (`schedule.ts`, with `WidgetHost`, `WidgetOpen`), `fillOf` (`fill.ts`),
+    a row's colour for white text, `useScheduleWidget` (`use-widget.ts`),
+    the open app's; `showWidget` in `background.ts`, background sync's.
+    → `plans/android.md#D317`
   - `places/` — `photon` (`photon.ts`), the place search and its answers
     kept; `tilesAround`, `mapsLink` (`map.ts`), the card's map and "Open in
     maps". `wikipediaPhotos` (`photos.ts`), a place's photo from
@@ -664,6 +669,11 @@ When you add a package, app or module, add its line here in the same PR.
     `AstroTimeHttp` takes a file's bytes as `bodyBase64`
     (`plans/foundation.md#D232`).
     → `plans/design.md#D230`
+  - Schedule widget (`android/app/src/main/java/io/github/astroreen/astrotime/widget/`):
+    `ScheduleWidget` keeps the UI's snapshot and draws the month, "+" and
+    the list; `ScheduleService`, the list's rows; `Snapshot`, the rows of a
+    day, JVM-tested. `src/widget.ts` hands it the snapshot and reads a
+    tap's address (`widgetOpenOf`). → `plans/android.md#D317`
   - `src/webview.ts` — the WebView's Chromium version, checked before the
     store opens. → `plans/android.md#D61`
   - `src/reminders.ts` — `androidReminders`: reminders as local

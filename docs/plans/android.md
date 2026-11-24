@@ -6,7 +6,8 @@ store), [PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners)
 (credentials, Login Flow v2, the shell's manners),
 [PR A3](#pr-a3--reminders) (reminders),
 [PR A4](#pr-a4--background-sync) (background sync) and
-[PR A5](#pr-a5--the-release-apk) (the release APK); what is left is
+[PR A5](#pr-a5--the-release-apk) (the release APK), and since then
+[PR A6](#pr-a6--the-schedule-widget) (the schedule widget); what is left is
 [Deferred](#deferred), the signed release first.
 It started once foundation's
 [PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
@@ -695,6 +696,52 @@ were checked on 2026-11-01.
     No emulator in CI yet: the UI is tested in the browser, and screenshots
     from a device or an emulator are each PR's evidence.
 
+- **D317. The schedule widget: the Agenda's days on the home screen.**
+  _Added by the owner's request, out of Deferred's "Widgets"; Google
+  Calendar's "Schedule" widget is the reference._ One widget: the month
+  and "+" over the days ahead in a list that scrolls freely, each day's
+  date beside its first row (today's in a circle), its items as the Agenda
+  has them ([design D87](design.md#D87)), the "N undone tasks" row first on
+  today ([design D51](design.md#D51)).
+  - **The UI works it out, the widget only draws it.** A widget is native
+    (RemoteViews) and cannot read the store in the WebView's OPFS
+    ([D63](#D63)), so `scheduleSnapshot` (`packages/ui/src/widget/`) makes
+    a snapshot from the store, as the platform's reminder set is made
+    ([D60](#D60)): the shown calendars' items from today for 31 days (at
+    most 200 rows), hidden calendars and "Hide completed tasks" as the user
+    chose on this device, every word in the user's language (weekdays,
+    months, times, titles, the undone row, a screen reader's labels), each
+    row's colour as the views colour it, darkened for white text by the
+    rule of [design D120](design.md#D120) (`fillOf`), a done task's muted.
+    `Platform.widget` (`WidgetHost`) is handed it: the open app at every
+    change to the store, the calendars shown, the words or the day
+    (`useScheduleWidget`, which hears the store with the page hidden too),
+    background sync after every run, an account or not ([D67](#D67)).
+  - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
+    background sync's `widget.show` keep the snapshot in a file of the
+    app's (`AtomicFile`) and draw every widget again; the list's rows come
+    from a `RemoteViewsService`, read again from the file
+    (`Snapshot.read`, JVM-tested). The days before the device's today are
+    left out when it draws, so the list moves on at midnight (an inexact
+    alarm, no permission) with the app closed; today with nothing on it
+    still heads the list ("Nothing planned today"). Before the app's first
+    snapshot the widget says to open AstroTime. Colours are the app's
+    tokens in `values` and `values-night`; from Android 12 the home screen
+    resolves them, so the widget follows the system's theme as it changes.
+  - **A tap opens the app on what was tapped:** an item's day in the Day
+    view and its details over it, as a tapped reminder does ([D66](#D66));
+    the undone row and the month, the day; "+", quick create for a new
+    event today. The tap starts `MainActivity` at
+    `io.github.astroreen.astrotime:/widget?open=<JSON>`, heard through
+    `@capacitor/app` (`appUrlOpen`, or the launch address on a cold
+    start). Any app can start the exported activity at that address, so
+    `widgetOpenOf` keeps only an item (by id), a day or quick create; the
+    worst a crafted address does is open one of them.
+  - **Fresh within:** at once from the open app; within an hour with it
+    closed (background sync); a hidden WebView's timers are throttled, so
+    a change made just before leaving the app may reach the widget some
+    seconds late.
+
 ## Deferred
 
 - **An inexact alarm Doze delayed, then moved** — a reminder whose alarm
@@ -724,8 +771,10 @@ were checked on 2026-11-01.
   neither is worth a tap.
 - **A sync interval setting** — the hour of [D67](#D67) is fixed until
   someone needs another.
-- **Widgets, quick settings tile, share target** — none in the first
-  release.
+- **Quick settings tile, share target, more widgets** — none in the first
+  release; the schedule widget is [D317](#D317). A month widget, a tasks
+  widget, a widget's own calendars or its own theme wait for someone to
+  ask.
 - **System calendars** — foundation's Deferred (`CalendarContract`).
 - **The app's icon and splash screen** — Capacitor's placeholders until
   AstroTime has a design for them ([D61](#D61)).
@@ -864,3 +913,14 @@ Decisions: D69 (release), foundation's D28.
 Done when: a prerelease tag (on a fork is enough) creates its Release with
 `astrotime-<version>-unsigned.apk`, which `apksigner verify` reports
 unsigned and which, signed by hand with a test key, a phone installs.
+
+### PR A6 — The schedule widget
+
+The home screen's schedule widget: the snapshot in the UI, the widget in
+Kotlin, the taps back into the app. Decisions: D317.
+
+Done when: on an Android 16 emulator the widget shows the days ahead from
+the store, scrolls, follows the system's theme, and a tap on an item, on
+"+" and on the month opens the item's details, quick create and today;
+the snapshot's words and colours are unit-tested, and native's reading of
+it by Gradle.
