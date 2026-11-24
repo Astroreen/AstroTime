@@ -675,11 +675,16 @@ describe("saving writes pending changes through the store (D5)", () => {
     ];
     const event = { kind: "event" as const, calendarId: "work" };
     // Chosen and taking it: that one.
-    expect(newItemCalendar(list, event)).toEqual({ calendar: list[2], refused: false });
+    expect(newItemCalendar(list, event)).toEqual({
+      calendar: list[2],
+      refused: false,
+      moved: false,
+    });
     // Chosen, there, no longer taking it: that one still, refused.
     expect(newItemCalendar(list, { ...event, calendarId: "tasks" })).toEqual({
       calendar: list[1],
       refused: true,
+      moved: false,
     });
     // Gone: the first that takes it, visible before hidden, as the dialog's default is.
     const gone = { ...event, calendarId: "gone" };
@@ -1496,6 +1501,58 @@ describe("a new item in every account (design D314)", () => {
       "yoga-copy",
       "here-work",
     ]);
+  });
+});
+
+const ALL_NO_CREATE = { create: false, edit: true, delete: true };
+
+describe("where a new item goes when its calendar changes under the dialog (D313, D314)", () => {
+  const calendar = (id: string, accountId: string, create = true) =>
+    ({
+      id,
+      accountId,
+      url: `https://example.com/${id}/`,
+      name: id,
+      color: null,
+      components: ["VEVENT"],
+      rights: { create, edit: true, delete: true },
+      syncToken: null,
+      ctag: null,
+    }) as const;
+  // By name, as the store lists them: the device's first.
+  const device = calendar("a-device", "local");
+  const away = calendar("b-away", "away");
+  const personal = calendar("c-personal", "home");
+  const work = calendar("d-work", "home");
+  const servers = new Set(["home", "away"]);
+  const event = { kind: "event" as const, calendarId: personal.id };
+
+  test("refused, with every account: its account's next before another server's", () => {
+    const list = [device, away, { ...personal, rights: ALL_NO_CREATE }, work];
+    expect(newItemCalendar(list, event, undefined, servers)).toMatchObject({
+      calendar: { id: work.id },
+      moved: false,
+    });
+    // Without: the dialog keeps it, refused, for the user to pick again.
+    expect(newItemCalendar(list, event)).toMatchObject({
+      calendar: { id: personal.id },
+      refused: true,
+    });
+  });
+
+  test("gone: a ticked one, else with every account a server's before the device's; files stay only in their account", () => {
+    expect(
+      newItemCalendar([device, away, work], { ...event, alsoIn: [work.id] }, undefined, servers),
+    ).toMatchObject({ calendar: { id: work.id }, moved: false });
+    expect(newItemCalendar([device, away, work], event, undefined, servers)).toMatchObject({
+      calendar: { id: away.id },
+      moved: true,
+    });
+    expect(newItemCalendar([device, away, work], event)).toMatchObject({
+      calendar: { id: device.id },
+      moved: true,
+    });
+    expect(newItemCalendar([], event, undefined, servers)).toBeNull();
   });
 });
 

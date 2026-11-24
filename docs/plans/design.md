@@ -2652,7 +2652,9 @@ keywords". The quick parse and voice that fill quick create are the
   account offered, its calendars at once. A new item (not a copy, [D164](#D164)) may be ticked into several
   of the account's calendars: it is saved in the first and a copy, a UID
   of its own, in each other, in one local write; the last tick never goes,
-  and the first one gone meanwhile leaves the item to the next ticked.
+  and the first one gone meanwhile leaves the item to the next ticked (in
+  the dialog too). A calendar gone meanwhile that leaves the item to another
+  account leaves that account's own files behind.
   Another account's calendar replaces the ticks. An existing item, or a
   copy, goes in one: a pick closes the list, and a move to another
   account's calendar is the move the calendar field already made
@@ -2674,9 +2676,11 @@ keywords". The quick parse and voice that fill quick create are the
   the same local write, a copy of it, a UID of its own, in each other
   account on a server's first calendar that takes it, visible before
   hidden; an account none of whose calendars takes it gets none. With no
-  row to pick again, a calendar that no longer takes it gives way to the
-  first on a server that does, else the first that does, without the files
-  of the account it leaves; none, the dialog says no calendar takes it.
+  row to pick again, a calendar that no longer takes it, or gone, gives
+  way to its account's next, else a server's, else the first that takes
+  it, without the files of an account it leaves; none, the dialog says no
+  calendar takes it. The dialog shows what the save does: one rule
+  (`newItemCalendar`), files of an account left shown gone.
   Ticks are not read then. One copy
   per account: "every calendar" is each account's, as the owner hides the
   account choice. The calendar on this device ([foundation
@@ -2717,8 +2721,9 @@ keywords". The quick parse and voice that fill quick create are the
   land. A notice of copies not made or not sent waits with keeping them
   alike.
 - **A file kept when its item changes account** ([D313](#D313)) — a file
-  uploaded to one account's files and attached stays on the item when its
-  calendar is then changed to another account's, as it did before D313;
+  uploaded to one account's files and attached stays on the item when the
+  user then changes its calendar to another account's, as it did before
+  D313 (a calendar gone or refused meanwhile leaves it behind, D314);
   dropping it (or holding it, as an upload finished late is) is the
   dialog's rule to make.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled

@@ -24,6 +24,7 @@ import {
   followed,
   formOf,
   GoneError,
+  goesToEveryCopy,
   InDoubtError,
   isOccurrence,
   itemOf,
@@ -604,24 +605,36 @@ export function useEditingState({
   // A new item (not a copy) while new items go to every account on a
   // server: no row for where it goes at all (D314).
   const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
-  const found =
-    editing && editing.target === null
-      ? newItemCalendar(calendars, editing.state.form, hidden)
-      : null;
-  // With no row to pick again, a calendar that no longer takes it gives way
-  // to the first that does, as the save does; none, the dialog says so (D314).
-  const fallback =
-    everyMode && found?.refused ? byId(firstFor(editing.state.form.kind) ?? "") : undefined;
+  // Where the new item goes now, the save's own rule (D122, D313, D314):
+  // going to every account, a calendar that no longer takes it gives way,
+  // as there is no row to pick again in; none, the dialog says so.
   const shown =
-    everyMode && found?.refused
-      ? fallback
-        ? { calendar: fallback, refused: false }
-        : null
-      : found;
-  const shownState =
+    editing && editing.target === null
+      ? newItemCalendar(
+          calendars,
+          everyMode ? { ...editing.state.form, alsoIn: [] } : editing.state.form,
+          hidden,
+          everyMode ? servers : undefined,
+        )
+      : null;
+  // Gone from the account chosen, no file of that one's own goes with it,
+  // and the dialog shows them gone (foundation D232).
+  const shownForm =
     editing && shown
-      ? { ...editing.state, form: { ...editing.state.form, calendarId: shown.calendar.id } }
-      : (editing?.state ?? null);
+      ? {
+          ...editing.state.form,
+          calendarId: shown.calendar.id,
+          ...(shown.moved && editing.state.form.attachments
+            ? {
+                attachments: editing.state.form.attachments.filter(
+                  (file) => file.kind === "existing" || goesToEveryCopy(file.attachment),
+                ),
+              }
+            : {}),
+        }
+      : null;
+  const shownState =
+    editing && shownForm ? { ...editing.state, form: shownForm } : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
   // Each account offered, with where choosing it puts the item (D313): an
