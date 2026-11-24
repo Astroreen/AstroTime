@@ -1432,12 +1432,69 @@ describe("a new item in every account (design D314)", () => {
     expect(own.some((line) => line.startsWith("TRIGGER"))).toBe(true);
     expect(await lines(meetings.id, "yoga-copy")).toEqual(own);
 
+    // Put on this device by choice: it still goes to every server (D314).
+    // Copies are made in the calendars' order: Meetings, then Personal.
+    const local = ["here", "here-work", "here-cloud"];
+    await saveForm(
+      store,
+      {
+        ...request,
+        form: { ...form, calendarId: onDevice.id },
+        hidden,
+        everyAccount: servers,
+      },
+      { now: NOW, uid: () => local.shift()! },
+    );
+    expect([
+      (await store.objectAt(onDevice.id, "here.ics"))?.uid,
+      (await store.objectAt(personal.id, "here-cloud.ics"))?.uid,
+      (await store.objectAt(meetings.id, "here-work.ics"))?.uid,
+    ]).toEqual(["here", "here-cloud", "here-work"]);
+
+    // A copy that fails to be written takes the others with it: one write.
+    const failing = new Proxy(store, {
+      get(target, key) {
+        if (key !== "changeLocal") {
+          const value: unknown = Reflect.get(target, key, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (change: Parameters<Store["changeLocal"]>[0]) =>
+          target.changeLocal((inner, log) => {
+            let saves = 0;
+            return change(
+              {
+                ...inner,
+                object: (id) => inner.object(id),
+                calendars: () => inner.calendars(),
+                withUids: (calendarId, uids) => inner.withUids(calendarId, uids),
+                delete: (id) => inner.delete(id),
+                save: async (calendarId, ics, href) => {
+                  if (++saves === 2) throw new Error("The disk is full.");
+                  return inner.save(calendarId, ics, href);
+                },
+              },
+              log,
+            );
+          });
+      },
+    });
+    const lost = ["lost", "lost-copy"];
+    await expect(
+      saveForm(
+        failing,
+        { ...request, hidden, everyAccount: servers },
+        { now: NOW, uid: () => lost.shift()! },
+      ),
+    ).rejects.toThrow("The disk is full.");
+    expect(await store.objectAt(personal.id, "lost.ics")).toBeUndefined();
+
     // Off, the default: only the calendar chosen.
     await saveForm(store, request, { now: NOW, uid: () => "alone" });
     expect(await store.objectAt(personal.id, "alone.ics")).toBeDefined();
     expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual([
       "second",
       "yoga-copy",
+      "here-work",
     ]);
   });
 });
