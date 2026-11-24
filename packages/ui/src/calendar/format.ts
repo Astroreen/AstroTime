@@ -117,6 +117,11 @@ export class Formats {
     return capitalize(text, this.#locale);
   }
 
+  /** "November", "Ноябрь": the widget's title (android D317). */
+  month(day: string): string {
+    return capitalize(this.#month.format(utcDate(day)), this.#locale);
+  }
+
   /** "November 2026", the month picker's title. */
   monthYear(day: string): string {
     return capitalize(this.#monthYear.format(utcDate(day)), this.#locale);

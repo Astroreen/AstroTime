@@ -63,6 +63,8 @@ import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { HOUR, hourIn } from "./items.tsx";
 import { TimeGrid } from "./time-grid.tsx";
+import type { WidgetOpen } from "../widget/schedule.ts";
+import { useScheduleWidget } from "../widget/use-widget.ts";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** A calendar without a colour of its own (design D47). */
@@ -406,25 +408,61 @@ export function CalendarScreen({
     setAnchor(day);
   };
 
+  // What opens from outside the page (a reminder, the widget) opens over
+  // the calendar: whatever was over it closes first.
+  const uncover = () => {
+    setSearching(false);
+    setDrawerOpen(false);
+    setSettingsOpen(false);
+    setTasksOpen(false);
+    setTaskFocus(null);
+  };
+  /** An occurrence's day in the Day view, when it has one, and its details over it. */
+  const openOccurrence = async (
+    objectId: string,
+    recurrenceId: ScheduledReminder["recurrenceId"],
+    day: string | null,
+  ) => {
+    uncover();
+    if (day) openDay(day);
+    const stored = await store.object(objectId);
+    if (!stored || stored.pending === "delete") return;
+    const object = CalendarObject.parse(stored.ics);
+    const item = itemOf(object, recurrenceId);
+    if (item) editing.value.open(targetOf(stored, object, recurrenceId, item));
+  };
+
   // A tapped reminder opens its occurrence's day in the Day view, and its
   // details over it (foundation D101): an event's start, a task's due or
   // start; one with no time opens only the details.
   const { onOpen } = useReminders();
   const openReminder = useEffectEvent(async (reminder: ScheduledReminder) => {
     const time = reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start;
-    setSearching(false);
-    setDrawerOpen(false);
-    setSettingsOpen(false);
-    setTasksOpen(false);
-    setTaskFocus(null);
-    if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
-    const stored = await store.object(reminder.objectId);
-    if (!stored || stored.pending === "delete") return;
-    const object = CalendarObject.parse(stored.ics);
-    const item = itemOf(object, reminder.recurrenceId);
-    if (item) editing.value.open(targetOf(stored, object, reminder.recurrenceId, item));
+    await openOccurrence(
+      reminder.objectId,
+      reminder.recurrenceId,
+      time ? wallClockOf(time, timeZone).slice(0, 10) : null,
+    );
   });
   useEffect(() => onOpen((reminder) => void openReminder(reminder)), [onOpen]);
+
+  // The home screen widget (android D317): kept with what the views show,
+  // and its taps open an item's day and details, a day, or quick create.
+  useScheduleWidget(platform.widget, store, {
+    t,
+    formats,
+    timeZone,
+    hidden,
+    hideCompleted,
+    today,
+  });
+  const openFromWidget = useEffectEvent(async (open: WidgetOpen) => {
+    if (open.kind === "item") return openOccurrence(open.objectId, open.recurrenceId, open.day);
+    uncover();
+    if (open.kind === "day") openDay(open.day ?? today);
+    else editing.value.create("event", { day: today });
+  });
+  useEffect(() => platform.widget?.onOpen((open) => void openFromWidget(open)), [platform.widget]);
 
   // The system's back button, where there is one (android D68): it closes
   // what is open, the topmost first, and with nothing open the shell leaves
