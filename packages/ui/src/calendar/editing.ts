@@ -962,23 +962,32 @@ export function occurrenceOn(
   const near = pick(idsOf(occurrences));
   if (near !== undefined) return near;
   // An exception moved far from the day it was shown on (a reminder's
-  // occurrence moved two days on): looked for where it is now.
-  // Only those whose id a step takes are expanded: one, as a rule, of however many.
-  const moved = object.exceptions.flatMap((exception) => {
+  // occurrence moved two days on): looked for where it is now. Step by step
+  // as above, expanding only the exceptions a step takes, and no more once
+  // two are found, which leaves the day alone.
+  const exceptions = object.exceptions.flatMap((exception) => {
     const id = exception.recurrenceId;
     const at = exception.start ?? (exception.kind === "task" ? exception.due : null);
-    if (!id || !at || exception.status?.toUpperCase() === "CANCELLED") return [];
-    if (!steps.some((step) => step(id))) return [];
-    try {
-      const its = wallClockOf(at, timeZone).slice(0, 10);
-      return idsOf(
-        occurrencesBetween(object, { from: addDays(its, -1), to: addDays(its, 2), timeZone }),
-      ).filter((drawn) => sameId(drawn.id, id));
-    } catch {
-      return [];
-    }
+    return id && at && exception.status?.toUpperCase() !== "CANCELLED" ? [{ id, at }] : [];
   });
-  return pick(moved) ?? null;
+  for (const step of steps) {
+    const found: Occurrence[] = [];
+    for (const { id, at } of exceptions) {
+      if (!step(id)) continue;
+      try {
+        const its = wallClockOf(at, timeZone).slice(0, 10);
+        const drawn = idsOf(
+          occurrencesBetween(object, { from: addDays(its, -1), to: addDays(its, 2), timeZone }),
+        ).filter((candidate) => sameId(candidate.id, id));
+        found.push(...drawn.map(({ occurrence }) => occurrence));
+      } catch {
+        // Too dense to expand, a time that does not read: not drawn.
+      }
+      if (found.length > 1) return null;
+    }
+    if (found.length === 1) return found[0]!;
+  }
+  return null;
 }
 
 /** The same recurrence id, field by field. */

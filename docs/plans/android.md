@@ -836,6 +836,10 @@ were checked on 2026-11-01.
   so after midnight it leaves with that day until the next snapshot (the
   app opened, or background sync within the hour); the widget could carry
   it to the new today, its count a guess until then ([D317](#D317)).
+- **A test of how few times a moved occurrence's search expands** — the
+  search expands only the exceptions a step takes (12 ms for 260 over ten
+  years, measured once); a test counting the expansions would keep it so,
+  rather than one timing them ([D317](#D317)).
 - **The widget without an account** — background sync starts no run with
   no account saved ([D67](#D67)), so the widget's undone row moves on only
   when the app opens; a run for the widget alone, where one is on the home

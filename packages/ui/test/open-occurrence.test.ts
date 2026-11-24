@@ -776,3 +776,13 @@ test("an occurrence moved days away still opens from the day it was shown on", (
     );
   }
 });
+
+test("a moved occurrence is found among cancelled and unrelated exceptions", () => {
+  const busy = series(
+    "",
+    "RECURRENCE-ID;TZID=Europe/Vilnius:20261103T090000\nDTSTART;TZID=Europe/Vilnius:20261103T090000\nDTEND;TZID=Europe/Vilnius:20261103T093000\nSTATUS:CANCELLED",
+    "RECURRENCE-ID;TZID=Europe/Vilnius:20261104T090000\nDTSTART;TZID=Europe/Vilnius:20261110T090000\nDTEND;TZID=Europe/Vilnius:20261110T093000\nSUMMARY:Other, moved",
+    "RECURRENCE-ID;TZID=Europe/Vilnius:20261105T090000\nDTSTART;TZID=Europe/Vilnius:20261108T100000\nDTEND;TZID=Europe/Vilnius:20261108T103000\nSUMMARY:Stand-up, moved",
+  );
+  expect(occurrenceOn(busy, fifth, "2026-11-05", timeZone)?.item.summary).toBe("Stand-up, moved");
+});
