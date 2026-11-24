@@ -1026,9 +1026,10 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
 
 /**
  * Whether a zoned time's instant reads its own wall clock in its zone, as
- * the series' times are read: the zones are the TZIDs its start and its
- * exceptions' ids are written in that read as this time's zone (`ianaName`:
- * Outlook's Windows names, Lightning's paths), each by the object's
+ * the series' times are read: the zones are the TZIDs its anchor (its
+ * start, or a task's due), its RDATEs and its exceptions' ids are written
+ * in that read as this time's zone (`ianaName`: Outlook's Windows names,
+ * Lightning's paths), each by the object's
  * VTIMEZONE of that TZID where it has one (its own offsets and changes,
  * D32), else by `Intl`, any of them reading it; a time in no such zone (a
  * server's UTC) by `Intl`; a zone neither knows is taken to. Not a
@@ -1037,15 +1038,15 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
 export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
   if (time.type !== "zoned") return true;
   if (!Number.isFinite(time.epochMs)) return false;
-  // A server's UTC is read at UTC whatever VTIMEZONE a calendar has by that name.
-  if (time.timeZone === "UTC") return wallClockIn(time.epochMs, "UTC") === time.local;
   const { master, exceptions } = object.components;
   const tzidOf = (property: ICAL.Property | null) => {
     const tzid: unknown = property?.getParameter("tzid");
     return typeof tzid === "string" ? tzid : null;
   };
   const written = [
-    tzidOf(master?.getFirstProperty("dtstart") ?? null),
+    // The series' anchor: its start, or a task's due without one (`anchorTzid`).
+    master ? anchorTzid(master) : null,
+    ...(master?.getAllProperties("rdate") ?? []).map(tzidOf),
     ...exceptions.map((exception) => tzidOf(exception.getFirstProperty("recurrence-id"))),
   ].filter((tzid): tzid is string => tzid !== null && ianaName(tzid) === time.timeZone);
   const zones = object.root.getAllSubcomponents("vtimezone");
@@ -1057,6 +1058,8 @@ export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
     return true;
   };
   try {
+    // A server's UTC is read at UTC whatever VTIMEZONE a calendar has by that name.
+    if (time.timeZone === "UTC") return wallClockIn(time.epochMs, "UTC") === time.local;
     return [...new Set(written.length > 0 ? written : [time.timeZone])].some(reads);
   } catch {
     // An instant past what a clock reads (a crafted id), a zone that does not read: none.

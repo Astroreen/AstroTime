@@ -681,3 +681,82 @@ test("a time before its VTIMEZONE's first change reads as ical.js reads it", () 
   );
   expect(readsItsClock(early, early.master!.start!)).toBe(true);
 });
+
+/** Outlook's "Russian Standard Time" kept at +04:00, and these lines of a series. */
+function russian(component: string, ...lines: string[]): CalendarObject {
+  return CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Russian Standard Time",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T000000",
+      "TZOFFSETFROM:+0400",
+      "TZOFFSETTO:+0400",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+      ...lines,
+      "END:VCALENDAR",
+      "",
+    ]
+      .join("\r\n")
+      .replaceAll("COMPONENT", component),
+  );
+}
+
+const moscowNine: ItemTime = {
+  type: "zoned",
+  local: "2026-07-05T09:00:00",
+  timeZone: "Europe/Moscow",
+  epochMs: Date.parse("2026-07-05T05:00:00Z"),
+};
+
+test("a task's series anchored on its due is read in its due's zone", () => {
+  const pills = russian(
+    "VTODO",
+    "BEGIN:COMPONENT",
+    "UID:pills",
+    "DTSTAMP:20260101T000000Z",
+    "DUE;TZID=Russian Standard Time:20260701T090000",
+    "RRULE:FREQ=DAILY",
+    "SUMMARY:Pills",
+    "END:COMPONENT",
+    "BEGIN:COMPONENT",
+    "UID:pills",
+    "DTSTAMP:20260101T000000Z",
+    "RECURRENCE-ID:20260705T050000Z",
+    "DUE;TZID=Russian Standard Time:20260705T100000",
+    "SUMMARY:Pills, moved",
+    "END:COMPONENT",
+  );
+  expect(occurrenceOn(pills, moscowNine, "2026-07-05", timeZone)?.item.summary).toBe(
+    "Pills, moved",
+  );
+});
+
+test("an RDATE's occurrence is read in the RDATE's zone", () => {
+  const extra = russian(
+    "VEVENT",
+    "BEGIN:COMPONENT",
+    "UID:extra",
+    "DTSTAMP:20260101T000000Z",
+    "DTSTART:20260701T120000Z",
+    "DURATION:PT30M",
+    "RDATE;TZID=Russian Standard Time:20260705T090000",
+    "SUMMARY:Extra",
+    "END:COMPONENT",
+    "BEGIN:COMPONENT",
+    "UID:extra",
+    "DTSTAMP:20260101T000000Z",
+    "RECURRENCE-ID:20260705T050000Z",
+    "DTSTART;TZID=Russian Standard Time:20260705T100000",
+    "DURATION:PT30M",
+    "SUMMARY:Extra, moved",
+    "END:COMPONENT",
+  );
+  expect(occurrenceOn(extra, moscowNine, "2026-07-05", timeZone)?.item.summary).toBe(
+    "Extra, moved",
+  );
+});

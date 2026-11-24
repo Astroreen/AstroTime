@@ -763,7 +763,8 @@ were checked on 2026-11-01.
     than one opening the day alone: the same id; for a zoned id, a zoned
     one at the same instant in another zone (a server's UTC), each reading
     its own wall clock there (core's `readsItsClock`: in the zones the
-    series' start and its exceptions' ids are written in, each by the
+    series' anchor (its start, or a task's due), its RDATEs and its
+    exceptions' ids are written in, each by the
     calendar's VTIMEZONE of that TZID where it has one, its changes of
     offset on the UTC time line, else by `Intl`), so a
     spring-forward 3:30 is never the 4:30 at its instant (a daily series'
