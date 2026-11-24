@@ -371,7 +371,7 @@ export const en = {
   "edit.calendar": "Calendar",
   "edit.list": "List",
   "edit.account": "Account",
-  "edit.everyAccount": "Also saved to your other accounts.",
+  "edit.everyAccount": "Also saved to {{where}}",
   "edit.color": "Colour",
   "edit.colorDefault": "The calendar's colour",
   "edit.location": "Location",

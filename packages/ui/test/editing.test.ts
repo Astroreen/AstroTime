@@ -1351,6 +1351,14 @@ describe("a new item in every account (design D313)", () => {
           },
         },
         { kind: "new" as const, attachment: { uri: "https://example.com/agenda.pdf" } },
+        // A file on the other accounts' server (their calendars are on example.com).
+        {
+          kind: "new" as const,
+          attachment: {
+            uri: "https://example.com/index.php/f/9",
+            parameters: { "X-NC-FILE-ID": "9" },
+          },
+        },
       ],
     };
     const made = ["first", "second", "third"];
@@ -1365,18 +1373,36 @@ describe("a new item in every account (design D313)", () => {
     const copy = await store.objectAt(meetings.id, "second.ics");
     expect(copy).toMatchObject({ pending: "create", uid: "second" });
     expect(CalendarObject.parse(copy!.ics).master?.summary).toBe("Dentist");
-    // The account's own file stays in its account (foundation D232); the link goes along.
+    // A file goes only to a copy on its own server (foundation D232); the link goes along.
     const linksOf = (ics: string) =>
       CalendarObject.parse(ics).master?.attachments.map((file) => file.uri);
-    expect(linksOf(copy!.ics)).toEqual(["https://example.com/agenda.pdf"]);
+    expect(linksOf(copy!.ics)).toEqual([
+      "https://example.com/agenda.pdf",
+      "https://example.com/index.php/f/9",
+    ]);
     expect(linksOf((await store.objectAt(personal.id, "first.ics"))!.ics)).toEqual([
       "https://cloud.example.com/index.php/f/123",
       "https://example.com/agenda.pdf",
+      "https://example.com/index.php/f/9",
     ]);
     // No calendar of the tasks-only account takes an event: no copy there.
     expect(await store.pending(todo.id)).toEqual([]);
     expect(await store.pending(team.id)).toEqual([]);
     expect(await store.pending(onDevice.id)).toEqual([]);
+
+    // A copy made with "Copy to" (D164) goes to the one calendar picked.
+    // Its base already has a UID of its own, as `copyOf` gives it.
+    const base = (await store.objectAt(personal.id, "first.ics"))!.ics.replace(
+      "UID:first",
+      "UID:copied",
+    );
+    await saveForm(
+      store,
+      { ...request, initial: form, base, everyAccount: servers },
+      { now: NOW, uid: () => "copied" },
+    );
+    expect(await store.objectAt(personal.id, "copied.ics")).toBeDefined();
+    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual(["second"]);
 
     // Off, the default: only the calendar chosen.
     await saveForm(store, request, { now: NOW, uid: () => "alone" });

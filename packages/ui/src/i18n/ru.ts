@@ -384,7 +384,7 @@ export const ru = {
   "edit.calendar": "Календарь",
   "edit.list": "Список",
   "edit.account": "Аккаунт",
-  "edit.everyAccount": "Также сохранится в других ваших аккаунтах.",
+  "edit.everyAccount": "Также сохранится в: {{where}}",
   "edit.color": "Цвет",
   "edit.colorDefault": "Цвет календаря",
   "edit.location": "Место",

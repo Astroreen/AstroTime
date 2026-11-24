@@ -50,6 +50,7 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
+import { accountName } from "./accounts.tsx";
 import type { AccountChoice, Press } from "./editor-fields.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor, QuickCreate } from "./lazy.tsx";
@@ -247,8 +248,19 @@ export function useEditingState({
   const toEvery = everyAccount && servers.size > 1;
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
+  // While new items go to every account, one on a server first: the
+  // device's calendar keeps no copy it would not step aside for (D313).
   const firstFor = (kind: "event" | "task") =>
-    firstCalendarFor(calendars, kind, hidden)?.id ?? null;
+    (toEvery
+      ? firstCalendarFor(
+          calendars.filter((calendar) => servers.has(calendar.accountId)),
+          kind,
+          hidden,
+        )
+      : undefined
+    )?.id ??
+    firstCalendarFor(calendars, kind, hidden)?.id ??
+    null;
   /** The calendar the item being edited was in; none for a new item. */
   const fromOf = (current: Editing) =>
     current.target ? byId(current.initial?.calendarId) : undefined;
@@ -594,14 +606,20 @@ export function useEditingState({
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
   // A new item (not a copy) that goes to every account on a server: no
   // account to choose, and the dialog says where else it goes (design D313).
-  const spread =
-    editing !== null &&
-    shown !== null &&
-    !shown.refused &&
-    toEvery &&
-    editing.base === undefined &&
-    otherAccountsCalendars(calendars, editing.state.form.kind, shown.calendar, servers, hidden)
-      .length > 0;
+  // Each copy's calendar and account, named under the calendar (D313).
+  const copiesTo =
+    editing !== null && shown !== null && !shown.refused && toEvery && editing.base === undefined
+      ? otherAccountsCalendars(
+          calendars,
+          editing.state.form.kind,
+          shown.calendar,
+          servers,
+          hidden,
+        ).flatMap((other) => {
+          const account = accounts.find((one) => one.id === other.accountId);
+          return account ? [`${other.name} · ${accountName(account, t)}`] : [];
+        })
+      : [];
   // Each account offered, with where choosing it puts the item (D312): an
   // existing item's own calendar in its own account, else the account's
   // first calendar that takes it, visible before hidden; none to choose
@@ -621,7 +639,7 @@ export function useEditingState({
   // whichever calendar it is in now (D313).
   const everyMode =
     toEvery && editing !== null && editing.target === null && editing.base === undefined;
-  const accountChoices: AccountChoice[] = everyMode || choices.length < 2 ? [] : choices;
+  const accountChoices: AccountChoice[] = choices.length < 2 ? [] : choices;
 
   const dialogs = (
     <>
@@ -646,7 +664,8 @@ export function useEditingState({
         state={editing?.quick ? shownState : null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        everyAccount={spread}
+        accountRow={!everyMode}
+        copiesTo={copiesTo}
         onChange={change}
         onDraft={setDraft}
         onSave={save}
@@ -658,7 +677,8 @@ export function useEditingState({
         target={editing?.target ?? null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        everyAccount={spread}
+        accountRow={!everyMode}
+        copiesTo={copiesTo}
         onChange={change}
         onDraft={setDraft}
         onSave={save}

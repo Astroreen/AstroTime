@@ -90,11 +90,14 @@ function CalendarSelect({
   value,
   onChange,
   calendars,
+  accountOf,
 }: {
   label: string;
   value: string;
   onChange: (calendarId: string) => void;
   calendars: readonly Calendar[];
+  /** The name of a calendar's account, beside its own when the list has several accounts' (D313). */
+  accountOf?: (calendar: Calendar) => string | undefined;
 }) {
   return (
     <Dropdown
@@ -103,7 +106,7 @@ function CalendarSelect({
       onChange={onChange}
       options={calendars.map((c) => ({
         value: c.id,
-        label: c.name,
+        label: accountOf?.(c) ? `${c.name} · ${accountOf(c)}` : c.name,
         leading: <Dot color={c.color} />,
       }))}
       className={fieldButton}
@@ -123,27 +126,38 @@ export interface AccountChoice {
 /**
  * Where an item goes (design D312): its account, when more than one is
  * offered, then that account's calendars (a task's lists). `accounts` is
- * empty when there is no account to choose; `everyAccount`, a new item
- * goes to every account (D313), said under the calendar.
+ * empty when there is no account to choose; `copiesTo`, where a new item's
+ * copies go when it goes to every account (D313), said under the calendar.
  */
 export function CalendarFields({
   form,
   calendars,
   accounts,
-  everyAccount,
+  accountRow,
+  copiesTo,
   onChange,
 }: {
   form: Form;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
-  everyAccount: boolean;
+  /** The account chosen in its own row; else the calendars of all are one list, each with its account's name. */
+  accountRow: boolean;
+  copiesTo: readonly string[];
   onChange: (calendarId: string) => void;
 }) {
   const { t } = useTranslation();
   const event = form.kind === "event";
   const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
   // The account row only while the item's own account is one of them.
-  const choosing = accounts.some((one) => one.account.id === accountId);
+  const choosing = accountRow && accounts.some((one) => one.account.id === accountId);
+  // One list of several accounts' calendars: each says whose it is.
+  const accountOf =
+    !choosing && accounts.length > 1
+      ? (calendar: Calendar) => {
+          const choice = accounts.find((one) => one.account.id === calendar.accountId);
+          return choice && accountName(choice.account, t);
+        }
+      : undefined;
   const own = choosing ? calendars.filter((c) => c.accountId === accountId) : calendars;
   return (
     <>
@@ -168,14 +182,17 @@ export function CalendarFields({
         value={form.calendarId}
         onChange={onChange}
         calendars={own}
+        {...(accountOf ? { accountOf } : {})}
       />
       {calendars.length === 0 && (
         <p className="px-2 text-small text-danger">
           {t(event ? "edit.noCalendar" : "edit.noList")}
         </p>
       )}
-      {everyAccount && calendars.length > 0 && (
-        <p className="px-2 text-small text-ink-muted">{t("edit.everyAccount")}</p>
+      {copiesTo.length > 0 && calendars.length > 0 && (
+        <p className="px-2 text-small text-ink-muted">
+          {t("edit.everyAccount", { where: copiesTo.join(", ") })}
+        </p>
       )}
     </>
   );

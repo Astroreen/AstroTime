@@ -111,7 +111,8 @@ export function ItemEditor({
   state,
   calendars,
   accounts,
-  everyAccount,
+  accountRow,
+  copiesTo,
   onChange,
   onSave,
   onClose,
@@ -123,8 +124,10 @@ export function ItemEditor({
   calendars: readonly Calendar[];
   /** The accounts to choose from; none when there is no choice (design D312). */
   accounts: readonly AccountChoice[];
-  /** A new item goes to every account (design D313). */
-  everyAccount: boolean;
+  /** Whether the account is chosen in its own row: not while a new item goes to every account (D313). */
+  accountRow: boolean;
+  /** Where copies of a new item go, each calendar with its account; none when it goes to one (design D313). */
+  copiesTo: readonly string[];
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -208,7 +211,8 @@ export function ItemEditor({
                 copy={state.copy ?? false}
                 calendars={calendars}
                 accounts={accounts}
-                everyAccount={everyAccount}
+                accountRow={accountRow}
+                copiesTo={copiesTo}
                 onChange={onChange}
               />
               {state.problem && (
@@ -264,7 +268,8 @@ function Fields({
   copy,
   calendars,
   accounts,
-  everyAccount,
+  accountRow,
+  copiesTo,
   onChange,
 }: {
   form: Form;
@@ -272,7 +277,8 @@ function Fields({
   copy: boolean;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
-  everyAccount: boolean;
+  accountRow: boolean;
+  copiesTo: readonly string[];
   onChange: (form: Form) => void;
 }) {
   const { t } = useTranslation();
@@ -393,7 +399,8 @@ function Fields({
             form={form}
             calendars={calendars}
             accounts={accounts}
-            everyAccount={everyAccount}
+            accountRow={accountRow}
+            copiesTo={copiesTo}
             onChange={(calendarId) => set({ calendarId })}
           />
         </Section>

@@ -2662,14 +2662,20 @@ keywords". The quick parse and voice that fill quick create are the
   account's. The calendar on this device ([foundation
   D122](foundation.md#D122)) and the demo's get no copy: they reach no
   server, and a copy would keep the device's calendar from stepping aside. A copy carries what the item has, its reminders too (each
-  copy's ring: one per account), but no file of the chosen account's own
-  ([foundation D232](foundation.md#D232): its link opens only there); a
-  link the user gave goes along. The setting stays in sight while it is
+  copy's ring: one per account), but a file of an account's own only to
+  the copy on that file's server ([foundation D232](foundation.md#D232):
+  its link opens only there); a link the user gave goes to every copy. The setting stays in sight while it is
   on, even with one account on a server left, so it can be turned off;
   it does nothing then. Each copy
   has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
   are two items, not one shared. The dialog has no account row then, and
-  says under the calendar that it is also saved to the other accounts.
+  says under the calendar where else it is saved, each copy's calendar
+  with its account ("Also saved to Work · astro@work.example.com": the
+  first calendar by name may be one shared with the user); a new item
+  starts in an account on a server, not on this device. Each copy is an
+  item of its own, drawn as one where its calendar is shown. Its
+  calendars, every account's in one list, each say whose they are
+  ("Personal · astro@cloud.example.com").
   It is about creating in the dialogs: an edit or a deletion later changes
   the one copy edited ([Deferred](#deferred)), and an assistant's
   `create` through MCP ([assistant D307](assistant.md#D307)) names its
@@ -2682,6 +2688,9 @@ keywords". The quick parse and voice that fill quick create are the
   a completion or a deletion changes only the one copy. Keeping them alike
   needs a link between them (an `X-` property, kept by [foundation
   D7](foundation.md#D7)) and rules for a copy changed on its server.
+  Which of an account's calendars a copy goes to is its first by name;
+  choosing one per account (or passing over calendars others shared) waits
+  with it.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled
   one asks, as the editor does": the editor asks nothing on Escape or ✕
   today, so quick create closes as it does; one question for both, when

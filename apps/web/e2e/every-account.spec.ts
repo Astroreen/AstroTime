@@ -129,7 +129,7 @@ test("a new event goes to the account chosen, or to every account", async ({
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(quick.getByRole("combobox", { name: "Account" })).toHaveCount(0);
-  await expect(quick.getByText("Also saved to your other accounts.")).toBeVisible();
+  await expect(quick.getByText(`Also saved to home · ${firstName}`)).toBeVisible();
   await quick.getByRole("textbox", { name: "Title" }).fill("Dentist");
   await shoot(page, "every-account-quick-create");
   const both = Promise.all([uploadTo(page, first), uploadTo(page, second)]);
