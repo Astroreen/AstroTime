@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
+import { nowIn } from "../calendar/dates.ts";
 import type { Form } from "../calendar/editing.ts";
 import { accountName, Avatar } from "./accounts.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
@@ -36,6 +37,10 @@ export const field =
 /** A dropdown's button in a row, as a field (design D167, D297). */
 export const fieldButton =
   "h-10 w-full min-w-0 rounded-lg bg-transparent pr-2 pl-2 hover:bg-raised-hover";
+
+/** A time in a row: as wide as its words (design D317). */
+const timeButton =
+  "h-10 min-w-0 rounded-lg bg-transparent px-2 whitespace-nowrap hover:bg-raised-hover";
 
 /**
  * A row of the form: its icon, then its value on the dialog's ground (design
@@ -128,12 +133,15 @@ export function CalendarFields({
   accounts,
   multiple,
   onChange,
+  end,
 }: {
   form: Form;
   calendars: readonly Calendar[];
   accounts: readonly AccountChoice[];
   multiple: boolean;
   onChange: (calendarId: string, alsoIn: readonly string[]) => void;
+  /** At the row's end, in place of the calendar's dot and the arrow: the edit dialog's colour (design D317). */
+  end?: ReactNode;
 }) {
   const { t } = useTranslation();
   const event = form.kind === "event";
@@ -190,100 +198,160 @@ export function CalendarFields({
     onChange(rest[0]!, rest.slice(1));
   };
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setStep(null);
-      }}
-    >
-      <Popover.Trigger className="flex min-h-10 w-full min-w-0 items-center gap-3 rounded-lg px-2 py-0.5 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent">
-        {/* Its name is what it shows, after the field's: "Calendar: astro, Personal". */}
-        <span className="sr-only">{label}: </span>
-        {account && <Avatar account={account} size="size-7" />}
-        <span className="flex min-w-0 flex-1 flex-col">
-          {account && (
-            <span className="truncate text-body leading-5 text-ink">
-              {shortName(account, t)}
-              <span className="sr-only">, </span>
+    <div className="flex min-w-0 items-center gap-1">
+      <Popover.Root
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (next) setStep(null);
+        }}
+      >
+        <Popover.Trigger className="flex min-h-10 w-full min-w-0 items-center gap-3 rounded-lg px-2 py-0.5 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent">
+          {/* Its name is what it shows, after the field's: "Calendar: astro, Personal". */}
+          <span className="sr-only">{label}: </span>
+          {account && <Avatar account={account} size="size-7" />}
+          <span className="flex min-w-0 flex-1 flex-col">
+            {account && (
+              <span className="truncate text-body leading-5 text-ink">
+                {shortName(account, t)}
+                <span className="sr-only">, </span>
+              </span>
+            )}
+            <span className="flex min-w-0 items-center gap-1.5 text-small leading-4 text-ink-muted">
+              {end === undefined && <Dot color={chosen?.color ?? null} className="size-2.5" />}
+              <span className="truncate">{names.join(", ")}</span>
             </span>
-          )}
-          <span className="flex min-w-0 items-center gap-1.5 text-small leading-4 text-ink-muted">
-            <Dot color={chosen?.color ?? null} className="size-2.5" />
-            <span className="truncate">{names.join(", ")}</span>
           </span>
-        </span>
-        <ChevronIcon direction="down" className="size-5 shrink-0 text-ink-muted" />
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner sideOffset={4} align="start" collisionPadding={8} className="z-[140]">
-          <Popover.Popup className={`${popup} w-72`}>
-            <div ref={listRef}>
-              {shown === null ? (
-                <>
-                  <Popover.Title className="px-2 py-1.5 text-small text-ink-muted">
-                    {t("edit.account")}
-                  </Popover.Title>
-                  {accounts.map((choice) => {
-                    const current = choice.account.id === chosen?.accountId;
-                    // Its calendars, small: two accounts of one user name differ by them.
-                    const its = calendars.filter((c) => c.accountId === choice.account.id);
-                    return (
-                      <button
-                        key={choice.account.id}
-                        type="button"
-                        aria-current={current ? "true" : undefined}
-                        onClick={() => pickAccount(choice)}
-                        className="flex min-h-12 w-full items-center gap-3 rounded-lg py-1 pr-3 pl-2 text-left text-body hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current=true]:bg-accent-soft"
-                      >
-                        <Avatar account={choice.account} size="size-7" />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate leading-5">{shortName(choice.account, t)}</span>
-                          <span className="truncate text-small leading-4 text-ink-muted">
-                            {its.map((c) => c.name).join(", ")}
-                          </span>
-                        </span>
-                        <ChevronIcon direction="right" className="size-4 shrink-0 text-ink-muted" />
-                      </button>
-                    );
-                  })}
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1 px-1 py-1">
-                    {!single && (
-                      <button
-                        type="button"
-                        aria-label={t("edit.accounts")}
-                        onClick={() => setStep(null)}
-                        className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
-                      >
-                        <ChevronIcon direction="left" className="size-5" />
-                      </button>
-                    )}
-                    <Popover.Title className="min-w-0 truncate px-1 text-small text-ink-muted">
-                      {shortName(shown.account, t)}
+          {end === undefined && (
+            <ChevronIcon direction="down" className="size-5 shrink-0 text-ink-muted" />
+          )}
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner sideOffset={4} align="start" collisionPadding={8} className="z-[140]">
+            <Popover.Popup className={`${popup} w-72`}>
+              <div ref={listRef}>
+                {shown === null ? (
+                  <>
+                    <Popover.Title className="px-2 py-1.5 text-small text-ink-muted">
+                      {t("edit.account")}
                     </Popover.Title>
-                  </div>
-                  <div role="group" aria-label={label}>
-                    {own.map((calendar) => (
-                      <CalendarRow
-                        key={calendar.id}
-                        calendar={calendar}
-                        color={calendar.color ?? "var(--color-ink-muted)"}
-                        shown={chosen?.accountId === shownAccount && ticked.includes(calendar.id)}
-                        onToggle={(id) => toggle(id)}
-                        className="min-h-10 rounded-lg hover:bg-raised-hover pointer-coarse:min-h-12"
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+                    {accounts.map((choice) => {
+                      const current = choice.account.id === chosen?.accountId;
+                      // Its calendars, small: two accounts of one user name differ by them.
+                      const its = calendars.filter((c) => c.accountId === choice.account.id);
+                      return (
+                        <button
+                          key={choice.account.id}
+                          type="button"
+                          aria-current={current ? "true" : undefined}
+                          onClick={() => pickAccount(choice)}
+                          className="flex min-h-12 w-full items-center gap-3 rounded-lg py-1 pr-3 pl-2 text-left text-body hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current=true]:bg-accent-soft"
+                        >
+                          <Avatar account={choice.account} size="size-7" />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate leading-5">
+                              {shortName(choice.account, t)}
+                            </span>
+                            <span className="truncate text-small leading-4 text-ink-muted">
+                              {its.map((c) => c.name).join(", ")}
+                            </span>
+                          </span>
+                          <ChevronIcon
+                            direction="right"
+                            className="size-4 shrink-0 text-ink-muted"
+                          />
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1 px-1 py-1">
+                      {!single && (
+                        <button
+                          type="button"
+                          aria-label={t("edit.accounts")}
+                          onClick={() => setStep(null)}
+                          className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
+                        >
+                          <ChevronIcon direction="left" className="size-5" />
+                        </button>
+                      )}
+                      <Popover.Title className="min-w-0 truncate px-1 text-small text-ink-muted">
+                        {shortName(shown.account, t)}
+                      </Popover.Title>
+                    </div>
+                    <div role="group" aria-label={label}>
+                      {own.map((calendar) => (
+                        <CalendarRow
+                          key={calendar.id}
+                          calendar={calendar}
+                          color={calendar.color ?? "var(--color-ink-muted)"}
+                          shown={chosen?.accountId === shownAccount && ticked.includes(calendar.id)}
+                          onToggle={(id) => toggle(id)}
+                          className="min-h-10 rounded-lg hover:bg-raised-hover pointer-coarse:min-h-12"
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
+      {end}
+    </div>
+  );
+}
+
+/**
+ * A date in words ("Wed, Nov 4", design D317) over the browser's date field,
+ * which still takes the press (its picker), the keys and a screen reader: the
+ * words give way to the field's own digits while a key is typed in it.
+ */
+export function DateField({
+  label,
+  value,
+  onChange,
+  className = "",
+  muted = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (date: string) => void;
+  /** Its share of the row. */
+  className?: string;
+  /** Paler: an end on its start's day, which says nothing new. */
+  muted?: boolean;
+}) {
+  const { formats, timeZone } = useCalendar();
+  // The year the words leave out: this one, as the dialog opened.
+  const [today] = useState(() => nowIn(Date.now(), timeZone).today);
+  const [typing, setTyping] = useState(false);
+  return (
+    <span className={`relative inline-flex h-10 min-w-28 items-center ${className}`}>
+      <input
+        type="date"
+        aria-label={label}
+        value={value}
+        required
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        onKeyDown={() => setTyping(true)}
+        onKeyUp={() => setTyping(true)}
+        onPointerDown={() => setTyping(false)}
+        onBlur={() => setTyping(false)}
+        data-words={typing ? undefined : ""}
+        className={`${field} date-field absolute inset-0 h-full ${typing ? "" : "text-transparent"}`}
+      />
+      {/* What the row shows, and its width. */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none relative px-2 text-input whitespace-nowrap ${muted ? "text-ink-muted" : "text-ink"} ${typing ? "invisible" : ""}`}
+      >
+        {value ? formats.shortDay(value, today) : ""}
+      </span>
+    </span>
   );
 }
 
@@ -296,10 +364,13 @@ export function DateTime({
   onDate,
   onTime,
   allDay,
+  muted,
 }: {
   form: Form;
   /** A date alone, or a date and a time; the form's "All day" by default. */
   allDay?: boolean;
+  /** As `DateField`'s. */
+  muted?: boolean;
   dateLabel: string;
   timeLabel: string;
   date: string;
@@ -308,15 +379,8 @@ export function DateTime({
   onTime: (time: string) => void;
 }) {
   return (
-    <div className="flex gap-2">
-      <input
-        type="date"
-        aria-label={dateLabel}
-        value={date}
-        required
-        onChange={(e) => e.target.value && onDate(e.target.value)}
-        className={`${field} flex-[3]`}
-      />
+    <div className="flex items-center">
+      <DateField label={dateLabel} value={date} onChange={onDate} muted={muted ?? false} />
       {!(allDay ?? form.allDay) && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
     </div>
   );
@@ -338,7 +402,7 @@ export function TimeSelect({
   label,
   value,
   onChange,
-  className = "flex-[2]",
+  className = "",
 }: {
   label: string;
   value: string;
@@ -354,7 +418,8 @@ export function TimeSelect({
       value={value}
       onChange={onChange}
       options={times.map((time) => ({ value: time, label: formats.clock(time) }))}
-      className={`${fieldButton} ${className}`}
+      caret={false}
+      className={`${timeButton} ${className}`}
     />
   );
 }

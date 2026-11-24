@@ -7,8 +7,10 @@
 // has no status, priority, progress or tags here, design D162). Enter in a
 // field saves, Escape closes. A new item reaches it from quick create's
 // "Expand" (design D296). Its rows have no boxes: an icon and the value on
-// the dialog's ground, an empty one a pale hint, groups parted by a
-// hairline (design D297).
+// the dialog's ground, an empty one a pale hint (design D297); no
+// hairlines or arrows, a date in words, start and end as one sentence, "All
+// day" at the end of the repeat's row and the colour at the end of the
+// calendar's (design D317).
 import {
   nthWeekdayOf,
   WEEKDAYS,
@@ -62,7 +64,6 @@ import {
   NotesIcon,
   PaletteIcon,
   PlaceIcon,
-  RepeatIcon,
 } from "./icons.tsx";
 import { ColorSelect } from "./color-select.tsx";
 import { MentionField } from "./mention-field.tsx";
@@ -76,6 +77,7 @@ import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.t
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 import {
   CalendarFields,
+  DateField,
   DateTime,
   field,
   fieldButton,
@@ -294,9 +296,13 @@ function Fields({
   const set = (changes: Partial<Form>) => onChange({ ...form, ...changes });
   const event = form.kind === "event";
   const calendar = calendars.find((c) => c.id === form.calendarId);
+  const chooseColor = (color: string | null) => {
+    setColorChosen(true);
+    set({ color });
+  };
   return (
-    <div className="flex flex-col">
-      <div className="flex flex-col gap-3 pb-3">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3 pb-1">
         {!existing && !copy && (
           <KindSwitch
             value={form.kind}
@@ -316,149 +322,156 @@ function Fields({
         />
       </div>
 
-      <Group>
-        <Section icon={<ClockIcon className="size-5" />}>
-          <Toggle
-            label={t("edit.allDay")}
-            checked={form.allDay}
-            onChange={(allDay) => onChange(withAllDay(form, allDay))}
-          />
-          <DateTime
-            form={form}
-            dateLabel={t("edit.startDate")}
-            timeLabel={t("edit.startTime")}
-            date={form.startDate}
-            time={form.startTime}
-            onDate={(date) => onChange(withStartDate(form, date))}
-            onTime={(startTime) => onChange(withStartTime(form, startTime))}
-          />
-          {event ? (
+      <Section icon={<ClockIcon className="size-5" />}>
+        {/* One line where there is room, the end under the start on a phone. */}
+        <div className="flex flex-wrap items-center gap-x-1">
+          <div className="flex items-center gap-x-1">
+            <DateTime
+              form={form}
+              dateLabel={t("edit.startDate")}
+              timeLabel={t("edit.startTime")}
+              date={form.startDate}
+              time={form.startTime}
+              onDate={(date) => onChange(withStartDate(form, date))}
+              onTime={(startTime) => onChange(withStartTime(form, startTime))}
+            />
+            {event && (
+              <span aria-hidden="true" className="text-ink-muted">
+                –
+              </span>
+            )}
+          </div>
+          {event && (
             <DateTime
               form={form}
               dateLabel={t("edit.endDate")}
               timeLabel={t("edit.endTime")}
               date={form.endDate}
               time={form.endTime}
+              muted={form.endDate === form.startDate}
               onDate={(endDate) => set({ endDate })}
               onTime={(endTime) => set({ endTime })}
             />
-          ) : form.endDate === "" ? (
+          )}
+        </div>
+        {!event &&
+          (form.endDate === "" ? (
             <button type="button" onClick={() => onChange(withDue(form, true))} className={hint}>
               {t("edit.addDue")}
             </button>
           ) : (
-            <div role="group" aria-label={t("edit.due")} className="flex flex-col gap-1">
-              <span className="px-2 text-small text-ink-muted">{t("edit.due")}</span>
-              <div className="flex items-center gap-1">
-                <div className="min-w-0 flex-1">
-                  <DateTime
-                    form={form}
-                    allDay={dueIsDate(form)}
-                    dateLabel={t("edit.dueDate")}
-                    timeLabel={t("edit.dueTime")}
-                    date={form.endDate}
-                    time={form.endTime}
-                    onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
-                    onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  aria-label={t("edit.removeDue")}
-                  title={t("edit.removeDue")}
-                  onClick={() => onChange(withDue(form, false))}
-                  className={dialogIcon}
-                >
-                  <CloseIcon className="size-4" />
-                </button>
-              </div>
+            <div role="group" aria-label={t("edit.due")} className="flex items-center">
+              <span className="pl-2 text-body text-ink-muted">{t("edit.due")}</span>
+              <DateTime
+                form={form}
+                allDay={dueIsDate(form)}
+                dateLabel={t("edit.dueDate")}
+                timeLabel={t("edit.dueTime")}
+                date={form.endDate}
+                time={form.endTime}
+                onDate={(endDate) => onChange(withDueAt(form, { endDate }))}
+                onTime={(endTime) => onChange(withDueAt(form, { endTime }))}
+              />
+              <button
+                type="button"
+                aria-label={t("edit.removeDue")}
+                title={t("edit.removeDue")}
+                onClick={() => onChange(withDue(form, false))}
+                className={dialogIcon}
+              >
+                <CloseIcon className="size-4" />
+              </button>
             </div>
-          )}
-          {!form.allDay && form.zone === null && (
-            <p className="px-2 text-small text-ink-muted">{t("edit.floating")}</p>
-          )}
-          {!form.allDay && form.zone !== null && form.zone !== timeZone && (
-            <p className="px-2 text-small text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
-          )}
-        </Section>
-
-        <Section icon={<RepeatIcon className="size-5" />}>
-          <RepeatField form={form} onChange={(repeat) => set({ repeat })} />
-        </Section>
-      </Group>
-
-      <Group>
-        <Section icon={<BellIcon className="size-5" />}>
-          <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
-        </Section>
-      </Group>
-
-      <Group>
-        {showWhere && (
-          <Section icon={<CalendarIcon className="size-5" />}>
-            <CalendarFields
-              form={form}
-              calendars={calendars}
-              accounts={accounts}
-              multiple={multiple}
-              onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
-            />
-          </Section>
+          ))}
+        {!form.allDay && form.zone === null && (
+          <p className="px-2 text-small text-ink-muted">{t("edit.floating")}</p>
         )}
+        {!form.allDay && form.zone !== null && form.zone !== timeZone && (
+          <p className="px-2 text-small text-ink-muted">{t("edit.zone", { zone: form.zone })}</p>
+        )}
+        <RepeatField
+          form={form}
+          onChange={(repeat) => set({ repeat })}
+          end={
+            <Toggle
+              label={t("edit.allDay")}
+              checked={form.allDay}
+              onChange={(allDay) => onChange(withAllDay(form, allDay))}
+            />
+          }
+        />
+      </Section>
 
+      <Section icon={<BellIcon className="size-5" />}>
+        <Reminders form={form} onChange={(alarms) => onChange(withAlarms(form, alarms))} />
+      </Section>
+
+      {showWhere ? (
+        <Section icon={<CalendarIcon className="size-5" />}>
+          <CalendarFields
+            form={form}
+            calendars={calendars}
+            accounts={accounts}
+            multiple={multiple}
+            onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
+            end={
+              <ColorSelect
+                label={t("edit.color")}
+                value={form.color}
+                calendarColor={calendar?.color ?? null}
+                task={!event}
+                onChange={chooseColor}
+                swatch
+                className="grid size-10 shrink-0 place-items-center rounded-full hover:bg-raised-hover"
+              />
+            }
+          />
+        </Section>
+      ) : (
         <Section icon={<PaletteIcon className="size-5" />}>
           <ColorSelect
             label={t("edit.color")}
             value={form.color}
             calendarColor={calendar?.color ?? null}
             task={!event}
-            onChange={(color) => {
-              setColorChosen(true);
-              set({ color });
-            }}
+            onChange={chooseColor}
+            caret={false}
             className={fieldButton}
           />
         </Section>
-      </Group>
+      )}
 
-      <Group>
-        <Section icon={<PlaceIcon className="size-5" />}>
-          <PlaceField
-            value={form.location}
-            geo={form.place?.geo ?? null}
-            onChange={(location, picked) => set({ location, place: picked ?? form.place })}
-            className={field}
-          />
-        </Section>
+      <Section icon={<PlaceIcon className="size-5" />}>
+        <PlaceField
+          value={form.location}
+          geo={form.place?.geo ?? null}
+          onChange={(location, picked) => set({ location, place: picked ?? form.place })}
+          className={field}
+        />
+      </Section>
 
-        <Section icon={<NotesIcon className="size-5" />}>
-          <MentionField
-            label={t("edit.description")}
-            placeholder={t("edit.addDescription")}
-            value={form.description}
-            accountId={calendar?.accountId ?? null}
-            onChange={(description) => set({ description })}
-            className={`${field} field-sizing-content h-auto min-h-10 resize-none py-2`}
-          />
-        </Section>
+      <Section icon={<NotesIcon className="size-5" />}>
+        <MentionField
+          label={t("edit.description")}
+          placeholder={t("edit.addDescription")}
+          value={form.description}
+          accountId={calendar?.accountId ?? null}
+          onChange={(description) => set({ description })}
+          className={`${field} field-sizing-content h-auto min-h-10 resize-none py-2`}
+        />
+      </Section>
 
-        <Section icon={<AttachmentsIcon className="size-5" />}>
-          <AttachmentsField
-            value={form.attachments ?? []}
-            calendar={calendar}
-            onChange={(attachments) => set({ attachments })}
-            field={field}
-            task={!event}
-          />
-        </Section>
-      </Group>
+      <Section icon={<AttachmentsIcon className="size-5" />}>
+        <AttachmentsField
+          value={form.attachments ?? []}
+          calendar={calendar}
+          onChange={(attachments) => set({ attachments })}
+          field={field}
+          task={!event}
+        />
+      </Section>
     </div>
   );
-}
-
-/** A group of rows, parted from the one above by a hairline (design D297). */
-function Group({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-2 border-t border-line py-3">{children}</div>;
 }
 
 function Toggle({
@@ -471,8 +484,8 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-3 px-2 text-row">
-      <span className="min-w-0 flex-1">{label}</span>
+    <label className="flex min-h-10 shrink-0 cursor-pointer items-center gap-2 px-2 text-body text-ink-muted">
+      <span>{label}</span>
       <Switch.Root
         checked={checked}
         onCheckedChange={onChange}
@@ -564,7 +577,16 @@ function presetRepeat(preset: Preset, day: string): Repeat | null {
 
 const same = (a: RepeatChoice, b: RepeatChoice) => JSON.stringify(a) === JSON.stringify(b);
 
-function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: RepeatChoice) => void }) {
+function RepeatField({
+  form,
+  onChange,
+  end,
+}: {
+  form: Form;
+  onChange: (repeat: RepeatChoice) => void;
+  /** At the row's end: "All day" (design D317). */
+  end: ReactNode;
+}) {
   const { t } = useTranslation();
   const { formats } = useCalendar();
   const [kept] = useState(form.repeat === "kept");
@@ -577,7 +599,7 @@ function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: Repeat
   const words = (r: Repeat | null) => (r ? repeatWords(r, start, t, formats) : t("repeat.none"));
   return (
     <>
-      <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
         <Dropdown
           label={t("edit.repeat")}
           value={current}
@@ -603,8 +625,11 @@ function RepeatField({ form, onChange }: { form: Form; onChange: (repeat: Repeat
               : []),
             { value: "custom", label: t("repeat.custom") },
           ]}
-          className={fieldButton}
+          caret={false}
+          wrap
+          className={`${fieldButton} h-auto min-h-10 flex-1 py-1`}
         />
+        {end}
       </div>
       {current === "current" && repeat && repeat !== "kept" && (
         <CustomRepeat repeat={repeat} day={day} onChange={onChange} />
@@ -732,14 +757,11 @@ function CustomRepeat({
           </label>
         ))}
         {repeat.end.type === "until" && (
-          <input
-            type="date"
-            aria-label={t("repeat.endsOn")}
+          <DateField
+            label={t("repeat.endsOn")}
             value={repeat.end.until}
-            onChange={(e) =>
-              e.target.value && set({ end: { type: "until", until: e.target.value } })
-            }
-            className={field}
+            onChange={(until) => set({ end: { type: "until", until } })}
+            className="self-start"
           />
         )}
         {repeat.end.type === "count" && (
@@ -851,6 +873,7 @@ function Reminders({
           { value: "custom", label: t("alarm.custom") },
         ]}
         onChoose={(value) => (value === "custom" ? setCustom(true) : add(Number(value)))}
+        caret={false}
         className={fieldButton}
       />
       {custom && (

@@ -96,6 +96,11 @@ export class Formats {
     if (Math.abs(offset) <= 1) {
       return capitalize(this.#relativeDay.format(offset, "day"), this.#locale);
     }
+    return this.shortDay(day, today);
+  }
+
+  /** "Thu, Nov 5", with the year when it is not `today`'s: a date field's words (design D317). */
+  shortDay(day: string, today: string): string {
     const format = day.slice(0, 4) === today.slice(0, 4) ? this.#shortDate : this.#shortDateYear;
     return format.format(utcDate(day));
   }

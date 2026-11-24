@@ -383,7 +383,9 @@ When you add a package, app or module, add its line here in the same PR.
       calendar, kind, the looks of a row, a double click's second press;
       `CalendarFields`, one row for the account and its calendars, which
       opens the accounts then one's calendars, ticked, `plans/design.md#D313`;
-      quick create's "Save" in the kind's row, `plans/design.md#D315`).
+      quick create's "Save" in the kind's row, `plans/design.md#D315`;
+      `DateField`, a date in words over the browser's date field, and the
+      edit dialog's lighter rows, `plans/design.md#D317`).
       → `plans/design.md#D296`, `plans/design.md#D297`; a new item in every
       account (`otherAccountsCalendars` in `calendar/editing.ts`, the
       `everyAccount` setting) → `plans/design.md#D314`

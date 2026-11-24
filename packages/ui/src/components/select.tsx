@@ -41,6 +41,9 @@ export function Select({
   onChange,
   options,
   className = "",
+  caret = true,
+  swatch = false,
+  wrap = false,
 }: {
   label: string;
   labelClassName?: string;
@@ -49,6 +52,12 @@ export function Select({
   options: readonly SelectOption[];
   /** The button's size and background. */
   className?: string;
+  /** The arrow at the button's end; none in the edit dialog's rows (design D317). */
+  caret?: boolean;
+  /** The button shows the value's `leading` alone, its label for a screen reader (design D317). */
+  swatch?: boolean;
+  /** A long value goes on to a second line instead of being cut (a repeat's rule, design D317). */
+  wrap?: boolean;
 }) {
   const { t } = useTranslation();
   const chosen = options.find((option) => option.value === value);
@@ -59,19 +68,32 @@ export function Select({
       )}
       <BaseSelect.Trigger
         aria-label={labelClassName === undefined ? label : undefined}
+        title={swatch ? label : undefined}
         className={`${button} ${className}`}
       >
-        <BaseSelect.Value className="flex min-w-0 flex-1 items-center gap-2">
+        <BaseSelect.Value
+          className={swatch ? "flex items-center" : "flex min-w-0 flex-1 items-center gap-2"}
+        >
           {chosen?.leading}
           {chosen ? (
-            <span className="min-w-0 flex-1 truncate">{chosen.label}</span>
+            <span
+              className={
+                swatch ? "sr-only" : `min-w-0 flex-1 ${wrap ? "line-clamp-2" : "truncate"}`
+              }
+            >
+              {chosen.label}
+            </span>
           ) : (
-            <span className="min-w-0 flex-1 truncate text-ink-muted">{t("select.none")}</span>
+            <span className={swatch ? "sr-only" : "min-w-0 flex-1 truncate text-ink-muted"}>
+              {t("select.none")}
+            </span>
           )}
         </BaseSelect.Value>
-        <BaseSelect.Icon className="shrink-0 text-ink-muted">
-          <CaretIcon className="size-5" />
-        </BaseSelect.Icon>
+        {caret && !swatch && (
+          <BaseSelect.Icon className="shrink-0 text-ink-muted">
+            <CaretIcon className="size-5" />
+          </BaseSelect.Icon>
+        )}
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner
@@ -118,12 +140,15 @@ export function MenuButton({
   onChoose,
   icon,
   className = "",
+  caret = true,
 }: {
   label: string;
   options: readonly SelectOption[];
   onChoose: (value: string) => void;
   icon?: ReactNode;
   className?: string;
+  /** The arrow at the button's end; none in the edit dialog's rows (design D317). */
+  caret?: boolean;
 }) {
   return (
     <Menu.Root>
@@ -134,7 +159,7 @@ export function MenuButton({
       ) : (
         <Menu.Trigger className={`${button} ${className}`}>
           <span className="min-w-0 flex-1 truncate text-ink-muted">{label}</span>
-          <CaretIcon className="size-5 shrink-0 text-ink-muted" />
+          {caret && <CaretIcon className="size-5 shrink-0 text-ink-muted" />}
         </Menu.Trigger>
       )}
       <Menu.Portal>

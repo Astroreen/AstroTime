@@ -1791,6 +1791,9 @@ reminders, its description and mentions in it.
   rest), so every icon stands 10 px from its row's top, level with its
   40 px control (`Section` in `editor-fields.tsx`). `editing.spec.ts` still
   measures it, on the edit dialog reached through quick create's "Expand".
+  _Amended by [D317](#D317):_ four rows are measured, by their first
+  control: the clock's (the start's date), a reminder, the calendar's and
+  Location; the repeat, "All day" and the colour have no icon of their own.
 
 - **D206. Reminders of the user's own; the menu offers the four most added**
   (the owner's feedback 2 after round 3: "Reminders must be dynamic. I want a
@@ -2614,6 +2617,9 @@ keywords". The quick parse and voice that fill quick create are the
   time and repeat; reminders; calendar and colour; place, description and
   attachments. "Add guests" has no row: the editor has no guests field
   ([Deferred](#deferred)).
+  _Amended by [D317](#D317):_ the hairlines went, "All day" and the colour
+  have no row of their own, the dropdowns no arrow, and a date reads in
+  words.
 - **D298. Pictures drawn to a higher standard.** The owner: "you can see
   mistakes (a snowdrift floating above the ground, a gap between a hill and
   a field) and the shapes they are made of". Every illustration and month
@@ -2712,6 +2718,52 @@ keywords". The quick parse and voice that fill quick create are the
   D171](foundation.md#D171)'s setting, off with its calm hint under the
   row), and its calendars fold under "N calendars", folded at first, the
   drawer's checkbox rows ([D137](#D137)) once opened.
+
+### Decided in round 8: the editor, lighter again
+
+- **D317. The edit dialog with less on it.** The owner, on the edit dialog
+  of an event and of a task: "it looks very heavy; maybe something should
+  go, move or be thought over". [D297](#D297) took the boxes off the rows;
+  what still weighed was the chrome around the values and the rows that
+  held one switch or one default. Every field, its name for a screen
+  reader, its behaviour and its tests stay; what changed is how the form
+  is drawn (`item-editor.tsx`, `editor-fields.tsx`):
+  - **No hairlines.** The rows follow each other at one distance; a row's
+    icon alone says where the next thing starts.
+  - **No arrows.** A row's dropdown (a time, the repeat, "Add a reminder",
+    the colour, the calendar's row) is its value alone, as in Google
+    Calendar's edit screen; pressed, it opens as before. A dropdown inside
+    a panel (the custom repeat's unit, the custom reminder's) keeps its
+    arrow: there it is a field among fields. Quick create's times lose
+    theirs too ([D296](#D296)), its calendar row keeps its arrow.
+  - **A date in words.** "Wed, Nov 4", with the year when it is not this
+    one, instead of the browser's "11/04/2026" and its calendar glyph
+    (`DateField`, in quick create and the custom repeat's last day too).
+    Under the words it is still the browser's date field: a press opens
+    its picker, a screen reader and the keys reach it as before, and while
+    a key is typed in it the words give way to its own digits, so a date
+    typed is seen. A date picker of our own is still
+    [Deferred](#deferred).
+  - **Start and end as one sentence.** "Wed, Nov 4 10:00 – Wed, Nov 4
+    11:30" on one line where there is room, the end under the start on a
+    phone; an end on its start's day is paler, as it says nothing new.
+    Both dates stay in sight, so an event over days needs no extra step.
+    A task's due is one line, "Due" before its date, no label above it.
+  - **"All day" at the end of the repeat's row**, a small switch with its
+    words, no row of its own; the repeat has no icon of its own, the
+    clock's row holds the whole "when". A long rule goes on to a second
+    line instead of being cut by the switch.
+  - **The colour at the end of the calendar's row**, a dot that opens the
+    same list ([D168](#D168)), named "Colour" (and so titled). The
+    calendar's own dot beside its name went: the row shows one colour, the
+    item's. While a new item goes to every account and has no calendar row
+    ([D314](#D314)), the colour keeps a row of its own.
+
+  A new event on a phone is 10 rows where it was 12 (9 on a wide screen),
+  with 4 hairlines, 6 arrows and 2 icons fewer. The empty fields keep
+  their places as pale hints ([D297](#D297), [D237](#D237)): nothing is
+  folded away, so nothing takes a press more than before. Tested:
+  `editing.spec.ts` ("the lighter rows", and [D205](#D205)'s icons).
 
 ## Deferred
 
@@ -2941,9 +2993,10 @@ keywords". The quick parse and voice that fill quick create are the
   undone by dragging it back ([D111](#D111)).
 - **Keys between the strip and the grid** — a timed item made all day, or
   the other way, by a drag only ([D112](#D112)).
-- **Dates in the app's own format** — the edit dialog's date field is the
-  browser's, in its language and order; its times are a list in the user's
-  clock ([D108](#D108)).
+- **Dates in the app's own format** — the edit dialog's date reads in
+  words in the app's language ([D317](#D317)); typed in, and in its
+  picker, it is still the browser's field, in the browser's language and
+  order. Its times are a list in the user's clock ([D108](#D108)).
 - **A view of starred tasks across lists** — the star is stored from PR 5
   ([D52](#D52)); a place that gathers starred tasks comes later.
 - **Search beyond titles** — descriptions, locations, attendees, and the
@@ -3071,6 +3124,12 @@ in both themes:
   reach it through quick create's "Expand" (one helper), so
   `editing.spec.ts` still measures D205 on the full editor; D132, D155 and
   D205 get their "amended by" notes (screenshots before and after).
+- **PR E1** — the edit dialog with less on it (D317). Done when: e2e reads
+  a date in words and its digits while typed, finds the end on its start's
+  line on a wide screen and under it on a phone, "All day" at the end of
+  the repeat's row and the colour at the end of the calendar's, and every
+  spec that edits through the dialog passes unchanged but D205's
+  (screenshots before and after, both themes).
 - **PR L3** — the pictures drawn again, and the new subjects (D298). Done
   when: every illustration and banner is rendered at its sizes and the gap
   check passes on each, and the screenshots before and after sit side by

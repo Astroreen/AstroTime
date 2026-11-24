@@ -455,3 +455,22 @@
     cursor: ns-resize;
   }
 }
+
+/* A date field under its date in words (design D317, `DateField`): the
+   browser's calendar glyph is not drawn and takes the whole field's press,
+   which opens the picker. */
+.date-field::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/* Its digits, and the part of them the browser marks, are not drawn under
+   the words (Firefox has no such part: its text is transparent). */
+.date-field[data-words]::-webkit-datetime-edit {
+  opacity: 0;
+}

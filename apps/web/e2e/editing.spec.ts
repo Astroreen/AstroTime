@@ -100,18 +100,17 @@ for (const [size, viewport] of [
     await dialog.getByRole("button", { name: "Add a reminder" }).click();
     await page.getByRole("menuitem", { name: "10 minutes before" }).click();
     const list = dialog.getByRole("list", { name: "Reminders" });
-    const allDay = dialog.getByRole("switch", { name: "All day" });
-    // Each control and the box its row's icon is levelled with: the switch's
-    // is its 40 px row, "All day" beside it.
-    const rows: (readonly [Locator, Locator?])[] = [
-      [allDay, allDay.locator("xpath=parent::label")],
-      [dialog.getByRole("combobox", { name: "Repeat" })],
-      [list.getByRole("listitem").first()],
-      [calendarField(dialog)],
-      [dialog.getByRole("combobox", { name: "Colour" })],
-      [dialog.getByRole("combobox", { name: "Location" })],
+    // Each row's first control: the clock's is the start's date, whose row
+    // holds the end, the repeat and "All day" too; the calendar's holds the
+    // colour (design D317).
+    const rows: Locator[] = [
+      dialog.getByLabel("Start date"),
+      list.getByRole("listitem").first(),
+      calendarField(dialog),
+      dialog.getByRole("combobox", { name: "Location" }),
     ];
-    for (const [control, measured = control] of rows) {
+    for (const control of rows) {
+      const measured = control;
       // The row's icon: the hidden one before the column the control is in.
       const icon = control.locator(
         "xpath=ancestor::div[contains(@class, 'items-start')][1]/span[@aria-hidden='true']",
@@ -122,6 +121,53 @@ for (const [size, viewport] of [
       const middle = box!.y + box!.height / 2;
       expect(Math.abs(drawn!.y + drawn!.height / 2 - middle)).toBeLessThanOrEqual(1);
     }
+  });
+}
+
+for (const [size, viewport] of [
+  ["phone", PHONE],
+  ["wide", WIDE],
+] as const) {
+  test(`the lighter rows on a ${size}: dates in words, the end by its start, the colour in the calendar's row (design D317)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    const start = dialog.getByLabel("Start date");
+    const end = dialog.getByLabel("End date");
+    const words = (field: Locator) => field.locator("xpath=following-sibling::span");
+    // A date reads in words, the year only when it is another.
+    await expect(words(start)).toHaveText("Wed, Nov 4");
+    await end.fill("2027-01-05");
+    await expect(words(end)).toHaveText("Tue, Jan 5, 2027");
+    // Typed in, the field shows its own digits; left, the words again.
+    await start.focus();
+    await page.keyboard.press("Shift");
+    await expect(words(start)).toBeHidden();
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(words(start)).toBeVisible();
+    // The end stands on the start's line where there is room, under it on a phone.
+    await end.fill("2026-11-04");
+    const [first, second] = [await start.boundingBox(), await end.boundingBox()];
+    if (size === "wide") expect(second!.y).toBe(first!.y);
+    else expect(second!.y).toBeGreaterThanOrEqual(first!.y + first!.height);
+    // "All day" is at the end of the repeat's row, the colour at the end of the calendar's.
+    const level = async (one: Locator, other: Locator) => {
+      const [a, b] = [await one.boundingBox(), await other.boundingBox()];
+      expect(Math.abs(a!.y + a!.height / 2 - (b!.y + b!.height / 2))).toBeLessThanOrEqual(1);
+      expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+    };
+    await level(
+      dialog.getByRole("combobox", { name: "Repeat" }),
+      dialog.getByRole("switch", { name: "All day" }),
+    );
+    const colour = dialog.getByRole("combobox", { name: "Colour" });
+    await level(calendarField(dialog), colour);
+    await choose(colour, "Red");
+    await expect(colour).toHaveText("Red");
   });
 }
 
