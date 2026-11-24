@@ -60,7 +60,7 @@ function timeOf(value: unknown): ItemTime | undefined {
     Number.isFinite(time["epochMs"]) &&
     // In the years a day may be in (`isDay`), a day either side for any zone.
     time["epochMs"] >= Date.UTC(1899, 11, 31) &&
-    time["epochMs"] <= Date.UTC(3000, 0, 1)
+    time["epochMs"] <= Date.UTC(3000, 0, 2)
   )
     return {
       type: "zoned",

@@ -17,6 +17,7 @@ import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-e
 import {
   epochNear,
   fromIcalTime,
+  ianaName,
   isKnownTimeZone,
   keepTzid,
   wallClockIn,
@@ -1026,26 +1027,69 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
 /**
  * Whether a zoned time's instant reads its own wall clock in its zone: by
  * the object's VTIMEZONE where it defines the zone (its own offsets and
- * changes, D32), else by `Intl`; a zone neither knows is taken to. Not a
+ * changes, D32), found by its TZID or by the IANA name a time in it is read
+ * with (`ianaName`: Outlook's Windows names, Lightning's paths), any of
+ * them reading it; else by `Intl`; a zone neither knows is taken to. Not a
  * spring-forward night's 3:30, which no clock shows. Other times always do.
  */
 export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
   if (time.type !== "zoned") return true;
-  const defined = object.root
-    .getAllSubcomponents("vtimezone")
-    .find((zone) => zone.getFirstPropertyValue("tzid") === time.timeZone);
+  if (!Number.isFinite(time.epochMs)) return false;
+  const zones = object.root.getAllSubcomponents("vtimezone");
+  const tzidOf = (zone: ICAL.Component) => String(zone.getFirstPropertyValue("tzid") ?? "");
+  const exact = zones.filter((zone) => tzidOf(zone) === time.timeZone);
+  const defined =
+    exact.length > 0 ? exact : zones.filter((zone) => ianaName(tzidOf(zone)) === time.timeZone);
   try {
-    if (defined) {
-      const zone = new ICAL.Timezone({ component: defined, tzid: time.timeZone });
-      return utc(time.epochMs).convertToZone(zone).toString().slice(0, 19) === time.local;
-    }
+    if (defined.length > 0)
+      return defined.some((zone) => clockAt(object.root, zone, time.epochMs) === time.local);
     if (isKnownTimeZone(time.timeZone))
       return wallClockIn(time.epochMs, time.timeZone) === time.local;
   } catch {
-    // An instant past what a clock reads (a crafted id): none.
+    // An instant past what a clock reads (a crafted id), a zone that does not read: none.
     return false;
   }
   return true;
+}
+
+/** One change of a zone's offset, as ical.js keeps them: its instant in UTC fields. */
+interface OffsetChange {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  readonly second: number;
+  readonly utcOffset: number;
+  readonly prevUtcOffset: number;
+}
+
+/**
+ * The wall clock a VTIMEZONE reads at `epochMs`: the offset of its last
+ * change at or before that instant, on the UTC time line. (ical.js's own
+ * `convertToZone` looks the offset up by the UTC time read as a local one,
+ * an hour off around each change.)
+ */
+function clockAt(root: ICAL.Component, component: ICAL.Component, epochMs: number): string {
+  const tzid = String(component.getFirstPropertyValue("tzid"));
+  // The zone the calendar's times are read with, worked out once (`shareTimeZones`), where it has it.
+  const cache: unknown = Reflect.get(root, "_timezoneCache");
+  const cached: unknown = cache instanceof Map ? cache.get(tzid) : undefined;
+  const zone = cached instanceof ICAL.Timezone ? cached : new ICAL.Timezone({ component, tzid });
+  const year = new Date(epochMs).getUTCFullYear();
+  (Reflect.get(zone, "_ensureCoverage") as (year: number) => void).call(zone, year + 1);
+  const instantOf = (change: OffsetChange) =>
+    Date.UTC(change.year, change.month - 1, change.day, change.hour, change.minute, change.second);
+  // In time order whatever order ical.js keeps them in.
+  const changes = (Reflect.get(zone, "changes") as readonly OffsetChange[]).toSorted(
+    (a, b) => instantOf(a) - instantOf(b),
+  );
+  let offset = changes[0]?.prevUtcOffset ?? 0;
+  for (const change of changes) {
+    if (instantOf(change) > epochMs) break;
+    offset = change.utcOffset;
+  }
+  return new Date(epochMs + offset * 1000).toISOString().slice(0, 19);
 }
 
 /**

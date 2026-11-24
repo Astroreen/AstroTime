@@ -500,3 +500,109 @@ test("a spring-forward 3:30 is not another zone's exception at its instant", () 
   };
   expect(occurrenceOn(utcSeries, stale, "2026-03-29", timeZone)).toBeNull();
 });
+
+/** A daily-hourly 1:30 in Vilnius on March 29th, its VTIMEZONE in the calendar, with these exceptions. */
+function vilniusWithZone(...exceptions: string[]): CalendarObject {
+  return CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Europe/Vilnius",
+      "BEGIN:STANDARD",
+      "DTSTART:19701025T040000",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "END:STANDARD",
+      "BEGIN:DAYLIGHT",
+      "DTSTART:19700329T030000",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "END:DAYLIGHT",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:hourly-zone",
+      "DTSTAMP:20260301T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20260329T013000",
+      "DURATION:PT10M",
+      "RRULE:FREQ=HOURLY;COUNT=5",
+      "SUMMARY:Check",
+      "END:VEVENT",
+      ...exceptions.flatMap((lines) => [
+        "BEGIN:VEVENT",
+        "UID:hourly-zone",
+        "DTSTAMP:20260301T000000Z",
+        ...lines.split("\n"),
+        "END:VEVENT",
+      ]),
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+}
+
+test("by the calendar's VTIMEZONE, 01:30Z on the spring-forward night reads 4:30, not 3:30", () => {
+  // A server rewrote 4:30's id in UTC and moved it: the row the views drew
+  // for 4:30 opens it; a stale 3:30, which no clock shows, does not.
+  const moved = vilniusWithZone(
+    "RECURRENCE-ID:20260329T013000Z\nDTSTART;TZID=Europe/Vilnius:20260329T063000\nDURATION:PT10M\nSUMMARY:Check, moved",
+  );
+  const at = (local: string): ItemTime => ({
+    type: "zoned",
+    local,
+    timeZone,
+    epochMs: Date.parse("2026-03-29T01:30:00Z"),
+  });
+  expect(occurrenceOn(moved, at("2026-03-29T04:30:00"), "2026-03-29", timeZone)?.item.summary).toBe(
+    "Check, moved",
+  );
+  expect(occurrenceOn(moved, at("2026-03-29T03:30:00"), "2026-03-29", timeZone)).toBeNull();
+});
+
+test("a VTIMEZONE named the Windows way is found by the IANA name its times are read with", () => {
+  // Outlook's "Russian Standard Time" kept at +04:00 (Moscow's offset before
+  // 2014), where Intl reads Moscow at +03:00: the calendar's offset counts.
+  const moscow = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Russian Standard Time",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T000000",
+      "TZOFFSETFROM:+0400",
+      "TZOFFSETTO:+0400",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:moscow",
+      "DTSTAMP:20260101T000000Z",
+      "DTSTART;TZID=Russian Standard Time:20260701T090000",
+      "DURATION:PT30M",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Standup",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:moscow",
+      "DTSTAMP:20260101T000000Z",
+      "RECURRENCE-ID:20260705T050000Z",
+      "DTSTART;TZID=Russian Standard Time:20260705T100000",
+      "DURATION:PT30M",
+      "SUMMARY:Standup, moved",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const shown: ItemTime = {
+    type: "zoned",
+    local: "2026-07-05T09:00:00",
+    timeZone: "Europe/Moscow",
+    epochMs: Date.parse("2026-07-05T05:00:00Z"),
+  };
+  expect(occurrenceOn(moscow, shown, "2026-07-05", timeZone)?.item.summary).toBe("Standup, moved");
+});
