@@ -141,6 +141,17 @@ for (const [size, viewport] of [
     const words = (field: Locator) => field.locator("xpath=following-sibling::span");
     // A date reads in words, the year only when it is another.
     await expect(words(start)).toHaveText("Wed, Nov 4");
+    // A press on the words asks the browser for its picker.
+    await page.evaluate(() => {
+      const asked = ((window as unknown as { asked: string[] }).asked = [] as string[]);
+      HTMLInputElement.prototype.showPicker = function () {
+        asked.push(this.getAttribute("aria-label") ?? "");
+      };
+    });
+    await words(start).click({ force: true });
+    expect(await page.evaluate(() => (window as unknown as { asked: string[] }).asked)).toEqual([
+      "Start date",
+    ]);
     await end.fill("2027-01-05");
     await expect(words(end)).toHaveText("Tue, Jan 5, 2027");
     // Tab comes in with the words still there; a key that changes the date
@@ -154,6 +165,12 @@ for (const [size, viewport] of [
     await page.keyboard.press("ArrowRight");
     await expect(words(start)).toBeHidden();
     expect(await startTime.boundingBox()).toEqual(before);
+    // What the digits cover still takes the first press.
+    await startTime.click();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await start.focus();
     await page.keyboard.press("ArrowUp");
     await expect(start).not.toHaveValue("2026-11-04");
     await start.fill("2026-11-05");
@@ -208,6 +225,11 @@ test("on a 360 px phone a task's due in another year keeps its time and its ✕ 
   }
   const time = dialog.getByLabel("Due time");
   expect(await time.evaluate((one) => one.scrollWidth <= one.clientWidth)).toBe(true);
+  // The date typed in, one press on the ✕ still removes the due.
+  await dialog.getByLabel("Due date").focus();
+  await page.keyboard.press("ArrowUp");
+  await dialog.getByRole("button", { name: "Remove due" }).click();
+  await expect(dialog.getByRole("button", { name: "Add due" })).toBeVisible();
 });
 
 test("the reminder menu offers four, the most added first; Custom… adds any amount before (design D206)", async ({

@@ -2746,13 +2746,15 @@ keywords". The quick parse and voice that fill quick create are the
     one, instead of the browser's "11/04/2026" and its calendar glyph
     (`DateField`, in quick create and the custom repeat's last day too).
     Under the words it is still the browser's date field, not drawn: a
-    press anywhere on the words opens its picker (`showPicker`, so in
-    Firefox too; a finger's tap opens it by itself), a screen reader and
-    the keys reach it as before, and once a key changes the date (a digit,
-    an arrow, Backspace or Delete; not Tab coming in, nor Escape or Enter
-    from the picker) the words give way to its own digits, drawn over what
-    stands after it in room enough for a whole date, so a date typed is
-    seen and nothing in the row moves. A year of five digits,
+    press anywhere on the words, a finger's too, opens its picker
+    (`showPicker`, so in Firefox too), a screen reader and the keys reach
+    it as before, and once a key changes the date (a digit, an arrow,
+    Backspace or Delete; not Tab coming in, Escape or Enter from the
+    picker, or a shortcut) the words give way to its own digits until the
+    field is left. The digits are drawn over what stands beside the field,
+    as wide as they are and from its end where the dialog's side is near,
+    so a date typed is seen, nothing in the row moves, and a press on what
+    they cover still reaches it. A year of five digits,
     which has no words, is not taken. A date picker of our own is still
     [Deferred](#deferred).
   - **Start and end as one sentence.** "Wed, Nov 4 10:00 – Wed, Nov 4
