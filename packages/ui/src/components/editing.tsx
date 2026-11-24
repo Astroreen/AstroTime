@@ -159,6 +159,12 @@ interface Editing {
   readonly quick?: boolean;
 }
 
+/**
+ * Each calendar's account as this app last saw it (calendar ids are unique),
+ * so a calendar gone since still names its account (design D313).
+ */
+const knownAccounts = new Map<string, string>();
+
 export function useEditingState({
   store,
   accounts,
@@ -243,8 +249,9 @@ export function useEditingState({
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
   // Each calendar's account as last seen: a calendar gone while its new item's
   // dialog is open still names its account, whose next calendar takes it (D313).
-  const knownAccounts = useRef(new Map<string, string>());
-  for (const calendar of calendars) knownAccounts.current.set(calendar.id, calendar.accountId);
+  useEffect(() => {
+    for (const calendar of calendars) knownAccounts.set(calendar.id, calendar.accountId);
+  }, [calendars]);
   /** The accounts on a server, which a new item goes to when it goes to every account (D314). */
   const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
   /** New items go to every account: on, and two accounts on a server or more to go to (D314). */
@@ -389,8 +396,7 @@ export function useEditingState({
       // can, in the same account first: the account chosen stays (D313).
       const offered = writable(form.kind, fromOf(current));
       const fits = offered.some((c) => c.id === form.calendarId);
-      const accountId =
-        byId(form.calendarId)?.accountId ?? knownAccounts.current.get(form.calendarId);
+      const accountId = byId(form.calendarId)?.accountId ?? knownAccounts.get(form.calendarId);
       const own = offered.filter((c) => c.accountId === accountId);
       // A calendar ticked beside it that takes the kind first, then the account's first.
       const tickedFits = own.find((c) => form.alsoIn?.includes(c.id));
@@ -448,8 +454,8 @@ export function useEditingState({
           untitled: t("edit.untitledReminder"),
           hidden,
           ...(toEvery ? { everyAccount: servers } : {}),
-          ...(knownAccounts.current.has(state.form.calendarId)
-            ? { account: knownAccounts.current.get(state.form.calendarId)! }
+          ...(knownAccounts.has(state.form.calendarId)
+            ? { account: knownAccounts.get(state.form.calendarId)! }
             : {}),
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
@@ -637,7 +643,7 @@ export function useEditingState({
           everyMode ? { ...editing.state.form, alsoIn: [] } : editing.state.form,
           hidden,
           everyMode ? servers : undefined,
-          knownAccounts.current.get(editing.state.form.calendarId),
+          knownAccounts.get(editing.state.form.calendarId),
         )
       : null;
   // Gone from the account chosen, no file of that one's own goes with it,
