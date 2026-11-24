@@ -6,7 +6,7 @@
 #    owner sees no pictures. Anything inside an http(s) link is fine; a file
 #    name outside one is not. Upload with scripts/pr-images.sh.
 # 2. The short shape: the problem first, then "What changed" (pictures under
-#    each change), "Risk" with how to undo, "How to check", and the proof in one
+#    each change), "Risk" with how to undo, at most 5 "How to check" steps, and the proof in one
 #    line or a collapsed <details>. Separate "Why", "Tests", "Screenshots",
 #    "Before / after" and "Docs" sections say the same things twice.
 # 3. At most MAX_WORDS words outside <details>, code, comments and links: a
@@ -41,6 +41,9 @@ text="$(printf '%s\n' "$body" | awk '
 	}')"
 
 pattern='(/home/|file://)[^ `)]*'
+# Other disks' paths count only when they name a picture or video: `~/.config`
+# in a description is fine, `~/shots/after.png` is not.
+pattern="$pattern|(/Users/|/tmp/|~/|[A-Za-z]:\\\\)[^ \`)]*\\.(png|jpe?g|gif|webp|mp4|webm|mov)\\b"
 # A bare image name ("`after-menu.png`") counts only when nothing is shown at
 # all; with real pictures present it is probably a file the code changes.
 if ! printf '%s' "$body" | grep -qE '!\[[^]]*\]\(https?://|<img [^>]*src="https?://|user-attachments/assets/'; then
@@ -66,6 +69,8 @@ old="$(printf '%s\n' "$text" | grep -ioE '^## +(why|tests|screenshots|before ?/ 
 [ -z "$old" ] || problems+=("old sections, now merged: ${old//$'\n'/, } — before/after goes under each change, tests, docs and proof into Proof")
 risk="$(printf '%s\n' "$text" | awk '/^## /{in_risk = tolower($0) ~ /^## +risk/; next} in_risk')"
 printf '%s' "$risk" | grep -qi 'undo' || problems+=("\"## Risk\" does not say how to undo")
+steps="$(printf '%s\n' "$text" | awk '/^## /{in_check = tolower($0) ~ /^## +how to check/; next} /<details/{in_check = 0} in_check && /^[0-9]+\./' | wc -l)"
+[ "$steps" -le 5 ] || problems+=("$steps steps in \"## How to check\" (at most 5)")
 
 # Words the owner reads before opening anything: outside <details>, without
 # picture alt texts, table pipes and Markdown marks.

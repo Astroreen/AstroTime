@@ -31,13 +31,13 @@ for f in "$@"; do
 	[ -f "$f" ] || { echo "no such file: $f" >&2; exit 1; }
 	name="$(basename "$f")"
 	hash="$(git hash-object -w "$f")"
-	grep -v -P "\t\Q$name\E\$" "$tree_in" >"$tree_in.new" || true
+	awk -F '\t' -v name="$name" '$2 != name' "$tree_in" >"$tree_in.new"
 	mv "$tree_in.new" "$tree_in"
 	printf '100644 blob %s\t%s\n' "$hash" "$name" >>"$tree_in"
 done
 
 tree="$(git mktree <"$tree_in")"
-commit="$(echo "Screenshots for PR #$pr (not code; kept for the PR page)" | git commit-tree "$tree" "${parent[@]}")"
+commit="$(echo "Screenshots for PR #$pr (not code; kept for the PR page)" | git commit-tree "$tree" ${parent[@]+"${parent[@]}"})"
 git push -q origin "$commit:refs/heads/$branch"
 
 for f in "$@"; do
