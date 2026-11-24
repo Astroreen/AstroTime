@@ -87,7 +87,7 @@ test("a new event goes to the account chosen, or to every account", async ({
   first,
   second,
 }) => {
-  const home = await first.mkcalendar("home");
+  const alpha = await first.mkcalendar("alpha");
   const work = await second.mkcalendar("work");
   const family = await second.mkcalendar("family");
   await openApp(page);
@@ -98,17 +98,16 @@ test("a new event goes to the account chosen, or to every account", async ({
   await page.getByRole("button", { name: "Create" }).click();
   const quick = quickCreate(page);
   const field = calendarField(quick);
+  // It starts in the first account's alpha (first by name); the accounts
+  // first, each by its user name (no server's address) and its calendars.
+  await expect(field).toHaveAccessibleName(/^Calendar: astro ?, alpha$/);
   await field.click();
-  // The accounts first, then the one chosen's calendars only.
-  // Each by its user name, no server's address (both are "astro" here), in
-  // the order they were added.
-  const accounts = page.getByRole("button", { name: "astro", exact: true });
-  await expect(accounts).toHaveCount(2);
-  await accounts.nth(1).click();
+  const firstAccount = page.getByRole("button", { name: "astro alpha", exact: true });
+  await expect(firstAccount).toHaveAttribute("aria-current", "true");
+  // The second account: the item goes to its first calendar, then a second tick.
+  await page.getByRole("button", { name: "astro family, work", exact: true }).click();
   const calendars = page.getByRole("group", { name: "Calendar" });
   await expect(calendars.getByRole("checkbox")).toHaveCount(2);
-  await expect(calendars.getByRole("checkbox", { name: "home" })).toHaveCount(0);
-  // Its first calendar is ticked; a second tick puts a copy there too.
   await expect(calendars.getByRole("checkbox", { name: "family" })).toBeChecked();
   await calendars.getByRole("checkbox", { name: "work" }).click();
   await page.keyboard.press("Escape");
@@ -145,9 +144,9 @@ test("a new event goes to the account chosen, or to every account", async ({
   const [[one], [other]] = await both;
   expect(one).not.toBe(other);
   // Off, the second server's two ticked calendars had it; on, each server's
-  // first calendar by name (family there, home here).
+  // first calendar by name (alpha here, family there).
   expect([
-    await itemsIn(first, home),
+    await itemsIn(first, alpha),
     await itemsIn(second, family),
     await itemsIn(second, work),
   ]).toEqual([1, 2, 1]);

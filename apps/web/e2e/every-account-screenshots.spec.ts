@@ -106,7 +106,7 @@ for (const language of ["en", "ru"] as const) {
         if (what === "quick" && (await field.count()) > 0) {
           await field.click();
           await shot(page, name("picker-accounts"));
-          await page.getByRole("button", { name: "astro", exact: true }).nth(1).click();
+          await page.getByRole("button", { name: "astro family, work", exact: true }).click();
           await page
             .getByRole("group", { name: w.calendar })
             .getByRole("checkbox", { name: "work" })

@@ -1499,6 +1499,57 @@ describe("a new item in every account (design D314)", () => {
   });
 });
 
+describe("a new item ticked into several calendars (design D313)", () => {
+  test("a copy in each other ticked calendar of its account; none elsewhere, none twice", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = (name: string) =>
+      store.addAccount({ provider: "caldav", name, serverUrl: `https://${name}/`, username: "a" });
+    const calendar = (accountId: string, name: string, components: ("VEVENT" | "VTODO")[]) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://example.com/${accountId}/${name}/`,
+        name,
+        color: null,
+        components,
+        rights: ALL_RIGHTS,
+      });
+    const home = await add("home.example.com");
+    const away = await add("away.example.com");
+    const personal = await calendar(home.id, "Personal", ["VEVENT"]);
+    const family = await calendar(home.id, "Family", ["VEVENT"]);
+    const chores = await calendar(home.id, "Chores", ["VTODO"]);
+    const other = await calendar(away.id, "Other", ["VEVENT"]);
+    const form = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dinner",
+      // Family once, Personal again, a list that takes no events, another account's.
+      alsoIn: [family.id, family.id, personal.id, chores.id, other.id],
+    };
+    const made = ["dinner", "dinner-family", "spare"];
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    await saveForm(store, request, { now: NOW, uid: () => made.shift()! });
+    expect([
+      (await store.pending(personal.id)).map((row) => row.uid),
+      (await store.pending(family.id)).map((row) => row.uid),
+      (await store.pending(chores.id)).map((row) => row.uid),
+      (await store.pending(other.id)).map((row) => row.uid),
+    ]).toEqual([["dinner"], ["dinner-family"], [], []]);
+
+    // Going to every account with its row hidden, a calendar that no longer
+    // takes it gives way to the first on a server that does (design D314).
+    await store.saveCalendar({ ...personal, rights: { create: false, edit: true, delete: true } });
+    const servers = new Set([home.id, away.id]);
+    const moved = ["moved", "moved-copy"];
+    await saveForm(
+      store,
+      { ...request, form: { ...form, alsoIn: [] }, everyAccount: servers },
+      { now: NOW, uid: () => moved.shift()! },
+    );
+    expect((await store.objectAt(family.id, "moved.ics"))?.uid).toBe("moved");
+    expect((await store.objectAt(other.id, "moved-copy.ics"))?.uid).toBe("moved-copy");
+  });
+});
+
 describe("copies (design D164)", () => {
   test("Make a copy saves the occurrence at once in its calendar, a new item that does not repeat", async () => {
     const { store, rowOf, byName } = await demo();

@@ -2646,9 +2646,10 @@ keywords". The quick parse and voice that fill quick create are the
   the calendars (a task's lists) it goes in. The name is the user name
   without the server's address AstroTime put after it (`astro`, not
   `astro@cloud.example.com`); a user name that is an address stays whole.
-  Pressed, the row opens the accounts, then the chosen account's
-  calendars, each with a tick; with one account offered, its calendars at
-  once. A new item (not a copy, [D164](#D164)) may be ticked into several
+  Pressed, the row opens the accounts, each with its calendars small
+  under its name (two of one user name differ by them) and the current one
+  marked, then the chosen account's calendars, each with a tick; with one
+  account offered, its calendars at once. A new item (not a copy, [D164](#D164)) may be ticked into several
   of the account's calendars: it is saved in the first and a copy, a UID
   of its own, in each other, in one local write; the last tick never goes.
   Another account's calendar replaces the ticks. An existing item, or a
@@ -2702,6 +2703,14 @@ keywords". The quick parse and voice that fill quick create are the
   Which of another account's calendars a copy goes to is its first by
   name; choosing one per account (or passing over calendars others shared)
   waits with it.
+- **Copies told apart, and copies that could not be made** ([D313](#D313),
+  [D314](#D314)) — the copies of a new item ticked into several calendars
+  are separate items too, as every account's are. A ticked calendar or an
+  account that no longer takes the item when it is saved gets no copy,
+  and nothing says so; each server is then sent its copy on its own
+  ([foundation D91](foundation.md#D91)), so one may fail while the others
+  land. A notice of copies not made or not sent waits with keeping them
+  alike.
 - **A file kept when its item changes account** ([D313](#D313)) — a file
   uploaded to one account's files and attached stays on the item when its
   calendar is then changed to another account's, as it did before D313;

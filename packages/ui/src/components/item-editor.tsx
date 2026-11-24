@@ -122,7 +122,7 @@ export function ItemEditor({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
-  /** The accounts to choose from; none when there is no choice (design D313). */
+  /** The accounts offered, each with where choosing it puts the item (design D313). */
   accounts: readonly AccountChoice[];
   /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
   showWhere: boolean;

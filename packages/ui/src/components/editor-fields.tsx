@@ -4,7 +4,7 @@
 // loads them without the editor (foundation D145).
 import type { Account, Calendar } from "@astrotime/storage";
 import { Popover } from "@base-ui/react/popover";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
@@ -14,7 +14,7 @@ import { CalendarRow } from "./calendar-row.tsx";
 import { Dot } from "./color-select.tsx";
 import { useCalendar } from "./context.ts";
 import { ChevronIcon } from "./icons.tsx";
-import { popup, row, Select as Dropdown } from "./select.tsx";
+import { popup, Select as Dropdown } from "./select.tsx";
 
 /** The click on an empty slot that opened a new item's dialog (design D190). */
 export interface Press {
@@ -79,7 +79,7 @@ export function KindSwitch({
           role="radio"
           aria-checked={value === kind}
           onClick={() => value !== kind && onChange(kind)}
-          className="rounded-full px-4 py-1.5 text-body font-medium ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-ink aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
+          className="rounded-full px-4 py-1.5 text-body font-medium whitespace-nowrap ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-ink aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
         >
           {t(`edit.kind.${kind}`)}
         </button>
@@ -133,24 +133,44 @@ export function CalendarFields({
   const label = t(event ? "edit.calendar" : "edit.list");
   const chosen = calendars.find((c) => c.id === form.calendarId);
   const account = accounts.find((one) => one.account.id === chosen?.accountId)?.account;
-  const alsoIn = multiple ? (form.alsoIn ?? []) : [];
+  // The other ticks as they stand: once each, in the chosen one's account,
+  // still offered (a sync may have changed the calendars meanwhile).
+  const alsoIn = multiple
+    ? [...new Set(form.alsoIn ?? [])].filter(
+        (id) =>
+          id !== form.calendarId &&
+          calendars.some((c) => c.id === id && c.accountId === chosen?.accountId),
+      )
+    : [];
   const ticked = [form.calendarId, ...alsoIn];
   const names = ticked.flatMap((id) => calendars.find((c) => c.id === id)?.name ?? []);
   const [open, setOpen] = useState(false);
-  // The accounts first, unless one alone is offered.
+  // The accounts first, unless one alone is offered; an account gone
+  // meanwhile leads back to them.
   const [step, setStep] = useState<string | null>(null);
   const single = accounts.length < 2;
-  const shownAccount = single ? (accounts[0]?.account.id ?? null) : step;
+  const shown =
+    accounts.find((one) => one.account.id === (single ? accounts[0]?.account.id : step)) ?? null;
+  const shownAccount = shown?.account.id ?? null;
+  // A new step keeps the focus in the list: on its first control.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (open) listRef.current?.querySelector<HTMLElement>("button, input")?.focus();
+  }, [open, shownAccount]);
   if (calendars.length === 0)
     return (
       <p className="px-2 text-small text-danger">{t(event ? "edit.noCalendar" : "edit.noList")}</p>
     );
   const own = calendars.filter((c) => c.accountId === shownAccount);
+  const pickAccount = (choice: AccountChoice) => {
+    // Another account: the item goes to its first calendar (its own, for an item that exists).
+    if (choice.account.id !== chosen?.accountId) onChange(choice.calendarId, []);
+    setStep(choice.account.id);
+  };
   const toggle = (id: string) => {
-    if (!multiple || chosen?.accountId !== shownAccount) {
-      // Another account's calendar, or one calendar only: it alone.
+    if (!multiple) {
       onChange(id, []);
-      if (!multiple) setOpen(false);
+      setOpen(false);
       return;
     }
     if (!ticked.includes(id)) {
@@ -171,7 +191,7 @@ export function CalendarFields({
       }}
     >
       <Popover.Trigger className="flex min-h-10 w-full min-w-0 items-center gap-3 rounded-lg px-2 py-0.5 text-left hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent">
-        {/* Its name is what it shows, after the field's: "Calendar: Work account, Personal". */}
+        {/* Its name is what it shows, after the field's: "Calendar: astro, Personal". */}
         <span className="sr-only">{label}: </span>
         {account && <Avatar account={account} size="size-7" />}
         <span className="flex min-w-0 flex-1 flex-col">
@@ -189,57 +209,70 @@ export function CalendarFields({
         <ChevronIcon direction="down" className="size-5 shrink-0 text-ink-muted" />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner sideOffset={4} align="start" className="z-[140]">
+        <Popover.Positioner sideOffset={4} align="start" collisionPadding={8} className="z-[140]">
           <Popover.Popup className={`${popup} w-72`}>
-            {shownAccount === null ? (
-              <>
-                <Popover.Title className="px-2 py-1.5 text-small text-ink-muted">
-                  {t("edit.account")}
-                </Popover.Title>
-                {accounts.map(({ account: one }) => (
-                  <button
-                    key={one.id}
-                    type="button"
-                    onClick={() => setStep(one.id)}
-                    className={`${row} w-full text-left`}
-                  >
-                    <Avatar account={one} size="size-7" />
-                    <span className="min-w-0 flex-1 truncate">{shortName(one, t)}</span>
-                    <ChevronIcon direction="right" className="size-4 shrink-0 text-ink-muted" />
-                  </button>
-                ))}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-1 px-1 py-1">
-                  {!single && (
-                    <button
-                      type="button"
-                      aria-label={t("edit.accounts")}
-                      onClick={() => setStep(null)}
-                      className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-raised-hover"
-                    >
-                      <ChevronIcon direction="left" className="size-5" />
-                    </button>
-                  )}
-                  <Popover.Title className="min-w-0 truncate px-1 text-small text-ink-muted">
-                    {shortName(accounts.find((one) => one.account.id === shownAccount)!.account, t)}
+            <div ref={listRef}>
+              {shown === null ? (
+                <>
+                  <Popover.Title className="px-2 py-1.5 text-small text-ink-muted">
+                    {t("edit.account")}
                   </Popover.Title>
-                </div>
-                <div role="group" aria-label={label}>
-                  {own.map((calendar) => (
-                    <CalendarRow
-                      key={calendar.id}
-                      calendar={calendar}
-                      color={calendar.color ?? "var(--color-ink-muted)"}
-                      shown={chosen?.accountId === shownAccount && ticked.includes(calendar.id)}
-                      onToggle={(id) => toggle(id)}
-                      className="min-h-10 rounded-lg hover:bg-raised-hover pointer-coarse:min-h-12"
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+                  {accounts.map((choice) => {
+                    const current = choice.account.id === chosen?.accountId;
+                    // Its calendars, small: two accounts of one user name differ by them.
+                    const its = calendars.filter((c) => c.accountId === choice.account.id);
+                    return (
+                      <button
+                        key={choice.account.id}
+                        type="button"
+                        aria-current={current ? "true" : undefined}
+                        onClick={() => pickAccount(choice)}
+                        className="flex min-h-12 w-full items-center gap-3 rounded-lg py-1 pr-3 pl-2 text-left text-body hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current=true]:bg-accent-soft"
+                      >
+                        <Avatar account={choice.account} size="size-7" />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate leading-5">{shortName(choice.account, t)}</span>
+                          <span className="truncate text-small leading-4 text-ink-muted">
+                            {its.map((c) => c.name).join(", ")}
+                          </span>
+                        </span>
+                        <ChevronIcon direction="right" className="size-4 shrink-0 text-ink-muted" />
+                      </button>
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 px-1 py-1">
+                    {!single && (
+                      <button
+                        type="button"
+                        aria-label={t("edit.accounts")}
+                        onClick={() => setStep(null)}
+                        className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-raised-hover focus-visible:outline-2 focus-visible:outline-accent"
+                      >
+                        <ChevronIcon direction="left" className="size-5" />
+                      </button>
+                    )}
+                    <Popover.Title className="min-w-0 truncate px-1 text-small text-ink-muted">
+                      {shortName(shown.account, t)}
+                    </Popover.Title>
+                  </div>
+                  <div role="group" aria-label={label}>
+                    {own.map((calendar) => (
+                      <CalendarRow
+                        key={calendar.id}
+                        calendar={calendar}
+                        color={calendar.color ?? "var(--color-ink-muted)"}
+                        shown={chosen?.accountId === shownAccount && ticked.includes(calendar.id)}
+                        onToggle={(id) => toggle(id)}
+                        className="min-h-10 rounded-lg hover:bg-raised-hover pointer-coarse:min-h-12"
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

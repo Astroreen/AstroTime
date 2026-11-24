@@ -1,8 +1,8 @@
 // Quick create (design D296), as Google Calendar's: what a tap on a slot,
 // the floating button or "Create" opens. On a phone a sheet from the bottom,
 // on a wide screen a popover by the item it makes, which the views draw
-// behind it (D155). The title, "Event | Task", the time, the place and the
-// calendar, and "Save" at its foot. There is no "More options": the sheet
+// behind it (D155). "Event | Task" with "Save" at its end (D315), the
+// title, the time, the place and where it goes (D313). There is no "More options": the sheet
 // dragged up, or its handle pressed ("Expand"), becomes the edit dialog
 // with everything filled carried over; the popover has an expand icon in
 // its corner, beside its ✕. Enter saves, Escape closes. Loaded with its first opening,
@@ -72,7 +72,7 @@ export function QuickCreate({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
-  /** The accounts to choose from; none when there is no choice (design D313). */
+  /** The accounts offered, each with where choosing it puts the item (design D313). */
   accounts: readonly AccountChoice[];
   /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
   showWhere: boolean;
@@ -184,7 +184,7 @@ export function QuickCreate({
                   <button
                     type="submit"
                     disabled={state.saving || calendars.length === 0}
-                    className={`${primaryButton} ml-auto shrink-0`}
+                    className={`${primaryButton} ml-auto shrink-0 whitespace-nowrap`}
                   >
                     {t("edit.save")}
                   </button>
@@ -229,7 +229,7 @@ function Fields({
   const days = event && form.endDate !== form.startDate;
   return (
     <>
-      <div className="flex items-center gap-2 pr-1">
+      <div className="flex flex-wrap items-center gap-2 pr-1">
         <KindSwitch
           value={form.kind}
           // The new kind's default colour (design D172): no colour is chosen here.

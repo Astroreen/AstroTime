@@ -386,7 +386,9 @@ export function useEditingState({
       const fits = offered.some((c) => c.id === form.calendarId);
       const accountId = byId(form.calendarId)?.accountId;
       const own = offered.filter((c) => c.accountId === accountId);
-      const sameAccount = own.find((c) => !hidden.has(c.id)) ?? own[0];
+      // A calendar ticked beside it that takes the kind first, then the account's first.
+      const tickedFits = own.find((c) => form.alsoIn?.includes(c.id));
+      const sameAccount = tickedFits ?? own.find((c) => !hidden.has(c.id)) ?? own[0];
       const placed = fits
         ? form
         : { ...form, calendarId: sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId };
@@ -654,7 +656,7 @@ export function useEditingState({
         state={editing?.quick ? shownState : null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        showWhere={!everyMode}
+        showWhere={!everyMode || shownCalendars.length === 0}
         multiple={multiple}
         onChange={change}
         onDraft={setDraft}
@@ -667,7 +669,7 @@ export function useEditingState({
         target={editing?.target ?? null}
         calendars={shownCalendars}
         accounts={accountChoices}
-        showWhere={!everyMode}
+        showWhere={!everyMode || shownCalendars.length === 0}
         multiple={multiple}
         onChange={change}
         onDraft={setDraft}

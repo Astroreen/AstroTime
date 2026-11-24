@@ -29,7 +29,13 @@ export async function pickCalendar(
 ): Promise<void> {
   const page = scope.page();
   await calendarField(scope).click();
-  if (account) await page.getByRole("button", { name: account, exact: true }).click();
+  // An account's button says its name, then its calendars.
+  if (account)
+    await page
+      .getByRole("button", {
+        name: new RegExp(`^${account.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`),
+      })
+      .click();
   const group = page.getByRole("group", { name: /^(Calendar|List|Календарь|Список)$/ });
   const box = group.getByRole("checkbox", { name: calendar, exact: true });
   // Ticked alone: the new one first (the last tick never goes), then the others off.
