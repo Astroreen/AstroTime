@@ -706,6 +706,27 @@ export function newItemCalendar(
   return first ? { calendar: first, refused: false } : null;
 }
 
+/**
+ * Where a copy of a new item goes when new items go to every account
+ * (design D313): for each account besides `into`'s, its first calendar
+ * that takes the item, visible before hidden, as `firstCalendarFor` picks
+ * one; an account none of whose calendars takes it gets no copy.
+ */
+export function otherAccountsCalendars(
+  calendars: readonly Calendar[],
+  kind: "event" | "task",
+  into: Calendar,
+  hidden?: ReadonlySet<string>,
+): Calendar[] {
+  const accounts = [...new Set(calendars.map((calendar) => calendar.accountId))];
+  return accounts.flatMap((accountId) => {
+    if (accountId === into.accountId) return [];
+    const own = calendars.filter((calendar) => calendar.accountId === accountId);
+    const first = firstCalendarFor(own, kind, hidden);
+    return first ? [first] : [];
+  });
+}
+
 /** @internal What a write needs: the time, and a new UID. */
 export interface Writes {
   readonly now: number;
@@ -880,6 +901,12 @@ export async function saveForm(
      * the dialog has no field for come along (D7).
      */
     readonly base?: string;
+    /**
+     * A new item goes to every account (design D313): a copy of it, with a
+     * UID of its own, in each other account's first calendar that takes it.
+     * Not for a copy ("Copy to" picks one calendar).
+     */
+    readonly everyAccount?: boolean;
   },
   writes: Writes,
 ): Promise<void> {
@@ -900,10 +927,25 @@ export async function saveForm(
       // The calendars as they are now, in this transaction: the screen's
       // list may not have caught up (foundation D122). Where it goes is what
       // the dialog shows (`newItemCalendar`, the same rule and list).
-      const into = newItemCalendar(await local.calendars(), form, request.hidden);
+      const calendars = await local.calendars();
+      const into = newItemCalendar(calendars, form, request.hidden);
       if (!into) throw new NowhereError("No calendar takes this item now.");
       if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
       await local.save(into.calendar.id, ics);
+      if (!request.everyAccount || request.base) return;
+      // In the same transaction: every account gets it, or none does.
+      for (const other of otherAccountsCalendars(
+        calendars,
+        form.kind,
+        into.calendar,
+        request.hidden,
+      )) {
+        const copy = createItem(form.kind, changesOf(null, form, untitled), {
+          now: writes.now,
+          uid: writes.uid(),
+        });
+        await local.save(other.id, copy);
+      }
     });
     return;
   }

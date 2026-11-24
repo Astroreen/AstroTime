@@ -112,6 +112,9 @@ export const en = {
   "accounts.sync": "Sync",
   "accounts.sync.hint":
     "Nothing goes to this server or comes from it; changes made here wait on this device until sync is on again.",
+  "accounts.everyAccount": "Save new items to every account",
+  "accounts.everyAccount.hint":
+    "A new event or task is saved to each account, not only to the one chosen.",
   "sync.offline": "Offline: changes wait until the server can be reached",
   "sync.signed-out": "Signed out: sign in again to sync",
   "sync.refused": "This AstroTime's administrator does not allow this server",
@@ -367,6 +370,8 @@ export const en = {
   "edit.untitledReminder": "Reminder",
   "edit.calendar": "Calendar",
   "edit.list": "List",
+  "edit.account": "Account",
+  "edit.everyAccount": "Also saved to each of your other accounts.",
   "edit.color": "Colour",
   "edit.colorDefault": "The calendar's colour",
   "edit.location": "Location",

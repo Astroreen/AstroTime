@@ -12,7 +12,7 @@ import {
   type ItemTimes,
   type Task,
 } from "@astrotime/core";
-import type { Calendar, Store, StoredObject } from "@astrotime/storage";
+import type { Account, Calendar, Store, StoredObject } from "@astrotime/storage";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -31,6 +31,7 @@ import {
   newItemCalendar,
   noticeOf,
   NowhereError,
+  otherAccountsCalendars,
   problemOf,
   RefusedError,
   rewriteTarget,
@@ -48,7 +49,7 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
-import type { Press } from "./editor-fields.tsx";
+import type { AccountChoice, Press } from "./editor-fields.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor, QuickCreate } from "./lazy.tsx";
 import type { Landed } from "./context.ts";
@@ -159,7 +160,9 @@ interface Editing {
 
 export function useEditingState({
   store,
+  accounts,
   calendars,
+  everyAccount,
   hidden,
   timeZone,
   today,
@@ -169,7 +172,11 @@ export function useEditingState({
   onChanged,
 }: {
   store: Store;
+  /** The accounts, to choose the one an item goes to (design D312). */
+  accounts: readonly Account[];
   calendars: readonly Calendar[];
+  /** A new item goes to every account, not to one chosen (design D313). */
+  everyAccount: boolean;
   /** Calendars hidden from the views: a new item goes in a visible one first. */
   hidden: ReadonlySet<string>;
   /** The colour a new event or task starts with (design D172); `null`, its calendar's. */
@@ -389,6 +396,7 @@ export function useEditingState({
           scope,
           untitled: t("edit.untitledReminder"),
           hidden,
+          everyAccount,
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
@@ -572,6 +580,26 @@ export function useEditingState({
       : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
+  // A new item (not a copy) that goes to every account: no account to
+  // choose, and the dialog says where else it goes (design D313).
+  const spread =
+    editing !== null &&
+    shown !== null &&
+    everyAccount &&
+    editing.base === undefined &&
+    otherAccountsCalendars(calendars, editing.state.form.kind, shown.calendar, hidden).length > 0;
+  // Each account offered, with where choosing it puts the item: its first
+  // calendar, visible before hidden; none when there is only one (D312).
+  const accountIds = [...new Set(shownCalendars.map((one) => one.accountId))];
+  const accountChoices: AccountChoice[] =
+    spread || accountIds.length < 2
+      ? []
+      : accountIds.flatMap((id) => {
+          const account = accounts.find((one) => one.id === id);
+          const own = shownCalendars.filter((one) => one.accountId === id);
+          const first = own.find((one) => !hidden.has(one.id)) ?? own[0];
+          return account && first ? [{ account, calendarId: first.id }] : [];
+        });
 
   const dialogs = (
     <>
@@ -595,6 +623,8 @@ export function useEditingState({
       <QuickCreate
         state={editing?.quick ? shownState : null}
         calendars={shownCalendars}
+        accounts={accountChoices}
+        everyAccount={spread}
         onChange={change}
         onDraft={setDraft}
         onSave={save}
@@ -605,6 +635,8 @@ export function useEditingState({
         state={editing?.quick ? null : shownState}
         target={editing?.target ?? null}
         calendars={shownCalendars}
+        accounts={accountChoices}
+        everyAccount={spread}
         onChange={change}
         onDraft={setDraft}
         onSave={save}

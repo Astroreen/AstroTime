@@ -2,11 +2,12 @@
 // row's looks, its date and its time, and the second press of a double click
 // on an empty slot (D190). Here, not in the editor's chunk, so quick create
 // loads them without the editor (foundation D145).
-import type { Calendar } from "@astrotime/storage";
+import type { Account, Calendar } from "@astrotime/storage";
 import { useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Form } from "../calendar/editing.ts";
+import { accountName, Avatar } from "./accounts.tsx";
 import { Dot } from "./color-select.tsx";
 import { useCalendar } from "./context.ts";
 import { Select as Dropdown } from "./select.tsx";
@@ -84,7 +85,7 @@ export function KindSwitch({
 }
 
 /** The calendar (a task's list) an item goes in, each with its colour's dot (design D297). */
-export function CalendarSelect({
+function CalendarSelect({
   label,
   value,
   onChange,
@@ -107,6 +108,77 @@ export function CalendarSelect({
       }))}
       className={fieldButton}
     />
+  );
+}
+
+/**
+ * An account the item may go to (design D312), and the calendar choosing it
+ * puts the item in: its first one offered, visible before hidden.
+ */
+export interface AccountChoice {
+  readonly account: Account;
+  readonly calendarId: string;
+}
+
+/**
+ * Where an item goes (design D312): its account, when more than one is
+ * offered, then that account's calendars (a task's lists). `accounts` is
+ * empty when there is no account to choose; `everyAccount`, a new item
+ * goes to every account (D313), said under the calendar.
+ */
+export function CalendarFields({
+  form,
+  calendars,
+  accounts,
+  everyAccount,
+  onChange,
+}: {
+  form: Form;
+  calendars: readonly Calendar[];
+  accounts: readonly AccountChoice[];
+  everyAccount: boolean;
+  onChange: (calendarId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const event = form.kind === "event";
+  const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
+  const own =
+    accounts.length > 0 && accountId !== undefined
+      ? calendars.filter((c) => c.accountId === accountId)
+      : calendars;
+  return (
+    <>
+      {accounts.length > 0 && accountId !== undefined && (
+        <Dropdown
+          label={t("edit.account")}
+          value={accountId}
+          onChange={(id) => {
+            const chosen = accounts.find((one) => one.account.id === id);
+            if (chosen) onChange(chosen.calendarId);
+          }}
+          options={accounts.map(({ account }) => ({
+            value: account.id,
+            label: accountName(account, t),
+            leading: <Avatar account={account} size="size-6" />,
+          }))}
+          className={fieldButton}
+        />
+      )}
+      <CalendarSelect
+        label={t(event ? "edit.calendar" : "edit.list")}
+        value={form.calendarId}
+        onChange={onChange}
+        calendars={own}
+      />
+      {calendars.length === 0 && (
+        <p className="px-2 text-small text-danger">
+          {t(event ? "edit.noCalendar" : "edit.noList")}
+        </p>
+      )}
+      {everyAccount && calendars.length > 0 && (
+        <p className="px-2 text-small text-ink-muted">{t("edit.everyAccount")}</p>
+      )}
+    </>
   );
 }
 

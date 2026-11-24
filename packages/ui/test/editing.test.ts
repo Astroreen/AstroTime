@@ -29,6 +29,7 @@ import {
   InDoubtError,
   newForm,
   newItemCalendar,
+  otherAccountsCalendars,
   noticeOf,
   NowhereError,
   problemOf,
@@ -1292,6 +1293,68 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(updated.ics).toContain("EXDATE;TZID=Europe/Vilnius:20261105T090000");
     await deleteTarget(store, await targetOn(store, updated, "2026-11-06"), "all", NOW);
     expect(await rowOf("Work", "demo-standup")).toMatchObject({ pending: "delete" });
+  });
+});
+
+describe("a new item in every account (design D313)", () => {
+  test("a copy with its own UID in each other account's first calendar that takes it, in one write", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = async (name: string) =>
+      store.addAccount({
+        provider: "caldav",
+        name,
+        serverUrl: `https://${name}/`,
+        username: "astro",
+      });
+    const calendar = async (accountId: string, name: string, components: ("VEVENT" | "VTODO")[]) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://example.com/${accountId}/${name}/`,
+        name,
+        color: null,
+        components,
+        rights: ALL_RIGHTS,
+      });
+    const cloud = await add("cloud.example.com");
+    const work = await add("work.example.com");
+    const tasksOnly = await add("tasks.example.com");
+    const personal = await calendar(cloud.id, "Personal", ["VEVENT", "VTODO"]);
+    const team = await calendar(work.id, "Team", ["VEVENT"]);
+    const meetings = await calendar(work.id, "Meetings", ["VEVENT"]);
+    const todo = await calendar(tasksOnly.id, "Todo", ["VTODO"]);
+    const hidden = new Set([team.id]);
+    // Each other account's first calendar that takes it, visible before hidden.
+    expect(
+      otherAccountsCalendars(await store.calendars(), "event", personal, hidden).map((c) => c.id),
+    ).toEqual([meetings.id]);
+    expect(
+      otherAccountsCalendars(await store.calendars(), "task", personal).map((c) => c.id),
+    ).toEqual([todo.id]);
+
+    const form = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dentist",
+    };
+    const made = ["first", "second", "third"];
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    await saveForm(
+      store,
+      { ...request, hidden, everyAccount: true },
+      { now: NOW, uid: () => made.shift()! },
+    );
+    // The chosen calendar's is the first UID made: where it lands (D193).
+    expect(await store.objectAt(personal.id, "first.ics")).toMatchObject({ pending: "create" });
+    const copy = await store.objectAt(meetings.id, "second.ics");
+    expect(copy).toMatchObject({ pending: "create", uid: "second" });
+    expect(CalendarObject.parse(copy!.ics).master?.summary).toBe("Dentist");
+    // No calendar of the tasks-only account takes an event: no copy there.
+    expect(await store.pending(todo.id)).toEqual([]);
+    expect(await store.pending(team.id)).toEqual([]);
+
+    // Off, the default: only the calendar chosen.
+    await saveForm(store, request, { now: NOW, uid: () => "alone" });
+    expect(await store.objectAt(personal.id, "alone.ics")).toBeDefined();
+    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual(["second"]);
   });
 });
 

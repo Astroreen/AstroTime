@@ -75,7 +75,7 @@ import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 import {
-  CalendarSelect,
+  CalendarFields,
   DateTime,
   field,
   fieldButton,
@@ -85,6 +85,7 @@ import {
   TimeSelect,
   titleField,
   useSecondPress,
+  type AccountChoice,
   type Press,
 } from "./editor-fields.tsx";
 
@@ -109,6 +110,8 @@ export interface EditorState {
 export function ItemEditor({
   state,
   calendars,
+  accounts,
+  everyAccount,
   onChange,
   onSave,
   onClose,
@@ -118,6 +121,10 @@ export function ItemEditor({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
+  /** The accounts to choose from; none when there is no choice (design D312). */
+  accounts: readonly AccountChoice[];
+  /** A new item goes to every account (design D313). */
+  everyAccount: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -200,6 +207,8 @@ export function ItemEditor({
                 existing={state.existing}
                 copy={state.copy ?? false}
                 calendars={calendars}
+                accounts={accounts}
+                everyAccount={everyAccount}
                 onChange={onChange}
               />
               {state.problem && (
@@ -254,12 +263,16 @@ function Fields({
   existing,
   copy,
   calendars,
+  accounts,
+  everyAccount,
   onChange,
 }: {
   form: Form;
   existing: boolean;
   copy: boolean;
   calendars: readonly Calendar[];
+  accounts: readonly AccountChoice[];
+  everyAccount: boolean;
   onChange: (form: Form) => void;
 }) {
   const { t } = useTranslation();
@@ -376,17 +389,13 @@ function Fields({
 
       <Group>
         <Section icon={<CalendarIcon className="size-5" />}>
-          <CalendarSelect
-            label={t(event ? "edit.calendar" : "edit.list")}
-            value={form.calendarId}
-            onChange={(calendarId) => set({ calendarId })}
+          <CalendarFields
+            form={form}
             calendars={calendars}
+            accounts={accounts}
+            everyAccount={everyAccount}
+            onChange={(calendarId) => set({ calendarId })}
           />
-          {calendars.length === 0 && (
-            <p className="px-2 text-small text-danger">
-              {t(event ? "edit.noCalendar" : "edit.noList")}
-            </p>
-          )}
         </Section>
 
         <Section icon={<PaletteIcon className="size-5" />}>

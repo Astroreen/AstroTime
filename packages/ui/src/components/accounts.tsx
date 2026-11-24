@@ -34,7 +34,14 @@ function needsAttention(last: AccountSync | undefined): boolean {
 const initial = (name: string | undefined) =>
   name ? (Array.from(name.trim())[0] ?? "?").toLocaleUpperCase() : "?";
 
-function Avatar({ account, size = "size-8" }: { account: Account | undefined; size?: string }) {
+/** An account's avatar: the first letter of its name. */
+export function Avatar({
+  account,
+  size = "size-8",
+}: {
+  account: Account | undefined;
+  size?: string;
+}) {
   const { t } = useTranslation();
   return (
     <span

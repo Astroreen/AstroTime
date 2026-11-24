@@ -204,6 +204,17 @@ function SettingsGroups({
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
       <Group title={t("accounts.title")}>
+        {/* A new item in one account, or in every one (D313): a choice only with two or more. */}
+        {accounts.length > 1 && (
+          <div className="border-b border-line pb-1">
+            <Toggle
+              label={t("accounts.everyAccount")}
+              checked={settings.everyAccount}
+              onChange={(everyAccount) => change({ everyAccount })}
+              hint={t("accounts.everyAccount.hint")}
+            />
+          </div>
+        )}
         {accounts.map((account, index) => {
           const own = calendars.filter((calendar) => calendar.accountId === account.id);
           return (

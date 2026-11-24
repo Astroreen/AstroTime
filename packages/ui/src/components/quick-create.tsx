@@ -35,7 +35,7 @@ import { primaryButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 import { FLOATS_REM, shownDraft, useDraft } from "./draft-aside.ts";
 import {
-  CalendarSelect,
+  CalendarFields,
   DateTime,
   field,
   KindSwitch,
@@ -43,6 +43,7 @@ import {
   TimeSelect,
   titleField,
   useSecondPress,
+  type AccountChoice,
 } from "./editor-fields.tsx";
 import { CalendarIcon, ClockIcon, CloseIcon, PlaceIcon } from "./icons.tsx";
 import type { EditorState } from "./item-editor.tsx";
@@ -58,6 +59,8 @@ const GAP = 8;
 export function QuickCreate({
   state,
   calendars,
+  accounts,
+  everyAccount,
   onChange,
   onSave,
   onClose,
@@ -67,6 +70,10 @@ export function QuickCreate({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
+  /** The accounts to choose from; none when there is no choice (design D312). */
+  accounts: readonly AccountChoice[];
+  /** The item goes to every account (design D313). */
+  everyAccount: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -160,7 +167,13 @@ export function QuickCreate({
               }}
               className="flex flex-col gap-2 px-4"
             >
-              <Fields form={form} calendars={calendars} onChange={onChange} />
+              <Fields
+                form={form}
+                calendars={calendars}
+                accounts={accounts}
+                everyAccount={everyAccount}
+                onChange={onChange}
+              />
               {state.problem && (
                 <p role="alert" className="rounded-xl bg-danger-soft p-3 text-body text-danger">
                   {t(problemKey(state.problem, state.problemKind ?? form.kind))}
@@ -187,10 +200,14 @@ export function QuickCreate({
 function Fields({
   form,
   calendars,
+  accounts,
+  everyAccount,
   onChange,
 }: {
   form: Form;
   calendars: readonly Calendar[];
+  accounts: readonly AccountChoice[];
+  everyAccount: boolean;
   onChange: (form: Form) => void;
 }) {
   const { t } = useTranslation();
@@ -283,17 +300,13 @@ function Fields({
         />
       </Section>
       <Section icon={<CalendarIcon className="size-5" />}>
-        <CalendarSelect
-          label={t(event ? "edit.calendar" : "edit.list")}
-          value={form.calendarId}
-          onChange={(calendarId) => set({ calendarId })}
+        <CalendarFields
+          form={form}
           calendars={calendars}
+          accounts={accounts}
+          everyAccount={everyAccount}
+          onChange={(calendarId) => set({ calendarId })}
         />
-        {calendars.length === 0 && (
-          <p className="px-2 text-small text-danger">
-            {t(event ? "edit.noCalendar" : "edit.noList")}
-          </p>
-        )}
       </Section>
     </>
   );

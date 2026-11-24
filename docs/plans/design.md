@@ -2631,8 +2631,42 @@ keywords". The quick parse and voice that fill quick create are the
   ([D216](#D216)) drift the same way, less (6 % of their height), as
   Google's do. None with reduced motion.
 
+### Decided in round 7: the account a new item goes to
+
+- **D312. The account an item goes to, chosen in its dialog.** The owner,
+  with Google Calendar's sheet beside it: "tasks and events need a choice
+  of which account to make them in". Quick create ([D296](#D296)) and the
+  edit dialog ([D297](#D297)) show, in the calendar's row, the account
+  first (its avatar and name, `edit.account`), then that account's
+  calendars (a task's lists) only. Choosing an account puts the item in
+  its first calendar offered, visible before hidden, as
+  [foundation D122](foundation.md#D122)'s default does. With one account
+  offered there is no account row: the calendar is the whole choice, as
+  before. An existing item's dialog offers it too: a move to another
+  account's calendar is the move the calendar field already made
+  ([D37](foundation.md#D37)'s rights decide where).
+- **D313. A new item in every account, a setting.** The owner: "by
+  default a new event or task goes to one calendar; one can also choose
+  to sync all calendars, so each has every task and event; then the
+  account choice is hidden". Settings → Accounts has "Save new items to
+  every account" (off by default, shown with two accounts or more). On, a
+  new event or task (not a copy, [D164](#D164) picks one calendar) is
+  saved in the calendar chosen and, in the same local write, a copy of it
+  in each other account's first calendar that takes it, visible before
+  hidden; an account none of whose calendars takes it gets none. Each copy
+  has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
+  are two items, not one shared. The dialog has no account row then, and
+  says under the calendar that it is also saved to the other accounts.
+  It is about creating: an edit or a deletion later changes the one copy
+  edited ([Deferred](#deferred)).
+
 ## Deferred
 
+- **Copies in every account kept alike** ([D313](#D313)) — a new item goes
+  to every account, but its copies are separate items afterwards: an edit,
+  a completion or a deletion changes only the one copy. Keeping them alike
+  needs a link between them (an `X-` property, kept by [foundation
+  D7](foundation.md#D7)) and rules for a copy changed on its server.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled
   one asks, as the editor does": the editor asks nothing on Escape or ✕
   today, so quick create closes as it does; one question for both, when
