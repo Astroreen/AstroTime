@@ -335,9 +335,9 @@ export function DateField({
   const [wide, setWide] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
   // As the listeners below read them: whether it is typed in now, whether a
-  // press (not a key) left it, and whether Tab went down inside it.
+  // press is down, and whether Tab went down inside it.
   const typed = useRef(false);
-  const leftByPress = useRef(false);
+  const pressing = useRef(false);
   const tabbed = useRef(false);
   const type = () => {
     typed.current = true;
@@ -347,15 +347,21 @@ export function DateField({
   useEffect(() => {
     if (!wide) return;
     // There from the key that made the room, so no leaving is missed. A key
-    // let go while a press that left the field is still down is not its end.
-    const narrow = (event: Event) => {
-      if (typed.current || (event.type === "keyup" && leftByPress.current)) return;
-      setWide(false);
+    // let go while a press is still down is not the leaving's end: the press's is.
+    const press = () => {
+      pressing.current = true;
     };
-    const ends = ["click", "keyup", "pointercancel", "contextmenu"] as const;
+    const narrow = (event: Event) => {
+      if (event.type !== "keyup") pressing.current = false;
+      else if (pressing.current) return;
+      if (!typed.current) setWide(false);
+    };
+    const ends = ["click", "auxclick", "keyup", "pointercancel", "contextmenu"] as const;
+    window.addEventListener("pointerdown", press, true);
     for (const end of ends) window.addEventListener(end, narrow, true);
     window.addEventListener("blur", narrow);
     return () => {
+      window.removeEventListener("pointerdown", press, true);
       for (const end of ends) window.removeEventListener(end, narrow, true);
       window.removeEventListener("blur", narrow);
     };
@@ -392,20 +398,23 @@ export function DateField({
         // Only a key that changes the date: not Tab coming in, Escape or
         // Enter from its picker, or a shortcut (Alt and the arrow opens it).
         onKeyDown={(e) => {
-          tabbed.current = e.key === "Tab";
-          if (e.altKey || e.ctrlKey || e.metaKey || !EDITS.test(e.key)) return;
-          type();
+          const plain = !e.altKey && !e.ctrlKey && !e.metaKey;
+          // Shift held for Tab backwards is no other key.
+          if (e.key === "Tab") tabbed.current = plain;
+          else if (e.key !== "Shift") tabbed.current = false;
+          if (plain && EDITS.test(e.key)) type();
         }}
         // Tab that stayed inside went on to the date's next part, which is
         // seen only in the digits.
         onKeyUp={(e) => {
-          if (e.key === "Tab" && tabbed.current && document.activeElement === e.currentTarget)
-            type();
+          if (e.key !== "Tab") return;
+          if (tabbed.current && document.activeElement === e.currentTarget) type();
           tabbed.current = false;
         }}
         onBlur={() => {
           typed.current = false;
-          leftByPress.current = document.documentElement.matches(":active");
+          // Tab that left: its keyup is another field's.
+          tabbed.current = false;
           setTyping(false);
         }}
         data-words={typing ? undefined : ""}

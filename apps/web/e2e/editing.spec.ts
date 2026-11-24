@@ -175,6 +175,10 @@ for (const [size, viewport] of [
     await page.keyboard.press("Shift+Tab");
     await expect(start).not.toBeFocused();
     await expect.poll(async () => (await start.boundingBox())!.width).toBe(narrow);
+    // Tab coming in again, after Tab left: the words still.
+    await page.keyboard.press("Tab");
+    await expect(start).toBeFocused();
+    await expect(words(start)).toBeVisible();
     // Alt and the arrow is the browser's shortcut for its picker: no typing.
     await end.focus();
     await page.keyboard.press("Alt+ArrowDown");
