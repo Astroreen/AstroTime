@@ -1322,13 +1322,19 @@ describe("a new item in every account (design D313)", () => {
     const team = await calendar(work.id, "Team", ["VEVENT"]);
     const meetings = await calendar(work.id, "Meetings", ["VEVENT"]);
     const todo = await calendar(tasksOnly.id, "Todo", ["VTODO"]);
+    // An account not on a server (this device's) gets no copy.
+    const device = await add("device.example.com");
+    const onDevice = await calendar(device.id, "Here", ["VEVENT", "VTODO"]);
+    const servers = new Set([cloud.id, work.id, tasksOnly.id]);
     const hidden = new Set([team.id]);
     // Each other account's first calendar that takes it, visible before hidden.
     expect(
-      otherAccountsCalendars(await store.calendars(), "event", personal, hidden).map((c) => c.id),
+      otherAccountsCalendars(await store.calendars(), "event", personal, servers, hidden).map(
+        (c) => c.id,
+      ),
     ).toEqual([meetings.id]);
     expect(
-      otherAccountsCalendars(await store.calendars(), "task", personal).map((c) => c.id),
+      otherAccountsCalendars(await store.calendars(), "task", personal, servers).map((c) => c.id),
     ).toEqual([todo.id]);
 
     const form = {
@@ -1339,7 +1345,7 @@ describe("a new item in every account (design D313)", () => {
     const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
     await saveForm(
       store,
-      { ...request, hidden, everyAccount: true },
+      { ...request, hidden, everyAccount: servers },
       { now: NOW, uid: () => made.shift()! },
     );
     // The chosen calendar's is the first UID made: where it lands (D193).
@@ -1350,6 +1356,7 @@ describe("a new item in every account (design D313)", () => {
     // No calendar of the tasks-only account takes an event: no copy there.
     expect(await store.pending(todo.id)).toEqual([]);
     expect(await store.pending(team.id)).toEqual([]);
+    expect(await store.pending(onDevice.id)).toEqual([]);
 
     // Off, the default: only the calendar chosen.
     await saveForm(store, request, { now: NOW, uid: () => "alone" });

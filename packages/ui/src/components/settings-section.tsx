@@ -17,6 +17,7 @@ import { Switch } from "@base-ui/react/switch";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { accountsOnServers } from "../calendar/editing.ts";
 import { addAssistantStrings } from "../i18n/assistants.ts";
 import { addDataStrings } from "../i18n/data.ts";
 import { LANGUAGES } from "../i18n/index.ts";
@@ -204,8 +205,8 @@ function SettingsGroups({
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
       <Group title={t("accounts.title")}>
-        {/* A new item in one account, or in every one (D313): a choice only with two or more. */}
-        {accounts.length > 1 && (
+        {/* A new item in one account, or in every one on a server (D313): a choice only with two or more. */}
+        {accountsOnServers(accounts).length > 1 && (
           <div className="border-b border-line pb-1">
             <Toggle
               label={t("accounts.everyAccount")}

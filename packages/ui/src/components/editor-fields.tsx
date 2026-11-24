@@ -142,13 +142,12 @@ export function CalendarFields({
   const { t } = useTranslation();
   const event = form.kind === "event";
   const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
-  const own =
-    accounts.length > 0 && accountId !== undefined
-      ? calendars.filter((c) => c.accountId === accountId)
-      : calendars;
+  // The account row only while the item's own account is one of them.
+  const choosing = accounts.some((one) => one.account.id === accountId);
+  const own = choosing ? calendars.filter((c) => c.accountId === accountId) : calendars;
   return (
     <>
-      {accounts.length > 0 && accountId !== undefined && (
+      {choosing && accountId !== undefined && (
         <Dropdown
           label={t("edit.account")}
           value={accountId}

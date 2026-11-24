@@ -31,6 +31,7 @@ import {
   newItemCalendar,
   noticeOf,
   NowhereError,
+  accountsOnServers,
   otherAccountsCalendars,
   problemOf,
   RefusedError,
@@ -240,6 +241,8 @@ export function useEditingState({
   }, [store, detailsId]);
 
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
+  /** The accounts on a server, which a new item goes to when it goes to every account (D313). */
+  const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
   const firstFor = (kind: "event" | "task") =>
@@ -365,9 +368,16 @@ export function useEditingState({
   const change = (form: Form) =>
     setEditing((current) => {
       if (!current) return current;
-      // A kind its calendar cannot hold moves to the first calendar that can.
-      const fits = writable(form.kind, fromOf(current)).some((c) => c.id === form.calendarId);
-      const next = fits ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
+      // A kind its calendar cannot hold moves to the first calendar that
+      // can, in the same account first: the account chosen stays (D312).
+      const offered = writable(form.kind, fromOf(current));
+      const fits = offered.some((c) => c.id === form.calendarId);
+      const accountId = byId(form.calendarId)?.accountId;
+      const own = offered.filter((c) => c.accountId === accountId);
+      const sameAccount = own.find((c) => !hidden.has(c.id)) ?? own[0];
+      const next = fits
+        ? form
+        : { ...form, calendarId: sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId };
       // A rule moves with the item's day (D105).
       const moved = followed(current.state.form, next);
       return { ...current, state: { ...current.state, form: moved, problem: null } };
@@ -396,7 +406,7 @@ export function useEditingState({
           scope,
           untitled: t("edit.untitledReminder"),
           hidden,
-          everyAccount,
+          ...(everyAccount ? { everyAccount: servers } : {}),
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
@@ -580,26 +590,32 @@ export function useEditingState({
       : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
-  // A new item (not a copy) that goes to every account: no account to
-  // choose, and the dialog says where else it goes (design D313).
+  // A new item (not a copy) that goes to every account on a server: no
+  // account to choose, and the dialog says where else it goes (design D313).
   const spread =
     editing !== null &&
     shown !== null &&
+    !shown.refused &&
     everyAccount &&
     editing.base === undefined &&
-    otherAccountsCalendars(calendars, editing.state.form.kind, shown.calendar, hidden).length > 0;
-  // Each account offered, with where choosing it puts the item: its first
-  // calendar, visible before hidden; none when there is only one (D312).
-  const accountIds = [...new Set(shownCalendars.map((one) => one.accountId))];
-  const accountChoices: AccountChoice[] =
-    spread || accountIds.length < 2
-      ? []
-      : accountIds.flatMap((id) => {
-          const account = accounts.find((one) => one.id === id);
-          const own = shownCalendars.filter((one) => one.accountId === id);
-          const first = own.find((one) => !hidden.has(one.id)) ?? own[0];
-          return account && first ? [{ account, calendarId: first.id }] : [];
-        });
+    otherAccountsCalendars(calendars, editing.state.form.kind, shown.calendar, servers, hidden)
+      .length > 0;
+  // Each account offered, with where choosing it puts the item (D312): an
+  // existing item's own calendar in its own account, else the account's
+  // first calendar that takes it, visible before hidden; none to choose
+  // when there is only one.
+  const from = editing ? fromOf(editing) : undefined;
+  // In the accounts' own order, as the drawer and Settings list them.
+  const choices = accounts.flatMap((account) => {
+    const id = account.id;
+    const own = shownCalendars.filter(
+      (one) => one.accountId === id && !(shown?.refused && one.id === shown.calendar.id),
+    );
+    const first =
+      own.find((one) => one.id === from?.id) ?? own.find((one) => !hidden.has(one.id)) ?? own[0];
+    return first ? [{ account, calendarId: first.id }] : [];
+  });
+  const accountChoices: AccountChoice[] = spread || choices.length < 2 ? [] : choices;
 
   const dialogs = (
     <>

@@ -36,6 +36,7 @@ import {
 import {
   CommitInDoubtError,
   HandOverError,
+  type Account,
   type Calendar,
   type LocalChange,
   type Store,
@@ -707,20 +708,30 @@ export function newItemCalendar(
 }
 
 /**
+ * The accounts a new item may go to on a server, when new items go to
+ * every account (design D313): CalDAV's. A subscription takes no item, and
+ * the calendar on this device and the demo's reach no server.
+ */
+export const accountsOnServers = (accounts: readonly Account[]): Account[] =>
+  accounts.filter((account) => account.provider === "caldav");
+
+/**
  * Where a copy of a new item goes when new items go to every account
- * (design D313): for each account besides `into`'s, its first calendar
- * that takes the item, visible before hidden, as `firstCalendarFor` picks
- * one; an account none of whose calendars takes it gets no copy.
+ * (design D313): for each account of `among` (those on a server) besides
+ * `into`'s, its first calendar that takes the item, visible before hidden,
+ * as `firstCalendarFor` picks one; an account none of whose calendars
+ * takes it gets no copy.
  */
 export function otherAccountsCalendars(
   calendars: readonly Calendar[],
   kind: "event" | "task",
   into: Calendar,
+  among: ReadonlySet<string>,
   hidden?: ReadonlySet<string>,
 ): Calendar[] {
   const accounts = [...new Set(calendars.map((calendar) => calendar.accountId))];
   return accounts.flatMap((accountId) => {
-    if (accountId === into.accountId) return [];
+    if (accountId === into.accountId || !among.has(accountId)) return [];
     const own = calendars.filter((calendar) => calendar.accountId === accountId);
     const first = firstCalendarFor(own, kind, hidden);
     return first ? [first] : [];
@@ -902,11 +913,12 @@ export async function saveForm(
      */
     readonly base?: string;
     /**
-     * A new item goes to every account (design D313): a copy of it, with a
-     * UID of its own, in each other account's first calendar that takes it.
-     * Not for a copy ("Copy to" picks one calendar).
+     * A new item goes to every account (design D313): these, the accounts
+     * on a server, each get a copy of it with a UID of its own, in their
+     * first calendar that takes it. Not for a copy ("Copy to" picks one
+     * calendar).
      */
-    readonly everyAccount?: boolean;
+    readonly everyAccount?: ReadonlySet<string>;
   },
   writes: Writes,
 ): Promise<void> {
@@ -938,6 +950,7 @@ export async function saveForm(
         calendars,
         form.kind,
         into.calendar,
+        request.everyAccount,
         request.hidden,
       )) {
         const copy = createItem(form.kind, changesOf(null, form, untitled), {

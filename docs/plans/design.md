@@ -2644,21 +2644,31 @@ keywords". The quick parse and voice that fill quick create are the
   offered there is no account row: the calendar is the whole choice, as
   before. An existing item's dialog offers it too: a move to another
   account's calendar is the move the calendar field already made
-  ([D37](foundation.md#D37)'s rights decide where).
+  ([D37](foundation.md#D37)'s rights decide where); its own account leads
+  back to its own calendar. A kind switched to one its calendar cannot
+  hold moves to the same account's first calendar that can, before
+  another account's.
 - **D313. A new item in every account, a setting.** The owner: "by
   default a new event or task goes to one calendar; one can also choose
   to sync all calendars, so each has every task and event; then the
   account choice is hidden". Settings → Accounts has "Save new items to
-  every account" (off by default, shown with two accounts or more). On, a
-  new event or task (not a copy, [D164](#D164) picks one calendar) is
-  saved in the calendar chosen and, in the same local write, a copy of it
-  in each other account's first calendar that takes it, visible before
-  hidden; an account none of whose calendars takes it gets none. Each copy
+  every account" (off by default, shown with two accounts on a server or
+  more). On, a new event or task (not a copy, [D164](#D164) picks one
+  calendar) is saved in the calendar chosen and, in the same local write, a
+  copy of it in each other account on a server's first calendar that takes
+  it, visible before hidden; an account none of whose calendars takes it
+  gets none. One copy per account, not one per calendar: the owner hides
+  the account choice, not the calendar's, so "every calendar" is each
+  account's. The calendar on this device ([foundation
+  D122](foundation.md#D122)) and the demo's get no copy: they reach no
+  server, and a copy would keep the device's calendar from stepping aside. Each copy
   has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
   are two items, not one shared. The dialog has no account row then, and
   says under the calendar that it is also saved to the other accounts.
-  It is about creating: an edit or a deletion later changes the one copy
-  edited ([Deferred](#deferred)).
+  It is about creating in the dialogs: an edit or a deletion later changes
+  the one copy edited ([Deferred](#deferred)), and an assistant's
+  `create` through MCP ([assistant D307](assistant.md#D307)) names its
+  calendar and makes one item.
 
 ## Deferred
 

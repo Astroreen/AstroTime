@@ -53,23 +53,37 @@ const uploadTo = (page: Page, server: CalDavServer) =>
       (response) =>
         // Through the dev server's proxy (`/dav-proxy/`), which names the server in its path.
         response.request().method() === "PUT" &&
-        decodeURIComponent(response.url()).includes(new URL(server.url).host),
+        decodeURIComponent(response.url()).includes(`${new URL(server.url).host}/`),
     )
     .then((response) => {
       expect(response.status()).toBe(201);
       return /\r\nUID:([^\r]+)\r\n/.exec(response.request().postData() ?? "")?.[1];
     });
 
+/** How many items a calendar holds on its server, as another client lists them. */
+async function itemsIn(server: CalDavServer, url: string): Promise<number> {
+  const response = await fetch(url, {
+    method: "PROPFIND",
+    headers: {
+      Authorization: `Basic ${btoa(`${server.username}:${server.password}`)}`,
+      Depth: "1",
+      "Content-Type": "application/xml",
+    },
+    body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>',
+  });
+  return (await response.text()).match(/\.ics<\//g)?.length ?? 0;
+}
+
 test("a new event goes to the account chosen, or to every account", async ({
   page,
   first,
   second,
 }) => {
-  await first.mkcalendar("home");
-  await second.mkcalendar("work");
-  await second.mkcalendar("family");
+  const home = await first.mkcalendar("home");
+  const work = await second.mkcalendar("work");
+  const family = await second.mkcalendar("family");
   await openApp(page);
-  await signIn(page, first);
+  const firstName = await signIn(page, first);
   const secondName = await signIn(page, second);
 
   // Quick create offers each account, and the chosen one's calendars (D312).
@@ -77,9 +91,18 @@ test("a new event goes to the account chosen, or to every account", async ({
   const quick = quickCreate(page);
   const account = quick.getByRole("combobox", { name: "Account" });
   await expect(account).toBeVisible();
+  // Each account in turn: its own calendars only, its first one chosen.
+  const calendar = quick.getByRole("combobox", { name: "Calendar" });
+  await choose(account, firstName);
+  await expect(calendar).toHaveText(/home/);
+  await calendar.click();
+  await expect(page.getByRole("option", { name: "home" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "family" })).toHaveCount(0);
+  await page.getByRole("option", { name: "home" }).click();
   await choose(account, secondName);
   await expect(account).toHaveText(new RegExp(secondName.replaceAll(".", "\\.")));
-  await quick.getByRole("combobox", { name: "Calendar" }).click();
+  await expect(calendar).not.toHaveText(/home/);
+  await calendar.click();
   await expect(page.getByRole("option", { name: "work" })).toBeVisible();
   await expect(page.getByRole("option", { name: "family" })).toBeVisible();
   await expect(page.getByRole("option", { name: "home" })).toHaveCount(0);
@@ -106,7 +129,7 @@ test("a new event goes to the account chosen, or to every account", async ({
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(quick.getByRole("combobox", { name: "Account" })).toHaveCount(0);
-  await expect(quick.getByText("Also saved to each of your other accounts.")).toBeVisible();
+  await expect(quick.getByText("Also saved to your other accounts.")).toBeVisible();
   await quick.getByRole("textbox", { name: "Title" }).fill("Dentist");
   await shoot(page, "every-account-quick-create");
   const both = Promise.all([uploadTo(page, first), uploadTo(page, second)]);
@@ -115,4 +138,9 @@ test("a new event goes to the account chosen, or to every account", async ({
   expect(one).toBeTruthy();
   expect(other).toBeTruthy();
   expect(one).not.toBe(other);
+  // Off, one server had it; on, both: the first holds one item, the second two.
+  expect([
+    await itemsIn(first, home),
+    (await itemsIn(second, family)) + (await itemsIn(second, work)),
+  ]).toEqual([1, 2]);
 });
