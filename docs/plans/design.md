@@ -2677,7 +2677,9 @@ keywords". The quick parse and voice that fill quick create are the
   says under the calendar where else it is saved, each copy's calendar
   with its account ("Also saved to Work · astro@work.example.com": the
   first calendar by name may be one shared with the user); a new item
-  starts in an account on a server, not on this device. Each copy is an
+  starts in an account on a server, not on this device; one put on this
+  device by choice still goes to every server, as the line under the
+  calendar says before it is saved. Each copy is an
   item of its own, drawn as one where its calendar is shown. Its
   calendars, every account's in one list, each say whose they are
   ("Personal · astro@cloud.example.com").
