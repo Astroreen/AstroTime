@@ -23,7 +23,7 @@ function series(master: string, ...exceptions: string[]): CalendarObject {
       "DTEND;TZID=Europe/Vilnius:20261101T093000",
       "RRULE:FREQ=DAILY",
       "SUMMARY:Stand-up",
-      ...master.split("\n").filter(Boolean),
+      ...master.split("\n").filter((line) => line !== ""),
       "END:VEVENT",
       ...exceptions.flatMap((lines) => [
         "BEGIN:VEVENT",
@@ -205,7 +205,11 @@ test("every occurrence the views draw opens itself, by the id they drew it with"
   }
 });
 
-/** A series with both 3:30s of Vilnius' fall-back night, 00:30Z and 01:30Z, by RDATE. */
+/**
+ * A series kept in UTC, 00:30Z and 01:30Z by RDATE: both read 3:30 in Vilnius
+ * on its fall-back night. (A series in Vilnius' own zone has no two 3:30s:
+ * the expansion keeps one.)
+ */
 function twoThreeThirties(...extra: string[]): CalendarObject {
   return CalendarObject.parse(
     [
@@ -234,7 +238,7 @@ const utc = (iso: string): ItemTime => ({
   epochMs: Date.parse(iso),
 });
 
-test("one of the two 3:30s taken out: the other is not opened for it", () => {
+test("in a series kept in UTC, an EXDATE'd occurrence does not open the next one", () => {
   const object = twoThreeThirties("EXDATE:20261025T003000Z");
   expect(occurrenceOn(object, utc("2026-10-25T00:30:00Z"), "2026-10-25", timeZone)).toBeNull();
   expect(occurrenceOn(object, utc("2026-10-25T01:30:00Z"), "2026-10-25", timeZone)).not.toBeNull();
@@ -263,4 +267,42 @@ test("on a spring-forward night, the id itself tells 3:30 from 4:30 at one insta
     .filter((id) => id.type === "zoned");
   const later = ids.find((id) => id.local === "2026-03-29T04:30:00")!;
   expect(occurrenceOn(hourly, later, "2026-03-29", timeZone)?.recurrenceId).toEqual(later);
+});
+
+test("on a spring-forward night, a stale 3:30 does not open the 4:30 at its instant", () => {
+  // 3:30 does not exist on March 29th in Vilnius; the expansion keeps it at
+  // 4:30's instant. With 4:30 moved away, an old 3:30 is not taken for it.
+  const hourly = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:hourly",
+      "DTSTAMP:20260301T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20260329T013000",
+      "DURATION:PT10M",
+      "RRULE:FREQ=HOURLY;COUNT=5",
+      "SUMMARY:Check",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:hourly",
+      "DTSTAMP:20260301T000000Z",
+      "RECURRENCE-ID;TZID=Europe/Vilnius:20260329T043000",
+      "DTSTART;TZID=Europe/Vilnius:20260329T063000",
+      "DURATION:PT10M",
+      "SUMMARY:Check, moved",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const stale: ItemTime = {
+    type: "zoned",
+    local: "2026-03-29T03:30:00",
+    timeZone,
+    epochMs: Date.parse("2026-03-29T01:30:00Z"),
+  };
+  const opened = occurrenceOn(hourly, stale, "2026-03-29", timeZone);
+  expect(opened?.item.summary).not.toBe("Check, moved");
 });

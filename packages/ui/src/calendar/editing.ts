@@ -899,14 +899,20 @@ export async function current(local: LocalChange, target: Target) {
  * The occurrence of a series a tap from outside the page opens (the home
  * screen widget, a reminder): one the views draw, expanded as they expand
  * it, from the day before `day` to the day after (a task due at midnight
- * ends where `day` begins). It is the only one with the same recurrence
- * id, as the snapshot or the reminder took it from the same expansion;
- * else the only zoned one at the same instant (a server's UTC); else, for
- * an id of another kind, the only one the series' own rule says it names
- * (`namesSameOccurrence`, foundation D35). Two zoned ids are never matched
- * on the wall clock: the two 03:30s of a fall-back night are two. `null` when there is none, or more than one, or the
- * series has it no more (an EXDATE, an exception the server cancelled) or
- * is too dense to expand, as the views draw none of it then.
+ * ends where `day` begins). In turn, the first step that finds any decides,
+ * and finding more than one is `null`:
+ * 1. the same recurrence id, every field (the snapshot and reminders take
+ *    theirs from the same expansion);
+ * 2. for a zoned id, a zoned one at the same instant in another zone (a
+ *    server's UTC for the series' zone); in the same zone a zoned id is
+ *    never matched but by step 1, so neither the two 3:30s of a fall-back
+ *    night nor the 3:30 and 4:30 of a spring-forward one are taken for
+ *    each other;
+ * 3. for ids of different kinds (a date or a floating time on either
+ *    side), the one the series' own rule says it names
+ *    (`namesSameOccurrence`, foundation D35).
+ * `null` too when the series has it no more (an EXDATE, an exception the
+ * server cancelled) or is too dense to expand, as the views draw none of it.
  */
 export function occurrenceOn(
   object: CalendarObject,
@@ -924,33 +930,34 @@ export function occurrenceOn(
   } catch {
     return null;
   }
-  const ids = occurrences.filter((occurrence) => occurrence.recurrenceId !== null);
-  const only = (found: Occurrence[]) => (found.length === 1 ? found[0]! : null);
-  // The same id, every field: the two 3:30s of a spring-forward night share an instant.
-  const same = only(
-    ids.filter((o) => JSON.stringify(o.recurrenceId) === JSON.stringify(recurrenceId)),
+  const ids = occurrences.flatMap((occurrence) =>
+    occurrence.recurrenceId ? [{ occurrence, id: occurrence.recurrenceId }] : [],
   );
-  if (same) return same;
-  // Two zoned ids name one occurrence by their instant alone (a server's UTC
-  // for the series' zone), never by the wall clock: the two 3:30s of a
-  // fall-back night are two.
-  if (recurrenceId.type === "zoned") {
-    const instant = only(
-      ids.filter(
-        (o) => o.recurrenceId!.type === "zoned" && o.recurrenceId!.epochMs === recurrenceId.epochMs,
-      ),
-    );
-    if (instant) return instant;
+  const steps: ((id: ItemTime) => boolean)[] = [
+    (id) => sameId(id, recurrenceId),
+    (id) =>
+      id.type === "zoned" &&
+      recurrenceId.type === "zoned" &&
+      id.timeZone !== recurrenceId.timeZone &&
+      id.epochMs === recurrenceId.epochMs,
+    (id) =>
+      (id.type !== "zoned" || recurrenceId.type !== "zoned") &&
+      namesSameOccurrence(object, id, recurrenceId),
+  ];
+  for (const step of steps) {
+    const found = ids.filter(({ id }) => step(id));
+    if (found.length > 0) return found.length === 1 ? found[0]!.occurrence : null;
   }
-  // Ids of another kind (a date, a floating time): as the series' own rule
-  // says they name it, when it names one.
-  return only(
-    ids.filter(
-      (o) =>
-        (o.recurrenceId!.type !== "zoned" || recurrenceId.type !== "zoned") &&
-        namesSameOccurrence(object, o.recurrenceId!, recurrenceId),
-    ),
-  );
+  return null;
+}
+
+/** The same recurrence id, field by field. */
+function sameId(a: ItemTime, b: ItemTime): boolean {
+  if (a.type === "date" || b.type === "date")
+    return a.type === b.type && a.date === (b as typeof a).date;
+  if (a.type === "floating" || b.type === "floating")
+    return a.type === b.type && a.local === b.local;
+  return a.local === b.local && a.timeZone === b.timeZone && a.epochMs === b.epochMs;
 }
 
 /** What shows of an occurrence: its exception, or the master. */
