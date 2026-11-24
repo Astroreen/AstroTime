@@ -11,11 +11,13 @@ import {
   editItem,
   hasOccurrence,
   movedRepeat,
+  occurrencesBetween,
   placeText,
   sameGeo,
   repeatOf,
   timesOf,
   wallClockIn,
+  wallClockOf,
   WEEKDAYS,
   zonedTime,
   attachLines,
@@ -31,6 +33,7 @@ import {
   type NewAlarm,
   type NewAttachment,
   type NewInlineFile,
+  type Occurrence,
   type Repeat,
   type Scope,
 } from "@astrotime/core";
@@ -890,6 +893,35 @@ export async function current(local: LocalChange, target: Target) {
     throw new GoneError("The occurrence is no longer in its series.");
   }
   return { stored, object };
+}
+
+/**
+ * The occurrence of a series a tap from outside the page opens (the home
+ * screen widget, a reminder): the one the views draw on `day`, expanded as
+ * they expand it and found by its time on the wall clock, so a recurrence id
+ * the server wrote another way (UTC for a zoned series) is the same; `null`
+ * when the series has it no more (an EXDATE, an exception the server
+ * cancelled, foundation D35) or is too dense to expand.
+ */
+export function occurrenceOn(
+  object: CalendarObject,
+  recurrenceId: ItemTime,
+  day: string,
+  timeZone: string,
+): Occurrence | null {
+  let occurrences: Occurrence[];
+  try {
+    occurrences = occurrencesBetween(object, { from: day, to: addDays(day, 1), timeZone });
+  } catch {
+    return null;
+  }
+  const at = wallClockOf(recurrenceId, timeZone);
+  return (
+    occurrences.find(
+      (occurrence) =>
+        occurrence.recurrenceId !== null && wallClockOf(occurrence.recurrenceId, timeZone) === at,
+    ) ?? null
+  );
 }
 
 /** What shows of an occurrence: its exception, or the master. */

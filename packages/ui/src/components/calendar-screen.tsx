@@ -27,7 +27,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
-import { itemOf } from "../calendar/editing.ts";
+import { itemOf, occurrenceOn } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { shownCalendars } from "../calendar/calendars.ts";
 import { liveQuery, whileShown } from "../calendar/live.ts";
@@ -448,11 +448,16 @@ export function CalendarScreen({
     if (opening !== openings.current || drafting.current) return;
     if (!stored || stored.pending === "delete") return;
     const object = CalendarObject.parse(stored.ics);
-    // An occurrence gone since it was shown (an EXDATE synced in): its day alone.
+    if (recurrenceId !== null && day) {
+      // The occurrence the views draw on its day; gone since it was shown
+      // (an EXDATE, an exception the server cancelled): its day alone.
+      const occurrence = occurrenceOn(object, recurrenceId, day, timeZone);
+      if (occurrence)
+        editing.value.open(targetOf(stored, object, occurrence.recurrenceId, occurrence.item));
+      return;
+    }
     if (recurrenceId !== null && !hasOccurrence(object, recurrenceId)) return;
     const item = itemOf(object, recurrenceId);
-    // One a cancelled exception removes, as the views leave it out (foundation D35): its day alone.
-    if (recurrenceId !== null && item?.status?.toUpperCase() === "CANCELLED") return;
     if (item) editing.value.open(targetOf(stored, object, recurrenceId, item));
   };
 

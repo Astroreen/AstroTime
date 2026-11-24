@@ -58,6 +58,9 @@ class ScheduleWidget : AppWidgetProvider() {
         /** Held while the file is written or read, never while drawing. */
         private val lock = Any()
 
+        /** The snapshot last drawn in this process; `null` before, or once another is written. */
+        private var drawn: String? = null
+
         /**
          * Keeps `json` (the UI's `ScheduleSnapshot`), when `allowed` still
          * says so, and draws every widget from it. The drawing is outside the lock: asking for the list's rows
@@ -76,18 +79,27 @@ class ScheduleWidget : AppWidgetProvider() {
                     } catch (error: IOException) {
                         null
                     }
-                if (had == json) return
-                file.baseFile.parentFile?.mkdirs()
-                val out = file.startWrite()
-                try {
-                    out.write(json.toByteArray(Charsets.UTF_8))
-                    file.finishWrite(out)
-                } catch (error: Throwable) {
-                    file.failWrite(out)
-                    throw error
+                // The same as the file, and drawn from it in this process: nothing to do. One written
+                // but not drawn (the drawing failed, or the process ended between) is drawn again.
+                if (had == json && drawn == json) return
+                drawn = null
+                if (had != json) {
+                    file.baseFile.parentFile?.mkdirs()
+                    val out = file.startWrite()
+                    try {
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                        file.finishWrite(out)
+                    } catch (error: Throwable) {
+                        file.failWrite(out)
+                        throw error
+                    }
                 }
             }
             redraw(context)
+            synchronized(lock) {
+                // Unless another came meanwhile: then the next one handed is drawn again.
+                if (kept(context) == json) drawn = json
+            }
         }
 
         /** The snapshot kept, or `null` before the first. */
@@ -106,18 +118,18 @@ class ScheduleWidget : AppWidgetProvider() {
          * and `java.time` came with 8.0.
          */
         fun shown(context: Context): Shown {
-            val at = Calendar.getInstance().time
+            // One moment for the day and its words, so midnight does not fall between them.
+            val now = Calendar.getInstance()
             return Snapshot.read(
                 kept(context),
-                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at),
-                { tag -> todayIn(tag?.let(Locale::forLanguageTag) ?: Locale.getDefault()) },
+                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(now.time),
+                { tag -> todayIn(now, tag?.let(Locale::forLanguageTag) ?: Locale.getDefault()) },
                 context.getString(R.string.widget_open_app),
             )
         }
 
-        /** Today's date and month in `locale`. */
-        private fun todayIn(locale: Locale): Today {
-            val now = Calendar.getInstance()
+        /** `now`'s date and month in `locale`. */
+        private fun todayIn(now: Calendar, locale: Locale): Today {
             val at = now.time
             val mark =
                 DayMark(

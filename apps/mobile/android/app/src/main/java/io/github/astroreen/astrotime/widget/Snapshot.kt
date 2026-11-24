@@ -92,11 +92,11 @@ object Snapshot {
             if (rows.size > start) title = title ?: day.optString("month").ifEmpty { null }
         }
         if (rows.firstOrNull()?.mark?.today != true) {
-            val words = todayWords(snapshot.optString("locale").ifEmpty { null })
-            rows.add(0, Row.Empty(words.mark, snapshot.optString("beyond").ifEmpty { beyond }))
+            val words = todayWords(snapshot.text("locale"))
+            rows.add(0, Row.Empty(words.mark, snapshot.text("beyond") ?: beyond))
             title = words.month
         }
-        return Shown(title, snapshot.optString("create").ifEmpty { null }, rows)
+        return Shown(title, snapshot.text("create"), rows)
     }
 
     private fun rowOf(row: JSONObject, mark: DayMark?): Row? {
@@ -118,6 +118,9 @@ object Snapshot {
             else -> null
         }
     }
+
+    /** A string field; `null` when it is missing, empty or JSON's `null` (which `optString` reads as "null"). */
+    private fun JSONObject.text(key: String): String? = if (isNull(key)) null else optString(key).ifEmpty { null }
 
     /** `#rrggbb` as opaque ARGB; `null` for anything else. */
     fun colorOf(hex: String): Int? {

@@ -721,8 +721,9 @@ were checked on 2026-11-01.
     ([D67](#D67)), even an app opened and left at once, before it drew
     (the widget then waits for the next run). The open app hands one at
     every change; the shell writes and draws only one that differs from
-    the file the widget has, whoever wrote it, so a write that failed is
-    made again with the next change. The snapshot names every day of its
+    the file the widget has, whoever wrote it, or one not yet drawn in this
+    process, so a write or a drawing that failed is made again with the
+    next change. The snapshot names every day of its
     range, those with nothing too, so after midnight the widget names
     today and its month in the user's words.
   - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
@@ -755,10 +756,11 @@ were checked on 2026-11-01.
     listener. A tap never replaces a draft open in quick create or the
     edit dialog, nor covers the question of a change's scope (an item's
     tap then opens its day alone); a tap closes an item's details open
-    before it; an occurrence gone since the snapshot opens its day alone;
-    a tap whose item is still being read gives way to a later one (not to
-    details opened in the app meanwhile, a read's length); an exception a
-    server cancelled opens its day alone, as the views leave it out;
+    before it; a tap whose item is still being read gives way to a later
+    one (not to details opened in the app meanwhile, a read's length); an
+    occurrence of a series opens as the views draw it on its day, found
+    by its time (`occurrenceOn`), so one a server cancelled, by an id it
+    wrote in UTC too, opens its day alone, and a series cancelled whole still opens;
     details a draft was opened from stay under it, for its Cancel. A tapped
     reminder opens the same way ([D66](#D66), foundation D101): the rule
     is the one for whatever opens from outside the page. Past the
@@ -812,6 +814,9 @@ were checked on 2026-11-01.
 - **A day the row cap cuts** — the snapshot ends with that day, showing
   part of its items with nothing to say there are more; at a month's
   distance it is the list's last day ([D317](#D317)).
+- **Past the snapshot's end, after the device's language changed** — that
+  row speaks the snapshot's language until the app opens, AstroTime's
+  choice being the app's to make ([D317](#D317)).
 - **The undone row across midnight** — it stands on the snapshot's today,
   so after midnight it leaves with that day until the next snapshot (the
   app opened, or background sync within the hour); the widget could carry
