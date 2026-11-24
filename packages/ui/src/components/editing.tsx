@@ -611,7 +611,7 @@ export function useEditingState({
   const labels = accountLabels(accounts, (account) => accountName(account, t));
   // Each copy's calendar and account, named under the calendar (D314).
   const copiesTo =
-    editing !== null && shown !== null && !shown.refused && toEvery && editing.base === undefined
+    editing !== null && shown !== null && !shown.refused && toEvery && !editing.base
       ? otherAccountsCalendars(
           calendars,
           editing.state.form.kind,
@@ -642,8 +642,7 @@ export function useEditingState({
   });
   // A new item while new items go to every account has no account row,
   // whichever calendar it is in now (D314).
-  const everyMode =
-    toEvery && editing !== null && editing.target === null && editing.base === undefined;
+  const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
   const accountChoices: AccountChoice[] = choices.length < 2 ? [] : choices;
 
   const dialogs = (

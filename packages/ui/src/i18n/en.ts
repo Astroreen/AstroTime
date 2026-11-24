@@ -114,7 +114,7 @@ export const en = {
     "Nothing goes to this server or comes from it; changes made here wait on this device until sync is on again.",
   "accounts.everyAccount": "Save new items to every account",
   "accounts.everyAccount.hint":
-    "A new event or task is saved to each account, not only to the one chosen.",
+    "A new event or task is saved to each account, not only to the one chosen. The copies are separate: a later change touches only the one changed.",
   "sync.offline": "Offline: changes wait until the server can be reached",
   "sync.signed-out": "Signed out: sign in again to sync",
   "sync.refused": "This AstroTime's administrator does not allow this server",
