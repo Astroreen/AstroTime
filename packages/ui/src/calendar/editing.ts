@@ -953,11 +953,14 @@ export function occurrenceOn(
 
 /** The same recurrence id, field by field. */
 function sameId(a: ItemTime, b: ItemTime): boolean {
-  if (a.type === "date" || b.type === "date")
-    return a.type === b.type && a.date === (b as typeof a).date;
-  if (a.type === "floating" || b.type === "floating")
-    return a.type === b.type && a.local === b.local;
-  return a.local === b.local && a.timeZone === b.timeZone && a.epochMs === b.epochMs;
+  if (a.type === "date") return b.type === "date" && a.date === b.date;
+  if (a.type === "floating") return b.type === "floating" && a.local === b.local;
+  return (
+    b.type === "zoned" &&
+    a.local === b.local &&
+    a.timeZone === b.timeZone &&
+    a.epochMs === b.epochMs
+  );
 }
 
 /** What shows of an occurrence: its exception, or the master. */
