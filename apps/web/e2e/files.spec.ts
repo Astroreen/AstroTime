@@ -293,7 +293,10 @@ test("an item moved to another account while its file uploads: not attached, sai
   await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
   // Meanwhile the item goes to the calendar on this device, which has no
   // files: the ways turn off, the upload goes on (its input stays, D237).
-  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Personal");
+  // Another account's calendar is chosen through its account (design D313).
+  const account = edit.getByRole("combobox", { name: "Account" });
+  await choose(account, "On this device");
+  await expect(edit.getByRole("combobox", { name: "Calendar" })).toHaveText(/Personal/);
   await expect(edit.getByRole("button", { name: "From this device" })).toBeDisabled();
   await expect(edit.getByRole("status")).toHaveText("Uploading minutes.txt…");
   answer();
@@ -302,7 +305,9 @@ test("an item moved to another account while its file uploads: not attached, sai
   );
   await expect(edit.getByRole("list", { name: "Attachments" })).toHaveCount(0);
   // Back in the account the file went to: attached after all, the alert gone.
-  await choose(edit.getByRole("combobox", { name: "Calendar" }), "Work");
+  // Its own account leads back to its own calendar (design D313).
+  await choose(account, `${USER}@cloud.example.com`);
+  await expect(edit.getByRole("combobox", { name: "Calendar" })).toHaveText(/Work/);
   await expect(edit.getByRole("list", { name: "Attachments" }).getByRole("listitem")).toHaveText([
     /minutes\.txt/,
   ]);
