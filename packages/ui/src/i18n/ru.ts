@@ -109,6 +109,10 @@ export const ru = {
   "sync.never": "Ещё не синхронизирован",
   "sync.syncedAt": "Синхронизирован в {{time}}",
   "sync.off": "Синхронизация выключена",
+  "accounts.calendars_one": "{{count}} календарь",
+  "accounts.calendars_few": "{{count}} календаря",
+  "accounts.calendars_many": "{{count}} календарей",
+  "accounts.calendars_other": "{{count}} календаря",
   "accounts.sync": "Синхронизация",
   "accounts.sync.hint":
     "С сервером ничего не обменивается; изменения, сделанные здесь, ждут на этом устройстве, пока синхронизация не включится снова.",

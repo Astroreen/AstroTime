@@ -7,7 +7,7 @@ import { syncs, type AccountSync, type Problem } from "@astrotime/sync";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import type { TFunction } from "i18next";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AccountStatus } from "../accounts/scheduler.ts";
@@ -200,10 +200,13 @@ export function AccountRow({
   account,
   onLeave,
   compact = false,
+  action,
 }: {
   account: Account;
   onLeave: () => void;
   compact?: boolean;
+  /** A control left of its menu: Settings' switch for its sync (design D316). */
+  action?: ReactNode;
 }) {
   const { t } = useTranslation();
   const value = useAccounts();
@@ -223,6 +226,7 @@ export function AccountRow({
             <StatusLine account={account} value={value} />
           </p>
         </div>
+        {action}
         <AccountMenu account={account} onLeave={onLeave} />
       </div>
       {last?.status === "signed-out" && !account.syncOff && (

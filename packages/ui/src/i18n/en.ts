@@ -109,6 +109,8 @@ export const en = {
   "sync.never": "Not synced yet",
   "sync.syncedAt": "Synced at {{time}}",
   "sync.off": "Sync is off",
+  "accounts.calendars_one": "{{count}} calendar",
+  "accounts.calendars_other": "{{count}} calendars",
   "accounts.sync": "Sync",
   "accounts.sync.hint":
     "Nothing goes to this server or comes from it; changes made here wait on this device until sync is on again.",

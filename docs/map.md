@@ -360,7 +360,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `calendar-row.tsx` — a calendar's row with its checkbox, the drawer's
       and Settings'. → `plans/design.md#D137`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
-      screen), from the drawer's foot. → `plans/design.md#D131`,
+      screen), from the drawer's foot; each account with its sync switch
+      beside its menu and its calendars folded (`plans/design.md#D316`). → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
     - `type-settings.tsx` — Settings' "Font" and "Text size", with their
       live preview (the Agenda's day heading and cards). → `plans/design.md#D294`,

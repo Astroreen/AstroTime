@@ -2703,6 +2703,15 @@ keywords". The quick parse and voice that fill quick create are the
   ([D296](#D296)) has no "Save" at its foot: it stands at the end of the
   "Event | Task" row, the microphone left of it when voice is on
   ([assistant D302](assistant.md#D302)).
+- **D316. An account in Settings: its switch beside its menu, its
+  calendars folded.** The owner: "Sync is in effect turning the account on:
+  put the switch left of the ⋮ by the account, an on/off for the account,
+  meaning whether it syncs with your calendar; and make the calendars
+  under it foldable." Settings → Accounts has no "Sync" row: each
+  account's switch stands left of its menu (named "Sync", [foundation
+  D171](foundation.md#D171)'s setting, off with its calm hint under the
+  row), and its calendars fold under "N calendars", folded at first, the
+  drawer's checkbox rows ([D137](#D137)) once opened.
 
 ## Deferred
 

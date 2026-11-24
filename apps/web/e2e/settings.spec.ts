@@ -61,7 +61,11 @@ test("theme, week start, clock, hide completed and language apply at once and ar
   await expect(strip.getByRole("button", { name: "3 undone tasks" })).toBeVisible();
 
   // A calendar hidden in Settings is hidden in the drawer too: one setting (D131).
-  await inSettings(page, (settings) => settings.getByRole("checkbox", { name: "Work" }).click());
+  // An account's calendars are folded until opened (design D316).
+  await inSettings(page, async (settings) => {
+    await settings.getByRole("button", { name: /^\d+ calendars$/ }).click();
+    await settings.getByRole("checkbox", { name: "Work" }).click();
+  });
   await expect(
     page.getByRole("navigation", { name: "Main menu" }).getByRole("checkbox", { name: "Work" }),
   ).not.toBeChecked();
@@ -172,7 +176,11 @@ test("Settings lists the accounts, each with how it syncs, its menu and its cale
   await expect(demo.getByText("Demo data, on this device only")).toBeVisible();
   await expect(demo.getByRole("status")).toHaveCount(0);
   await expect(demo.getByRole("button", { name: "Options for Demo" })).toBeVisible();
-  // The drawer's calendar row, the same checkbox in the same place.
+  // Its calendars folded until opened (design D316), then the drawer's row.
+  const fold = demo.getByRole("button", { name: "4 calendars" });
+  await expect(fold).toHaveAttribute("aria-expanded", "false");
+  await expect(demo.getByRole("checkbox")).toHaveCount(0);
+  await fold.click();
   for (const name of ["Holidays", "Personal", "Tasks", "Work"]) {
     await expect(demo.getByRole("checkbox", { name })).toBeChecked();
   }
@@ -194,6 +202,7 @@ test("the calendar on this device is named so in Settings (design D137)", async 
     .getByRole("region", { name: "Accounts" });
   // The account, and its calendar's own row, named in the language spoken now.
   const local = accounts.getByRole("region", { name: "On this device" });
+  await local.getByRole("button", { name: "1 calendar" }).click();
   await expect(local.getByRole("checkbox", { name: "Personal" })).toBeChecked();
   await choose(page.getByLabel("Language"), "Русский");
   const russian = page

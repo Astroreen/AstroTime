@@ -710,8 +710,9 @@ test("an account's sync turned off in Settings says so calmly; on again, it sync
   // Off from the start: the app's syncs asked nothing of the server.
   expect(server.requests).toEqual([]);
 
-  // These tests load no CSS: the label takes the tap.
-  await section.getByText("Sync", { exact: true }).click();
+  // The switch beside the account's menu turns it on (design D316); no CSS
+  // here gives it no size, so it is pressed in the DOM.
+  (toggle.element() as HTMLElement).click();
   await expect.element(toggle).toBeChecked();
   // One sync at once: this fake has no calendars for it, so it fails, but it asked.
   await expect

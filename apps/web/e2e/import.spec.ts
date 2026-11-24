@@ -97,6 +97,9 @@ test("a double tap on Import imports once: one new calendar, each event once", a
   });
   await expect(dialog.getByRole("status")).toContainText("2 events · 1 task");
   await dialog.getByRole("button", { name: "Close" }).last().click();
+  // Each account's calendars folded until opened (design D316).
+  for (const fold of await settings.getByRole("button", { name: /^\d+ calendars?$/ }).all())
+    if ((await fold.getAttribute("aria-expanded")) === "false") await fold.click();
   await expect(settings.getByRole("checkbox", { name: "Team" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(
@@ -138,6 +141,9 @@ test("a big file with a series, stopped in the middle: what landed stays, the se
   await expect(done).toContainText("Stopped. What was imported before stays.");
   await expect(done).toContainText("200 events");
   await dialog.getByRole("button", { name: "Close" }).last().click();
+  // Each account's calendars folded until opened (design D316).
+  for (const fold of await settings.getByRole("button", { name: /^\d+ calendars?$/ }).all())
+    if ((await fold.getAttribute("aria-expanded")) === "false") await fold.click();
   await expect(settings.getByRole("checkbox", { name: "Archive" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   // The series came in the first batch: its occurrences in the week.
