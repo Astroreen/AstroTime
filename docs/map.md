@@ -589,7 +589,7 @@ When you add a package, app or module, add its line here in the same PR.
     the specs that create through the edit dialog reach it by `expand` in
     `support.ts`. → `plans/design.md#D296`; `every-account.spec.ts`
     chooses a new event's account and saves one to every account, against
-    two Radicales. → `plans/design.md#D313`, `plans/design.md#D314`;
+    two Radicales, `every-account-screenshots.spec.ts` takes its evidence. → `plans/design.md#D313`, `plans/design.md#D314`;
     `editing.spec.ts` creates, edits and deletes on the demo data,
     `editing-server.spec.ts` sees an item made here, then dragged, reach
     Radicale, `editing-screenshots.spec.ts` takes the editing evidence.
