@@ -3,11 +3,17 @@
 import type { Account } from "@astrotime/storage";
 import { expect, test } from "vite-plus/test";
 
+import { accountsOnServers, goesToEveryCopy } from "../src/calendar/editing.ts";
 import { accountLabels } from "../src/components/account-labels.ts";
 
-const account = (id: string, name: string, serverUrl: string): Account => ({
+const account = (
+  id: string,
+  name: string,
+  serverUrl: string,
+  provider: Account["provider"] = "caldav",
+): Account => ({
   id,
-  provider: "caldav",
+  provider,
   name,
   serverUrl,
   username: "anna",
@@ -34,4 +40,23 @@ test("a name alone, a twin's with its server, and its path when the host is shar
     "same@example.org (cloud.example/personal)",
     "same@example.org (cloud.example/work)",
   ]);
+});
+
+test("copies go only to CalDAV accounts, with no account's own file (design D314)", () => {
+  const accounts = [
+    account("a", "a", "https://a.example/"),
+    account("device", "On this device", "local:", "local"),
+    account("demo", "Demo", "demo:", "demo"),
+    account("holidays", "Holidays", "https://h.example/", "ics"),
+  ];
+  expect(accountsOnServers(accounts).map((one) => one.id)).toEqual(["a"]);
+  expect([
+    goesToEveryCopy({ uri: "https://example.com/agenda.pdf", type: "application/pdf" }),
+    goesToEveryCopy({ content: "aGk=", name: "hi.txt" }),
+    goesToEveryCopy({
+      uri: "https://a.example/index.php/f/1",
+      parameters: { "X-NC-FILE-ID": "1" },
+    }),
+    goesToEveryCopy({ uri: "/index.php/f/1" }),
+  ]).toEqual([true, true, false, false]);
 });

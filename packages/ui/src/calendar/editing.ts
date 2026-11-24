@@ -30,6 +30,7 @@ import {
   type ItemTimes,
   type NewAlarm,
   type NewAttachment,
+  type NewInlineFile,
   type Repeat,
   type Scope,
 } from "@astrotime/core";
@@ -738,6 +739,16 @@ export function otherAccountsCalendars(
   });
 }
 
+/**
+ * Whether a new item's attachment goes to its copies in other accounts
+ * (design D314): a file inline, or a link the user gave (absolute, with no
+ * provider's parameters). A file of an account's own (`X-NC-FILE-ID`, or a
+ * link relative to its server) opens only for its account (foundation D232).
+ */
+export const goesToEveryCopy = (file: NewAttachment | NewInlineFile): boolean =>
+  "content" in file ||
+  (Object.keys(file.parameters ?? {}).length === 0 && /^[a-z][a-z0-9+.-]*:/i.test(file.uri));
+
 /** @internal What a write needs: the time, and a new UID. */
 export interface Writes {
   readonly now: number;
@@ -955,12 +966,7 @@ export async function saveForm(
             ...changes,
             attachments: {
               ...changes.attachments,
-              add: changes.attachments.add.filter(
-                (file) =>
-                  "content" in file ||
-                  (Object.keys(file.parameters ?? {}).length === 0 &&
-                    /^[a-z][a-z0-9+.-]*:/i.test(file.uri)),
-              ),
+              add: changes.attachments.add.filter(goesToEveryCopy),
             },
           }
         : changes;
