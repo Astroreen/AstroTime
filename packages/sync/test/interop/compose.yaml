@@ -32,7 +32,7 @@ services:
   # Xandikos as its documentation deploys it: authentication is its reverse
   # proxy's (its own --htpasswd needs TLS), so it takes any credentials.
   xandikos:
-    image: ghcr.io/jelmer/xandikos:v0.4.10
+    image: ghcr.io/jelmer/xandikos:v0.4.11
     environment:
       DEFAULTS: "true"
       AUTOCREATE: "true"
