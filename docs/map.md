@@ -769,6 +769,10 @@ When you add a package, app or module, add its line here in the same PR.
   their fuses back, starts the AppImage and starts the installed deb on a
   virtual display (`start.sh`); CI and the release share it.
   → `plans/desktop.md#D79`
+- `.github/pull_request_template.md`, `scripts/pr-images.sh` — a PR's
+  description and its screenshots, uploaded to `assets/pr-<number>`;
+  `scripts/ci/check-pr-body.sh` (the "PR description" workflow) checks
+  both. → `plans/foundation.md#D312`
 - `scripts/release-apk.sh` — names the unsigned release APK
   `astrotime-<version>-unsigned.apk` and checks it is unsigned and carries
   the version; CI and the release share it. → `plans/android.md#D69`

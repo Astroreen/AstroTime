@@ -266,6 +266,20 @@ logic worth borrowing.
 - **D30. Repository and branches.** `Astroreen/AstroTime`, public. `main` is
   protected: the `CI` status is required, no direct or force pushes. One
   branch per PR; Conventional Commits.
+- **D312. A PR's description is a short page for the owner, pictures
+  uploaded.** As in Caspian Logistics: `.github/pull_request_template.md`
+  gives the shape — the problem and the plan's PR with its D-numbers first,
+  then "What changed" with each change's before/after pictures under its
+  line, "Risk" with how to undo, at most five "How to check" steps, and the
+  evidence in a collapsed Proof; at most 300 words outside `<details>`.
+  Separate "Tests" and "Screenshots" sections said the same things twice.
+  Screenshots go to the branch `assets/pr-<number>` through
+  `scripts/pr-images.sh`, never into `main`; the `evidence` branch keeps
+  the pictures of PRs before this one. The "PR description" workflow
+  (`scripts/ci/check-pr-body.sh`) fails on the old shape, on a path on
+  someone's disk instead of a picture, and on a committed
+  `.github/pr-assets/`; it skips Dependabot's PRs and is not required for
+  merging ([D30](#D30)).
 
 ### The core's time model
 
