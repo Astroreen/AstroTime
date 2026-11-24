@@ -356,3 +356,51 @@ test("two ids of one kind are never matched by the series' rule", () => {
   const morning: ItemTime = { type: "floating", local: "2026-11-05T09:00:00" };
   expect(occurrenceOn(daily, morning, "2026-11-05", timeZone)).toBeNull();
 });
+
+test("a zone of the calendar's own, which Intl knows not, is read by its VTIMEZONE", () => {
+  const custom = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Customized Time Zone",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T000000",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0200",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:custom",
+      "DTSTAMP:20261101T000000Z",
+      "DTSTART;TZID=Customized Time Zone:20261101T090000",
+      "DURATION:PT30M",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Sync",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:custom",
+      "DTSTAMP:20261101T000000Z",
+      "RECURRENCE-ID:20261105T070000Z",
+      "DTSTART;TZID=Customized Time Zone:20261105T100000",
+      "DURATION:PT30M",
+      "SUMMARY:Sync, moved",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const shown: ItemTime = {
+    type: "zoned",
+    local: "2026-11-05T09:00:00",
+    timeZone: "Customized Time Zone",
+    epochMs: Date.parse("2026-11-05T07:00:00Z"),
+  };
+  expect(occurrenceOn(custom, shown, "2026-11-05", timeZone)?.item.summary).toBe("Sync, moved");
+});
+
+test("an id naming a zone nobody knows (a crafted widget address) opens the day alone", () => {
+  const crafted: ItemTime = { ...fifth, timeZone: "Not/A_Zone" };
+  expect(() => occurrenceOn(series(""), crafted, "2026-11-05", timeZone)).not.toThrow();
+});
