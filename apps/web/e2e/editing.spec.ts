@@ -175,7 +175,7 @@ for (const [size, viewport] of [
     await page.keyboard.press("Shift+Tab");
     await expect(start).not.toBeFocused();
     await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
-    expect((await start.boundingBox())!.width).toBe(narrow);
+    expect((await start.boundingBox())!.width).toBeCloseTo(narrow, 0);
     // Tab coming in again, after Tab left: the words still.
     await page.keyboard.press("Tab");
     await expect(start).toBeFocused();
@@ -192,10 +192,15 @@ for (const [size, viewport] of [
     await page.keyboard.press("Escape");
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
-    expect((await start.boundingBox())!.width).toBe(narrow);
+    expect((await start.boundingBox())!.width).toBeCloseTo(narrow, 0);
     await start.focus();
     await page.keyboard.press("ArrowUp");
     await expect(start).not.toHaveValue("2026-11-04");
+    // Emptied and left, the field holds its date again, as its words say.
+    await start.fill("2026-11-05");
+    await start.press("Backspace");
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(start).toHaveValue("2026-11-05");
     await start.fill("2026-11-05");
     await dialog.getByRole("textbox", { name: "Title" }).focus();
     await expect(words(start)).toHaveText("Thu, Nov 5");

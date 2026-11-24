@@ -8,11 +8,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-import { nowIn } from "../calendar/dates.ts";
 import type { Form } from "../calendar/editing.ts";
 import { accountName, Avatar } from "./accounts.tsx";
 import { CalendarRow } from "./calendar-row.tsx";
 import { Dot } from "./color-select.tsx";
+import { useNow } from "../hooks.ts";
 import { useCalendar } from "./context.ts";
 import { ChevronIcon } from "./icons.tsx";
 import { popup, Select as Dropdown } from "./select.tsx";
@@ -326,8 +326,8 @@ export function DateField({
   muted?: boolean;
 }) {
   const { formats, timeZone } = useCalendar();
-  // The year the words leave out: this one, as the dialog opened.
-  const [today] = useState(() => nowIn(Date.now(), timeZone).today);
+  // The year the words leave out: this one, by the views' own clock.
+  const { today } = useNow(timeZone);
   // Typed in: its own digits show in place of the words.
   const [typing, setTyping] = useState(false);
   // Room for the digits, from the key that starts typing until the press or
@@ -411,7 +411,10 @@ export function DateField({
           if (tabbed.current && document.activeElement === e.currentTarget) type();
           tabbed.current = false;
         }}
-        onBlur={() => {
+        onBlur={(e) => {
+          // What it was left holding and the form did not take (emptied, half
+          // typed, a year of five digits) goes: the field is its words again.
+          if (e.currentTarget.value !== value) e.currentTarget.value = value;
           typed.current = false;
           // Tab that left: its keyup is another field's.
           tabbed.current = false;

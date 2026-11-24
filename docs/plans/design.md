@@ -2769,7 +2769,8 @@ keywords". The quick parse and voice that fill quick create are the
     before its date, no label above it, and wraps the same way, its ✕
     always in sight.
   - **"All day" at the end of the repeat's row**, a small switch with its
-    words, no row of its own; the repeat has no icon of its own, the
+    words, no row of its own, so it is reached and read after the dates
+    and the repeat, not before them; the repeat has no icon of its own, the
     clock's row holds the whole "when". A long rule goes on to more lines
     instead of being cut, and where the two do not fit (360 px at a large
     text size) the switch goes under the rule.
@@ -3015,6 +3016,10 @@ keywords". The quick parse and voice that fill quick create are the
   undone by dragging it back ([D111](#D111)).
 - **Keys between the strip and the grid** — a timed item made all day, or
   the other way, by a drag only ([D112](#D112)).
+- **The date field on a phone's own browser** — [D317](#D317)'s press
+  that opens the picker (`showPicker`) was read in Chromium's and
+  Firefox's code and run in desktop Chromium; on Android's WebView, iOS
+  Safari and Firefox it is not yet tried on a device.
 - **Dates in the app's own format** — the edit dialog's date reads in
   words in the app's language ([D317](#D317)); typed in, and in its
   picker, it is still the browser's field, in the browser's language and
