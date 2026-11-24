@@ -155,17 +155,20 @@ for (const [size, viewport] of [
     await end.fill("2027-01-05");
     await expect(words(end)).toHaveText("Tue, Jan 5, 2027");
     // Tab comes in with the words still there; a key that changes the date
-    // shows the field's own digits, and nothing in the row moves; left, the
-    // words again, of the new date.
+    // shows the field's own digits; left, the words again, of the new date.
     const startTime = dialog.getByLabel("Start time");
-    const before = await startTime.boundingBox();
     await start.focus();
     await page.keyboard.press("Shift");
     await expect(words(start)).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await expect(words(start)).toBeHidden();
-    expect(await startTime.boundingBox()).toEqual(before);
-    // What the digits cover still takes the first press.
+    // Alt and the arrow is the browser's shortcut for its picker: no typing.
+    await end.focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(words(end)).toBeVisible();
+    await start.focus();
+    await page.keyboard.press("ArrowRight");
+    // The field left by a press: nothing moves under it, so the first press counts.
     await startTime.click();
     await expect(page.getByRole("listbox")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -228,6 +231,10 @@ test("on a 360 px phone a task's due in another year keeps its time and its ✕ 
   // The date typed in, one press on the ✕ still removes the due.
   await dialog.getByLabel("Due date").focus();
   await page.keyboard.press("ArrowUp");
+  // A press on its digits is the field's own, at its end too: the due stays.
+  const digits = (await dialog.getByLabel("Due date").boundingBox())!;
+  await page.mouse.click(digits.x + digits.width - 4, digits.y + digits.height / 2);
+  await expect(dialog.getByLabel("Due date")).toBeFocused();
   await dialog.getByRole("button", { name: "Remove due" }).click();
   await expect(dialog.getByRole("button", { name: "Add due" })).toBeVisible();
 });

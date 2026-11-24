@@ -328,17 +328,30 @@ export function DateField({
   const { formats, timeZone } = useCalendar();
   // The year the words leave out: this one, as the dialog opened.
   const [today] = useState(() => nowIn(Date.now(), timeZone).today);
-  // Typed in, and the side its digits are drawn from: the end where the
-  // dialog's side is too near for a whole date.
-  const [typing, setTyping] = useState<false | "start" | "end">(false);
+  // Typed in: its own digits show in place of the words.
+  const [typing, setTyping] = useState(false);
+  // Room for the digits, from the key that starts typing until the press or
+  // key that left the field is over: nothing changes size under a press.
+  const [wide, setWide] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!wide || typing) return;
+    const narrow = () => setWide(false);
+    window.addEventListener("click", narrow, true);
+    window.addEventListener("keyup", narrow, true);
+    return () => {
+      window.removeEventListener("click", narrow, true);
+      window.removeEventListener("keyup", narrow, true);
+    };
+  }, [wide, typing]);
   return (
     // The row's look, and the press that opens the picker, are the wrapper's:
     // the field itself is not drawn under the words.
     <span
       onClick={(e) => {
         const own = input.current;
-        if (!own) return;
+        // Typed in, a press is the field's own: on one of its digits.
+        if (!own || typing) return;
         // A press anywhere on the words opens the picker, in every browser
         // and by a finger too; one that cannot is left to the browser.
         try {
@@ -349,7 +362,7 @@ export function DateField({
           // The field is still typed in.
         }
       }}
-      className={`relative inline-flex h-10 cursor-pointer items-center rounded-lg text-input hover:bg-raised-hover has-[:focus]:bg-raised-hover has-[:focus]:shadow-[inset_0_-2px_0_var(--color-accent)] forced-colors:has-[:focus]:outline-2 ${className}`}
+      className={`relative inline-flex h-10 items-center rounded-lg text-input hover:bg-raised-hover has-[:focus]:bg-raised-hover has-[:focus]:shadow-[inset_0_-2px_0_var(--color-accent)] forced-colors:has-[:focus]:outline-2 ${wide ? "min-w-[10.5em]" : ""} ${className}`}
     >
       <input
         ref={input}
@@ -363,18 +376,12 @@ export function DateField({
         // Only a key that changes the date: not Tab coming in, Escape or
         // Enter from its picker, or a shortcut (Alt and the arrow opens it).
         onKeyDown={(e) => {
-          if (typing || e.altKey || e.ctrlKey || e.metaKey || !EDITS.test(e.key)) return;
-          const from = e.currentTarget.getBoundingClientRect().left;
-          const side = e.currentTarget.closest("form, [role=dialog]")?.getBoundingClientRect();
-          const room = parseFloat(getComputedStyle(e.currentTarget).fontSize) * DIGITS_EM;
-          setTyping(side && from + room > side.right - 16 ? "end" : "start");
+          if (e.altKey || e.ctrlKey || e.metaKey || !EDITS.test(e.key)) return;
+          setTyping(true);
+          setWide(true);
         }}
-        // Until the field is left: nothing changes shape under a press.
         onBlur={() => setTyping(false)}
-        // Typed in, its digits are drawn over what stands beside it, as wide
-        // as they are: nothing in the row moves, and a press on what they
-        // cover still reaches it.
-        className={`date-field absolute inset-y-0 h-full min-w-full rounded-lg px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? `pointer-events-none z-10 w-max bg-raised shadow-[inset_0_-2px_0_var(--color-accent)] forced-colors:outline-2 ${typing === "end" ? "right-0" : "left-0"}` : "left-0 w-full bg-transparent opacity-0"}`}
+        className={`date-field absolute inset-0 size-full rounded-lg bg-transparent px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? "" : "cursor-pointer opacity-0"}`}
       />
       {/* What the row shows, and its width. */}
       <span
@@ -386,9 +393,6 @@ export function DateField({
     </span>
   );
 }
-
-/** The room a date field's digits take, in its font's size: "11/04/2026" and its sides. */
-const DIGITS_EM = 8.5;
 
 /** The keys that change a date field's date. */
 const EDITS = /^(\d|Arrow(Up|Down|Left|Right)|Backspace|Delete)$/;
