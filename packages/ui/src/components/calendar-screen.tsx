@@ -422,18 +422,28 @@ export function CalendarScreen({
     setTasksOpen(false);
     setTaskFocus(null);
   };
+  // Each opening from outside counts: one whose item is still being read
+  // when another comes gives way to it.
+  const openings = useRef(0);
+  // Whether a draft is open now, for an opening that has read its item.
+  const drafting = useRef(false);
+  useLayoutEffect(() => {
+    drafting.current = editing.value.drafting;
+  });
   /** An occurrence's day in the Day view, when it has one, and its details over it. */
   const openOccurrence = async (
     objectId: string,
     recurrenceId: ScheduledReminder["recurrenceId"],
     day: string | null,
   ) => {
+    const opening = ++openings.current;
     uncover();
     if (day) openDay(day);
     // Whatever's details were open close; a draft stays, and the day alone shows under it.
     editing.value.closeDetails();
     if (editing.value.drafting) return;
     const stored = await store.object(objectId);
+    if (opening !== openings.current || drafting.current) return;
     if (!stored || stored.pending === "delete") return;
     const object = CalendarObject.parse(stored.ics);
     // An occurrence gone since it was shown (an EXDATE synced in): its day alone.
@@ -468,14 +478,18 @@ export function CalendarScreen({
   });
   const openFromWidget = useEffectEvent(async (open: WidgetOpen) => {
     if (open.kind === "item") return openOccurrence(open.objectId, open.recurrenceId, open.day);
-    uncover();
+    // An item still being read for an earlier tap gives way.
+    openings.current++;
     if (open.kind === "day") {
       // The day shows: an item's details, which change nothing, close over it.
+      uncover();
       editing.value.closeDetails();
       openDay(open.day ?? today);
     }
-    // A draft open in quick create or the edit dialog is never replaced by a new one.
+    // A draft open in quick create or the edit dialog is never replaced by a
+    // new one, nor is anything under it closed.
     else if (!editing.value.drafting) {
+      uncover();
       editing.value.closeDetails();
       editing.value.create("event", { day: today });
     }

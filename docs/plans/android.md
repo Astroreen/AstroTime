@@ -753,7 +753,13 @@ were checked on 2026-11-01.
     listener. A tap never replaces a draft open in quick create or the
     edit dialog, nor covers the question of a change's scope (an item's
     tap then opens its day alone); a tap closes an item's details open
-    before it; an occurrence gone since the snapshot opens its day alone.
+    before it; an occurrence gone since the snapshot opens its day alone;
+    a tap whose item is still being read gives way to a later one. A tapped
+    reminder opens the same way ([D66](#D66), foundation D101): the rule
+    is the one for whatever opens from outside the page. Past the
+    snapshot's end (an app not opened for a month, or rows cut by the
+    cap) the widget knows nothing of today and says to open AstroTime,
+    never "nothing planned".
   - **Fresh within:** at once from the open app; within an hour with it
     closed, as background sync runs ([D67](#D67)): only with an account
     saved and a network, so a device with only the calendar on it sees

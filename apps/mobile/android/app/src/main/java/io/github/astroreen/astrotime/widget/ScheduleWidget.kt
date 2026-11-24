@@ -59,13 +59,15 @@ class ScheduleWidget : AppWidgetProvider() {
         private val lock = Any()
 
         /**
-         * Keeps `json` (the UI's `ScheduleSnapshot`) and draws every widget
-         * from it. The drawing is outside the lock: asking for the list's rows
+         * Keeps `json` (the UI's `ScheduleSnapshot`), when `allowed` still
+         * says so, and draws every widget from it. The drawing is outside the lock: asking for the list's rows
          * again reaches `ScheduleService`, which reads the file, in this
          * process, and waits for the answer.
          */
-        fun keep(context: Context, json: String) {
+        fun keep(context: Context, json: String, allowed: () -> Boolean = { true }) {
             synchronized(lock) {
+                // Asked under the lock, so no write of the open app's comes between the answer and this one.
+                if (!allowed()) return
                 val file = file(context)
                 file.baseFile.parentFile?.mkdirs()
                 val out = file.startWrite()
@@ -107,7 +109,13 @@ class ScheduleWidget : AppWidgetProvider() {
                     true,
                 )
             val month = SimpleDateFormat("LLLL", locale).format(at).replaceFirstChar { it.titlecase(locale) }
-            return Snapshot.read(kept(context), SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at), mark, month)
+            return Snapshot.read(
+                kept(context),
+                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at),
+                mark,
+                month,
+                context.getString(R.string.widget_open_app),
+            )
         }
 
         /** Draws every widget on the home screen again, the list's rows too. */

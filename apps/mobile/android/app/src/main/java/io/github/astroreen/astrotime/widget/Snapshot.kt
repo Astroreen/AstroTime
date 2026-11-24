@@ -53,12 +53,14 @@ object Snapshot {
 
     /**
      * The rows of `json` from `today` on; nothing that reads (no snapshot
-     * yet), no rows. The snapshot names every day of its range, so today is
-     * among them; one older than its range names none, and `todayMark` and
-     * `todayMonth` (the device's words) head the list then. The title is the
-     * month of the day that heads it.
+     * yet), no rows. The snapshot names every day up to where it ends (31
+     * days, or the day its rows were cut), so today is among them while it
+     * covers today; past its end, it knows nothing of today: `todayMark` and
+     * `todayMonth` (the device's words) head the list then, with `beyond`
+     * (to open the app), never "nothing planned". The title is the month of
+     * the day that heads it.
      */
-    fun read(json: String?, today: String, todayMark: DayMark, todayMonth: String): Shown {
+    fun read(json: String?, today: String, todayMark: DayMark, todayMonth: String, beyond: String): Shown {
         val snapshot =
             try {
                 json?.let(::JSONObject)?.takeIf { it.optInt("version") == 1 }
@@ -86,7 +88,7 @@ object Snapshot {
             if (rows.size > start) title = title ?: day.optString("month").ifEmpty { null }
         }
         if (rows.firstOrNull()?.mark?.today != true) {
-            rows.add(0, Row.Empty(todayMark, empty))
+            rows.add(0, Row.Empty(todayMark, beyond))
             title = todayMonth
         }
         return Shown(title, snapshot.optString("create").ifEmpty { null }, rows)
