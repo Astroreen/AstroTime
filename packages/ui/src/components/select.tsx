@@ -54,9 +54,9 @@ export function Select({
   className?: string;
   /** The arrow at the button's end; none in the edit dialog's rows (design D317). */
   caret?: boolean;
-  /** The button shows the value's `leading` alone, its label for a screen reader (design D317). */
+  /** The button shows the value's `leading` (and the arrow) alone, its label for a screen reader (design D317). */
   swatch?: boolean;
-  /** A long value goes on to a second line instead of being cut (a repeat's rule, design D317). */
+  /** A long value goes on to more lines instead of being cut (a repeat's rule, design D317). */
   wrap?: boolean;
 }) {
   const { t } = useTranslation();
@@ -72,15 +72,13 @@ export function Select({
         className={`${button} ${className}`}
       >
         <BaseSelect.Value
-          className={swatch ? "flex items-center" : "flex min-w-0 flex-1 items-center gap-2"}
+          className={
+            swatch ? "flex shrink-0 items-center" : "flex min-w-0 flex-1 items-center gap-2"
+          }
         >
           {chosen?.leading}
           {chosen ? (
-            <span
-              className={
-                swatch ? "sr-only" : `min-w-0 flex-1 ${wrap ? "line-clamp-2" : "truncate"}`
-              }
-            >
+            <span className={swatch ? "sr-only" : `min-w-0 flex-1 ${wrap ? "" : "truncate"}`}>
               {chosen.label}
             </span>
           ) : (
@@ -89,7 +87,7 @@ export function Select({
             </span>
           )}
         </BaseSelect.Value>
-        {caret && !swatch && (
+        {caret && (
           <BaseSelect.Icon className="shrink-0 text-ink-muted">
             <CaretIcon className="size-5" />
           </BaseSelect.Icon>

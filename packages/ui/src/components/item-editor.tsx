@@ -336,7 +336,7 @@ function Fields({
               onTime={(startTime) => onChange(withStartTime(form, startTime))}
             />
             {event && (
-              <span aria-hidden="true" className="text-ink-muted">
+              <span aria-hidden="true" className="px-1 text-ink-muted">
                 –
               </span>
             )}
@@ -360,7 +360,11 @@ function Fields({
               {t("edit.addDue")}
             </button>
           ) : (
-            <div role="group" aria-label={t("edit.due")} className="flex items-center">
+            <div
+              role="group"
+              aria-label={t("edit.due")}
+              className="flex flex-wrap items-center gap-x-1"
+            >
               <span className="pl-2 text-body text-ink-muted">{t("edit.due")}</span>
               <DateTime
                 form={form}
@@ -422,7 +426,7 @@ function Fields({
                 task={!event}
                 onChange={chooseColor}
                 swatch
-                className="grid size-10 shrink-0 place-items-center rounded-full hover:bg-raised-hover"
+                className="h-10 shrink-0 gap-0.5 rounded-lg pr-1 pl-2 hover:bg-raised-hover"
               />
             }
           />
@@ -599,7 +603,7 @@ function RepeatField({
   const words = (r: Repeat | null) => (r ? repeatWords(r, start, t, formats) : t("repeat.none"));
   return (
     <>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-x-1">
         <Dropdown
           label={t("edit.repeat")}
           value={current}
@@ -627,7 +631,7 @@ function RepeatField({
           ]}
           caret={false}
           wrap
-          className={`${fieldButton} h-auto min-h-10 flex-1 py-1`}
+          className="min-h-10 min-w-[9.5em] flex-1 rounded-lg bg-transparent px-2 py-1 hover:bg-raised-hover"
         />
         {end}
       </div>
@@ -970,7 +974,7 @@ function CustomReminder({
       {allDay && (
         <div className="flex items-center gap-2">
           <span className="text-body text-ink-muted">{t("alarm.custom.at")}</span>
-          <TimeSelect label={t("alarm.custom.time")} value={time} onChange={setTime} />
+          <TimeSelect label={t("alarm.custom.time")} value={time} onChange={setTime} caret />
         </div>
       )}
       <p aria-live="polite" className="text-body">

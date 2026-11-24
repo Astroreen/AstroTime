@@ -171,6 +171,34 @@ for (const [size, viewport] of [
   });
 }
 
+test("on a 360 px phone a task's due in another year keeps its time and its ✕ in sight (design D317)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
+  await page
+    .getByRole("dialog", { name: "New event" })
+    .getByRole("radio", { name: "Task" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "New task" });
+  await dialog.getByRole("button", { name: "Add due" }).click();
+  await dialog.getByLabel("Due date").fill("2027-09-29");
+  await choose(dialog.getByLabel("Due time"), "12:00 PM");
+  // Nothing of the row is cut or pushed past the dialog's side.
+  for (const part of [
+    dialog.getByLabel("Due date"),
+    dialog.getByLabel("Due time"),
+    dialog.getByRole("button", { name: "Remove due" }),
+  ]) {
+    const box = await part.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(360 - 16);
+  }
+  const time = dialog.getByLabel("Due time");
+  expect(await time.evaluate((one) => one.scrollWidth <= one.clientWidth)).toBe(true);
+});
+
 test("the reminder menu offers four, the most added first; Custom… adds any amount before (design D206)", async ({
   page,
 }) => {

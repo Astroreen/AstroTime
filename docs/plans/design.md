@@ -1123,6 +1123,8 @@ Settings, the colours and the lists controls open.
   since deleted) by its generated name ([D170](#D170)), a CSS name by its
   hex's (`colorNameHex`), "Its own colour" only for what is no colour. A calendar's colour stays the server's: AstroTime does
   not change it (Deferred).
+  _Amended by [D317](#D317):_ in the edit dialog the dropdown's button is
+  the colour's dot alone, at the end of the calendar's row.
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group
   after "Hide completed tasks", on unless turned off: today's look stays
@@ -2670,6 +2672,8 @@ keywords". The quick parse and voice that fill quick create are the
   D122](foundation.md#D122)'s default does. A kind switched to one its
   calendar cannot hold moves to the same account's first calendar that
   can, before another account's, and keeps the ticks that take it.
+  _Amended by [D317](#D317):_ in the edit dialog the row has no dot of the
+  calendar's colour and no arrow; the item's colour stands at its end.
 - **D314. A new item in every account, a setting.** The owner: "by
   default a new event or task goes to one calendar; one can also choose
   to sync all calendars, so each has every task and event; then the
@@ -2731,39 +2735,47 @@ keywords". The quick parse and voice that fill quick create are the
   - **No hairlines.** The rows follow each other at one distance; a row's
     icon alone says where the next thing starts.
   - **No arrows.** A row's dropdown (a time, the repeat, "Add a reminder",
-    the colour, the calendar's row) is its value alone, as in Google
+    the calendar's row) is its value alone, as in Google
     Calendar's edit screen; pressed, it opens as before. A dropdown inside
-    a panel (the custom repeat's unit, the custom reminder's) keeps its
-    arrow: there it is a field among fields. Quick create's times lose
+    a panel (the custom repeat's unit, the custom reminder's unit and
+    time) keeps its arrow: there it is a field among fields. Quick create's times lose
     theirs too ([D296](#D296)), its calendar row keeps its arrow.
   - **A date in words.** "Wed, Nov 4", with the year when it is not this
     one, instead of the browser's "11/04/2026" and its calendar glyph
     (`DateField`, in quick create and the custom repeat's last day too).
-    Under the words it is still the browser's date field: a press opens
-    its picker, a screen reader and the keys reach it as before, and while
-    a key is typed in it the words give way to its own digits, so a date
-    typed is seen. A date picker of our own is still
+    Under the words it is still the browser's date field, not drawn: a
+    press anywhere on the words opens its picker (`showPicker`, so in
+    Firefox too), a screen reader and the keys reach it as before, and
+    while a key is typed in it the words give way to its own digits, in
+    room enough for them, so a date typed is seen. A year of five digits,
+    which has no words, is not taken. A date picker of our own is still
     [Deferred](#deferred).
   - **Start and end as one sentence.** "Wed, Nov 4 10:00 – Wed, Nov 4
-    11:30" on one line where there is room, the end under the start on a
-    phone; an end on its start's day is paler, as it says nothing new.
-    Both dates stay in sight, so an event over days needs no extra step.
-    A task's due is one line, "Due" before its date, no label above it.
+    11:30" on one line where there is room; where there is not (a narrow
+    phone, a large text size, a year shown) the end goes under the start,
+    and a time under its date before it is cut. An end on its start's day
+    is paler, as it says nothing new. Both dates stay in sight, so an
+    event over days needs no extra step. A task's due is one line, "Due"
+    before its date, no label above it, and wraps the same way, its ✕
+    always in sight.
   - **"All day" at the end of the repeat's row**, a small switch with its
     words, no row of its own; the repeat has no icon of its own, the
-    clock's row holds the whole "when". A long rule goes on to a second
-    line instead of being cut by the switch.
-  - **The colour at the end of the calendar's row**, a dot that opens the
-    same list ([D168](#D168)), named "Colour" (and so titled). The
+    clock's row holds the whole "when". A long rule goes on to more lines
+    instead of being cut, and where the two do not fit (360 px at a large
+    text size) the switch goes under the rule.
+  - **The colour at the end of the calendar's row**, a dot with a small
+    arrow, which says it is pressed, that opens the same list
+    ([D168](#D168)), named "Colour" (and so titled). The
     calendar's own dot beside its name went: the row shows one colour, the
     item's. While a new item goes to every account and has no calendar row
     ([D314](#D314)), the colour keeps a row of its own.
 
   A new event on a phone is 10 rows where it was 12 (9 on a wide screen),
-  with 4 hairlines, 6 arrows and 2 icons fewer. The empty fields keep
+  with 4 hairlines, 5 arrows and 2 icons fewer. The empty fields keep
   their places as pale hints ([D297](#D297), [D237](#D237)): nothing is
   folded away, so nothing takes a press more than before. Tested:
-  `editing.spec.ts` ("the lighter rows", and [D205](#D205)'s icons).
+  `editing.spec.ts` ("the lighter rows", a due in another year at 360 px,
+  and [D205](#D205)'s icons).
 
 ## Deferred
 

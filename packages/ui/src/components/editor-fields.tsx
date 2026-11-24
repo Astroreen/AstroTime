@@ -40,7 +40,7 @@ export const fieldButton =
 
 /** A time in a row: as wide as its words (design D317). */
 const timeButton =
-  "h-10 min-w-0 rounded-lg bg-transparent px-2 whitespace-nowrap hover:bg-raised-hover";
+  "h-10 shrink-0 rounded-lg bg-transparent px-2 whitespace-nowrap hover:bg-raised-hover";
 
 /**
  * A row of the form: its icon, then its value on the dialog's ground (design
@@ -330,30 +330,46 @@ export function DateField({
   const [today] = useState(() => nowIn(Date.now(), timeZone).today);
   const [typing, setTyping] = useState(false);
   return (
-    <span className={`relative inline-flex h-10 min-w-28 items-center ${className}`}>
+    // The row's look is the wrapper's: the field itself is not drawn under the words.
+    <span
+      className={`relative inline-flex h-10 items-center rounded-lg text-input hover:bg-raised-hover has-[:focus]:bg-raised-hover has-[:focus]:shadow-[inset_0_-2px_0_var(--color-accent)] ${typing ? "min-w-[10.5em]" : ""} ${className}`}
+    >
       <input
         type="date"
         aria-label={label}
         value={value}
         required
-        onChange={(e) => e.target.value && onChange(e.target.value)}
+        max="9999-12-31"
+        // A year of four digits: one of five has no words (`Intl` refuses it).
+        onChange={(e) => DAY.test(e.target.value) && onChange(e.target.value)}
         onKeyDown={() => setTyping(true)}
         onKeyUp={() => setTyping(true)}
         onPointerDown={() => setTyping(false)}
         onBlur={() => setTyping(false)}
-        data-words={typing ? undefined : ""}
-        className={`${field} date-field absolute inset-0 h-full ${typing ? "" : "text-transparent"}`}
+        onClick={(e) => {
+          // A press anywhere on the words opens the picker, in every browser;
+          // one that cannot (or has it open) is left alone.
+          try {
+            e.currentTarget.showPicker();
+          } catch {
+            // The field is still typed in.
+          }
+        }}
+        className={`date-field absolute inset-0 size-full cursor-pointer rounded-lg bg-transparent px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? "" : "opacity-0"}`}
       />
       {/* What the row shows, and its width. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none relative px-2 text-input whitespace-nowrap ${muted ? "text-ink-muted" : "text-ink"} ${typing ? "invisible" : ""}`}
+        className={`pointer-events-none relative px-2 whitespace-nowrap ${muted ? "text-ink-muted" : "text-ink"} ${typing ? "invisible" : ""}`}
       >
-        {value ? formats.shortDay(value, today) : ""}
+        {DAY.test(value) ? formats.shortDay(value, today) : ""}
       </span>
     </span>
   );
 }
+
+/** A day as a date field gives it, its year of four digits. */
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function DateTime({
   form,
@@ -379,7 +395,7 @@ export function DateTime({
   onTime: (time: string) => void;
 }) {
   return (
-    <div className="flex items-center">
+    <div className="flex flex-wrap items-center">
       <DateField label={dateLabel} value={date} onChange={onDate} muted={muted ?? false} />
       {!(allDay ?? form.allDay) && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
     </div>
@@ -403,12 +419,15 @@ export function TimeSelect({
   value,
   onChange,
   className = "",
+  caret = false,
 }: {
   label: string;
   value: string;
   onChange: (time: string) => void;
   /** Its share of the row. */
   className?: string;
+  /** The arrow at its end: in a panel, a field among fields (design D317). */
+  caret?: boolean;
 }) {
   const { formats } = useCalendar();
   const times = QUARTERS.includes(value) ? QUARTERS : [...QUARTERS, value].toSorted();
@@ -418,7 +437,7 @@ export function TimeSelect({
       value={value}
       onChange={onChange}
       options={times.map((time) => ({ value: time, label: formats.clock(time) }))}
-      caret={false}
+      caret={caret}
       className={`${timeButton} ${className}`}
     />
   );
