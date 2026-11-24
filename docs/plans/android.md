@@ -771,8 +771,9 @@ were checked on 2026-11-01.
     only occurrence in that gap, moved by a UTC id, opens its day alone);
     in one zone, the exact id alone, so a fall-back night's two 3:30s stay
     apart; for ids of different kinds, the one the series' own rule names
-    (core's `namesSameOccurrence`, foundation D35). So one a server
-    cancelled opens its day alone, a series cancelled whole still opens, and so does a task due at midnight; a
+    (core's `namesSameOccurrence`, foundation D35); with none near its
+    day, by the same steps among the exceptions moved further, where they
+    are now. So one a server cancelled opens its day alone, a series cancelled whole still opens, and so does a task due at midnight; a
     series too dense to expand opens its day alone, as the views draw none
     of it;
     details a draft was opened from stay under it, for its Cancel. A tapped

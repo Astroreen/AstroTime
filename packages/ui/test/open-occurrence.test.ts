@@ -760,3 +760,19 @@ test("an RDATE's occurrence is read in the RDATE's zone", () => {
     "Extra, moved",
   );
 });
+
+test("an occurrence moved days away still opens from the day it was shown on", () => {
+  // The fifth's stand-up moved to the 8th, by its own id or by one in UTC.
+  for (const id of [
+    "RECURRENCE-ID;TZID=Europe/Vilnius:20261105T090000",
+    "RECURRENCE-ID:20261105T070000Z",
+  ]) {
+    const moved = series(
+      "",
+      `${id}\nDTSTART;TZID=Europe/Vilnius:20261108T100000\nDTEND;TZID=Europe/Vilnius:20261108T103000\nSUMMARY:Stand-up, moved`,
+    );
+    expect(occurrenceOn(moved, fifth, "2026-11-05", timeZone)?.item.summary).toBe(
+      "Stand-up, moved",
+    );
+  }
+});

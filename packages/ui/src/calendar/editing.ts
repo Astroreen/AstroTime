@@ -19,6 +19,7 @@ import {
   repeatOf,
   timesOf,
   wallClockIn,
+  wallClockOf,
   WEEKDAYS,
   zonedTime,
   attachLines,
@@ -932,9 +933,10 @@ export function occurrenceOn(
   } catch {
     return null;
   }
-  const ids = occurrences.flatMap((occurrence) =>
-    occurrence.recurrenceId ? [{ occurrence, id: occurrence.recurrenceId }] : [],
-  );
+  const idsOf = (drawn: readonly Occurrence[]) =>
+    drawn.flatMap((occurrence) =>
+      occurrence.recurrenceId ? [{ occurrence, id: occurrence.recurrenceId }] : [],
+    );
   const steps: ((id: ItemTime) => boolean)[] = [
     (id) => sameId(id, recurrenceId),
     (id) =>
@@ -946,11 +948,31 @@ export function occurrenceOn(
       readsItsClock(object, recurrenceId),
     (id) => id.type !== recurrenceId.type && namesSameOccurrence(object, id, recurrenceId),
   ];
-  for (const step of steps) {
-    const found = ids.filter(({ id }) => step(id));
-    if (found.length > 0) return found.length === 1 ? found[0]!.occurrence : null;
-  }
-  return null;
+  /** The step that finds any decides: its one, or `null` for more; `undefined` when none finds. */
+  const pick = (candidates: readonly { occurrence: Occurrence; id: ItemTime }[]) => {
+    for (const step of steps) {
+      const found = candidates.filter(({ id }) => step(id));
+      if (found.length > 0) return found.length === 1 ? found[0]!.occurrence : null;
+    }
+    return undefined;
+  };
+  const near = pick(idsOf(occurrences));
+  if (near !== undefined) return near;
+  // An exception moved far from the day it was shown on (a reminder's
+  // occurrence moved two days on): looked for where it is now.
+  const moved = object.exceptions.flatMap((exception) => {
+    const at = exception.start ?? (exception.kind === "task" ? exception.due : null);
+    if (!exception.recurrenceId || !at) return [];
+    const its = wallClockOf(at, timeZone).slice(0, 10);
+    try {
+      return idsOf(
+        occurrencesBetween(object, { from: addDays(its, -1), to: addDays(its, 2), timeZone }),
+      ).filter(({ id }) => sameId(id, exception.recurrenceId!));
+    } catch {
+      return [];
+    }
+  });
+  return pick(moved) ?? null;
 }
 
 /** The same recurrence id, field by field. */

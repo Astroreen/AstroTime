@@ -1038,6 +1038,14 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
 export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
   if (time.type !== "zoned") return true;
   if (!Number.isFinite(time.epochMs)) return false;
+  // A server's UTC is read at UTC whatever VTIMEZONE a calendar has by that name.
+  if (time.timeZone === "UTC") {
+    try {
+      return wallClockIn(time.epochMs, "UTC") === time.local;
+    } catch {
+      return false;
+    }
+  }
   const { master, exceptions } = object.components;
   const tzidOf = (property: ICAL.Property | null) => {
     const tzid: unknown = property?.getParameter("tzid");
@@ -1057,10 +1065,16 @@ export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
       return wallClockIn(time.epochMs, time.timeZone) === time.local;
     return true;
   };
+  // None written in this zone (an exception alone, its id rewritten in UTC):
+  // the VTIMEZONEs read as this zone, then the zone itself.
+  const fallback = [
+    ...zones
+      .map((zone) => String(zone.getFirstPropertyValue("tzid") ?? ""))
+      .filter((tzid) => tzid !== "" && ianaName(tzid) === time.timeZone),
+    time.timeZone,
+  ];
   try {
-    // A server's UTC is read at UTC whatever VTIMEZONE a calendar has by that name.
-    if (time.timeZone === "UTC") return wallClockIn(time.epochMs, "UTC") === time.local;
-    return [...new Set(written.length > 0 ? written : [time.timeZone])].some(reads);
+    return [...new Set(written.length > 0 ? written : fallback)].some(reads);
   } catch {
     // An instant past what a clock reads (a crafted id), a zone that does not read: none.
     return false;
