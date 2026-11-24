@@ -325,22 +325,22 @@ function Fields({
       <Section icon={<ClockIcon className="size-5" />}>
         {/* One line where there is room, the end under the start on a phone. */}
         <div className="flex flex-wrap items-center gap-x-1">
-          <div className="flex items-center gap-x-1">
-            <DateTime
-              form={form}
-              dateLabel={t("edit.startDate")}
-              timeLabel={t("edit.startTime")}
-              date={form.startDate}
-              time={form.startTime}
-              onDate={(date) => onChange(withStartDate(form, date))}
-              onTime={(startTime) => onChange(withStartTime(form, startTime))}
-            />
-            {event && (
-              <span aria-hidden="true" className="px-1 text-ink-muted">
-                –
-              </span>
-            )}
-          </div>
+          <DateTime
+            form={form}
+            dateLabel={t("edit.startDate")}
+            timeLabel={t("edit.startTime")}
+            date={form.startDate}
+            time={form.startTime}
+            onDate={(date) => onChange(withStartDate(form, date))}
+            onTime={(startTime) => onChange(withStartTime(form, startTime))}
+            end={
+              event && (
+                <span aria-hidden="true" className="px-1 text-ink-muted">
+                  –
+                </span>
+              )
+            }
+          />
           {event && (
             <DateTime
               form={form}
@@ -426,7 +426,7 @@ function Fields({
                 task={!event}
                 onChange={chooseColor}
                 swatch
-                className="h-10 shrink-0 gap-0.5 rounded-lg pr-1 pl-2 hover:bg-raised-hover"
+                className="h-10 shrink-0 rounded-lg pr-1 pl-2 hover:bg-raised-hover"
               />
             }
           />

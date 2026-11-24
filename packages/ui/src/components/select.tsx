@@ -19,7 +19,7 @@ export interface SelectOption {
 
 /** The button's own look; the caller gives its size and background. */
 const button =
-  "flex cursor-default items-center gap-2 text-left text-input text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent data-popup-open:ring-2 data-popup-open:ring-accent";
+  "flex cursor-default items-center text-left text-input text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent data-popup-open:ring-2 data-popup-open:ring-accent";
 
 /** The popup's look, which Location's place list shares (design D175). */
 export const popup =
@@ -69,7 +69,7 @@ export function Select({
       <BaseSelect.Trigger
         aria-label={labelClassName === undefined ? label : undefined}
         title={swatch ? label : undefined}
-        className={`${button} ${className}`}
+        className={`${button} ${swatch ? "gap-0.5" : "gap-2"} ${className}`}
       >
         <BaseSelect.Value
           className={
@@ -155,7 +155,7 @@ export function MenuButton({
           {icon}
         </Menu.Trigger>
       ) : (
-        <Menu.Trigger className={`${button} ${className}`}>
+        <Menu.Trigger className={`${button} gap-2 ${className}`}>
           <span className="min-w-0 flex-1 truncate text-ink-muted">{label}</span>
           {caret && <CaretIcon className="size-5 shrink-0 text-ink-muted" />}
         </Menu.Trigger>

@@ -143,12 +143,23 @@ for (const [size, viewport] of [
     await expect(words(start)).toHaveText("Wed, Nov 4");
     await end.fill("2027-01-05");
     await expect(words(end)).toHaveText("Tue, Jan 5, 2027");
-    // Typed in, the field shows its own digits; left, the words again.
+    // Tab comes in with the words still there; a key that changes the date
+    // shows the field's own digits, and nothing in the row moves; left, the
+    // words again, of the new date.
+    const startTime = dialog.getByLabel("Start time");
+    const before = await startTime.boundingBox();
     await start.focus();
     await page.keyboard.press("Shift");
-    await expect(words(start)).toBeHidden();
-    await dialog.getByRole("textbox", { name: "Title" }).focus();
     await expect(words(start)).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(words(start)).toBeHidden();
+    expect(await startTime.boundingBox()).toEqual(before);
+    await page.keyboard.press("ArrowUp");
+    await expect(start).not.toHaveValue("2026-11-04");
+    await start.fill("2026-11-05");
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(words(start)).toHaveText("Thu, Nov 5");
+    await start.fill("2026-11-04");
     // The end stands on the start's line where there is room, under it on a phone.
     await end.fill("2026-11-04");
     const [first, second] = [await start.boundingBox(), await end.boundingBox()];

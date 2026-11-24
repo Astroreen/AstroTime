@@ -332,7 +332,7 @@ export function DateField({
   return (
     // The row's look is the wrapper's: the field itself is not drawn under the words.
     <span
-      className={`relative inline-flex h-10 items-center rounded-lg text-input hover:bg-raised-hover has-[:focus]:bg-raised-hover has-[:focus]:shadow-[inset_0_-2px_0_var(--color-accent)] ${typing ? "min-w-[10.5em]" : ""} ${className}`}
+      className={`relative inline-flex h-10 items-center rounded-lg text-input hover:bg-raised-hover has-[:focus]:bg-raised-hover has-[:focus]:shadow-[inset_0_-2px_0_var(--color-accent)] forced-colors:has-[:focus]:outline-2 ${className}`}
     >
       <input
         type="date"
@@ -342,20 +342,26 @@ export function DateField({
         max="9999-12-31"
         // A year of four digits: one of five has no words (`Intl` refuses it).
         onChange={(e) => DAY.test(e.target.value) && onChange(e.target.value)}
-        onKeyDown={() => setTyping(true)}
-        onKeyUp={() => setTyping(true)}
+        // Only a key that changes the date: not Tab coming in, nor Escape or
+        // Enter from its picker.
+        onKeyDown={(e) => EDITS.test(e.key) && setTyping(true)}
         onPointerDown={() => setTyping(false)}
         onBlur={() => setTyping(false)}
         onClick={(e) => {
-          // A press anywhere on the words opens the picker, in every browser;
-          // one that cannot (or has it open) is left alone.
+          // A finger's tap opens the picker by itself.
+          if ((e.nativeEvent as PointerEvent).pointerType === "touch") return;
+          // A press anywhere on the words opens it, in every browser; one
+          // that cannot is left to the browser.
           try {
             e.currentTarget.showPicker();
+            e.preventDefault();
           } catch {
             // The field is still typed in.
           }
         }}
-        className={`date-field absolute inset-0 size-full cursor-pointer rounded-lg bg-transparent px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? "" : "opacity-0"}`}
+        // Typed in, its digits are drawn over what stands after it, in room
+        // enough for a whole date: nothing in the row moves.
+        className={`date-field absolute inset-y-0 left-0 h-full min-w-full cursor-pointer rounded-lg px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? "z-10 w-[10.5em] bg-raised shadow-[inset_0_-2px_0_var(--color-accent)]" : "w-full bg-transparent opacity-0"}`}
       />
       {/* What the row shows, and its width. */}
       <span
@@ -367,6 +373,9 @@ export function DateField({
     </span>
   );
 }
+
+/** The keys that change a date field's date. */
+const EDITS = /^(\d|Arrow(Up|Down|Left|Right)|Backspace|Delete)$/;
 
 /** A day as a date field gives it, its year of four digits. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -381,12 +390,15 @@ export function DateTime({
   onTime,
   allDay,
   muted,
+  end,
 }: {
   form: Form;
   /** A date alone, or a date and a time; the form's "All day" by default. */
   allDay?: boolean;
   /** As `DateField`'s. */
   muted?: boolean;
+  /** After the time, on its line: the dash before an end. */
+  end?: ReactNode;
   dateLabel: string;
   timeLabel: string;
   date: string;
@@ -398,6 +410,7 @@ export function DateTime({
     <div className="flex flex-wrap items-center">
       <DateField label={dateLabel} value={date} onChange={onDate} muted={muted ?? false} />
       {!(allDay ?? form.allDay) && <TimeSelect label={timeLabel} value={time} onChange={onTime} />}
+      {end}
     </div>
   );
 }

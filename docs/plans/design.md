@@ -1124,7 +1124,7 @@ Settings, the colours and the lists controls open.
   hex's (`colorNameHex`), "Its own colour" only for what is no colour. A calendar's colour stays the server's: AstroTime does
   not change it (Deferred).
   _Amended by [D317](#D317):_ in the edit dialog the dropdown's button is
-  the colour's dot alone, at the end of the calendar's row.
+  as [D317](#D317) draws it, at the end of the calendar's row.
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group
   after "Hide completed tasks", on unless turned off: today's look stays
@@ -2602,6 +2602,8 @@ keywords". The quick parse and voice that fill quick create are the
   `apps/web/e2e/quick-create.spec.ts`.
   _Amended by [D315](#D315):_ "Save" stands at the end of the kind's row,
   not at the foot.
+  _Amended by [D317](#D317):_ its date reads in words (`DateField`) and its
+  times have no arrow; its calendar row keeps its arrow.
 - **D297. The full editor, lighter.** Its rows lose their boxes: each is an
   icon and its value on the dialog's ground, with no border or fill, as in
   Google Calendar's edit screen; groups are parted by a hairline. An empty
@@ -2745,9 +2747,12 @@ keywords". The quick parse and voice that fill quick create are the
     (`DateField`, in quick create and the custom repeat's last day too).
     Under the words it is still the browser's date field, not drawn: a
     press anywhere on the words opens its picker (`showPicker`, so in
-    Firefox too), a screen reader and the keys reach it as before, and
-    while a key is typed in it the words give way to its own digits, in
-    room enough for them, so a date typed is seen. A year of five digits,
+    Firefox too; a finger's tap opens it by itself), a screen reader and
+    the keys reach it as before, and once a key changes the date (a digit,
+    an arrow, Backspace or Delete; not Tab coming in, nor Escape or Enter
+    from the picker) the words give way to its own digits, drawn over what
+    stands after it in room enough for a whole date, so a date typed is
+    seen and nothing in the row moves. A year of five digits,
     which has no words, is not taken. A date picker of our own is still
     [Deferred](#deferred).
   - **Start and end as one sentence.** "Wed, Nov 4 10:00 – Wed, Nov 4

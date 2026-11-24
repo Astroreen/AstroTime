@@ -79,7 +79,7 @@ export function ColorSelect({
   /** A task's colour: its first entry is its list's colour (design D236). */
   task?: boolean;
   className?: string;
-  /** As `Select`'s: the button's arrow, and the colour's dot alone (design D317). */
+  /** As `Select`'s: the button's arrow, and the colour's dot with it alone (design D317). */
   caret?: boolean;
   swatch?: boolean;
 }) {
