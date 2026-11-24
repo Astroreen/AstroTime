@@ -704,7 +704,8 @@ export function firstCalendarFor(
  * pick again in, so a refused one gives way too. Another is, in order: a
  * calendar ticked beside it (D313), its account's first, a server's first
  * (with `servers`), the first; none when no calendar takes it. `moved`: it
- * left the account chosen, or that account is not known (gone), so no file
+ * left the account chosen, or that account is not known (gone, and no
+ * `knownAccount`), so no file
  * of the account's own goes with it (foundation D232). The dialog's field
  * shows this, and the save uses it.
  */
@@ -713,13 +714,15 @@ export function newItemCalendar(
   form: Pick<Form, "kind" | "calendarId" | "alsoIn">,
   hidden?: ReadonlySet<string>,
   servers?: ReadonlySet<string>,
+  /** The account of the calendar chosen as the dialog last saw it, for one gone since. */
+  knownAccount?: string,
 ): { readonly calendar: Calendar; readonly refused: boolean; readonly moved: boolean } | null {
   const takes = (calendar: Calendar) => calendarsFor([calendar], form.kind).length > 0;
   const byId = (id: string) => calendars.find((calendar) => calendar.id === id);
   const chosen = byId(form.calendarId);
   if (chosen && takes(chosen)) return { calendar: chosen, refused: false, moved: false };
   if (chosen && !servers) return { calendar: chosen, refused: true, moved: false };
-  const account = chosen?.accountId;
+  const account = chosen?.accountId ?? knownAccount;
   // The ticks are of the account chosen: one of them stays in it.
   const tick = (form.alsoIn ?? [])
     .map(byId)
@@ -972,6 +975,8 @@ export async function saveForm(
      * calendar).
      */
     readonly everyAccount?: ReadonlySet<string>;
+    /** The account of its calendar as the dialog knew it: one gone since still names it (D313). */
+    readonly account?: string;
   },
   writes: Writes,
 ): Promise<void> {
@@ -997,6 +1002,10 @@ export async function saveForm(
       ? // "Copy to…"'s code loads with it, not with the app (foundation D145).
         (await import("./copy.ts")).createFrom(request.base, changes, writes.now)
       : createItem(form.kind, changes, { now: writes.now, uid });
+    // Gone from the account chosen: no file of that one's own (foundation D232).
+    const icsMoved = request.base
+      ? (await import("./copy.ts")).createFrom(request.base, forCopy, writes.now)
+      : createItem(form.kind, forCopy, { now: writes.now, uid });
     await changeLocal(store, async (local) => {
       // The calendars as they are now, in this transaction: the screen's
       // list may not have caught up (foundation D122). Where it goes is what
@@ -1010,16 +1019,11 @@ export async function saveForm(
         { ...form, alsoIn: ticks },
         request.hidden,
         servers && !request.base ? servers : undefined,
+        request.account,
       );
       if (!into) throw new NowhereError("No calendar takes this item now.");
       if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
-      // Gone from the account chosen: no file of that one's own (foundation D232).
-      await local.save(
-        into.calendar.id,
-        into.moved && !request.base
-          ? createItem(form.kind, forCopy, { now: writes.now, uid })
-          : ics,
-      );
+      await local.save(into.calendar.id, into.moved ? icsMoved : ics);
       // A save retried keeps its copies' UIDs too, in the order they are made.
       let copies = 0;
       const copyUid = () => (made[copies++] ??= writes.uid());

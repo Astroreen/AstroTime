@@ -1548,6 +1548,11 @@ describe("where a new item goes when its calendar changes under the dialog (D313
       calendar: { id: away.id },
       moved: true,
     });
+    // Its account still known to the dialog: that account's next, files kept.
+    expect(newItemCalendar([device, away, work], event, undefined, servers, "home")).toMatchObject({
+      calendar: { id: work.id },
+      moved: false,
+    });
     expect(newItemCalendar([device, away, work], event)).toMatchObject({
       calendar: { id: device.id },
       moved: true,
@@ -1653,6 +1658,15 @@ describe("a new item ticked into several calendars (design D313)", () => {
     await store.removeCalendar(alpha.id);
     await saveForm(store, request, { now: NOW, uid: () => "kept" });
     expect((await store.objectAt(zeta.id, "kept.ics"))?.uid).toBe("kept");
+    expect(await store.pending(beta.id)).toEqual([]);
+    // No tick, but the dialog knew its account: that account's next, files kept.
+    await saveForm(
+      store,
+      { ...request, form: { ...form, alsoIn: [] }, account: home.id },
+      { now: NOW, uid: () => "hinted" },
+    );
+    const hinted = await store.objectAt(zeta.id, "hinted.ics");
+    expect(CalendarObject.parse(hinted!.ics).master?.attachments).toHaveLength(2);
     expect(await store.pending(beta.id)).toEqual([]);
 
     // Every account, and nothing of Home takes it now: it goes to Away,

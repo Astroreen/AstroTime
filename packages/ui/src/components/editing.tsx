@@ -241,6 +241,10 @@ export function useEditingState({
   }, [store, detailsId]);
 
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
+  // Each calendar's account as last seen: a calendar gone while its new item's
+  // dialog is open still names its account, whose next calendar takes it (D313).
+  const knownAccounts = useRef(new Map<string, string>());
+  for (const calendar of calendars) knownAccounts.current.set(calendar.id, calendar.accountId);
   /** The accounts on a server, which a new item goes to when it goes to every account (D314). */
   const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
   /** New items go to every account: on, and two accounts on a server or more to go to (D314). */
@@ -429,6 +433,9 @@ export function useEditingState({
           untitled: t("edit.untitledReminder"),
           hidden,
           ...(toEvery ? { everyAccount: servers } : {}),
+          ...(knownAccounts.current.has(state.form.calendarId)
+            ? { account: knownAccounts.current.get(state.form.calendarId)! }
+            : {}),
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
@@ -615,6 +622,7 @@ export function useEditingState({
           everyMode ? { ...editing.state.form, alsoIn: [] } : editing.state.form,
           hidden,
           everyMode ? servers : undefined,
+          knownAccounts.current.get(editing.state.form.calendarId),
         )
       : null;
   // Gone from the account chosen, no file of that one's own goes with it,

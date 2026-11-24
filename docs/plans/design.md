@@ -2679,8 +2679,10 @@ keywords". The quick parse and voice that fill quick create are the
   row to pick again, a calendar that no longer takes it, or gone, gives
   way to its account's next, else a server's, else the first that takes
   it, without the files of an account it leaves; none, the dialog says no
-  calendar takes it. The dialog shows what the save does: one rule
-  (`newItemCalendar`), files of an account left shown gone.
+  calendar takes it. A calendar gone still names its account, as the
+  dialog last saw it. The dialog shows what the save does: one rule
+  (`newItemCalendar`), files of an account left shown gone, a copy's
+  ("Copy to") too.
   Ticks are not read then. One copy
   per account: "every calendar" is each account's, as the owner hides the
   account choice. The calendar on this device ([foundation
