@@ -1,7 +1,8 @@
 // Background sync's page (docs/plans/android.md#D67) with native replaced:
 // the channel's calls and answers, a run with nothing to sync, and a run that
 // syncs through native's HTTP and credentials and hands the reminder set to
-// native's notifications; the store closed whatever happens.
+// native's notifications and the widget's snapshot to native's widget
+// (D317); the store closed whatever happens.
 import { ALL_RIGHTS } from "@astrotime/core";
 import { Store } from "@astrotime/storage";
 import { nodeDriver } from "@astrotime/storage/node";
@@ -120,12 +121,46 @@ test("the channel answers each call under its id, a refusal with its code and da
   ]);
 });
 
-test("signed out of every account: nothing is synced or scheduled, and the store is closed", async () => {
+test("signed out of every account: nothing is synced or scheduled, the widget drawn, and the store is closed", async () => {
   const device = native(() => ({ value: null }));
   const run = context(device.port, await Store.open(nodeDriver()));
   await expect(run.run()).resolves.toEqual({ accounts: [], reminders: null });
-  expect(device.sent).toEqual([]);
+  expect(device.methods()).toEqual(["widget.show"]);
   expect(run.closed()).toBe(true);
+});
+
+test("reminders native could not schedule: the widget is drawn all the same", async () => {
+  const { store } = await storeWithStandup();
+  const device = native((method) => {
+    if (method === "secrets.get")
+      return { value: JSON.stringify({ username: "anna", password: "secret" }) };
+    if (method === "http") return new NativeError("Unreachable.", "offline", undefined);
+    if (method === "notifications.check") return { value: { display: "granted" } };
+    if (method === "notifications.exact") return { value: { exact_alarm: "granted" } };
+    if (method === "notifications.pending") return { value: { notifications: [] } };
+    if (method === "notifications.schedule") return new NativeError("Busy.", "failed", undefined);
+    return { value: null };
+  });
+  await expect(context(device.port, store).run()).rejects.toThrow("Busy.");
+  expect(device.methods()).toContain("widget.show");
+});
+
+test("a widget native could not draw fails nothing else", async () => {
+  const { store, account } = await storeWithStandup();
+  const device = native((method) => {
+    if (method === "widget.show") return new NativeError("No room.", "write", undefined);
+    if (method === "secrets.get")
+      return { value: JSON.stringify({ username: "anna", password: "secret" }) };
+    if (method === "http") return new NativeError("Unreachable.", "offline", undefined);
+    if (method === "notifications.check") return { value: { display: "granted" } };
+    if (method === "notifications.exact") return { value: { exact_alarm: "granted" } };
+    if (method === "notifications.pending") return { value: { notifications: [] } };
+    return { value: null };
+  });
+  await expect(context(device.port, store).run()).resolves.toEqual({
+    accounts: [{ accountId: account.id, status: "offline" }],
+    reminders: 1,
+  });
 });
 
 test("each account syncs through native, and the reminder set goes to Android", async () => {
@@ -163,6 +198,17 @@ test("each account syncs through native, and the reminder set goes to Android", 
       schedule: { at: "2026-11-04T11:45:00.000Z", allowWhileIdle: true },
     },
   ]);
+  // The widget is drawn after the reminders, from the store as the sync left it.
+  const shown = device.sent.find((call) => call.method === "widget.show")!.params as {
+    snapshot: string;
+  };
+  const snapshot = JSON.parse(shown.snapshot) as { version: number; days: unknown[] };
+  expect(snapshot.version).toBe(1);
+  expect(snapshot.days[0]).toMatchObject({
+    day: "2026-11-04",
+    rows: [{ kind: "item", title: "Standup", time: "12:00 PM" }],
+  });
+  expect(device.methods().at(-1)).toBe("widget.show");
   expect(run.closed()).toBe(true);
 });
 

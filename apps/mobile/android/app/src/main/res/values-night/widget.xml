@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The schedule widget's colours in the dark theme (docs/plans/android.md#D317). -->
+<resources>
+    <color name="widget_ground">#1B1D23</color>
+    <color name="widget_raised">#262A33</color>
+    <color name="widget_ink">#E6E8ED</color>
+    <color name="widget_muted">#9AA1AD</color>
+    <color name="widget_accent">#A8C7FA</color>
+    <color name="widget_on_today">#0C1D36</color>
+</resources>

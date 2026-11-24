@@ -23,6 +23,8 @@ export {
   deleteItem,
   editItem,
   hasOccurrence,
+  namesSameOccurrence,
+  readsItsClock,
   placeText,
   sameGeo,
   PRODID,

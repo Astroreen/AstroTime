@@ -70,6 +70,7 @@ test("a file is handed to the shell's picker in base64, a big one too (design D2
   const asked: { name: string; type: string; data: string }[] = [];
   const save = saveFile({
     setBars: async () => {},
+    showWidget: async () => {},
     saveFile: async (options) => {
       asked.push(options);
       return { saved: true };
@@ -84,7 +85,11 @@ test("a file is handed to the shell's picker in base64, a big one too (design D2
   ).toBe(true);
   expect(asked).toEqual([{ name: "figures.txt", type: "text/plain", data: "UTE6IDEyIDAwMAo=" }]);
   // Its dialog turned away: said, so no "saved" is shown (import D274).
-  const refused = saveFile({ setBars: async () => {}, saveFile: async () => ({ saved: false }) });
+  const refused = saveFile({
+    setBars: async () => {},
+    showWidget: async () => {},
+    saveFile: async () => ({ saved: false }),
+  });
   expect(await refused({ name: "a.ics", type: "text/calendar", bytes: new Uint8Array([1]) })).toBe(
     false,
   );

@@ -6,7 +6,8 @@ store), [PR A2](#pr-a2--credentials-login-flow-v2-the-shells-manners)
 (credentials, Login Flow v2, the shell's manners),
 [PR A3](#pr-a3--reminders) (reminders),
 [PR A4](#pr-a4--background-sync) (background sync) and
-[PR A5](#pr-a5--the-release-apk) (the release APK); what is left is
+[PR A5](#pr-a5--the-release-apk) (the release APK), and since then
+[PR A6](#pr-a6--the-schedule-widget) (the schedule widget); what is left is
 [Deferred](#deferred), the signed release first.
 It started once foundation's
 [PR 5](foundation.md#pr-5--calendar-grid) had landed the shared UI. This
@@ -695,6 +696,98 @@ were checked on 2026-11-01.
     No emulator in CI yet: the UI is tested in the browser, and screenshots
     from a device or an emulator are each PR's evidence.
 
+- **D317. The schedule widget: the Agenda's days on the home screen.**
+  _Added by the owner's request, out of Deferred's "Widgets"; Google
+  Calendar's "Schedule" widget is the reference._ One widget: the month
+  and "+" over the days ahead in a list that scrolls freely, each day's
+  date beside its first row (today's in a circle), its items as the Agenda
+  has them ([design D87](design.md#D87)), the "N undone tasks" row first on
+  today ([design D51](design.md#D51)).
+  - **The UI works it out, the widget only draws it.** A widget is native
+    (RemoteViews) and cannot read the store in the WebView's OPFS
+    ([D63](#D63)), so `scheduleSnapshot` (`packages/ui/src/widget/`) makes
+    a snapshot from the store, as the platform's reminder set is made
+    ([D60](#D60)): the shown calendars' items from today for 31 days (at
+    most 200 rows, the snapshot ending with the day they cut), hidden
+    calendars and "Hide completed tasks" as the user chose on this device, every word in the user's language (weekdays,
+    months, times, titles, the undone row, a screen reader's labels), each
+    row's colour as the views colour it, darkened for white text by the
+    rule of [design D120](design.md#D120) (`fillOf`), a done task's muted.
+    `Platform.widget` (`WidgetHost`) is handed it: the open app at every
+    change to the store, the calendars shown, the words or the day
+    (`useScheduleWidget`, which hears the store with the page hidden too),
+    background sync after every run, whatever its reminders did, unless
+    the app came to the front during the run: its own snapshot wins
+    ([D67](#D67)), even an app opened and left at once, before it drew
+    (the widget then waits for the next run). The open app hands one at
+    every change; the shell writes and draws only one that differs from
+    the file the widget has, whoever wrote it, or one not yet drawn in this
+    process, so a write or a drawing that failed is made again with the
+    next change; drawings take turns, each from the file as it is then. The snapshot names every day of its
+    range, those with nothing too, so after midnight the widget names
+    today and its month in the user's words.
+  - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
+    background sync's `widget.show` keep the snapshot in a file of the
+    app's (`AtomicFile`) and draw every widget again; the list's rows come
+    from a `RemoteViewsService`, read again from the file
+    (`Snapshot.read`, JVM-tested). The days before the device's today are
+    left out when it draws, so the list moves on at midnight (an alarm
+    within ten minutes of it, `setWindow`, no permission; `java.util`'s
+    calendar, as the app runs from Android 7.0) with the app closed; today
+    with nothing on it still heads the list ("Nothing planned today"), and
+    another day with nothing is left out. Before the app's first snapshot
+    the widget says to open AstroTime. Colours are the app's
+    tokens in `values` and `values-night`; from Android 12 the home screen
+    resolves them, so the widget follows the system's theme as it changes.
+  - **A tap opens the app on what was tapped:** an item's day in the Day
+    view and its details over it, as a tapped reminder does ([D66](#D66));
+    the undone row and the month, the day; "+", quick create for a new
+    event today. The tap starts `MainActivity` at
+    `io.github.astroreen.astrotime:/widget?open=<JSON>`, heard through
+    `@capacitor/app` (`appUrlOpen`). Any app can start the exported activity at that address, so
+    `widgetOpenOf` keeps only an item (by id), a day the calendar has or
+    quick create, and rebuilds a recurrence id from its own kind's fields;
+    the worst a crafted address does is open one of them. The UI hears taps
+    once the calendars are read, so a tap that started the app opens quick
+    create with a calendar to put it in; `MainActivity` forgets a tap when
+    the activity is made again from Recents or after the system ended the
+    app, so it is not acted on twice; the tap that started the app is
+    heard once, from `appUrlOpen`, which the plugin keeps for its first
+    listener. A tap never replaces a draft open in quick create or the
+    edit dialog, nor covers the question of a change's scope (an item's
+    tap then opens its day alone); a tap closes an item's details open
+    before it; a tap whose item is still being read gives way to a later
+    one (not to details opened in the app meanwhile, a read's length); an
+    occurrence of a series opens as the views draw it, expanded around its
+    day (`occurrenceOn`), the first step that finds any deciding and more
+    than one opening the day alone: the same id; for a zoned id, a zoned
+    one at the same instant in another zone (a server's UTC), each reading
+    its own wall clock there (core's `readsItsClock`: in the zones the
+    series' anchor (its start, or a task's due), its RDATEs and its
+    exceptions' ids are written in, each by the
+    calendar's VTIMEZONE of that TZID where it has one, its changes of
+    offset on the UTC time line, else by `Intl`), so a
+    spring-forward 3:30 is never the 4:30 at its instant (a daily series'
+    only occurrence in that gap, moved by a UTC id, opens its day alone);
+    in one zone, the exact id alone, so a fall-back night's two 3:30s stay
+    apart; for ids of different kinds, the one the series' own rule names
+    (core's `namesSameOccurrence`, foundation D35); with none near its
+    day, by the same steps among the exceptions moved further, where they
+    are now. So one a server cancelled opens its day alone, a series cancelled whole still opens, and so does a task due at midnight; a
+    series too dense to expand opens its day alone, as the views draw none
+    of it;
+    details a draft was opened from stay under it, for its Cancel. A tapped
+    reminder opens the same way ([D66](#D66), foundation D101): the rule
+    is the one for whatever opens from outside the page. Past the
+    snapshot's end (an app not opened for a month, or rows cut by the
+    cap) the widget knows nothing of today and says to open AstroTime, in
+    the snapshot's words and locale, never "nothing planned".
+  - **Fresh within:** at once from the open app; within an hour with it
+    closed, as background sync runs ([D67](#D67)): only with an account
+    saved and a network, so a device with only the calendar on it sees
+    the widget move on at midnight but its "N undone tasks" row only when
+    the app opens.
+
 ## Deferred
 
 - **An inexact alarm Doze delayed, then moved** — a reminder whose alarm
@@ -724,8 +817,33 @@ were checked on 2026-11-01.
   neither is worth a tap.
 - **A sync interval setting** — the hour of [D67](#D67) is fixed until
   someone needs another.
-- **Widgets, quick settings tile, share target** — none in the first
-  release.
+- **Quick settings tile, share target, more widgets** — none in the first
+  release; the schedule widget is [D317](#D317). A month widget, a tasks
+  widget, a widget's own calendars or its own theme wait for someone to
+  ask.
+- **The widget across a zone change** — the snapshot's days are the zone's
+  the app had when it made it, and the open app reads the zone once, at its
+  start (as the whole UI does); after the phone's zone changes, the widget
+  shows the old zone's days until the app starts again or background sync
+  runs ([D317](#D317)).
+- **A day the row cap cuts** — the snapshot ends with that day, showing
+  part of its items with nothing to say there are more; at a month's
+  distance it is the list's last day ([D317](#D317)).
+- **Past the snapshot's end, after the device's language changed** — that
+  row speaks the snapshot's language until the app opens, AstroTime's
+  choice being the app's to make ([D317](#D317)).
+- **The undone row across midnight** — it stands on the snapshot's today,
+  so after midnight it leaves with that day until the next snapshot (the
+  app opened, or background sync within the hour); the widget could carry
+  it to the new today, its count a guess until then ([D317](#D317)).
+- **A test of how few times a moved occurrence's search expands** — the
+  search expands only the exceptions a step takes (12 ms for 260 over ten
+  years, measured once); a test counting the expansions would keep it so,
+  rather than one timing them ([D317](#D317)).
+- **The widget without an account** — background sync starts no run with
+  no account saved ([D67](#D67)), so the widget's undone row moves on only
+  when the app opens; a run for the widget alone, where one is on the home
+  screen, would cover it ([D317](#D317)).
 - **System calendars** — foundation's Deferred (`CalendarContract`).
 - **The app's icon and splash screen** — Capacitor's placeholders until
   AstroTime has a design for them ([D61](#D61)).
@@ -864,3 +982,14 @@ Decisions: D69 (release), foundation's D28.
 Done when: a prerelease tag (on a fork is enough) creates its Release with
 `astrotime-<version>-unsigned.apk`, which `apksigner verify` reports
 unsigned and which, signed by hand with a test key, a phone installs.
+
+### PR A6 — The schedule widget
+
+The home screen's schedule widget: the snapshot in the UI, the widget in
+Kotlin, the taps back into the app. Decisions: D317.
+
+Done when: on an Android 16 emulator the widget shows the days ahead from
+the store, scrolls, follows the system's theme, and a tap on an item, on
+"+" and on the month opens the item's details, quick create and today;
+the snapshot's words and colours are unit-tested, and native's reading of
+it by Gradle.

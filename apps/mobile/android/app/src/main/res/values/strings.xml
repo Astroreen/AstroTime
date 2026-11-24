@@ -7,4 +7,9 @@
     <!-- The reminders' notification channel, in Android's settings (docs/plans/android.md#D66). -->
     <string name="reminders_channel">Reminders</string>
     <string name="reminders_channel_description">Reminders of events and tasks</string>
+    <!-- The schedule widget (docs/plans/android.md#D317): its name and line in the widget picker, and what it says before the app's first snapshot. -->
+    <string name="widget_name">Schedule</string>
+    <string name="widget_description">Your events and tasks of the days ahead</string>
+    <string name="widget_open_app">Open AstroTime to see your schedule here</string>
+    <string name="widget_create">New event</string>
 </resources>

@@ -14,7 +14,16 @@ import { point, readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
-import { epochNear, fromIcalTime, keepTzid, wallClockNear, type ItemTime } from "./time.ts";
+import {
+  epochNear,
+  fromIcalTime,
+  ianaName,
+  isKnownTimeZone,
+  keepTzid,
+  wallClockIn,
+  wallClockNear,
+  type ItemTime,
+} from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
 
 /** Refuses a colour `COLOR` cannot take before anything is written (D174). */
@@ -1013,6 +1022,122 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
     const moved = movedRule(rule, from, to);
     if (moved.toString() !== rule.toString()) property.setValue(moved);
   }
+}
+
+/**
+ * Whether a zoned time's instant reads its own wall clock in its zone, as
+ * the series' times are read: the zones are the TZIDs its anchor (its
+ * start, or a task's due), its RDATEs and its exceptions' ids are written
+ * in that read as this time's zone (`ianaName`: Outlook's Windows names,
+ * Lightning's paths), each by the object's
+ * VTIMEZONE of that TZID where it has one (its own offsets and changes,
+ * D32), else by `Intl`, any of them reading it; a server's UTC at UTC; a
+ * time written in no such zone by the VTIMEZONEs read as its zone, then by
+ * `Intl`; a zone neither knows is taken to. Not a
+ * spring-forward night's 3:30, which no clock shows. Other times always do.
+ */
+export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
+  if (time.type !== "zoned") return true;
+  if (!Number.isFinite(time.epochMs)) return false;
+  // A server's UTC is read at UTC whatever VTIMEZONE a calendar has by that name.
+  if (time.timeZone === "UTC") {
+    try {
+      return wallClockIn(time.epochMs, "UTC") === time.local;
+    } catch {
+      return false;
+    }
+  }
+  const { master, exceptions } = object.components;
+  const tzidOf = (property: ICAL.Property | null) => {
+    const tzid: unknown = property?.getParameter("tzid");
+    return typeof tzid === "string" ? tzid : null;
+  };
+  const written = [
+    // The series' anchor: its start, or a task's due without one (`anchorTzid`).
+    master ? anchorTzid(master) : null,
+    ...(master?.getAllProperties("rdate") ?? []).map(tzidOf),
+    ...exceptions.map((exception) => tzidOf(exception.getFirstProperty("recurrence-id"))),
+  ].filter((tzid): tzid is string => tzid !== null && ianaName(tzid) === time.timeZone);
+  const zones = object.root.getAllSubcomponents("vtimezone");
+  const reads = (tzid: string) => {
+    const defined = zones.find((zone) => zone.getFirstPropertyValue("tzid") === tzid);
+    if (defined) return clockAt(object.root, defined, time.epochMs) === time.local;
+    if (isKnownTimeZone(time.timeZone))
+      return wallClockIn(time.epochMs, time.timeZone) === time.local;
+    return true;
+  };
+  // None written in this zone (an exception alone, its id rewritten in UTC):
+  // the VTIMEZONEs read as this zone, then the zone itself.
+  const fallback = [
+    ...zones
+      .map((zone) => String(zone.getFirstPropertyValue("tzid") ?? ""))
+      .filter((tzid) => tzid !== "" && ianaName(tzid) === time.timeZone),
+    time.timeZone,
+  ];
+  try {
+    return [...new Set(written.length > 0 ? written : fallback)].some(reads);
+  } catch {
+    // An instant past what a clock reads (a crafted id), a zone that does not read: none.
+    return false;
+  }
+}
+
+/** One change of a zone's offset, as ical.js keeps them: its instant in UTC fields. */
+interface OffsetChange {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  readonly second: number;
+  readonly utcOffset: number;
+  readonly prevUtcOffset: number;
+}
+
+/**
+ * The wall clock a VTIMEZONE reads at `epochMs`: the offset of its last
+ * change at or before that instant, on the UTC time line. (ical.js's own
+ * `convertToZone` looks the offset up by the UTC time read as a local one,
+ * an hour off around each change.)
+ */
+function clockAt(root: ICAL.Component, component: ICAL.Component, epochMs: number): string {
+  const tzid = String(component.getFirstPropertyValue("tzid"));
+  // The zone the calendar's times are read with, worked out once (`shareTimeZones`), where it has it.
+  const cache: unknown = Reflect.get(root, "_timezoneCache");
+  const cached: unknown = cache instanceof Map ? cache.get(tzid) : undefined;
+  const zone = cached instanceof ICAL.Timezone ? cached : new ICAL.Timezone({ component, tzid });
+  const year = new Date(epochMs).getUTCFullYear();
+  (Reflect.get(zone, "_ensureCoverage") as (year: number) => void).call(zone, year + 1);
+  const instantOf = (change: OffsetChange) => {
+    const at = new Date(0);
+    // Years before 100 too (Date.UTC would read 1 as 1901).
+    at.setUTCFullYear(change.year, change.month - 1, change.day);
+    at.setUTCHours(change.hour, change.minute, change.second, 0);
+    return at.getTime();
+  };
+  // In time order whatever order ical.js keeps them in.
+  const changes = (Reflect.get(zone, "changes") as readonly OffsetChange[]).toSorted(
+    (a, b) => instantOf(a) - instantOf(b),
+  );
+  // Before its first change ical.js reads a time in the zone at UTC: so here.
+  let offset = 0;
+  for (const change of changes) {
+    if (instantOf(change) > epochMs) break;
+    offset = change.utcOffset;
+  }
+  return new Date(epochMs + offset * 1000).toISOString().slice(0, 19);
+}
+
+/**
+ * Whether two recurrence ids name one occurrence of `object`'s series,
+ * however each was written: on the series' wall clock, or by day where
+ * either or the series' start is a date (D35); outside a series, the same
+ * time.
+ */
+export function namesSameOccurrence(object: CalendarObject, a: ItemTime, b: ItemTime): boolean {
+  const { master } = object.components;
+  const anchor = master && isSeries(master) ? anchorOf(master) : null;
+  return anchor ? sameOccurrence(a, b, anchor) : sameTime(a, b);
 }
 
 /**

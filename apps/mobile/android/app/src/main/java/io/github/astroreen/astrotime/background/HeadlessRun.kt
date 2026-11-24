@@ -24,6 +24,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.github.astroreen.astrotime.http.Exchange
+import io.github.astroreen.astrotime.widget.ScheduleWidget
 import java.io.IOException
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -70,6 +71,10 @@ class HeadlessRun(
                 throw RunFailed("This WebView has no WebMessageListener.")
             }
             val gate = Gate(Executors.newCachedThreadPool())
+            // The app in front, or coming to the front during the run (gone again by its end too),
+            // drew the widget itself. Read on the main thread, as the activity sets them.
+            val behind = !AppVisibility.inFront
+            val comings = AppVisibility.comings
             val webView = WebView(context)
             try {
                 suspendCancellableCoroutine { continuation ->
@@ -81,7 +86,19 @@ class HeadlessRun(
                         }
                     }
                     val handlers =
-                        Handlers(Exchange(), KeystoreSecrets(context), PluginNotifications(context), gate::work) {
+                        Handlers(
+                            Exchange(),
+                            KeystoreSecrets(context),
+                            PluginNotifications(context),
+                            // The open app's snapshot wins: a run during which the user opened the
+                            // app (and hid a calendar, say) leaves the widget as the app drew it (D317).
+                            {
+                                ScheduleWidget.keep(context, it) {
+                                    behind && !AppVisibility.inFront && AppVisibility.comings == comings
+                                }
+                            },
+                            gate::work,
+                        ) {
                             main.post { finish(Result.success(it)) }
                         }
                     WebViewCompat.addWebMessageListener(webView, PORT, origins) { _, message, _, isMainFrame, reply ->

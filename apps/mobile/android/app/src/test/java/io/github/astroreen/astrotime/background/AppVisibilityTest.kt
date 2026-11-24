@@ -3,6 +3,7 @@
 package io.github.astroreen.astrotime.background
 
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,5 +26,15 @@ class AppVisibilityTest {
         AppVisibility.inFront = false
         AppVisibility.inFront = true
         assertTrue(AppVisibility.inFront)
+    }
+
+    @Test
+    fun everyComingToTheFrontIsCounted() {
+        val before = AppVisibility.comings
+        AppVisibility.inFront = true
+        AppVisibility.inFront = false
+        assertFalse(AppVisibility.inFront)
+        // Gone again, it was there: a background run started before knows.
+        assertEquals(before + 1, AppVisibility.comings)
     }
 }

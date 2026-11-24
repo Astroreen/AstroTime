@@ -11,11 +11,15 @@ import {
   editItem,
   hasOccurrence,
   movedRepeat,
+  namesSameOccurrence,
+  occurrencesBetween,
+  readsItsClock,
   placeText,
   sameGeo,
   repeatOf,
   timesOf,
   wallClockIn,
+  wallClockOf,
   WEEKDAYS,
   zonedTime,
   attachLines,
@@ -31,6 +35,7 @@ import {
   type NewAlarm,
   type NewAttachment,
   type NewInlineFile,
+  type Occurrence,
   type Repeat,
   type Scope,
 } from "@astrotime/core";
@@ -890,6 +895,111 @@ export async function current(local: LocalChange, target: Target) {
     throw new GoneError("The occurrence is no longer in its series.");
   }
   return { stored, object };
+}
+
+/**
+ * The occurrence of a series a tap from outside the page opens (the home
+ * screen widget, a reminder): one the views draw, expanded as they expand
+ * it, from the day before `day` to the day after (a task due at midnight
+ * ends where `day` begins). In turn, the first step that finds any decides,
+ * and finding more than one is `null`:
+ * 1. the same recurrence id, every field (the snapshot and reminders take
+ *    theirs from the same expansion);
+ * 2. for a zoned id, a zoned one at the same instant in another zone (a
+ *    server's UTC for the series' zone), each reading its own wall clock
+ *    at that instant (`readsItsClock`, by the calendar's VTIMEZONE where
+ *    it has one): a spring-forward 3:30, which no clock shows, is never
+ *    taken for the 4:30 at its instant. In the same zone a zoned id is
+ *    matched by step 1 alone, so a fall-back night's two 3:30s stay two;
+ * 3. for ids of different kinds (a date, a floating time and a zoned one),
+ *    the one the series' own rule says it names
+ *    (`namesSameOccurrence`, foundation D35).
+ * With none near `day`, the same steps among the exceptions moved
+ * further (a reminder's occurrence moved days on), each looked for around
+ * its own day, where the views draw it now.
+ * `null` too when the series has it no more (an EXDATE, an exception the
+ * server cancelled) or is too dense to expand, as the views draw none of it.
+ */
+export function occurrenceOn(
+  object: CalendarObject,
+  recurrenceId: ItemTime,
+  day: string,
+  timeZone: string,
+): Occurrence | null {
+  let occurrences: Occurrence[];
+  try {
+    occurrences = occurrencesBetween(object, {
+      from: addDays(day, -1),
+      to: addDays(day, 2),
+      timeZone,
+    });
+  } catch {
+    return null;
+  }
+  const idsOf = (drawn: readonly Occurrence[]) =>
+    drawn.flatMap((occurrence) =>
+      occurrence.recurrenceId ? [{ occurrence, id: occurrence.recurrenceId }] : [],
+    );
+  const steps: ((id: ItemTime) => boolean)[] = [
+    (id) => sameId(id, recurrenceId),
+    (id) =>
+      id.type === "zoned" &&
+      recurrenceId.type === "zoned" &&
+      id.timeZone !== recurrenceId.timeZone &&
+      id.epochMs === recurrenceId.epochMs &&
+      readsItsClock(object, id) &&
+      readsItsClock(object, recurrenceId),
+    (id) => id.type !== recurrenceId.type && namesSameOccurrence(object, id, recurrenceId),
+  ];
+  /** The step that finds any decides: its one, or `null` for more; `undefined` when none finds. */
+  const pick = (candidates: readonly { occurrence: Occurrence; id: ItemTime }[]) => {
+    for (const step of steps) {
+      const found = candidates.filter(({ id }) => step(id));
+      if (found.length > 0) return found.length === 1 ? found[0]!.occurrence : null;
+    }
+    return undefined;
+  };
+  const near = pick(idsOf(occurrences));
+  if (near !== undefined) return near;
+  // An exception moved far from the day it was shown on (a reminder's
+  // occurrence moved two days on): looked for where it is now. Step by step
+  // as above, expanding only the exceptions a step takes, and no more once
+  // two are found, which leaves the day alone.
+  const exceptions = object.exceptions.flatMap((exception) => {
+    const id = exception.recurrenceId;
+    const at = exception.start ?? (exception.kind === "task" ? exception.due : null);
+    return id && at && exception.status?.toUpperCase() !== "CANCELLED" ? [{ id, at }] : [];
+  });
+  for (const step of steps) {
+    const found: Occurrence[] = [];
+    for (const { id, at } of exceptions) {
+      if (!step(id)) continue;
+      try {
+        const its = wallClockOf(at, timeZone).slice(0, 10);
+        const drawn = idsOf(
+          occurrencesBetween(object, { from: addDays(its, -1), to: addDays(its, 2), timeZone }),
+        ).filter((candidate) => sameId(candidate.id, id));
+        found.push(...drawn.map(({ occurrence }) => occurrence));
+      } catch {
+        // Too dense to expand, a time that does not read: not drawn.
+      }
+      if (found.length > 1) return null;
+    }
+    if (found.length === 1) return found[0]!;
+  }
+  return null;
+}
+
+/** The same recurrence id, field by field. */
+function sameId(a: ItemTime, b: ItemTime): boolean {
+  if (a.type === "date") return b.type === "date" && a.date === b.date;
+  if (a.type === "floating") return b.type === "floating" && a.local === b.local;
+  return (
+    b.type === "zoned" &&
+    a.local === b.local &&
+    a.timeZone === b.timeZone &&
+    a.epochMs === b.epochMs
+  );
 }
 
 /** What shows of an occurrence: its exception, or the master. */

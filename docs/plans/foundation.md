@@ -2388,6 +2388,11 @@ task?"
 
 ## Deferred
 
+- **One instant, two occurrences** — on a spring-forward night an hourly
+  series draws 3:30 (which no clock shows) and 4:30 at one instant;
+  moving one of them by an exception takes both away, as `isReplaced`
+  (`occurrences.ts`) matches an exception by instant while the expansion
+  counts two (found in android D317's review).
 - **A creation whose upload keeps failing, listed by the server**
   ([D38](#D38)) — it stays pending and reported, and every sync keeps its
   token and lists the calendar again until the upload recognises the

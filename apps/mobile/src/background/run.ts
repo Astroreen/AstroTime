@@ -1,13 +1,14 @@
 // Background sync's run in the headless WebView (docs/plans/android.md#D67):
 // the store opened as any tab opens it, `syncAll` under the tabs' sync lock,
-// and the reminder set handed to Android again, with HTTP, the credentials
+// the reminder set handed to Android again and the schedule widget drawn
+// again (D317), with HTTP, the credentials
 // and the notifications reached through native's handlers instead of
 // Capacitor's plugins.
 import type { SecretStore } from "@astrotime/core";
 import type { Store } from "@astrotime/storage";
 import { connectCalDav, syncAll, syncs, type AccountSync, type SyncLock } from "@astrotime/sync";
 import type { Preferences } from "@astrotime/ui";
-import { scheduleReminders } from "@astrotime/ui/background";
+import { scheduleReminders, showWidget } from "@astrotime/ui/background";
 
 import {
   cleartextOrigins,
@@ -46,7 +47,10 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
   const store = await context.openStore();
   try {
     // Signed out of everything: nothing to sync, and the app emptied the set.
+    // The widget is drawn all the same, the new day's. (Native starts no run
+    // with no account saved, android D317: this is when the two disagree.)
     if (!(await store.accounts()).some(syncs)) {
+      await widget(context, store, now());
       return { accounts: [], reminders: null };
     }
     const http = nativeClient(
@@ -62,6 +66,8 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
       http,
       lock: context.syncLock,
     });
+    // The widget is drawn whatever the reminders do: what the sync wrote is
+    // in the store either way.
     const set = await scheduleReminders({
       store,
       scheduler: androidReminders({
@@ -74,13 +80,36 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
       languages: context.languages,
       timeZone: context.timeZone,
       now: now(),
-    });
+    }).finally(() => widget(context, store, now()));
     return {
       accounts: report.accounts.map(({ accountId, status }) => ({ accountId, status })),
       reminders: set?.length ?? null,
     };
   } finally {
     await store.close();
+  }
+}
+
+/**
+ * Draws the schedule widget from the store as it is now (D317). A failure is
+ * only logged: the sync and the reminders are what the run is for.
+ */
+async function widget(context: BackgroundContext, store: Store, now: number): Promise<void> {
+  try {
+    await showWidget({
+      store,
+      widget: {
+        show: (snapshot) =>
+          context.native.call<void>("widget.show", { snapshot: JSON.stringify(snapshot) }),
+        onOpen: () => () => {},
+      },
+      preferences: context.preferences,
+      languages: context.languages,
+      timeZone: context.timeZone,
+      now,
+    });
+  } catch (error) {
+    console.error(error);
   }
 }
 

@@ -2,7 +2,9 @@ package io.github.astroreen.astrotime;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Intent;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
@@ -18,10 +20,25 @@ public class MainActivity extends BridgeActivity {
         // The app's own plugins, registered before the bridge starts.
         registerPlugin(HttpPlugin.class);
         registerPlugin(ShellPlugin.class);
+        forgetWidgetTap(savedInstanceState);
         super.onCreate(savedInstanceState);
         createRemindersChannel();
         // Every hour while the app is not in front (docs/plans/android.md#D67).
         SyncWorker.schedule(this);
+    }
+
+    /**
+     * A widget's tap (docs/plans/android.md#D317) is acted on once: the
+     * activity made again from Recents, or after the system ended the app,
+     * starts with the intent that first started it, and Capacitor would hand
+     * the page that tap again as its launch address.
+     */
+    private void forgetWidgetTap(Bundle savedInstanceState) {
+        Intent intent = getIntent();
+        Uri data = intent == null ? null : intent.getData();
+        if (data == null || !"/widget".equals(data.getPath())) return;
+        boolean fromHistory = (intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+        if (savedInstanceState != null || fromHistory) intent.setData(null);
     }
 
     @Override

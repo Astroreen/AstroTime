@@ -2,4 +2,8 @@
 <resources>
     <string name="reminders_channel">Напоминания</string>
     <string name="reminders_channel_description">Напоминания о событиях и задачах</string>
+    <string name="widget_name">Расписание</string>
+    <string name="widget_description">Ваши мероприятия и задачи на ближайшие дни</string>
+    <string name="widget_open_app">Откройте AstroTime, чтобы видеть здесь своё расписание</string>
+    <string name="widget_create">Новое мероприятие</string>
 </resources>

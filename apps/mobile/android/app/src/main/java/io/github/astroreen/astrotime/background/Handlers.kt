@@ -1,7 +1,8 @@
 // What background sync's page (apps/mobile/src/background/) calls on native
 // (docs/plans/android.md#D67): HTTP on the plugin's `Exchange`, the
-// credentials read as the secure storage plugin keeps them, and the
-// notifications scheduled on the notifications plugin's own classes. One JSON
+// credentials read as the secure storage plugin keeps them, the
+// notifications scheduled on the notifications plugin's own classes, and the
+// schedule widget's snapshot (D317). One JSON
 // message per call, answered under its id; no Android API here, so the JVM
 // tests run it as it is.
 package io.github.astroreen.astrotime.background
@@ -42,6 +43,8 @@ class Handlers(
     private val exchange: Exchange,
     private val secrets: Secrets,
     private val notifications: Notifications,
+    /** Keeps the schedule widget's snapshot, its JSON, and draws the widget (D317). */
+    private val widget: (String) -> Unit,
     /** Runs a call off the WebView's thread: an exchange blocks until answered. */
     private val work: (Runnable) -> Unit,
     /** The page is done, with what it reports (`{ report }` or `{ error }`). */
@@ -108,6 +111,7 @@ class Handlers(
                 val list = params.getJSONArray("notifications")
                 notifications.cancel((0 until list.length()).map { list.getJSONObject(it).getInt("id") }).let { null }
             }
+            "widget.show" -> widget(params.getString("snapshot")).let { null }
             else -> throw IllegalArgumentException("No handler for $method.")
         }
 

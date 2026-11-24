@@ -8,6 +8,7 @@ import type { UnprotectedPrompt } from "./accounts/unprotected.ts";
 import type { MapLinks } from "./places/map.ts";
 import type { Preferences } from "./preferences.ts";
 import type { Theme } from "./settings.ts";
+import type { WidgetHost } from "./widget/schedule.ts";
 
 /**
  * A newer version of the app, installed and waiting to run (the web's
@@ -138,6 +139,12 @@ export interface Platform {
   readonly syncLock?: SyncLock;
   /** Shows the reminders the UI works out (docs/plans/foundation.md#D101). */
   readonly reminders: ReminderScheduler;
+  /**
+   * The home screen's schedule widget, where the shell has one (Android's,
+   * android D317): the UI hands it a snapshot at every change, and opens
+   * what a tap on it asks for.
+   */
+  readonly widget?: WidgetHost;
   /**
    * A shell that lives on with its window closed (the desktop, desktop D75):
    * the UI hands it its chrome's state on start and at every change, and the

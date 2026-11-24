@@ -17,7 +17,13 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser/context";
 
 import { loadDemo } from "../src/demo/index.ts";
-import { AstroTime, type Platform } from "../src/index.ts";
+import {
+  AstroTime,
+  type Platform,
+  type ScheduleSnapshot,
+  type WidgetHost,
+  type WidgetOpen,
+} from "../src/index.ts";
 import { memoryPreferences } from "../src/preferences.ts";
 import { fakeReminders, memorySecrets, nextcloud, SERVER } from "./fakes.ts";
 
@@ -428,6 +434,68 @@ test("Reminders: the switch asks the permission from the tap, the set reaches th
   await label.click();
   await expect.element(toggle).not.toBeChecked();
   expect(reminders.last).toEqual([]);
+});
+
+test("The home screen widget: a snapshot from the store, and its taps open quick create, an item's details and a day (android D317)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  const store = await demoStore(["en-US"]);
+  const snapshots: ScheduleSnapshot[] = [];
+  let shown: () => void = () => {};
+  const first = new Promise<void>((resolve) => (shown = resolve));
+  let listener: ((open: WidgetOpen) => void) | null = null;
+  // A tap that started the app, waiting in the shell as Android's adapter keeps it.
+  let pending: WidgetOpen | null = { kind: "create" };
+  const widget: WidgetHost = {
+    show(snapshot) {
+      snapshots.push(snapshot);
+      shown();
+    },
+    onOpen(next) {
+      listener = next;
+      if (pending) next(pending);
+      pending = null;
+      return () => {
+        listener = null;
+      };
+    },
+  };
+  render(Promise.resolve(store), ["en-US"], { widget });
+  // Heard once the calendars are read: quick create has one to put it in.
+  const creating = page.getByRole("dialog", { name: "Quick create" });
+  await expect.element(creating).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(creating).not.toBeInTheDocument();
+  await first;
+  const rows = snapshots.at(-1)!.days.flatMap((day) => day.rows);
+  const dentist = rows.find((row) => row.kind === "item" && row.title === "Dentist")!;
+  listener!(dentist.open);
+  const details = page.getByRole("dialog", { name: "Dentist" });
+  await expect.element(details).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5" }))
+    .toBeInTheDocument();
+  // A day closes the details over it.
+  listener!(dentist.open);
+  await expect.element(details).toBeInTheDocument();
+  listener!({ kind: "day" });
+  await expect.element(details).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("list", { name: "Wednesday, November 4" }))
+    .toBeInTheDocument();
+  // "+" never replaces a draft open in quick create.
+  listener!({ kind: "create" });
+  const title = creating.getByRole("textbox", { name: "Title" });
+  await title.fill("Half written");
+  listener!({ kind: "create" });
+  // Taps are handled in order: once the next one's day shows (under quick
+  // create, which hides it from the accessibility tree), "+" was handled.
+  listener!({ kind: "day", day: "2026-11-05" });
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5", includeHidden: true }))
+    .toBeInTheDocument();
+  await expect.element(title).toHaveValue("Half written");
 });
 
 test("Reminders the browser blocks: the switch cannot turn on and says why, in Russian", async () => {

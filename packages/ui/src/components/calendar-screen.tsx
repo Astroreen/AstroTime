@@ -7,7 +7,12 @@
 // shows from the first run, with no account: the calendar on this device
 // (docs/plans/foundation.md#D122). The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
-import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
+import {
+  CalendarObject,
+  hasOccurrence,
+  wallClockOf,
+  type ScheduledReminder,
+} from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import {
@@ -22,7 +27,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { addDays } from "../calendar/dates.ts";
-import { itemOf } from "../calendar/editing.ts";
+import { itemOf, occurrenceOn } from "../calendar/editing.ts";
 import { Formats } from "../calendar/format.ts";
 import { shownCalendars } from "../calendar/calendars.ts";
 import { liveQuery, whileShown } from "../calendar/live.ts";
@@ -63,6 +68,8 @@ import { AgendaView, SettingsScreen } from "./lazy.tsx";
 import { TasksScreen, type TaskFocus } from "./tasks-screen.tsx";
 import { HOUR, hourIn } from "./items.tsx";
 import { TimeGrid } from "./time-grid.tsx";
+import type { WidgetOpen } from "../widget/schedule.ts";
+import { useScheduleWidget } from "../widget/use-widget.ts";
 import { DialogBackdrop, DialogPopup } from "./dialog-parts.tsx";
 
 /** A calendar without a colour of its own (design D47). */
@@ -406,25 +413,107 @@ export function CalendarScreen({
     setAnchor(day);
   };
 
+  // What opens from outside the page (a reminder, the widget) opens over
+  // the calendar: whatever was over it closes first.
+  const uncover = () => {
+    setSearching(false);
+    setDrawerOpen(false);
+    setSettingsOpen(false);
+    setTasksOpen(false);
+    setTaskFocus(null);
+  };
+  // Each opening from outside counts: one whose item is still being read
+  // when another comes gives way to it.
+  const openings = useRef(0);
+  // Whether a draft is open now, for an opening that has read its item.
+  const drafting = useRef(false);
+  useLayoutEffect(() => {
+    drafting.current = editing.value.drafting;
+  });
+  /** An occurrence's day in the Day view, when it has one, and its details over it. */
+  const openOccurrence = async (
+    objectId: string,
+    recurrenceId: ScheduledReminder["recurrenceId"],
+    day: string | null,
+  ) => {
+    const opening = ++openings.current;
+    uncover();
+    if (day) openDay(day);
+    // A draft stays, with the details it was opened from under it (its
+    // Cancel goes back to them), and the day alone shows under both.
+    if (editing.value.drafting) return;
+    // Whatever's details were open close.
+    editing.value.closeDetails();
+    const stored = await store.object(objectId);
+    if (opening !== openings.current || drafting.current) return;
+    if (!stored || stored.pending === "delete") return;
+    const object = CalendarObject.parse(stored.ics);
+    if (recurrenceId !== null && day) {
+      // The occurrence the views draw on its day; gone since it was shown
+      // (an EXDATE, an exception the server cancelled): its day alone.
+      const occurrence = occurrenceOn(object, recurrenceId, day, timeZone);
+      if (occurrence)
+        editing.value.open(targetOf(stored, object, occurrence.recurrenceId, occurrence.item));
+      return;
+    }
+    if (recurrenceId !== null && !hasOccurrence(object, recurrenceId)) return;
+    const item = itemOf(object, recurrenceId);
+    if (item) editing.value.open(targetOf(stored, object, recurrenceId, item));
+  };
+
   // A tapped reminder opens its occurrence's day in the Day view, and its
   // details over it (foundation D101): an event's start, a task's due or
   // start; one with no time opens only the details.
   const { onOpen } = useReminders();
   const openReminder = useEffectEvent(async (reminder: ScheduledReminder) => {
     const time = reminder.kind === "task" ? (reminder.due ?? reminder.start) : reminder.start;
-    setSearching(false);
-    setDrawerOpen(false);
-    setSettingsOpen(false);
-    setTasksOpen(false);
-    setTaskFocus(null);
-    if (time) openDay(wallClockOf(time, timeZone).slice(0, 10));
-    const stored = await store.object(reminder.objectId);
-    if (!stored || stored.pending === "delete") return;
-    const object = CalendarObject.parse(stored.ics);
-    const item = itemOf(object, reminder.recurrenceId);
-    if (item) editing.value.open(targetOf(stored, object, reminder.recurrenceId, item));
+    await openOccurrence(
+      reminder.objectId,
+      reminder.recurrenceId,
+      time ? wallClockOf(time, timeZone).slice(0, 10) : null,
+    );
   });
   useEffect(() => onOpen((reminder) => void openReminder(reminder)), [onOpen]);
+
+  // The home screen widget (android D317): kept with what the views show,
+  // and its taps open an item's day and details, a day, or quick create.
+  useScheduleWidget(platform.widget, store, {
+    t,
+    formats,
+    timeZone,
+    locale: settings.locale,
+    hidden,
+    hideCompleted,
+    today,
+  });
+  const openFromWidget = useEffectEvent(async (open: WidgetOpen) => {
+    if (open.kind === "item") return openOccurrence(open.objectId, open.recurrenceId, open.day);
+    // An item still being read for an earlier tap gives way.
+    openings.current++;
+    if (open.kind === "day") {
+      // The day shows: an item's details, which change nothing, close over it.
+      uncover();
+      // Details under a draft stay: the draft's Cancel goes back to them.
+      if (!editing.value.drafting) editing.value.closeDetails();
+      openDay(open.day ?? today);
+    }
+    // A draft open in quick create or the edit dialog is never replaced by a
+    // new one, nor is anything under it closed.
+    else if (!editing.value.drafting) {
+      uncover();
+      editing.value.closeDetails();
+      editing.value.create("event", { day: today });
+    }
+  });
+  // Heard once the calendars are read: a tap that started the app waits in
+  // the shell until then, so quick create has a calendar to put it in.
+  const calendarsRead = lists !== null || listsFailed;
+  useEffect(() => {
+    if (!calendarsRead) return;
+    return platform.widget?.onOpen(
+      (open) => void openFromWidget(open).catch((error: unknown) => console.error(error)),
+    );
+  }, [platform.widget, calendarsRead]);
 
   // The system's back button, where there is one (android D68): it closes
   // what is open, the topmost first, and with nothing open the shell leaves

@@ -9,3 +9,4 @@ export type {
   Platform,
   ShellState,
 } from "./platform.ts";
+export type { ScheduleSnapshot, WidgetHost, WidgetOpen } from "./widget/schedule.ts";
