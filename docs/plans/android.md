@@ -716,7 +716,8 @@ were checked on 2026-11-01.
     `Platform.widget` (`WidgetHost`) is handed it: the open app at every
     change to the store, the calendars shown, the words or the day
     (`useScheduleWidget`, which hears the store with the page hidden too),
-    background sync after every run, whatever its reminders did
+    background sync after every run, whatever its reminders did, unless
+    the app came to the front meanwhile: its own snapshot wins
     ([D67](#D67)). The snapshot names every day of its range, those with
     nothing too, so after midnight the widget names today and its month in
     the user's words. The open app hands it at every change and the shell
@@ -728,7 +729,7 @@ were checked on 2026-11-01.
     from a `RemoteViewsService`, read again from the file
     (`Snapshot.read`, JVM-tested). The days before the device's today are
     left out when it draws, so the list moves on at midnight (an alarm
-    within a minute of it, `setWindow`, no permission; `java.util`'s
+    within ten minutes of it, `setWindow`, no permission; `java.util`'s
     calendar, as the app runs from Android 7.0) with the app closed; today
     with nothing on it still heads the list ("Nothing planned today"), and
     another day with nothing is left out. Before the app's first snapshot
@@ -748,7 +749,11 @@ were checked on 2026-11-01.
     once the calendars are read, so a tap that started the app opens quick
     create with a calendar to put it in; `MainActivity` forgets a tap when
     the activity is made again from Recents or after the system ended the
-    app, so it is not acted on twice.
+    app, so it is not acted on twice; the tap that started the app is
+    heard once, from `appUrlOpen`, which the plugin keeps for its first
+    listener. A tap never replaces a draft open in quick create or the
+    edit dialog; a day's tap closes an item's details over it; an
+    occurrence gone since the snapshot opens its day alone.
   - **Fresh within:** at once from the open app; within an hour with it
     closed, as background sync runs ([D67](#D67)): only with an account
     saved and a network, so a device with only the calendar on it sees
@@ -793,6 +798,10 @@ were checked on 2026-11-01.
   start (as the whole UI does); after the phone's zone changes, the widget
   shows the old zone's days until the app starts again or background sync
   runs ([D317](#D317)).
+- **The undone row across midnight** — it stands on the snapshot's today,
+  so after midnight it leaves with that day until the next snapshot (the
+  app opened, or background sync within the hour); the widget could carry
+  it to the new today, its count a guess until then ([D317](#D317)).
 - **The widget without an account** — background sync starts no run with
   no account saved ([D67](#D67)), so the widget's undone row moves on only
   when the app opens; a run for the widget alone, where one is on the home

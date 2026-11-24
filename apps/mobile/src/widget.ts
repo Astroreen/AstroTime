@@ -3,7 +3,8 @@
 // (android/app/src/main/java/io/github/astroreen/astrotime/widget/); a tap
 // on the widget starts the app at `io.github.astroreen.astrotime:/widget`
 // with what it opens, heard as `@capacitor/app` hears any address the app
-// is opened at. The activity can be started at that address by any app, so
+// is opened at: the one it was started at too, which the plugin keeps for
+// the first listener (`appUrlOpen` alone, so a tap is heard once). The activity can be started at that address by any app, so
 // what it asks for is read strictly: an item, a day or quick create, no more.
 import type { ItemTime } from "@astrotime/core";
 import type { WidgetHost, WidgetOpen } from "@astrotime/ui";
@@ -22,13 +23,14 @@ export interface WidgetApp {
     event: "appUrlOpen",
     listener: (event: { readonly url: string }) => void,
   ): Promise<unknown>;
-  /** The address the app was started at, if any. */
-  getLaunchUrl(): Promise<{ readonly url: string } | undefined>;
 }
 
-/** A day as `YYYY-MM-DD` that the calendar has: not "2026-02-31". */
+/**
+ * A day as `YYYY-MM-DD` that the calendar has, not "2026-02-31", in years
+ * the views can step a period around (a widget's are years from now).
+ */
 function isDay(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (typeof value !== "string" || !/^(19|2\d)\d{2}-\d{2}-\d{2}$/.test(value)) return false;
   const ms = Date.parse(`${value}T00:00:00Z`);
   return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value;
 }
@@ -54,7 +56,9 @@ function timeOf(value: unknown): ItemTime | undefined {
     isLocal(time["local"]) &&
     typeof time["timeZone"] === "string" &&
     typeof time["epochMs"] === "number" &&
-    Number.isFinite(time["epochMs"])
+    Number.isFinite(time["epochMs"]) &&
+    // Within what a `Date` holds.
+    Math.abs(time["epochMs"]) <= 8.64e15
   )
     return {
       type: "zoned",
@@ -100,10 +104,7 @@ export function androidWidget(native: NativeWidget, app: WidgetApp): WidgetHost 
   void app
     .addListener("appUrlOpen", ({ url }) => tapped(url))
     .catch((error: unknown) => console.error(error));
-  void app
-    .getLaunchUrl()
-    .then((launch) => launch && tapped(launch.url))
-    .catch((error: unknown) => console.error(error));
+
   // The snapshot the widget has: the UI hands one at every change to the
   // store, and one the same as the last is not written again. One that
   // failed is handed again with the next change.

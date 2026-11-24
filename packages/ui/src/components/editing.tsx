@@ -77,6 +77,10 @@ export type Rescheduled = "saved" | "unchanged" | "cancelled" | "gone" | "inDoub
 export interface EditingValue {
   /** Shows an item's details. */
   open(target: Target): void;
+  /** Closes an item's details, which change nothing (a tap on the home screen widget's day). */
+  closeDetails(): void;
+  /** Whether quick create or the edit dialog is open, with a draft no tap from outside may replace. */
+  readonly drafting: boolean;
   /** Opens quick create for a new item, which expands to the edit dialog (design D296). */
   create(kind: "event" | "task", options: CreateOptions): void;
   /** Whether any calendar can take a new item. */
@@ -320,6 +324,8 @@ export function useEditingState({
 
   const value: EditingValue = {
     open: setDetails,
+    closeDetails: () => setDetails(null),
+    drafting: editing !== null,
     create(kind, options) {
       const fits = options.calendarId && writable(kind).some((c) => c.id === options.calendarId);
       const other = kind === "event" ? "task" : "event";

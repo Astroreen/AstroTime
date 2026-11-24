@@ -476,10 +476,22 @@ test("The home screen widget: a snapshot from the store, and its taps open quick
   await expect
     .element(page.getByRole("list", { name: "Thursday, November 5" }))
     .toBeInTheDocument();
+  // A day closes the details over it.
+  listener!(dentist.open);
+  await expect.element(details).toBeInTheDocument();
   listener!({ kind: "day" });
+  await expect.element(details).not.toBeInTheDocument();
   await expect
     .element(page.getByRole("list", { name: "Wednesday, November 4" }))
     .toBeInTheDocument();
+  // "+" never replaces a draft open in quick create.
+  listener!({ kind: "create" });
+  const title = creating.getByRole("textbox", { name: "Title" });
+  await title.fill("Half written");
+  listener!({ kind: "create" });
+  // React has rendered whatever the tap did once a frame has been drawn after it.
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  await expect.element(title).toHaveValue("Half written");
 });
 
 test("Reminders the browser blocks: the switch cannot turn on and says why, in Russian", async () => {

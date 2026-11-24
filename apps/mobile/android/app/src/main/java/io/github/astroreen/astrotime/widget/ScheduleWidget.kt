@@ -186,9 +186,10 @@ class ScheduleWidget : AppWidgetProvider() {
             )
 
         /**
-         * Draws again just after the next midnight, within a minute of it:
-         * a window, not an exact alarm, so it needs no permission; without
-         * `_WAKEUP`, a phone asleep sees it when it wakes.
+         * Draws again just after the next midnight, within ten minutes of it
+         * (the least window Android 12 and later give): a window, not an
+         * exact alarm, so it needs no permission; without `_WAKEUP`, a phone
+         * asleep sees it when it wakes.
          */
         private fun atMidnight(context: Context) {
             val next =
@@ -201,7 +202,7 @@ class ScheduleWidget : AppWidgetProvider() {
                 }
             context
                 .getSystemService(AlarmManager::class.java)
-                .setWindow(AlarmManager.RTC, next.timeInMillis, 60_000L, midnightIntent(context))
+                .setWindow(AlarmManager.RTC, next.timeInMillis, 10 * 60_000L, midnightIntent(context))
         }
     }
 }

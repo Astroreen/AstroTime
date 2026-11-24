@@ -86,7 +86,9 @@ class HeadlessRun(
                             Exchange(),
                             KeystoreSecrets(context),
                             PluginNotifications(context),
-                            { ScheduleWidget.keep(context, it) },
+                            // The open app's snapshot wins: a run that ends after the user opened the
+                            // app (and hid a calendar, say) leaves the widget as the app drew it (D317).
+                            { if (!AppVisibility.inFront) ScheduleWidget.keep(context, it) },
                             gate::work,
                         ) {
                             main.post { finish(Result.success(it)) }

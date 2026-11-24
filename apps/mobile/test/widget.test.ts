@@ -19,6 +19,8 @@ test("a time is rebuilt with its own fields alone", () => {
   const open = (recurrenceId: unknown) =>
     widgetOpenOf(at({ kind: "item", objectId: "o1", recurrenceId, day: "2026-11-04" }));
   expect(open({ ...zoned, extra: 1 })).toMatchObject({ recurrenceId: zoned });
+  // Past what a `Date` holds: no time.
+  expect(open({ ...zoned, epochMs: 1e20 })).toBeNull();
   expect(open({ type: "floating", local: "2026-11-04T09:00:00", date: "x" })).toMatchObject({
     recurrenceId: { type: "floating", local: "2026-11-04T09:00:00" },
   });
@@ -59,6 +61,9 @@ test("anything else is no tap", () => {
     // A day the calendar has not, or a time missing what its kind needs.
     at({ kind: "day", day: "2026-02-31" }),
     at({ kind: "day", day: "9999-99-99" }),
+    // Years the views cannot step a period around.
+    at({ kind: "day", day: "0000-01-01" }),
+    at({ kind: "day", day: "9999-12-31" }),
     at({ kind: "item", objectId: "o1", recurrenceId: null, day: "2026-13-01" }),
     at({ kind: "item", objectId: "o1", recurrenceId: { type: "date" }, day: "2026-11-04" }),
     at({
@@ -83,13 +88,14 @@ test("anything else is no tap", () => {
     expect(widgetOpenOf(url)).toBeNull();
 });
 
+/** `@capacitor/app` as it hears addresses: the one the app started at kept for the first listener. */
 function fakeApp(launch?: string) {
   let listener: ((event: { url: string }) => void) | null = null;
   const app: WidgetApp = {
     addListener: async (_event, next) => {
       listener = next;
+      if (launch) next({ url: launch });
     },
-    getLaunchUrl: async () => (launch ? { url: launch } : undefined),
   };
   return { app, open: (url: string) => listener?.({ url }) };
 }
@@ -118,12 +124,9 @@ test("the snapshot goes to the shell as JSON, the same one once, one that failed
   expect(sent).toHaveLength(2);
 });
 
-test("a tap that started the app waits for the UI; a later one reaches it at once", async () => {
+test("a tap that started the app waits for the UI, heard once; a later one reaches it at once", async () => {
   const fake = fakeApp(at({ kind: "create" }));
   const widget = androidWidget({ showWidget: async () => {} }, fake.app);
-  // The launch address is read as the app starts.
-  await Promise.resolve();
-  await Promise.resolve();
   const heard: WidgetOpen[] = [];
   const stop = widget.onOpen((open) => heard.push(open));
   expect(heard).toEqual([{ kind: "create" }]);

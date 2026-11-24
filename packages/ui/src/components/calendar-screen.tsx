@@ -7,7 +7,12 @@
 // shows from the first run, with no account: the calendar on this device
 // (docs/plans/foundation.md#D122). The view reads the local
 // store only and follows its changes (docs/plans/foundation.md#D5).
-import { CalendarObject, wallClockOf, type ScheduledReminder } from "@astrotime/core";
+import {
+  CalendarObject,
+  hasOccurrence,
+  wallClockOf,
+  type ScheduledReminder,
+} from "@astrotime/core";
 import type { Account, Calendar, Store, UndoneTask } from "@astrotime/storage";
 import { Dialog } from "@base-ui/react/dialog";
 import {
@@ -428,6 +433,8 @@ export function CalendarScreen({
     const stored = await store.object(objectId);
     if (!stored || stored.pending === "delete") return;
     const object = CalendarObject.parse(stored.ics);
+    // An occurrence gone since it was shown (an EXDATE synced in): its day alone.
+    if (recurrenceId !== null && !hasOccurrence(object, recurrenceId)) return;
     const item = itemOf(object, recurrenceId);
     if (item) editing.value.open(targetOf(stored, object, recurrenceId, item));
   };
@@ -459,8 +466,13 @@ export function CalendarScreen({
   const openFromWidget = useEffectEvent(async (open: WidgetOpen) => {
     if (open.kind === "item") return openOccurrence(open.objectId, open.recurrenceId, open.day);
     uncover();
-    if (open.kind === "day") openDay(open.day ?? today);
-    else editing.value.create("event", { day: today });
+    if (open.kind === "day") {
+      // The day shows: an item's details, which change nothing, close over it.
+      editing.value.closeDetails();
+      openDay(open.day ?? today);
+    }
+    // A draft open in quick create or the edit dialog is never replaced by a new one.
+    else if (!editing.value.drafting) editing.value.create("event", { day: today });
   });
   // Heard once the calendars are read: a tap that started the app waits in
   // the shell until then, so quick create has a calendar to put it in.
