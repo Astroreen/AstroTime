@@ -400,7 +400,103 @@ test("a zone of the calendar's own, which Intl knows not, is read by its VTIMEZO
   expect(occurrenceOn(custom, shown, "2026-11-05", timeZone)?.item.summary).toBe("Sync, moved");
 });
 
-test("an id naming a zone nobody knows (a crafted widget address) opens the day alone", () => {
+test("an id naming a zone nobody knows (a crafted widget address) throws nothing", () => {
+  // A zone neither Intl nor the calendar knows is taken to read its clock:
+  // at the stand-up's instant, it is the stand-up.
   const crafted: ItemTime = { ...fifth, timeZone: "Not/A_Zone" };
-  expect(() => occurrenceOn(series(""), crafted, "2026-11-05", timeZone)).not.toThrow();
+  expect(occurrenceOn(series(""), crafted, "2026-11-05", timeZone)?.item.summary).toBe("Stand-up");
+});
+
+/** Outlook's own zone, +02:00 in winter and +03:00 in summer, and a daily 9:00 from January. */
+function outlook(...exceptions: string[]): CalendarObject {
+  return CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Customized Time Zone",
+      "BEGIN:STANDARD",
+      "DTSTART:16011028T040000",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "END:STANDARD",
+      "BEGIN:DAYLIGHT",
+      "DTSTART:16010325T030000",
+      "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+      "TZOFFSETFROM:+0200",
+      "TZOFFSETTO:+0300",
+      "END:DAYLIGHT",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:outlook",
+      "DTSTAMP:20260101T000000Z",
+      "DTSTART;TZID=Customized Time Zone:20260101T090000",
+      "DURATION:PT30M",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Sync",
+      "END:VEVENT",
+      ...exceptions.flatMap((lines) => [
+        "BEGIN:VEVENT",
+        "UID:outlook",
+        "DTSTAMP:20260101T000000Z",
+        ...lines.split("\n"),
+        "END:VEVENT",
+      ]),
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+}
+
+test("a summer occurrence of a zone of the calendar's own, moved by a UTC id, opens", () => {
+  const moved = outlook(
+    "RECURRENCE-ID:20260705T060000Z\nDTSTART;TZID=Customized Time Zone:20260705T100000\nDURATION:PT30M\nSUMMARY:Sync, moved",
+  );
+  const shown: ItemTime = {
+    type: "zoned",
+    local: "2026-07-05T09:00:00",
+    timeZone: "Customized Time Zone",
+    epochMs: Date.parse("2026-07-05T06:00:00Z"),
+  };
+  expect(occurrenceOn(moved, shown, "2026-07-05", timeZone)?.item.summary).toBe("Sync, moved");
+});
+
+test("a spring-forward 3:30 is not another zone's exception at its instant", () => {
+  // A series kept in UTC with an exception at 03:30 Vilnius (no clock shows
+  // it) and one at 04:30 Riga, both 01:30Z: the first cancelled, its stale
+  // id opens the day alone.
+  const utcSeries = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:imported",
+      "DTSTAMP:20260301T000000Z",
+      "DTSTART:20260327T013000Z",
+      "DURATION:PT10M",
+      "RRULE:FREQ=DAILY;COUNT=5",
+      "SUMMARY:Check",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:imported",
+      "DTSTAMP:20260301T000000Z",
+      "RECURRENCE-ID;TZID=Europe/Riga:20260329T043000",
+      "DTSTART;TZID=Europe/Riga:20260329T050000",
+      "DURATION:PT10M",
+      "SUMMARY:Riga",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const stale: ItemTime = {
+    type: "zoned",
+    local: "2026-03-29T03:30:00",
+    timeZone,
+    epochMs: Date.parse("2026-03-29T01:30:00Z"),
+  };
+  expect(occurrenceOn(utcSeries, stale, "2026-03-29", timeZone)).toBeNull();
 });

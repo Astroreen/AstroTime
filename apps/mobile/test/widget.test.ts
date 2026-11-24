@@ -19,8 +19,9 @@ test("a time is rebuilt with its own fields alone", () => {
   const open = (recurrenceId: unknown) =>
     widgetOpenOf(at({ kind: "item", objectId: "o1", recurrenceId, day: "2026-11-04" }));
   expect(open({ ...zoned, extra: 1 })).toMatchObject({ recurrenceId: zoned });
-  // Past what a `Date` holds: no time.
+  // Past the years a day may be in: no time.
   expect(open({ ...zoned, epochMs: 1e20 })).toBeNull();
+  expect(open({ ...zoned, epochMs: 8.64e15 })).toBeNull();
   expect(open({ type: "floating", local: "2026-11-04T09:00:00", date: "x" })).toMatchObject({
     recurrenceId: { type: "floating", local: "2026-11-04T09:00:00" },
   });

@@ -58,8 +58,9 @@ function timeOf(value: unknown): ItemTime | undefined {
     typeof time["timeZone"] === "string" &&
     typeof time["epochMs"] === "number" &&
     Number.isFinite(time["epochMs"]) &&
-    // Within what a `Date` holds.
-    Math.abs(time["epochMs"]) <= 8.64e15
+    // In the years a day may be in (`isDay`), a day either side for any zone.
+    time["epochMs"] >= Date.UTC(1899, 11, 31) &&
+    time["epochMs"] <= Date.UTC(3000, 0, 1)
   )
     return {
       type: "zoned",

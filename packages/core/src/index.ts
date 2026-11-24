@@ -24,6 +24,7 @@ export {
   editItem,
   hasOccurrence,
   namesSameOccurrence,
+  readsItsClock,
   placeText,
   sameGeo,
   PRODID,

@@ -13,6 +13,7 @@ import {
   movedRepeat,
   namesSameOccurrence,
   occurrencesBetween,
+  readsItsClock,
   placeText,
   sameGeo,
   repeatOf,
@@ -904,12 +905,11 @@ export async function current(local: LocalChange, target: Target) {
  * 1. the same recurrence id, every field (the snapshot and reminders take
  *    theirs from the same expansion);
  * 2. for a zoned id, a zoned one at the same instant in another zone (a
- *    server's UTC for the series' zone) that also reads the same on the
- *    series' wall clock, by its own VTIMEZONE (`namesSameOccurrence`): a
- *    spring-forward 3:30, which no clock shows, is not the 4:30 at its
- *    instant; in the same zone a zoned id is never matched but by step 1, so neither the two 3:30s of a fall-back
- *    night nor the 3:30 and 4:30 of a spring-forward one are taken for
- *    each other;
+ *    server's UTC for the series' zone), each reading its own wall clock
+ *    at that instant (`readsItsClock`, by the calendar's VTIMEZONE where
+ *    it has one): a spring-forward 3:30, which no clock shows, is never
+ *    taken for the 4:30 at its instant. In the same zone a zoned id is
+ *    matched by step 1 alone, so a fall-back night's two 3:30s stay two;
  * 3. for ids of different kinds (a date, a floating time and a zoned one),
  *    the one the series' own rule says it names
  *    (`namesSameOccurrence`, foundation D35).
@@ -942,7 +942,8 @@ export function occurrenceOn(
       recurrenceId.type === "zoned" &&
       id.timeZone !== recurrenceId.timeZone &&
       id.epochMs === recurrenceId.epochMs &&
-      namesSameOccurrence(object, id, recurrenceId),
+      readsItsClock(object, id) &&
+      readsItsClock(object, recurrenceId),
     (id) => id.type !== recurrenceId.type && namesSameOccurrence(object, id, recurrenceId),
   ];
   for (const step of steps) {

@@ -14,7 +14,15 @@ import { point, readItem, X_COLOR, type Geo } from "./item.ts";
 import { seriesStarts } from "./recurrence.ts";
 import { movedRule, ruleOf, type Repeat } from "./repeat.ts";
 import { componentOf, copyOf, exceptionOf, sameTime, touch, utc } from "./task-edits.ts";
-import { epochNear, fromIcalTime, keepTzid, wallClockNear, type ItemTime } from "./time.ts";
+import {
+  epochNear,
+  fromIcalTime,
+  isKnownTimeZone,
+  keepTzid,
+  wallClockIn,
+  wallClockNear,
+  type ItemTime,
+} from "./time.ts";
 import { vtimezone } from "./vtimezone.ts";
 
 /** Refuses a colour `COLOR` cannot take before anything is written (D174). */
@@ -1013,6 +1021,31 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
     const moved = movedRule(rule, from, to);
     if (moved.toString() !== rule.toString()) property.setValue(moved);
   }
+}
+
+/**
+ * Whether a zoned time's instant reads its own wall clock in its zone: by
+ * the object's VTIMEZONE where it defines the zone (its own offsets and
+ * changes, D32), else by `Intl`; a zone neither knows is taken to. Not a
+ * spring-forward night's 3:30, which no clock shows. Other times always do.
+ */
+export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {
+  if (time.type !== "zoned") return true;
+  const defined = object.root
+    .getAllSubcomponents("vtimezone")
+    .find((zone) => zone.getFirstPropertyValue("tzid") === time.timeZone);
+  try {
+    if (defined) {
+      const zone = new ICAL.Timezone({ component: defined, tzid: time.timeZone });
+      return utc(time.epochMs).convertToZone(zone).toString().slice(0, 19) === time.local;
+    }
+    if (isKnownTimeZone(time.timeZone))
+      return wallClockIn(time.epochMs, time.timeZone) === time.local;
+  } catch {
+    // An instant past what a clock reads (a crafted id): none.
+    return false;
+  }
+  return true;
 }
 
 /**
