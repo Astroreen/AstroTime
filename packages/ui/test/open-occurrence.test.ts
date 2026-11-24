@@ -1,9 +1,10 @@
 // What a tap from outside the page opens of a series (docs/plans/android.md#D317):
 // the occurrence the views draw on its day, found by its time whatever way
 // the server wrote its recurrence id; none once the series has it no more.
-import { CalendarObject, type ItemTime } from "@astrotime/core";
+import { CalendarObject, occurrencesBetween, type ItemTime } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
+import { addDays } from "../src/calendar/dates.ts";
 import { occurrenceOn } from "../src/calendar/editing.ts";
 
 const timeZone = "Europe/Vilnius";
@@ -137,6 +138,13 @@ test("on the night the clocks go back, an occurrence is found by its instant", (
   expect(occurrenceOn(nightly, utc, "2026-10-25", timeZone)?.recurrenceId).toMatchObject({
     local: "2026-10-25T03:30:00",
   });
+  // The winter 3:30, an hour later, reads 3:30 too, and is no occurrence of it.
+  const winter = {
+    ...utc,
+    local: "2026-10-25T01:30:00",
+    epochMs: Date.parse("2026-10-25T01:30:00Z"),
+  };
+  expect(occurrenceOn(nightly, winter, "2026-10-25", timeZone)).toBeNull();
 });
 
 /** A daily call at 22:00 in New York, from November 4, with these exceptions. */
@@ -183,16 +191,76 @@ test("a date id names its day on the series' own wall clock, not the viewer's", 
   expect(occurrenceOn(call, shown, "2026-11-06", timeZone)?.item.summary).toBe("Moved call");
 });
 
-test("an id the expansion gave opens its own occurrence, though another shares its day", () => {
-  // A day-id exception in the morning and an exact-id one in the evening of the 5th.
+test("every occurrence the views draw opens itself, by the id they drew it with", () => {
+  // Days in Vilnius around a New York series, one of them moved by a client
+  // that named it by its day (on the 6th in Vilnius, beside the 5th's evening one).
   const call = newYork(
-    "RECURRENCE-ID;TZID=America/New_York:20261105T220000\nDTSTART;TZID=America/New_York:20261105T230000\nDURATION:PT30M\nSUMMARY:Late call",
+    "RECURRENCE-ID;VALUE=DATE:20261106\nDTSTART;TZID=America/New_York:20261106T090000\nDURATION:PT30M\nSUMMARY:Morning call",
   );
-  const late: ItemTime = {
-    type: "zoned",
-    local: "2026-11-05T22:00:00",
-    timeZone: "America/New_York",
-    epochMs: Date.parse("2026-11-06T03:00:00Z"),
-  };
-  expect(occurrenceOn(call, late, "2026-11-06", timeZone)?.item.summary).toBe("Late call");
+  for (const day of ["2026-11-05", "2026-11-06"]) {
+    const drawn = occurrencesBetween(call, { from: day, to: addDays(day, 1), timeZone });
+    expect(drawn.length).toBeGreaterThan(0);
+    for (const occurrence of drawn)
+      expect(occurrenceOn(call, occurrence.recurrenceId!, day, timeZone)).toEqual(occurrence);
+  }
+});
+
+/** A series with both 3:30s of Vilnius' fall-back night, 00:30Z and 01:30Z, by RDATE. */
+function twoThreeThirties(...extra: string[]): CalendarObject {
+  return CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:twice",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART:20261025T003000Z",
+      "DURATION:PT10M",
+      "RDATE:20261025T013000Z",
+      "SUMMARY:Check",
+      ...extra,
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+}
+
+const utc = (iso: string): ItemTime => ({
+  type: "zoned",
+  local: iso.slice(0, 19),
+  timeZone: "UTC",
+  epochMs: Date.parse(iso),
+});
+
+test("one of the two 3:30s taken out: the other is not opened for it", () => {
+  const object = twoThreeThirties("EXDATE:20261025T003000Z");
+  expect(occurrenceOn(object, utc("2026-10-25T00:30:00Z"), "2026-10-25", timeZone)).toBeNull();
+  expect(occurrenceOn(object, utc("2026-10-25T01:30:00Z"), "2026-10-25", timeZone)).not.toBeNull();
+});
+
+test("on a spring-forward night, the id itself tells 3:30 from 4:30 at one instant", () => {
+  const hourly = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:hourly",
+      "DTSTAMP:20260301T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20260329T013000",
+      "DURATION:PT10M",
+      "RRULE:FREQ=HOURLY;COUNT=5",
+      "SUMMARY:Check",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const ids = occurrencesBetween(hourly, { from: "2026-03-29", to: "2026-03-30", timeZone })
+    .map((occurrence) => occurrence.recurrenceId!)
+    .filter((id) => id.type === "zoned");
+  const later = ids.find((id) => id.local === "2026-03-29T04:30:00")!;
+  expect(occurrenceOn(hourly, later, "2026-03-29", timeZone)?.recurrenceId).toEqual(later);
 });

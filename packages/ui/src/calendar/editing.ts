@@ -899,12 +899,12 @@ export async function current(local: LocalChange, target: Target) {
  * The occurrence of a series a tap from outside the page opens (the home
  * screen widget, a reminder): one the views draw, expanded as they expand
  * it, from the day before `day` to the day after (a task due at midnight
- * ends where `day` begins). It is the one with the same recurrence id, as
- * the snapshot or the reminder took it from the same expansion (two
- * zoned ids by their instant, so the two 03:30s of the night the clocks go
- * back stay apart); else the only one the series' own rule says the id
- * names, written another way by another client (`namesSameOccurrence`,
- * foundation D35). `null` when there is none, or more than one, or the
+ * ends where `day` begins). It is the only one with the same recurrence
+ * id, as the snapshot or the reminder took it from the same expansion;
+ * else the only zoned one at the same instant (a server's UTC); else, for
+ * an id of another kind, the only one the series' own rule says it names
+ * (`namesSameOccurrence`, foundation D35). Two zoned ids are never matched
+ * on the wall clock: the two 03:30s of a fall-back night are two. `null` when there is none, or more than one, or the
  * series has it no more (an EXDATE, an exception the server cancelled) or
  * is too dense to expand, as the views draw none of it then.
  */
@@ -925,18 +925,32 @@ export function occurrenceOn(
     return null;
   }
   const ids = occurrences.filter((occurrence) => occurrence.recurrenceId !== null);
-  const exact = ids.find((occurrence) => sameId(occurrence.recurrenceId!, recurrenceId));
-  if (exact) return exact;
-  const named = ids.filter((occurrence) =>
-    namesSameOccurrence(object, occurrence.recurrenceId!, recurrenceId),
+  const only = (found: Occurrence[]) => (found.length === 1 ? found[0]! : null);
+  // The same id, every field: the two 3:30s of a spring-forward night share an instant.
+  const same = only(
+    ids.filter((o) => JSON.stringify(o.recurrenceId) === JSON.stringify(recurrenceId)),
   );
-  return named.length === 1 ? named[0]! : null;
-}
-
-/** The same id as written: two zoned ones by their instant. */
-function sameId(a: ItemTime, b: ItemTime): boolean {
-  if (a.type === "zoned" && b.type === "zoned") return a.epochMs === b.epochMs;
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (same) return same;
+  // Two zoned ids name one occurrence by their instant alone (a server's UTC
+  // for the series' zone), never by the wall clock: the two 3:30s of a
+  // fall-back night are two.
+  if (recurrenceId.type === "zoned") {
+    const instant = only(
+      ids.filter(
+        (o) => o.recurrenceId!.type === "zoned" && o.recurrenceId!.epochMs === recurrenceId.epochMs,
+      ),
+    );
+    if (instant) return instant;
+  }
+  // Ids of another kind (a date, a floating time): as the series' own rule
+  // says they name it, when it names one.
+  return only(
+    ids.filter(
+      (o) =>
+        (o.recurrenceId!.type !== "zoned" || recurrenceId.type !== "zoned") &&
+        namesSameOccurrence(object, o.recurrenceId!, recurrenceId),
+    ),
+  );
 }
 
 /** What shows of an occurrence: its exception, or the master. */
