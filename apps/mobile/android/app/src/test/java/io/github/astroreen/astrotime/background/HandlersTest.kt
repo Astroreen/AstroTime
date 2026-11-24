@@ -22,6 +22,7 @@ class HandlersTest {
     private val cancelled = mutableListOf<List<Int>>()
     private var enabled = true
     private val done = mutableListOf<JSONObject>()
+    private val widget = mutableListOf<String>()
 
     private val notifications =
         object : Notifications {
@@ -47,6 +48,7 @@ class HandlersTest {
             Exchange(),
             Secrets { key -> if (key == "account:a") """{"username":"u","password":"p"}""" else null },
             notifications,
+            { widget += it },
             { it.run() },
         ) { done += it }
 
@@ -147,6 +149,13 @@ class HandlersTest {
         val ids = JSONArray().put(JSONObject().put("id", 7)).put(JSONObject().put("id", 9))
         assertTrue(call(10, "notifications.cancel", JSONObject().put("notifications", ids)).getBoolean("ok"))
         assertEquals(listOf(7, 9), cancelled.single())
+    }
+
+    @Test
+    fun `the widget's snapshot is kept as sent`() {
+        val answer = call(9, "widget.show", JSONObject().put("snapshot", """{"version":1,"days":[]}"""))
+        assertTrue(answer.getBoolean("ok"))
+        assertEquals(listOf("""{"version":1,"days":[]}"""), widget)
     }
 
     @Test

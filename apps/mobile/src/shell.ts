@@ -2,9 +2,10 @@
 // button, and the system bars following the theme the app shows. The native
 // side is AstroTime's own plugin (`AstroTimeShell`, in
 // android/app/src/main/java/io/github/astroreen/astrotime/shell/).
+import type { NativeWidget } from "./widget.ts";
 
 /** AstroTime's shell plugin. */
-export interface NativeShell {
+export interface NativeShell extends NativeWidget {
   /**
    * The system bars' icons light (`dark`) or dark, and `background` (`#rrggbb`)
    * behind the bars where the window draws them (a WebView before Chromium

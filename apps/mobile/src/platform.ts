@@ -5,7 +5,8 @@
 // as local notifications (D66), the Web Locks it shares with background
 // sync's WebView (D67), and places on the map, searched from the WebView and
 // opened in the user's maps app by a `geo:` URI (foundation D178); a file
-// saved through the shell's "Save to" picker (design D230).
+// saved through the shell's "Save to" picker (design D230); the home screen's
+// schedule widget (D317).
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { PLACES } from "@astrotime/caldav";
 import type { Store } from "@astrotime/storage";
@@ -22,6 +23,7 @@ import { preferences } from "./preferences.ts";
 import { androidReminders } from "./reminders.ts";
 import { keystoreSecrets } from "./secrets.ts";
 import { backButton, saveFile, type NativeShell } from "./shell.ts";
+import { androidWidget } from "./widget.ts";
 
 const http = registerPlugin<NativeHttp>("AstroTimeHttp");
 
@@ -53,6 +55,7 @@ export function mobilePlatform(store: Promise<Store>, shell: NativeShell): Platf
     places: { photon: PLACES.photon, tiles: PLACES.tiles, links: "geo" },
     // Background sync opens the same store in a WebView of its own (D67).
     syncLock,
+    widget: androidWidget(shell, App),
     reminders: androidReminders({
       native: LocalNotifications,
       preferences,

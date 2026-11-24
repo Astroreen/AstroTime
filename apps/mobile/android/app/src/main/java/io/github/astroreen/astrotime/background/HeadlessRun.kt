@@ -24,6 +24,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.github.astroreen.astrotime.http.Exchange
+import io.github.astroreen.astrotime.widget.ScheduleWidget
 import java.io.IOException
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -81,7 +82,13 @@ class HeadlessRun(
                         }
                     }
                     val handlers =
-                        Handlers(Exchange(), KeystoreSecrets(context), PluginNotifications(context), gate::work) {
+                        Handlers(
+                            Exchange(),
+                            KeystoreSecrets(context),
+                            PluginNotifications(context),
+                            { ScheduleWidget.keep(context, it) },
+                            gate::work,
+                        ) {
                             main.post { finish(Result.success(it)) }
                         }
                     WebViewCompat.addWebMessageListener(webView, PORT, origins) { _, message, _, isMainFrame, reply ->

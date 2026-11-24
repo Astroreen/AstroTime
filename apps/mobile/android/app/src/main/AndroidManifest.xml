@@ -38,6 +38,29 @@
 
         </activity>
 
+        <!-- The schedule widget (docs/plans/android.md#D317); drawn again at midnight
+             (its own alarm) and when the clock, the zone or the language changes. -->
+        <receiver
+            android:name=".widget.ScheduleWidget"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/schedule_widget_info" />
+        </receiver>
+
+        <!-- The widget's rows; only the launcher, holding BIND_REMOTEVIEWS, binds it. -->
+        <service
+            android:name=".widget.ScheduleService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

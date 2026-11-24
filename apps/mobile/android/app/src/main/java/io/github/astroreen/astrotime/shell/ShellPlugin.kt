@@ -17,6 +17,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import io.github.astroreen.astrotime.widget.ScheduleWidget
 import java.util.concurrent.Executors
 
 @CapacitorPlugin(name = "AstroTimeShell")
@@ -32,6 +33,27 @@ class ShellPlugin : Plugin() {
         activity.runOnUiThread {
             Bars.set(activity, Bars.Style(dark, background))
             call.resolve()
+        }
+    }
+
+    /**
+     * Keeps the schedule widget's snapshot (`snapshot`, its JSON) and draws
+     * the widget from it (docs/plans/android.md#D317), off the main thread.
+     */
+    @PluginMethod
+    fun showWidget(call: PluginCall) {
+        val snapshot = call.getString("snapshot")
+        if (snapshot == null) {
+            call.reject("showWidget needs `snapshot`.", "invalid")
+            return
+        }
+        writer.execute {
+            try {
+                ScheduleWidget.keep(context, snapshot)
+                call.resolve()
+            } catch (error: Exception) {
+                call.reject("The widget's snapshot could not be kept.", "write", error)
+            }
         }
     }
 

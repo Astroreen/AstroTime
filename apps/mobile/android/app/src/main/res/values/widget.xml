@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The schedule widget's colours (docs/plans/android.md#D317): the app's
+     tokens (packages/ui/src/styles.css), light here, dark in values-night. -->
+<resources>
+    <!-- canvas -->
+    <color name="widget_ground">#EEF0F4</color>
+    <!-- raised: the undone row -->
+    <color name="widget_raised">#FFFFFF</color>
+    <!-- ink, ink-muted -->
+    <color name="widget_ink">#1B1E25</color>
+    <color name="widget_muted">#5B6271</color>
+    <!-- accent, on-accent: today's date and "+" -->
+    <color name="widget_accent">#3565C4</color>
+    <color name="widget_on_today">#FFFFFF</color>
+</resources>
