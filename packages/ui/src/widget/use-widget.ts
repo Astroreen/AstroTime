@@ -11,6 +11,9 @@ import { everyRun, liveQuery } from "../calendar/live.ts";
 import { ObjectCache } from "../calendar/query.ts";
 import type { SnapshotWords, WidgetHost } from "./schedule.ts";
 
+/** The snapshot's chunk: outside the hook, which the React Compiler then keeps (it takes no `import()`). */
+const loadSchedule = () => import("./schedule.ts");
+
 /** Keeps `widget` (none: nothing) with the store and the user's choices. */
 export function useScheduleWidget(
   widget: WidgetHost | undefined,
@@ -31,7 +34,7 @@ export function useScheduleWidget(
     const hidden = new Set(JSON.parse(hiddenKey) as string[]);
     let stop: (() => void) | undefined;
     let gone = false;
-    void import("./schedule.ts").then(
+    void loadSchedule().then(
       ({ scheduleSnapshot }) => {
         if (gone) return;
         stop = liveQuery(
