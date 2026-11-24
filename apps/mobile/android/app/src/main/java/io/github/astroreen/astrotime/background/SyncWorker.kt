@@ -82,13 +82,23 @@ private suspend fun failedAsOutcome(work: suspend () -> String): String =
  */
 object AppVisibility {
     private val started = AtomicInteger()
+    private val shown = AtomicInteger()
 
     @JvmStatic
     var inFront: Boolean
         get() = started.get() > 0
         set(value) {
-            if (value) started.incrementAndGet() else started.updateAndGet { maxOf(0, it - 1) }
+            if (value) {
+                shown.incrementAndGet()
+                started.incrementAndGet()
+            } else {
+                started.updateAndGet { maxOf(0, it - 1) }
+            }
         }
+
+    /** How many times the app has come to the front in this process: a run compares it, start to end. */
+    val comings: Int
+        get() = shown.get()
 }
 
 class SyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {

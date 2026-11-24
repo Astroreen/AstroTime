@@ -188,8 +188,10 @@ export async function scheduleSnapshot(options: {
         },
       });
     }
-    // Past the most rows, a day keeps its date and none of its items.
-    const kept = rows.slice(0, Math.max(0, budget));
+    // Past the most rows the snapshot ends, with the day cut: a day kept
+    // with none of its items would read as nothing planned.
+    if (budget <= 0 && rows.length > 0) break;
+    const kept = rows.slice(0, budget);
     budget -= kept.length;
     days.push({
       day: day.day,

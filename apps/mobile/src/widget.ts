@@ -4,8 +4,9 @@
 // on the widget starts the app at `io.github.astroreen.astrotime:/widget`
 // with what it opens, heard as `@capacitor/app` hears any address the app
 // is opened at: the one it was started at too, which the plugin keeps for
-// the first listener (`appUrlOpen` alone, so a tap is heard once). The activity can be started at that address by any app, so
-// what it asks for is read strictly: an item, a day or quick create, no more.
+// the first listener (`appUrlOpen` alone, so a tap is heard once). The
+// activity can be started at that address by any app, so what it asks for
+// is read strictly: an item, a day or quick create, no more.
 import type { ItemTime } from "@astrotime/core";
 import type { WidgetHost, WidgetOpen } from "@astrotime/ui";
 
@@ -109,13 +110,17 @@ export function androidWidget(native: NativeWidget, app: WidgetApp): WidgetHost 
   // store, and one the same as the last is not written again. One that
   // failed is handed again with the next change.
   let shown: string | null = null;
+  // Writes end in the order they were handed (the plugin's one thread); only
+  // the last one handed says what the widget has.
+  let handed = 0;
   return {
     async show(snapshot) {
       const json = JSON.stringify(snapshot);
       if (json === shown) return;
+      const call = ++handed;
       shown = null;
       await native.showWidget({ snapshot: json });
-      shown = json;
+      if (call === handed) shown = json;
     },
     onOpen(listener) {
       listeners.add(listener);

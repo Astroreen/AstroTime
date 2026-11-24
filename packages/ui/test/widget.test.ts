@@ -114,7 +114,7 @@ describe("the snapshot", () => {
     });
   });
 
-  test("past the most rows, a day is cut and the days after keep only their words", async () => {
+  test("past the most rows, a day is cut and the snapshot ends with it", async () => {
     const store = await Store.open(nodeDriver());
     await loadDemo(store, { languages: ["en-US"], timeZone, now: NOW });
     const settings = localeSettings(["en-US"]);
@@ -128,10 +128,9 @@ describe("the snapshot", () => {
       now: NOW,
       limit: 13,
     });
-    // Today has 11 rows, tomorrow 4: two of tomorrow's make 13.
-    expect(snapshot.days.map((day) => day.rows.length).slice(0, 3)).toEqual([11, 2, 0]);
-    expect(snapshot.days.flatMap((day) => day.rows)).toHaveLength(13);
-    expect(snapshot.days).toHaveLength(WIDGET_DAYS);
+    // Today has 11 rows, tomorrow 4: two of tomorrow's make 13, and no day
+    // with items follows to read as nothing planned.
+    expect(snapshot.days.map((day) => day.rows.length)).toEqual([11, 2]);
   });
 
   test("in the language and clock chosen, without hidden calendars or completed tasks", async () => {

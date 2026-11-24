@@ -71,6 +71,8 @@ class HeadlessRun(
                 throw RunFailed("This WebView has no WebMessageListener.")
             }
             val gate = Gate(Executors.newCachedThreadPool())
+            // The app coming to the front during the run, even gone again by its end, drew the widget itself.
+            val comings = AppVisibility.comings
             val webView = WebView(context)
             try {
                 suspendCancellableCoroutine { continuation ->
@@ -86,9 +88,13 @@ class HeadlessRun(
                             Exchange(),
                             KeystoreSecrets(context),
                             PluginNotifications(context),
-                            // The open app's snapshot wins: a run that ends after the user opened the
+                            // The open app's snapshot wins: a run during which the user opened the
                             // app (and hid a calendar, say) leaves the widget as the app drew it (D317).
-                            { if (!AppVisibility.inFront) ScheduleWidget.keep(context, it) },
+                            {
+                                if (!AppVisibility.inFront && AppVisibility.comings == comings) {
+                                    ScheduleWidget.keep(context, it)
+                                }
+                            },
                             gate::work,
                         ) {
                             main.post { finish(Result.success(it)) }

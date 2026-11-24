@@ -489,8 +489,12 @@ test("The home screen widget: a snapshot from the store, and its taps open quick
   const title = creating.getByRole("textbox", { name: "Title" });
   await title.fill("Half written");
   listener!({ kind: "create" });
-  // React has rendered whatever the tap did once a frame has been drawn after it.
-  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  // Taps are handled in order: once the next one's day shows (under quick
+  // create, which hides it from the accessibility tree), "+" was handled.
+  listener!({ kind: "day", day: "2026-11-05" });
+  await expect
+    .element(page.getByRole("list", { name: "Thursday, November 5", includeHidden: true }))
+    .toBeInTheDocument();
   await expect.element(title).toHaveValue("Half written");
 });
 

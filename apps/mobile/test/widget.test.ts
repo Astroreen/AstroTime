@@ -124,6 +124,38 @@ test("the snapshot goes to the shell as JSON, the same one once, one that failed
   expect(sent).toHaveLength(2);
 });
 
+test("a snapshot handed while another is written is written, even the one before that", async () => {
+  const sent: string[] = [];
+  const ends: (() => void)[] = [];
+  const widget = androidWidget(
+    {
+      showWidget: ({ snapshot }) =>
+        new Promise<void>((done) => {
+          sent.push(snapshot);
+          ends.push(done);
+        }),
+    },
+    fakeApp().app,
+  );
+  const a = { version: 1, days: [], empty: "A", create: "+" } as const;
+  const b = { ...a, empty: "B" };
+  const first = widget.show(a);
+  const second = widget.show(b);
+  // A's write ends while B's is still under way: the widget will have B, not A.
+  ends[0]!();
+  await first;
+  const third = widget.show(a);
+  ends[1]!();
+  await second;
+  ends[2]!();
+  await third;
+  expect(sent.map((json) => (JSON.parse(json) as { empty: string }).empty)).toEqual([
+    "A",
+    "B",
+    "A",
+  ]);
+});
+
 test("a tap that started the app waits for the UI, heard once; a later one reaches it at once", async () => {
   const fake = fakeApp(at({ kind: "create" }));
   const widget = androidWidget({ showWidget: async () => {} }, fake.app);

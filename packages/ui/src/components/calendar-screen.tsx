@@ -430,6 +430,9 @@ export function CalendarScreen({
   ) => {
     uncover();
     if (day) openDay(day);
+    // Whatever's details were open close; a draft stays, and the day alone shows under it.
+    editing.value.closeDetails();
+    if (editing.value.drafting) return;
     const stored = await store.object(objectId);
     if (!stored || stored.pending === "delete") return;
     const object = CalendarObject.parse(stored.ics);
@@ -472,7 +475,10 @@ export function CalendarScreen({
       openDay(open.day ?? today);
     }
     // A draft open in quick create or the edit dialog is never replaced by a new one.
-    else if (!editing.value.drafting) editing.value.create("event", { day: today });
+    else if (!editing.value.drafting) {
+      editing.value.closeDetails();
+      editing.value.create("event", { day: today });
+    }
   });
   // Heard once the calendars are read: a tap that started the app waits in
   // the shell until then, so quick create has a calendar to put it in.

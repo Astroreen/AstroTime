@@ -79,7 +79,10 @@ export interface EditingValue {
   open(target: Target): void;
   /** Closes an item's details, which change nothing (a tap on the home screen widget's day). */
   closeDetails(): void;
-  /** Whether quick create or the edit dialog is open, with a draft no tap from outside may replace. */
+  /**
+   * Whether quick create or the edit dialog is open with a draft, or the
+   * scope of a change is being asked: nothing a tap from outside may cover.
+   */
   readonly drafting: boolean;
   /** Opens quick create for a new item, which expands to the edit dialog (design D296). */
   create(kind: "event" | "task", options: CreateOptions): void;
@@ -325,7 +328,7 @@ export function useEditingState({
   const value: EditingValue = {
     open: setDetails,
     closeDetails: () => setDetails(null),
-    drafting: editing !== null,
+    drafting: editing !== null || asking !== null,
     create(kind, options) {
       const fits = options.calendarId && writable(kind).some((c) => c.id === options.calendarId);
       const other = kind === "event" ? "task" : "event";

@@ -708,8 +708,8 @@ were checked on 2026-11-01.
     ([D63](#D63)), so `scheduleSnapshot` (`packages/ui/src/widget/`) makes
     a snapshot from the store, as the platform's reminder set is made
     ([D60](#D60)): the shown calendars' items from today for 31 days (at
-    most 200 rows), hidden calendars and "Hide completed tasks" as the user
-    chose on this device, every word in the user's language (weekdays,
+    most 200 rows, the snapshot ending with the day they cut), hidden
+    calendars and "Hide completed tasks" as the user chose on this device, every word in the user's language (weekdays,
     months, times, titles, the undone row, a screen reader's labels), each
     row's colour as the views colour it, darkened for white text by the
     rule of [design D120](design.md#D120) (`fillOf`), a done task's muted.
@@ -717,7 +717,7 @@ were checked on 2026-11-01.
     change to the store, the calendars shown, the words or the day
     (`useScheduleWidget`, which hears the store with the page hidden too),
     background sync after every run, whatever its reminders did, unless
-    the app came to the front meanwhile: its own snapshot wins
+    the app came to the front during the run: its own snapshot wins
     ([D67](#D67)). The snapshot names every day of its range, those with
     nothing too, so after midnight the widget names today and its month in
     the user's words. The open app hands it at every change and the shell
@@ -741,8 +741,7 @@ were checked on 2026-11-01.
     the undone row and the month, the day; "+", quick create for a new
     event today. The tap starts `MainActivity` at
     `io.github.astroreen.astrotime:/widget?open=<JSON>`, heard through
-    `@capacitor/app` (`appUrlOpen`, or the launch address on a cold
-    start). Any app can start the exported activity at that address, so
+    `@capacitor/app` (`appUrlOpen`). Any app can start the exported activity at that address, so
     `widgetOpenOf` keeps only an item (by id), a day the calendar has or
     quick create, and rebuilds a recurrence id from its own kind's fields;
     the worst a crafted address does is open one of them. The UI hears taps
@@ -752,8 +751,9 @@ were checked on 2026-11-01.
     app, so it is not acted on twice; the tap that started the app is
     heard once, from `appUrlOpen`, which the plugin keeps for its first
     listener. A tap never replaces a draft open in quick create or the
-    edit dialog; a day's tap closes an item's details over it; an
-    occurrence gone since the snapshot opens its day alone.
+    edit dialog, nor covers the question of a change's scope (an item's
+    tap then opens its day alone); a tap closes an item's details open
+    before it; an occurrence gone since the snapshot opens its day alone.
   - **Fresh within:** at once from the open app; within an hour with it
     closed, as background sync runs ([D67](#D67)): only with an account
     saved and a network, so a device with only the calendar on it sees
