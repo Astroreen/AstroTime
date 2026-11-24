@@ -70,13 +70,12 @@ test("an assistant creates, changes and deletes through the app; the window show
   await keepPassword(page, "Keep until AstroTime quits");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The first sync brought the server's calendar (Settings lists it).
+  // The first sync brought the server's calendar (Settings lists it, folded
+  // under its account until opened, design D316).
   const settings = await openSettings(page);
-  await expect(
-    settings
-      .getByRole("region", { name: `astro@${new URL(radicale.url).host}` })
-      .getByText("Work", { exact: true }),
-  ).toBeVisible();
+  const account = settings.getByRole("region", { name: `astro@${new URL(radicale.url).host}` });
+  await account.getByRole("button", { name: "1 calendar" }).click();
+  await expect(account.getByText("Work", { exact: true })).toBeVisible();
   // Off by default; on, its address and token show.
   const enable = settings.getByRole("switch", { name: "Let AI assistants in (MCP)" });
   await expect(enable).not.toBeChecked();
