@@ -37,3 +37,6 @@ Thumbs.db
 
 # Dev scripts (scripts/t3)
 .astrotime-dev/
+
+# PR screenshots: uploaded with scripts/pr-images.sh, never committed
+.github/pr-assets/

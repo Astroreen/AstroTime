@@ -69,9 +69,18 @@ Tests:
 Pull requests:
 
 - One branch per PR, never push to `main` directly.
-- The PR description lists the decisions (D-numbers) it implements and
-  concrete evidence: commands run with their output, screenshots for UI.
-  "Tests pass" alone is not evidence.
+- The description follows `.github/pull_request_template.md`, short (at
+  most 300 words outside `<details>`): the problem and the plan's PR with
+  its D-numbers → "What changed", one line per change with its before/after
+  pictures right under it → "Risk" and how to undo → at most 5 "How to
+  check" steps → the evidence in a collapsed Proof: commands run with their
+  output. "Tests pass" alone is not evidence. Say each fact once.
+- UI change → before/after screenshots (the screenshot specs,
+  `ASTROTIME_SCREENSHOTS`), light and dark. Save them in `.github/pr-assets/`
+  (git-ignored), upload with `scripts/pr-images.sh <pr> <files…>` and paste
+  the Markdown it prints; a path on your disk shows nothing on GitHub. The
+  "PR description" check fails on the old shape and on local paths.
+  → `docs/plans/foundation.md#D312`
 
 ## Rules
 

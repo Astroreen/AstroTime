@@ -1,0 +1,35 @@
+# Checks the PR description: its short shape, and screenshots uploaded, not
+# named by a path on someone's disk (see scripts/ci/check-pr-body.sh) and
+# never committed. Runs again when the description is edited, so fixing the
+# text turns the check green. → docs/plans/foundation.md#D312
+
+name: PR description
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  body:
+    name: PR description
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Dependabot writes its own description; nobody reads it as the owner's page.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Short shape, no local file paths instead of pictures
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: scripts/ci/check-pr-body.sh
+      # .github/pr-assets/ is git-ignored; `git add -f` still commits it.
+      - name: No PR screenshots committed
+        run: |
+          files="$(git ls-files .github/pr-assets)"
+          if test -n "$files"; then
+            printf 'PR screenshots are uploaded, never committed (scripts/pr-images.sh). Remove from git:\n%s\n' "$files" >&2
+            exit 1
+          fi
