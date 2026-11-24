@@ -9,6 +9,21 @@ import { androidWidget, WIDGET_URL, widgetOpenOf, type WidgetApp } from "../src/
 const at = (open: unknown) =>
   `${WIDGET_URL}?${new URLSearchParams({ open: JSON.stringify(open) }).toString()}`;
 
+test("a time is rebuilt with its own fields alone", () => {
+  const zoned = {
+    type: "zoned",
+    local: "2026-11-04T09:00:00",
+    timeZone: "Europe/Vilnius",
+    epochMs: 1793775600000,
+  };
+  const open = (recurrenceId: unknown) =>
+    widgetOpenOf(at({ kind: "item", objectId: "o1", recurrenceId, day: "2026-11-04" }));
+  expect(open({ ...zoned, extra: 1 })).toMatchObject({ recurrenceId: zoned });
+  expect(open({ type: "floating", local: "2026-11-04T09:00:00", date: "x" })).toMatchObject({
+    recurrenceId: { type: "floating", local: "2026-11-04T09:00:00" },
+  });
+});
+
 test("a tap's address opens an item, a day or quick create", () => {
   const item = {
     kind: "item",
@@ -41,6 +56,29 @@ test("anything else is no tap", () => {
     at({ kind: "item", objectId: 7, recurrenceId: null, day: "2026-11-04" }),
     at({ kind: "item", objectId: "o1", recurrenceId: "x", day: "2026-11-04" }),
     at({ kind: "item", objectId: "o1", day: "2026-11-04" }),
+    // A day the calendar has not, or a time missing what its kind needs.
+    at({ kind: "day", day: "2026-02-31" }),
+    at({ kind: "day", day: "9999-99-99" }),
+    at({ kind: "item", objectId: "o1", recurrenceId: null, day: "2026-13-01" }),
+    at({ kind: "item", objectId: "o1", recurrenceId: { type: "date" }, day: "2026-11-04" }),
+    at({
+      kind: "item",
+      objectId: "o1",
+      recurrenceId: { type: "zoned", local: "2026-11-04T09:00:00" },
+      day: "2026-11-04",
+    }),
+    at({
+      kind: "item",
+      objectId: "o1",
+      recurrenceId: { type: "x", date: "2026-11-04" },
+      day: "2026-11-04",
+    }),
+    at({
+      kind: "item",
+      objectId: "o1",
+      recurrenceId: { type: "floating", local: "2026-11-04T25:00:00" },
+      day: "2026-11-04",
+    }),
   ])
     expect(widgetOpenOf(url)).toBeNull();
 });
@@ -56,15 +94,28 @@ function fakeApp(launch?: string) {
   return { app, open: (url: string) => listener?.({ url }) };
 }
 
-test("the snapshot goes to the shell as JSON", async () => {
+test("the snapshot goes to the shell as JSON, the same one once, one that failed again", async () => {
   const sent: string[] = [];
+  let fails = false;
   const widget = androidWidget(
-    { showWidget: async ({ snapshot }) => void sent.push(snapshot) },
+    {
+      showWidget: async ({ snapshot }) => {
+        if (fails) throw new Error("No room.");
+        sent.push(snapshot);
+      },
+    },
     fakeApp().app,
   );
   const snapshot = { version: 1, days: [], empty: "Nothing", create: "New event" } as const;
   await widget.show(snapshot);
+  await widget.show(snapshot);
   expect(sent.map((json) => JSON.parse(json) as unknown)).toEqual([snapshot]);
+  const next = { ...snapshot, empty: "Nothing at all" };
+  fails = true;
+  await expect(widget.show(next)).rejects.toThrow("No room.");
+  fails = false;
+  await widget.show(next);
+  expect(sent).toHaveLength(2);
 });
 
 test("a tap that started the app waits for the UI; a later one reaches it at once", async () => {

@@ -129,6 +129,22 @@ test("signed out of every account: nothing is synced or scheduled, the widget dr
   expect(run.closed()).toBe(true);
 });
 
+test("reminders native could not schedule: the widget is drawn all the same", async () => {
+  const { store } = await storeWithStandup();
+  const device = native((method) => {
+    if (method === "secrets.get")
+      return { value: JSON.stringify({ username: "anna", password: "secret" }) };
+    if (method === "http") return new NativeError("Unreachable.", "offline", undefined);
+    if (method === "notifications.check") return { value: { display: "granted" } };
+    if (method === "notifications.exact") return { value: { exact_alarm: "granted" } };
+    if (method === "notifications.pending") return { value: { notifications: [] } };
+    if (method === "notifications.schedule") return new NativeError("Busy.", "failed", undefined);
+    return { value: null };
+  });
+  await expect(context(device.port, store).run()).rejects.toThrow("Busy.");
+  expect(device.methods()).toContain("widget.show");
+});
+
 test("a widget native could not draw fails nothing else", async () => {
   const { store, account } = await storeWithStandup();
   const device = native((method) => {
@@ -186,9 +202,11 @@ test("each account syncs through native, and the reminder set goes to Android", 
   const shown = device.sent.find((call) => call.method === "widget.show")!.params as {
     snapshot: string;
   };
-  expect(JSON.parse(shown.snapshot)).toMatchObject({
-    version: 1,
-    days: [{ day: "2026-11-04", rows: [{ kind: "item", title: "Standup", time: "12:00 PM" }] }],
+  const snapshot = JSON.parse(shown.snapshot) as { version: number; days: unknown[] };
+  expect(snapshot.version).toBe(1);
+  expect(snapshot.days[0]).toMatchObject({
+    day: "2026-11-04",
+    rows: [{ kind: "item", title: "Standup", time: "12:00 PM" }],
   });
   expect(device.methods().at(-1)).toBe("widget.show");
   expect(run.closed()).toBe(true);

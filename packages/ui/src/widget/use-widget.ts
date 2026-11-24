@@ -7,10 +7,11 @@
 import type { Store } from "@astrotime/storage";
 import { useEffect, useState } from "react";
 
-import { liveQuery } from "../calendar/live.ts";
+import { everyRun, liveQuery } from "../calendar/live.ts";
 import { ObjectCache } from "../calendar/query.ts";
 import type { SnapshotWords, WidgetHost } from "./schedule.ts";
 
+/** Keeps `widget` (none: nothing) with the store and the user's choices. */
 export function useScheduleWidget(
   widget: WidgetHost | undefined,
   store: Store,
@@ -53,6 +54,10 @@ export function useScheduleWidget(
               console.error(error);
             }
           },
+          undefined,
+          // Every run: a write that failed is tried again with the next
+          // change; the shell leaves out a snapshot the same as it has.
+          everyRun,
         );
       },
       (error: unknown) => console.error(error),

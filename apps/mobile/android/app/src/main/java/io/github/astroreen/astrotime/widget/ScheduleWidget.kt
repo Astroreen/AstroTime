@@ -22,9 +22,9 @@ import io.github.astroreen.astrotime.MainActivity
 import io.github.astroreen.astrotime.R
 import java.io.File
 import java.io.IOException
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.TextStyle
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 class ScheduleWidget : AppWidgetProvider() {
@@ -72,7 +72,7 @@ class ScheduleWidget : AppWidgetProvider() {
                 try {
                     out.write(json.toByteArray(Charsets.UTF_8))
                     file.finishWrite(out)
-                } catch (error: IOException) {
+                } catch (error: Throwable) {
                     file.failWrite(out)
                     throw error
                 }
@@ -90,18 +90,24 @@ class ScheduleWidget : AppWidgetProvider() {
                 }
             }
 
-        /** What the widget shows now, on the device's today. */
+        /**
+         * What the widget shows now, on the device's today. `java.util`'s
+         * calendar, not `java.time`: the app runs from Android 7.0 (API 24),
+         * and `java.time` came with 8.0.
+         */
         fun shown(context: Context): Shown {
-            val today = LocalDate.now(ZoneId.systemDefault())
+            val now = Calendar.getInstance()
             val locale = Locale.getDefault()
+            val at = now.time
             val mark =
                 DayMark(
-                    today.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
-                    today.dayOfMonth.toString(),
-                    today.toString(),
+                    SimpleDateFormat("EEE", locale).format(at),
+                    now.get(Calendar.DAY_OF_MONTH).toString(),
+                    DateFormat.getDateInstance(DateFormat.FULL, locale).format(at),
                     true,
                 )
-            return Snapshot.read(kept(context), today.toString(), mark)
+            val month = SimpleDateFormat("LLLL", locale).format(at).replaceFirstChar { it.titlecase(locale) }
+            return Snapshot.read(kept(context), SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at), mark, month)
         }
 
         /** Draws every widget on the home screen again, the list's rows too. */
@@ -110,8 +116,6 @@ class ScheduleWidget : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(ComponentName(context, ScheduleWidget::class.java))
             if (ids.isEmpty()) return
             draw(context, manager, ids)
-            @Suppress("DEPRECATION")
-            manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list)
         }
 
         private fun draw(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -136,6 +140,9 @@ class ScheduleWidget : AppWidgetProvider() {
                 views.setPendingIntentTemplate(R.id.widget_list, template(context))
                 manager.updateAppWidget(id, views)
             }
+            // The rows too: the service's address is the same, so the list would keep the rows it has.
+            @Suppress("DEPRECATION")
+            manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list)
             atMidnight(context)
         }
 
@@ -179,14 +186,22 @@ class ScheduleWidget : AppWidgetProvider() {
             )
 
         /**
-         * Draws again just after the next midnight: inexact, it needs no
-         * permission, and the list is a minute late at worst while the phone
-         * is awake (Doze may hold it until the phone wakes, when it is seen).
+         * Draws again just after the next midnight, within a minute of it:
+         * a window, not an exact alarm, so it needs no permission; without
+         * `_WAKEUP`, a phone asleep sees it when it wakes.
          */
         private fun atMidnight(context: Context) {
-            val zone = ZoneId.systemDefault()
-            val next = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() + 1_000
-            context.getSystemService(AlarmManager::class.java).set(AlarmManager.RTC, next, midnightIntent(context))
+            val next =
+                Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 1)
+                    set(Calendar.MILLISECOND, 0)
+                }
+            context
+                .getSystemService(AlarmManager::class.java)
+                .setWindow(AlarmManager.RTC, next.timeInMillis, 60_000L, midnightIntent(context))
         }
     }
 }

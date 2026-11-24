@@ -9,7 +9,11 @@ import { showWidget, type ScheduleSnapshot, type WidgetHost } from "../src/backg
 import { loadDemo } from "../src/demo/index.ts";
 import { KEYS, memoryPreferences } from "../src/preferences.ts";
 import { fillOf, rgbOf } from "../src/widget/fill.ts";
-import { WIDGET_DAYS } from "../src/widget/schedule.ts";
+import { ObjectCache } from "../src/calendar/query.ts";
+import { Formats } from "../src/calendar/format.ts";
+import { localeSettings } from "../src/calendar/locale.ts";
+import { createI18n } from "../src/i18n/index.ts";
+import { scheduleSnapshot, WIDGET_DAYS } from "../src/widget/schedule.ts";
 
 const timeZone = "Europe/Vilnius";
 const NOW = Date.parse("2026-11-04T10:40:00+02:00");
@@ -95,12 +99,39 @@ describe("the snapshot", () => {
     });
   });
 
-  test(`reaches ${WIDGET_DAYS} days from today, no further`, async () => {
+  test(`names every one of ${WIDGET_DAYS} days from today, those with nothing too`, async () => {
     const { snapshot } = await snapshotOf();
     const days = snapshot.days.map(({ day }) => day);
+    expect(days).toHaveLength(WIDGET_DAYS);
     expect(days[0]).toBe("2026-11-04");
-    expect(days.at(-1)! < "2026-12-05").toBe(true);
-    expect(days).toEqual(days.toSorted());
+    expect(days.at(-1)).toBe("2026-12-04");
+    // A day with nothing keeps its words, for the widget's today after midnight.
+    const empty = snapshot.days.find((day) => day.rows.length === 0)!;
+    expect(empty.month).toMatch(/^(November|December)$/);
+    expect(snapshot.days.find((day) => day.day === "2026-12-01")).toMatchObject({
+      month: "December",
+      weekday: "Tue",
+    });
+  });
+
+  test("past the most rows, a day is cut and the days after keep only their words", async () => {
+    const store = await Store.open(nodeDriver());
+    await loadDemo(store, { languages: ["en-US"], timeZone, now: NOW });
+    const settings = localeSettings(["en-US"]);
+    const i18n = createI18n(settings.language);
+    const snapshot = await scheduleSnapshot({
+      store,
+      cache: new ObjectCache(),
+      hidden: new Set(),
+      hideCompleted: false,
+      words: { t: i18n.t.bind(i18n), formats: new Formats(settings), timeZone },
+      now: NOW,
+      limit: 13,
+    });
+    // Today has 11 rows, tomorrow 4: two of tomorrow's make 13.
+    expect(snapshot.days.map((day) => day.rows.length).slice(0, 3)).toEqual([11, 2, 0]);
+    expect(snapshot.days.flatMap((day) => day.rows)).toHaveLength(13);
+    expect(snapshot.days).toHaveLength(WIDGET_DAYS);
   });
 
   test("in the language and clock chosen, without hidden calendars or completed tasks", async () => {

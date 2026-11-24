@@ -2,7 +2,9 @@
 <!-- The schedule widget in the widget picker (Android 12 and later): its
      shape, with bars in the views' colours where the items will be; no
      words, which the app hands over in the user's language. -->
+<!-- The bars' android:tint: a home screen inflates no AppCompat views, so app:tint would do nothing. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
@@ -58,6 +60,7 @@
                 android:layout_marginBottom="4dp"
                 android:scaleType="fitXY"
                 android:src="@drawable/widget_row_shape"
+                tools:ignore="UseAppTint"
                 android:tint="#4178B5" />
 
             <ImageView
@@ -66,6 +69,7 @@
                 android:layout_marginBottom="4dp"
                 android:scaleType="fitXY"
                 android:src="@drawable/widget_row_shape"
+                tools:ignore="UseAppTint"
                 android:tint="#318362" />
 
             <ImageView
@@ -73,6 +77,7 @@
                 android:layout_height="40dp"
                 android:scaleType="fitXY"
                 android:src="@drawable/widget_row_shape"
+                tools:ignore="UseAppTint"
                 android:tint="#7669C3" />
         </LinearLayout>
     </LinearLayout>

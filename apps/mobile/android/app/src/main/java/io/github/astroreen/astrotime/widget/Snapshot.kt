@@ -53,10 +53,12 @@ object Snapshot {
 
     /**
      * The rows of `json` from `today` on; nothing that reads (no snapshot
-     * yet), no rows. `todayMark` names today when the snapshot is older
-     * than today and had nothing on it.
+     * yet), no rows. The snapshot names every day of its range, so today is
+     * among them; one older than its range names none, and `todayMark` and
+     * `todayMonth` (the device's words) head the list then. The title is the
+     * month of the day that heads it.
      */
-    fun read(json: String?, today: String, todayMark: DayMark): Shown {
+    fun read(json: String?, today: String, todayMark: DayMark, todayMonth: String): Shown {
         val snapshot =
             try {
                 json?.let(::JSONObject)?.takeIf { it.optInt("version") == 1 }
@@ -64,14 +66,13 @@ object Snapshot {
                 null
             } ?: return Shown(null, null, emptyList())
         val days = snapshot.optJSONArray("days")
+        val empty = snapshot.optString("empty")
         val rows = mutableListOf<Row>()
         var title: String? = null
-        var todaySeen = false
         for (i in 0 until (days?.length() ?: 0)) {
             val day = days!!.optJSONObject(i) ?: continue
             val date = day.optString("day")
             if (date < today) continue
-            title = title ?: day.optString("month").ifEmpty { null }
             val mark =
                 DayMark(day.optString("weekday"), day.optString("date"), day.optString("label"), date == today)
             val list = day.optJSONArray("rows")
@@ -80,14 +81,14 @@ object Snapshot {
                 val row = list!!.optJSONObject(j) ?: continue
                 rowOf(row, if (rows.size == start) mark else null)?.let(rows::add)
             }
-            if (date == today) {
-                todaySeen = true
-                if (rows.size == start) rows += Row.Empty(mark, snapshot.optString("empty"))
-            }
+            // Today heads the list, with nothing on it too; another day with nothing is left out.
+            if (date == today && rows.size == start) rows += Row.Empty(mark, empty)
+            if (rows.size > start) title = title ?: day.optString("month").ifEmpty { null }
         }
-        // A day went by since the snapshot, and today had nothing: today
-        // still heads the list, named by the device.
-        if (!todaySeen) rows.add(0, Row.Empty(todayMark, snapshot.optString("empty")))
+        if (rows.firstOrNull()?.mark?.today != true) {
+            rows.add(0, Row.Empty(todayMark, empty))
+            title = todayMonth
+        }
         return Shown(title, snapshot.optString("create").ifEmpty { null }, rows)
     }
 

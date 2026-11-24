@@ -462,7 +462,15 @@ export function CalendarScreen({
     if (open.kind === "day") openDay(open.day ?? today);
     else editing.value.create("event", { day: today });
   });
-  useEffect(() => platform.widget?.onOpen((open) => void openFromWidget(open)), [platform.widget]);
+  // Heard once the calendars are read: a tap that started the app waits in
+  // the shell until then, so quick create has a calendar to put it in.
+  const calendarsRead = lists !== null || listsFailed;
+  useEffect(() => {
+    if (!calendarsRead) return;
+    return platform.widget?.onOpen(
+      (open) => void openFromWidget(open).catch((error: unknown) => console.error(error)),
+    );
+  }, [platform.widget, calendarsRead]);
 
   // The system's back button, where there is one (android D68): it closes
   // what is open, the topmost first, and with nothing open the shell leaves

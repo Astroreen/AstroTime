@@ -11,4 +11,5 @@
     <string name="widget_name">Schedule</string>
     <string name="widget_description">Your events and tasks of the days ahead</string>
     <string name="widget_open_app">Open AstroTime to see your schedule here</string>
+    <string name="widget_create">New event</string>
 </resources>

@@ -716,16 +716,23 @@ were checked on 2026-11-01.
     `Platform.widget` (`WidgetHost`) is handed it: the open app at every
     change to the store, the calendars shown, the words or the day
     (`useScheduleWidget`, which hears the store with the page hidden too),
-    background sync after every run, an account or not ([D67](#D67)).
+    background sync after every run, whatever its reminders did
+    ([D67](#D67)). The snapshot names every day of its range, those with
+    nothing too, so after midnight the widget names today and its month in
+    the user's words. The open app hands it at every change and the shell
+    writes only one that differs from what the widget has, so a write that
+    failed is made again with the next change.
   - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
     background sync's `widget.show` keep the snapshot in a file of the
     app's (`AtomicFile`) and draw every widget again; the list's rows come
     from a `RemoteViewsService`, read again from the file
     (`Snapshot.read`, JVM-tested). The days before the device's today are
-    left out when it draws, so the list moves on at midnight (an inexact
-    alarm, no permission) with the app closed; today with nothing on it
-    still heads the list ("Nothing planned today"). Before the app's first
-    snapshot the widget says to open AstroTime. Colours are the app's
+    left out when it draws, so the list moves on at midnight (an alarm
+    within a minute of it, `setWindow`, no permission; `java.util`'s
+    calendar, as the app runs from Android 7.0) with the app closed; today
+    with nothing on it still heads the list ("Nothing planned today"), and
+    another day with nothing is left out. Before the app's first snapshot
+    the widget says to open AstroTime. Colours are the app's
     tokens in `values` and `values-night`; from Android 12 the home screen
     resolves them, so the widget follows the system's theme as it changes.
   - **A tap opens the app on what was tapped:** an item's day in the Day
@@ -735,12 +742,18 @@ were checked on 2026-11-01.
     `io.github.astroreen.astrotime:/widget?open=<JSON>`, heard through
     `@capacitor/app` (`appUrlOpen`, or the launch address on a cold
     start). Any app can start the exported activity at that address, so
-    `widgetOpenOf` keeps only an item (by id), a day or quick create; the
-    worst a crafted address does is open one of them.
+    `widgetOpenOf` keeps only an item (by id), a day the calendar has or
+    quick create, and rebuilds a recurrence id from its own kind's fields;
+    the worst a crafted address does is open one of them. The UI hears taps
+    once the calendars are read, so a tap that started the app opens quick
+    create with a calendar to put it in; `MainActivity` forgets a tap when
+    the activity is made again from Recents or after the system ended the
+    app, so it is not acted on twice.
   - **Fresh within:** at once from the open app; within an hour with it
-    closed (background sync); a hidden WebView's timers are throttled, so
-    a change made just before leaving the app may reach the widget some
-    seconds late.
+    closed, as background sync runs ([D67](#D67)): only with an account
+    saved and a network, so a device with only the calendar on it sees
+    the widget move on at midnight but its "N undone tasks" row only when
+    the app opens.
 
 ## Deferred
 
@@ -775,6 +788,15 @@ were checked on 2026-11-01.
   release; the schedule widget is [D317](#D317). A month widget, a tasks
   widget, a widget's own calendars or its own theme wait for someone to
   ask.
+- **The widget across a zone change** — the snapshot's days are the zone's
+  the app had when it made it, and the open app reads the zone once, at its
+  start (as the whole UI does); after the phone's zone changes, the widget
+  shows the old zone's days until the app starts again or background sync
+  runs ([D317](#D317)).
+- **The widget without an account** — background sync starts no run with
+  no account saved ([D67](#D67)), so the widget's undone row moves on only
+  when the app opens; a run for the widget alone, where one is on the home
+  screen, would cover it ([D317](#D317)).
 - **System calendars** — foundation's Deferred (`CalendarContract`).
 - **The app's icon and splash screen** — Capacitor's placeholders until
   AstroTime has a design for them ([D61](#D61)).

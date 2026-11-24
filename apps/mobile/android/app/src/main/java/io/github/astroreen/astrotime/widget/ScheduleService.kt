@@ -17,7 +17,8 @@ class ScheduleService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory = Rows(applicationContext)
 
     private class Rows(private val context: Context) : RemoteViewsFactory {
-        private var rows: List<Row> = emptyList()
+        // Set and read on the binder's threads, which may differ call to call.
+        @Volatile private var rows: List<Row> = emptyList()
 
         override fun onCreate() {}
 
@@ -31,7 +32,8 @@ class ScheduleService : RemoteViewsService() {
 
         override fun getViewAt(position: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_row)
-            val row = rows.getOrNull(position) ?: return views
+            // Gone since the list was counted: a blank row until it is drawn again.
+            val row = rows.getOrNull(position) ?: Row.Empty(null, "")
             mark(views, row.mark)
             when (row) {
                 is Row.Item -> item(views, row)
@@ -60,7 +62,10 @@ class ScheduleService : RemoteViewsService() {
         private fun item(views: RemoteViews, row: Row.Item) {
             views.setViewVisibility(R.id.row_fill, View.VISIBLE)
             views.setInt(R.id.row_fill, "setColorFilter", row.fill)
-            views.setViewVisibility(R.id.row_check, if (row.task) View.VISIBLE else View.GONE)
+            // A task's mark; an event has none, and its title starts where the mark would.
+            views.setViewVisibility(R.id.row_mark, if (row.task) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.row_badge, View.GONE)
+            views.setViewVisibility(R.id.row_check, View.VISIBLE)
             views.setInt(R.id.row_check, "setColorFilter", WHITE)
             views.setImageViewResource(R.id.row_check, if (row.done) R.drawable.widget_check_done else R.drawable.widget_check)
             views.setTextViewText(R.id.row_title, row.title)
@@ -77,12 +82,16 @@ class ScheduleService : RemoteViewsService() {
         }
 
         private fun undone(views: RemoteViews, row: Row.Undone) {
-            // On the widget's own ground, a step raised; the check in the oldest task's colour.
+            // On the widget's own ground, a step raised; a white check in a
+            // circle of the oldest task's colour, as the app's chip (design D51).
             views.setViewVisibility(R.id.row_fill, View.VISIBLE)
             themed(views, R.id.row_fill, "setColorFilter", R.color.widget_raised)
+            views.setViewVisibility(R.id.row_mark, View.VISIBLE)
+            views.setViewVisibility(R.id.row_badge, View.VISIBLE)
+            views.setInt(R.id.row_badge, "setColorFilter", row.fill)
             views.setViewVisibility(R.id.row_check, View.VISIBLE)
-            views.setImageViewResource(R.id.row_check, R.drawable.widget_check_done)
-            views.setInt(R.id.row_check, "setColorFilter", row.fill)
+            views.setImageViewResource(R.id.row_check, R.drawable.widget_check_mark)
+            views.setInt(R.id.row_check, "setColorFilter", WHITE)
             views.setTextViewText(R.id.row_title, row.text)
             themed(views, R.id.row_title, "setTextColor", R.color.widget_ink)
             views.setInt(R.id.row_title, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)
@@ -92,7 +101,7 @@ class ScheduleService : RemoteViewsService() {
 
         private fun empty(views: RemoteViews, row: Row.Empty) {
             views.setViewVisibility(R.id.row_fill, View.INVISIBLE)
-            views.setViewVisibility(R.id.row_check, View.GONE)
+            views.setViewVisibility(R.id.row_mark, View.GONE)
             views.setTextViewText(R.id.row_title, row.text)
             themed(views, R.id.row_title, "setTextColor", R.color.widget_muted)
             views.setInt(R.id.row_title, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)

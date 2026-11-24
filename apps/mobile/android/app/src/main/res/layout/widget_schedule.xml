@@ -21,21 +21,26 @@
         <TextView
             android:id="@+id/widget_title"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:ellipsize="end"
-            android:gravity="center_vertical"
+            android:gravity="center_vertical|start"
             android:maxLines="1"
+            android:minHeight="48dp"
             android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:textColor="@color/widget_ink"
             android:textSize="20sp"
             android:textStyle="bold" />
 
+        <!-- 48dp to touch, the pill 40dp within it; named in the app's
+             language once the app hands a snapshot, in the system's before. -->
         <ImageView
             android:id="@+id/widget_create"
             android:layout_width="64dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_create_shape"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_create_inset"
+            android:contentDescription="@string/widget_create"
             android:scaleType="center"
             android:src="@drawable/widget_add" />
     </LinearLayout>

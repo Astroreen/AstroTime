@@ -47,7 +47,8 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
   const store = await context.openStore();
   try {
     // Signed out of everything: nothing to sync, and the app emptied the set.
-    // The widget is drawn all the same: the calendar on this device, a new day.
+    // The widget is drawn all the same, the new day's. (Native starts no run
+    // with no account saved, android D317: this is when the two disagree.)
     if (!(await store.accounts()).some(syncs)) {
       await widget(context, store, now());
       return { accounts: [], reminders: null };
@@ -65,6 +66,8 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
       http,
       lock: context.syncLock,
     });
+    // The widget is drawn whatever the reminders do: what the sync wrote is
+    // in the store either way.
     const set = await scheduleReminders({
       store,
       scheduler: androidReminders({
@@ -77,8 +80,7 @@ export async function backgroundSync(context: BackgroundContext): Promise<Backgr
       languages: context.languages,
       timeZone: context.timeZone,
       now: now(),
-    });
-    await widget(context, store, now());
+    }).finally(() => widget(context, store, now()));
     return {
       accounts: report.accounts.map(({ accountId, status }) => ({ accountId, status })),
       reminders: set?.length ?? null,

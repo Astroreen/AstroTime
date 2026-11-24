@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SnapshotTest {
-    private val deviceToday = DayMark("Thu", "26", "2026-11-26", true)
+    private val deviceToday = DayMark("Sun", "10", "Sunday, January 10, 2027", true)
 
     private fun item(title: String, time: String?, done: Boolean = false) =
         JSONObject()
@@ -56,13 +56,16 @@ class SnapshotTest {
                         ),
                     )
                     .put(day("2026-11-25", "Wed", "November", item("Pick up mum", "06:40")))
+                    // Days with nothing are named too (the snapshot names every day of its range).
+                    .put(day("2026-11-26", "Thu", "November"))
+                    .put(day("2026-11-30", "Mon", "November"))
                     .put(day("2026-12-01", "Tue", "December", item("Exam", "16:20–17:55"), item("Report", null, done = true))),
             )
             .toString()
 
     @Test
     fun `on its own day the undone row comes first, each day's date beside its first row`() {
-        val shown = Snapshot.read(snapshot, "2026-11-24", deviceToday)
+        val shown = Snapshot.read(snapshot, "2026-11-24", deviceToday, "January")
         assertEquals("November", shown.title)
         assertEquals("New event", shown.create)
         assertEquals(5, shown.rows.size)
@@ -82,25 +85,39 @@ class SnapshotTest {
 
     @Test
     fun `days gone by are left out, and the header names the first day's month`() {
-        val shown = Snapshot.read(snapshot, "2026-11-25", deviceToday)
+        val shown = Snapshot.read(snapshot, "2026-11-25", deviceToday, "January")
         assertEquals(listOf("Pick up mum", "Exam", "Report"), shown.rows.map { (it as Row.Item).title })
         assertEquals("November", shown.title)
         assertTrue(shown.rows[0].mark!!.today)
     }
 
     @Test
-    fun `today with nothing on it still heads the list, named by the device`() {
-        val shown = Snapshot.read(snapshot, "2026-11-26", deviceToday)
-        assertEquals(Row.Empty(deviceToday, "Nothing planned today"), shown.rows[0])
-        assertEquals("December", shown.title)
+    fun `today with nothing on it heads the list in the snapshot's words, and names the month`() {
+        // November 30, the next item on December 1: the month is still November.
+        val shown = Snapshot.read(snapshot, "2026-11-30", deviceToday, "January")
+        assertEquals(Row.Empty(DayMark("Mon", "30", "Mon 2026-11-30", true), "Nothing planned today"), shown.rows[0])
+        assertEquals("November", shown.title)
         assertEquals("Exam", (shown.rows[1] as Row.Item).title)
         assertEquals(false, shown.rows[1].mark!!.today)
     }
 
     @Test
+    fun `another day with nothing on it is left out`() {
+        val shown = Snapshot.read(snapshot, "2026-11-25", deviceToday, "January")
+        assertTrue(shown.rows.none { it.mark?.date == "26" })
+    }
+
+    @Test
+    fun `a snapshot older than its range names today in the device's words`() {
+        val shown = Snapshot.read(snapshot, "2027-01-10", deviceToday, "January")
+        assertEquals(listOf(Row.Empty(deviceToday, "Nothing planned today")), shown.rows)
+        assertEquals("January", shown.title)
+    }
+
+    @Test
     fun `no snapshot, or one that does not read, has no rows`() {
         for (json in listOf(null, "", "not json", """{"version":2,"days":[]}""")) {
-            val shown = Snapshot.read(json, "2026-11-24", deviceToday)
+            val shown = Snapshot.read(json, "2026-11-24", deviceToday, "January")
             assertEquals(Shown(null, null, emptyList()), shown)
         }
     }

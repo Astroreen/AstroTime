@@ -14,7 +14,7 @@ import type { Formats } from "../calendar/format.ts";
 import type { ObjectCache, Entry } from "../calendar/query.ts";
 import { fillOf, rgbOf } from "./fill.ts";
 
-/** Days the snapshot reaches from today, today included. */
+/** Days the snapshot reaches from today, today included, each named in it. */
 export const WIDGET_DAYS = 31;
 /** The most rows it holds: a full month's days are cut there, not the file grown without end. */
 export const WIDGET_ROWS = 200;
@@ -57,6 +57,10 @@ export type SnapshotRow =
       readonly open: WidgetOpen;
     };
 
+/**
+ * One day of the range; a day with no rows is in it only for its words: the
+ * widget shows it when it is today.
+ */
 export interface SnapshotDay {
   /** `YYYY-MM-DD`: the widget leaves out the days before its own today. */
   readonly day: string;
@@ -86,6 +90,7 @@ export interface ScheduleSnapshot {
  * hands it each snapshot, and hears the taps that open the app.
  */
 export interface WidgetHost {
+  /** Called at every change, the same snapshot again too: the host leaves out what it has. */
   show(snapshot: ScheduleSnapshot): void | Promise<void>;
   /** Calls `listener` with each tap that opened the app; returns the function that stops it. */
   onOpen(listener: (open: WidgetOpen) => void): () => void;
@@ -110,6 +115,8 @@ export async function scheduleSnapshot(options: {
   readonly hideCompleted: boolean;
   readonly words: SnapshotWords;
   readonly now: number;
+  /** The most rows; `WIDGET_ROWS` unless a test asks for fewer. */
+  readonly limit?: number;
 }): Promise<ScheduleSnapshot> {
   const { store, cache, hidden, hideCompleted, words, now } = options;
   const { t, formats, timeZone } = words;
@@ -136,10 +143,18 @@ export async function scheduleSnapshot(options: {
       : formats.timeRange(start, end, timeZone);
   };
 
-  let budget = WIDGET_ROWS;
+  let budget = options.limit ?? WIDGET_ROWS;
   const days: SnapshotDay[] = [];
-  for (const day of agendaDays(entries, today, to, { today, timeZone, undone: undone.length })) {
-    if (budget <= 0) break;
+  const agenda = new Map(
+    agendaDays(entries, today, to, { today, timeZone, undone: undone.length }).map((day) => [
+      day.day,
+      day,
+    ]),
+  );
+  // Every day of the range, those with nothing too: after midnight the
+  // widget names the new today, and its month, from the snapshot's words.
+  for (let date = today; date < to; date = addDays(date, 1)) {
+    const day = agenda.get(date) ?? { day: date, items: [], undone: false };
     const rows: SnapshotRow[] = [];
     if (day.undone) {
       rows.push({
@@ -173,7 +188,8 @@ export async function scheduleSnapshot(options: {
         },
       });
     }
-    const kept = rows.slice(0, budget);
+    // Past the most rows, a day keeps its date and none of its items.
+    const kept = rows.slice(0, Math.max(0, budget));
     budget -= kept.length;
     days.push({
       day: day.day,
