@@ -57,7 +57,8 @@ When you add a package, app or module, add its line here in the same PR.
   - `createItem`, `editItem`, `deleteItem`, `timesOf` (`edits.ts`) — every
     other edit: only the fields changed, in a scope for an occurrence of a
     series (this, this and following, all), a series moved as its
-    occurrence moved; `hasOccurrence`, whether a series still has one.
+    occurrence moved; `hasOccurrence`, whether a series still has one;
+    `namesSameOccurrence`, whether two recurrence ids name one occurrence.
     → `plans/foundation.md#D103`, `plans/foundation.md#D105`
   - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
     `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its

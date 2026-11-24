@@ -759,9 +759,10 @@ were checked on 2026-11-01.
     before it; a tap whose item is still being read gives way to a later
     one (not to details opened in the app meanwhile, a read's length); an
     occurrence of a series opens as the views draw it, expanded around its
-    day and found by its recurrence id however the server wrote it
-    (`occurrenceOn`, `sameOccurrence`: zoned ids by their instant, a date
-    by its day), so one a server cancelled opens its day alone, a series
+    day (`occurrenceOn`): the one with the same id, else the only one the
+    series' own rule says the id names however another client wrote it
+    (core's `namesSameOccurrence`, foundation D35), so one a server
+    cancelled opens its day alone, a series
     cancelled whole still opens, and so does a task due at midnight; a
     series too dense to expand opens its day alone, as the views draw none
     of it;

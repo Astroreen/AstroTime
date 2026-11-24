@@ -1016,6 +1016,18 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
 }
 
 /**
+ * Whether two recurrence ids name one occurrence of `object`'s series,
+ * however each was written: on the series' wall clock, or by day where
+ * either or the series' start is a date (D35); outside a series, the same
+ * time.
+ */
+export function namesSameOccurrence(object: CalendarObject, a: ItemTime, b: ItemTime): boolean {
+  const { master } = object.components;
+  const anchor = master && isSeries(master) ? anchorOf(master) : null;
+  return anchor ? sameOccurrence(a, b, anchor) : sameTime(a, b);
+}
+
+/**
  * Whether a series still has the occurrence `recurrenceId` names: an
  * exception for it, or one its rule or RDATEs make that no EXDATE removes. A
  * series too dense to walk through is taken to have it.

@@ -109,7 +109,7 @@ test("an exception another client wrote with a date id is the same occurrence", 
   expect(occurrenceOn(moved, fifth, "2026-11-05", timeZone)?.item.summary).toBe("Stand-up at 11");
 });
 
-test("the two 3:30s of the night the clocks go back are told apart by their instant", () => {
+test("on the night the clocks go back, an occurrence is found by its instant", () => {
   const nightly = CalendarObject.parse(
     [
       "BEGIN:VCALENDAR",
@@ -127,14 +127,72 @@ test("the two 3:30s of the night the clocks go back are told apart by their inst
       "",
     ].join("\r\n"),
   );
-  // October 25th's 3:30 is the summer one, 00:30Z; the winter one an hour
-  // later reads 3:30 on the wall clock too, and is not this occurrence.
-  const at = (iso: string): ItemTime => ({
+  // October 25th's 3:30 is the summer one, 00:30Z, here as a server wrote it in UTC.
+  const utc: ItemTime = {
     type: "zoned",
+    local: "2026-10-25T00:30:00",
+    timeZone: "UTC",
+    epochMs: Date.parse("2026-10-25T00:30:00Z"),
+  };
+  expect(occurrenceOn(nightly, utc, "2026-10-25", timeZone)?.recurrenceId).toMatchObject({
     local: "2026-10-25T03:30:00",
-    timeZone,
-    epochMs: Date.parse(iso),
   });
-  expect(occurrenceOn(nightly, at("2026-10-25T00:30:00Z"), "2026-10-25", timeZone)).not.toBeNull();
-  expect(occurrenceOn(nightly, at("2026-10-25T01:30:00Z"), "2026-10-25", timeZone)).toBeNull();
+});
+
+/** A daily call at 22:00 in New York, from November 4, with these exceptions. */
+function newYork(...exceptions: string[]): CalendarObject {
+  return CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:call",
+      "DTSTAMP:20261101T000000Z",
+      "DTSTART;TZID=America/New_York:20261104T220000",
+      "DURATION:PT30M",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Call",
+      "END:VEVENT",
+      ...exceptions.flatMap((lines) => [
+        "BEGIN:VEVENT",
+        "UID:call",
+        "DTSTAMP:20261101T000000Z",
+        ...lines.split("\n"),
+        "END:VEVENT",
+      ]),
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+}
+
+test("a date id names its day on the series' own wall clock, not the viewer's", () => {
+  // November 5th's call at 22:00 in New York is 05:00 on the 6th in Vilnius;
+  // another client moved it with a date id for the 5th, and another for the 6th.
+  const call = newYork(
+    "RECURRENCE-ID;VALUE=DATE:20261105\nDTSTART;TZID=America/New_York:20261105T110000\nDURATION:PT30M\nSUMMARY:Moved call",
+    "RECURRENCE-ID;VALUE=DATE:20261106\nDTSTART;TZID=America/New_York:20261106T110000\nDURATION:PT30M\nSUMMARY:Next call",
+  );
+  const shown: ItemTime = {
+    type: "zoned",
+    local: "2026-11-05T22:00:00",
+    timeZone: "America/New_York",
+    epochMs: Date.parse("2026-11-06T03:00:00Z"),
+  };
+  expect(occurrenceOn(call, shown, "2026-11-06", timeZone)?.item.summary).toBe("Moved call");
+});
+
+test("an id the expansion gave opens its own occurrence, though another shares its day", () => {
+  // A day-id exception in the morning and an exact-id one in the evening of the 5th.
+  const call = newYork(
+    "RECURRENCE-ID;TZID=America/New_York:20261105T220000\nDTSTART;TZID=America/New_York:20261105T230000\nDURATION:PT30M\nSUMMARY:Late call",
+  );
+  const late: ItemTime = {
+    type: "zoned",
+    local: "2026-11-05T22:00:00",
+    timeZone: "America/New_York",
+    epochMs: Date.parse("2026-11-06T03:00:00Z"),
+  };
+  expect(occurrenceOn(call, late, "2026-11-06", timeZone)?.item.summary).toBe("Late call");
 });

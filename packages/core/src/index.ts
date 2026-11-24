@@ -23,6 +23,7 @@ export {
   deleteItem,
   editItem,
   hasOccurrence,
+  namesSameOccurrence,
   placeText,
   sameGeo,
   PRODID,

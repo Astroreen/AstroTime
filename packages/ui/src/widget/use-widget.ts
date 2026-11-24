@@ -24,11 +24,11 @@ export function useScheduleWidget(
 ): void {
   const { t, formats, timeZone, locale, hideCompleted, today } = options;
   // The ids by value: the set is new with every change of it.
-  const hiddenKey = [...options.hidden].toSorted().join(",");
+  const hiddenKey = JSON.stringify([...options.hidden].toSorted());
   const [cache] = useState(() => new ObjectCache());
   useEffect(() => {
     if (!widget) return;
-    const hidden = new Set(hiddenKey === "" ? [] : hiddenKey.split(","));
+    const hidden = new Set(JSON.parse(hiddenKey) as string[]);
     let stop: (() => void) | undefined;
     let gone = false;
     void import("./schedule.ts").then(
