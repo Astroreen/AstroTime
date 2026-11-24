@@ -174,7 +174,8 @@ for (const [size, viewport] of [
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");
     await expect(start).not.toBeFocused();
-    await expect.poll(async () => (await start.boundingBox())!.width).toBe(narrow);
+    await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
+    expect((await start.boundingBox())!.width).toBe(narrow);
     // Tab coming in again, after Tab left: the words still.
     await page.keyboard.press("Tab");
     await expect(start).toBeFocused();
@@ -190,7 +191,8 @@ for (const [size, viewport] of [
     await expect(page.getByRole("listbox")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("listbox")).toHaveCount(0);
-    await expect.poll(async () => (await start.boundingBox())!.width).toBe(narrow);
+    await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
+    expect((await start.boundingBox())!.width).toBe(narrow);
     await start.focus();
     await page.keyboard.press("ArrowUp");
     await expect(start).not.toHaveValue("2026-11-04");

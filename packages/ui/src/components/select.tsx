@@ -78,7 +78,14 @@ export function Select({
         >
           {chosen?.leading}
           {chosen ? (
-            <span className={swatch ? "sr-only" : `min-w-0 flex-1 ${wrap ? "" : "truncate"}`}>
+            <span
+              className={
+                // Forced colours draw every dot alike: there the name shows.
+                swatch
+                  ? "sr-only forced-colors:not-sr-only forced-colors:pl-1"
+                  : `min-w-0 flex-1 ${wrap ? "" : "truncate"}`
+              }
+            >
               {chosen.label}
             </span>
           ) : (
