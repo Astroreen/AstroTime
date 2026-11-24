@@ -285,7 +285,6 @@ function Fields({
                   label={t("edit.startTime")}
                   value={form.startTime}
                   onChange={(time) => onChange(withStartTime(form, time))}
-                  className="flex-1"
                 />
                 {event && (
                   <>
@@ -296,7 +295,6 @@ function Fields({
                       label={t("edit.endTime")}
                       value={form.endTime}
                       onChange={(endTime) => set({ endTime })}
-                      className="flex-1"
                     />
                   </>
                 )}
