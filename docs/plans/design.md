@@ -2722,6 +2722,11 @@ keywords". The quick parse and voice that fill quick create are the
   ([foundation D91](foundation.md#D91)), so one may fail while the others
   land. A notice of copies not made or not sent waits with keeping them
   alike.
+- **Files kept while a kind switch visits another account** ([D313](#D313))
+  — a kind its account cannot hold moves the draft to another account's
+  calendar, and the first account's own files leave the form; switched
+  back, they are not there again (they stay in the account's files, to
+  attach again). Holding them, as a late upload is held, waits.
 - **A file kept when its item changes account** ([D313](#D313)) — a file
   uploaded to one account's files and attached stays on the item when the
   user then changes its calendar to another account's, as it did before

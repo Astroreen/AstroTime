@@ -184,7 +184,7 @@ export function QuickCreate({
                   <button
                     type="submit"
                     disabled={state.saving || calendars.length === 0}
-                    className={`${primaryButton} ml-auto shrink-0 whitespace-nowrap`}
+                    className={`${primaryButton.replace("px-5", "px-4")} ml-auto shrink-0 whitespace-nowrap`}
                   >
                     {t("edit.save")}
                   </button>
@@ -229,8 +229,9 @@ function Fields({
   const days = event && form.endDate !== form.startDate;
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 pr-1">
+      <div className="flex flex-wrap items-center gap-2">
         <KindSwitch
+          tight
           value={form.kind}
           // The new kind's default colour (design D172): no colour is chosen here.
           onChange={(kind) =>

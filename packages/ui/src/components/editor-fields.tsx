@@ -65,13 +65,20 @@ export const titleField =
 export function KindSwitch({
   value,
   onChange,
+  tight = false,
 }: {
   value: Form["kind"];
   onChange: (kind: Form["kind"]) => void;
+  /** Narrower chips, beside "Save" on a phone (design D315). */
+  tight?: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <div role="radiogroup" aria-label={t("edit.kind")} className="flex gap-2 px-2">
+    <div
+      role="radiogroup"
+      aria-label={t("edit.kind")}
+      className={`flex gap-2 ${tight ? "" : "px-2"}`}
+    >
       {(["event", "task"] as const).map((kind) => (
         <button
           key={kind}
@@ -79,7 +86,7 @@ export function KindSwitch({
           role="radio"
           aria-checked={value === kind}
           onClick={() => value !== kind && onChange(kind)}
-          className="rounded-full px-4 py-1.5 text-body font-medium whitespace-nowrap ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-ink aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent"
+          className={`rounded-full ${tight ? "px-2.5" : "px-4"} py-1.5 text-body font-medium whitespace-nowrap ring-1 ring-line aria-checked:bg-accent-soft aria-checked:text-ink aria-checked:ring-transparent focus-visible:outline-2 focus-visible:outline-accent`}
         >
           {t(`edit.kind.${kind}`)}
         </button>

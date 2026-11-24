@@ -389,7 +389,8 @@ export function useEditingState({
       // can, in the same account first: the account chosen stays (D313).
       const offered = writable(form.kind, fromOf(current));
       const fits = offered.some((c) => c.id === form.calendarId);
-      const accountId = byId(form.calendarId)?.accountId;
+      const accountId =
+        byId(form.calendarId)?.accountId ?? knownAccounts.current.get(form.calendarId);
       const own = offered.filter((c) => c.accountId === accountId);
       // A calendar ticked beside it that takes the kind first, then the account's first.
       const tickedFits = own.find((c) => form.alsoIn?.includes(c.id));

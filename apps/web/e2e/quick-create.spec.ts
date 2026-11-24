@@ -203,3 +203,19 @@ test.describe("on a wide screen", () => {
     await expect(calendarField(editor)).toHaveAccessibleName(/, Personal$/);
   });
 });
+
+test.describe("on a narrow phone in Russian", () => {
+  test.use({ viewport: { width: 360, height: 780 }, hasTouch: true, locale: "ru-RU" });
+
+  test('"Save" stays at the end of the kind\'s row (design D315)', async ({ page }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Создать" }).first().click();
+    const quick = quickCreate(page, "ru");
+    const kind = (await quick.getByRole("radio", { name: "Мероприятие" }).boundingBox())!;
+    const save = (await quick.getByRole("button", { name: "Сохранить" }).boundingBox())!;
+    // One row: their middles level, "Save" right of the kinds and inside the sheet.
+    expect(Math.abs(kind.y + kind.height / 2 - (save.y + save.height / 2))).toBeLessThanOrEqual(1);
+    expect(save.x).toBeGreaterThan(kind.x + kind.width);
+    expect(save.x + save.width).toBeLessThanOrEqual(360);
+  });
+});
