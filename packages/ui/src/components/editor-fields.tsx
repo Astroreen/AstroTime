@@ -7,7 +7,7 @@ import { useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Form } from "../calendar/editing.ts";
-import { accountName, Avatar } from "./accounts.tsx";
+import { Avatar } from "./accounts.tsx";
 import { Dot } from "./color-select.tsx";
 import { useCalendar } from "./context.ts";
 import { Select as Dropdown } from "./select.tsx";
@@ -121,6 +121,8 @@ function CalendarSelect({
 export interface AccountChoice {
   readonly account: Account;
   readonly calendarId: string;
+  /** Its name, with its server beside a twin's (`accountLabels`). */
+  readonly label: string;
 }
 
 /**
@@ -150,25 +152,12 @@ export function CalendarFields({
   const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
   // The account row only while the item's own account is one of them.
   const choosing = accountRow && accounts.some((one) => one.account.id === accountId);
-  // Two accounts of one name (one login on two servers) say their server too.
-  const nameOf = (account: Account) => {
-    const name = accountName(account, t);
-    const twin = accounts.some(
-      (one) => one.account.id !== account.id && accountName(one.account, t) === name,
-    );
-    if (!twin) return name;
-    try {
-      return `${name} (${new URL(account.serverUrl).host})`;
-    } catch {
-      return name;
-    }
-  };
   // One list of several accounts' calendars: each says whose it is.
   const accountOf =
     !choosing && accounts.length > 1
       ? (calendar: Calendar) => {
           const choice = accounts.find((one) => one.account.id === calendar.accountId);
-          return choice && nameOf(choice.account);
+          return choice?.label;
         }
       : undefined;
   const own = choosing ? calendars.filter((c) => c.accountId === accountId) : calendars;
@@ -182,9 +171,9 @@ export function CalendarFields({
             const chosen = accounts.find((one) => one.account.id === id);
             if (chosen) onChange(chosen.calendarId);
           }}
-          options={accounts.map(({ account }) => ({
+          options={accounts.map(({ account, label }) => ({
             value: account.id,
-            label: nameOf(account),
+            label,
             leading: <Avatar account={account} size="size-6" />,
           }))}
           className={fieldButton}

@@ -1402,10 +1402,43 @@ describe("a new item in every account (design D314)", () => {
     expect(await store.objectAt(personal.id, "copied.ics")).toBeDefined();
     expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual(["second"]);
 
+    // A copy is the same item as the one chosen: its day, its rule, its reminder.
+    const weekly = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Yoga",
+      allDay: true,
+      repeat: {
+        frequency: "WEEKLY" as const,
+        interval: 1,
+        weekdays: [],
+        monthlyWeekday: null,
+        end: { type: "never" as const },
+      },
+      alarms: [{ kind: "new" as const, relatedTo: "start" as const, offsetSeconds: -900 }],
+    };
+    const ids = ["yoga", "yoga-copy"];
+    await saveForm(
+      store,
+      { ...request, form: weekly, hidden, everyAccount: servers },
+      { now: NOW, uid: () => ids.shift()! },
+    );
+    const lines = async (calendarId: string, uid: string) =>
+      (await store.objectAt(calendarId, `${uid}.ics`))!.ics
+        .split("\r\n")
+        .filter((line) => /^(DTSTART|RRULE|TRIGGER|ACTION)/.test(line));
+    const own = await lines(personal.id, "yoga");
+    expect(own).toEqual(expect.arrayContaining([expect.stringMatching(/^DTSTART;VALUE=DATE:/)]));
+    expect(own.some((line) => line.startsWith("RRULE:FREQ=WEEKLY"))).toBe(true);
+    expect(own.some((line) => line.startsWith("TRIGGER"))).toBe(true);
+    expect(await lines(meetings.id, "yoga-copy")).toEqual(own);
+
     // Off, the default: only the calendar chosen.
     await saveForm(store, request, { now: NOW, uid: () => "alone" });
     expect(await store.objectAt(personal.id, "alone.ics")).toBeDefined();
-    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual(["second"]);
+    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual([
+      "second",
+      "yoga-copy",
+    ]);
   });
 });
 

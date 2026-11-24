@@ -50,6 +50,7 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
+import { accountLabels } from "./account-labels.ts";
 import { accountName } from "./accounts.tsx";
 import type { AccountChoice, Press } from "./editor-fields.tsx";
 import type { EditorState } from "./item-editor.tsx";
@@ -606,6 +607,8 @@ export function useEditingState({
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
   // A new item (not a copy) that goes to every account on a server: no
   // account to choose, and the dialog says where else it goes (design D314).
+  // Accounts as the dialog names them: a twin's with its server (D313).
+  const labels = accountLabels(accounts, (account) => accountName(account, t));
   // Each copy's calendar and account, named under the calendar (D314).
   const copiesTo =
     editing !== null && shown !== null && !shown.refused && toEvery && editing.base === undefined
@@ -617,7 +620,7 @@ export function useEditingState({
           hidden,
         ).flatMap((other) => {
           const account = accounts.find((one) => one.id === other.accountId);
-          return account ? [`${other.name} · ${accountName(account, t)}`] : [];
+          return account ? [`${other.name} · ${labels.get(account.id) ?? ""}`] : [];
         })
       : [];
   // Each account offered, with where choosing it puts the item (D313): an
@@ -633,7 +636,9 @@ export function useEditingState({
     );
     const first =
       own.find((one) => one.id === from?.id) ?? own.find((one) => !hidden.has(one.id)) ?? own[0];
-    return first ? [{ account, calendarId: first.id }] : [];
+    return first
+      ? [{ account, calendarId: first.id, label: labels.get(id) ?? accountName(account, t) }]
+      : [];
   });
   // A new item while new items go to every account has no account row,
   // whichever calendar it is in now (D314).

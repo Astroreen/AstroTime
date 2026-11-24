@@ -2639,7 +2639,8 @@ keywords". The quick parse and voice that fill quick create are the
   edit dialog ([D297](#D297)) show, in the calendar's row, the account
   first (its avatar and name, `edit.account`), then that account's
   calendars (a task's lists) only. Two accounts of one name (one login
-  on two servers) say their server beside it. Choosing an account puts the item in
+  on two servers) say their server beside it, its path too when they
+  share a host, wherever the dialog names them. Choosing an account puts the item in
   its first calendar offered, visible before hidden, as
   [foundation D122](foundation.md#D122)'s default does. With one account
   offered there is no account row: the calendar is the whole choice, as
