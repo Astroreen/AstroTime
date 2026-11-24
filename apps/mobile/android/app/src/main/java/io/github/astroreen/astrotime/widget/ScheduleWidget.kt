@@ -29,7 +29,7 @@ import java.util.Locale
 
 class ScheduleWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        draw(context, manager, ids)
+        synchronized(drawing) { draw(context, manager, ids) }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -61,6 +61,17 @@ class ScheduleWidget : AppWidgetProvider() {
         /** The snapshot last drawn in this process; `null` before, or once another is written. */
         private var drawn: String? = null
 
+        /** Counts the snapshots handed to be drawn: a drawing marks its own only if none came after. */
+        private var handed = 0
+
+        /**
+         * Held while drawing, apart from the file's lock (the list's rows read
+         * the file while a drawing waits for them): one drawing at a time,
+         * each from the file as it is then, so the last to end draws the
+         * newest.
+         */
+        internal val drawing = Any()
+
         /**
          * Keeps `json` (the UI's `ScheduleSnapshot`), when `allowed` still
          * says so, and draws every widget from it. The drawing is outside the lock: asking for the list's rows
@@ -68,6 +79,7 @@ class ScheduleWidget : AppWidgetProvider() {
          * process, and waits for the answer.
          */
         fun keep(context: Context, json: String, allowed: () -> Boolean = { true }) {
+            val mine: Int
             synchronized(lock) {
                 // Asked under the lock, so no write of the open app's comes between the answer and this one.
                 if (!allowed()) return
@@ -83,6 +95,7 @@ class ScheduleWidget : AppWidgetProvider() {
                 // but not drawn (the drawing failed, or the process ended between) is drawn again.
                 if (had == json && drawn == json) return
                 drawn = null
+                mine = ++handed
                 if (had != json) {
                     file.baseFile.parentFile?.mkdirs()
                     val out = file.startWrite()
@@ -98,7 +111,7 @@ class ScheduleWidget : AppWidgetProvider() {
             redraw(context)
             synchronized(lock) {
                 // Unless another came meanwhile: then the next one handed is drawn again.
-                if (kept(context) == json) drawn = json
+                if (handed == mine) drawn = json
             }
         }
 
@@ -143,7 +156,9 @@ class ScheduleWidget : AppWidgetProvider() {
         }
 
         /** Draws every widget on the home screen again, the list's rows too. */
-        fun redraw(context: Context) {
+        fun redraw(context: Context) = synchronized(drawing) { redrawNow(context) }
+
+        private fun redrawNow(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, ScheduleWidget::class.java))
             if (ids.isEmpty()) return

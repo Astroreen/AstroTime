@@ -73,3 +73,68 @@ test("a series cancelled as a whole still opens: the views draw it", () => {
   const cancelled = series("STATUS:CANCELLED");
   expect(occurrenceOn(cancelled, fifth, "2026-11-05", timeZone)?.item.status).toBe("CANCELLED");
 });
+
+test("a task due at midnight is found on the day it is due, where the reminder opens", () => {
+  const task = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTODO",
+      "UID:late",
+      "DTSTAMP:20261101T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20261104T220000",
+      "DUE;TZID=Europe/Vilnius:20261105T000000",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Lock up",
+      "END:VTODO",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const fourth: ItemTime = {
+    type: "zoned",
+    local: "2026-11-04T22:00:00",
+    timeZone,
+    epochMs: Date.parse("2026-11-04T20:00:00Z"),
+  };
+  expect(occurrenceOn(task, fourth, "2026-11-05", timeZone)?.item.summary).toBe("Lock up");
+});
+
+test("an exception another client wrote with a date id is the same occurrence", () => {
+  const moved = series(
+    "",
+    "RECURRENCE-ID;VALUE=DATE:20261105\nDTSTART;TZID=Europe/Vilnius:20261105T110000\nDTEND;TZID=Europe/Vilnius:20261105T113000\nSUMMARY:Stand-up at 11",
+  );
+  expect(occurrenceOn(moved, fifth, "2026-11-05", timeZone)?.item.summary).toBe("Stand-up at 11");
+});
+
+test("the two 3:30s of the night the clocks go back are told apart by their instant", () => {
+  const nightly = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:nightly",
+      "DTSTAMP:20261001T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20261024T033000",
+      "DURATION:PT10M",
+      "RRULE:FREQ=DAILY;COUNT=3",
+      "SUMMARY:Backup",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  // October 25th's 3:30 is the summer one, 00:30Z; the winter one an hour
+  // later reads 3:30 on the wall clock too, and is not this occurrence.
+  const at = (iso: string): ItemTime => ({
+    type: "zoned",
+    local: "2026-10-25T03:30:00",
+    timeZone,
+    epochMs: Date.parse(iso),
+  });
+  expect(occurrenceOn(nightly, at("2026-10-25T00:30:00Z"), "2026-10-25", timeZone)).not.toBeNull();
+  expect(occurrenceOn(nightly, at("2026-10-25T01:30:00Z"), "2026-10-25", timeZone)).toBeNull();
+});

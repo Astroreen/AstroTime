@@ -723,7 +723,7 @@ were checked on 2026-11-01.
     every change; the shell writes and draws only one that differs from
     the file the widget has, whoever wrote it, or one not yet drawn in this
     process, so a write or a drawing that failed is made again with the
-    next change. The snapshot names every day of its
+    next change; drawings take turns, each from the file as it is then. The snapshot names every day of its
     range, those with nothing too, so after midnight the widget names
     today and its month in the user's words.
   - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
@@ -758,9 +758,13 @@ were checked on 2026-11-01.
     tap then opens its day alone); a tap closes an item's details open
     before it; a tap whose item is still being read gives way to a later
     one (not to details opened in the app meanwhile, a read's length); an
-    occurrence of a series opens as the views draw it on its day, found
-    by its time (`occurrenceOn`), so one a server cancelled, by an id it
-    wrote in UTC too, opens its day alone, and a series cancelled whole still opens;
+    occurrence of a series opens as the views draw it, expanded around its
+    day and found by its recurrence id however the server wrote it
+    (`occurrenceOn`, `sameOccurrence`: zoned ids by their instant, a date
+    by its day), so one a server cancelled opens its day alone, a series
+    cancelled whole still opens, and so does a task due at midnight; a
+    series too dense to expand opens its day alone, as the views draw none
+    of it;
     details a draft was opened from stay under it, for its Cancel. A tapped
     reminder opens the same way ([D66](#D66), foundation D101): the rule
     is the one for whatever opens from outside the page. Past the

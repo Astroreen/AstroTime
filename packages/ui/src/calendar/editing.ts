@@ -897,11 +897,12 @@ export async function current(local: LocalChange, target: Target) {
 
 /**
  * The occurrence of a series a tap from outside the page opens (the home
- * screen widget, a reminder): the one the views draw on `day`, expanded as
- * they expand it and found by its time on the wall clock, so a recurrence id
- * the server wrote another way (UTC for a zoned series) is the same; `null`
- * when the series has it no more (an EXDATE, an exception the server
- * cancelled, foundation D35) or is too dense to expand.
+ * screen widget, a reminder): one the views draw, expanded as they expand
+ * it, from the day before `day` to the day after (a task due at midnight
+ * ends where `day` begins), found by its recurrence id however the server
+ * wrote it (`sameOccurrence`); `null` when the series has it no more (an
+ * EXDATE, an exception the server cancelled, foundation D35) or is too
+ * dense to expand, as the views draw none of it then.
  */
 export function occurrenceOn(
   object: CalendarObject,
@@ -911,17 +912,37 @@ export function occurrenceOn(
 ): Occurrence | null {
   let occurrences: Occurrence[];
   try {
-    occurrences = occurrencesBetween(object, { from: day, to: addDays(day, 1), timeZone });
+    occurrences = occurrencesBetween(object, {
+      from: addDays(day, -1),
+      to: addDays(day, 2),
+      timeZone,
+    });
   } catch {
     return null;
   }
-  const at = wallClockOf(recurrenceId, timeZone);
   return (
     occurrences.find(
       (occurrence) =>
-        occurrence.recurrenceId !== null && wallClockOf(occurrence.recurrenceId, timeZone) === at,
+        occurrence.recurrenceId !== null &&
+        sameOccurrence(occurrence.recurrenceId, recurrenceId, timeZone),
     ) ?? null
   );
+}
+
+/**
+ * Whether two recurrence ids name one occurrence: two zoned ones by their
+ * instant (UTC or the series' zone alike, and the two 03:30s of the night
+ * the clocks go back apart); a date by its day; a floating time by the
+ * zoned one's wall clock in its own zone; else on the wall clock in
+ * `timeZone`.
+ */
+export function sameOccurrence(a: ItemTime, b: ItemTime, timeZone: string): boolean {
+  if (a.type === "zoned" && b.type === "zoned") return a.epochMs === b.epochMs;
+  if (a.type === "date" || b.type === "date")
+    return wallClockOf(a, timeZone).slice(0, 10) === wallClockOf(b, timeZone).slice(0, 10);
+  if (a.type === "floating" && b.type === "zoned") return a.local === b.local;
+  if (a.type === "zoned" && b.type === "floating") return a.local === b.local;
+  return wallClockOf(a, timeZone) === wallClockOf(b, timeZone);
 }
 
 /** What shows of an occurrence: its exception, or the master. */
