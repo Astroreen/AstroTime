@@ -762,9 +762,10 @@ were checked on 2026-11-01.
     day (`occurrenceOn`), the first step that finds any deciding and more
     than one opening the day alone: the same id; for a zoned id, a zoned
     one at the same instant in another zone (a server's UTC), each reading
-    its own wall clock there (core's `readsItsClock`, by the calendar's
-    VTIMEZONE where it has one, found by its TZID or the IANA name it is
-    read with, its changes of offset taken on the UTC time line), so a
+    its own wall clock there (core's `readsItsClock`: in the zones the
+    series' start and its exceptions' ids are written in, each by the
+    calendar's VTIMEZONE of that TZID where it has one, its changes of
+    offset on the UTC time line, else by `Intl`), so a
     spring-forward 3:30 is never the 4:30 at its instant (a daily series'
     only occurrence in that gap, moved by a UTC id, opens its day alone);
     in one zone, the exact id alone, so a fall-back night's two 3:30s stay

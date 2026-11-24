@@ -60,7 +60,8 @@ When you add a package, app or module, add its line here in the same PR.
     occurrence moved; `hasOccurrence`, whether a series still has one;
     `namesSameOccurrence`, whether two recurrence ids name one occurrence;
     `readsItsClock`, whether a zoned time's instant reads its own wall
-    clock, by the calendar's VTIMEZONE where it has one.
+    clock in the zones the series is written in, by the calendar's
+    VTIMEZONE where it has one.
     → `plans/foundation.md#D103`, `plans/foundation.md#D105`
   - `repeatOf` (`repeat.ts`) — a series' rule as the edit dialog's
     `Repeat`, and back; `movedRule`, `movedRepeat`, a rule moved with its

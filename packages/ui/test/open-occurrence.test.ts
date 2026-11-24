@@ -1,7 +1,7 @@
 // What a tap from outside the page opens of a series (docs/plans/android.md#D317):
 // the occurrence the views draw on its day, found by its time whatever way
 // the server wrote its recurrence id; none once the series has it no more.
-import { CalendarObject, occurrencesBetween, type ItemTime } from "@astrotime/core";
+import { CalendarObject, occurrencesBetween, readsItsClock, type ItemTime } from "@astrotime/core";
 import { expect, test } from "vite-plus/test";
 
 import { addDays } from "../src/calendar/dates.ts";
@@ -605,4 +605,79 @@ test("a VTIMEZONE named the Windows way is found by the IANA name its times are 
     epochMs: Date.parse("2026-07-05T05:00:00Z"),
   };
   expect(occurrenceOn(moscow, shown, "2026-07-05", timeZone)?.item.summary).toBe("Standup, moved");
+});
+
+test("the series' own zone decides, not another property's zone of the same IANA name", () => {
+  // The start in Moscow by Intl (+03:00), the end in Outlook's "Russian
+  // Standard Time" kept at +04:00: a 9:00 a server moved by a UTC id opens.
+  const mixed = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Russian Standard Time",
+      "BEGIN:STANDARD",
+      "DTSTART:16010101T000000",
+      "TZOFFSETFROM:+0400",
+      "TZOFFSETTO:+0400",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:mixed",
+      "DTSTAMP:20260101T000000Z",
+      "DTSTART;TZID=Europe/Moscow:20260701T090000",
+      "DTEND;TZID=Russian Standard Time:20260701T100000",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Standup",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:mixed",
+      "DTSTAMP:20260101T000000Z",
+      "RECURRENCE-ID:20260705T060000Z",
+      "DTSTART;TZID=Europe/Moscow:20260705T110000",
+      "DTEND;TZID=Europe/Moscow:20260705T113000",
+      "SUMMARY:Standup, moved",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const shown: ItemTime = {
+    type: "zoned",
+    local: "2026-07-05T09:00:00",
+    timeZone: "Europe/Moscow",
+    epochMs: Date.parse("2026-07-05T06:00:00Z"),
+  };
+  expect(occurrenceOn(mixed, shown, "2026-07-05", timeZone)?.item.summary).toBe("Standup, moved");
+});
+
+test("a time before its VTIMEZONE's first change reads as ical.js reads it", () => {
+  // AstroTime writes a zone's rules from the year before a time (vtimezone()):
+  // a start moved back past them is read at UTC, and that reads its clock.
+  const early = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VTIMEZONE",
+      "TZID:Europe/Vilnius",
+      "BEGIN:STANDARD",
+      "DTSTART:20251026T040000",
+      "TZOFFSETFROM:+0300",
+      "TZOFFSETTO:+0200",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:early",
+      "DTSTAMP:20240101T000000Z",
+      "DTSTART;TZID=Europe/Vilnius:20240110T100000",
+      "DURATION:PT1H",
+      "SUMMARY:Early",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  expect(readsItsClock(early, early.master!.start!)).toBe(true);
 });
