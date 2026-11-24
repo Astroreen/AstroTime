@@ -718,11 +718,13 @@ were checked on 2026-11-01.
     (`useScheduleWidget`, which hears the store with the page hidden too),
     background sync after every run, whatever its reminders did, unless
     the app came to the front during the run: its own snapshot wins
-    ([D67](#D67)). The snapshot names every day of its range, those with
-    nothing too, so after midnight the widget names today and its month in
-    the user's words. The open app hands it at every change and the shell
-    writes only one that differs from what the widget has, so a write that
-    failed is made again with the next change.
+    ([D67](#D67)), even an app opened and left at once, before it drew
+    (the widget then waits for the next run). The open app hands one at
+    every change; the shell writes and draws only one that differs from
+    the file the widget has, whoever wrote it, so a write that failed is
+    made again with the next change. The snapshot names every day of its
+    range, those with nothing too, so after midnight the widget names
+    today and its month in the user's words.
   - **Native keeps it and draws it.** `AstroTimeShell.showWidget` and
     background sync's `widget.show` keep the snapshot in a file of the
     app's (`AtomicFile`) and draw every widget again; the list's rows come
@@ -754,12 +756,15 @@ were checked on 2026-11-01.
     edit dialog, nor covers the question of a change's scope (an item's
     tap then opens its day alone); a tap closes an item's details open
     before it; an occurrence gone since the snapshot opens its day alone;
-    a tap whose item is still being read gives way to a later one. A tapped
+    a tap whose item is still being read gives way to a later one (not to
+    details opened in the app meanwhile, a read's length); an exception a
+    server cancelled opens its day alone, as the views leave it out;
+    details a draft was opened from stay under it, for its Cancel. A tapped
     reminder opens the same way ([D66](#D66), foundation D101): the rule
     is the one for whatever opens from outside the page. Past the
     snapshot's end (an app not opened for a month, or rows cut by the
-    cap) the widget knows nothing of today and says to open AstroTime,
-    never "nothing planned".
+    cap) the widget knows nothing of today and says to open AstroTime, in
+    the snapshot's words and locale, never "nothing planned".
   - **Fresh within:** at once from the open app; within an hour with it
     closed, as background sync runs ([D67](#D67)): only with an account
     saved and a network, so a device with only the calendar on it sees
@@ -804,6 +809,9 @@ were checked on 2026-11-01.
   start (as the whole UI does); after the phone's zone changes, the widget
   shows the old zone's days until the app starts again or background sync
   runs ([D317](#D317)).
+- **A day the row cap cuts** — the snapshot ends with that day, showing
+  part of its items with nothing to say there are more; at a month's
+  distance it is the list's last day ([D317](#D317)).
 - **The undone row across midnight** — it stands on the snapshot's today,
   so after midnight it leaves with that day until the next snapshot (the
   app opened, or background sync within the hour); the widget could carry

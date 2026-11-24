@@ -213,6 +213,7 @@ export const ru = {
 
   "agenda.dayOf": "День {{index}} из {{total}}",
   "agenda.nothingToday": "На сегодня ничего не запланировано",
+  "widget.beyond": "Откройте AstroTime, чтобы видеть здесь своё расписание",
   "agenda.earlier": "Показать раньше",
   "agenda.later": "Показать позже",
 

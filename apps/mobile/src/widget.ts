@@ -106,22 +106,11 @@ export function androidWidget(native: NativeWidget, app: WidgetApp): WidgetHost 
     .addListener("appUrlOpen", ({ url }) => tapped(url))
     .catch((error: unknown) => console.error(error));
 
-  // The snapshot the widget has: the UI hands one at every change to the
-  // store, and one the same as the last is not written again. One that
-  // failed is handed again with the next change.
-  let shown: string | null = null;
-  // Writes end in the order they were handed (the plugin's one thread); only
-  // the last one handed says what the widget has.
-  let handed = 0;
   return {
-    async show(snapshot) {
-      const json = JSON.stringify(snapshot);
-      if (json === shown) return;
-      const call = ++handed;
-      shown = null;
-      await native.showWidget({ snapshot: json });
-      if (call === handed) shown = json;
-    },
+    // At every change: the shell writes and draws only one that differs from
+    // what the widget has (its file, whoever wrote it), and a write that
+    // failed is made with the next.
+    show: (snapshot) => native.showWidget({ snapshot: JSON.stringify(snapshot) }),
     onOpen(listener) {
       listeners.add(listener);
       if (pending) {

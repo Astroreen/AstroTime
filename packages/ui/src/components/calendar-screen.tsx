@@ -439,9 +439,11 @@ export function CalendarScreen({
     const opening = ++openings.current;
     uncover();
     if (day) openDay(day);
-    // Whatever's details were open close; a draft stays, and the day alone shows under it.
-    editing.value.closeDetails();
+    // A draft stays, with the details it was opened from under it (its
+    // Cancel goes back to them), and the day alone shows under both.
     if (editing.value.drafting) return;
+    // Whatever's details were open close.
+    editing.value.closeDetails();
     const stored = await store.object(objectId);
     if (opening !== openings.current || drafting.current) return;
     if (!stored || stored.pending === "delete") return;
@@ -449,6 +451,8 @@ export function CalendarScreen({
     // An occurrence gone since it was shown (an EXDATE synced in): its day alone.
     if (recurrenceId !== null && !hasOccurrence(object, recurrenceId)) return;
     const item = itemOf(object, recurrenceId);
+    // One a cancelled exception removes, as the views leave it out (foundation D35): its day alone.
+    if (recurrenceId !== null && item?.status?.toUpperCase() === "CANCELLED") return;
     if (item) editing.value.open(targetOf(stored, object, recurrenceId, item));
   };
 
@@ -472,6 +476,7 @@ export function CalendarScreen({
     t,
     formats,
     timeZone,
+    locale: settings.locale,
     hidden,
     hideCompleted,
     today,
@@ -483,7 +488,8 @@ export function CalendarScreen({
     if (open.kind === "day") {
       // The day shows: an item's details, which change nothing, close over it.
       uncover();
-      editing.value.closeDetails();
+      // Details under a draft stay: the draft's Cancel goes back to them.
+      if (!editing.value.drafting) editing.value.closeDetails();
       openDay(open.day ?? today);
     }
     // A draft open in quick create or the edit dialog is never replaced by a

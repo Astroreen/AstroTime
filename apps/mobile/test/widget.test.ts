@@ -100,60 +100,24 @@ function fakeApp(launch?: string) {
   return { app, open: (url: string) => listener?.({ url }) };
 }
 
-test("the snapshot goes to the shell as JSON, the same one once, one that failed again", async () => {
+test("the snapshot goes to the shell as JSON, at every change", async () => {
   const sent: string[] = [];
-  let fails = false;
   const widget = androidWidget(
-    {
-      showWidget: async ({ snapshot }) => {
-        if (fails) throw new Error("No room.");
-        sent.push(snapshot);
-      },
-    },
+    { showWidget: async ({ snapshot }) => void sent.push(snapshot) },
     fakeApp().app,
   );
-  const snapshot = { version: 1, days: [], empty: "Nothing", create: "New event" } as const;
+  const snapshot = {
+    version: 1,
+    days: [],
+    empty: "Nothing",
+    create: "New event",
+    beyond: "Open AstroTime",
+    locale: "en-US",
+  } as const;
   await widget.show(snapshot);
   await widget.show(snapshot);
-  expect(sent.map((json) => JSON.parse(json) as unknown)).toEqual([snapshot]);
-  const next = { ...snapshot, empty: "Nothing at all" };
-  fails = true;
-  await expect(widget.show(next)).rejects.toThrow("No room.");
-  fails = false;
-  await widget.show(next);
-  expect(sent).toHaveLength(2);
-});
-
-test("a snapshot handed while another is written is written, even the one before that", async () => {
-  const sent: string[] = [];
-  const ends: (() => void)[] = [];
-  const widget = androidWidget(
-    {
-      showWidget: ({ snapshot }) =>
-        new Promise<void>((done) => {
-          sent.push(snapshot);
-          ends.push(done);
-        }),
-    },
-    fakeApp().app,
-  );
-  const a = { version: 1, days: [], empty: "A", create: "+" } as const;
-  const b = { ...a, empty: "B" };
-  const first = widget.show(a);
-  const second = widget.show(b);
-  // A's write ends while B's is still under way: the widget will have B, not A.
-  ends[0]!();
-  await first;
-  const third = widget.show(a);
-  ends[1]!();
-  await second;
-  ends[2]!();
-  await third;
-  expect(sent.map((json) => (JSON.parse(json) as { empty: string }).empty)).toEqual([
-    "A",
-    "B",
-    "A",
-  ]);
+  // The shell leaves out the same one: it knows what the widget has.
+  expect(sent.map((json) => JSON.parse(json) as unknown)).toEqual([snapshot, snapshot]);
 });
 
 test("a tap that started the app waits for the UI, heard once; a later one reaches it at once", async () => {

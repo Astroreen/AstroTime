@@ -84,7 +84,12 @@ describe("the snapshot", () => {
     // An all-day item has no time line; a day of several says which day it is.
     expect(today!.rows[1]).toMatchObject({ time: null, label: "Mom's birthday, All day" });
     expect(tomorrow!.rows[0]).toMatchObject({ title: "Developer conference", time: "Day 1 of 3" });
-    expect(snapshot).toMatchObject({ empty: "Nothing planned today", create: "New event" });
+    expect(snapshot).toMatchObject({
+      empty: "Nothing planned today",
+      create: "New event",
+      beyond: "Open AstroTime to see your schedule here",
+      locale: "en-US",
+    });
   });
 
   test("a tap on an item opens its occurrence on its day", async () => {
@@ -124,7 +129,12 @@ describe("the snapshot", () => {
       cache: new ObjectCache(),
       hidden: new Set(),
       hideCompleted: false,
-      words: { t: i18n.t.bind(i18n), formats: new Formats(settings), timeZone },
+      words: {
+        t: i18n.t.bind(i18n),
+        formats: new Formats(settings),
+        timeZone,
+        locale: settings.locale,
+      },
       now: NOW,
       limit: 13,
     });
@@ -147,7 +157,12 @@ describe("the snapshot", () => {
     expect(rows.some((row) => row.done)).toBe(false);
     expect(rows.map((row) => row.title)).not.toContain("Stand-up");
     expect(rows.find((row) => row.title === "Call with Anna")?.time).toBe("11:15–11:45");
-    expect(snapshot.empty).toBe("На сегодня ничего не запланировано");
+    expect(snapshot).toMatchObject({
+      empty: "На сегодня ничего не запланировано",
+      beyond: "Откройте AstroTime, чтобы видеть здесь своё расписание",
+      // Russian in the region of the device's languages, as the app formats it.
+      locale: "ru-US",
+    });
   });
 });
 

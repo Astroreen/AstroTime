@@ -69,6 +69,7 @@ class ScheduleService : RemoteViewsService() {
             views.setInt(R.id.row_check, "setColorFilter", WHITE)
             views.setImageViewResource(R.id.row_check, if (row.done) R.drawable.widget_check_done else R.drawable.widget_check)
             views.setTextViewText(R.id.row_title, row.title)
+            views.setInt(R.id.row_title, "setMaxLines", 1)
             views.setTextColor(R.id.row_title, WHITE)
             // A done task is struck through, as the app draws it (design D51).
             views.setInt(
@@ -93,6 +94,7 @@ class ScheduleService : RemoteViewsService() {
             views.setImageViewResource(R.id.row_check, R.drawable.widget_check_mark)
             views.setInt(R.id.row_check, "setColorFilter", WHITE)
             views.setTextViewText(R.id.row_title, row.text)
+            views.setInt(R.id.row_title, "setMaxLines", 1)
             themed(views, R.id.row_title, "setTextColor", R.color.widget_ink)
             views.setInt(R.id.row_title, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)
             views.setViewVisibility(R.id.row_time, View.GONE)
@@ -103,6 +105,8 @@ class ScheduleService : RemoteViewsService() {
             views.setViewVisibility(R.id.row_fill, View.INVISIBLE)
             views.setViewVisibility(R.id.row_mark, View.GONE)
             views.setTextViewText(R.id.row_title, row.text)
+            // A sentence, not a title: it wraps rather than being cut.
+            views.setInt(R.id.row_title, "setMaxLines", 3)
             themed(views, R.id.row_title, "setTextColor", R.color.widget_muted)
             views.setInt(R.id.row_title, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)
             views.setViewVisibility(R.id.row_time, View.GONE)

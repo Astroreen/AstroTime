@@ -74,7 +74,12 @@ export async function showWidget(options: {
     cache: new ObjectCache(),
     hidden: readHidden(preferences.get(KEYS.hiddenCalendars)),
     hideCompleted: chosen.hideCompleted,
-    words: { t: i18n.t.bind(i18n), formats: new Formats(settings), timeZone },
+    words: {
+      t: i18n.t.bind(i18n),
+      formats: new Formats(settings),
+      timeZone,
+      locale: settings.locale,
+    },
     now,
   });
   await widget.show(snapshot);

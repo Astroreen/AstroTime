@@ -22,7 +22,7 @@ export function useScheduleWidget(
     readonly today: string;
   },
 ): void {
-  const { t, formats, timeZone, hideCompleted, today } = options;
+  const { t, formats, timeZone, locale, hideCompleted, today } = options;
   // The ids by value: the set is new with every change of it.
   const hiddenKey = [...options.hidden].toSorted().join(",");
   const [cache] = useState(() => new ObjectCache());
@@ -42,7 +42,7 @@ export function useScheduleWidget(
               cache,
               hidden,
               hideCompleted,
-              words: { t, formats, timeZone },
+              words: { t, formats, timeZone, locale },
               now: Date.now(),
             }),
           (snapshot) => {
@@ -66,5 +66,5 @@ export function useScheduleWidget(
       gone = true;
       stop?.();
     };
-  }, [widget, store, cache, hiddenKey, hideCompleted, t, formats, timeZone, today]);
+  }, [widget, store, cache, hiddenKey, hideCompleted, t, formats, timeZone, locale, today]);
 }

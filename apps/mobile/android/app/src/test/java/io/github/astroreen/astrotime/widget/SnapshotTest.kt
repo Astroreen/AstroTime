@@ -13,6 +13,13 @@ import org.junit.Test
 
 class SnapshotTest {
     private val deviceToday = DayMark("Sun", "10", "Sunday, January 10, 2027", true)
+    private val locales = mutableListOf<String?>()
+
+    /** The device's words of today, the locale asked kept. */
+    private fun deviceWords(locale: String?): Today {
+        locales += locale
+        return Today(deviceToday, "January")
+    }
 
     private fun item(title: String, time: String?, done: Boolean = false) =
         JSONObject()
@@ -39,6 +46,8 @@ class SnapshotTest {
             .put("version", 1)
             .put("empty", "Nothing planned today")
             .put("create", "New event")
+            .put("beyond", "Откройте AstroTime")
+            .put("locale", "ru")
             .put(
                 "days",
                 JSONArray()
@@ -65,7 +74,7 @@ class SnapshotTest {
 
     @Test
     fun `on its own day the undone row comes first, each day's date beside its first row`() {
-        val shown = Snapshot.read(snapshot, "2026-11-24", deviceToday, "January", "Open AstroTime")
+        val shown = Snapshot.read(snapshot, "2026-11-24", { deviceWords(it) }, "Open AstroTime")
         assertEquals("November", shown.title)
         assertEquals("New event", shown.create)
         assertEquals(5, shown.rows.size)
@@ -85,7 +94,7 @@ class SnapshotTest {
 
     @Test
     fun `days gone by are left out, and the header names the first day's month`() {
-        val shown = Snapshot.read(snapshot, "2026-11-25", deviceToday, "January", "Open AstroTime")
+        val shown = Snapshot.read(snapshot, "2026-11-25", { deviceWords(it) }, "Open AstroTime")
         assertEquals(listOf("Pick up mum", "Exam", "Report"), shown.rows.map { (it as Row.Item).title })
         assertEquals("November", shown.title)
         assertTrue(shown.rows[0].mark!!.today)
@@ -94,7 +103,7 @@ class SnapshotTest {
     @Test
     fun `today with nothing on it heads the list in the snapshot's words, and names the month`() {
         // November 30, the next item on December 1: the month is still November.
-        val shown = Snapshot.read(snapshot, "2026-11-30", deviceToday, "January", "Open AstroTime")
+        val shown = Snapshot.read(snapshot, "2026-11-30", { deviceWords(it) }, "Open AstroTime")
         assertEquals(Row.Empty(DayMark("Mon", "30", "Mon 2026-11-30", true), "Nothing planned today"), shown.rows[0])
         assertEquals("November", shown.title)
         assertEquals("Exam", (shown.rows[1] as Row.Item).title)
@@ -103,22 +112,24 @@ class SnapshotTest {
 
     @Test
     fun `another day with nothing on it is left out`() {
-        val shown = Snapshot.read(snapshot, "2026-11-25", deviceToday, "January", "Open AstroTime")
+        val shown = Snapshot.read(snapshot, "2026-11-25", { deviceWords(it) }, "Open AstroTime")
         assertTrue(shown.rows.none { it.mark?.date == "26" })
     }
 
     @Test
     fun `a snapshot older than its range names today in the device's words`() {
-        val shown = Snapshot.read(snapshot, "2027-01-10", deviceToday, "January", "Open AstroTime")
-        // It knows nothing of today: never "nothing planned".
-        assertEquals(listOf(Row.Empty(deviceToday, "Open AstroTime")), shown.rows)
+        val shown = Snapshot.read(snapshot, "2027-01-10", { deviceWords(it) }, "Open AstroTime")
+        // It knows nothing of today: never "nothing planned"; the snapshot's
+        // words to open the app, the device's date in the snapshot's locale.
+        assertEquals(listOf(Row.Empty(deviceToday, "Откройте AstroTime")), shown.rows)
+        assertEquals(listOf("ru"), locales)
         assertEquals("January", shown.title)
     }
 
     @Test
     fun `no snapshot, or one that does not read, has no rows`() {
         for (json in listOf(null, "", "not json", """{"version":2,"days":[]}""")) {
-            val shown = Snapshot.read(json, "2026-11-24", deviceToday, "January", "Open AstroTime")
+            val shown = Snapshot.read(json, "2026-11-24", { deviceWords(it) }, "Open AstroTime")
             assertEquals(Shown(null, null, emptyList()), shown)
         }
     }

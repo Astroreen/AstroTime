@@ -69,6 +69,14 @@ class ScheduleWidget : AppWidgetProvider() {
                 // Asked under the lock, so no write of the open app's comes between the answer and this one.
                 if (!allowed()) return
                 val file = file(context)
+                // The open app hands one at every change: the same as the widget has is not drawn again.
+                val had =
+                    try {
+                        file.readFully().toString(Charsets.UTF_8)
+                    } catch (error: IOException) {
+                        null
+                    }
+                if (had == json) return
                 file.baseFile.parentFile?.mkdirs()
                 val out = file.startWrite()
                 try {
@@ -98,8 +106,18 @@ class ScheduleWidget : AppWidgetProvider() {
          * and `java.time` came with 8.0.
          */
         fun shown(context: Context): Shown {
+            val at = Calendar.getInstance().time
+            return Snapshot.read(
+                kept(context),
+                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at),
+                { tag -> todayIn(tag?.let(Locale::forLanguageTag) ?: Locale.getDefault()) },
+                context.getString(R.string.widget_open_app),
+            )
+        }
+
+        /** Today's date and month in `locale`. */
+        private fun todayIn(locale: Locale): Today {
             val now = Calendar.getInstance()
-            val locale = Locale.getDefault()
             val at = now.time
             val mark =
                 DayMark(
@@ -109,13 +127,7 @@ class ScheduleWidget : AppWidgetProvider() {
                     true,
                 )
             val month = SimpleDateFormat("LLLL", locale).format(at).replaceFirstChar { it.titlecase(locale) }
-            return Snapshot.read(
-                kept(context),
-                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(at),
-                mark,
-                month,
-                context.getString(R.string.widget_open_app),
-            )
+            return Today(mark, month)
         }
 
         /** Draws every widget on the home screen again, the list's rows too. */

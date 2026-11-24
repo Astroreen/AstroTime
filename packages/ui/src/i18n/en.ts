@@ -200,6 +200,7 @@ export const en = {
 
   "agenda.dayOf": "Day {{index}} of {{total}}",
   "agenda.nothingToday": "Nothing planned today",
+  "widget.beyond": "Open AstroTime to see your schedule here",
   "agenda.earlier": "Show earlier",
   "agenda.later": "Show later",
 

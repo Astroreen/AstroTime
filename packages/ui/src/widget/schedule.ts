@@ -83,6 +83,10 @@ export interface ScheduleSnapshot {
   readonly empty: string;
   /** The "+" button's name for a screen reader. */
   readonly create: string;
+  /** Today's line past the snapshot's end, where it knows nothing of today: to open the app. */
+  readonly beyond: string;
+  /** The words' locale (BCP 47), for the widget's own words of a day past the snapshot's end. */
+  readonly locale: string;
 }
 
 /**
@@ -90,7 +94,7 @@ export interface ScheduleSnapshot {
  * hands it each snapshot, and hears the taps that open the app.
  */
 export interface WidgetHost {
-  /** Called at every change, the same snapshot again too: the host leaves out what it has. */
+  /** Called at every change, the same snapshot again too: the host leaves out what the widget has. */
   show(snapshot: ScheduleSnapshot): void | Promise<void>;
   /** Calls `listener` with each tap that opened the app; returns the function that stops it. */
   onOpen(listener: (open: WidgetOpen) => void): () => void;
@@ -100,6 +104,8 @@ export interface SnapshotWords {
   readonly t: TFunction;
   readonly formats: Formats;
   readonly timeZone: string;
+  /** The locale `formats` speaks (BCP 47). */
+  readonly locale: string;
 }
 
 /**
@@ -119,7 +125,7 @@ export async function scheduleSnapshot(options: {
   readonly limit?: number;
 }): Promise<ScheduleSnapshot> {
   const { store, cache, hidden, hideCompleted, words, now } = options;
-  const { t, formats, timeZone } = words;
+  const { t, formats, timeZone, locale } = words;
   const { today } = nowIn(now, timeZone);
   const to = addDays(today, WIDGET_DAYS);
   const calendars = (await store.calendars()).filter((calendar) => !hidden.has(calendar.id));
@@ -202,5 +208,12 @@ export async function scheduleSnapshot(options: {
       rows: kept,
     });
   }
-  return { version: 1, days, empty: t("agenda.nothingToday"), create: t("edit.newEvent") };
+  return {
+    version: 1,
+    days,
+    empty: t("agenda.nothingToday"),
+    create: t("edit.newEvent"),
+    beyond: t("widget.beyond"),
+    locale,
+  };
 }
