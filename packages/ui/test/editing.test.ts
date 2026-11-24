@@ -1547,6 +1547,81 @@ describe("a new item ticked into several calendars (design D313)", () => {
     );
     expect((await store.objectAt(family.id, "moved.ics"))?.uid).toBe("moved");
     expect((await store.objectAt(other.id, "moved-copy.ics"))?.uid).toBe("moved-copy");
+
+    // Going to every account, ticks are not read: one copy per account (D314).
+    await store.saveCalendar({ ...personal, rights: ALL_RIGHTS });
+    const once = ["once", "once-away", "spare"];
+    await saveForm(
+      store,
+      { ...request, everyAccount: servers },
+      { now: NOW, uid: () => once.shift()! },
+    );
+    expect((await store.objectAt(personal.id, "once.ics"))?.uid).toBe("once");
+    expect(await store.objectAt(family.id, "spare.ics")).toBeUndefined();
+    expect((await store.objectAt(other.id, "once-away.ics"))?.uid).toBe("once-away");
+  });
+
+  test("its calendar gone, a ticked one takes it; moved to another account, no file of the first's", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = (name: string) =>
+      store.addAccount({ provider: "caldav", name, serverUrl: `https://${name}/`, username: "a" });
+    const calendar = (accountId: string, name: string) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://${accountId}.example/${name}/`,
+        name,
+        color: null,
+        components: ["VEVENT"],
+        rights: ALL_RIGHTS,
+      });
+    const home = await add("home.example.com");
+    const away = await add("away.example.com");
+    const alpha = await calendar(home.id, "Alpha");
+    const zeta = await calendar(home.id, "Zeta");
+    const beta = await calendar(away.id, "Beta");
+    const form = {
+      ...newForm("event", { calendarId: alpha.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dinner",
+      alsoIn: [zeta.id],
+      attachments: [
+        {
+          kind: "new" as const,
+          attachment: { uri: "https://home.example/f/1", parameters: { "X-NC-FILE-ID": "1" } },
+        },
+        { kind: "new" as const, attachment: { uri: "https://example.com/menu.pdf" } },
+      ],
+    };
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    // Alpha went meanwhile: Zeta, ticked, takes it, not Beta of another account.
+    await store.removeCalendar(alpha.id);
+    await saveForm(store, request, { now: NOW, uid: () => "kept" });
+    expect((await store.objectAt(zeta.id, "kept.ics"))?.uid).toBe("kept");
+    expect(await store.pending(beta.id)).toEqual([]);
+
+    // Every account, and nothing of Home takes it now: it goes to Away,
+    // without Home's own file (foundation D232).
+    await store.saveCalendar({ ...zeta, rights: { create: false, edit: true, delete: true } });
+    const servers = new Set([home.id, away.id]);
+    const made = ["away", "spare"];
+    await saveForm(
+      store,
+      { ...request, form: { ...form, calendarId: zeta.id, alsoIn: [] }, everyAccount: servers },
+      { now: NOW, uid: () => made.shift()! },
+    );
+    const saved = await store.objectAt(beta.id, "away.ics");
+    expect(CalendarObject.parse(saved!.ics).master?.attachments.map((file) => file.uri)).toEqual([
+      "https://example.com/menu.pdf",
+    ]);
+
+    // Nothing takes it at all: nowhere, not "pick another" with no row to pick in.
+    await store.saveCalendar({ ...beta, rights: { create: false, edit: true, delete: true } });
+    await expect(
+      saveForm(
+        store,
+        { ...request, form: { ...form, calendarId: zeta.id, alsoIn: [] }, everyAccount: servers },
+        { now: NOW, uid: () => "none" },
+      ),
+    ).rejects.toThrow(NowhereError);
   });
 });
 

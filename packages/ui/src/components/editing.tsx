@@ -601,10 +601,23 @@ export function useEditingState({
   // A new item's field shows where it goes now (`newItemCalendar`, the save's
   // own rule): its calendar while there, kept in the field even once it no
   // longer takes the item; else the first that takes it (foundation D122).
-  const shown =
+  // A new item (not a copy) while new items go to every account on a
+  // server: no row for where it goes at all (D314).
+  const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
+  const found =
     editing && editing.target === null
       ? newItemCalendar(calendars, editing.state.form, hidden)
       : null;
+  // With no row to pick again, a calendar that no longer takes it gives way
+  // to the first that does, as the save does; none, the dialog says so (D314).
+  const fallback =
+    everyMode && found?.refused ? byId(firstFor(editing.state.form.kind) ?? "") : undefined;
+  const shown =
+    everyMode && found?.refused
+      ? fallback
+        ? { calendar: fallback, refused: false }
+        : null
+      : found;
   const shownState =
     editing && shown
       ? { ...editing.state, form: { ...editing.state.form, calendarId: shown.calendar.id } }
@@ -627,9 +640,6 @@ export function useEditingState({
       all[0];
     return first ? [{ account, calendarId: first.id }] : [];
   });
-  // A new item (not a copy) while new items go to every account on a
-  // server: no row for where it goes at all (D314).
-  const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
   // A new item (not a copy) may be ticked into several calendars (D313).
   const multiple = editing !== null && editing.target === null && !editing.base;
 

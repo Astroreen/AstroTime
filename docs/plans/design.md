@@ -2651,7 +2651,8 @@ keywords". The quick parse and voice that fill quick create are the
   marked, then the chosen account's calendars, each with a tick; with one
   account offered, its calendars at once. A new item (not a copy, [D164](#D164)) may be ticked into several
   of the account's calendars: it is saved in the first and a copy, a UID
-  of its own, in each other, in one local write; the last tick never goes.
+  of its own, in each other, in one local write; the last tick never goes,
+  and the first one gone meanwhile leaves the item to the next ticked.
   Another account's calendar replaces the ticks. An existing item, or a
   copy, goes in one: a pick closes the list, and a move to another
   account's calendar is the move the calendar field already made
@@ -2672,7 +2673,11 @@ keywords". The quick parse and voice that fill quick create are the
   goes: it starts in an account on a server, and is saved there and, in
   the same local write, a copy of it, a UID of its own, in each other
   account on a server's first calendar that takes it, visible before
-  hidden; an account none of whose calendars takes it gets none. One copy
+  hidden; an account none of whose calendars takes it gets none. With no
+  row to pick again, a calendar that no longer takes it gives way to the
+  first on a server that does, else the first that does, without the files
+  of the account it leaves; none, the dialog says no calendar takes it.
+  Ticks are not read then. One copy
   per account: "every calendar" is each account's, as the owner hides the
   account choice. The calendar on this device ([foundation
   D122](foundation.md#D122)), the demo's and subscriptions get no copy;
