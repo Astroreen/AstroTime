@@ -1031,8 +1031,9 @@ function followRule(master: ICAL.Component, from: ItemTime, to: ItemTime): void 
  * in that read as this time's zone (`ianaName`: Outlook's Windows names,
  * Lightning's paths), each by the object's
  * VTIMEZONE of that TZID where it has one (its own offsets and changes,
- * D32), else by `Intl`, any of them reading it; a time in no such zone (a
- * server's UTC) by `Intl`; a zone neither knows is taken to. Not a
+ * D32), else by `Intl`, any of them reading it; a server's UTC at UTC; a
+ * time written in no such zone by the VTIMEZONEs read as its zone, then by
+ * `Intl`; a zone neither knows is taken to. Not a
  * spring-forward night's 3:30, which no clock shows. Other times always do.
  */
 export function readsItsClock(object: CalendarObject, time: ItemTime): boolean {

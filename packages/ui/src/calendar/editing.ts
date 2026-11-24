@@ -914,6 +914,9 @@ export async function current(local: LocalChange, target: Target) {
  * 3. for ids of different kinds (a date, a floating time and a zoned one),
  *    the one the series' own rule says it names
  *    (`namesSameOccurrence`, foundation D35).
+ * With none near `day`, the same steps among the exceptions moved
+ * further (a reminder's occurrence moved days on), each looked for around
+ * its own day, where the views draw it now.
  * `null` too when the series has it no more (an EXDATE, an exception the
  * server cancelled) or is too dense to expand, as the views draw none of it.
  */
@@ -960,14 +963,17 @@ export function occurrenceOn(
   if (near !== undefined) return near;
   // An exception moved far from the day it was shown on (a reminder's
   // occurrence moved two days on): looked for where it is now.
+  // Only those whose id a step takes are expanded: one, as a rule, of however many.
   const moved = object.exceptions.flatMap((exception) => {
+    const id = exception.recurrenceId;
     const at = exception.start ?? (exception.kind === "task" ? exception.due : null);
-    if (!exception.recurrenceId || !at) return [];
-    const its = wallClockOf(at, timeZone).slice(0, 10);
+    if (!id || !at || exception.status?.toUpperCase() === "CANCELLED") return [];
+    if (!steps.some((step) => step(id))) return [];
     try {
+      const its = wallClockOf(at, timeZone).slice(0, 10);
       return idsOf(
         occurrencesBetween(object, { from: addDays(its, -1), to: addDays(its, 2), timeZone }),
-      ).filter(({ id }) => sameId(id, exception.recurrenceId!));
+      ).filter((drawn) => sameId(drawn.id, id));
     } catch {
       return [];
     }
