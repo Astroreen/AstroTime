@@ -1351,7 +1351,7 @@ describe("a new item in every account (design D313)", () => {
           },
         },
         { kind: "new" as const, attachment: { uri: "https://example.com/agenda.pdf" } },
-        // A file on the other accounts' server (their calendars are on example.com).
+        // A file on the server the other accounts' calendars are on (example.com).
         {
           kind: "new" as const,
           attachment: {
@@ -1373,13 +1373,11 @@ describe("a new item in every account (design D313)", () => {
     const copy = await store.objectAt(meetings.id, "second.ics");
     expect(copy).toMatchObject({ pending: "create", uid: "second" });
     expect(CalendarObject.parse(copy!.ics).master?.summary).toBe("Dentist");
-    // A file goes only to a copy on its own server (foundation D232); the link goes along.
+    // No copy gets an account's own file, even on the same server: its link
+    // opens only for its account (foundation D232); the link goes along.
     const linksOf = (ics: string) =>
       CalendarObject.parse(ics).master?.attachments.map((file) => file.uri);
-    expect(linksOf(copy!.ics)).toEqual([
-      "https://example.com/agenda.pdf",
-      "https://example.com/index.php/f/9",
-    ]);
+    expect(linksOf(copy!.ics)).toEqual(["https://example.com/agenda.pdf"]);
     expect(linksOf((await store.objectAt(personal.id, "first.ics"))!.ics)).toEqual([
       "https://cloud.example.com/index.php/f/123",
       "https://example.com/agenda.pdf",

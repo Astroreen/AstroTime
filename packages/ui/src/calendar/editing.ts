@@ -946,33 +946,24 @@ export async function saveForm(
       await local.save(into.calendar.id, ics);
       if (!request.everyAccount || request.base) return;
       // In the same transaction: every account gets it, or none does. A
-      // file of an account's own goes only to a copy on its server: its
-      // link opens only there (foundation D232); a link the user gave, or a
-      // file inline, goes to every copy.
+      // copy has no file of an account's own (a provider's parameters name
+      // it): its link opens only for its account (foundation D232); a link
+      // the user gave, or a file inline, goes to every copy.
       const changes = changesOf(null, form, untitled);
-      const originOf = (uri: string) => {
-        try {
-          return new URL(uri).origin;
-        } catch {
-          return null;
-        }
-      };
-      const forCopyIn = (calendar: Calendar): ItemChanges =>
-        changes.attachments
-          ? {
-              ...changes,
-              attachments: {
-                ...changes.attachments,
-                add: changes.attachments.add.filter((file) => {
-                  if ("content" in file) return true;
-                  const origin = originOf(file.uri);
-                  if (origin === null) return false;
-                  const own = file.parameters && Object.keys(file.parameters).length > 0;
-                  return !own || origin === originOf(calendar.url);
-                }),
-              },
-            }
-          : changes;
+      const forCopy: ItemChanges = changes.attachments
+        ? {
+            ...changes,
+            attachments: {
+              ...changes.attachments,
+              add: changes.attachments.add.filter(
+                (file) =>
+                  "content" in file ||
+                  (Object.keys(file.parameters ?? {}).length === 0 &&
+                    /^[a-z][a-z0-9+.-]*:/i.test(file.uri)),
+              ),
+            },
+          }
+        : changes;
       for (const other of otherAccountsCalendars(
         calendars,
         form.kind,
@@ -980,7 +971,7 @@ export async function saveForm(
         request.everyAccount,
         request.hidden,
       )) {
-        const copy = createItem(form.kind, forCopyIn(other), {
+        const copy = createItem(form.kind, forCopy, {
           now: writes.now,
           uid: writes.uid(),
         });

@@ -2662,9 +2662,12 @@ keywords". The quick parse and voice that fill quick create are the
   account's. The calendar on this device ([foundation
   D122](foundation.md#D122)) and the demo's get no copy: they reach no
   server, and a copy would keep the device's calendar from stepping aside. A copy carries what the item has, its reminders too (each
-  copy's ring: one per account), but a file of an account's own only to
-  the copy on that file's server ([foundation D232](foundation.md#D232):
-  its link opens only there); a link the user gave goes to every copy. The setting stays in sight while it is
+  copy's ring: one per account), but no file of an account's own
+  ([foundation D232](foundation.md#D232): its link opens only for its
+  account, even on the same server); a link the user gave, or a file
+  inline, goes to every copy. An account whose sync is off
+  ([foundation D171](foundation.md#D171)) gets its copy too, which waits
+  here until sync is on, as any change made there does. The setting stays in sight while it is
   on, even with one account on a server left, so it can be turned off;
   it does nothing then. Each copy
   has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
@@ -2691,6 +2694,11 @@ keywords". The quick parse and voice that fill quick create are the
   Which of an account's calendars a copy goes to is its first by name;
   choosing one per account (or passing over calendars others shared) waits
   with it.
+- **A file kept when its item changes account** ([D312](#D312)) — a file
+  uploaded to one account's files and attached stays on the item when its
+  calendar is then changed to another account's, as it did before D312;
+  dropping it (or holding it, as an upload finished late is) is the
+  dialog's rule to make.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled
   one asks, as the editor does": the editor asks nothing on Escape or ✕
   today, so quick create closes as it does; one question for both, when
