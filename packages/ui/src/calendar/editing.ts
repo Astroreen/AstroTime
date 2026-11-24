@@ -945,7 +945,22 @@ export async function saveForm(
       if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
       await local.save(into.calendar.id, ics);
       if (!request.everyAccount || request.base) return;
-      // In the same transaction: every account gets it, or none does.
+      // In the same transaction: every account gets it, or none does. A
+      // copy has no file of the account's own: its link opens only there
+      // (foundation D232); a link the user gave, or a file inline, goes along.
+      const changes = changesOf(null, form, untitled);
+      const forCopy: ItemChanges = changes.attachments
+        ? {
+            ...changes,
+            attachments: {
+              ...changes.attachments,
+              add: changes.attachments.add.filter(
+                (file) =>
+                  "content" in file || (!file.parameters && /^[a-z][a-z0-9+.-]*:/i.test(file.uri)),
+              ),
+            },
+          }
+        : changes;
       for (const other of otherAccountsCalendars(
         calendars,
         form.kind,
@@ -953,7 +968,7 @@ export async function saveForm(
         request.everyAccount,
         request.hidden,
       )) {
-        const copy = createItem(form.kind, changesOf(null, form, untitled), {
+        const copy = createItem(form.kind, forCopy, {
           now: writes.now,
           uid: writes.uid(),
         });

@@ -2661,7 +2661,12 @@ keywords". The quick parse and voice that fill quick create are the
   the account choice, not the calendar's, so "every calendar" is each
   account's. The calendar on this device ([foundation
   D122](foundation.md#D122)) and the demo's get no copy: they reach no
-  server, and a copy would keep the device's calendar from stepping aside. Each copy
+  server, and a copy would keep the device's calendar from stepping aside. A copy carries what the item has, its reminders too (each
+  copy's ring: one per account), but no file of the chosen account's own
+  ([foundation D232](foundation.md#D232): its link opens only there); a
+  link the user gave goes along. The setting stays in sight while it is
+  on, even with one account on a server left, so it can be turned off;
+  it does nothing then. Each copy
   has a UID of its own, as [D164](#D164)'s copies do: two servers' copies
   are two items, not one shared. The dialog has no account row then, and
   says under the calendar that it is also saved to the other accounts.

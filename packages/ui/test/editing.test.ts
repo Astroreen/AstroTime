@@ -1340,6 +1340,18 @@ describe("a new item in every account (design D313)", () => {
     const form = {
       ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
       summary: "Dentist",
+      // A file of the chosen account's own, and a link the user gave.
+      attachments: [
+        {
+          kind: "new" as const,
+          attachment: {
+            uri: "https://cloud.example.com/index.php/f/123",
+            name: "/Calendar/photo.jpg",
+            parameters: { "X-NC-FILE-ID": "123" },
+          },
+        },
+        { kind: "new" as const, attachment: { uri: "https://example.com/agenda.pdf" } },
+      ],
     };
     const made = ["first", "second", "third"];
     const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
@@ -1353,6 +1365,14 @@ describe("a new item in every account (design D313)", () => {
     const copy = await store.objectAt(meetings.id, "second.ics");
     expect(copy).toMatchObject({ pending: "create", uid: "second" });
     expect(CalendarObject.parse(copy!.ics).master?.summary).toBe("Dentist");
+    // The account's own file stays in its account (foundation D232); the link goes along.
+    const linksOf = (ics: string) =>
+      CalendarObject.parse(ics).master?.attachments.map((file) => file.uri);
+    expect(linksOf(copy!.ics)).toEqual(["https://example.com/agenda.pdf"]);
+    expect(linksOf((await store.objectAt(personal.id, "first.ics"))!.ics)).toEqual([
+      "https://cloud.example.com/index.php/f/123",
+      "https://example.com/agenda.pdf",
+    ]);
     // No calendar of the tasks-only account takes an event: no copy there.
     expect(await store.pending(todo.id)).toEqual([]);
     expect(await store.pending(team.id)).toEqual([]);

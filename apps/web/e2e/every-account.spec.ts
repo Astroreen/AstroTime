@@ -138,9 +138,11 @@ test("a new event goes to the account chosen, or to every account", async ({
   expect(one).toBeTruthy();
   expect(other).toBeTruthy();
   expect(one).not.toBe(other);
-  // Off, one server had it; on, both: the first holds one item, the second two.
+  // Off, the family calendar alone had it; on, the first server's too (the
+  // second's first calendar by name is family again).
   expect([
     await itemsIn(first, home),
-    (await itemsIn(second, family)) + (await itemsIn(second, work)),
-  ]).toEqual([1, 2]);
+    await itemsIn(second, family),
+    await itemsIn(second, work),
+  ]).toEqual([1, 2, 0]);
 });

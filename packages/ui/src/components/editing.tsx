@@ -243,6 +243,8 @@ export function useEditingState({
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
   /** The accounts on a server, which a new item goes to when it goes to every account (D313). */
   const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
+  /** New items go to every account: on, and two accounts on a server or more to go to (D313). */
+  const toEvery = everyAccount && servers.size > 1;
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
   const firstFor = (kind: "event" | "task") =>
@@ -406,7 +408,7 @@ export function useEditingState({
           scope,
           untitled: t("edit.untitledReminder"),
           hidden,
-          ...(everyAccount ? { everyAccount: servers } : {}),
+          ...(toEvery ? { everyAccount: servers } : {}),
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
@@ -596,7 +598,7 @@ export function useEditingState({
     editing !== null &&
     shown !== null &&
     !shown.refused &&
-    everyAccount &&
+    toEvery &&
     editing.base === undefined &&
     otherAccountsCalendars(calendars, editing.state.form.kind, shown.calendar, servers, hidden)
       .length > 0;
@@ -615,7 +617,11 @@ export function useEditingState({
       own.find((one) => one.id === from?.id) ?? own.find((one) => !hidden.has(one.id)) ?? own[0];
     return first ? [{ account, calendarId: first.id }] : [];
   });
-  const accountChoices: AccountChoice[] = spread || choices.length < 2 ? [] : choices;
+  // A new item while new items go to every account has no account row,
+  // whichever calendar it is in now (D313).
+  const everyMode =
+    toEvery && editing !== null && editing.target === null && editing.base === undefined;
+  const accountChoices: AccountChoice[] = everyMode || choices.length < 2 ? [] : choices;
 
   const dialogs = (
     <>
