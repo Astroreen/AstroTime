@@ -709,7 +709,7 @@ export function newItemCalendar(
 
 /**
  * The accounts a new item may go to on a server, when new items go to
- * every account (design D313): CalDAV's. A subscription takes no item, and
+ * every account (design D314): CalDAV's. A subscription takes no item, and
  * the calendar on this device and the demo's reach no server.
  */
 export const accountsOnServers = (accounts: readonly Account[]): Account[] =>
@@ -717,7 +717,7 @@ export const accountsOnServers = (accounts: readonly Account[]): Account[] =>
 
 /**
  * Where a copy of a new item goes when new items go to every account
- * (design D313): for each account of `among` (those on a server) besides
+ * (design D314): for each account of `among` (those on a server) besides
  * `into`'s, its first calendar that takes the item, visible before hidden,
  * as `firstCalendarFor` picks one; an account none of whose calendars
  * takes it gets no copy.
@@ -913,7 +913,7 @@ export async function saveForm(
      */
     readonly base?: string;
     /**
-     * A new item goes to every account (design D313): these, the accounts
+     * A new item goes to every account (design D314): these, the accounts
      * on a server, each get a copy of it with a UID of its own, in their
      * first calendar that takes it. Not for a copy ("Copy to" picks one
      * calendar).

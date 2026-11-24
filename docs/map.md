@@ -380,10 +380,10 @@ When you add a package, app or module, add its line here in the same PR.
       popover beside its draft on a wide screen, expanded into the edit
       dialog; `editor-fields.tsx`, the rows both share (date, time,
       calendar, kind, the looks of a row, a double click's second press;
-      `CalendarFields`, the account and its calendars, `plans/design.md#D312`).
+      `CalendarFields`, the account and its calendars, `plans/design.md#D313`).
       → `plans/design.md#D296`, `plans/design.md#D297`; a new item in every
       account (`otherAccountsCalendars` in `calendar/editing.ts`, the
-      `everyAccount` setting) → `plans/design.md#D313`
+      `everyAccount` setting) → `plans/design.md#D314`
     - `draft-aside.ts` — `useDraft`, the edit dialog's draft made in the
       editor's chunk and handed to the views (`DrawnDraft`), and where the
       dialog stands on a wide screen, beside it. → `plans/design.md#D155`
@@ -589,7 +589,7 @@ When you add a package, app or module, add its line here in the same PR.
     the specs that create through the edit dialog reach it by `expand` in
     `support.ts`. → `plans/design.md#D296`; `every-account.spec.ts`
     chooses a new event's account and saves one to every account, against
-    two Radicales. → `plans/design.md#D312`, `plans/design.md#D313`;
+    two Radicales. → `plans/design.md#D313`, `plans/design.md#D314`;
     `editing.spec.ts` creates, edits and deletes on the demo data,
     `editing-server.spec.ts` sees an item made here, then dragged, reach
     Radicale, `editing-screenshots.spec.ts` takes the editing evidence.

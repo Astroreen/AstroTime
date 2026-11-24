@@ -71,11 +71,11 @@ export function QuickCreate({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
-  /** The accounts to choose from; none when there is no choice (design D312). */
+  /** The accounts to choose from; none when there is no choice (design D313). */
   accounts: readonly AccountChoice[];
-  /** Whether the account is chosen in its own row: not while a new item goes to every account (D313). */
+  /** Whether the account is chosen in its own row: not while a new item goes to every account (D314). */
   accountRow: boolean;
-  /** Where copies of a new item go, each calendar with its account; none when it goes to one (design D313). */
+  /** Where copies of a new item go, each calendar with its account; none when it goes to one (design D314). */
   copiesTo: readonly string[];
   onChange: (form: Form) => void;
   onSave: () => void;

@@ -1,5 +1,5 @@
-// The account a new item goes to (design D312), and every account at once
-// (D313), against two real Radicales: quick create offers each account and
+// The account a new item goes to (design D313), and every account at once
+// (D314), against two real Radicales: quick create offers each account and
 // that account's calendars, and the event is uploaded to the one chosen;
 // with Settings' "Save new items to every account" on, there is no account
 // to choose, and the event is uploaded to both servers, a UID each. With
@@ -86,7 +86,7 @@ test("a new event goes to the account chosen, or to every account", async ({
   const firstName = await signIn(page, first);
   const secondName = await signIn(page, second);
 
-  // Quick create offers each account, and the chosen one's calendars (D312).
+  // Quick create offers each account, and the chosen one's calendars (D313).
   await page.getByRole("button", { name: "Create" }).click();
   const quick = quickCreate(page);
   const account = quick.getByRole("combobox", { name: "Account" });
@@ -113,7 +113,7 @@ test("a new event goes to the account chosen, or to every account", async ({
   await quick.getByRole("button", { name: "Save" }).click();
   expect(await toSecond).toBeTruthy();
 
-  // On: no account to choose, and the event is uploaded to both (D313).
+  // On: no account to choose, and the event is uploaded to both (D314).
   await page
     .getByRole("navigation", { name: "Main menu" })
     .getByRole("button", { name: "Settings" })

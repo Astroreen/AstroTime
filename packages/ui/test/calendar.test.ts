@@ -226,7 +226,7 @@ describe("the drawer's settings override the locale (D53)", () => {
       everyAccount: true,
     };
     expect(readSettings(JSON.stringify(chosen))).toEqual(chosen);
-    // A new item goes to one account unless turned on (design D313).
+    // A new item goes to one account unless turned on (design D314).
     expect(readSettings('{"everyAccount":"yes"}').everyAccount).toBe(false);
     // Reminders are on unless turned off (foundation D101), and so is
     // keeping the desktop app running with its window closed (desktop D75).

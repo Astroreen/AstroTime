@@ -4,7 +4,7 @@
 // user's own (D172, D173), whether reminders notify (foundation D101), the
 // pictures the Agenda and the details are drawn with (D217), whether
 // completing a task is celebrated (D198), and the font and text size (D294,
-// D295), and whether a new item goes to every account (D313).
+// D295), and whether a new item goes to every account (D314).
 // Kept in the app's preferences as one value and applied at once.
 import { isColorName } from "@astrotime/core";
 import { createContext, useContext } from "react";
@@ -89,7 +89,7 @@ export interface Settings {
   readonly ownBanners: Readonly<Record<string, string>>;
   /**
    * A new event or task goes to every account, a copy in each, not to the
-   * one account chosen (design D313); off unless turned on.
+   * one account chosen (design D314); off unless turned on.
    */
   readonly everyAccount: boolean;
 }

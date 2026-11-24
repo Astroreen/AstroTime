@@ -96,7 +96,7 @@ function CalendarSelect({
   value: string;
   onChange: (calendarId: string) => void;
   calendars: readonly Calendar[];
-  /** The name of a calendar's account, beside its own when the list has several accounts' (D313). */
+  /** The name of a calendar's account, beside its own when the list has several accounts' (D314). */
   accountOf?: (calendar: Calendar) => string | undefined;
 }) {
   return (
@@ -115,7 +115,7 @@ function CalendarSelect({
 }
 
 /**
- * An account the item may go to (design D312), and the calendar choosing it
+ * An account the item may go to (design D313), and the calendar choosing it
  * puts the item in: its first one offered, visible before hidden.
  */
 export interface AccountChoice {
@@ -124,10 +124,10 @@ export interface AccountChoice {
 }
 
 /**
- * Where an item goes (design D312): its account, when more than one is
+ * Where an item goes (design D313): its account, when more than one is
  * offered, then that account's calendars (a task's lists). `accounts` is
  * empty when there is no account to choose; `copiesTo`, where a new item's
- * copies go when it goes to every account (D313), said under the calendar.
+ * copies go when it goes to every account (D314), said under the calendar.
  */
 export function CalendarFields({
   form,
@@ -150,12 +150,25 @@ export function CalendarFields({
   const accountId = calendars.find((c) => c.id === form.calendarId)?.accountId;
   // The account row only while the item's own account is one of them.
   const choosing = accountRow && accounts.some((one) => one.account.id === accountId);
+  // Two accounts of one name (one login on two servers) say their server too.
+  const nameOf = (account: Account) => {
+    const name = accountName(account, t);
+    const twin = accounts.some(
+      (one) => one.account.id !== account.id && accountName(one.account, t) === name,
+    );
+    if (!twin) return name;
+    try {
+      return `${name} (${new URL(account.serverUrl).host})`;
+    } catch {
+      return name;
+    }
+  };
   // One list of several accounts' calendars: each says whose it is.
   const accountOf =
     !choosing && accounts.length > 1
       ? (calendar: Calendar) => {
           const choice = accounts.find((one) => one.account.id === calendar.accountId);
-          return choice && accountName(choice.account, t);
+          return choice && nameOf(choice.account);
         }
       : undefined;
   const own = choosing ? calendars.filter((c) => c.accountId === accountId) : calendars;
@@ -171,7 +184,7 @@ export function CalendarFields({
           }}
           options={accounts.map(({ account }) => ({
             value: account.id,
-            label: accountName(account, t),
+            label: nameOf(account),
             leading: <Avatar account={account} size="size-6" />,
           }))}
           className={fieldButton}

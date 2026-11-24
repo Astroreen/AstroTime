@@ -2633,12 +2633,13 @@ keywords". The quick parse and voice that fill quick create are the
 
 ### Decided in round 7: the account a new item goes to
 
-- **D312. The account an item goes to, chosen in its dialog.** The owner,
+- **D313. The account an item goes to, chosen in its dialog.** The owner,
   with Google Calendar's sheet beside it: "tasks and events need a choice
   of which account to make them in". Quick create ([D296](#D296)) and the
   edit dialog ([D297](#D297)) show, in the calendar's row, the account
   first (its avatar and name, `edit.account`), then that account's
-  calendars (a task's lists) only. Choosing an account puts the item in
+  calendars (a task's lists) only. Two accounts of one name (one login
+  on two servers) say their server beside it. Choosing an account puts the item in
   its first calendar offered, visible before hidden, as
   [foundation D122](foundation.md#D122)'s default does. With one account
   offered there is no account row: the calendar is the whole choice, as
@@ -2648,7 +2649,7 @@ keywords". The quick parse and voice that fill quick create are the
   back to its own calendar. A kind switched to one its calendar cannot
   hold moves to the same account's first calendar that can, before
   another account's.
-- **D313. A new item in every account, a setting.** The owner: "by
+- **D314. A new item in every account, a setting.** The owner: "by
   default a new event or task goes to one calendar; one can also choose
   to sync all calendars, so each has every task and event; then the
   account choice is hidden". Settings → Accounts has "Save new items to
@@ -2686,7 +2687,7 @@ keywords". The quick parse and voice that fill quick create are the
 
 ## Deferred
 
-- **Copies in every account kept alike** ([D313](#D313)) — a new item goes
+- **Copies in every account kept alike** ([D314](#D314)) — a new item goes
   to every account, but its copies are separate items afterwards: an edit,
   a completion or a deletion changes only the one copy. Keeping them alike
   needs a link between them (an `X-` property, kept by [foundation
@@ -2694,9 +2695,9 @@ keywords". The quick parse and voice that fill quick create are the
   Which of an account's calendars a copy goes to is its first by name;
   choosing one per account (or passing over calendars others shared) waits
   with it.
-- **A file kept when its item changes account** ([D312](#D312)) — a file
+- **A file kept when its item changes account** ([D313](#D313)) — a file
   uploaded to one account's files and attached stays on the item when its
-  calendar is then changed to another account's, as it did before D312;
+  calendar is then changed to another account's, as it did before D313;
   dropping it (or holding it, as an upload finished late is) is the
   dialog's rule to make.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled

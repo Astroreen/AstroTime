@@ -205,7 +205,7 @@ function SettingsGroups({
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
       <Group title={t("accounts.title")}>
-        {/* A new item in one account, or in every one on a server (D313): a choice only with two or more, or while it is on. */}
+        {/* A new item in one account, or in every one on a server (D314): a choice only with two or more, or while it is on. */}
         {(accountsOnServers(accounts).length > 1 || settings.everyAccount) && (
           <div className="border-b border-line pb-1">
             <Toggle

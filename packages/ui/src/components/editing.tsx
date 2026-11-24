@@ -174,10 +174,10 @@ export function useEditingState({
   onChanged,
 }: {
   store: Store;
-  /** The accounts, to choose the one an item goes to (design D312). */
+  /** The accounts, to choose the one an item goes to (design D313). */
   accounts: readonly Account[];
   calendars: readonly Calendar[];
-  /** A new item goes to every account, not to one chosen (design D313). */
+  /** A new item goes to every account, not to one chosen (design D314). */
   everyAccount: boolean;
   /** Calendars hidden from the views: a new item goes in a visible one first. */
   hidden: ReadonlySet<string>;
@@ -242,14 +242,14 @@ export function useEditingState({
   }, [store, detailsId]);
 
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
-  /** The accounts on a server, which a new item goes to when it goes to every account (D313). */
+  /** The accounts on a server, which a new item goes to when it goes to every account (D314). */
   const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
-  /** New items go to every account: on, and two accounts on a server or more to go to (D313). */
+  /** New items go to every account: on, and two accounts on a server or more to go to (D314). */
   const toEvery = everyAccount && servers.size > 1;
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
   // While new items go to every account, one on a server first: the
-  // device's calendar keeps no copy it would not step aside for (D313).
+  // device's calendar keeps no copy it would not step aside for (D314).
   const firstFor = (kind: "event" | "task") =>
     (toEvery
       ? firstCalendarFor(
@@ -383,7 +383,7 @@ export function useEditingState({
     setEditing((current) => {
       if (!current) return current;
       // A kind its calendar cannot hold moves to the first calendar that
-      // can, in the same account first: the account chosen stays (D312).
+      // can, in the same account first: the account chosen stays (D313).
       const offered = writable(form.kind, fromOf(current));
       const fits = offered.some((c) => c.id === form.calendarId);
       const accountId = byId(form.calendarId)?.accountId;
@@ -605,8 +605,8 @@ export function useEditingState({
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
   // A new item (not a copy) that goes to every account on a server: no
-  // account to choose, and the dialog says where else it goes (design D313).
-  // Each copy's calendar and account, named under the calendar (D313).
+  // account to choose, and the dialog says where else it goes (design D314).
+  // Each copy's calendar and account, named under the calendar (D314).
   const copiesTo =
     editing !== null && shown !== null && !shown.refused && toEvery && editing.base === undefined
       ? otherAccountsCalendars(
@@ -620,7 +620,7 @@ export function useEditingState({
           return account ? [`${other.name} · ${accountName(account, t)}`] : [];
         })
       : [];
-  // Each account offered, with where choosing it puts the item (D312): an
+  // Each account offered, with where choosing it puts the item (D313): an
   // existing item's own calendar in its own account, else the account's
   // first calendar that takes it, visible before hidden; none to choose
   // when there is only one.
@@ -636,7 +636,7 @@ export function useEditingState({
     return first ? [{ account, calendarId: first.id }] : [];
   });
   // A new item while new items go to every account has no account row,
-  // whichever calendar it is in now (D313).
+  // whichever calendar it is in now (D314).
   const everyMode =
     toEvery && editing !== null && editing.target === null && editing.base === undefined;
   const accountChoices: AccountChoice[] = choices.length < 2 ? [] : choices;

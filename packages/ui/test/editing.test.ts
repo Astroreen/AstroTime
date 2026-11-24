@@ -1296,7 +1296,7 @@ describe("saving writes pending changes through the store (D5)", () => {
   });
 });
 
-describe("a new item in every account (design D313)", () => {
+describe("a new item in every account (design D314)", () => {
   test("a copy with its own UID in each other account's first calendar that takes it, in one write", async () => {
     const store = await Store.open(nodeDriver());
     const add = async (name: string) =>
