@@ -705,9 +705,8 @@ export function firstCalendarFor(
  * calendar ticked beside it (D313), its account's first, a server's first
  * (with `servers`), the first; none when no calendar takes it. `moved`: it
  * left the account chosen, or that account is not known (gone, and no
- * `knownAccount`), so no file
- * of the account's own goes with it (foundation D232). The dialog's field
- * shows this, and the save uses it.
+ * `knownAccount`), so no file of the account's own goes with it
+ * (foundation D232). The dialog's field shows this, and the save uses it.
  */
 export function newItemCalendar(
   calendars: readonly Calendar[],

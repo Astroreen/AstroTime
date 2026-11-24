@@ -2725,7 +2725,8 @@ keywords". The quick parse and voice that fill quick create are the
 - **A file kept when its item changes account** ([D313](#D313)) — a file
   uploaded to one account's files and attached stays on the item when the
   user then changes its calendar to another account's, as it did before
-  D313 (a calendar gone or refused meanwhile leaves it behind, D314);
+  D313 (a calendar gone or refused meanwhile leaves a new one behind,
+  D314; a copy's files from its item, "Copy to", go with it as before);
   dropping it (or holding it, as an upload finished late is) is the
   dialog's rule to make.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled

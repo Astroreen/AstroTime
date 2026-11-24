@@ -394,9 +394,23 @@ export function useEditingState({
       // A calendar ticked beside it that takes the kind first, then the account's first.
       const tickedFits = own.find((c) => form.alsoIn?.includes(c.id));
       const sameAccount = tickedFits ?? own.find((c) => !hidden.has(c.id)) ?? own[0];
-      const placed = fits
-        ? form
-        : { ...form, calendarId: sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId };
+      const placedId = fits
+        ? form.calendarId
+        : (sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId);
+      // Moved here to another account, not picked: no file of the first's own
+      // goes with it (foundation D232).
+      const left = !fits && byId(placedId)?.accountId !== accountId;
+      const placed = {
+        ...form,
+        calendarId: placedId,
+        ...(left && form.attachments
+          ? {
+              attachments: form.attachments.filter(
+                (file) => file.kind === "existing" || goesToEveryCopy(file.attachment),
+              ),
+            }
+          : {}),
+      };
       // The other calendars ticked: those of its account that take its kind (D313).
       const account = byId(placed.calendarId)?.accountId;
       const alsoIn = (placed.alsoIn ?? []).filter(
