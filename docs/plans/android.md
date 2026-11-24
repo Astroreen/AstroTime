@@ -761,10 +761,10 @@ were checked on 2026-11-01.
     occurrence of a series opens as the views draw it, expanded around its
     day (`occurrenceOn`), the first step that finds any deciding and more
     than one opening the day alone: the same id; for a zoned id, a zoned
-    one at the same instant in another zone (a server's UTC; in one zone
-    never by the wall clock, so the 3:30s of the nights the clocks change
-    stay apart); for ids of different kinds, the one the series' own rule
-    names (core's `namesSameOccurrence`, foundation D35). So one a server
+    one at the same instant in another zone (a server's UTC), each on its
+    own wall clock; in one zone, the exact id alone, so a fall-back night's
+    two 3:30s and a spring-forward night's 3:30 and 4:30 stay apart; for
+    ids of different kinds, the one the series' own rule names (core's `namesSameOccurrence`, foundation D35). So one a server
     cancelled opens its day alone, a series
     cancelled whole still opens, and so does a task due at midnight; a
     series too dense to expand opens its day alone, as the views draw none

@@ -904,12 +904,13 @@ export async function current(local: LocalChange, target: Target) {
  * 1. the same recurrence id, every field (the snapshot and reminders take
  *    theirs from the same expansion);
  * 2. for a zoned id, a zoned one at the same instant in another zone (a
- *    server's UTC for the series' zone); in the same zone a zoned id is
- *    never matched but by step 1, so neither the two 3:30s of a fall-back
+ *    server's UTC for the series' zone), each reading its own wall clock
+ *    (no spring-forward 3:30); in the same zone a zoned id is never
+ *    matched but by step 1, so neither the two 3:30s of a fall-back
  *    night nor the 3:30 and 4:30 of a spring-forward one are taken for
  *    each other;
- * 3. for ids of different kinds (a date or a floating time on either
- *    side), the one the series' own rule says it names
+ * 3. for ids of different kinds (a date, a floating time and a zoned one),
+ *    the one the series' own rule says it names
  *    (`namesSameOccurrence`, foundation D35).
  * `null` too when the series has it no more (an EXDATE, an exception the
  * server cancelled) or is too dense to expand, as the views draw none of it.
@@ -939,10 +940,10 @@ export function occurrenceOn(
       id.type === "zoned" &&
       recurrenceId.type === "zoned" &&
       id.timeZone !== recurrenceId.timeZone &&
-      id.epochMs === recurrenceId.epochMs,
-    (id) =>
-      (id.type !== "zoned" || recurrenceId.type !== "zoned") &&
-      namesSameOccurrence(object, id, recurrenceId),
+      id.epochMs === recurrenceId.epochMs &&
+      onItsClock(id) &&
+      onItsClock(recurrenceId),
+    (id) => id.type !== recurrenceId.type && namesSameOccurrence(object, id, recurrenceId),
   ];
   for (const step of steps) {
     const found = ids.filter(({ id }) => step(id));
@@ -950,6 +951,13 @@ export function occurrenceOn(
   }
   return null;
 }
+
+/**
+ * Whether a zoned time's instant reads its own wall clock in its zone: not a
+ * spring-forward night's 3:30, which no clock shows (its instant reads 4:30).
+ */
+const onItsClock = (time: Extract<ItemTime, { type: "zoned" }>) =>
+  wallClockIn(time.epochMs, time.timeZone) === time.local;
 
 /** The same recurrence id, field by field. */
 function sameId(a: ItemTime, b: ItemTime): boolean {

@@ -303,6 +303,56 @@ test("on a spring-forward night, a stale 3:30 does not open the 4:30 at its inst
     timeZone,
     epochMs: Date.parse("2026-03-29T01:30:00Z"),
   };
-  const opened = occurrenceOn(hourly, stale, "2026-03-29", timeZone);
-  expect(opened?.item.summary).not.toBe("Check, moved");
+  // The exception takes 3:30 away with 4:30 (core matches it by instant):
+  // the day alone, and never the moved one, by the series' zone or by UTC.
+  expect(occurrenceOn(hourly, stale, "2026-03-29", timeZone)).toBeNull();
+  const moved = CalendarObject.parse(
+    hourly
+      .serialize()
+      .replace(
+        "RECURRENCE-ID;TZID=Europe/Vilnius:20260329T043000",
+        "RECURRENCE-ID:20260329T013000Z",
+      ),
+  );
+  expect(occurrenceOn(moved, stale, "2026-03-29", timeZone)).toBeNull();
+});
+
+test("two ids of one kind are never matched by the series' rule", () => {
+  // An all-day series with two exceptions on one date, at 9:00 and 11:00
+  // (floating ids); the first cancelled: its stale id opens the day alone.
+  const daily = CalendarObject.parse(
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//test//EN",
+      "BEGIN:VEVENT",
+      "UID:allday",
+      "DTSTAMP:20261101T000000Z",
+      "DTSTART;VALUE=DATE:20261101",
+      "RRULE:FREQ=DAILY",
+      "SUMMARY:Day",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:allday",
+      "DTSTAMP:20261101T000000Z",
+      "RECURRENCE-ID:20261105T110000",
+      "DTSTART:20261105T110000",
+      "DURATION:PT1H",
+      "SUMMARY:Later",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:allday",
+      "DTSTAMP:20261101T000000Z",
+      "RECURRENCE-ID:20261105T090000",
+      "DTSTART:20261105T090000",
+      "DURATION:PT1H",
+      "STATUS:CANCELLED",
+      "SUMMARY:Morning",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+  const morning: ItemTime = { type: "floating", local: "2026-11-05T09:00:00" };
+  expect(occurrenceOn(daily, morning, "2026-11-05", timeZone)).toBeNull();
 });
