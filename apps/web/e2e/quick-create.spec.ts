@@ -4,7 +4,15 @@
 // icon) becomes the edit dialog with what was filled carried over.
 import { expect, test, type Page } from "@playwright/test";
 
-import { choose, openDemo, PHONE, quickCreate, WIDE } from "./support.ts";
+import {
+  calendarField,
+  choose,
+  openDemo,
+  pickCalendar,
+  PHONE,
+  quickCreate,
+  WIDE,
+} from "./support.ts";
 
 const day = (page: Page, name: string) => page.getByRole("list", { name });
 
@@ -50,7 +58,7 @@ for (const [size, viewport] of [
       await quick.getByRole("radio", { name: "Task" }).click();
       // A task has a time, no end, and goes in a list.
       await expect(quick.getByLabel("End time")).toHaveCount(0);
-      await choose(quick.getByRole("combobox", { name: "List" }), "Tasks");
+      await pickCalendar(quick, "Tasks");
       await quick.getByRole("textbox", { name: "Title" }).fill("Call the plumber");
       await quick.getByRole("button", { name: "Save" }).click();
       await expect(quick).toHaveCount(0);
@@ -85,8 +93,9 @@ test.describe("on a phone", () => {
     const quick = quickCreate(page);
     await quick.getByRole("textbox", { name: "Title" }).fill("Swimming");
     await choose(quick.getByLabel("Start time"), "5:00 PM");
+    // The calendar before the place: the place's search answers later.
+    await pickCalendar(quick, "Work");
     await quick.getByRole("combobox", { name: "Location" }).fill("City pool");
-    await choose(quick.getByRole("combobox", { name: "Calendar" }), "Work");
     // A sheet from the bottom over the view.
     const sheet = (await quick.boundingBox())!;
     expect(Math.round(sheet.y + sheet.height)).toBe(PHONE.height);
@@ -109,7 +118,7 @@ test.describe("on a phone", () => {
     await expect(editor.getByLabel("Start time")).toHaveText("5:00 PM");
     await expect(editor.getByLabel("End time")).toHaveText("6:00 PM");
     await expect(editor.getByRole("combobox", { name: "Location" })).toHaveValue("City pool");
-    await expect(editor.getByRole("combobox", { name: "Calendar" })).toHaveText("Work");
+    await expect(calendarField(editor)).toHaveAccessibleName(/, Work$/);
     // What only the editor has is there now.
     await expect(editor.getByRole("switch", { name: "All day" })).toBeVisible();
     await editor.getByRole("button", { name: "Save" }).click();
@@ -191,6 +200,22 @@ test.describe("on a wide screen", () => {
     await expect(editor.getByRole("textbox", { name: "Title" })).toHaveValue("Review");
     await expect(editor.getByLabel("Start date")).toHaveValue("2026-11-05");
     await expect(editor.getByLabel("Start time")).toHaveText("2:00 PM");
-    await expect(editor.getByRole("combobox", { name: "Calendar" })).toHaveText("Personal");
+    await expect(calendarField(editor)).toHaveAccessibleName(/, Personal$/);
+  });
+});
+
+test.describe("on a narrow phone in Russian", () => {
+  test.use({ viewport: { width: 360, height: 780 }, hasTouch: true, locale: "ru-RU" });
+
+  test('"Save" stays at the end of the kind\'s row (design D315)', async ({ page }) => {
+    await openDemo(page, "day");
+    await page.getByRole("button", { name: "Создать" }).first().click();
+    const quick = quickCreate(page, "ru");
+    const kind = (await quick.getByRole("radio", { name: "Мероприятие" }).boundingBox())!;
+    const save = (await quick.getByRole("button", { name: "Сохранить" }).boundingBox())!;
+    // One row: their middles level, "Save" right of the kinds and inside the sheet.
+    expect(Math.abs(kind.y + kind.height / 2 - (save.y + save.height / 2))).toBeLessThanOrEqual(1);
+    expect(save.x).toBeGreaterThan(kind.x + kind.width);
+    expect(save.x + save.width).toBeLessThanOrEqual(360);
   });
 });

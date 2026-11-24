@@ -1,8 +1,8 @@
 // Quick create (design D296), as Google Calendar's: what a tap on a slot,
 // the floating button or "Create" opens. On a phone a sheet from the bottom,
 // on a wide screen a popover by the item it makes, which the views draw
-// behind it (D155). The title, "Event | Task", the time, the place and the
-// calendar, and "Save" at its foot. There is no "More options": the sheet
+// behind it (D155). "Event | Task" with "Save" at its end (D315), the
+// title, the time, the place and where it goes (D313). There is no "More options": the sheet
 // dragged up, or its handle pressed ("Expand"), becomes the edit dialog
 // with everything filled carried over; the popover has an expand icon in
 // its corner, beside its ✕. Enter saves, Escape closes. Loaded with its first opening,
@@ -16,6 +16,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -35,7 +36,7 @@ import { primaryButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 import { FLOATS_REM, shownDraft, useDraft } from "./draft-aside.ts";
 import {
-  CalendarSelect,
+  CalendarFields,
   DateTime,
   field,
   KindSwitch,
@@ -43,6 +44,7 @@ import {
   TimeSelect,
   titleField,
   useSecondPress,
+  type AccountChoice,
 } from "./editor-fields.tsx";
 import { CalendarIcon, ClockIcon, CloseIcon, PlaceIcon } from "./icons.tsx";
 import type { EditorState } from "./item-editor.tsx";
@@ -58,6 +60,9 @@ const GAP = 8;
 export function QuickCreate({
   state,
   calendars,
+  accounts,
+  showWhere,
+  multiple,
   onChange,
   onSave,
   onClose,
@@ -67,6 +72,12 @@ export function QuickCreate({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
+  /** The accounts offered, each with where choosing it puts the item (design D313). */
+  accounts: readonly AccountChoice[];
+  /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
+  showWhere: boolean;
+  /** A new item may be ticked into several calendars (D313). */
+  multiple: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -160,22 +171,30 @@ export function QuickCreate({
               }}
               className="flex flex-col gap-2 px-4"
             >
-              <Fields form={form} calendars={calendars} onChange={onChange} />
+              <Fields
+                form={form}
+                calendars={calendars}
+                accounts={accounts}
+                showWhere={showWhere}
+                multiple={multiple}
+                onChange={onChange}
+                save={
+                  // In the corner of the kind's row, as the owner asked (design D296's
+                  // amendment); the microphone stands left of it when voice is on (assistant D302).
+                  <button
+                    type="submit"
+                    disabled={state.saving || calendars.length === 0}
+                    className={`${primaryButton.replace("px-5", "px-4")} ml-auto shrink-0 whitespace-nowrap`}
+                  >
+                    {t("edit.save")}
+                  </button>
+                }
+              />
               {state.problem && (
                 <p role="alert" className="rounded-xl bg-danger-soft p-3 text-body text-danger">
                   {t(problemKey(state.problem, state.problemKind ?? form.kind))}
                 </p>
               )}
-              {/* The microphone stands left of "Save" when voice is on (assistant D302). */}
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={state.saving || calendars.length === 0}
-                  className={`${primaryButton} flex-1`}
-                >
-                  {t("edit.save")}
-                </button>
-              </div>
             </form>
           )}
         </DialogPopup>
@@ -187,11 +206,20 @@ export function QuickCreate({
 function Fields({
   form,
   calendars,
+  accounts,
+  showWhere,
+  multiple,
   onChange,
+  save,
 }: {
   form: Form;
   calendars: readonly Calendar[];
+  accounts: readonly AccountChoice[];
+  showWhere: boolean;
+  multiple: boolean;
   onChange: (form: Form) => void;
+  /** "Save", at the end of the kind's row. */
+  save: ReactNode;
 }) {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -201,13 +229,17 @@ function Fields({
   const days = event && form.endDate !== form.startDate;
   return (
     <>
-      <KindSwitch
-        value={form.kind}
-        // The new kind's default colour (design D172): no colour is chosen here.
-        onChange={(kind) =>
-          onChange({ ...switchKind(form, kind), color: defaultColorOf(settings, kind) })
-        }
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <KindSwitch
+          tight
+          value={form.kind}
+          // The new kind's default colour (design D172): no colour is chosen here.
+          onChange={(kind) =>
+            onChange({ ...switchKind(form, kind), color: defaultColorOf(settings, kind) })
+          }
+        />
+        {save}
+      </div>
       <input
         aria-label={t("edit.title")}
         placeholder={t("edit.titlePlaceholder")}
@@ -282,19 +314,17 @@ function Fields({
           className={field}
         />
       </Section>
-      <Section icon={<CalendarIcon className="size-5" />}>
-        <CalendarSelect
-          label={t(event ? "edit.calendar" : "edit.list")}
-          value={form.calendarId}
-          onChange={(calendarId) => set({ calendarId })}
-          calendars={calendars}
-        />
-        {calendars.length === 0 && (
-          <p className="px-2 text-small text-danger">
-            {t(event ? "edit.noCalendar" : "edit.noList")}
-          </p>
-        )}
-      </Section>
+      {showWhere && (
+        <Section icon={<CalendarIcon className="size-5" />}>
+          <CalendarFields
+            form={form}
+            calendars={calendars}
+            accounts={accounts}
+            multiple={multiple}
+            onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
+          />
+        </Section>
+      )}
     </>
   );
 }

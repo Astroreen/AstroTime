@@ -2595,6 +2595,8 @@ keywords". The quick parse and voice that fill quick create are the
   time, the calendar's row and the shared looks are in `editor-fields.tsx`,
   so its chunk (4 KiB) loads without the editor's. Tested:
   `apps/web/e2e/quick-create.spec.ts`.
+  _Amended by [D315](#D315):_ "Save" stands at the end of the kind's row,
+  not at the foot.
 - **D297. The full editor, lighter.** Its rows lose their boxes: each is an
   icon and its value on the dialog's ground, with no border or fill, as in
   Google Calendar's edit screen; groups are parted by a hairline. An empty
@@ -2631,8 +2633,116 @@ keywords". The quick parse and voice that fill quick create are the
   ([D216](#D216)) drift the same way, less (6 % of their height), as
   Google's do. None with reduced motion.
 
+### Decided in round 7: the account a new item goes to
+
+- **D313. Where an item goes: its account, then its calendars.** The owner,
+  with Google Calendar's sheet beside it: "tasks and events need a choice
+  of which account to make them in"; then, on the first build: "imagine
+  ten calendars per account: that takes far too much room. Accounts matter
+  more than calendars; calendars are better tucked away. No IP or server
+  address; first the account, then the calendar (or several)". Quick
+  create ([D296](#D296)) and the edit dialog ([D297](#D297)) have one row
+  for it, as Google's: the account's avatar and name, and small under it
+  the calendars (a task's lists) it goes in. The name is the user name
+  without the server's address AstroTime put after it (`astro`, not
+  `astro@cloud.example.com`); a user name that is an address stays whole.
+  Pressed, the row opens the accounts, each with its calendars small
+  under its name (two of one user name differ by them) and the current one
+  marked, then the chosen account's calendars, each with a tick; with one
+  account offered, its calendars at once. A new item (not a copy, [D164](#D164)) may be ticked into several
+  of the account's calendars: it is saved in the first and a copy, a UID
+  of its own, in each other, in one local write; the last tick never goes,
+  and the first one gone meanwhile leaves the item to the next ticked (in
+  the dialog too). A calendar gone meanwhile that leaves the item to another
+  account leaves that account's own files behind.
+  Another account's calendar replaces the ticks. An existing item, or a
+  copy, goes in one: a pick closes the list, and a move to another
+  account's calendar is the move the calendar field already made
+  ([D37](foundation.md#D37)'s rights decide where); its own account leads
+  back to its own calendar. Choosing an account puts the item in its
+  first calendar offered, visible before hidden, as [foundation
+  D122](foundation.md#D122)'s default does. A kind switched to one its
+  calendar cannot hold moves to the same account's first calendar that
+  can, before another account's, and keeps the ticks that take it.
+- **D314. A new item in every account, a setting.** The owner: "by
+  default a new event or task goes to one calendar; one can also choose
+  to sync all calendars, so each has every task and event; then the
+  account choice is hidden", and, asked, that the row of [D313](#D313) is
+  then not shown at all. Settings → Accounts has "Save new items to every
+  account" (off by default, shown with two accounts on a server or more,
+  and while it is on, so it can be turned off). On, with two accounts on a
+  server or more, a new event or task (not a copy) has no row for where it
+  goes: it starts in an account on a server, and is saved there and, in
+  the same local write, a copy of it, a UID of its own, in each other
+  account on a server's first calendar that takes it, visible before
+  hidden; an account none of whose calendars takes it gets none. With no
+  row to pick again, a calendar that no longer takes it, or gone, gives
+  way to its account's next, else a server's, else the first that takes
+  it, without the files of an account it leaves; none, the dialog says no
+  calendar takes it. A calendar gone still names its account, as the
+  dialog last saw it. The dialog shows what the save does: one rule
+  (`newItemCalendar`), files of an account left shown gone, a copy's
+  ("Copy to") too.
+  Ticks are not read then. One copy
+  per account: "every calendar" is each account's, as the owner hides the
+  account choice. The calendar on this device ([foundation
+  D122](foundation.md#D122)), the demo's and subscriptions get no copy;
+  one put on this device by choice still goes to every server. A copy
+  carries what the item has, its reminders too (each copy rings), but no
+  file of an account's own ([foundation D232](foundation.md#D232): its
+  link opens only for its account, even on the same server); a link the
+  user gave, or a file inline, goes to every copy. An account whose sync
+  is off ([foundation D171](foundation.md#D171)) gets its copy too, which
+  waits here until sync is on. The setting's hint says the copies are
+  separate items: an edit or a deletion later changes the one copy edited
+  ([Deferred](#deferred)). An assistant's `create` through MCP
+  ([assistant D307](assistant.md#D307)) names its calendar and makes one
+  item.
+- **D315. Quick create's "Save" in the kind's row.** The owner: "the Save
+  button in the corner, on the same row as Event, Task". Quick create
+  ([D296](#D296)) has no "Save" at its foot: it stands at the end of the
+  "Event | Task" row, the microphone left of it when voice is on
+  ([assistant D302](assistant.md#D302)).
+- **D316. An account in Settings: its switch beside its menu, its
+  calendars folded.** The owner: "Sync is in effect turning the account on:
+  put the switch left of the ⋮ by the account, an on/off for the account,
+  meaning whether it syncs with your calendar; and make the calendars
+  under it foldable." Settings → Accounts has no "Sync" row: each
+  account's switch stands left of its menu (named "Sync", [foundation
+  D171](foundation.md#D171)'s setting, off with its calm hint under the
+  row), and its calendars fold under "N calendars", folded at first, the
+  drawer's checkbox rows ([D137](#D137)) once opened.
+
 ## Deferred
 
+- **Copies in every account kept alike** ([D314](#D314)) — a new item goes
+  to every account, but its copies are separate items afterwards: an edit,
+  a completion or a deletion changes only the one copy. Keeping them alike
+  needs a link between them (an `X-` property, kept by [foundation
+  D7](foundation.md#D7)) and rules for a copy changed on its server.
+  Which of another account's calendars a copy goes to is its first by
+  name; choosing one per account (or passing over calendars others shared)
+  waits with it.
+- **Copies told apart, and copies that could not be made** ([D313](#D313),
+  [D314](#D314)) — the copies of a new item ticked into several calendars
+  are separate items too, as every account's are. A ticked calendar or an
+  account that no longer takes the item when it is saved gets no copy,
+  and nothing says so; each server is then sent its copy on its own
+  ([foundation D91](foundation.md#D91)), so one may fail while the others
+  land. A notice of copies not made or not sent waits with keeping them
+  alike.
+- **Files kept while a kind switch visits another account** ([D313](#D313))
+  — a kind its account cannot hold moves the draft to another account's
+  calendar, and the first account's own files leave the form; switched
+  back, they are not there again (they stay in the account's files, to
+  attach again). Holding them, as a late upload is held, waits.
+- **A file kept when its item changes account** ([D313](#D313)) — a file
+  uploaded to one account's files and attached stays on the item when the
+  user then changes its calendar to another account's, as it did before
+  D313 (a calendar gone or refused meanwhile leaves a new one behind,
+  D314; a copy's files from its item, "Copy to", go with it as before);
+  dropping it (or holding it, as an upload finished late is) is the
+  dialog's rule to make.
 - **Asking before a filled form is closed** ([D296](#D296)) — "a filled
   one asks, as the editor does": the editor asks nothing on Escape or ✕
   today, so quick create closes as it does; one question for both, when

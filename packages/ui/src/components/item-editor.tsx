@@ -75,7 +75,7 @@ import { primaryButton, textButton } from "./buttons.ts";
 import { DialogBackdrop, DialogPopup, dialogIcon, sheet } from "./dialog-parts.tsx";
 import { asideStyle, useDraft, useDraftAside } from "./draft-aside.ts";
 import {
-  CalendarSelect,
+  CalendarFields,
   DateTime,
   field,
   fieldButton,
@@ -85,6 +85,7 @@ import {
   TimeSelect,
   titleField,
   useSecondPress,
+  type AccountChoice,
   type Press,
 } from "./editor-fields.tsx";
 
@@ -109,6 +110,9 @@ export interface EditorState {
 export function ItemEditor({
   state,
   calendars,
+  accounts,
+  showWhere,
+  multiple,
   onChange,
   onSave,
   onClose,
@@ -118,6 +122,12 @@ export function ItemEditor({
   state: EditorState | null;
   /** The calendars the item may be saved in. */
   calendars: readonly Calendar[];
+  /** The accounts offered, each with where choosing it puts the item (design D313). */
+  accounts: readonly AccountChoice[];
+  /** Whether the row of where it goes shows: not while a new item goes to every account (D314). */
+  showWhere: boolean;
+  /** A new item may be ticked into several calendars (D313). */
+  multiple: boolean;
   onChange: (form: Form) => void;
   onSave: () => void;
   onClose: () => void;
@@ -200,6 +210,9 @@ export function ItemEditor({
                 existing={state.existing}
                 copy={state.copy ?? false}
                 calendars={calendars}
+                accounts={accounts}
+                showWhere={showWhere}
+                multiple={multiple}
                 onChange={onChange}
               />
               {state.problem && (
@@ -254,12 +267,18 @@ function Fields({
   existing,
   copy,
   calendars,
+  accounts,
+  showWhere,
+  multiple,
   onChange,
 }: {
   form: Form;
   existing: boolean;
   copy: boolean;
   calendars: readonly Calendar[];
+  accounts: readonly AccountChoice[];
+  showWhere: boolean;
+  multiple: boolean;
   onChange: (form: Form) => void;
 }) {
   const { t } = useTranslation();
@@ -375,19 +394,17 @@ function Fields({
       </Group>
 
       <Group>
-        <Section icon={<CalendarIcon className="size-5" />}>
-          <CalendarSelect
-            label={t(event ? "edit.calendar" : "edit.list")}
-            value={form.calendarId}
-            onChange={(calendarId) => set({ calendarId })}
-            calendars={calendars}
-          />
-          {calendars.length === 0 && (
-            <p className="px-2 text-small text-danger">
-              {t(event ? "edit.noCalendar" : "edit.noList")}
-            </p>
-          )}
-        </Section>
+        {showWhere && (
+          <Section icon={<CalendarIcon className="size-5" />}>
+            <CalendarFields
+              form={form}
+              calendars={calendars}
+              accounts={accounts}
+              multiple={multiple}
+              onChange={(calendarId, alsoIn) => set({ calendarId, alsoIn })}
+            />
+          </Section>
+        )}
 
         <Section icon={<PaletteIcon className="size-5" />}>
           <ColorSelect

@@ -288,7 +288,9 @@ export function CalendarScreen({
   const { platform, scheduler } = useAccounts();
   const editing = useEditingState({
     store,
+    accounts: lists?.accounts ?? [],
     calendars: lists?.calendars ?? [],
+    everyAccount: chosen.everyAccount,
     hidden,
     timeZone,
     today,

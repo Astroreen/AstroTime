@@ -103,7 +103,7 @@ test("a default colour for events is a new event's own colour, chosen with a dot
   // list is a list, not a calendar (design D236, the owner's 4 in round 5).
   await dialog.getByRole("radio", { name: "Task" }).click();
   await expect(colour).toHaveText("The list's colour");
-  await expect(dialog.getByRole("combobox", { name: "List" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^List: / })).toBeVisible();
   await dialog.getByRole("radio", { name: "Event" }).click();
   await expect(colour).toHaveText("Dusty rose");
   await dialog.getByRole("textbox", { name: "Title" }).fill("Pottery");
@@ -199,7 +199,7 @@ test.describe("in Russian", () => {
     const colour = dialog.getByRole("combobox", { name: "Цвет" });
     await dialog.getByRole("radio", { name: "Задача" }).click();
     await expect(colour).toHaveText("Цвет списка");
-    await expect(dialog.getByRole("combobox", { name: "Список" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Список: / })).toBeVisible();
     await dialog.getByRole("radio", { name: "Мероприятие" }).click();
     await expect(colour).toHaveText("Цвет календаря");
   });

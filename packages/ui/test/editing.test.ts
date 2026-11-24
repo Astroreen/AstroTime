@@ -29,6 +29,7 @@ import {
   InDoubtError,
   newForm,
   newItemCalendar,
+  otherAccountsCalendars,
   noticeOf,
   NowhereError,
   problemOf,
@@ -674,11 +675,16 @@ describe("saving writes pending changes through the store (D5)", () => {
     ];
     const event = { kind: "event" as const, calendarId: "work" };
     // Chosen and taking it: that one.
-    expect(newItemCalendar(list, event)).toEqual({ calendar: list[2], refused: false });
+    expect(newItemCalendar(list, event)).toEqual({
+      calendar: list[2],
+      refused: false,
+      moved: false,
+    });
     // Chosen, there, no longer taking it: that one still, refused.
     expect(newItemCalendar(list, { ...event, calendarId: "tasks" })).toEqual({
       calendar: list[1],
       refused: true,
+      moved: false,
     });
     // Gone: the first that takes it, visible before hidden, as the dialog's default is.
     const gone = { ...event, calendarId: "gone" };
@@ -1292,6 +1298,401 @@ describe("saving writes pending changes through the store (D5)", () => {
     expect(updated.ics).toContain("EXDATE;TZID=Europe/Vilnius:20261105T090000");
     await deleteTarget(store, await targetOn(store, updated, "2026-11-06"), "all", NOW);
     expect(await rowOf("Work", "demo-standup")).toMatchObject({ pending: "delete" });
+  });
+});
+
+describe("a new item in every account (design D314)", () => {
+  test("a copy with its own UID in each other account's first calendar that takes it, in one write", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = async (name: string) =>
+      store.addAccount({
+        provider: "caldav",
+        name,
+        serverUrl: `https://${name}/`,
+        username: "astro",
+      });
+    const calendar = async (accountId: string, name: string, components: ("VEVENT" | "VTODO")[]) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://example.com/${accountId}/${name}/`,
+        name,
+        color: null,
+        components,
+        rights: ALL_RIGHTS,
+      });
+    const cloud = await add("cloud.example.com");
+    const work = await add("work.example.com");
+    const tasksOnly = await add("tasks.example.com");
+    const personal = await calendar(cloud.id, "Personal", ["VEVENT", "VTODO"]);
+    const team = await calendar(work.id, "Team", ["VEVENT"]);
+    const meetings = await calendar(work.id, "Meetings", ["VEVENT"]);
+    const todo = await calendar(tasksOnly.id, "Todo", ["VTODO"]);
+    // An account not on a server (this device's) gets no copy.
+    const device = await add("device.example.com");
+    const onDevice = await calendar(device.id, "Here", ["VEVENT", "VTODO"]);
+    const servers = new Set([cloud.id, work.id, tasksOnly.id]);
+    const hidden = new Set([team.id]);
+    // Each other account's first calendar that takes it, visible before hidden.
+    expect(
+      otherAccountsCalendars(await store.calendars(), "event", personal, servers, hidden).map(
+        (c) => c.id,
+      ),
+    ).toEqual([meetings.id]);
+    expect(
+      otherAccountsCalendars(await store.calendars(), "task", personal, servers).map((c) => c.id),
+    ).toEqual([todo.id]);
+
+    const form = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dentist",
+      // A file of the chosen account's own, and a link the user gave.
+      attachments: [
+        {
+          kind: "new" as const,
+          attachment: {
+            uri: "https://cloud.example.com/index.php/f/123",
+            name: "/Calendar/photo.jpg",
+            parameters: { "X-NC-FILE-ID": "123" },
+          },
+        },
+        { kind: "new" as const, attachment: { uri: "https://example.com/agenda.pdf" } },
+        // A file on the server the other accounts' calendars are on (example.com).
+        {
+          kind: "new" as const,
+          attachment: {
+            uri: "https://example.com/index.php/f/9",
+            parameters: { "X-NC-FILE-ID": "9" },
+          },
+        },
+      ],
+    };
+    const made = ["first", "second", "third"];
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    await saveForm(
+      store,
+      { ...request, hidden, everyAccount: servers },
+      { now: NOW, uid: () => made.shift()! },
+    );
+    // The chosen calendar's is the first UID made: where it lands (D193).
+    expect(await store.objectAt(personal.id, "first.ics")).toMatchObject({ pending: "create" });
+    const copy = await store.objectAt(meetings.id, "second.ics");
+    expect(copy).toMatchObject({ pending: "create", uid: "second" });
+    expect(CalendarObject.parse(copy!.ics).master?.summary).toBe("Dentist");
+    // No copy gets an account's own file, even on the same server: its link
+    // opens only for its account (foundation D232); the link goes along.
+    const linksOf = (ics: string) =>
+      CalendarObject.parse(ics).master?.attachments.map((file) => file.uri);
+    expect(linksOf(copy!.ics)).toEqual(["https://example.com/agenda.pdf"]);
+    expect(linksOf((await store.objectAt(personal.id, "first.ics"))!.ics)).toEqual([
+      "https://cloud.example.com/index.php/f/123",
+      "https://example.com/agenda.pdf",
+      "https://example.com/index.php/f/9",
+    ]);
+    // No calendar of the tasks-only account takes an event: no copy there.
+    expect(await store.pending(todo.id)).toEqual([]);
+    expect(await store.pending(team.id)).toEqual([]);
+    expect(await store.pending(onDevice.id)).toEqual([]);
+
+    // A copy made with "Copy to" (D164) goes to the one calendar picked.
+    // Its base already has a UID of its own, as `copyOf` gives it.
+    const base = (await store.objectAt(personal.id, "first.ics"))!.ics.replace(
+      "UID:first",
+      "UID:copied",
+    );
+    await saveForm(
+      store,
+      { ...request, initial: form, base, everyAccount: servers },
+      { now: NOW, uid: () => "copied" },
+    );
+    expect(await store.objectAt(personal.id, "copied.ics")).toBeDefined();
+    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual(["second"]);
+
+    // A copy is the same item as the one chosen: its day, its rule, its reminder.
+    const weekly = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Yoga",
+      allDay: true,
+      repeat: {
+        frequency: "WEEKLY" as const,
+        interval: 1,
+        weekdays: [],
+        monthlyWeekday: null,
+        end: { type: "never" as const },
+      },
+      alarms: [{ kind: "new" as const, relatedTo: "start" as const, offsetSeconds: -900 }],
+    };
+    const ids = ["yoga", "yoga-copy"];
+    await saveForm(
+      store,
+      { ...request, form: weekly, hidden, everyAccount: servers },
+      { now: NOW, uid: () => ids.shift()! },
+    );
+    const lines = async (calendarId: string, uid: string) =>
+      (await store.objectAt(calendarId, `${uid}.ics`))!.ics
+        .split("\r\n")
+        .filter((line) => /^(DTSTART|RRULE|TRIGGER|ACTION)/.test(line));
+    const own = await lines(personal.id, "yoga");
+    expect(own).toEqual(expect.arrayContaining([expect.stringMatching(/^DTSTART;VALUE=DATE:/)]));
+    expect(own.some((line) => line.startsWith("RRULE:FREQ=WEEKLY"))).toBe(true);
+    expect(own.some((line) => line.startsWith("TRIGGER"))).toBe(true);
+    expect(await lines(meetings.id, "yoga-copy")).toEqual(own);
+
+    // Put on this device by choice: it still goes to every server (D314).
+    // Copies are made in the calendars' order: Meetings, then Personal.
+    const local = ["here", "here-work", "here-cloud"];
+    await saveForm(
+      store,
+      {
+        ...request,
+        form: { ...form, calendarId: onDevice.id },
+        hidden,
+        everyAccount: servers,
+      },
+      { now: NOW, uid: () => local.shift()! },
+    );
+    expect([
+      (await store.objectAt(onDevice.id, "here.ics"))?.uid,
+      (await store.objectAt(personal.id, "here-cloud.ics"))?.uid,
+      (await store.objectAt(meetings.id, "here-work.ics"))?.uid,
+    ]).toEqual(["here", "here-cloud", "here-work"]);
+
+    // A copy that fails to be written takes the others with it: one write.
+    const failing = new Proxy(store, {
+      get(target, key) {
+        if (key !== "changeLocal") {
+          const value: unknown = Reflect.get(target, key, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (change: Parameters<Store["changeLocal"]>[0]) =>
+          target.changeLocal((inner, log) => {
+            let saves = 0;
+            return change(
+              {
+                ...inner,
+                object: (id) => inner.object(id),
+                calendars: () => inner.calendars(),
+                withUids: (calendarId, wanted) => inner.withUids(calendarId, wanted),
+                delete: (id) => inner.delete(id),
+                save: async (calendarId, ics, href) => {
+                  if (++saves === 2) throw new Error("The disk is full.");
+                  return inner.save(calendarId, ics, href);
+                },
+              },
+              log,
+            );
+          });
+      },
+    });
+    const lost = ["lost", "lost-copy"];
+    await expect(
+      saveForm(
+        failing,
+        { ...request, hidden, everyAccount: servers },
+        { now: NOW, uid: () => lost.shift()! },
+      ),
+    ).rejects.toThrow("The disk is full.");
+    expect(await store.objectAt(personal.id, "lost.ics")).toBeUndefined();
+
+    // Off, the default: only the calendar chosen.
+    await saveForm(store, request, { now: NOW, uid: () => "alone" });
+    expect(await store.objectAt(personal.id, "alone.ics")).toBeDefined();
+    expect((await store.pending(meetings.id)).map((row) => row.uid)).toEqual([
+      "second",
+      "yoga-copy",
+      "here-work",
+    ]);
+  });
+});
+
+const ALL_NO_CREATE = { create: false, edit: true, delete: true };
+
+describe("where a new item goes when its calendar changes under the dialog (D313, D314)", () => {
+  const calendar = (id: string, accountId: string, create = true) =>
+    ({
+      id,
+      accountId,
+      url: `https://example.com/${id}/`,
+      name: id,
+      color: null,
+      components: ["VEVENT"],
+      rights: { create, edit: true, delete: true },
+      syncToken: null,
+      ctag: null,
+    }) as const;
+  // By name, as the store lists them: the device's first.
+  const device = calendar("a-device", "local");
+  const away = calendar("b-away", "away");
+  const personal = calendar("c-personal", "home");
+  const work = calendar("d-work", "home");
+  const servers = new Set(["home", "away"]);
+  const event = { kind: "event" as const, calendarId: personal.id };
+
+  test("refused, with every account: its account's next before another server's", () => {
+    const list = [device, away, { ...personal, rights: ALL_NO_CREATE }, work];
+    expect(newItemCalendar(list, event, undefined, servers)).toMatchObject({
+      calendar: { id: work.id },
+      moved: false,
+    });
+    // Without: the dialog keeps it, refused, for the user to pick again.
+    expect(newItemCalendar(list, event)).toMatchObject({
+      calendar: { id: personal.id },
+      refused: true,
+    });
+  });
+
+  test("gone: a ticked one, else with every account a server's before the device's; files stay only in their account", () => {
+    expect(
+      newItemCalendar([device, away, work], { ...event, alsoIn: [work.id] }, undefined, servers),
+    ).toMatchObject({ calendar: { id: work.id }, moved: false });
+    expect(newItemCalendar([device, away, work], event, undefined, servers)).toMatchObject({
+      calendar: { id: away.id },
+      moved: true,
+    });
+    // Its account still known to the dialog: that account's next, files kept.
+    expect(newItemCalendar([device, away, work], event, undefined, servers, "home")).toMatchObject({
+      calendar: { id: work.id },
+      moved: false,
+    });
+    expect(newItemCalendar([device, away, work], event)).toMatchObject({
+      calendar: { id: device.id },
+      moved: true,
+    });
+    expect(newItemCalendar([], event, undefined, servers)).toBeNull();
+  });
+});
+
+describe("a new item ticked into several calendars (design D313)", () => {
+  test("a copy in each other ticked calendar of its account; none elsewhere, none twice", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = (name: string) =>
+      store.addAccount({ provider: "caldav", name, serverUrl: `https://${name}/`, username: "a" });
+    const calendar = (accountId: string, name: string, components: ("VEVENT" | "VTODO")[]) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://example.com/${accountId}/${name}/`,
+        name,
+        color: null,
+        components,
+        rights: ALL_RIGHTS,
+      });
+    const home = await add("home.example.com");
+    const away = await add("away.example.com");
+    const personal = await calendar(home.id, "Personal", ["VEVENT"]);
+    const family = await calendar(home.id, "Family", ["VEVENT"]);
+    const chores = await calendar(home.id, "Chores", ["VTODO"]);
+    const other = await calendar(away.id, "Other", ["VEVENT"]);
+    const form = {
+      ...newForm("event", { calendarId: personal.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dinner",
+      // Family once, Personal again, a list that takes no events, another account's.
+      alsoIn: [family.id, family.id, personal.id, chores.id, other.id],
+    };
+    const made = ["dinner", "dinner-family", "spare"];
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    await saveForm(store, request, { now: NOW, uid: () => made.shift()! });
+    expect([
+      (await store.pending(personal.id)).map((row) => row.uid),
+      (await store.pending(family.id)).map((row) => row.uid),
+      (await store.pending(chores.id)).map((row) => row.uid),
+      (await store.pending(other.id)).map((row) => row.uid),
+    ]).toEqual([["dinner"], ["dinner-family"], [], []]);
+
+    // Going to every account with its row hidden, a calendar that no longer
+    // takes it gives way to the first on a server that does (design D314).
+    await store.saveCalendar({ ...personal, rights: { create: false, edit: true, delete: true } });
+    const servers = new Set([home.id, away.id]);
+    const moved = ["moved", "moved-copy"];
+    await saveForm(
+      store,
+      { ...request, form: { ...form, alsoIn: [] }, everyAccount: servers },
+      { now: NOW, uid: () => moved.shift()! },
+    );
+    expect((await store.objectAt(family.id, "moved.ics"))?.uid).toBe("moved");
+    expect((await store.objectAt(other.id, "moved-copy.ics"))?.uid).toBe("moved-copy");
+
+    // Going to every account, ticks are not read: one copy per account (D314).
+    await store.saveCalendar({ ...personal, rights: ALL_RIGHTS });
+    const once = ["once", "once-away", "spare"];
+    await saveForm(
+      store,
+      { ...request, everyAccount: servers },
+      { now: NOW, uid: () => once.shift()! },
+    );
+    expect((await store.objectAt(personal.id, "once.ics"))?.uid).toBe("once");
+    expect(await store.objectAt(family.id, "spare.ics")).toBeUndefined();
+    expect((await store.objectAt(other.id, "once-away.ics"))?.uid).toBe("once-away");
+  });
+
+  test("its calendar gone, a ticked one takes it; moved to another account, no file of the first's", async () => {
+    const store = await Store.open(nodeDriver());
+    const add = (name: string) =>
+      store.addAccount({ provider: "caldav", name, serverUrl: `https://${name}/`, username: "a" });
+    const calendar = (accountId: string, name: string) =>
+      store.saveCalendar({
+        accountId,
+        url: `https://${accountId}.example/${name}/`,
+        name,
+        color: null,
+        components: ["VEVENT"],
+        rights: ALL_RIGHTS,
+      });
+    const home = await add("home.example.com");
+    const away = await add("away.example.com");
+    const alpha = await calendar(home.id, "Alpha");
+    const zeta = await calendar(home.id, "Zeta");
+    const beta = await calendar(away.id, "Beta");
+    const form = {
+      ...newForm("event", { calendarId: alpha.id, day: "2026-11-04", minutes: 600, timeZone }),
+      summary: "Dinner",
+      alsoIn: [zeta.id],
+      attachments: [
+        {
+          kind: "new" as const,
+          attachment: { uri: "https://home.example/f/1", parameters: { "X-NC-FILE-ID": "1" } },
+        },
+        { kind: "new" as const, attachment: { uri: "https://example.com/menu.pdf" } },
+      ],
+    };
+    const request = { target: null, initial: null, form, scope: "all" as const, untitled: "R" };
+    // Alpha went meanwhile: Zeta, ticked, takes it, not Beta of another account.
+    await store.removeCalendar(alpha.id);
+    await saveForm(store, request, { now: NOW, uid: () => "kept" });
+    expect((await store.objectAt(zeta.id, "kept.ics"))?.uid).toBe("kept");
+    expect(await store.pending(beta.id)).toEqual([]);
+    // No tick, but the dialog knew its account: that account's next, files kept.
+    await saveForm(
+      store,
+      { ...request, form: { ...form, alsoIn: [] }, account: home.id },
+      { now: NOW, uid: () => "hinted" },
+    );
+    const hinted = await store.objectAt(zeta.id, "hinted.ics");
+    expect(CalendarObject.parse(hinted!.ics).master?.attachments).toHaveLength(2);
+    expect(await store.pending(beta.id)).toEqual([]);
+
+    // Every account, and nothing of Home takes it now: it goes to Away,
+    // without Home's own file (foundation D232).
+    await store.saveCalendar({ ...zeta, rights: { create: false, edit: true, delete: true } });
+    const servers = new Set([home.id, away.id]);
+    const made = ["away", "spare"];
+    await saveForm(
+      store,
+      { ...request, form: { ...form, calendarId: zeta.id, alsoIn: [] }, everyAccount: servers },
+      { now: NOW, uid: () => made.shift()! },
+    );
+    const saved = await store.objectAt(beta.id, "away.ics");
+    expect(CalendarObject.parse(saved!.ics).master?.attachments.map((file) => file.uri)).toEqual([
+      "https://example.com/menu.pdf",
+    ]);
+
+    // Nothing takes it at all: nowhere, not "pick another" with no row to pick in.
+    await store.saveCalendar({ ...beta, rights: { create: false, edit: true, delete: true } });
+    await expect(
+      saveForm(
+        store,
+        { ...request, form: { ...form, calendarId: zeta.id, alsoIn: [] }, everyAccount: servers },
+        { now: NOW, uid: () => "none" },
+      ),
+    ).rejects.toThrow(NowhereError);
   });
 });
 

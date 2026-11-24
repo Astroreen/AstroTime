@@ -12,7 +12,7 @@ import {
   type ItemTimes,
   type Task,
 } from "@astrotime/core";
-import type { Calendar, Store, StoredObject } from "@astrotime/storage";
+import type { Account, Calendar, Store, StoredObject } from "@astrotime/storage";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +24,7 @@ import {
   followed,
   formOf,
   GoneError,
+  goesToEveryCopy,
   InDoubtError,
   isOccurrence,
   itemOf,
@@ -31,6 +32,7 @@ import {
   newItemCalendar,
   noticeOf,
   NowhereError,
+  accountsOnServers,
   problemOf,
   RefusedError,
   rewriteTarget,
@@ -48,7 +50,7 @@ import { rightsOf } from "../calendar/rights.ts";
 import type { DefaultColors } from "../settings.ts";
 import { useCelebrate } from "./celebration.ts";
 import { ChangeNotice } from "./change-notice.tsx";
-import type { Press } from "./editor-fields.tsx";
+import type { AccountChoice, Press } from "./editor-fields.tsx";
 import type { EditorState } from "./item-editor.tsx";
 import { CopyNotice, ItemDetails, ItemEditor, QuickCreate } from "./lazy.tsx";
 import type { Landed } from "./context.ts";
@@ -157,9 +159,17 @@ interface Editing {
   readonly quick?: boolean;
 }
 
+/**
+ * Each calendar's account as this app last saw it (calendar ids are unique),
+ * so a calendar gone since still names its account (design D313).
+ */
+const knownAccounts = new Map<string, string>();
+
 export function useEditingState({
   store,
+  accounts,
   calendars,
+  everyAccount,
   hidden,
   timeZone,
   today,
@@ -169,7 +179,11 @@ export function useEditingState({
   onChanged,
 }: {
   store: Store;
+  /** The accounts, to choose the one an item goes to (design D313). */
+  accounts: readonly Account[];
   calendars: readonly Calendar[];
+  /** A new item goes to every account, not to one chosen (design D314). */
+  everyAccount: boolean;
   /** Calendars hidden from the views: a new item goes in a visible one first. */
   hidden: ReadonlySet<string>;
   /** The colour a new event or task starts with (design D172); `null`, its calendar's. */
@@ -233,10 +247,30 @@ export function useEditingState({
   }, [store, detailsId]);
 
   const byId = (id: string | undefined) => calendars.find((c) => c.id === id);
+  // Each calendar's account as last seen: a calendar gone while its new item's
+  // dialog is open still names its account, whose next calendar takes it (D313).
+  useEffect(() => {
+    for (const calendar of calendars) knownAccounts.set(calendar.id, calendar.accountId);
+  }, [calendars]);
+  /** The accounts on a server, which a new item goes to when it goes to every account (D314). */
+  const servers = new Set(accountsOnServers(accounts).map((account) => account.id));
+  /** New items go to every account: on, and two accounts on a server or more to go to (D314). */
+  const toEvery = everyAccount && servers.size > 1;
   // A new item goes where new items may; an existing one stays, or moves where its own lets it (D37).
   const writable = (kind: "event" | "task", from?: Calendar) => calendarsFor(calendars, kind, from);
+  // While new items go to every account, one on a server first: the
+  // device's calendar keeps no copy it would not step aside for (D314).
   const firstFor = (kind: "event" | "task") =>
-    firstCalendarFor(calendars, kind, hidden)?.id ?? null;
+    (toEvery
+      ? firstCalendarFor(
+          calendars.filter((calendar) => servers.has(calendar.accountId)),
+          kind,
+          hidden,
+        )
+      : undefined
+    )?.id ??
+    firstCalendarFor(calendars, kind, hidden)?.id ??
+    null;
   /** The calendar the item being edited was in; none for a new item. */
   const fromOf = (current: Editing) =>
     current.target ? byId(current.initial?.calendarId) : undefined;
@@ -358,9 +392,39 @@ export function useEditingState({
   const change = (form: Form) =>
     setEditing((current) => {
       if (!current) return current;
-      // A kind its calendar cannot hold moves to the first calendar that can.
-      const fits = writable(form.kind, fromOf(current)).some((c) => c.id === form.calendarId);
-      const next = fits ? form : { ...form, calendarId: firstFor(form.kind) ?? form.calendarId };
+      // A kind its calendar cannot hold moves to the first calendar that
+      // can, in the same account first: the account chosen stays (D313).
+      const offered = writable(form.kind, fromOf(current));
+      const fits = offered.some((c) => c.id === form.calendarId);
+      const accountId = byId(form.calendarId)?.accountId ?? knownAccounts.get(form.calendarId);
+      const own = offered.filter((c) => c.accountId === accountId);
+      // A calendar ticked beside it that takes the kind first, then the account's first.
+      const tickedFits = own.find((c) => form.alsoIn?.includes(c.id));
+      const sameAccount = tickedFits ?? own.find((c) => !hidden.has(c.id)) ?? own[0];
+      const placedId = fits
+        ? form.calendarId
+        : (sameAccount?.id ?? firstFor(form.kind) ?? form.calendarId);
+      // Moved here to another account, not picked: no file of the first's own
+      // goes with it (foundation D232).
+      const left = !fits && byId(placedId)?.accountId !== accountId;
+      const placed = {
+        ...form,
+        calendarId: placedId,
+        ...(left && form.attachments
+          ? {
+              attachments: form.attachments.filter(
+                (file) => file.kind === "existing" || goesToEveryCopy(file.attachment),
+              ),
+            }
+          : {}),
+      };
+      // The other calendars ticked: those of its account that take its kind (D313).
+      const account = byId(placed.calendarId)?.accountId;
+      const alsoIn = (placed.alsoIn ?? []).filter(
+        (id) =>
+          id !== placed.calendarId && offered.some((c) => c.id === id && c.accountId === account),
+      );
+      const next = { ...placed, alsoIn };
       // A rule moves with the item's day (D105).
       const moved = followed(current.state.form, next);
       return { ...current, state: { ...current.state, form: moved, problem: null } };
@@ -389,6 +453,10 @@ export function useEditingState({
           scope,
           untitled: t("edit.untitledReminder"),
           hidden,
+          ...(toEvery ? { everyAccount: servers } : {}),
+          ...(knownAccounts.has(state.form.calendarId)
+            ? { account: knownAccounts.get(state.form.calendarId)! }
+            : {}),
           ...(editing.base === undefined ? {} : { base: editing.base }),
         },
         {
@@ -562,16 +630,60 @@ export function useEditingState({
   // A new item's field shows where it goes now (`newItemCalendar`, the save's
   // own rule): its calendar while there, kept in the field even once it no
   // longer takes the item; else the first that takes it (foundation D122).
+  // A new item (not a copy) while new items go to every account on a
+  // server: no row for where it goes at all (D314).
+  const everyMode = toEvery && editing !== null && editing.target === null && !editing.base;
+  // Where the new item goes now, the save's own rule (D122, D313, D314):
+  // going to every account, a calendar that no longer takes it gives way,
+  // as there is no row to pick again in; none, the dialog says so.
   const shown =
     editing && editing.target === null
-      ? newItemCalendar(calendars, editing.state.form, hidden)
+      ? newItemCalendar(
+          calendars,
+          everyMode ? { ...editing.state.form, alsoIn: [] } : editing.state.form,
+          hidden,
+          everyMode ? servers : undefined,
+          knownAccounts.get(editing.state.form.calendarId),
+        )
+      : null;
+  // Gone from the account chosen, no file of that one's own goes with it,
+  // and the dialog shows them gone (foundation D232).
+  const shownForm =
+    editing && shown
+      ? {
+          ...editing.state.form,
+          calendarId: shown.calendar.id,
+          ...(shown.moved && editing.state.form.attachments
+            ? {
+                attachments: editing.state.form.attachments.filter(
+                  (file) => file.kind === "existing" || goesToEveryCopy(file.attachment),
+                ),
+              }
+            : {}),
+        }
       : null;
   const shownState =
-    editing && shown
-      ? { ...editing.state, form: { ...editing.state.form, calendarId: shown.calendar.id } }
-      : (editing?.state ?? null);
+    editing && shownForm ? { ...editing.state, form: shownForm } : (editing?.state ?? null);
   const offered = editing ? writable(editing.state.form.kind, fromOf(editing)) : [];
   const shownCalendars = shown?.refused ? [shown.calendar, ...offered] : offered;
+  // Each account offered, with where choosing it puts the item (D313): an
+  // existing item's own calendar in its own account, else the account's
+  // first calendar that takes it, visible before hidden. In the accounts'
+  // own order, as the drawer and Settings list them.
+  const from = editing ? fromOf(editing) : undefined;
+  const accountChoices: AccountChoice[] = accounts.flatMap((account) => {
+    const all = shownCalendars.filter((one) => one.accountId === account.id);
+    // A calendar that refuses the item is where its account leads only when it has no other.
+    const own = all.filter((one) => !(shown?.refused && one.id === shown.calendar.id));
+    const first =
+      own.find((one) => one.id === from?.id) ??
+      own.find((one) => !hidden.has(one.id)) ??
+      own[0] ??
+      all[0];
+    return first ? [{ account, calendarId: first.id }] : [];
+  });
+  // A new item (not a copy) may be ticked into several calendars (D313).
+  const multiple = editing !== null && editing.target === null && !editing.base;
 
   const dialogs = (
     <>
@@ -595,6 +707,9 @@ export function useEditingState({
       <QuickCreate
         state={editing?.quick ? shownState : null}
         calendars={shownCalendars}
+        accounts={accountChoices}
+        showWhere={!everyMode || shownCalendars.length === 0}
+        multiple={multiple}
         onChange={change}
         onDraft={setDraft}
         onSave={save}
@@ -605,6 +720,9 @@ export function useEditingState({
         state={editing?.quick ? null : shownState}
         target={editing?.target ?? null}
         calendars={shownCalendars}
+        accounts={accountChoices}
+        showWhere={!everyMode || shownCalendars.length === 0}
+        multiple={multiple}
         onChange={change}
         onDraft={setDraft}
         onSave={save}

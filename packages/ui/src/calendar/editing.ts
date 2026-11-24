@@ -30,12 +30,14 @@ import {
   type ItemTimes,
   type NewAlarm,
   type NewAttachment,
+  type NewInlineFile,
   type Repeat,
   type Scope,
 } from "@astrotime/core";
 import {
   CommitInDoubtError,
   HandOverError,
+  type Account,
   type Calendar,
   type LocalChange,
   type Store,
@@ -78,6 +80,11 @@ export type RepeatChoice = Repeat | null | "kept";
 export interface Form {
   readonly kind: "event" | "task";
   readonly calendarId: string;
+  /**
+   * A new item's other calendars of the same account, ticked beside
+   * `calendarId` (design D313): a copy, a UID of its own, in each.
+   */
+  readonly alsoIn?: readonly string[];
   readonly summary: string;
   /** A task's start and due alike (design D159). */
   readonly allDay: boolean;
@@ -692,19 +699,99 @@ export function firstCalendarFor(
  * as they are (foundation D122): that one while it takes the item; that one
  * still, but `refused`, while it is there and no longer takes it (read-only
  * now, its components changed: the dialog keeps showing it, and the user
- * picks again); else, when it is gone, the first that takes the item; none
- * when no calendar does. The dialog's field shows this, and the save uses it.
+ * picks again); else, when it is gone, another that takes it. With
+ * `servers` (new items go to every account, D314) the dialog has no row to
+ * pick again in, so a refused one gives way too. Another is, in order: a
+ * calendar ticked beside it (D313), its account's first, a server's first
+ * (with `servers`), the first; none when no calendar takes it. `moved`: it
+ * left the account chosen, or that account is not known (gone, and no
+ * `knownAccount`), so no file of the account's own goes with it
+ * (foundation D232). The dialog's field shows this, and the save uses it.
  */
 export function newItemCalendar(
   calendars: readonly Calendar[],
-  form: Pick<Form, "kind" | "calendarId">,
+  form: Pick<Form, "kind" | "calendarId" | "alsoIn">,
   hidden?: ReadonlySet<string>,
-): { readonly calendar: Calendar; readonly refused: boolean } | null {
-  const chosen = calendars.find((calendar) => calendar.id === form.calendarId);
-  if (chosen) return { calendar: chosen, refused: calendarsFor([chosen], form.kind).length === 0 };
-  const first = firstCalendarFor(calendars, form.kind, hidden);
-  return first ? { calendar: first, refused: false } : null;
+  servers?: ReadonlySet<string>,
+  /** The account of the calendar chosen as the dialog last saw it, for one gone since. */
+  knownAccount?: string,
+): { readonly calendar: Calendar; readonly refused: boolean; readonly moved: boolean } | null {
+  const takes = (calendar: Calendar) => calendarsFor([calendar], form.kind).length > 0;
+  const byId = (id: string) => calendars.find((calendar) => calendar.id === id);
+  const chosen = byId(form.calendarId);
+  if (chosen && takes(chosen)) return { calendar: chosen, refused: false, moved: false };
+  if (chosen && !servers) return { calendar: chosen, refused: true, moved: false };
+  const account = chosen?.accountId ?? knownAccount;
+  // The ticks are of the account chosen: one of them stays in it.
+  const tick = (form.alsoIn ?? [])
+    .map(byId)
+    .find(
+      (calendar): calendar is Calendar =>
+        calendar !== undefined &&
+        takes(calendar) &&
+        (account === undefined || calendar.accountId === account),
+    );
+  if (tick) return { calendar: tick, refused: false, moved: false };
+  const own =
+    account === undefined
+      ? undefined
+      : firstCalendarFor(
+          calendars.filter((calendar) => calendar.accountId === account),
+          form.kind,
+          hidden,
+        );
+  if (own) return { calendar: own, refused: false, moved: false };
+  const other =
+    (servers
+      ? firstCalendarFor(
+          calendars.filter((calendar) => servers.has(calendar.accountId)),
+          form.kind,
+          hidden,
+        )
+      : undefined) ?? firstCalendarFor(calendars, form.kind, hidden);
+  return other ? { calendar: other, refused: false, moved: true } : null;
 }
+
+/**
+ * The accounts a new item may go to on a server, when new items go to
+ * every account (design D314): CalDAV's. A subscription takes no item, and
+ * the calendar on this device and the demo's reach no server.
+ */
+export const accountsOnServers = (accounts: readonly Account[]): Account[] =>
+  accounts.filter((account) => account.provider === "caldav");
+
+/**
+ * Where a copy of a new item goes when new items go to every account
+ * (design D314): for each account of `among` (those on a server) besides
+ * `into`'s, its first calendar that takes the item, visible before hidden,
+ * as `firstCalendarFor` picks one; an account none of whose calendars
+ * takes it gets no copy.
+ */
+export function otherAccountsCalendars(
+  calendars: readonly Calendar[],
+  kind: "event" | "task",
+  into: Calendar,
+  among: ReadonlySet<string>,
+  hidden?: ReadonlySet<string>,
+): Calendar[] {
+  const accounts = [...new Set(calendars.map((calendar) => calendar.accountId))];
+  return accounts.flatMap((accountId) => {
+    if (accountId === into.accountId || !among.has(accountId)) return [];
+    const own = calendars.filter((calendar) => calendar.accountId === accountId);
+    const first = firstCalendarFor(own, kind, hidden);
+    return first ? [first] : [];
+  });
+}
+
+/**
+ * Whether a new item's attachment goes to its copies in other accounts
+ * (design D314): a file inline, or a link the user gave (absolute, with no
+ * provider's parameters). A file of an account's own (`X-NC-FILE-ID`, or a
+ * link relative to its server) opens only for its account (foundation D232).
+ */
+export const goesToEveryCopy = (file: NewAttachment | NewInlineFile): boolean =>
+  "content" in file ||
+  (Object.keys(file.parameters ?? {}).length === 0 && /^[a-z][a-z0-9+.-]*:/i.test(file.uri));
 
 /** @internal What a write needs: the time, and a new UID. */
 export interface Writes {
@@ -880,30 +967,88 @@ export async function saveForm(
      * the dialog has no field for come along (D7).
      */
     readonly base?: string;
+    /**
+     * A new item goes to every account (design D314): these, the accounts
+     * on a server, each get a copy of it with a UID of its own, in their
+     * first calendar that takes it. Not for a copy ("Copy to" picks one
+     * calendar).
+     */
+    readonly everyAccount?: ReadonlySet<string>;
+    /** The account of its calendar as the dialog knew it: one gone since still names it (D313). */
+    readonly account?: string;
   },
   writes: Writes,
 ): Promise<void> {
   const { target, initial, form, untitled } = request;
   if (!target || !initial) {
+    // A new item's UID is made once: a save retried keeps it (D193 lands it).
+    const uid = request.base ? "" : writes.uid();
+    const made: string[] = [];
+    const changes = changesOf(initial, form, untitled);
+    // A copy has no file of an account's own (a provider's parameters name
+    // it): its link opens only for its account (foundation D232); a link the
+    // user gave, or a file inline, goes to every copy.
+    const forCopy: ItemChanges = changes.attachments
+      ? {
+          ...changes,
+          attachments: {
+            ...changes.attachments,
+            add: changes.attachments.add.filter(goesToEveryCopy),
+          },
+        }
+      : changes;
     const ics = request.base
       ? // "Copy to…"'s code loads with it, not with the app (foundation D145).
-        (await import("./copy.ts")).createFrom(
-          request.base,
-          changesOf(initial, form, untitled),
-          writes.now,
-        )
-      : createItem(form.kind, changesOf(null, form, untitled), {
-          now: writes.now,
-          uid: writes.uid(),
-        });
+        (await import("./copy.ts")).createFrom(request.base, changes, writes.now)
+      : createItem(form.kind, changes, { now: writes.now, uid });
+    // Gone from the account chosen: no file of that one's own (foundation D232).
+    const icsMoved = request.base
+      ? (await import("./copy.ts")).createFrom(request.base, forCopy, writes.now)
+      : createItem(form.kind, forCopy, { now: writes.now, uid });
     await changeLocal(store, async (local) => {
       // The calendars as they are now, in this transaction: the screen's
       // list may not have caught up (foundation D122). Where it goes is what
       // the dialog shows (`newItemCalendar`, the same rule and list).
-      const into = newItemCalendar(await local.calendars(), form, request.hidden);
+      const calendars = await local.calendars();
+      const servers = request.everyAccount;
+      // Going to every account, there are no ticks: its row is hidden (D314).
+      const ticks = servers ? [] : [...new Set(form.alsoIn ?? [])];
+      const into = newItemCalendar(
+        calendars,
+        { ...form, alsoIn: ticks },
+        request.hidden,
+        servers && !request.base ? servers : undefined,
+        request.account,
+      );
       if (!into) throw new NowhereError("No calendar takes this item now.");
       if (into.refused) throw new RefusedError("The calendar chosen no longer takes this item.");
-      await local.save(into.calendar.id, ics);
+      await local.save(into.calendar.id, into.moved ? icsMoved : ics);
+      // A save retried keeps its copies' UIDs too, in the order they are made.
+      let copies = 0;
+      const copyUid = () => (made[copies++] ??= writes.uid());
+      if (request.base) return;
+      // The other calendars ticked in its account, each that still takes it (D313).
+      for (const id of ticks) {
+        const also = calendars.find((calendar) => calendar.id === id);
+        if (!also || also.id === into.calendar.id || also.accountId !== into.calendar.accountId)
+          continue;
+        if (calendarsFor([also], form.kind).length === 0) continue;
+        const copy = createItem(form.kind, changes, { now: writes.now, uid: copyUid() });
+        await local.save(also.id, copy);
+      }
+      if (!servers) return;
+      // In the same local write: here, every account gets it or none does
+      // (each server is then sent its copy on its own, foundation D91).
+      for (const other of otherAccountsCalendars(
+        calendars,
+        form.kind,
+        into.calendar,
+        request.everyAccount,
+        request.hidden,
+      )) {
+        const copy = createItem(form.kind, forCopy, { now: writes.now, uid: copyUid() });
+        await local.save(other.id, copy);
+      }
     });
     return;
   }

@@ -17,6 +17,7 @@ import { Switch } from "@base-ui/react/switch";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { accountsOnServers } from "../calendar/editing.ts";
 import { addAssistantStrings } from "../i18n/assistants.ts";
 import { addDataStrings } from "../i18n/data.ts";
 import { LANGUAGES } from "../i18n/index.ts";
@@ -30,7 +31,7 @@ import { deferred } from "./lazy.tsx";
 import { ColorSettings } from "./color-settings.tsx";
 import { PictureSettings } from "./picture-settings.tsx";
 import { useCalendar } from "./context.ts";
-import { CloseIcon } from "./icons.tsx";
+import { ChevronIcon, CloseIcon } from "./icons.tsx";
 import { RemindersSwitch } from "./reminders-switch.tsx";
 import { Select } from "./select.tsx";
 import { TypeSettings } from "./type-settings.tsx";
@@ -204,42 +205,30 @@ function SettingsGroups({
       {/* Each account with how it syncs, its menu and its calendars, each
           shown or not as the drawer's checkbox says (D131, D137). */}
       <Group title={t("accounts.title")}>
-        {accounts.map((account, index) => {
-          const own = calendars.filter((calendar) => calendar.accountId === account.id);
-          return (
-            <section
-              key={account.id}
-              aria-label={accountName(account, t)}
-              className={`flex flex-col pb-1 ${index > 0 ? "border-t border-line pt-1" : ""}`}
-            >
-              <div className="px-4 py-2">
-                <AccountRow account={account} onLeave={onLeave} />
-              </div>
-              {/* Whether it syncs at all (foundation D171); off, its calendars stay. */}
-              {syncs(account) && (
-                <Toggle
-                  label={t("accounts.sync")}
-                  checked={!account.syncOff}
-                  onChange={(on) => void setSyncing(account, on).catch(console.error)}
-                  {...(account.syncOff ? { hint: t("accounts.sync.hint") } : {})}
-                />
-              )}
-              {own.length === 0 && (
-                <p className="px-4 pb-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>
-              )}
-              {own.map((calendar) => (
-                <CalendarRow
-                  key={calendar.id}
-                  calendar={calendar}
-                  color={colorOf(calendar)}
-                  shown={!hidden.has(calendar.id)}
-                  onToggle={onToggle}
-                  className="min-h-11"
-                />
-              ))}
-            </section>
-          );
-        })}
+        {/* A new item in one account, or in every one on a server (D314): a choice only with two or more, or while it is on. */}
+        {(accountsOnServers(accounts).length > 1 || settings.everyAccount) && (
+          <div className="border-b border-line pb-1">
+            <Toggle
+              label={t("accounts.everyAccount")}
+              checked={settings.everyAccount}
+              onChange={(everyAccount) => change({ everyAccount })}
+              hint={t("accounts.everyAccount.hint")}
+            />
+          </div>
+        )}
+        {accounts.map((account, index) => (
+          <AccountSettings
+            key={account.id}
+            account={account}
+            calendars={calendars.filter((calendar) => calendar.accountId === account.id)}
+            first={index === 0}
+            hidden={hidden}
+            onToggle={onToggle}
+            colorOf={colorOf}
+            onLeave={onLeave}
+            onSync={(on) => void setSyncing(account, on).catch(console.error)}
+          />
+        ))}
         <div className="border-t border-line px-2 py-1">
           <AddAccountButton onLeave={onLeave} />
         </div>
@@ -394,6 +383,98 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
         {title}
       </h2>
       <div className="flex flex-col rounded-2xl bg-canvas py-1">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * An account in Settings (design D131, D137, D316): its row with, left of
+ * its menu, the switch that turns it on or off, which is whether it syncs
+ * (foundation D171); under it its calendars, folded until opened.
+ */
+function AccountSettings({
+  account,
+  calendars,
+  first,
+  hidden,
+  onToggle,
+  colorOf,
+  onLeave,
+  onSync,
+}: {
+  account: Account;
+  calendars: readonly Calendar[];
+  first: boolean;
+  hidden: ReadonlySet<string>;
+  onToggle: (calendarId: string, visible: boolean) => void;
+  colorOf: (calendar: Calendar) => string;
+  onLeave: () => void;
+  onSync: (on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const hintId = useId();
+  const listId = useId();
+  return (
+    <section
+      aria-label={accountName(account, t)}
+      className={`flex flex-col pb-1 ${first ? "" : "border-t border-line pt-1"}`}
+    >
+      <div className="px-4 py-2">
+        <AccountRow
+          account={account}
+          onLeave={onLeave}
+          action={
+            syncs(account) ? (
+              <Switch.Root
+                checked={!account.syncOff}
+                onCheckedChange={onSync}
+                aria-label={t("accounts.sync")}
+                aria-describedby={account.syncOff ? hintId : undefined}
+                className="flex h-6 w-10 shrink-0 items-center rounded-full bg-pill p-0.5 shadow-[inset_0_0_0_2px_var(--color-ink-muted)] transition-colors duration-150 data-checked:bg-accent data-checked:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Switch.Thumb className="size-5 rounded-full bg-ink-muted transition-[translate,background-color] duration-150 data-checked:translate-x-4 data-checked:bg-on-accent" />
+              </Switch.Root>
+            ) : undefined
+          }
+        />
+        {/* Off, its calendars stay and nothing reaches its server (foundation D171). */}
+        {syncs(account) && account.syncOff ? (
+          <p id={hintId} className="pt-1 text-note text-ink-muted">
+            {t("accounts.sync.hint")}
+          </p>
+        ) : null}
+      </div>
+      {calendars.length === 0 ? (
+        <p className="px-4 pb-2 text-small text-ink-muted">{t("accounts.noCalendars")}</p>
+      ) : (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={listId}
+            onClick={() => setOpen(!open)}
+            className="flex min-h-11 items-center gap-2 px-4 text-left text-body text-ink-muted hover:bg-raised-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          >
+            <span className="min-w-0 flex-1">
+              {t("accounts.calendars", { count: calendars.length })}
+            </span>
+            <ChevronIcon direction={open ? "up" : "down"} className="size-5 shrink-0" />
+          </button>
+          <div id={listId} hidden={!open}>
+            {calendars.map((calendar) => (
+              <CalendarRow
+                key={calendar.id}
+                calendar={calendar}
+                color={colorOf(calendar)}
+                shown={!hidden.has(calendar.id)}
+                onToggle={onToggle}
+                className="min-h-11"
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }

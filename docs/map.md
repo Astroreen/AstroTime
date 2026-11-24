@@ -360,7 +360,8 @@ When you add a package, app or module, add its line here in the same PR.
     - `calendar-row.tsx` — a calendar's row with its checkbox, the drawer's
       and Settings'. → `plans/design.md#D137`
     - `settings-section.tsx` — the Settings screen (a dialog on a wide
-      screen), from the drawer's foot. → `plans/design.md#D131`,
+      screen), from the drawer's foot; each account with its sync switch
+      beside its menu and its calendars folded (`plans/design.md#D316`). → `plans/design.md#D131`,
       `plans/design.md#D96`, `plans/design.md#D226`
     - `type-settings.tsx` — Settings' "Font" and "Text size", with their
       live preview (the Agenda's day heading and cards). → `plans/design.md#D294`,
@@ -379,8 +380,13 @@ When you add a package, app or module, add its line here in the same PR.
     - `quick-create.tsx` — quick create: a new item's sheet on a phone, a
       popover beside its draft on a wide screen, expanded into the edit
       dialog; `editor-fields.tsx`, the rows both share (date, time,
-      calendar, kind, the looks of a row, a double click's second press).
-      → `plans/design.md#D296`, `plans/design.md#D297`
+      calendar, kind, the looks of a row, a double click's second press;
+      `CalendarFields`, one row for the account and its calendars, which
+      opens the accounts then one's calendars, ticked, `plans/design.md#D313`;
+      quick create's "Save" in the kind's row, `plans/design.md#D315`).
+      → `plans/design.md#D296`, `plans/design.md#D297`; a new item in every
+      account (`otherAccountsCalendars` in `calendar/editing.ts`, the
+      `everyAccount` setting) → `plans/design.md#D314`
     - `draft-aside.ts` — `useDraft`, the edit dialog's draft made in the
       editor's chunk and handed to the views (`DrawnDraft`), and where the
       dialog stands on a wide screen, beside it. → `plans/design.md#D155`
@@ -584,7 +590,9 @@ When you add a package, app or module, add its line here in the same PR.
     `quick-create.spec.ts` makes an event and a task through quick create
     and expands it, `quick-create-screenshots.spec.ts` takes its evidence;
     the specs that create through the edit dialog reach it by `expand` in
-    `support.ts`. → `plans/design.md#D296`;
+    `support.ts`. → `plans/design.md#D296`; `every-account.spec.ts`
+    chooses a new event's account and saves one to every account, against
+    two Radicales, `every-account-screenshots.spec.ts` takes its evidence. → `plans/design.md#D313`, `plans/design.md#D314`;
     `editing.spec.ts` creates, edits and deletes on the demo data,
     `editing-server.spec.ts` sees an item made here, then dragged, reach
     Radicale, `editing-screenshots.spec.ts` takes the editing evidence.
