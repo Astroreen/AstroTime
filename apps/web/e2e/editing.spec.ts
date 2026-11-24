@@ -141,6 +141,7 @@ for (const [size, viewport] of [
     const words = (field: Locator) => field.locator("xpath=following-sibling::span");
     // A date reads in words, the year only when it is another.
     await expect(words(start)).toHaveText("Wed, Nov 4");
+    const narrow = (await start.boundingBox())!.width;
     // A press on the words asks the browser for its picker.
     await page.evaluate(() => {
       const asked = ((window as unknown as { asked: string[] }).asked = [] as string[]);
@@ -162,6 +163,18 @@ for (const [size, viewport] of [
     await expect(words(start)).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await expect(words(start)).toBeHidden();
+    // Tab inside the field goes on to the date's next part: seen in the digits.
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(words(start)).toBeVisible();
+    await start.focus();
+    await page.keyboard.press("Tab");
+    await expect(start).toBeFocused();
+    await expect(words(start)).toBeHidden();
+    // Left by a key, the field gives its room back.
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expect(start).not.toBeFocused();
+    await expect.poll(async () => (await start.boundingBox())!.width).toBe(narrow);
     // Alt and the arrow is the browser's shortcut for its picker: no typing.
     await end.focus();
     await page.keyboard.press("Alt+ArrowDown");
@@ -173,6 +186,7 @@ for (const [size, viewport] of [
     await expect(page.getByRole("listbox")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect.poll(async () => (await start.boundingBox())!.width).toBe(narrow);
     await start.focus();
     await page.keyboard.press("ArrowUp");
     await expect(start).not.toHaveValue("2026-11-04");

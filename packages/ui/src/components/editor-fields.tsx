@@ -334,16 +334,32 @@ export function DateField({
   // key that left the field is over: nothing changes size under a press.
   const [wide, setWide] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
+  // As the listeners below read them: whether it is typed in now, whether a
+  // press (not a key) left it, and whether Tab went down inside it.
+  const typed = useRef(false);
+  const leftByPress = useRef(false);
+  const tabbed = useRef(false);
+  const type = () => {
+    typed.current = true;
+    setTyping(true);
+    setWide(true);
+  };
   useEffect(() => {
-    if (!wide || typing) return;
-    const narrow = () => setWide(false);
-    window.addEventListener("click", narrow, true);
-    window.addEventListener("keyup", narrow, true);
-    return () => {
-      window.removeEventListener("click", narrow, true);
-      window.removeEventListener("keyup", narrow, true);
+    if (!wide) return;
+    // There from the key that made the room, so no leaving is missed. A key
+    // let go while a press that left the field is still down is not its end.
+    const narrow = (event: Event) => {
+      if (typed.current || (event.type === "keyup" && leftByPress.current)) return;
+      setWide(false);
     };
-  }, [wide, typing]);
+    const ends = ["click", "keyup", "pointercancel", "contextmenu"] as const;
+    for (const end of ends) window.addEventListener(end, narrow, true);
+    window.addEventListener("blur", narrow);
+    return () => {
+      for (const end of ends) window.removeEventListener(end, narrow, true);
+      window.removeEventListener("blur", narrow);
+    };
+  }, [wide]);
   return (
     // The row's look, and the press that opens the picker, are the wrapper's:
     // the field itself is not drawn under the words.
@@ -376,11 +392,23 @@ export function DateField({
         // Only a key that changes the date: not Tab coming in, Escape or
         // Enter from its picker, or a shortcut (Alt and the arrow opens it).
         onKeyDown={(e) => {
+          tabbed.current = e.key === "Tab";
           if (e.altKey || e.ctrlKey || e.metaKey || !EDITS.test(e.key)) return;
-          setTyping(true);
-          setWide(true);
+          type();
         }}
-        onBlur={() => setTyping(false)}
+        // Tab that stayed inside went on to the date's next part, which is
+        // seen only in the digits.
+        onKeyUp={(e) => {
+          if (e.key === "Tab" && tabbed.current && document.activeElement === e.currentTarget)
+            type();
+          tabbed.current = false;
+        }}
+        onBlur={() => {
+          typed.current = false;
+          leftByPress.current = document.documentElement.matches(":active");
+          setTyping(false);
+        }}
+        data-words={typing ? undefined : ""}
         className={`date-field absolute inset-0 size-full rounded-lg bg-transparent px-2 text-input text-ink outline-none [color-scheme:inherit] ${typing ? "" : "cursor-pointer opacity-0"}`}
       />
       {/* What the row shows, and its width. */}

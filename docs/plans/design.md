@@ -2749,11 +2749,14 @@ keywords". The quick parse and voice that fill quick create are the
     press anywhere on the words, a finger's too, opens its picker
     (`showPicker`, so in Firefox too), a screen reader and the keys reach
     it as before, and once a key changes the date (a digit, an arrow,
-    Backspace or Delete; not Tab coming in, Escape or Enter from the
-    picker, or a shortcut) its own digits show in place of the words until
-    the field is left, a press then being on a digit. The field makes room
+    Backspace or Delete, or Tab going on to the date's next part; not Tab
+    coming in, Escape or Enter from the picker, or a shortcut) its own
+    digits show in place of the words until the field is left, a press
+    then being on a digit, and the browser's calendar glyph there to open
+    the picker. The field makes room
     for its digits on that key, and gives it back only once the press or
-    key that left it is over, so nothing changes size under a press; a row
+    key that left it is over (or the window is left), so nothing changes
+    size under a press; a row
     still wraps anew when a date typed has longer words. A year of five digits,
     which has no words, is not taken. A date picker of our own is still
     [Deferred](#deferred).

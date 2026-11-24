@@ -457,8 +457,8 @@
 }
 
 /* A date field under its date in words (design D317, `DateField`): the
-   browser's calendar glyph is not drawn; a press on the field opens the
-   picker (`showPicker`). */
-.date-field::-webkit-calendar-picker-indicator {
+   browser's calendar glyph is not drawn, a press on the words opens the
+   picker (`showPicker`); typed in, the glyph is there to open it. */
+.date-field[data-words]::-webkit-calendar-picker-indicator {
   display: none;
 }
