@@ -66,6 +66,8 @@ export function ColorSelect({
   ownById = false,
   task = false,
   className,
+  caret,
+  swatch,
 }: {
   label: string;
   labelClassName?: string;
@@ -77,6 +79,9 @@ export function ColorSelect({
   /** A task's colour: its first entry is its list's colour (design D236). */
   task?: boolean;
   className?: string;
+  /** As `Select`'s: the button's arrow, and the colour's dot with it alone (design D317). */
+  caret?: boolean;
+  swatch?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   addTaskStrings(i18n);
@@ -131,6 +136,8 @@ export function ColorSelect({
       }
       options={options}
       {...(className === undefined ? {} : { className })}
+      {...(caret === undefined ? {} : { caret })}
+      {...(swatch === undefined ? {} : { swatch })}
     />
   );
 }

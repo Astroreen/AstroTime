@@ -1123,6 +1123,8 @@ Settings, the colours and the lists controls open.
   since deleted) by its generated name ([D170](#D170)), a CSS name by its
   hex's (`colorNameHex`), "Its own colour" only for what is no colour. A calendar's colour stays the server's: AstroTime does
   not change it (Deferred).
+  _Amended by [D317](#D317):_ in the edit dialog the dropdown's button is
+  as [D317](#D317) draws it, at the end of the calendar's row.
 - **D169. Week numbers can be turned off** (feedback 10: "a setting whether
   to show week numbers"). "Show week numbers", in Settings' views group
   after "Hide completed tasks", on unless turned off: today's look stays
@@ -1791,6 +1793,9 @@ reminders, its description and mentions in it.
   rest), so every icon stands 10 px from its row's top, level with its
   40 px control (`Section` in `editor-fields.tsx`). `editing.spec.ts` still
   measures it, on the edit dialog reached through quick create's "Expand".
+  _Amended by [D317](#D317):_ four rows are measured, by their first
+  control: the clock's (the start's date), a reminder, the calendar's and
+  Location; the repeat, "All day" and the colour have no icon of their own.
 
 - **D206. Reminders of the user's own; the menu offers the four most added**
   (the owner's feedback 2 after round 3: "Reminders must be dynamic. I want a
@@ -2597,6 +2602,8 @@ keywords". The quick parse and voice that fill quick create are the
   `apps/web/e2e/quick-create.spec.ts`.
   _Amended by [D315](#D315):_ "Save" stands at the end of the kind's row,
   not at the foot.
+  _Amended by [D317](#D317):_ its date reads in words (`DateField`) and its
+  times have no arrow; its calendar row keeps its arrow.
 - **D297. The full editor, lighter.** Its rows lose their boxes: each is an
   icon and its value on the dialog's ground, with no border or fill, as in
   Google Calendar's edit screen; groups are parted by a hairline. An empty
@@ -2614,6 +2621,9 @@ keywords". The quick parse and voice that fill quick create are the
   time and repeat; reminders; calendar and colour; place, description and
   attachments. "Add guests" has no row: the editor has no guests field
   ([Deferred](#deferred)).
+  _Amended by [D317](#D317):_ the hairlines went, "All day" and the colour
+  have no row of their own, the dropdowns no arrow, and a date reads in
+  words.
 - **D298. Pictures drawn to a higher standard.** The owner: "you can see
   mistakes (a snowdrift floating above the ground, a gap between a hill and
   a field) and the shapes they are made of". Every illustration and month
@@ -2664,6 +2674,8 @@ keywords". The quick parse and voice that fill quick create are the
   D122](foundation.md#D122)'s default does. A kind switched to one its
   calendar cannot hold moves to the same account's first calendar that
   can, before another account's, and keeps the ticks that take it.
+  _Amended by [D317](#D317):_ in the edit dialog the row has no dot of the
+  calendar's colour and no arrow; the item's colour stands at its end.
 - **D314. A new item in every account, a setting.** The owner: "by
   default a new event or task goes to one calendar; one can also choose
   to sync all calendars, so each has every task and event; then the
@@ -2712,6 +2724,69 @@ keywords". The quick parse and voice that fill quick create are the
   D171](foundation.md#D171)'s setting, off with its calm hint under the
   row), and its calendars fold under "N calendars", folded at first, the
   drawer's checkbox rows ([D137](#D137)) once opened.
+
+### Decided in round 8: the editor, lighter again
+
+- **D317. The edit dialog with less on it.** The owner, on the edit dialog
+  of an event and of a task: "it looks very heavy; maybe something should
+  go, move or be thought over". [D297](#D297) took the boxes off the rows;
+  what still weighed was the chrome around the values and the rows that
+  held one switch or one default. Every field, its name for a screen
+  reader, its behaviour and its tests stay; what changed is how the form
+  is drawn (`item-editor.tsx`, `editor-fields.tsx`):
+  - **No hairlines.** The rows follow each other at one distance; a row's
+    icon alone says where the next thing starts.
+  - **No arrows.** A row's dropdown (a time, the repeat, "Add a reminder",
+    the calendar's row) is its value alone, as in Google
+    Calendar's edit screen; pressed, it opens as before. A dropdown inside
+    a panel (the custom repeat's unit, the custom reminder's unit and
+    time) keeps its arrow: there it is a field among fields. Quick create's times lose
+    theirs too ([D296](#D296)), its calendar row keeps its arrow.
+  - **A date in words.** "Wed, Nov 4", with the year when it is not this
+    one, instead of the browser's "11/04/2026" and its calendar glyph
+    (`DateField`, in quick create and the custom repeat's last day too).
+    Under the words it is still the browser's date field, not drawn: a
+    press anywhere on the words, a finger's too, opens its picker
+    (`showPicker`, so in Firefox too), a screen reader and the keys reach
+    it as before, and once a key changes the date (a digit, an arrow,
+    Backspace or Delete, or Tab going on to the date's next part; not Tab
+    coming in, Escape or Enter from the picker, or a shortcut) its own
+    digits show in place of the words until the field is left, a press
+    then being on a digit, and the browser's calendar glyph there to open
+    the picker. The field makes room
+    for its digits on that key, and gives it back only once the press or
+    key that left it is over (or the window is left), so nothing changes
+    size under a press; a row
+    still wraps anew when a date typed has longer words. A year of five digits,
+    which has no words, is not taken. A date picker of our own is still
+    [Deferred](#deferred).
+  - **Start and end as one sentence.** "Wed, Nov 4 10:00 – Wed, Nov 4
+    11:30" on one line where there is room; where there is not (a narrow
+    phone, a large text size, a year shown) the end goes under the start,
+    and a time under its date before it is cut. An end on its start's day
+    is paler, as it says nothing new. Both dates stay in sight, so an
+    event over days needs no extra step. A task's due is one line, "Due"
+    before its date, no label above it, and wraps the same way, its ✕
+    always in sight.
+  - **"All day" at the end of the repeat's row**, a small switch with its
+    words, no row of its own, so it is reached and read after the dates
+    and the repeat, not before them; the repeat has no icon of its own, the
+    clock's row holds the whole "when". A long rule goes on to more lines
+    instead of being cut, and where the two do not fit (360 px at a large
+    text size) the switch goes under the rule.
+  - **The colour at the end of the calendar's row**, a dot with a small
+    arrow, which says it is pressed, that opens the same list
+    ([D168](#D168)), named "Colour" (and so titled). The
+    calendar's own dot beside its name went: the row shows one colour, the
+    item's. While a new item goes to every account and has no calendar row
+    ([D314](#D314)), the colour keeps a row of its own.
+
+  A new event on a phone is 10 rows where it was 12 (9 on a wide screen),
+  with 4 hairlines, 5 arrows and 2 icons fewer. The empty fields keep
+  their places as pale hints ([D297](#D297), [D237](#D237)): nothing is
+  folded away, so nothing takes a press more than before. Tested:
+  `editing.spec.ts` ("the lighter rows", a due in another year at 360 px,
+  and [D205](#D205)'s icons).
 
 ## Deferred
 
@@ -2941,9 +3016,14 @@ keywords". The quick parse and voice that fill quick create are the
   undone by dragging it back ([D111](#D111)).
 - **Keys between the strip and the grid** — a timed item made all day, or
   the other way, by a drag only ([D112](#D112)).
-- **Dates in the app's own format** — the edit dialog's date field is the
-  browser's, in its language and order; its times are a list in the user's
-  clock ([D108](#D108)).
+- **The date field on a phone's own browser** — [D317](#D317)'s press
+  that opens the picker (`showPicker`) was read in Chromium's and
+  Firefox's code and run in desktop Chromium; on Android's WebView, iOS
+  Safari and Firefox it is not yet tried on a device.
+- **Dates in the app's own format** — the edit dialog's date reads in
+  words in the app's language ([D317](#D317)); typed in, and in its
+  picker, it is still the browser's field, in the browser's language and
+  order. Its times are a list in the user's clock ([D108](#D108)).
 - **A view of starred tasks across lists** — the star is stored from PR 5
   ([D52](#D52)); a place that gathers starred tasks comes later.
 - **Search beyond titles** — descriptions, locations, attendees, and the
@@ -3071,6 +3151,12 @@ in both themes:
   reach it through quick create's "Expand" (one helper), so
   `editing.spec.ts` still measures D205 on the full editor; D132, D155 and
   D205 get their "amended by" notes (screenshots before and after).
+- **PR E1** — the edit dialog with less on it (D317). Done when: e2e reads
+  a date in words and its digits while typed, finds the end on its start's
+  line on a wide screen and under it on a phone, "All day" at the end of
+  the repeat's row and the colour at the end of the calendar's, and every
+  spec that edits through the dialog passes unchanged but D205's
+  (screenshots before and after, both themes).
 - **PR L3** — the pictures drawn again, and the new subjects (D298). Done
   when: every illustration and banner is rendered at its sizes and the gap
   check passes on each, and the screenshots before and after sit side by

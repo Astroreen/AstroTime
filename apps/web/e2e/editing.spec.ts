@@ -100,18 +100,17 @@ for (const [size, viewport] of [
     await dialog.getByRole("button", { name: "Add a reminder" }).click();
     await page.getByRole("menuitem", { name: "10 minutes before" }).click();
     const list = dialog.getByRole("list", { name: "Reminders" });
-    const allDay = dialog.getByRole("switch", { name: "All day" });
-    // Each control and the box its row's icon is levelled with: the switch's
-    // is its 40 px row, "All day" beside it.
-    const rows: (readonly [Locator, Locator?])[] = [
-      [allDay, allDay.locator("xpath=parent::label")],
-      [dialog.getByRole("combobox", { name: "Repeat" })],
-      [list.getByRole("listitem").first()],
-      [calendarField(dialog)],
-      [dialog.getByRole("combobox", { name: "Colour" })],
-      [dialog.getByRole("combobox", { name: "Location" })],
+    // Each row's first control: the clock's is the start's date, whose row
+    // holds the end, the repeat and "All day" too; the calendar's holds the
+    // colour (design D317).
+    const rows: Locator[] = [
+      dialog.getByLabel("Start date"),
+      list.getByRole("listitem").first(),
+      calendarField(dialog),
+      dialog.getByRole("combobox", { name: "Location" }),
     ];
-    for (const [control, measured = control] of rows) {
+    for (const control of rows) {
+      const measured = control;
       // The row's icon: the hidden one before the column the control is in.
       const icon = control.locator(
         "xpath=ancestor::div[contains(@class, 'items-start')][1]/span[@aria-hidden='true']",
@@ -124,6 +123,146 @@ for (const [size, viewport] of [
     }
   });
 }
+
+for (const [size, viewport] of [
+  ["phone", PHONE],
+  ["wide", WIDE],
+] as const) {
+  test(`the lighter rows on a ${size}: dates in words, the end by its start, the colour in the calendar's row (design D317)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openDemo(page, "week");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expand(page);
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    const start = dialog.getByLabel("Start date");
+    const end = dialog.getByLabel("End date");
+    const words = (field: Locator) => field.locator("xpath=following-sibling::span");
+    // A date reads in words, the year only when it is another.
+    await expect(words(start)).toHaveText("Wed, Nov 4");
+    const narrow = (await start.boundingBox())!.width;
+    // A press on the words asks the browser for its picker.
+    await page.evaluate(() => {
+      const asked = ((window as unknown as { asked: string[] }).asked = [] as string[]);
+      HTMLInputElement.prototype.showPicker = function () {
+        asked.push(this.getAttribute("aria-label") ?? "");
+      };
+    });
+    await words(start).click({ force: true });
+    expect(await page.evaluate(() => (window as unknown as { asked: string[] }).asked)).toEqual([
+      "Start date",
+    ]);
+    await end.fill("2027-01-05");
+    await expect(words(end)).toHaveText("Tue, Jan 5, 2027");
+    // Tab comes in with the words still there; a key that changes the date
+    // shows the field's own digits; left, the words again, of the new date.
+    const startTime = dialog.getByLabel("Start time");
+    await start.focus();
+    await page.keyboard.press("Shift");
+    await expect(words(start)).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(words(start)).toBeHidden();
+    // Tab inside the field goes on to the date's next part: seen in the digits.
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(words(start)).toBeVisible();
+    await start.focus();
+    await page.keyboard.press("Tab");
+    await expect(start).toBeFocused();
+    await expect(words(start)).toBeHidden();
+    // Left by a key, the field gives its room back.
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expect(start).not.toBeFocused();
+    await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
+    expect((await start.boundingBox())!.width).toBeCloseTo(narrow, 0);
+    // Tab coming in again, after Tab left: the words still.
+    await page.keyboard.press("Tab");
+    await expect(start).toBeFocused();
+    await expect(words(start)).toBeVisible();
+    // Alt and the arrow is the browser's shortcut for its picker: no typing.
+    await end.focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(words(end)).toBeVisible();
+    await start.focus();
+    await page.keyboard.press("ArrowRight");
+    // The field left by a press: nothing moves under it, so the first press counts.
+    await startTime.click();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(start.locator("xpath=parent::span")).not.toHaveClass(/min-w-/);
+    expect((await start.boundingBox())!.width).toBeCloseTo(narrow, 0);
+    await start.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(start).not.toHaveValue("2026-11-04");
+    // Emptied and left, the field holds its date again, as its words say.
+    await start.fill("2026-11-05");
+    await start.press("Backspace");
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(start).toHaveValue("2026-11-05");
+    await start.fill("2026-11-05");
+    await dialog.getByRole("textbox", { name: "Title" }).focus();
+    await expect(words(start)).toHaveText("Thu, Nov 5");
+    await start.fill("2026-11-04");
+    // The end stands on the start's line where there is room, under it on a phone.
+    await end.fill("2026-11-04");
+    const [first, second] = [await start.boundingBox(), await end.boundingBox()];
+    if (size === "wide") expect(second!.y).toBe(first!.y);
+    else expect(second!.y).toBeGreaterThanOrEqual(first!.y + first!.height);
+    // "All day" is at the end of the repeat's row, the colour at the end of the calendar's.
+    const level = async (one: Locator, other: Locator) => {
+      const [a, b] = [await one.boundingBox(), await other.boundingBox()];
+      expect(Math.abs(a!.y + a!.height / 2 - (b!.y + b!.height / 2))).toBeLessThanOrEqual(1);
+      expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+    };
+    await level(
+      dialog.getByRole("combobox", { name: "Repeat" }),
+      dialog.getByRole("switch", { name: "All day" }),
+    );
+    const colour = dialog.getByRole("combobox", { name: "Colour" });
+    await level(calendarField(dialog), colour);
+    await choose(colour, "Red");
+    await expect(colour).toHaveText("Red");
+  });
+}
+
+test("on a 360 px phone a task's due in another year keeps its time and its ✕ in sight (design D317)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await openDemo(page, "week");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expand(page);
+  await page
+    .getByRole("dialog", { name: "New event" })
+    .getByRole("radio", { name: "Task" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "New task" });
+  await dialog.getByRole("button", { name: "Add due" }).click();
+  await dialog.getByLabel("Due date").fill("2027-09-29");
+  await choose(dialog.getByLabel("Due time"), "12:00 PM");
+  // Nothing of the row is cut or pushed past the dialog's side.
+  for (const part of [
+    dialog.getByLabel("Due date"),
+    dialog.getByLabel("Due time"),
+    dialog.getByRole("button", { name: "Remove due" }),
+  ]) {
+    const box = await part.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(360 - 16);
+  }
+  const time = dialog.getByLabel("Due time");
+  expect(await time.evaluate((one) => one.scrollWidth <= one.clientWidth)).toBe(true);
+  // The date typed in, one press on the ✕ still removes the due.
+  await dialog.getByLabel("Due date").focus();
+  await page.keyboard.press("ArrowUp");
+  // A press on its digits is the field's own, at its end too: the due stays.
+  const digits = (await dialog.getByLabel("Due date").boundingBox())!;
+  await page.mouse.click(digits.x + digits.width - 4, digits.y + digits.height / 2);
+  await expect(dialog.getByLabel("Due date")).toBeFocused();
+  await dialog.getByRole("button", { name: "Remove due" }).click();
+  await expect(dialog.getByRole("button", { name: "Add due" })).toBeVisible();
+});
 
 test("the reminder menu offers four, the most added first; Custom… adds any amount before (design D206)", async ({
   page,

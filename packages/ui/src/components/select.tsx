@@ -19,7 +19,7 @@ export interface SelectOption {
 
 /** The button's own look; the caller gives its size and background. */
 const button =
-  "flex cursor-default items-center gap-2 text-left text-input text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent data-popup-open:ring-2 data-popup-open:ring-accent";
+  "flex cursor-default items-center text-left text-input text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent data-popup-open:ring-2 data-popup-open:ring-accent";
 
 /** The popup's look, which Location's place list shares (design D175). */
 export const popup =
@@ -41,6 +41,9 @@ export function Select({
   onChange,
   options,
   className = "",
+  caret = true,
+  swatch = false,
+  wrap = false,
 }: {
   label: string;
   labelClassName?: string;
@@ -49,6 +52,12 @@ export function Select({
   options: readonly SelectOption[];
   /** The button's size and background. */
   className?: string;
+  /** The arrow at the button's end; none in the edit dialog's rows (design D317). */
+  caret?: boolean;
+  /** The button shows the value's `leading` (and the arrow) alone, its label for a screen reader (design D317). */
+  swatch?: boolean;
+  /** A long value goes on to more lines instead of being cut (a repeat's rule, design D317). */
+  wrap?: boolean;
 }) {
   const { t } = useTranslation();
   const chosen = options.find((option) => option.value === value);
@@ -59,19 +68,37 @@ export function Select({
       )}
       <BaseSelect.Trigger
         aria-label={labelClassName === undefined ? label : undefined}
-        className={`${button} ${className}`}
+        title={swatch ? label : undefined}
+        className={`${button} ${swatch ? "gap-0.5" : "gap-2"} ${className}`}
       >
-        <BaseSelect.Value className="flex min-w-0 flex-1 items-center gap-2">
+        <BaseSelect.Value
+          className={
+            swatch ? "flex shrink-0 items-center" : "flex min-w-0 flex-1 items-center gap-2"
+          }
+        >
           {chosen?.leading}
           {chosen ? (
-            <span className="min-w-0 flex-1 truncate">{chosen.label}</span>
+            <span
+              className={
+                // Forced colours draw every dot alike: there the name shows.
+                swatch
+                  ? "sr-only forced-colors:not-sr-only forced-colors:pl-1"
+                  : `min-w-0 flex-1 ${wrap ? "" : "truncate"}`
+              }
+            >
+              {chosen.label}
+            </span>
           ) : (
-            <span className="min-w-0 flex-1 truncate text-ink-muted">{t("select.none")}</span>
+            <span className={swatch ? "sr-only" : "min-w-0 flex-1 truncate text-ink-muted"}>
+              {t("select.none")}
+            </span>
           )}
         </BaseSelect.Value>
-        <BaseSelect.Icon className="shrink-0 text-ink-muted">
-          <CaretIcon className="size-5" />
-        </BaseSelect.Icon>
+        {caret && (
+          <BaseSelect.Icon className="shrink-0 text-ink-muted">
+            <CaretIcon className="size-5" />
+          </BaseSelect.Icon>
+        )}
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner
@@ -118,12 +145,15 @@ export function MenuButton({
   onChoose,
   icon,
   className = "",
+  caret = true,
 }: {
   label: string;
   options: readonly SelectOption[];
   onChoose: (value: string) => void;
   icon?: ReactNode;
   className?: string;
+  /** The arrow at the button's end; none in the edit dialog's rows (design D317). */
+  caret?: boolean;
 }) {
   return (
     <Menu.Root>
@@ -132,9 +162,9 @@ export function MenuButton({
           {icon}
         </Menu.Trigger>
       ) : (
-        <Menu.Trigger className={`${button} ${className}`}>
+        <Menu.Trigger className={`${button} gap-2 ${className}`}>
           <span className="min-w-0 flex-1 truncate text-ink-muted">{label}</span>
-          <CaretIcon className="size-5 shrink-0 text-ink-muted" />
+          {caret && <CaretIcon className="size-5 shrink-0 text-ink-muted" />}
         </Menu.Trigger>
       )}
       <Menu.Portal>

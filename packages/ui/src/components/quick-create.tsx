@@ -37,6 +37,7 @@ import { DialogBackdrop, DialogPopup, dialogIcon } from "./dialog-parts.tsx";
 import { FLOATS_REM, shownDraft, useDraft } from "./draft-aside.ts";
 import {
   CalendarFields,
+  DateField,
   DateTime,
   field,
   KindSwitch,
@@ -272,13 +273,11 @@ function Fields({
           </>
         ) : (
           <>
-            <input
-              type="date"
-              aria-label={t("edit.startDate")}
+            <DateField
+              label={t("edit.startDate")}
               value={form.startDate}
-              required
-              onChange={(e) => e.target.value && onChange(withStartDate(form, e.target.value))}
-              className={field}
+              onChange={(date) => onChange(withStartDate(form, date))}
+              className="self-start"
             />
             {!form.allDay && (
               <div className="flex items-center gap-1">
@@ -286,7 +285,6 @@ function Fields({
                   label={t("edit.startTime")}
                   value={form.startTime}
                   onChange={(time) => onChange(withStartTime(form, time))}
-                  className="flex-1"
                 />
                 {event && (
                   <>
@@ -297,7 +295,6 @@ function Fields({
                       label={t("edit.endTime")}
                       value={form.endTime}
                       onChange={(endTime) => set({ endTime })}
-                      className="flex-1"
                     />
                   </>
                 )}
